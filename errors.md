@@ -335,3 +335,33 @@ These records describe local validation limits, not application failures.
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T00:13:19.319Z"},"status":"resolved","cause":"The token test was edited after the context fingerprints were refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-22T17:02:16.604Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-22T17:04:10.593Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-22T17:36:29.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-22T17:54:19.594Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T19:11:58.769Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T20:18:05.550Z","exitCode":1}
+```

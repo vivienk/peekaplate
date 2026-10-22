@@ -27,7 +27,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem; four weights; Inter family without a loaded font file) and the corner-radius scale (4-24px plus full). The ease-out curve is interim. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
+      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem; four weights; Inter family without a loaded font file), the corner-radius scale (4-24px plus full), the spacing scale (0-80px), three shadow levels, and the color palette (orange, neutral, gray, info, success, error, warning, plus white and black). Color roles map existing palette colors for the Button (action, outline, disabled, focus ring) and Navigation (circular back/next states) controls. The ease-out curve is interim. Surface and text roles, Chips, Card, Input and remaining interaction states remain pending approved Figma values.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -38,7 +38,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "12e5c345df683ab4cd32227a7a676384e43b70f5d6fd8be9637942ff3d271b1f"
+      "sourceFingerprint": "b24c5b988b1fff92dfb7e5f0853807b9fa70813b7fe21aeaa091e186695f62e7"
     },
     {
       "id": "diner",
