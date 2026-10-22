@@ -1,0 +1,22 @@
+[project]
+name = "processing"
+version = "0.1.0"
+description = "Menu-text extraction and validated dish drafts for PeekaPlate"
+readme = "README.md"
+authors = [
+    { name = "YACIINE 105", email = "mooml.intern@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic==2.14.1",
+    "pillow==12.3.0",
+    "pypdfium2==5.14.0",
+    "python-dotenv==1.2.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "peekaplate_processing"

@@ -75,6 +75,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Code quality and unit tests
         run: pnpm verify lint typecheck test
+      - name: Python processing tests and package
+        run: |
+          python3 -m venv "$RUNNER_TEMP/peekaplate-uv"
+          "$RUNNER_TEMP/peekaplate-uv/bin/pip" install --disable-pip-version-check uv==0.12.10
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --frozen
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --frozen python -m unittest discover -s processing/tests
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" build --project processing
       - run: pnpm verify build
       - name: Context freshness
         if: ${{ !cancelled() }}

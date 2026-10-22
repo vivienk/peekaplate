@@ -1,0 +1,12 @@
+Tomato Soup — 8.50 CAD
+Category: Starters
+Description: Slow-cooked tomato soup.
+Ingredients: tomatoes, onion, basil
+
+Garden Salad — $10.00
+Category: Starters
+Description: Crisp mixed leaves with lemon dressing.
+
+Name: Chef's Special
+Category: Mains
+Description: Ask your server about today's special.

@@ -187,7 +187,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9a5bd75d4724890e7c236f01a85bbaf9fd71963c5e0b3416c31e05aeecbfb984"
+      "sourceFingerprint": "44eab3e82e64e71d7b696ea8edc6586ac8469cacc4e02f9ab447599b323aa557"
     },
     {
       "id": "agents",
@@ -242,9 +242,70 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "sourceFingerprint": "47351eb70296f29fd4328beeb09f5bae752148a2973a902ed7a7624dce27f918"
+    },
+    {
+      "id": "processing",
+      "status": "foundation",
+      "summary": "Bounded Python ingestion with OCR.space Engine 3, source snapshots and needs_review drafts, plus offline frozen-report evaluation that never certifies acceptance. T0 asset preparation emits create-only, hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks a human-prepared layered sample against the T0 detail variant and keeps the approved photo as fallback. Manifests never self-approve: review stays needs_review and publication stays ineligible. 118 standard-library tests collect; three assert POSIX file modes that cannot hold on Windows and pass in the Linux CI job. No provider credential, accuracy benchmark, approved real photo or backend integration is supplied.",
+      "paths": [
+        "processing/.gitignore",
+        "processing/.python-version",
+        "processing/README.md",
+        "processing/evaluate_menu.py",
+        "processing/pyproject.toml",
+        "processing/src/peekaplate_processing/__init__.py",
+        "processing/src/peekaplate_processing/assets.py",
+        "processing/src/peekaplate_processing/captures.py",
+        "processing/src/peekaplate_processing/errors.py",
+        "processing/src/peekaplate_processing/extract_menus.py",
+        "processing/src/peekaplate_processing/harness.py",
+        "processing/src/peekaplate_processing/images.py",
+        "processing/src/peekaplate_processing/menu_text.py",
+        "processing/src/peekaplate_processing/ocr_regions.py",
+        "processing/src/peekaplate_processing/ocr_space.py",
+        "processing/src/peekaplate_processing/pdf.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/prepare_spatial.py",
+        "processing/src/peekaplate_processing/schemas.py",
+        "processing/src/peekaplate_processing/sources.py",
+        "processing/src/peekaplate_processing/spatial.py",
+        "processing/src/peekaplate_processing/storage.py",
+        "processing/src/peekaplate_processing/website.py",
+        "processing/tests/fixture_factory.py",
+        "processing/tests/fixtures/menu-photo-expected.txt",
+        "processing/tests/fixtures/menu.txt",
+        "processing/tests/fixtures/website-menu.html",
+        "processing/tests/test_assets.py",
+        "processing/tests/test_captures.py",
+        "processing/tests/test_configuration.py",
+        "processing/tests/test_evaluation.py",
+        "processing/tests/test_extract_menu.py",
+        "processing/tests/test_ingestion.py",
+        "processing/tests/test_ocr_regions.py",
+        "processing/tests/test_ocr_space.py",
+        "processing/tests/test_schemas.py",
+        "processing/tests/test_sources.py",
+        "processing/tests/test_spatial.py",
+        "processing/uv.lock",
+        "docs/asset-delivery.md"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0004-visual-tiers.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "bb00e059f8ae34b4c9eb895458f7dd9b347d7f4818dca11322f05a6ed91b0e9b"
     }
   ],
   "handoffs": [
+    {
+      "summary": "Ported preserved Python ingestion without importing the old application branch and added OCR overlay evidence and a frozen-report field evaluator. Added local T0 asset preparation and 2.5D feasibility validation for S3-VIS-03: create-only hash-addressed bundles with four variants, immutable source/revision references and processing state, plus layered-sample validation that keeps the approved photo as fallback through a dependency-free harness. Manifests never self-approve. Standard-library tests pass locally; source accuracy, approved real photos and full dependency/application verification remain pending.",
+      "modules": [
+        "processing",
+        "delivery"
+      ],
+      "next": "Run full CI, obtain human review, agree ingestion/review schema and rubric, then evaluate permitted representative sources using a privately configured OCR.space key. Prepare the permitted restaurant photos with real dish/revision identifiers and capture evidence, then record manifest hashes and byte totals for the PR. Keep the manifest JSON provisional until S3-ARC-01 freezes the TypeScript contract, align the fallback/publication fields with S3-RES-02, and obtain Vivien and Shirley rights and publication review. Hand source/error evidence to Uneeza and Sai."
+    },
     {
       "summary": "Updated deployment selection to main for both environments per the maintainer's explicit instruction. Configured verified non-secret staging account, issuer and Hyperdrive bindings. Provider audit found existing Supabase migrations, forced RLS, restricted staging login, an ES256 public key and uncached Hyperdrive; no duplicate database branch was created. Hosted request behavior remains unverified.",
       "modules": [
@@ -276,13 +337,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Finish exact-head review and CI for the local recovery PR. Keep the GitHub protection policy in a separate owner-action PR; stop before Cloudflare/Supabase integration until protected credentials are supplied."
     },
     {
-      "summary": "Corrected the design hyperlink in docs/team_guide.md to the owner-supplied Figma Make diner-menu V1 URL. No design or runtime behavior changed.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Use the linked Figma Make diner-menu V1 as the referenced design handoff."
-    },
-    {
       "summary": "Updated the final team_guide plan from the dated Team Interests & Responsibilities document. Proposed bounded contributions and explicit handoffs, distinguished preferences from confirmed assignments, and kept reported capacity and unfilled engineering work visible. Existing delivery dependencies and runtime behavior are unchanged.",
       "modules": [
         "delivery"
@@ -307,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     },
     {
-      "summary": "October 21, 2026: restricted pooler login and PostHog export recovered using a privately generated credential, official Supabase CA and hostname verification. Runs 01a15d4f-261f-0000-b88a-3f67d622bc39 and 01a15d53-eb5b-0000-0e3e-3ccb4c589db6 completed the October 20 06:00–07:00 UTC interval. Actual Supabase view: eight raw copies, four unique events, one matching diner/console record each. All 14 row/permission checks passed; hourly schedule enabled. No runtime, migration, grants or production change. Earlier failures remain in errors.md; original cache/mismatch cause unproven.",
+      "summary": "October 21, 2026: restricted pooler login and PostHog export recovered using a privately generated credential, official Supabase CA and hostname verification. Runs 01a15d4f-261f-0000-b88a-3f67d622bc39 and 01a15d53-eb5b-0000-0e3e-3ccb4c589db6 completed the October 20 06:00â€“07:00 UTC interval. Actual Supabase view: eight raw copies, four unique events, one matching diner/console record each. All 14 row/permission checks passed; hourly schedule enabled. No runtime, migration, grants or production change. Earlier failures remain in errors.md; original cache/mismatch cause unproven.",
       "modules": [
         "analytics",
         "database",
