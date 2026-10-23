@@ -4,6 +4,8 @@
 -- DRI: Louis Dieme | Reviewer: Jeffin Sam Joji
 -- =====================================================================
 
+CREATE EXTENSION IF NOT EXISTS pgtap;
+
 BEGIN; -- 1. Début de la transaction pour isoler les tests (Rollback à la fin)
 
 -- Déclaration du nombre de tests prévus par pgTAP
