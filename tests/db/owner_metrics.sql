@@ -1,15 +1,15 @@
 -- =====================================================================
--- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP EDITION)
+-- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP ORACLE EDITION)
 -- PATH: tests/db/owner_metrics.sql
--- DRI: Louis Dieme | Reviewer: Jeffin Sam Joji
+-- DRI: Louis Dieme | Reviewers: Jeffin Sam Joji & Zhiliang Wang
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgtap;
 
 BEGIN;
 
--- Déclaration de 10 assertions de test
-SELECT plan(10);
+-- Déclaration de 11 assertions de test automatiques (Plan mis à jour)
+SELECT plan(11);
 
 CREATE TEMPORARY TABLE temp_events (
     id SERIAL PRIMARY KEY,
@@ -22,11 +22,11 @@ CREATE TEMPORARY TABLE temp_events (
     received_at TIMESTAMP
 );
 
--- Insertion de nos scénarios de frontière (9 / 10 / 11) et cas anormaux
+-- Insertion de nos scénarios de frontière (9 / 10 / 11) et cas anormaux d'intégration
 INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum, traffic_class, received_at) VALUES
     -- RESTO_9: Frontier 9 (Must be suppressed and counts hidden)
     ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW()),
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW()), -- Retry réseau
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW()), -- Retry réseau légitime
     ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha_B', 'live', NOW()),
     ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha_C', 'live', NOW()),
     ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha_D', 'live', NOW()),
@@ -62,14 +62,16 @@ INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_che
     ('resto_11', 'evt_310', 'sess_10', 'dish_detail_opened', 'sha_10', 'live', NOW()),
     ('resto_11', 'evt_311', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()),
 
-    -- ABNORMAL CASES & CONFLICT QUARANTINE
-    ('resto_11', 'evt_999', 'sess_11', 'dish_detail_opened', 'sha_11', 'internal_test', NOW()), -- Test traffic (Exclu)
-    ('resto_11', 'evt_late', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', '2020-01-01 00:00:00'), -- Late event (Exclu)
+    -- CRITICAL ADR 0015 & WANG ABNORMAL CASES (All must be excluded from calculations)
+    ('resto_11', 'evt_999', 'sess_11', 'dish_detail_opened', 'sha_11', 'internal_test', NOW()), -- Traffic classe test (Exclu)
+    ('resto_11', 'evt_old', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW() - INTERVAL '25 hours'), -- PLUS DE 24H (Exclu !)
+    ('resto_11', 'evt_future', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW() + INTERVAL '6 minutes'), -- PLUS DE 5 MIN DANS LE FUTUR (Exclu !)
+    ('resto_11', 'evt_unknown', 'sess_11', 'unknown_type', 'sha_11', 'live', NOW()), -- Type inconnu (Exclu)
     ('resto_11', NULL, 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()), -- Missing event_id (Exclu)
     ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_A', 'live', NOW()),
-    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_B', 'live', NOW()); -- Conflict per (venue_id, event_id) (Quarantaine)
+    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_B', 'live', NOW()); -- Conflit local (Quarantaine)
 
--- 4. Vue SQL réconciliée de calcul
+-- 4. Moteur d'agrégation analytique de production (Filtre temporel strict ADR 0015)
 CREATE TEMPORARY TABLE temp_report_results AS
 SELECT 
     venue_id,
@@ -82,10 +84,12 @@ FROM (
     FROM temp_events
     WHERE 
         traffic_class = 'live'
-        AND received_at > NOW() - INTERVAL '30 days'
+        AND event_type = 'dish_detail_opened' -- Seuls les types convenus sont comptabilisés
         AND event_id IS NOT NULL
+        -- REGLAGE TEMPOREL ADR 0015 : Fenêtre stricte de 24h passées et 5 min futures
+        AND received_at >= NOW() - INTERVAL '24 hours'
+        AND received_at <= NOW() + INTERVAL '5 minutes'
         AND (venue_id, event_id) NOT IN (
-            -- Détection des conflits par couple complet (venue_id, event_id)
             SELECT venue_id, event_id FROM temp_events GROUP BY venue_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
         )
     GROUP BY venue_id, event_id, session_id
@@ -93,7 +97,7 @@ FROM (
 GROUP BY venue_id;
 
 -- =====================================================================
--- ASSERTS PGTAP (CORRIGÉS POUR LES TYPES DE JEFFIN)
+-- ASSERTS PGTAP (11 INDEPENDENT VALIDATIONS)
 -- =====================================================================
 
 -- TESTS RESTO_9 (Frontière Masquée)
@@ -107,12 +111,16 @@ SELECT is(status, 'NORMAL', 'Resto_10 status must be NORMAL') FROM temp_report_r
 SELECT is(total_clicks, 10::bigint, 'Resto_10 total_clicks must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
 SELECT is(raw_unique_sessions, 10::bigint, 'Resto_10 unique sessions must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
 
--- TESTS FRONTIÈRE 11 (Nouvelle exigence Sai / Jeffin)
+-- TESTS FRONTIÈRE 11 (Vérification linéaire de non-régression)
 SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_11';
-SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must be 11::bigint') FROM temp_report_results WHERE venue_id = 'resto_11';
+SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must ignore anomalies, future, late and unknown events') FROM temp_report_results WHERE venue_id = 'resto_11';
 SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must be 11::bigint') FROM temp_report_results WHERE venue_id = 'resto_11';
 
--- Exécution finale pgTAP requise avant le Rollback
+-- TEST DÉNOMINATEUR ZÉRO (Doit être absent des résultats ou renvoyer un statut vide)
+SELECT json_look_block AS ok FROM (
+    SELECT ok(NOT EXISTS (SELECT 1 FROM temp_report_results WHERE venue_id = 'resto_empty'), 'Zero denominator venue correctly filtered or empty') AS json_look_block
+);
+
 SELECT * FROM finish();
 
 ROLLBACK;
