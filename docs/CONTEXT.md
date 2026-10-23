@@ -68,7 +68,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies configured staff JWTs and current restaurant membership, executes atomic dish revisions under a restricted database role, provides staging/local-only team analytics GET endpoints, and provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and S3-VIS-01 structured candidate handoff). Staging API uses the Supabase issuer and uncached Hyperdrive. Staff approval and review boundary preserved; no direct live publication.",
+      "summary": "Hono Worker verifies configured staff JWTs and current restaurant membership, executes atomic dish revisions under a restricted database role, provides staging/local-only team analytics GET endpoints, and provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, HTML and native PDF text extraction, deterministic ranking, aggregate context limits, and S3-VIS-01 structured candidate handoff). Staging API uses the Supabase issuer and uncached Hyperdrive. Staff approval and review boundary preserved; no direct live publication.",
       "paths": [
         "backend/src/index.ts",
         "backend/src/index.test.ts",
@@ -107,7 +107,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "43b4855ec6ad26a18661aaeaa06af872ada37fc7d9be712691b863c4700078b1"
+      "sourceFingerprint": "fe03ec99e6fb341fbf8b0459ff0c311e9ab059a2ffae240280da053336757b85"
     },
     {
       "id": "database",

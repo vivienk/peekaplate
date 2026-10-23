@@ -4,6 +4,7 @@ import {
   type RetrievalRequest,
   RetrievalRequestSchema,
 } from '@peekaplate/contracts';
+import { extractText } from 'unpdf';
 import { type SafeFetchOptions, safeFetch } from './fetcher';
 import { type ExtractedSegment, parseHtmlSource, parsePlainTextSource } from './parser';
 import {
@@ -93,48 +94,139 @@ export async function retrieveMenuEvidence(
     }
   }
 
-  // 3. Process candidate URLs
-  if (request.candidate_urls && request.candidate_urls.length > 0) {
-    const urlsToFetch = request.candidate_urls.slice(0, maxFetchedSources);
-    for (let i = 0; i < urlsToFetch.length; i++) {
-      const url = urlsToFetch[i];
-      if (!url) continue;
-      const sourceId = `src_url_${i + 1}`;
+  // 3. Process candidate URLs and follow discovered menu links within one bound.
+  const maxSources = Math.min(
+    MAX_FETCHED_SOURCES,
+    Math.max(0, options.maxFetchedSources ?? MAX_FETCHED_SOURCES),
+  );
 
-      try {
-        const fetchResult = await safeFetch(url, options);
-        if (fetchResult.redirectCount > 0) {
-          warnings.push(`Source '${url}' redirected ${fetchResult.redirectCount} time(s)`);
+  const urlQueue = [...(request.candidate_urls ?? []).slice(0, maxSources)];
+  const queuedUrls = new Set(urlQueue);
+  const processedUrls = new Set<string>();
+  let fetchedSourceCount = 0;
+
+  for (let i = 0; i < urlQueue.length && fetchedSourceCount < maxSources; i++) {
+    const url = urlQueue[i];
+    if (!url || processedUrls.has(url)) continue;
+
+    processedUrls.add(url);
+    fetchedSourceCount++;
+
+    const sourceId = `src_url_${fetchedSourceCount}`;
+
+    try {
+      const fetchResult = await safeFetch(url, options);
+
+      if (fetchResult.redirectCount > 0) {
+        warnings.push(`Source '${url}' redirected ${fetchResult.redirectCount} time(s)`);
+      }
+
+      const contentType = fetchResult.contentType.toLowerCase();
+      const hasPdfMagicBytes =
+        fetchResult.bytes.length >= 5 &&
+        fetchResult.bytes[0] === 0x25 && // %
+        fetchResult.bytes[1] === 0x50 && // P
+        fetchResult.bytes[2] === 0x44 && // D
+        fetchResult.bytes[3] === 0x46 && // F
+        fetchResult.bytes[4] === 0x2d; // -
+
+      const isPdf =
+        contentType.includes('application/pdf') ||
+        /\.pdf(?:$|[?#])/i.test(fetchResult.finalUrl) ||
+        hasPdfMagicBytes;
+
+      const isHtml =
+        contentType.includes('text/html') ||
+        contentType.includes('application/xhtml+xml') ||
+        (!isPdf && fetchResult.content.trim().startsWith('<'));
+
+      if (isPdf) {
+        try {
+          const extracted = await extractText(fetchResult.bytes, {
+            mergePages: false,
+          });
+
+          let pageSegmentCount = 0;
+
+          for (let pageIndex = 0; pageIndex < extracted.text.length; pageIndex++) {
+            const pageText = extracted.text[pageIndex]?.trim();
+            if (!pageText) continue;
+
+            allSegments.push({
+              sourceId,
+              segment: {
+                segment_id: `${sourceId}#page-${pageIndex + 1}`,
+                text: pageText,
+                page_number: pageIndex + 1,
+                method: 'pdf_native',
+                is_menu_scope:
+                  /menu|appetizer|entree|main|dessert|beverage|dish|price|\$\s*\d+/i.test(pageText),
+              },
+            });
+
+            pageSegmentCount++;
+          }
+
+          if (pageSegmentCount === 0) {
+            warnings.push(
+              `PDF '${url}' contained no extractable text; scanned PDFs may require OCR`,
+            );
+          }
+
+          successfulSourceCount++;
+        } catch (err: unknown) {
+          failedSourceCount++;
+          warnings.push(
+            `Failed to extract text from PDF '${url}': ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      } else if (isHtml) {
+        const parsed = parseHtmlSource(fetchResult.content, sourceId, fetchResult.finalUrl);
+
+        for (const seg of parsed.segments) {
+          allSegments.push({ sourceId, segment: seg });
         }
 
-        const isHtml =
-          fetchResult.contentType.includes('text/html') ||
-          fetchResult.content.trim().startsWith('<');
+        warnings.push(...parsed.warnings);
 
-        if (isHtml) {
-          const parsed = parseHtmlSource(fetchResult.content, sourceId, fetchResult.finalUrl);
-          for (const seg of parsed.segments) {
-            allSegments.push({ sourceId, segment: seg });
+        // Follow discovered links only while the overall fetch budget permits.
+        for (const discoveredUrl of parsed.discoveredLinks) {
+          if (
+            urlQueue.length >= maxSources ||
+            queuedUrls.has(discoveredUrl) ||
+            processedUrls.has(discoveredUrl)
+          ) {
+            continue;
           }
-          warnings.push(...parsed.warnings);
-        } else {
-          const parsed = parsePlainTextSource(fetchResult.content, sourceId, 'text');
-          for (const seg of parsed.segments) {
-            allSegments.push({ sourceId, segment: seg });
-          }
-          warnings.push(...parsed.warnings);
+
+          urlQueue.push(discoveredUrl);
+          queuedUrls.add(discoveredUrl);
         }
 
         successfulSourceCount++;
-      } catch (err: unknown) {
-        failedSourceCount++;
-        if (err instanceof SecurityValidationError) {
-          warnings.push(`Security rejection for '${url}': ${err.message} (${err.code})`);
-        } else {
-          warnings.push(
-            `Failed to fetch candidate source '${url}': ${err instanceof Error ? err.message : String(err)}`,
-          );
+      } else {
+        const parsed = parsePlainTextSource(fetchResult.content, sourceId, 'text');
+
+        for (const seg of parsed.segments) {
+          allSegments.push({ sourceId, segment: seg });
         }
+
+        warnings.push(...parsed.warnings);
+        successfulSourceCount++;
+      }
+    } catch (err: unknown) {
+      failedSourceCount++;
+
+      if (err instanceof SecurityValidationError) {
+        warnings.push(`Security rejection for '${url}': ${err.message} (${err.code})`);
+      } else {
+        warnings.push(
+          `Failed to fetch candidate source '${url}': ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       }
     }
   }

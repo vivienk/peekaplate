@@ -32,6 +32,7 @@ export type SafeFetchOptions = {
 
 export type SafeFetchResult = {
   content: string;
+  bytes: Uint8Array;
   contentType: string;
   finalUrl: string;
   redirectCount: number;
@@ -43,7 +44,7 @@ export type SafeFetchResult = {
 async function readBoundedBody(
   response: Response,
   maxBytes: number,
-): Promise<{ text: string; size: number }> {
+): Promise<{ text: string; bytes: Uint8Array; size: number }> {
   // Check Content-Length header early if available
   const contentLengthHeader = response.headers.get('content-length');
   if (contentLengthHeader) {
@@ -57,7 +58,7 @@ async function readBoundedBody(
   }
 
   if (!response.body) {
-    return { text: '', size: 0 };
+    return { text: '', bytes: new Uint8Array(0), size: 0 };
   }
 
   const reader = response.body.getReader();
@@ -92,7 +93,12 @@ async function readBoundedBody(
   }
 
   const decoder = new TextDecoder('utf-8', { fatal: false });
-  return { text: decoder.decode(fullBuffer), size: totalBytes };
+
+  return {
+    text: decoder.decode(fullBuffer),
+    bytes: fullBuffer,
+    size: totalBytes,
+  };
 }
 
 /**
@@ -210,10 +216,11 @@ export async function safeFetch(
       const isHtml = contentType.includes('text/html');
       const maxAllowedBytes = isHtml ? MAX_HTML_BYTES : MAX_SOURCE_BYTES;
 
-      const { text } = await readBoundedBody(response, maxAllowedBytes);
+      const { text, bytes } = await readBoundedBody(response, maxAllowedBytes);
 
       return {
         content: text,
+        bytes,
         contentType,
         finalUrl: validatedUrl.toString(),
         redirectCount,
