@@ -387,3 +387,18 @@ These records describe local validation limits, not application failures.
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-23T04:26:49.229Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-23T04:47:01.875Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-23T04:54:23.339Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-23T04:57:34.176Z","exitCode":1}
+```

@@ -186,7 +186,7 @@ describe('design tokens', () => {
       '--pp-role-nav-hover-bg': 'var(--pp-color-orange-500)',
       '--pp-role-nav-pressed-bg': 'var(--pp-color-neutral-950)',
       '--pp-role-nav-disabled-bg': 'var(--pp-color-neutral-600)',
-      
+
       '--pp-role-primary': 'var(--pp-color-orange-500)',
       '--pp-role-on-primary': 'var(--pp-color-orange-950)',
       '--pp-role-primary-container': 'var(--pp-color-orange-800)',
@@ -215,11 +215,11 @@ describe('design tokens', () => {
       '--pp-role-on-information': 'var(--pp-color-info-900)',
       '--pp-role-information-container': 'var(--pp-color-info-800)',
       '--pp-role-on-information-container': 'var(--pp-color-info-100)',
-      '--pp-role-button-text-hover': 'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
+      '--pp-role-button-text-hover':
+        'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
       '--pp-role-button-disabled-border': 'var(--pp-color-neutral-600)',
       '--pp-role-button-outlined-pressed': 'var(--pp-color-neutral-600)',
       '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
-     
     });
 
     for (const value of Object.values(roles)) {

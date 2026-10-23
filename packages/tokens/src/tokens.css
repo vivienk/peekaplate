@@ -206,13 +206,7 @@
   --pp-role-nav-hover-bg: var(--pp-color-orange-500);
   --pp-role-nav-pressed-bg: var(--pp-color-neutral-950);
   --pp-role-nav-disabled-bg: var(--pp-color-neutral-600);
-  /* Chips: menu filter pills. The inactive chip has no fill. Shape uses --pp-radius-full
-     and padding uses --pp-space-12 and --pp-space-4. */
-  --pp-role-chip-selected-bg: var(--pp-color-neutral-50);
-  --pp-role-chip-selected-text: var(--pp-color-neutral-800);
-  --pp-role-chip-unselected-text: var(--pp-color-neutral-50);
-  --pp-role-chip-border: color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent);
-  
+
   --pp-role-primary: var(--pp-color-orange-500);
   --pp-role-on-primary: var(--pp-color-orange-950);
   --pp-role-primary-container: var(--pp-color-orange-800);
@@ -243,7 +237,7 @@
   --pp-role-on-information-container: var(--pp-color-info-100);
   --pp-role-button-text-hover: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
   --pp-role-button-disabled-border: var(--pp-color-neutral-600);
-  --pp-role-button-outlined-pressed: va(--pp-color-neutral-600);
+  --pp-role-button-outlined-pressed: var(--pp-color-neutral-600);
   --pp-role-nav-icon-disabled: var(--pp-color-neutral-400);
 }
 
