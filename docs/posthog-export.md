@@ -18,13 +18,13 @@ Destination `01a15822-9737-0001-7711-d5a784eb2635` exports Events hourly, includ
 
 Earlier attempts failed certificate verification, then a missing database password, then password authentication. A privately generated replacement credential was set by the operator and verified through an independent PostgreSQL connection before the successful hosted exports. The original authentication mismatch/cache cause was not established. Inspect individual runs and database rows: an earlier backfill wrapper showed “Completed” while its underlying run failed.
 
-These checks prove the bounded synthetic transfer and retry behavior. The next automatic hourly run, sustained monitoring, production traffic and account-specific spending limits have not been verified.
+These checks prove the bounded synthetic transfer and retry behavior. On October 22, the run history showed subsequent hourly runs completing successfully; the latest inspected run was `01a1672c-5761-0000-4453-2b83d1fc11dd`. Recent windows exported zero rows, so they establish successful scheduled execution, not new diner activity or completeness. A fresh read-only Supabase audit still found eight raw copies and four deduplicated events. Sustained monitoring, production traffic and account-specific spending limits have not been verified.
 
 The diner and console staging sites already send optional shell-view observations to PostHog after consent. Real menu controls and the durable diner-evidence pipeline are separate tickets.
 
 ## What this adds
 
-[ADR 0014](adr/0014-team-analytics-access.md) adds a narrow internal inspection API: approved staging readers can request redacted events/counts through a checked database function. The application runtime still has no direct analytics-schema access, and owners receive no access to these records. See [team access and release steps](team-data-access.md); availability requires its forward migration and Worker release.
+[ADR 0014](adr/0014-team-analytics-access.md) adds a narrow internal inspection API: current repository collaborators can request redacted events/counts through a checked database function using their own GitHub identity. The application runtime still has no direct analytics-schema access, and owners receive no access to these records. Migration and Worker deployment are complete; hosted positive reads passed. See [team access and remaining 403 checks](team-data-access.md).
 
 ```mermaid
 flowchart LR
