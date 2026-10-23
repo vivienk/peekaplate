@@ -19,3 +19,4 @@ Accepted decisions express intent, not proof of completed implementation. Review
 
 - [0011 — Deploy staging from the staging branch](0011-staging-environment-branch.md) — Accepted; supersedes ADR 0010 branch selection.
 - [0012 — Promote a main commit through staging and production](0012-main-environment-promotion.md) — Accepted; supersedes deployment branch selection in ADRs 0010 and 0011.
+- [0015 — Integration contracts and owner-evidence boundary](0015-integration-contracts-and-owner-evidence.md) — Proposed; S3-ARC-01 approval required.
