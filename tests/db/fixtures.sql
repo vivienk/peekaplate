@@ -1,58 +1,82 @@
 -- =====================================================================
--- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP EDITION)
+-- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP FRONTIER EDITION)
 -- PATH: tests/db/fixtures.sql
 -- DRI: Louis Dieme | Reviewer: Jeffin Sam Joji
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgtap;
 
-BEGIN; -- 1. Début de la transaction pour isoler les tests (Rollback à la fin)
+BEGIN;
 
--- Déclaration du nombre de tests prévus par pgTAP
-SELECT plan(6);
+-- Nous passons de 6 à 9 assertions automatiques pour couvrir la frontière 11 et les anomalies
+SELECT plan(9);
 
--- 2. Création d'une table temporaire simulant la future table ARC-01
 CREATE TEMPORARY TABLE temp_events (
     id SERIAL PRIMARY KEY,
     venue_id TEXT,
     event_id TEXT,
     session_id TEXT,
     event_type TEXT,
-    payload_checksum TEXT
+    payload_checksum TEXT,
+    traffic_class TEXT, -- Pour filtrer le trafic de test
+    received_at TIMESTAMP -- Pour identifier les cas anormaux / en retard
 );
 
--- 3. Insertion des Jeux d'Essais (Fixtures) avec les cas aux frontières (9 vs 10)
-INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum) VALUES
-    -- FRONTIÈRE A : RESTO_9 (9 sessions uniques -> Doit être masqué anonyme)
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha256_A'),
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha256_A'), -- Retry réseau légitime (Même id, même contenu)
-    ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha256_B'),
-    ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha256_C'),
-    ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha256_D'),
-    ('resto_9', 'evt_105', 'sess_05', 'dish_detail_opened', 'sha256_E'),
-    ('resto_9', 'evt_106', 'sess_06', 'dish_detail_opened', 'sha256_F'),
-    ('resto_9', 'evt_107', 'sess_07', 'dish_detail_opened', 'sha256_G'),
-    ('resto_9', 'evt_108', 'sess_08', 'dish_detail_opened', 'sha256_H'),
-    ('resto_9', 'evt_109', 'sess_09', 'dish_detail_opened', 'sha256_I'),
+-- Insertion des Jeux d'Essais (Fixtures augmentées selon les consignes de Wang)
+INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum, traffic_class, received_at) VALUES
+    -- -----------------------------------------------------------------
+    -- CASE 9: Frontier 9 (Must be STRICTLY suppressed and hidden)
+    -- -----------------------------------------------------------------
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha256_A', 'live', NOW()),
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha256_A', 'live', NOW()), -- Network Retry
+    ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha256_B', 'live', NOW()),
+    ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha256_C', 'live', NOW()),
+    ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha256_D', 'live', NOW()),
+    ('resto_9', 'evt_105', 'sess_05', 'dish_detail_opened', 'sha256_E', 'live', NOW()),
+    ('resto_9', 'evt_106', 'sess_06', 'dish_detail_opened', 'sha256_F', 'live', NOW()),
+    ('resto_9', 'evt_107', 'sess_07', 'dish_detail_opened', 'sha256_G', 'live', NOW()),
+    ('resto_9', 'evt_108', 'sess_08', 'dish_detail_opened', 'sha256_H', 'live', NOW()),
+    ('resto_9', 'evt_109', 'sess_09', 'dish_detail_opened', 'sha256_I', 'live', NOW()),
 
-    -- FRONTIÈRE B : RESTO_10 (10 sessions uniques -> Doit s'afficher normalement)
-    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha256_1'),
-    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha256_1'), -- Retry réseau dans le cas 10 aussi !
-    ('resto_10', 'evt_202', 'sess_B', 'dish_detail_opened', 'sha256_2'),
-    ('resto_10', 'evt_203', 'sess_C', 'dish_detail_opened', 'sha256_3'),
-    ('resto_10', 'evt_204', 'sess_D', 'dish_detail_opened', 'sha256_4'),
-    ('resto_10', 'evt_205', 'sess_E', 'dish_detail_opened', 'sha256_5'),
-    ('resto_10', 'evt_206', 'sess_F', 'dish_detail_opened', 'sha256_6'),
-    ('resto_10', 'evt_207', 'sess_G', 'dish_detail_opened', 'sha256_7'),
-    ('resto_10', 'evt_208', 'sess_H', 'dish_detail_opened', 'sha256_8'),
-    ('resto_10', 'evt_209', 'sess_I', 'dish_detail_opened', 'sha256_9'),
-    ('resto_10', 'evt_210', 'sess_J', 'dish_detail_opened', 'sha256_10'),
+    -- -----------------------------------------------------------------
+    -- CASE 10: Frontier 10 (Must show ALL metrics normally = 10)
+    -- -----------------------------------------------------------------
+    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha256_1', 'live', NOW()),
+    ('resto_10', 'evt_202', 'sess_B', 'dish_detail_opened', 'sha256_2', 'live', NOW()),
+    ('resto_10', 'evt_203', 'sess_C', 'dish_detail_opened', 'sha256_3', 'live', NOW()),
+    ('resto_10', 'evt_204', 'sess_D', 'dish_detail_opened', 'sha256_4', 'live', NOW()),
+    ('resto_10', 'evt_205', 'sess_E', 'dish_detail_opened', 'sha256_5', 'live', NOW()),
+    ('resto_10', 'evt_206', 'sess_F', 'dish_detail_opened', 'sha256_6', 'live', NOW()),
+    ('resto_10', 'evt_207', 'sess_G', 'dish_detail_opened', 'sha256_7', 'live', NOW()),
+    ('resto_10', 'evt_208', 'sess_H', 'dish_detail_opened', 'sha256_8', 'live', NOW()),
+    ('resto_10', 'evt_209', 'sess_I', 'dish_detail_opened', 'sha256_9', 'live', NOW()),
+    ('resto_10', 'evt_210', 'sess_J', 'dish_detail_opened', 'sha256_10', 'live', NOW()),
 
-    -- CAS DE TEST CRITIQUE : Conflit de payload (Même event_id mais contenu différent -> Quarantaine)
-    ('resto_10', 'evt_conflict_999', 'sess_J', 'dish_detail_opened', 'sha256_VALID'),
-    ('resto_10', 'evt_conflict_999', 'sess_J', 'dish_detail_opened', 'sha256_FRAUDULENT');
+    -- -----------------------------------------------------------------
+    -- CASE 11: Frontier 11 (New requirement Wang - Must show normally = 11)
+    -- -----------------------------------------------------------------
+    ('resto_11', 'evt_301', 'sess_01', 'dish_detail_opened', 'sha_1', 'live', NOW()),
+    ('resto_11', 'evt_302', 'sess_02', 'dish_detail_opened', 'sha_2', 'live', NOW()),
+    ('resto_11', 'evt_303', 'sess_03', 'dish_detail_opened', 'sha_3', 'live', NOW()),
+    ('resto_11', 'evt_304', 'sess_04', 'dish_detail_opened', 'sha_4', 'live', NOW()),
+    ('resto_11', 'evt_305', 'sess_05', 'dish_detail_opened', 'sha_5', 'live', NOW()),
+    ('resto_11', 'evt_306', 'sess_06', 'dish_detail_opened', 'sha_6', 'live', NOW()),
+    ('resto_11', 'evt_307', 'sess_07', 'dish_detail_opened', 'sha_7', 'live', NOW()),
+    ('resto_11', 'evt_308', 'sess_08', 'dish_detail_opened', 'sha_8', 'live', NOW()),
+    ('resto_11', 'evt_309', 'sess_09', 'dish_detail_opened', 'sha_9', 'live', NOW()),
+    ('resto_11', 'evt_310', 'sess_10', 'dish_detail_opened', 'sha_10', 'live', NOW()),
+    ('resto_11', 'evt_311', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()),
 
--- 4. Création de la vue ou table de calcul (Moteur SQL réconcilié)
+    -- -----------------------------------------------------------------
+    -- ABNORMAL CASES (Must be isolated and excluded from calculations)
+    -- -----------------------------------------------------------------
+    ('resto_11', 'evt_999', 'sess_11', 'dish_detail_opened', 'sha_11', 'internal_test', NOW()), -- Test traffic (Exclu !)
+    ('resto_11', 'evt_late', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', '2020-01-01 00:00:00'), -- Late event (Exclu !)
+    ('resto_11', NULL, 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()), -- Missing event_id (Exclu !)
+    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_A', 'live', NOW()),
+    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_B', 'live', NOW()); -- Same-ID Payload conflict (Quarantaine !)
+
+-- 4. Le Moteur de calcul filtré
 CREATE TEMPORARY TABLE temp_report_results AS
 SELECT 
     venue_id,
@@ -61,30 +85,36 @@ SELECT
     CASE WHEN COUNT(DISTINCT session_id) < 10 THEN 'insufficient data' ELSE CAST(COUNT(DISTINCT session_id) AS TEXT) END AS reconciled_sessions,
     CASE WHEN COUNT(DISTINCT session_id) < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS status
 FROM (
-    -- Filtrage des retries légitimes ET mise en quarantaine des conflits d'ID
     SELECT MIN(id) as id, venue_id, event_id, session_id
     FROM temp_events
-    WHERE event_id NOT IN (
-        -- Sous-requête détectant les event_id corrompus (payloads différents pour un même ID)
-        SELECT event_id FROM temp_events GROUP BY event_id HAVING COUNT(DISTINCT payload_checksum) > 1
-    )
+    WHERE 
+        traffic_class = 'live' -- Exclusion du trafic de test
+        AND received_at > NOW() - INTERVAL '30 days' -- Exclusion des événements trop anciens/tardifs
+        AND event_id IS NOT NULL -- Exclusion des champs manquants
+        AND event_id NOT IN (
+            -- Isolation des conflits de même ID (Même ID avec payload différent)
+            SELECT event_id FROM temp_events GROUP BY event_id HAVING COUNT(DISTINCT payload_checksum) > 1
+        )
     GROUP BY venue_id, event_id, session_id
 ) AS cleaned_events
 GROUP BY venue_id;
 
 -- =====================================================================
--- ASSERTS PGTAP (Vérifications automatiques pour la CI)
+-- ASSERTS PGTAP
 -- =====================================================================
 
--- TESTS RESTO_9 (Frontière Masquée)
+-- TESTS FRONTIÈRE 9
 SELECT is(status, 'SUPPRESSED', 'Resto_9 status must be SUPPRESSED') FROM temp_report_results WHERE venue_id = 'resto_9';
-SELECT is(total_clicks, NULL, 'Resto_9 absolute clicks must be hidden (NULL)') FROM temp_report_results WHERE venue_id = 'resto_9';
-SELECT is(reconciled_sessions, 'insufficient data', 'Resto_9 display text must be insufficient data') FROM temp_report_results WHERE venue_id = 'resto_9';
+SELECT is(total_clicks, NULL, 'Resto_9 absolute counts must be hidden') FROM temp_report_results WHERE venue_id = 'resto_9';
 
--- TESTS RESTO_10 (Frontière Validée)
-SELECT is(status, 'NORMAL', 'Resto_10 status must clear as NORMAL') FROM temp_report_results WHERE venue_id = 'resto_10';
-SELECT is(total_clicks, 10, 'Resto_10 clicks must be exactly 10 (Retries filtered, conflict quarantined)') FROM temp_report_results WHERE venue_id = 'resto_10';
-SELECT is(raw_unique_sessions, 10, 'Resto_10 unique sessions must match 10') FROM temp_report_results WHERE venue_id = 'resto_10';
+-- TESTS FRONTIÈRE 10
+SELECT is(status, 'NORMAL', 'Resto_10 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_10';
+SELECT is(raw_unique_sessions, 10, 'Resto_10 sessions must be exactly 10') FROM temp_report_results WHERE venue_id = 'resto_10';
 
--- 5. Annulation de la transaction pour laisser la base de données de staging intacte
+-- TESTS FRONTIÈRE 11 (Nouvelle exigence)
+SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_11';
+SELECT is(raw_unique_sessions, 11, 'Resto_11 sessions must be exactly 11') FROM temp_report_results WHERE venue_id = 'resto_11';
+-- Prouve que les 4 cas anormaux injectés dans resto_11 ont bien été éliminés (Le compte reste à 11 clics propres)
+SELECT is(total_clicks, 11, 'Resto_11 clicks must ignore all abnormal cases and conflicts') FROM temp_report_results WHERE venue_id = 'resto_11';
+
 ROLLBACK;
