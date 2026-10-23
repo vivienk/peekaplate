@@ -352,3 +352,13 @@ These records describe local validation limits, not application failures.
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T00:13:19.319Z"},"status":"resolved","cause":"The token test was edited after the context fingerprints were refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
 ```
+
+## October 22 staging activation verification
+
+```json
+{"id": "OBS-20261022-STAGING-AUDIT-001", "status": "resolved", "area": "hosted-verification-tooling", "observation": "Attaching an old Supabase SQL tab timed out during browser focus setup. A first local migration read also used a nonexistent singular filename; one documentation patch failed its ledger context check before applying.", "cause": "The existing SQL browser tab could not be attached; its underlying browser cause was not established. Local reads/patch context did not match the actual repository paths/text.", "prevention": "Open a fresh tab in the same authorized browser for a stale tab, inspect actual migration paths, and verify file context before applying a patch. Do not infer a provider outage or alter database permissions from a browser attachment failure.", "regression": "A fresh SQL tab completed a read-only transaction: all eleven catalog/permission assertions passed and eight raw/four deduplicated events remained. Corrected paths/patch context were used; pnpm check passed; a trailing blank line introduced in this ledger was removed before the final diff check."}
+```
+
+```json
+{"kind": "resolution", "references": {"id": "OBS-20261021-GITHUB-ENV-001"}, "status": "resolved", "cause": "Vivien configured the protected staging environment and credentials after the earlier administrator-access block.", "regression": "Run 39907285014 completed after an eligible separate reviewer approved it. Both hosted analytics GET endpoints returned 200 for hemu77; no secret value was published.", "remaining": "Valid non-collaborator and controlled collaborator-removal hosted 403 checks remain deferred; this resolution does not mark full hosted acceptance complete."}
+```
