@@ -81,6 +81,7 @@ describe('design tokens', () => {
       '--pp-shadow-small': '0 8px 12px rgba(34, 34, 34, 0.08)',
       '--pp-shadow-medium': '0 8px 12px rgba(34, 34, 34, 0.1)',
       '--pp-shadow-large': '0 8px 12px rgba(34, 34, 34, 0.14)',
+      '--pp-shadow-chip': '0 1px 2px rgba(0, 0, 0, 0.12)',
     });
   });
 
@@ -107,7 +108,7 @@ describe('design tokens', () => {
       '--pp-color-neutral-400': '#a1a3aa',
       '--pp-color-neutral-500': '#71737a',
       '--pp-color-neutral-600': '#52555c',
-      '--pp-color-neutral-700': '#3e414a',
+      '--pp-color-neutral-700': '#2d3038',
       '--pp-color-neutral-800': '#2a2d36',
       '--pp-color-neutral-900': '#171921',
       '--pp-color-neutral-950': '#07080e',
@@ -185,6 +186,40 @@ describe('design tokens', () => {
       '--pp-role-nav-hover-bg': 'var(--pp-color-orange-500)',
       '--pp-role-nav-pressed-bg': 'var(--pp-color-neutral-950)',
       '--pp-role-nav-disabled-bg': 'var(--pp-color-neutral-600)',
+      
+      '--pp-role-primary': 'var(--pp-color-orange-500)',
+      '--pp-role-on-primary': 'var(--pp-color-orange-950)',
+      '--pp-role-primary-container': 'var(--pp-color-orange-800)',
+      '--pp-role-on-primary-container': 'var(--pp-color-orange-100)',
+      '--pp-role-surface': 'var(--pp-color-neutral-800)',
+      '--pp-role-surface-container': 'var(--pp-color-neutral-700)',
+      '--pp-role-on-surface': 'var(--pp-color-neutral-50)',
+      '--pp-role-on-surface-variant': 'var(--pp-color-gray-400)',
+      '--pp-role-outline': 'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
+      '--pp-role-outline-solid': 'var(--pp-color-neutral-500)',
+      '--pp-role-outline-variant': 'var(--pp-color-neutral-700)',
+      '--pp-role-text-secondary': 'var(--pp-color-neutral-200)',
+      '--pp-role-error': 'var(--pp-color-error-400)',
+      '--pp-role-on-error': 'var(--pp-color-error-900)',
+      '--pp-role-error-container': 'var(--pp-color-error-800)',
+      '--pp-role-on-error-container': 'var(--pp-color-error-100)',
+      '--pp-role-success': 'var(--pp-color-success-400)',
+      '--pp-role-on-success': 'var(--pp-color-success-900)',
+      '--pp-role-success-container': 'var(--pp-color-success-800)',
+      '--pp-role-on-success-container': 'var(--pp-color-success-100)',
+      '--pp-role-warning': 'var(--pp-color-warning-400)',
+      '--pp-role-on-warning': 'var(--pp-color-warning-900)',
+      '--pp-role-warning-container': 'var(--pp-color-warning-800)',
+      '--pp-role-on-warning-container': 'var(--pp-color-warning-100)',
+      '--pp-role-information': 'var(--pp-color-info-400)',
+      '--pp-role-on-information': 'var(--pp-color-info-900)',
+      '--pp-role-information-container': 'var(--pp-color-info-800)',
+      '--pp-role-on-information-container': 'var(--pp-color-info-100)',
+      '--pp-role-button-text-hover': 'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
+      '--pp-role-button-disabled-border': 'var(--pp-color-neutral-600)',
+      '--pp-role-button-outlined-pressed': 'var(--pp-color-neutral-600)',
+      '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
+     
     });
 
     for (const value of Object.values(roles)) {
