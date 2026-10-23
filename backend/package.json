@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./retrieval": "./src/retrieval/index.ts"
+  },
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
     "local": "node local.mjs",
@@ -14,7 +18,8 @@
     "@peekaplate/contracts": "workspace:*",
     "hono": "4.13.13",
     "jose": "6.2.12",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "unpdf": "1.8.1"
   },
   "devDependencies": {
     "@types/pg": "8.23.1",
