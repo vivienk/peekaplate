@@ -26,6 +26,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "sourceFingerprint": "17b4bf0b98b5808aa805cf10b4ad7763069bdde6194a2a5614cdeb422f0868e9"
     },
     {
+      "id": "tokens",
+      "status": "foundation",
+      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem; four weights; Inter family without a loaded font file) and the corner-radius scale (4-24px plus full). The ease-out curve is interim. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
+      "paths": [
+        "packages/tokens/package.json",
+        "packages/tokens/src/tokens.css",
+        "packages/tokens/src/tokens.test.ts"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0004-visual-tiers.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "12e5c345df683ab4cd32227a7a676384e43b70f5d6fd8be9637942ff3d271b1f"
+    },
+    {
       "id": "diner",
       "status": "foundation",
       "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. See docs/posthog.md for activation and evidence limits.",
@@ -43,9 +59,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [
-        "contracts"
+        "contracts",
+        "tokens"
       ],
-      "sourceFingerprint": "277a8be5e4b45ef41eba68d87907024a6aa89c030677e64af388f97f6d5f5221"
+      "sourceFingerprint": "0f8777025be9ef1375b19fc580f5a200826465b2b8acfb44021d9f8156f1cc02"
     },
     {
       "id": "console",
@@ -62,9 +79,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [
-        "contracts"
+        "contracts",
+        "tokens"
       ],
-      "sourceFingerprint": "76fee1388a2aa45d7ffaf13527a727816305f7038d4f48e0d17cb00181145893"
+      "sourceFingerprint": "f8c87694012c4d8b67d4947f635d6453235bb8fb2494448b2b5a487f1adca2f0"
     },
     {
       "id": "backend",
@@ -249,6 +267,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Started S3-TOK-01 with a shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides, the Design System text-style scale and weights, and the corner-radius scale, with tests for values, token groups and both imports. No color or component token was invented; shells are not restyled.",
+      "modules": [
+        "tokens",
+        "diner",
+        "console"
+      ],
+      "next": "Confirm the custom ease-out curve, licensed brand font, H2/footer weight typos and semantic token names with Rania. Spacing and elevation are proposed for Harshita; then add approved color and interaction-state tokens and the Button/Card/Input/Typography/Navigation foundations."
+    },
+    {
       "summary": "October 22 staging activation is deployed: main afe45db, protected run 39907285014 and Worker 5922a293-6893-47fd-8bc5-a20f0afd8d0b. Fourteen live HTTP checks passed using the maintainer individual GitHub credential; eleven read-only database assertions passed, including migration history and restricted grants. Hyperdrive caching is disabled; recent hourly export runs completed with no new rows, existing eight raw/four unique records unchanged. README, team guide, access/export runbooks and operations now distinguish deployed diagnostics from planned owner reporting. No runtime, grant, schema or deployment change in this documentation handoff.",
       "modules": [
         "backend",
@@ -318,15 +345,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the linked Figma Make diner-menu V1 as the referenced design handoff."
-    },
-    {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     }
   ]
 }
