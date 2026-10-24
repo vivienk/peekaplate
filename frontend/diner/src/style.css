@@ -1,3 +1,5 @@
+@import "@peekaplate/tokens/tokens.css";
+
 :root {
   font-family: system-ui, sans-serif;
   color: #f7f1e7;

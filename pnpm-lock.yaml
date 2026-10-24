@@ -54,6 +54,9 @@ importers:
       '@peekaplate/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -79,6 +82,9 @@ importers:
       '@peekaplate/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
     devDependencies:
       vite:
         specifier: 8.3.4
@@ -95,6 +101,8 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/tokens: {}
 
 packages:
 
