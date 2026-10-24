@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result and initial dish-intent schemas. HTTP command authority fields are rejected; ingest and broader diner events remain planned. Team analytics query/response schemas enforce bounded dates/results and allowlisted diagnostic fields.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "17b4bf0b98b5808aa805cf10b4ad7763069bdde6194a2a5614cdeb422f0868e9"
+      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
     },
     {
       "id": "diner",
@@ -69,23 +69,35 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs and restaurant membership for atomic draft revisions. Dated hosted staff identity/isolation/retry/concurrency evidence remains valid. Staging/local-only analytics GET endpoints verify individual GitHub identity and current collaboration; server project, seven-day/100-row bounds and redaction are enforced. Main afe45db deployed through protected run 39907285014; hosted collaborator reads returned 200, invalid/missing credentials 401 and invalid queries 400. Two user-run October 23 outsider checks returned GitHub 200 and Worker 403/403 forbidden. Controlled collaborator removal remains pending; production is untested. No ingestion or publication endpoint; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker verifies staff JWTs and restaurant membership for atomic draft revisions. Dated hosted staff identity/isolation/retry/concurrency evidence remains valid. Staging/local-only analytics GET endpoints verify individual GitHub identity and current collaboration; server project, seven-day/100-row bounds and redaction are enforced. Main afe45db deployed through protected run 39907285014; hosted collaborator reads returned 200, invalid/missing credentials 401 and invalid queries 400. Two user-run October 23 outsider checks returned GitHub 200 and Worker 403/403 forbidden. Controlled collaborator removal remains pending; production is untested. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No direct live publication; JWT logout revocation remains expiry-bounded.",
       "paths": [
-        "backend/src/index.ts",
-        "backend/src/index.test.ts",
-        "backend/wrangler.jsonc",
-        "backend/src/auth.ts",
-        "backend/src/auth.test.ts",
-        "backend/src/dish-command.ts",
-        "backend/src/dish-command.test.ts",
-        "backend/src/dish.integration.ts",
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
-        "backend/src/team-analytics.ts",
+        "backend/src/auth.test.ts",
+        "backend/src/auth.ts",
+        "backend/src/dish-command.test.ts",
+        "backend/src/dish-command.ts",
+        "backend/src/dish.integration.ts",
+        "backend/src/index.test.ts",
+        "backend/src/index.ts",
+        "backend/src/retrieval/api.test.ts",
+        "backend/src/retrieval/fetcher.ts",
+        "backend/src/retrieval/fetcher.workerd.test.ts",
+        "backend/src/retrieval/handoff.test.ts",
+        "backend/src/retrieval/handoff.ts",
+        "backend/src/retrieval/index.ts",
+        "backend/src/retrieval/parser.ts",
+        "backend/src/retrieval/ranker.ts",
+        "backend/src/retrieval/retrieval.test.ts",
+        "backend/src/retrieval/retriever.ts",
+        "backend/src/retrieval/security.test.ts",
+        "backend/src/retrieval/security.ts",
         "backend/src/team-analytics.test.ts",
+        "backend/src/team-analytics.ts",
+        "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
-        "backend/src/team-auth.test.ts"
+        "backend/wrangler.jsonc"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -97,7 +109,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "92f22213bceebd5fb3a213a5a135dc4ebc35532f191e73ffc157d646f0b8b551"
+      "sourceFingerprint": "faa27fc83e16f459c83fcbc2124b17cd91426e28935a638575c1c1ecdf88caba"
     },
     {
       "id": "database",
@@ -260,6 +272,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Harshita confirms the Save/UI transitions, persistence, unsave/Undo, unavailable-storage behaviour and any Saved limit; Adam accepts, then record ADR acceptance. Owners deliver the listed contracts, ingest, consumer, migrations/views, report API, protected bindings, menu token, retention/consent and hosted validation through later PRs."
     },
     {
+      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication; excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and workerd-level external fetch security tests.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "Submit PR #23 for re-review with permanent regression test coverage across all 6 review findings."
+    },
+    {
       "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
       "modules": [
         "delivery",
@@ -288,13 +308,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Configure the isolated staging Supabase/auth/Hyperdrive and frontend/API connections, supply scoped GitHub deployment credentials, then verify the deployed staging flow before activation or production promotion."
-    },
-    {
-      "summary": "Prepared history-preserving core import, marketing split, develop CI, PR 13-derived ruleset proposals and disabled staging deployment gate. Reconciled all eight later source commits through b40e3ca, retaining their history and five updated planning links. Application runtime and backend bindings are unchanged. Owner chooses private GitHub Free; branch rules remain inactive and manual PR/CI gates apply.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Obtain independent human review; reconcile open source PRs and establish provider parity before release or archival. Apply manual PR/CI gates because private branch enforcement is unavailable on the selected free plan."
     },
     {
       "summary": "Recovered Windows Docker after checksummed offline disk backups and an official Desktop 4.95 upgrade. Real testing exposed a pnpm.mjs launcher rejection; the DB harness now invokes installed Vitest directly, with a failing-then-passing launcher regression. All 43 SQL assertions, 13 Worker/Postgres cases and local startup/demo/cleanup passed on Windows. Contributor Claude/Codex setup is independently owned.",
