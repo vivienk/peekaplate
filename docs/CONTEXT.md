@@ -87,7 +87,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c0e3d7e364298fcac3c3ddfa9d72813e52c92fda3cd116ca3b86c8834d97167a"
+      "sourceFingerprint": "4ad754237c05a5a72c0820d3b3e9fc37dc12d740ab3260cb36244af4d1ba04d4"
     },
     {
       "id": "backend",
@@ -272,7 +272,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Added the S3-TOK-01 Input foundation scaffold in the console: an Input component that names each field with a visible label and describes it with optional hint and error text (aria-describedby, aria-invalid, hidden Error prefix; whitespace-only hint/error text is ignored), 16px text and a 44px touch target; the thicker error border does not shift the text. It uses only shared typography and radius tokens; colors stay browser defaults and focus keeps the browser outline. A development-only /foundations.html page shows synthetic states and saves nothing. Browser tests cover naming, descriptions, blank text, stable text position on error, disabled focus order, visible focus, 320px fit and axe.",
+      "summary": "Added the S3-TOK-01 Input foundation scaffold in the console: an Input component that names each field with a visible label and describes it with optional hint and error text (aria-describedby, aria-invalid, hidden Error prefix; whitespace-only hint/error text is ignored), 16px text and a 44px touch target; the thicker error border does not shift the text. It uses only shared typography and radius tokens; colors stay browser defaults and focus keeps the browser outline. A development-only /foundations.html page shows synthetic default, filled, error, disabled and focus states and saves nothing. Browser tests cover naming, descriptions, blank text, stable text position on error, disabled focus order, visible focus, 320px fit and axe.",
       "modules": [
         "console"
       ],

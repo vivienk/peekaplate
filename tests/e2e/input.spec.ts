@@ -30,6 +30,11 @@ test('inputs expose their label, hint and error to assistive technology', async 
   await expect(note).not.toHaveAttribute('aria-invalid');
   await expect(page.locator('.pp-input__hint, .pp-input__error')).toHaveCount(3);
 
+  const filled = page.getByLabel('Short name');
+  await expect(filled).toHaveValue('Berry pancakes');
+  await expect(filled).toBeEditable();
+  await expect(filled).not.toHaveAttribute('aria-invalid');
+
   await expect(page.getByLabel('Category')).toBeDisabled();
 
   await name.fill('Synthetic pancakes');
@@ -48,7 +53,7 @@ test('the error border does not move the input text', async ({ page }) => {
 
 test('keyboard focus skips disabled inputs and stays visible', async ({ page }) => {
   await page.goto(demo);
-  const order = ['Dish name', 'Price', 'Internal note'];
+  const order = ['Dish name', 'Price', 'Short name', 'Internal note'];
   await page.getByLabel(order[0] ?? '').focus();
   for (const [index, label] of order.entries()) {
     if (index > 0) await page.keyboard.press('Tab');
@@ -70,7 +75,7 @@ test('input demo fits a narrow viewport with usable touch targets', async ({ pag
     true,
   );
   const fields = await page.getByRole('textbox').all();
-  expect(fields).toHaveLength(4);
+  expect(fields).toHaveLength(5);
   for (const field of fields) {
     const box = await field.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);

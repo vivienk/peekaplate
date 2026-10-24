@@ -23,6 +23,7 @@ createRoot(root).render(
           error="Enter a price"
           inputMode="decimal"
         />
+        <Input label="Short name" defaultValue="Berry pancakes" />
         <Input label="Category" defaultValue="Breakfast" disabled />
         {/* Whitespace-only hint and error text are ignored, so this stays a plain field. */}
         <Input label="Internal note" hint=" " error=" " />
