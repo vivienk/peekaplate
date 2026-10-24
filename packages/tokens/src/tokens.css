@@ -238,6 +238,16 @@
   --pp-role-button-disabled-border: var(--pp-color-neutral-600);
   --pp-role-button-outlined-pressed: var(--pp-color-neutral-600);
   --pp-role-nav-icon-disabled: var(--pp-color-neutral-400);
+  /* Input roles. Interim: reuse palette colors until the Input design exists in Figma. */
+  --pp-role-input-bg: var(--pp-color-neutral-800);
+  --pp-role-input-text: var(--pp-color-neutral-50);
+  --pp-role-input-placeholder: var(--pp-color-neutral-400);
+  --pp-role-input-border: var(--pp-color-neutral-400);
+  --pp-role-input-border-focus: var(--pp-color-info-400);
+  --pp-role-input-border-error: var(--pp-color-error-400);
+  --pp-role-input-text-error: var(--pp-color-error-400);
+  --pp-role-input-bg-disabled: var(--pp-color-neutral-600);
+  --pp-role-input-text-disabled: var(--pp-color-neutral-400);
 }
 
 /* Reduced motion: transitions shrink to 1ms, delays and staggers are removed, and screens

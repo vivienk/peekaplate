@@ -39,7 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3c5f358c9d5b691f1e83831dd44305d28435c645099b7c6cb931953104cae0ef"
+      "sourceFingerprint": "94ebacea52b37b75ad4dd88008c4562e5e8c421814afd15d7b5ac38943f0d49b"
     },
     {
       "id": "diner",
