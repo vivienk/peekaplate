@@ -24,7 +24,8 @@ createRoot(root).render(
           inputMode="decimal"
         />
         <Input label="Category" defaultValue="Breakfast" disabled />
-        <Input label="Internal note" />
+        {/* Whitespace-only hint and error text are ignored, so this stays a plain field. */}
+        <Input label="Internal note" hint=" " error=" " />
       </div>
     </main>
   </StrictMode>,

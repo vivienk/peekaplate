@@ -14,7 +14,17 @@ type InputProps = Omit<
  * Text input foundation (S3-TOK-01). Owns the label, hint and error wiring so every field is
  * named and described the same way. Visual roles wait for the approved Input design.
  */
-export function Input({ label, hint, error, id, className, ...props }: InputProps) {
+export function Input({
+  label,
+  hint: rawHint,
+  error: rawError,
+  id,
+  className,
+  ...props
+}: InputProps) {
+  // Whitespace-only text would announce an empty hint or a false error, so treat it as absent.
+  const hint = rawHint?.trim();
+  const error = rawError?.trim();
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const hintId = hint ? `${inputId}-hint` : undefined;

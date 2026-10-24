@@ -41,8 +41,10 @@
   border-radius: var(--pp-radius-8);
 }
 
+/* The thicker error border takes 1px from the padding so the text does not shift. */
 .pp-input[data-invalid] .pp-input__control {
   border-width: 2px;
+  padding-inline: calc(0.75rem - 1px);
 }
 
 .pp-input__control:disabled {

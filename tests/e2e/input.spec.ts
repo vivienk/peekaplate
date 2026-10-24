@@ -24,13 +24,26 @@ test('inputs expose their label, hint and error to assistive technology', async 
     'Numbers only, for example 12.50. Error: Enter a price',
   );
 
+  // The demo passes whitespace-only hint and error text here; it must be ignored.
   const note = page.getByLabel('Internal note');
   await expect(note).not.toHaveAttribute('aria-describedby');
+  await expect(note).not.toHaveAttribute('aria-invalid');
+  await expect(page.locator('.pp-input__hint, .pp-input__error')).toHaveCount(3);
 
   await expect(page.getByLabel('Category')).toBeDisabled();
 
   await name.fill('Synthetic pancakes');
   await expect(name).toHaveValue('Synthetic pancakes');
+});
+
+test('the error border does not move the input text', async ({ page }) => {
+  await page.goto(demo);
+  const textStart = (label: string) =>
+    page.getByLabel(label).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.paddingLeft);
+    });
+  expect(await textStart('Price')).toBe(await textStart('Dish name'));
 });
 
 test('keyboard focus skips disabled inputs and stays visible', async ({ page }) => {
