@@ -62,17 +62,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0f8777025be9ef1375b19fc580f5a200826465b2b8acfb44021d9f8156f1cc02"
+      "sourceFingerprint": "b94a28cf38b11a84ce82c4fe5ae7df9b29afde2efa893384c5d299fc92f055a8"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. S3-TOK-01 Input foundation scaffold: labelled text input with hint/error wiring built from shared tokens, shown on a development-only synthetic demo page that is not in the production build; visual roles await the Input design. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
-        "frontend/console/package.json"
+        "frontend/console/package.json",
+        "frontend/console/foundations.html",
+        "frontend/console/src/foundations/Input.tsx",
+        "frontend/console/src/foundations/input.css",
+        "frontend/console/src/foundations/demo.tsx",
+        "tests/e2e/input.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -82,7 +87,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f8c87694012c4d8b67d4947f635d6453235bb8fb2494448b2b5a487f1adca2f0"
+      "sourceFingerprint": "4ad754237c05a5a72c0820d3b3e9fc37dc12d740ab3260cb36244af4d1ba04d4"
     },
     {
       "id": "backend",
@@ -267,6 +272,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Added the S3-TOK-01 Input foundation scaffold in the console: an Input component that names each field with a visible label and describes it with optional hint and error text (aria-describedby, aria-invalid, hidden Error prefix; whitespace-only hint/error text is ignored), 16px text and a 44px touch target; the thicker error border does not shift the text. It uses only shared typography and radius tokens; colors stay browser defaults and focus keeps the browser outline. A development-only /foundations.html page shows synthetic default, filled, error, disabled and focus states and saves nothing. Browser tests cover naming, descriptions, blank text, stable text position on error, disabled focus order, visible focus, 320px fit and axe.",
+      "modules": [
+        "console"
+      ],
+      "next": "Apply Harshita's spacing tokens and the Input color roles once the Input design is approved and her token branch lands, then capture screenshots for Rania. Build the restaurant review form on this Input after Adam chooses OWN-07 or OWN-08 and its fields."
+    },
+    {
       "summary": "Started S3-TOK-01 with a shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides, the Design System text-style scale and weights, and the corner-radius scale, with tests for values, token groups and both imports. No color or component token was invented; shells are not restyled.",
       "modules": [
         "tokens",
@@ -338,13 +350,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Finish exact-head review and CI for the local recovery PR. Keep the GitHub protection policy in a separate owner-action PR; stop before Cloudflare/Supabase integration until protected credentials are supplied."
-    },
-    {
-      "summary": "Corrected the design hyperlink in docs/team_guide.md to the owner-supplied Figma Make diner-menu V1 URL. No design or runtime behavior changed.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Use the linked Figma Make diner-menu V1 as the referenced design handoff."
     }
   ]
 }
