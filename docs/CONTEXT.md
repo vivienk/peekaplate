@@ -102,7 +102,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. ADR 0015 observation_index and observation_conflict tables exist locally: (tenant_id, event_id) identity, append-only, forced RLS, runtime select/insert only; not applied to staging and no writer is merged. Physical hosted pool reuse and restore remain unverified.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -114,16 +114,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261023120000_observation_index.sql",
+        "tests/db/observations.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0013-posthog-export-boundary.md",
-        "docs/adr/0014-team-analytics-access.md"
+        "docs/adr/0014-team-analytics-access.md",
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fccd1d02035493216fcb1fae4fb672e25ec554da17005a27354ae2a4f975f7f8"
+      "sourceFingerprint": "64bdf57dea697b3602505b6f2b1c394e78e76fb086f4e7cc3e440773f28cf4fa"
     },
     {
       "id": "measurement",
@@ -249,6 +252,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Added the ADR 0015 canonical observation identity migration: app_private.observation_index keyed by (tenant_id, event_id) with checksum, observation.v2, P0 type, authorized publication, occurred/first-received times, R2 key and accepted/rejected disposition, plus app_private.observation_conflict for quarantined reuse. Both are append-only with forced tenant RLS and runtime select/insert grants. pgTAP covers identity, isolation, grants, time window, reason codes and idempotent conflict recording. tenant_id naming and the column list are proposals pending Louis, Teeyansh and Zhiliang.",
+      "modules": [
+        "database"
+      ],
+      "next": "Agree column names with Louis, the consumer write with Teeyansh and the Queue message with Zhiliang; then add the typed fact tables and the owner report view. Sai and Vivien apply migrations to staging."
+    },
+    {
       "summary": "October 22 staging activation is deployed: main afe45db, protected run 39907285014 and Worker 5922a293-6893-47fd-8bc5-a20f0afd8d0b. Fourteen live HTTP checks passed using the maintainer individual GitHub credential; eleven read-only database assertions passed, including migration history and restricted grants. Hyperdrive caching is disabled; recent hourly export runs completed with no new rows, existing eight raw/four unique records unchanged. README, team guide, access/export runbooks and operations now distinguish deployed diagnostics from planned owner reporting. No runtime, grant, schema or deployment change in this documentation handoff.",
       "modules": [
         "backend",
@@ -318,15 +328,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the linked Figma Make diner-menu V1 as the referenced design handoff."
-    },
-    {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     }
   ]
 }
