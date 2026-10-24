@@ -1,5 +1,5 @@
 -- =====================================================================
--- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP ORACLE EDITION)
+-- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP ORACLE EDITION v3)
 -- PATH: tests/db/owner_metrics.sql
 -- DRI: Louis Dieme | Reviewers: Jeffin Sam Joji & Zhiliang Wang
 -- =====================================================================
@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap;
 
 BEGIN;
 
--- Déclaration de 11 assertions de test automatiques (Plan mis à jour)
+-- Declaring 11 automated test assertions
 SELECT plan(11);
 
 CREATE TEMPORARY TABLE temp_events (
@@ -19,59 +19,68 @@ CREATE TEMPORARY TABLE temp_events (
     event_type TEXT,
     payload_checksum TEXT,
     traffic_class TEXT,
+    occurred_at TIMESTAMP, -- Added browser event timestamp for ADR 0015 compliance
     received_at TIMESTAMP
 );
 
--- Insertion de nos scénarios de frontière (9 / 10 / 11) et cas anormaux d'intégration
-INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum, traffic_class, received_at) VALUES
-    -- RESTO_9: Frontier 9 (Must be suppressed and counts hidden)
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW()),
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW()), -- Retry réseau légitime
-    ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha_B', 'live', NOW()),
-    ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha_C', 'live', NOW()),
-    ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha_D', 'live', NOW()),
-    ('resto_9', 'evt_105', 'sess_05', 'dish_detail_opened', 'sha_E', 'live', NOW()),
-    ('resto_9', 'evt_106', 'sess_06', 'dish_detail_opened', 'sha_F', 'live', NOW()),
-    ('resto_9', 'evt_107', 'sess_07', 'dish_detail_opened', 'sha_G', 'live', NOW()),
-    ('resto_9', 'evt_108', 'sess_08', 'dish_detail_opened', 'sha_H', 'live', NOW()),
-    ('resto_9', 'evt_109', 'sess_09', 'dish_detail_opened', 'sha_I', 'live', NOW()),
+-- Inserting boundary test fixtures (9 / 10 / 11) and abnormal scenarios
+INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum, traffic_class, occurred_at, received_at) VALUES
+    -- -----------------------------------------------------------------
+    -- CASE 9: Frontier 9 (Must be suppressed and counts hidden)
+    -- -----------------------------------------------------------------
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()), -- Network retry
+    ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha_B', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha_C', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha_D', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_105', 'sess_05', 'dish_detail_opened', 'sha_E', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_106', 'sess_06', 'dish_detail_opened', 'sha_F', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_107', 'sess_07', 'dish_detail_opened', 'sha_G', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_108', 'sess_08', 'dish_detail_opened', 'sha_H', 'live', NOW(), NOW()),
+    ('resto_9', 'evt_109', 'sess_09', 'dish_detail_opened', 'sha_I', 'live', NOW(), NOW()),
 
-    -- RESTO_10: Frontier 10 (Must show metrics normally = 10)
-    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW()),
-    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW()), -- Retry réseau
-    ('resto_10', 'evt_202', 'sess_B', 'dish_detail_opened', 'sha_2', 'live', NOW()),
-    ('resto_10', 'evt_203', 'sess_C', 'dish_detail_opened', 'sha_3', 'live', NOW()),
-    ('resto_10', 'evt_204', 'sess_D', 'dish_detail_opened', 'sha_4', 'live', NOW()),
-    ('resto_10', 'evt_205', 'sess_E', 'dish_detail_opened', 'sha_5', 'live', NOW()),
-    ('resto_10', 'evt_206', 'sess_F', 'dish_detail_opened', 'sha_6', 'live', NOW()),
-    ('resto_10', 'evt_207', 'sess_G', 'dish_detail_opened', 'sha_7', 'live', NOW()),
-    ('resto_10', 'evt_208', 'sess_H', 'dish_detail_opened', 'sha_8', 'live', NOW()),
-    ('resto_10', 'evt_209', 'sess_I', 'dish_detail_opened', 'sha_9', 'live', NOW()),
-    ('resto_10', 'evt_210', 'sess_J', 'dish_detail_opened', 'sha_10', 'live', NOW()),
+    -- -----------------------------------------------------------------
+    -- CASE 10: Frontier 10 (Must show metrics normally = 10)
+    -- -----------------------------------------------------------------
+    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW(), NOW()), -- Network retry
+    ('resto_10', 'evt_202', 'sess_B', 'dish_detail_opened', 'sha_2', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_203', 'sess_C', 'dish_detail_opened', 'sha_3', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_204', 'sess_D', 'dish_detail_opened', 'sha_4', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_205', 'sess_E', 'dish_detail_opened', 'sha_5', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_206', 'sess_F', 'dish_detail_opened', 'sha_6', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_207', 'sess_G', 'dish_detail_opened', 'sha_7', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_208', 'sess_H', 'dish_detail_opened', 'sha_8', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_209', 'sess_I', 'dish_detail_opened', 'sha_9', 'live', NOW(), NOW()),
+    ('resto_10', 'evt_210', 'sess_J', 'dish_detail_opened', 'sha_10', 'live', NOW(), NOW()),
 
-    -- RESTO_11: Frontier 11 (Must show metrics normally = 11)
-    ('resto_11', 'evt_301', 'sess_01', 'dish_detail_opened', 'sha_x', 'live', NOW()),
-    ('resto_11', 'evt_302', 'sess_02', 'dish_detail_opened', 'sha_y', 'live', NOW()),
-    ('resto_11', 'evt_303', 'sess_03', 'dish_detail_opened', 'sha_z', 'live', NOW()),
-    ('resto_11', 'evt_304', 'sess_04', 'dish_detail_opened', 'sha_4', 'live', NOW()),
-    ('resto_11', 'evt_305', 'sess_05', 'dish_detail_opened', 'sha_5', 'live', NOW()),
-    ('resto_11', 'evt_306', 'sess_06', 'dish_detail_opened', 'sha_6', 'live', NOW()),
-    ('resto_11', 'evt_307', 'sess_07', 'dish_detail_opened', 'sha_7', 'live', NOW()),
-    ('resto_11', 'evt_308', 'sess_08', 'dish_detail_opened', 'sha_8', 'live', NOW()),
-    ('resto_11', 'evt_309', 'sess_09', 'dish_detail_opened', 'sha_9', 'live', NOW()),
-    ('resto_11', 'evt_310', 'sess_10', 'dish_detail_opened', 'sha_10', 'live', NOW()),
-    ('resto_11', 'evt_311', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()),
+    -- -----------------------------------------------------------------
+    -- CASE 11: Frontier 11 (Must show metrics normally = 11)
+    -- -----------------------------------------------------------------
+    ('resto_11', 'evt_301', 'sess_x1', 'dish_detail_opened', 'sha_x', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_302', 'sess_x2', 'dish_detail_opened', 'sha_y', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_303', 'sess_x3', 'dish_detail_opened', 'sha_z', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_304', 'sess_x4', 'dish_detail_opened', 'sha_4', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_305', 'sess_x5', 'dish_detail_opened', 'sha_5', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_306', 'sess_x6', 'dish_detail_opened', 'sha_6', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_307', 'sess_x7', 'dish_detail_opened', 'sha_7', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_308', 'sess_x8', 'dish_detail_opened', 'sha_8', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_309', 'sess_x9', 'dish_detail_opened', 'sha_9', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_310', 'sess_x10', 'dish_detail_opened', 'sha_10', 'live', NOW(), NOW()),
+    ('resto_11', 'evt_311', 'sess_x11', 'dish_detail_opened', 'sha_11', 'live', NOW(), NOW()),
 
-    -- CRITICAL ADR 0015 & WANG ABNORMAL CASES (All must be excluded from calculations)
-    ('resto_11', 'evt_999', 'sess_11', 'dish_detail_opened', 'sha_11', 'internal_test', NOW()), -- Traffic classe test (Exclu)
-    ('resto_11', 'evt_old', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW() - INTERVAL '25 hours'), -- PLUS DE 24H (Exclu !)
-    ('resto_11', 'evt_future', 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW() + INTERVAL '6 minutes'), -- PLUS DE 5 MIN DANS LE FUTUR (Exclu !)
-    ('resto_11', 'evt_unknown', 'sess_11', 'unknown_type', 'sha_11', 'live', NOW()), -- Type inconnu (Exclu)
-    ('resto_11', NULL, 'sess_11', 'dish_detail_opened', 'sha_11', 'live', NOW()), -- Missing event_id (Exclu)
-    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_A', 'live', NOW()),
-    ('resto_11', 'evt_conflict', 'sess_11', 'dish_detail_opened', 'sha_conf_B', 'live', NOW()); -- Conflit local (Quarantaine)
+    -- -----------------------------------------------------------------
+    -- CASE EMPTY: Real Zero-Denominator (All events are excluded)
+    -- -----------------------------------------------------------------
+    ('resto_empty', 'evt_901', 'bad_sess_1', 'dish_detail_opened', 'sha_11', 'internal_test', NOW(), NOW()), -- Test traffic
+    ('resto_empty', 'evt_902', 'bad_sess_2', 'dish_detail_opened', 'sha_11', 'live', NOW() - INTERVAL '25 hours', NOW()), -- Out of 24h window
+    ('resto_empty', 'evt_903', 'bad_sess_3', 'dish_detail_opened', 'sha_11', 'live', NOW() + INTERVAL '6 minutes', NOW()), -- Out of 5m window
+    ('resto_empty', 'evt_904', 'bad_sess_4', 'unknown_type', 'sha_11', 'live', NOW(), NOW()), -- Unknown type
+    ('resto_empty', NULL, 'bad_sess_5', 'dish_detail_opened', 'sha_11', 'live', NOW(), NOW()), -- Missing event_id
+    ('resto_empty', 'evt_905', 'bad_sess_6', 'dish_detail_opened', 'sha_conf_A', 'live', NOW(), NOW()),
+    ('resto_empty', 'evt_905', 'bad_sess_7', 'dish_detail_opened', 'sha_conf_B', 'live', NOW(), NOW()); -- Venue-scoped conflict
 
--- 4. Moteur d'agrégation analytique de production (Filtre temporel strict ADR 0015)
+-- 4. Analytical production calculation view (Filtering strictly on occurred_at per ADR 0015)
 CREATE TEMPORARY TABLE temp_report_results AS
 SELECT 
     venue_id,
@@ -84,12 +93,13 @@ FROM (
     FROM temp_events
     WHERE 
         traffic_class = 'live'
-        AND event_type = 'dish_detail_opened' -- Seuls les types convenus sont comptabilisés
+        AND event_type = 'dish_detail_opened'
         AND event_id IS NOT NULL
-        -- REGLAGE TEMPOREL ADR 0015 : Fenêtre stricte de 24h passées et 5 min futures
-        AND received_at >= NOW() - INTERVAL '24 hours'
-        AND received_at <= NOW() + INTERVAL '5 minutes'
+        -- ADR 0015 strict time window applied to browser occurred_at relative to server receipt
+        AND occurred_at >= received_at - INTERVAL '24 hours'
+        AND occurred_at <= received_at + INTERVAL '5 minutes'
         AND (venue_id, event_id) NOT IN (
+            -- Conflict detection bounded strictly to (venue_id, event_id) pair
             SELECT venue_id, event_id FROM temp_events GROUP BY venue_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
         )
     GROUP BY venue_id, event_id, session_id
@@ -97,29 +107,27 @@ FROM (
 GROUP BY venue_id;
 
 -- =====================================================================
--- ASSERTS PGTAP (11 INDEPENDENT VALIDATIONS)
+-- PGTAP ASSERTS
 -- =====================================================================
 
--- TESTS RESTO_9 (Frontière Masquée)
+-- RESTO_9 TESTS (Suppressed Frontier)
 SELECT is(status, 'SUPPRESSED', 'Resto_9 status must be SUPPRESSED') FROM temp_report_results WHERE venue_id = 'resto_9';
 SELECT is(total_clicks, NULL::bigint, 'Resto_9 total_clicks must be NULL::bigint') FROM temp_report_results WHERE venue_id = 'resto_9';
 SELECT is(raw_unique_sessions, NULL::bigint, 'Resto_9 raw_unique_sessions must be NULL::bigint') FROM temp_report_results WHERE venue_id = 'resto_9';
 SELECT is(reconciled_sessions, 'insufficient data', 'Resto_9 display text must be insufficient data') FROM temp_report_results WHERE venue_id = 'resto_9';
 
--- TESTS RESTO_10 (Frontière Validée)
+-- RESTO_10 TESTS (Normal Frontier)
 SELECT is(status, 'NORMAL', 'Resto_10 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_10';
 SELECT is(total_clicks, 10::bigint, 'Resto_10 total_clicks must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
 SELECT is(raw_unique_sessions, 10::bigint, 'Resto_10 unique sessions must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
 
--- TESTS FRONTIÈRE 11 (Vérification linéaire de non-régression)
+-- RESTO_11 TESTS (Linear Clearance Check)
 SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_11';
-SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must ignore anomalies, future, late and unknown events') FROM temp_report_results WHERE venue_id = 'resto_11';
-SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must be 11::bigint') FROM temp_report_results WHERE venue_id = 'resto_11';
+SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live events only') FROM temp_report_results WHERE venue_id = 'resto_11';
+SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE venue_id = 'resto_11';
 
--- TEST DÉNOMINATEUR ZÉRO (Doit être absent des résultats ou renvoyer un statut vide)
-SELECT json_look_block AS ok FROM (
-    SELECT ok(NOT EXISTS (SELECT 1 FROM temp_report_results WHERE venue_id = 'resto_empty'), 'Zero denominator venue correctly filtered or empty') AS json_look_block
-);
+-- REAL ZERO DENOMINATOR TEST (Checks that an all-excluded venue returns empty / not measurable context)
+SELECT ok(NOT EXISTS (SELECT 1 FROM temp_report_results WHERE venue_id = 'resto_empty'), 'Zero denominator venue correctly yields zero measurable records');
 
 SELECT * FROM finish();
 
