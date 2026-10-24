@@ -1,34 +1,60 @@
 /**
- * Provisional contracts and domain types for the Queue Consumer.
+ * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-02).
  *
- * NOTE: The production message contract is owned by Zhiliang (S3-DIN-02),
- * and the production database tables/migrations are owned by Jeffin (S3-DATA-01).
- *
- * These types and interfaces are PROVISIONAL and TEST-ONLY adapters that match
- * the boundaries agreed in ADR 0015 and will be replaced by confirmed schemas.
+ * Conforms to ADR 0015, the DATA-01 -> DATA-02 mapping v0.2, and the canonical
+ * PostgreSQL schema defined in PR #32 (app_private.observation_index and
+ * app_private.observation_conflict).
  */
 
+export const ALLOWED_EVENT_TYPES = [
+  'menu_viewed',
+  'dish_viewed',
+  'dish_detail_opened',
+  'dish_detail_closed',
+  'dish_activity_checkpoint',
+  'dish_compared',
+  'dish_saved',
+  'dish_unsaved',
+  'shortlist_viewed',
+] as const;
+
+export type AllowedEventType = (typeof ALLOWED_EVENT_TYPES)[number];
+
+export const REJECTION_REASON_CODES = [
+  'schema_invalid',
+  'unknown_type',
+  'too_old',
+  'future_time',
+  'publication_not_allowed',
+] as const;
+
+export type RejectionReasonCode = (typeof REJECTION_REASON_CODES)[number];
+
 export type EventIdentity = {
-  venueId: string;
+  tenantId: string;
   eventId: string;
 };
 
 /**
  * Validated observation item extracted from Queue message.
- * ADR 0015 defines:
- * transport key is (venue_id, event_id).
- * venue_id derived on the server from signed menu token at ingest.
- * schema_version is 2 for observation.v2.
+ * ADR 0015 & PR #32 define:
+ * - tenant_id is the server-derived venue_id.
+ * - event_id is the UUID identifying the observation.
+ * - schema_version is 'observation.v2' (string).
+ * - authorized_publication_id is the server-derived authorized publication UUID.
+ * - session_id is preserved for downstream typed facts.
  */
 export type ObservationEnvelope = {
-  venueId: string;
+  tenantId: string;
+  venueId?: string | undefined; // alias for backwards compatibility
   eventId: string;
   sessionId?: string | undefined;
-  schemaVersion: number;
+  schemaVersion: 'observation.v2';
   occurredAt: string;
   type: string;
+  authorizedPublicationId: string;
   payload: Record<string, unknown>;
-  receivedAt?: string | undefined;
+  firstReceivedAt?: string | undefined;
 };
 
 /**
@@ -58,9 +84,10 @@ export interface R2ArchiveStorage {
  * Persistence disposition outcome.
  */
 export type PersistenceOutcome =
-  | { disposition: 'accepted'; isDuplicate: false }
-  | { disposition: 'duplicate'; isDuplicate: true }
-  | { disposition: 'conflict'; conflictReason: string };
+  | { disposition: 'accepted'; isDuplicate: false; reasonCode?: undefined }
+  | { disposition: 'rejected'; isDuplicate: false; reasonCode: string }
+  | { disposition: 'duplicate'; isDuplicate: true; reasonCode?: undefined }
+  | { disposition: 'conflict'; conflictReason: string; originalChecksum?: string };
 
 export class InvalidKeyError extends Error {
   constructor(message: string) {
@@ -71,34 +98,35 @@ export class InvalidKeyError extends Error {
 
 /**
  * Port interface for observation database persistence.
- * Matches ADR 0015 canonical tables:
- * - app_private.observation_index
- * - app_private.observation_conflict
- * - app_private.observation_<type>_fact (typed facts)
+ * Matches ADR 0015 canonical tables from PR #32:
+ * - app_private.observation_index: (tenant_id, event_id) PRIMARY KEY
+ * - app_private.observation_conflict: (tenant_id, event_id, incoming_checksum) PRIMARY KEY
  */
 export interface ObservationRepository {
   /**
-   * Checks whether the event identity (venue_id, event_id) already exists.
-   * If it exists, returns its stored payload checksum.
+   * Checks whether the event identity (tenant_id, event_id) already exists.
+   * If it exists, returns its stored payload checksum and disposition.
    */
   lookupExisting(
-    venueId: string,
+    tenantId: string,
     eventId: string,
   ): Promise<{ checksum: string; disposition: string } | null>;
 
   /**
-   * Records a canonical observation index and typed fact atomically.
-   * If a unique constraint violation occurs concurrently on (venue_id, event_id),
+   * Records a canonical observation index.
+   * Runs in an atomic transaction with forced tenant RLS (app.tenant_id).
+   * If a unique constraint violation occurs concurrently on (tenant_id, event_id),
    * returns duplicate or conflict outcome based on checksum comparison.
    */
   persistCanonical(record: {
-    venueId: string;
+    tenantId: string;
     eventId: string;
     sessionId?: string | undefined;
-    schemaVersion: number;
-    type: string;
+    schemaVersion: 'observation.v2';
+    eventType: string;
+    authorizedPublicationId: string;
     occurredAt: string;
-    receivedAt: string;
+    firstReceivedAt: string;
     checksum: string;
     r2ArchiveKey: string;
     payload: Record<string, unknown>;
@@ -108,33 +136,29 @@ export interface ObservationRepository {
   /**
    * Records a conflict into app_private.observation_conflict table
    * without overwriting original canonical event.
+   * Returns whether this conflict was already recorded (idempotent redelivery).
    */
   recordConflict(conflict: {
-    venueId: string;
+    tenantId: string;
     eventId: string;
-    schemaVersion: number;
-    type: string;
-    occurredAt: string;
-    receivedAt: string;
     incomingChecksum: string;
-    originalChecksum: string;
-    incomingR2ArchiveKey: string;
-    incomingPayload: Record<string, unknown>;
-  }): Promise<void>;
+    r2ArchiveKey: string;
+    receivedAt: string;
+  }): Promise<{ alreadyRecorded: boolean }>;
 }
 
 /**
  * Formats R2 archive key following ADR 0015 and repository conventions.
- * Format: raw/observations/{venue_id}/{yyyy}/{mm}/{dd}/{event_id}.json
+ * Format: raw/observations/{tenant_id}/{yyyy}/{mm}/{dd}/{event_id}.json
  * Sanitizes and validates inputs to prevent path traversal or invalid keys.
  */
 export function buildRawArchiveKey(
-  venueId: string,
+  tenantId: string,
   eventId: string,
   occurredAtIso: string,
 ): string {
-  if (!venueId || venueId.includes('/') || venueId.includes('\\') || venueId.includes('..')) {
-    throw new InvalidKeyError(`Invalid venueId for archive key: ${venueId}`);
+  if (!tenantId || tenantId.includes('/') || tenantId.includes('\\') || tenantId.includes('..')) {
+    throw new InvalidKeyError(`Invalid tenantId for archive key: ${tenantId}`);
   }
   if (!eventId || eventId.includes('/') || eventId.includes('\\') || eventId.includes('..')) {
     throw new InvalidKeyError(`Invalid eventId for archive key: ${eventId}`);
@@ -148,5 +172,37 @@ export function buildRawArchiveKey(
   const yyyy = date.getUTCFullYear();
   const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `raw/observations/${venueId}/${yyyy}/${mm}/${dd}/${eventId}.json`;
+  return `raw/observations/${tenantId}/${yyyy}/${mm}/${dd}/${eventId}.json`;
+}
+
+/**
+ * Formats R2 conflict archive key ensuring distinct payloads reusing the same
+ * (tenant_id, event_id) get unique, deterministic, path-traversal-safe keys.
+ * Format: raw/observations/{tenant_id}/{yyyy}/{mm}/{dd}/{event_id}-{incoming_checksum}.json
+ */
+export function buildConflictArchiveKey(
+  tenantId: string,
+  eventId: string,
+  occurredAtIso: string,
+  incomingChecksum: string,
+): string {
+  if (!tenantId || tenantId.includes('/') || tenantId.includes('\\') || tenantId.includes('..')) {
+    throw new InvalidKeyError(`Invalid tenantId for conflict archive key: ${tenantId}`);
+  }
+  if (!eventId || eventId.includes('/') || eventId.includes('\\') || eventId.includes('..')) {
+    throw new InvalidKeyError(`Invalid eventId for conflict archive key: ${eventId}`);
+  }
+  if (!/^[0-9a-f]{64}$/i.test(incomingChecksum)) {
+    throw new InvalidKeyError(`Invalid checksum for conflict archive key: ${incomingChecksum}`);
+  }
+
+  const date = new Date(occurredAtIso);
+  if (Number.isNaN(date.getTime())) {
+    throw new InvalidKeyError(`Invalid occurredAt date for conflict archive key: ${occurredAtIso}`);
+  }
+
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `raw/observations/${tenantId}/${yyyy}/${mm}/${dd}/${eventId}-${incomingChecksum.toLowerCase()}.json`;
 }

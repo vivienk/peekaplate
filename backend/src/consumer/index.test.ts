@@ -49,9 +49,13 @@ class TestMessageBatch implements MessageBatch<unknown> {
 }
 
 describe('createQueueHandler', () => {
+  const testTenant = '11111111-1111-4111-8111-111111111111';
+  const testEvent = '22222222-2222-4222-8222-222222222222';
+  const testPublication = '33333333-3333-4333-8333-333333333333';
+
   it('retries all messages with a safety delay if OBSERVATION_ARCHIVE_BUCKET binding is missing', async () => {
     const handler = createQueueHandler();
-    const msg = new TestQueueMessage('m1', { venueId: 'v1', eventId: 'e1' });
+    const msg = new TestQueueMessage('m1', { tenantId: testTenant, eventId: testEvent });
     const batch = new TestMessageBatch('obs-queue', [msg]);
 
     await handler(batch, { APP_ENV: 'local', LOCAL_DATABASE_URL: 'postgres://localhost/test' });
@@ -63,7 +67,7 @@ describe('createQueueHandler', () => {
 
   it('retries all messages with a safety delay if database connection configuration is missing', async () => {
     const handler = createQueueHandler();
-    const msg = new TestQueueMessage('m1', { venueId: 'v1', eventId: 'e1' });
+    const msg = new TestQueueMessage('m1', { tenantId: testTenant, eventId: testEvent });
     const batch = new TestMessageBatch('obs-queue', [msg]);
 
     const fakeBucket = new FakeR2ArchiveStorage();
@@ -90,11 +94,13 @@ describe('createQueueHandler', () => {
     });
 
     const msg = new TestQueueMessage('m1', {
-      venueId: 'v-adapter',
-      eventId: 'e-adapter',
-      schemaVersion: 2,
+      tenantId: testTenant,
+      eventId: testEvent,
+      authorizedPublicationId: testPublication,
+      schemaVersion: 'observation.v2',
       occurredAt: '2026-10-24T12:00:00Z',
-      type: 'dish_open',
+      firstReceivedAt: '2026-10-24T12:00:00Z',
+      type: 'dish_detail_opened',
       payload: { test: true },
     });
     const batch = new TestMessageBatch('obs-queue', [msg]);
@@ -104,6 +110,6 @@ describe('createQueueHandler', () => {
     expect(msg.acked).toBe(true);
     expect(cleanupCalled).toBe(true);
     expect(repository.index.size).toBe(1);
-    expect(r2Storage.has('raw/observations/v-adapter/2026/10/24/e-adapter.json')).toBe(true);
+    expect(r2Storage.has(`raw/observations/${testTenant}/2026/10/24/${testEvent}.json`)).toBe(true);
   });
 });

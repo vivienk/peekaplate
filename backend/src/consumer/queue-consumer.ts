@@ -1,5 +1,8 @@
 import { canonicalizeJson, sha256Hex } from './canonical-json';
 import {
+  ALLOWED_EVENT_TYPES,
+  type AllowedEventType,
+  buildConflictArchiveKey,
   buildRawArchiveKey,
   type ObservationEnvelope,
   type ObservationRepository,
@@ -20,6 +23,8 @@ export class MalformedMessageError extends Error {
     this.name = 'MalformedMessageError';
   }
 }
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Minimal Cloudflare Queue Message interface.
@@ -45,9 +50,12 @@ export interface MessageBatch<T = unknown> {
 
 /**
  * Validates and extracts the observation envelope from a Queue message body.
- * Adheres strictly to ADR 0015:
- * Transport identity is (venue_id, event_id).
- * venue_id is set/verified by server during ingest.
+ * Adheres strictly to ADR 0015 & PR #32:
+ * - Transport identity is (tenant_id, event_id), where tenant_id is the server-derived venue_id.
+ * - authorized_publication_id is the server-derived UUID required for provenance.
+ * - schema_version must be 'observation.v2' (string).
+ * - type must be an allowed P0 event type.
+ * - session_id is preserved for downstream fact flows.
  */
 export function validateObservationEnvelope(body: unknown): ObservationEnvelope {
   if (!body || typeof body !== 'object') {
@@ -56,25 +64,44 @@ export function validateObservationEnvelope(body: unknown): ObservationEnvelope 
 
   const b = body as Record<string, unknown>;
 
-  // Check required fields
-  const venueId = b.venueId ?? b.venue_id;
-  const eventId = b.eventId ?? b.event_id;
-  const sessionId = b.sessionId ?? b.session_id;
-  const schemaVersion = b.schemaVersion ?? b.schema_version ?? 2;
-  const occurredAt = b.occurredAt ?? b.occurred_at;
-  const type = b.type ?? b.eventType ?? b.event_type;
+  const tenantId = (b.tenantId ?? b.tenant_id ?? b.venueId ?? b.venue_id) as string;
+  const eventId = (b.eventId ?? b.event_id) as string;
+  const authorizedPublicationId = (b.authorizedPublicationId ??
+    b.authorized_publication_id) as string;
+  const sessionId = (b.sessionId ?? b.session_id) as string | undefined;
+  const schemaVersion = (b.schemaVersion ?? b.schema_version) as string;
+  const occurredAt = (b.occurredAt ?? b.occurred_at) as string;
+  const type = (b.type ?? b.eventType ?? b.event_type) as string;
+  const firstReceivedAt = (b.firstReceivedAt ??
+    b.first_received_at ??
+    b.receivedAt ??
+    b.received_at ??
+    new Date().toISOString()) as string;
 
-  if (typeof venueId !== 'string' || !venueId) {
-    throw new MalformedMessageError('Missing or invalid venueId');
+  if (typeof tenantId !== 'string' || !UUID_REGEX.test(tenantId)) {
+    throw new MalformedMessageError('Missing or invalid tenantId: must be a valid UUID');
   }
-  if (typeof eventId !== 'string' || !eventId) {
-    throw new MalformedMessageError('Missing or invalid eventId');
+  if (typeof eventId !== 'string' || !UUID_REGEX.test(eventId)) {
+    throw new MalformedMessageError('Missing or invalid eventId: must be a valid UUID');
+  }
+  if (typeof authorizedPublicationId !== 'string' || !UUID_REGEX.test(authorizedPublicationId)) {
+    throw new MalformedMessageError(
+      'Missing or invalid authorizedPublicationId: must be a valid UUID',
+    );
+  }
+  if (schemaVersion !== 'observation.v2') {
+    throw new MalformedMessageError(
+      `Unsupported schemaVersion: expected 'observation.v2', got ${JSON.stringify(schemaVersion)}`,
+    );
   }
   if (typeof occurredAt !== 'string' || Number.isNaN(Date.parse(occurredAt))) {
     throw new MalformedMessageError('Missing or invalid occurredAt timestamp');
   }
-  if (typeof type !== 'string' || !type) {
-    throw new MalformedMessageError('Missing or invalid observation type');
+  if (typeof firstReceivedAt !== 'string' || Number.isNaN(Date.parse(firstReceivedAt))) {
+    throw new MalformedMessageError('Missing or invalid firstReceivedAt timestamp');
+  }
+  if (typeof type !== 'string' || !ALLOWED_EVENT_TYPES.includes(type as AllowedEventType)) {
+    throw new MalformedMessageError(`Unsupported observation type: ${type}`);
   }
 
   const payload = (b.payload && typeof b.payload === 'object' ? b.payload : b) as Record<
@@ -83,14 +110,16 @@ export function validateObservationEnvelope(body: unknown): ObservationEnvelope 
   >;
 
   return {
-    venueId,
+    tenantId,
+    venueId: tenantId,
     eventId,
     sessionId: typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : undefined,
-    schemaVersion: Number(schemaVersion),
+    schemaVersion: 'observation.v2',
     occurredAt,
     type,
+    authorizedPublicationId,
     payload,
-    receivedAt: (b.receivedAt ?? b.received_at ?? new Date().toISOString()) as string,
+    firstReceivedAt,
   };
 }
 
@@ -124,8 +153,9 @@ export class QueueConsumer {
    * 1. Validate envelope.
    * 2. Canonicalize payload and compute deterministic SHA-256 checksum.
    * 3. Archive raw payload to R2 first using create-only semantics.
-   * 4. Persist canonical observation in Postgres (idempotently).
-   * 5. Handle duplicate or conflict outcomes.
+   *    (If a conflicting payload is detected, archive under a distinct conflict key).
+   * 4. Persist canonical observation in Postgres (idempotently with forced RLS).
+   * 5. Handle duplicate or conflict outcomes without rewriting original records.
    * 6. Return appropriate disposition.
    */
   async processMessage(body: unknown): Promise<MessageDisposition> {
@@ -139,14 +169,23 @@ export class QueueConsumer {
       return { status: 'dead_letter', reason };
     }
 
-    const { venueId, eventId, sessionId, occurredAt, schemaVersion, type, payload, receivedAt } =
-      envelope;
+    const {
+      tenantId,
+      eventId,
+      sessionId,
+      occurredAt,
+      schemaVersion,
+      type,
+      authorizedPublicationId,
+      payload,
+      firstReceivedAt,
+    } = envelope;
 
     // Step 2: Canonicalize and hash content
     const canonicalStr = canonicalizeJson(payload);
     const checksum = await sha256Hex(canonicalStr);
 
-    // Raw bytes of the payload for R2 archival (preserves raw incoming structure)
+    // Raw bytes of the payload for R2 archival
     let rawBytes: Uint8Array;
     if (typeof body === 'string') {
       rawBytes = new TextEncoder().encode(body);
@@ -158,7 +197,7 @@ export class QueueConsumer {
 
     let archiveKey: string;
     try {
-      archiveKey = buildRawArchiveKey(venueId, eventId, occurredAt);
+      archiveKey = buildRawArchiveKey(tenantId, eventId, occurredAt);
     } catch (err: unknown) {
       const reason = err instanceof Error ? err.message : 'Invalid archive key';
       this.log('error', 'Malformed message key, routing to dead letter', { reason });
@@ -175,37 +214,46 @@ export class QueueConsumer {
           existingChecksum: r2Result.existingChecksum,
         });
 
-        // If existing archive has a DIFFERENT checksum, this is an archive conflict!
+        // If existing archive has a DIFFERENT checksum, this is a conflict!
         if (r2Result.existingChecksum && r2Result.existingChecksum !== checksum) {
-          this.log('warn', 'R2 archive checksum discrepancy detected - quarantining as conflict', {
-            venueId,
+          this.log('warn', 'R2 archive checksum discrepancy detected - archiving to conflict key', {
+            tenantId,
             eventId,
             incomingChecksum: checksum,
             existingChecksum: r2Result.existingChecksum,
           });
 
-          this.trace('db.recordConflict', { venueId, eventId });
-          await this.deps.repository.recordConflict({
-            venueId,
+          // Write conflicting payload to its own distinct, deterministic R2 key
+          const conflictArchiveKey = buildConflictArchiveKey(
+            tenantId,
             eventId,
-            schemaVersion,
-            type,
             occurredAt,
-            receivedAt: receivedAt ?? new Date().toISOString(),
+            checksum,
+          );
+          await this.deps.r2Storage.putRawPayload(conflictArchiveKey, rawBytes, checksum);
+
+          this.trace('db.recordConflict', { tenantId, eventId });
+          const conflictOutcome = await this.deps.repository.recordConflict({
+            tenantId,
+            eventId,
             incomingChecksum: checksum,
-            originalChecksum: r2Result.existingChecksum,
-            incomingR2ArchiveKey: archiveKey,
-            incomingPayload: payload,
+            r2ArchiveKey: conflictArchiveKey,
+            receivedAt: firstReceivedAt ?? new Date().toISOString(),
           });
 
-          return { status: 'acknowledged', reason: 'conflict_recorded' };
+          return {
+            status: 'acknowledged',
+            reason: conflictOutcome.alreadyRecorded
+              ? 'duplicate_same_payload'
+              : 'conflict_recorded',
+          };
         }
       }
     } catch (err: unknown) {
       // Transient R2 failure -> retry message
       const error = err instanceof Error ? err : new Error(String(err));
       this.log('error', 'R2 raw archive write failed, triggering retry', {
-        venueId,
+        tenantId,
         eventId,
         error: error.message,
       });
@@ -214,64 +262,74 @@ export class QueueConsumer {
 
     // Step 4 & 5: Persist canonical observation in database
     try {
-      this.trace('db.persistCanonical', { venueId, eventId });
+      this.trace('db.persistCanonical', { tenantId, eventId });
       const outcome = await this.deps.repository.persistCanonical({
-        venueId,
+        tenantId,
         eventId,
         sessionId,
         schemaVersion,
-        type,
+        eventType: type,
+        authorizedPublicationId,
         occurredAt,
-        receivedAt: receivedAt ?? new Date().toISOString(),
+        firstReceivedAt: firstReceivedAt ?? new Date().toISOString(),
         checksum,
         r2ArchiveKey: archiveKey,
         payload,
       });
 
       if (outcome.disposition === 'accepted') {
-        this.log('info', 'Canonical observation accepted and persisted', { venueId, eventId });
+        this.log('info', 'Canonical observation accepted and persisted', { tenantId, eventId });
+        return { status: 'acknowledged', reason: 'persisted' };
+      }
+
+      if (outcome.disposition === 'rejected') {
+        this.log('info', 'Canonical observation rejected per business rules and persisted', {
+          tenantId,
+          eventId,
+          reasonCode: outcome.reasonCode,
+        });
         return { status: 'acknowledged', reason: 'persisted' };
       }
 
       if (outcome.disposition === 'duplicate') {
         this.log('info', 'Duplicate observation received with identical payload', {
-          venueId,
+          tenantId,
           eventId,
         });
         return { status: 'acknowledged', reason: 'duplicate_same_payload' };
       }
 
       if (outcome.disposition === 'conflict') {
-        this.log('warn', 'Event identity conflict detected - recording in conflict table', {
-          venueId,
+        this.log('warn', 'Event identity conflict detected in DB - recording in conflict table', {
+          tenantId,
           eventId,
           conflictReason: outcome.conflictReason,
         });
 
-        // Fetch original checksum for conflict log
-        const existing = await this.deps.repository.lookupExisting(venueId, eventId);
-        this.trace('db.recordConflict', { venueId, eventId });
-        await this.deps.repository.recordConflict({
-          venueId,
+        // Write conflicting payload to its own distinct, deterministic R2 key
+        const conflictArchiveKey = buildConflictArchiveKey(tenantId, eventId, occurredAt, checksum);
+        await this.deps.r2Storage.putRawPayload(conflictArchiveKey, rawBytes, checksum);
+
+        this.trace('db.recordConflict', { tenantId, eventId });
+        const conflictOutcome = await this.deps.repository.recordConflict({
+          tenantId,
           eventId,
-          schemaVersion,
-          type,
-          occurredAt,
-          receivedAt: receivedAt ?? new Date().toISOString(),
           incomingChecksum: checksum,
-          originalChecksum: existing?.checksum ?? 'unknown',
-          incomingR2ArchiveKey: archiveKey,
-          incomingPayload: payload,
+          r2ArchiveKey: conflictArchiveKey,
+          receivedAt: firstReceivedAt ?? new Date().toISOString(),
         });
 
-        return { status: 'acknowledged', reason: 'conflict_recorded' };
+        return {
+          status: 'acknowledged',
+          reason: conflictOutcome.alreadyRecorded ? 'duplicate_same_payload' : 'conflict_recorded',
+        };
       }
 
       return { status: 'acknowledged', reason: 'persisted' };
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.log('error', 'Database persistence failed, triggering retry', {
-        venueId,
+        tenantId,
         eventId,
         error: error.message,
       });
