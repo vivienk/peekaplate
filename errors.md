@@ -379,3 +379,80 @@ These records describe local validation limits, not application failures.
 ```json
 {"id":"OBS-20261024-INFRA-TOOLING-001","status":"resolved","area":"operator-tooling","observation":"Initial account-wide R2 inventory could not choose between two authorized accounts; a CORS read returned the documented no-configuration 404. A local probe syntax check, one atomic documentation patch and an intermediate scan-draft schema submission also rejected invalid local input before completion.","cause":"Account selection must be explicit for these commands; no CORS configuration is represented by provider error 10059. Local tooling input did not match its file/API schema.","prevention":"Pin the intended non-secret account, distinguish the exact no-CORS response from other errors, syntax-check probes before execution, inspect patch context and use documented scan fields. Never print credential-bearing subprocess output.","regression":"Corrected account-specific inventory, private-bucket readback, real R2/Queue probes and scan checkpoint succeeded. No token, raw analytics payload or private conversation was retained."}
 ```
+
+## OBS-20261022-VIS02-DRAFT-PREPARATION
+
+- Observation: the imported processing source has whitespace-only blank lines that
+  fail the default `git diff --check`; the user source style is retained for this
+  draft. This is a known review-preparation limitation, not a runtime test result.
+- Observation: the first offline package build could not create a temporary lock
+  in the read-only user uv cache. Repeating with a task-local writable cache
+  built both wheel and source distribution successfully.
+- Evidence: `uv --cache-dir /tmp/peeka-uv-cache build --offline --project
+  /tmp/peeka-vis02-review/processing --out-dir /tmp/peeka-vis02-dist` passed.
+  The isolated current processing suite passed all 82 tests with mocked providers.
+- Scope: no provider calls, application behavior change or performance refinement.
+
+## OBS-20261023-VIS02-REVIEW-CORRECTIONS
+
+- Cause: document iteration loaded each page before the per-page try block.
+  A failing synthetic middle-page load aborted extraction before the later page.
+- Correction: iterate bounded page indices and load inside the existing guard;
+  the regression now preserves ready/failed/ready segments and exact identities.
+- Test portability: cache hit/retry checks remain unconditional; mode 0600 is
+  asserted only on POSIX, without claiming verified Windows ACL privacy.
+- Test scheduling: SDK cancellation waits for mocked HTTP start; existing
+  wall-clock deadline tests cover timeout rejection and sibling-batch retention.
+- Cleanup: removed only the 18 imported whitespace-only lines flagged in review.
+  Reconciled current develop documentation and refreshed affected fingerprints.
+- No live provider calls or latency refinements were made for these corrections.
+
+- Packaging check: an existing ignored source-directory .env was included by the build backend. Added explicit source exclusions (also applied to wheels), retained the local env, and rebuilt the distributions for archive inspection. No artifacts were uploaded.
+
+## OBS-20261023-VIS02-LIVE-PDF
+
+Fresh OCR acquired all35pages in268.779s without old cache reuse. Allfour default LLM batches hit90s deadlines; a one-page/concurrency2 follow-up reused the fresh OCR and retained161 needs_review drafts in549.035s. Four pages timed out and six unsupported names were rejected; result remains incomplete. Source spans verified, field accuracy and acceptance pending. Defaults were not changed. See docs/ocr-delivery.md and test-data/README.md.
+
+## OBS-20261023-VIS02-CI-FORMAT
+
+Hosted run39931137291 failed biome formatting in scripts/processing-handoff.test.mjs; browser/database and docs/context/PR checks passed. Applied only the requested call/destructuring wraps. The same run showed account cache egress quota exhaustion and a roughly10minute setup delay; removed optional pnpm cache restore while preserving frozen installs and all checks. Node24.16.0/pnpm11.25.0 are available in temporary local tooling for native verification.
+
+Native verification: biome/typecheck/context/docs passed using pinned Node24.16.0/pnpm11.25.0. All56 Vitest cases and23 repository-script tests passed with bounded workers. One initial script-test invocation lacked the pnpm executable on PATH; rerunning in the installed pnpm environment passed without a source change.
+
+## OBS-20261024-VIS02-OCR-PROVENANCE
+
+An injected provider returning Engine 2 settings was accepted as complete while
+segment/report labels claimed Engine 3, for both image and PDF input. The new
+regressions reproduced this before the fix. Both callers now validate the
+current Engine-3-compatible response contract before accepting text; incompatible
+or missing settings fail the segment while native sibling pages survive.
+The 89-test Python suite passes with mocked providers; no live calls were made.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-24T06:28:20.278Z","exitCode":1}
+```
+
+Local verification initially lacked the cached pnpm launcher on PATH; native
+commands were rerun with that directory included. A main-checkout package-manager
+autostart was avoided by running its dependency-free context/link scripts directly.
+The first archive inspection also attempted to read uv's non-archive metadata;
+restricting inspection to wheel/sdist files passed. These were local command
+setup issues; no dependency, runtime or environment configuration was changed.
+
+The current develop branch advanced to 5da1642 before publication. GitHub blocked
+pull-request CI on shared context/error-ledger conflicts. Reconciled those files
+by preserving develop nodes/records and retaining this processing node/handoff;
+processing sources were unchanged. Repeated 89 Python tests and native quality,
+context and documentation checks passed on the reconciled tree.
+
+## OBS-20261024-VIS02-SHARED-DOC-MERGE
+
+Current develop 245b780 conflicted with the VIS-02 branch in shared context and
+error records. Retained develop module descriptions and recent infrastructure/
+team-access handoffs, the processing node and both appended error histories.
+Only the older design-link-only handoff was retired within the ten-entry cap.
+Processing files are unchanged from reviewed 0e3f204. The 89 Python tests, four
+context/Unicode script tests, context freshness and local documentation links
+passed. PR #23 remains separate; reconcile its merged result and rerun CI before
+the final integrated approval in the agreed #23 -> #24 -> #25 order.

@@ -190,7 +190,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "4b887c58755cf31dd931c14cab2887066ae0d72e0afcd425f04b949e30922957"
+      "sourceFingerprint": "a6b7acbb465ffd51390a48ec7cc40b6b158a57d0d75817d80f5c04c9a0acf6c7"
     },
     {
       "id": "agents",
@@ -248,9 +248,62 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "sourceFingerprint": "1dd5e77257b699965de953a06b67cae41efa432a18b804d92f6e69d68988d8e0"
+    },
+    {
+      "id": "processing",
+      "status": "foundation",
+      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending.",
+      "paths": [
+        "processing/.gitignore",
+        "processing/.python-version",
+        "processing/README.md",
+        "processing/pyproject.toml",
+        "processing/src/peekaplate_processing/__init__.py",
+        "processing/src/peekaplate_processing/check_llm.py",
+        "processing/src/peekaplate_processing/errors.py",
+        "processing/src/peekaplate_processing/extract_menus.py",
+        "processing/src/peekaplate_processing/images.py",
+        "processing/src/peekaplate_processing/model_cache.py",
+        "processing/src/peekaplate_processing/ocr_regions.py",
+        "processing/src/peekaplate_processing/ocr_space.py",
+        "processing/src/peekaplate_processing/pdf.py",
+        "processing/src/peekaplate_processing/run_pipeline.py",
+        "processing/src/peekaplate_processing/schemas.py",
+        "processing/src/peekaplate_processing/sources.py",
+        "processing/src/peekaplate_processing/storage.py",
+        "processing/src/peekaplate_processing/workflow.py",
+        "processing/tests/fixture_factory.py",
+        "processing/tests/test_ocr_regions.py",
+        "processing/tests/test_ocr_space.py",
+        "processing/tests/test_pdf_images.py",
+        "processing/tests/test_schemas.py",
+        "processing/tests/test_workflow.py",
+        "processing/uv.lock",
+        "docs/ocr-delivery.md",
+        "processing/tests/fixtures/source-spans.json",
+        "processing/tests/test_handoff.py",
+        "scripts/processing-handoff.test.mjs",
+        "processing/src/peekaplate_processing/ocr.py",
+        "processing/tests/test_ocr_provider.py",
+        "test-data/README.md"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0005-tenancy-and-privacy.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "929fb3bbb31657ffe307c3d5040770955f5ecd7d488af3f0ea329ed0bb05f119"
     }
   ],
   "handoffs": [
+    {
+      "summary": "Reconciled current develop 245b780 into the VIS-02 review branch. Preserved newer staging infrastructure and team-access module descriptions/handoffs, the processing node and both append-only error histories. OCR/LLM processing is unchanged from reviewed 0e3f204; Engine 3 compatibility and partial-page behavior remain covered.",
+      "modules": [
+        "processing",
+        "delivery"
+      ],
+      "next": "Run current-head CI and request Sai recheck. Keep merge order #23 -> #24 -> #25; once #23 lands, reconcile against that result and rerun integrated checks before final approval. Live accuracy and PM acceptance remain open."
+    },
     {
       "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
       "modules": [
@@ -295,13 +348,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Finish exact-head review and CI for the local recovery PR. Keep the GitHub protection policy in a separate owner-action PR; stop before Cloudflare/Supabase integration until protected credentials are supplied."
-    },
-    {
-      "summary": "Corrected the design hyperlink in docs/team_guide.md to the owner-supplied Figma Make diner-menu V1 URL. No design or runtime behavior changed.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Use the linked Figma Make diner-menu V1 as the referenced design handoff."
     },
     {
       "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",

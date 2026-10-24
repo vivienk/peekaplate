@@ -27,7 +27,7 @@ Staging observation infrastructure is provisioned: the source Queue and DLQ are 
 | Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
 | Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
 | Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
-| Processing and analysis | Python, uv, pytest | Accepted scope in [ADR 0001](docs/adr/0001-scope-and-repository.md); no job, package or runtime dependency implemented |
+| Processing and analysis | Python, uv, Pydantic | [Local PDF/image acquisition and LLM dish drafts](processing/README.md); needs-review output, application integration and quality acceptance pending |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
 Frontends and backend share contracts. Frontends do not import backend internals or hold database credentials. Authorization belongs to the backend; venue authority must derive from verified identity and membership. Database policies support this boundary; they do not authenticate callers.
@@ -76,6 +76,7 @@ packages/contracts/  Shared runtime schemas and types
 migrations/          Ordered SQL migrations
 tests/               Database and browser integration tests
 scripts/             Repository checks and local test tools
+processing/          Local Python OCR and LLM dish extraction
 docs/                Architecture, decisions, delivery and context
 ```
 
@@ -151,3 +152,9 @@ Each contributor installs and authenticates their own Claude or Codex client and
 ## Optional product analytics
 
 See [PostHog setup and evidence limits](docs/posthog.md) for consent, separate staging/production build variables, taxonomy mapping, validation and manual project setup. Tracking is disabled until configured; current shells do not publish menu or owner-report events.
+
+Python processing uses `uv sync --project processing --frozen` and
+`uv run --project processing --frozen python -m unittest discover -s processing/tests`.
+The local package and review boundaries are described in the
+[processing guide](processing/README.md) and [delivery handoff](docs/ocr-delivery.md).
+Python tests and package builds run in CI alongside the repository checks.
