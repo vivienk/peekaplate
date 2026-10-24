@@ -1,9 +1,8 @@
 /*
  * Shared design tokens consumed by the diner and console apps (S3-TOK-01).
- * Motion values come from the design team's Animation specification; typography and corner
- * radius from the Design System. Color, spacing and elevation tokens join this file once their
- *Spacing and shadows come from the Design System; color tokens join this file once their Figma values are approved.
- * Figma values are approved.
+ * Motion values come from the design team's Animation specification; typography, corner
+ * radius, spacing, shadows and the color palette from the Design System pages. Color roles
+ * map palette colors to Button and Navigation controls and to general semantic uses.
  */
 :root {
   /* Easing. The specification's "custom ease-out" curve is not yet supplied; the standard
