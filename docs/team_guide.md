@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Infrastructure updated October 18, 2026; PostHog export and dashboard-freshness guidance updated October 20. The team research and board inventory below remains the dated October 14 snapshot.
+Infrastructure and team analytics access updated October 22, 2026. The team research and board inventory below remains the dated October 14 snapshot.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
 
@@ -41,13 +41,15 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
 | Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
-| PostHog analytics | Opt-in shell views verified from both hosted staging sites | Activate the private Supabase export; menu work and approved control instrumentation can proceed independently |
+| PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Accepted extension in the architecture | Implement, test and choose a runtime for the first specific job |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
 
 ### Where to open staging
+
+The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is now provisioned and tested with synthetic messages. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. The staging binding configuration needs its reviewed release before the API Worker can use it; actual archive-to-database processing remains separate work.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -98,9 +100,9 @@ Photo files belong in file storage; the database will hold their references, own
 3. Test that deployed version and record its commit, deployment IDs and results.
 4. Once production exists and release approval is given, deploy that same tested commit with separate production resources.
 
-Today, Pages receives manually uploaded builds and the Worker was deployed with Wrangler, Cloudflare's deployment tool. Automatic GitHub deployment remains disabled behind its activation gate. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
+Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The running apps were built from `bb56cef94f09f4937a89532cf1f28d47d323a171`. Subsequent documentation commits do not change those running apps. [Operations](operations.md#staging-deployment-record) records deployment IDs and test evidence.
+The Worker now runs main release `afe45db`. The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. [Operations](operations.md#team-analytics-hosted-verification--october-22-2026) records the current Worker version and test evidence; the older deployment record preserves the earlier staff-command checks.
 
 ### Verified behavior, access and costs
 
@@ -229,7 +231,7 @@ Before connecting a job to staging, test a successful result, bad input, a timeo
 
 ### What PostHog adds, and what it does not
 
-For team inspection, the new read API lets any current repository collaborator use their own GitHub token to ask the Worker for safe staging events or technical counts. Nobody needs our export password or database administrator key. The Worker verifies their GitHub identity and current collaborator status before asking Supabase; data still arrives through PostHog's hourly export. This is a development tool, not the restaurant-owner dashboard. Hosted activation is still pending; the repository owner’s [activation checklist](team-data-access.md#repository-owner-activate-and-hand-over) describes credentials, release order and access tests before team use. See [team data access](team-data-access.md) for authentication, API examples, permissions and the migration/deployment checkpoint.
+For team inspection, the deployed read API lets any current repository collaborator use their own GitHub token to ask the Worker for safe staging events or technical counts. Nobody needs our export password or database administrator key. The Worker verifies their GitHub identity and current collaborator status before asking Supabase; data still arrives through PostHog's hourly export. Both endpoints returned 200 using Sai's GitHub account, and missing or invalid tokens returned 401. On October 23, Harshita helped verify that a valid non-collaborator received 403 from both endpoints, twice. The separate controlled collaborator-removal check remains pending. This is a development tool, not the restaurant-owner dashboard. See [team data access](team-data-access.md) for the URL, authentication, examples and dated evidence.
 
 **Both hosted staging pages now send consented test events to PostHog, and those records were checked in PostHog.** For now, the two screens are starter pages. Clicking **Allow optional analytics** sends one `app_shell_viewed` event: a small record saying which screen was viewed and that this is staging. PostHog turns those records into an internal chart. It does not mean a diner opened a published menu or ordered food.
 
@@ -258,7 +260,7 @@ PostHog remains useful for the team's optional usage charts and later checks aga
 
 **Files behind this:** [analytics/index.ts](../packages/analytics/src/index.ts) checks configuration and consent, builds the allowed event fields and limits network requests. [analytics/consent.ts](../packages/analytics/src/consent.ts) provides the opt-in button. [diner/main.ts](../frontend/diner/src/main.ts) and [console/main.tsx](../frontend/console/src/main.tsx) connect it to each screen. [Unit tests](../packages/analytics/src/index.test.ts) and [browser tests](../tests/e2e/posthog.spec.ts) check allowed, blocked and failed capture. [posthog.md](posthog.md) is the operator's setup and verification record.
 
-**What comes next:** finalize the diner design states, build approved menu controls and connect their agreed events. The private Supabase export can be activated in parallel; it does not block those tickets. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
+**What comes next:** finalize the diner design states, build approved menu controls and connect their agreed events. The private Supabase export and separate team inspection API are deployed; use [the access guide](team-data-access.md) with your own GitHub token. Collaborator access and genuine outsider denial have passed; the controlled collaborator-removal check remains before full access acceptance. Local work with synthetic fixtures can continue. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
 
 ### What T0, T1 and T2 mean
 

@@ -1,0 +1,16 @@
+[
+  {
+    "segment_id": "synthetic-menu#page-1",
+    "text": "Soup 🍜 $8.50",
+    "evidence_text": "Soup 🍜 $8.50",
+    "code_point_span": { "start": 0, "end": 12 },
+    "utf16_span": { "start": 0, "end": 13 }
+  },
+  {
+    "segment_id": "synthetic-menu#page-2",
+    "text": "Special 🍲: Soup 🍜 $8.50 - Extra Spicy",
+    "evidence_text": "Soup 🍜 $8.50",
+    "code_point_span": { "start": 11, "end": 23 },
+    "utf16_span": { "start": 12, "end": 25 }
+  }
+]

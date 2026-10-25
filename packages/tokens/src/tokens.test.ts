@@ -44,6 +44,8 @@ describe('design tokens', () => {
   it('match the Design System corner radius scale', async () => {
     const { base } = await tokenBlocks();
     expect(group(base, radius)).toEqual({
+      '--pp-radius-0': '0px',
+      '--pp-radius-2': '2px',
       '--pp-radius-4': '4px',
       '--pp-radius-6': '6px',
       '--pp-radius-8': '8px',
@@ -255,14 +257,15 @@ describe('design tokens', () => {
       '--pp-line-height-h4': '2rem',
       '--pp-font-size-h5': '1.125rem',
       '--pp-line-height-h5': '1.75rem',
+      '--pp-line-height-h5-bold': '1.5rem',
       '--pp-font-size-paragraph-1': '1rem',
       '--pp-line-height-paragraph-1': '1.5rem',
       '--pp-font-size-paragraph-2': '0.875rem',
-      '--pp-line-height-paragraph-2': '1.5rem',
+      '--pp-line-height-paragraph-2': '1.375rem',
       '--pp-font-size-small': '0.75rem',
       '--pp-line-height-small': '1rem',
       '--pp-font-size-footer': '0.625rem',
-      '--pp-line-height-footer': '0.75rem',
+      '--pp-line-height-footer': '0.875rem',
     });
   });
 
