@@ -369,4 +369,44 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('validates VIS-02 compatible source inputs, OCR methods, and provenance', () => {
+    // 1. SourceInputSchema accepting 'image' and 'website' kinds with sha256 & provenance
+    const imageSource = {
+      source_id: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      kind: 'image' as const,
+      sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      retrieved_at: '2026-10-22T20:00:00.000Z',
+      size_bytes: 1024,
+      segments: [
+        {
+          segment_id:
+            'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855#image-1',
+          text: 'Clam Chowder $11.50',
+          page_number: 1,
+          method: 'ocr_space_engine3' as const,
+          status: 'ready' as const,
+          metadata: { engine: 3, bounding_box: [10, 20, 100, 200] },
+          warnings: ['Low confidence OCR on line 1'],
+        },
+      ],
+    };
+
+    const reqWithImage = RetrievalRequestSchema.safeParse({
+      query: 'Clam Chowder',
+      sources: [imageSource],
+    });
+    expect(reqWithImage.success).toBe(true);
+
+    // 2. SourceReferenceSchema with full URL provenance
+    const refWithProvenance = {
+      source_id: 'src_url_1',
+      segment_id: 'src_url_1#seg-1',
+      source_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      original_url: 'https://example.com/menu',
+      final_url: 'https://example.com/menu/dinner',
+      retrieved_at: '2026-10-22T20:00:00.000Z',
+    };
+    expect(SourceReferenceSchema.safeParse(refWithProvenance).success).toBe(true);
+  });
 });

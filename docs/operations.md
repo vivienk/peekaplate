@@ -1,8 +1,14 @@
 # Local and staging operations
 
+## Observation infrastructure — October 24, 2026
+
+Created only the missing staging source Queue and DLQ in the existing account, reused private `peekaplate-staging-assets`, and verified source retry-to-DLQ routing with HTTP pull consumers. The complete synthetic repeat at `2026-10-24T17:30:36.147Z` passed archive/readback before ACK, initial delivery plus three retries, DLQ arrival and exact probe cleanup. A separate real R2 concurrency check allowed exactly one create-only writer and preserved its bytes on conflicting attempts. Provider readback confirms both Queues empty and paused, 24-hour retention, `r2.dev` disabled, no custom domain and no CORS rule. No production resource, application consumer, database fact or unfinished PR changed.
+
+The [observation infrastructure handoff](observation-infrastructure.md) records names/IDs, configuration, test limits and consumer replacement steps. Staging producer/R2 bindings are prepared in `backend/wrangler.jsonc`; their live activation requires the reviewed `main` deployment. No ingestion route or successful placeholder Queue handler is added. This new setup record advances the earlier provisioning checkpoint below without claiming the full observation pipeline is implemented.
+
 ## Team analytics hosted verification — October 22, 2026
 
-The staging Worker is deployed and its collaborator read path works. This record supersedes the earlier same-day prerequisite audit below. Full hosted acceptance still awaits the two controlled 403 checks, which the maintainer explicitly deferred. This is staging development access, not pilot or production sign-off.
+The staging Worker is deployed and its collaborator read path works. This record supersedes the earlier same-day prerequisite audit below. The two hosted 403 cases were initially deferred; the [October 23 follow-up](#non-collaborator-confirmation--october-23-2026) now records successful non-collaborator denial. Controlled collaborator removal remains pending. This is staging development access, not pilot or production sign-off.
 
 | Release item | Verified result |
 | --- | --- |
@@ -37,11 +43,29 @@ The PostHog export remains enabled/hourly, including only `app_shell_viewed` wit
 
 ### Remaining boundary
 
-- **Deferred hosted 403 cases:** a valid non-collaborator token; a controlled disposable collaborator returning 200 before removal and 403 afterward. Random credentials test 401, not membership denial. Do not remove a real teammate. Local denial/revocation tests are separate evidence.
+- **Non-collaborator denial: PASS**, as recorded in the October 23 follow-up below. **Controlled collaborator removal: NOT RUN**; a disposable collaborator must return 200 before removal and 403 afterward. Random credentials test 401, not membership denial. Do not remove a real teammate. Local denial/revocation tests are separate evidence.
 - Existing successful staff-write, concurrency and revocation evidence remains below. This release rechecked unauthenticated staff denial and database permissions without repeating that full hosted write sequence.
 - Production has no configured application deployment or separate database/bindings. There is no hosted production endpoint to accept here. Production-mode route denial is covered locally; it is not a production deployment test. Pilot load, restore, monitoring/retention/billing ownership and production approval remain separate delivery work.
 
-Contributors can continue tickets with local fixtures and the bounded staging read API. Share [team data access](team-data-access.md), not provider passwords or the checker token. Complete the deferred identity tests before closing full hosted acceptance. This documentation update does not deploy a newer application revision.
+Contributors can continue tickets with local fixtures and the bounded staging read API. Share [team data access](team-data-access.md), not provider passwords or the checker token. Complete the controlled removal test before closing full hosted acceptance. This documentation update does not deploy a newer application revision.
+
+### Non-collaborator confirmation — October 23, 2026
+
+Harshita helped complete the remaining outsider check. The maintainer supplied two successful terminal reports from a valid non-collaborator account, using the [repository checker introduced in PR #33](https://github.com/vivienk/peekaplate/pull/33). The second run followed a fresh `develop` clone. These are user-run hosted results, not a new test executed by the documentation editor.
+
+| Evidence | First run | Fresh-clone repeat |
+| --- | --- | --- |
+| Verification time (UTC) | `2026-10-24T05:52:32.802Z` | `2026-10-24T06:07:16.871Z` |
+| GitHub `/user` | 200; expected account matched | 200; expected account matched |
+| Staging events | 403; `error=forbidden` | 403; `error=forbidden` |
+| Events request ID | `e5c56d75-4c30-4bfa-8cc1-48736a0d6494` | `caff985f-24b6-4a4a-8deb-93741b07425d` |
+| Staging summary | 403; `error=forbidden` | 403; `error=forbidden` |
+| Summary request ID | `3c8c3962-48d1-4e69-b3b7-41af1274761f` | `260bf8ee-c591-4b88-bba9-4d340f747fb0` |
+| Checker outcome | PASS | PASS |
+
+Both UTC timestamps fall on October 23 in America/Phoenix. Target: `https://peekaplate-api-staging.vxkong.workers.dev`, with the checker's fixed historical query window. This verifies denial for the tested valid outsider identity on both routes; it does not measure data freshness. No token, password, raw analytics body or private conversation is retained here. The reports do not identify a new Worker release; the latest recorded deployment remains `afe45db` above.
+
+The collaborator 200 and invalid-token 401 evidence remains in the October 22 record. The outsider 403 check is now complete, and the staging inspection API is available to accepted repository collaborators. Controlled collaborator-removal acceptance and production verification remain NOT RUN. No access grants, migration, provider setting or deployment changed for this confirmation.
 
 ## PostHog export handoff — October 21, 2026
 
@@ -83,7 +107,7 @@ A read-only SQL transaction against staging project `icwhkrlsecpzcomfjsso` initi
 
 Project-local Wrangler authenticated successfully with the operator's existing OAuth credential and could list the intended account's Worker secrets; the staging Worker returned an empty secret list. This verifies the operator connection, **not** the separate `CLOUDFLARE_API_TOKEN` or `TEAM_GITHUB_TOKEN` stored in GitHub. Both GitHub environment secret names exist, but their values, expiry and effective permissions remain unverified. GitHub secrets cannot be read back for local testing. Test them only through an approved protected runner without printing them; do not substitute the operator's OAuth result as evidence for those tokens.
 
-At this earlier audit the activation variable was unset and deployment remained disabled. Vivien subsequently enabled it after completing the prerequisites; the protected release and hosted positive checks are recorded above. The two hosted 403 cases remain deferred. The earlier audit itself changed no credentials, provider resources or deployment settings.
+At this earlier audit the activation variable was unset and deployment remained disabled. Vivien subsequently enabled it after completing the prerequisites; the protected release and hosted positive checks are recorded above. The October 23 follow-up closes outsider denial; controlled collaborator removal remains deferred. The earlier audit itself changed no credentials, provider resources or deployment settings.
 
 ## Staging deployment record
 

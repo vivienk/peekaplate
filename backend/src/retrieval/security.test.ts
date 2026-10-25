@@ -278,5 +278,63 @@ describe('S3-VIS-04 Security & SSRF Protection Boundary', () => {
       expect(result.content).toContain('Ignore all previous instructions');
       expect(result.content).toContain('French Onion Soup');
     });
+
+    it('enforces general 12MB limit for non-HTML sources and rejects oversized payloads', async () => {
+      const { MAX_SOURCE_BYTES } = await import('./fetcher');
+      const mockFetch: typeof fetch = async () => {
+        return new Response(null, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Length': String(MAX_SOURCE_BYTES + 1024),
+          },
+        });
+      };
+
+      await expect(
+        safeFetch('https://example.com/huge-menu.pdf', {
+          customFetch: mockFetch,
+          allowLocalTestDestinations: true,
+        }),
+      ).rejects.toThrow(FetchError);
+    });
+
+    it('supports timeout and abort signal cancellation during fetch', async () => {
+      const mockFetch: typeof fetch = async (_url, init) => {
+        const signal = init?.signal;
+        return new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException('The operation was aborted', 'TimeoutError'));
+            return;
+          }
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'TimeoutError'));
+          });
+        });
+      };
+
+      await expect(
+        safeFetch('https://example.com/slow-menu', {
+          customFetch: mockFetch,
+          timeoutMs: 50,
+          maxRetries: 0,
+          allowLocalTestDestinations: true,
+        }),
+      ).rejects.toThrow(FetchError);
+    });
+
+    it('handles IPv6 prohibited address resolution correctly', async () => {
+      const mockDns = async () => [{ address: 'fe80::1', family: 6 }]; // Link-local IPv6
+      await expect(
+        validateDestination('https://ipv6-bad.example.com/menu', { dnsLookup: mockDns }),
+      ).rejects.toThrow(SecurityValidationError);
+    });
+
+    it('validates a permitted public HTTPS destination successfully', async () => {
+      const mockDns = async () => [{ address: '93.184.216.34', family: 4 }];
+      const result = await validateDestination('https://example.com/menu', { dnsLookup: mockDns });
+      expect(result.url.protocol).toBe('https:');
+      expect(result.resolvedIPs).toEqual(['93.184.216.34']);
+    });
   });
 });

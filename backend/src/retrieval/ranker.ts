@@ -14,6 +14,14 @@ export type CandidatePassage = {
   start_offset: number;
   end_offset: number;
   score: number;
+  provenance?:
+    | {
+        source_sha256?: string | undefined;
+        original_url?: string | undefined;
+        final_url?: string | undefined;
+        retrieved_at?: string | undefined;
+      }
+    | undefined;
 };
 
 export type RankingOptions = {
@@ -199,7 +207,38 @@ export function extractPassageFromSegment(
     start_offset: startOffset,
     end_offset: endOffset,
     score,
+    ...(segment.provenance ? { provenance: segment.provenance } : {}),
   };
+}
+
+/**
+ * Extracts and normalizes explicit prices from text for conflict detection.
+ */
+export function extractPrices(text: string): string[] {
+  const priceRegex =
+    /(?:\$|CAD|USD|EUR|€|£)\s*(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)|\b(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})\b/g;
+  const prices = new Set<string>();
+  for (const m of text.matchAll(priceRegex)) {
+    const val = m[1] ?? m[2];
+    if (val !== undefined) {
+      const cleanVal = val.replace(/,/g, '');
+      const num = Number.parseFloat(cleanVal);
+      if (!Number.isNaN(num) && num >= 0) {
+        prices.add(num.toFixed(2));
+      }
+    }
+  }
+  return [...prices].sort();
+}
+
+/**
+ * Checks whether two candidate passages contain mutually conflicting explicit prices.
+ */
+export function hasConflictingPrices(textA: string, textB: string): boolean {
+  const pricesA = extractPrices(textA);
+  const pricesB = extractPrices(textB);
+  if (pricesA.length === 0 || pricesB.length === 0) return false;
+  return pricesA.some((p) => !pricesB.includes(p)) || pricesB.some((p) => !pricesA.includes(p));
 }
 
 /**
@@ -222,6 +261,8 @@ function jaccardSimilarity(textA: string, textB: string): number {
 
 /**
  * Deduplicates and ranks candidate passages deterministically.
+ * Preserves conflicting evidence (e.g. differing prices for the same dish)
+ * so that contradictions remain visible for ambiguity detection.
  */
 export function rankAndBoundPassages(
   candidates: CandidatePassage[],
@@ -242,13 +283,15 @@ export function rankAndBoundPassages(
     return a.start_offset - b.start_offset;
   });
 
-  // 3. Deduplication
+  // 3. Deduplication with contradiction preservation
   const deduplicated: CandidatePassage[] = [];
+  let detectedConflict = false;
+
   for (const cand of filtered) {
     let isDuplicate = false;
 
     for (const existing of deduplicated) {
-      // Check segment overlap
+      // Check segment overlap within the same segment of the same source
       if (cand.source_id === existing.source_id && cand.segment_id === existing.segment_id) {
         if (cand.start_offset < existing.end_offset && cand.end_offset > existing.start_offset) {
           isDuplicate = true;
@@ -258,6 +301,14 @@ export function rankAndBoundPassages(
 
       // Check text Jaccard similarity
       if (jaccardSimilarity(cand.text, existing.text) > 0.8) {
+        // If the candidates contain conflicting explicit prices or details, do NOT discard them!
+        // Preserving both candidates allows conflict detection to surface the contradiction.
+        if (hasConflictingPrices(cand.text, existing.text)) {
+          detectedConflict = true;
+          // Do not treat as duplicate
+          continue;
+        }
+
         isDuplicate = true;
         break;
       }
@@ -268,28 +319,25 @@ export function rankAndBoundPassages(
     }
   }
 
-  // 4. Check for ambiguity: multiple top-ranking candidates with near-equal scores
-  // but differing dish details or prices
-  let isAmbiguous = false;
-  if (deduplicated.length >= 2) {
-    const cand0 = deduplicated[0];
-    const cand1 = deduplicated[1];
-    if (cand0 && cand1) {
-      const topScore = cand0.score;
-      const secondScore = cand1.score;
-      if (topScore >= 0.7 && Math.abs(topScore - secondScore) < 0.05) {
-        // Check if they reference different sources or have differing prices
-        const priceRegex = /\$\s*(\d+(?:\.\d{2})?)/g;
-        const prices0 = [...cand0.text.matchAll(priceRegex)].map((m) => m[1]);
-        const prices1 = [...cand1.text.matchAll(priceRegex)].map((m) => m[1]);
-        if (
-          prices0.length > 0 &&
-          prices1.length > 0 &&
-          JSON.stringify(prices0) !== JSON.stringify(prices1)
-        ) {
+  // 4. Check for ambiguity: conflicting details detected during deduplication
+  // or multiple top-ranking candidates with near-equal scores but differing prices
+  let isAmbiguous = detectedConflict;
+
+  if (!isAmbiguous && deduplicated.length >= 2) {
+    const topScore = deduplicated[0]?.score ?? 0;
+    const candidatesToCheck = deduplicated.filter(
+      (c) => c.score >= 0.5 && Math.abs(topScore - c.score) <= 0.15,
+    );
+    for (let i = 0; i < candidatesToCheck.length; i++) {
+      for (let j = i + 1; j < candidatesToCheck.length; j++) {
+        const c1 = candidatesToCheck[i]!;
+        const c2 = candidatesToCheck[j]!;
+        if (hasConflictingPrices(c1.text, c2.text)) {
           isAmbiguous = true;
+          break;
         }
       }
+      if (isAmbiguous) break;
     }
   }
 
@@ -312,6 +360,10 @@ export function rankAndBoundPassages(
       source: {
         source_id: cand.source_id,
         segment_id: cand.segment_id,
+        ...(cand.provenance?.source_sha256 ? { source_sha256: cand.provenance.source_sha256 } : {}),
+        ...(cand.provenance?.original_url ? { original_url: cand.provenance.original_url } : {}),
+        ...(cand.provenance?.final_url ? { final_url: cand.provenance.final_url } : {}),
+        ...(cand.provenance?.retrieved_at ? { retrieved_at: cand.provenance.retrieved_at } : {}),
       },
       text: cand.text,
       start_offset: cand.start_offset,

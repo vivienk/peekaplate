@@ -92,6 +92,13 @@ export const MAX_AGGREGATE_PASSAGE_CHARS = 16000;
 export const SourceReferenceSchema = z.strictObject({
   source_id: z.string().min(1),
   segment_id: z.string().min(1),
+  source_sha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  original_url: z.string().url().optional(),
+  final_url: z.string().url().optional(),
+  retrieved_at: z.iso.datetime({ offset: true }).optional(),
 });
 
 export const EvidencePassageSchema = z
@@ -182,15 +189,26 @@ export const SourceInputSegmentSchema = z.strictObject({
   segment_id: z.string().min(1),
   text: z.string(),
   page_number: z.number().int().positive().optional(),
-  method: z.enum(['text', 'html', 'pdf_native', 'ocr']).optional(),
+  method: z.enum(['text', 'html', 'pdf_native', 'ocr', 'ocr_space_engine3']).optional(),
+  status: z.enum(['ready', 'skipped', 'failed']).optional(),
+  error: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const SourceInputSchema = z.strictObject({
   source_id: z.string().min(1),
-  kind: z.enum(['url', 'html', 'text', 'pdf']),
+  kind: z.enum(['url', 'html', 'text', 'pdf', 'image', 'website']),
   location: z.string().min(1).optional(),
   content: z.string().optional(),
   segments: z.array(SourceInputSegmentSchema).optional(),
+  sha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  retrieved_at: z.iso.datetime({ offset: true }).optional(),
+  size_bytes: z.number().int().positive().max(12_000_000).optional(),
+  snapshot_base64: z.string().optional(),
 });
 
 export const RetrievalRequestSchema = z.strictObject({

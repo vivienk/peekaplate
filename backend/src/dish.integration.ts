@@ -57,6 +57,21 @@ async function request(dishId: string, body = command(), tenant = venue, subject
   });
 }
 
+async function requestEvidence(
+  body: unknown = { query: 'Tuscan White Bean Soup' },
+  tenant = venue,
+  subject = actor,
+) {
+  return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menu-evidence`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await token(subject)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 async function counts(dishId: string) {
   const result = await admin.query(
     `SELECT
@@ -428,5 +443,71 @@ describe('real PostgreSQL staff command', () => {
     } finally {
       await client.end();
     }
+  });
+
+  describe('Finding P1: menu evidence database authorization under restricted database role', () => {
+    it('authorizes a valid venue owner with 200 under restricted database role', async () => {
+      const response = await requestEvidence({ query: 'Tuscan White Bean Soup' });
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json).toHaveProperty('schema_version', 1);
+    });
+
+    it('authorizes a valid editor with 200 under restricted database role', async () => {
+      const editorActor = crypto.randomUUID();
+      await admin.query(
+        "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'editor')",
+        [venue, editorActor],
+      );
+      try {
+        const response = await requestEvidence(
+          { query: 'Tuscan White Bean Soup' },
+          venue,
+          editorActor,
+        );
+        expect(response.status).toBe(200);
+      } finally {
+        await admin.query(
+          'DELETE FROM app_private.staff_membership WHERE tenant_id=$1 AND actor_id=$2',
+          [venue, editorActor],
+        );
+      }
+    });
+
+    it('denies a viewer with 403 under restricted database role', async () => {
+      const response = await requestEvidence({ query: 'Tuscan White Bean Soup' }, venue, viewer);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'forbidden' });
+    });
+
+    it('denies an actor from another venue with 403', async () => {
+      const response = await requestEvidence(
+        { query: 'Tuscan White Bean Soup' },
+        otherVenue,
+        actor,
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'forbidden' });
+    });
+
+    it('rejects a body-supplied venue ID mismatch with 400 invalid_request', async () => {
+      const response = await requestEvidence({
+        query: 'Tuscan White Bean Soup',
+        venue_id: otherVenue,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('does not leak transaction-local actor context to subsequent requests on the same connection', async () => {
+      // First request: valid owner succeeds
+      const res1 = await requestEvidence({ query: 'Tuscan White Bean Soup' }, venue, actor);
+      expect(res1.status).toBe(200);
+
+      // Second request: nonmember fails with 403
+      const nonmember = crypto.randomUUID();
+      const res2 = await requestEvidence({ query: 'Tuscan White Bean Soup' }, venue, nonmember);
+      expect(res2.status).toBe(403);
+    });
   });
 });

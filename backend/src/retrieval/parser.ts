@@ -2,8 +2,17 @@ export type ExtractedSegment = {
   segment_id: string;
   text: string;
   page_number?: number | undefined;
-  method: 'html' | 'text' | 'pdf_native' | 'ocr';
+  method: 'html' | 'text' | 'pdf_native' | 'ocr' | 'ocr_space_engine3';
   is_menu_scope?: boolean | undefined;
+  metadata?: Record<string, unknown> | undefined;
+  provenance?:
+    | {
+        source_sha256?: string | undefined;
+        original_url?: string | undefined;
+        final_url?: string | undefined;
+        retrieved_at?: string | undefined;
+      }
+    | undefined;
 };
 
 export type ParseSourceResult = {
@@ -195,13 +204,44 @@ function hasMenuItemEntity(value: unknown, depth = 0): boolean {
   return false;
 }
 
-function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number.parseInt(dec, 10)));
+export function decodeCodePoint(cp: number): string {
+  if (!Number.isSafeInteger(cp) || cp <= 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) {
+    return '\uFFFD';
+  }
+  return String.fromCodePoint(cp);
+}
+
+export function decodeHtmlEntities(str: string): string {
+  return str.replace(
+    /&(?:#[xX]([0-9a-fA-F]+)|#([0-9]+)|([a-zA-Z]+));/g,
+    (match, hex, dec, named) => {
+      if (hex !== undefined) {
+        const cp = Number.parseInt(hex, 16);
+        return decodeCodePoint(cp);
+      }
+      if (dec !== undefined) {
+        const cp = Number.parseInt(dec, 10);
+        return decodeCodePoint(cp);
+      }
+      if (named !== undefined) {
+        switch (named.toLowerCase()) {
+          case 'amp':
+            return '&';
+          case 'lt':
+            return '<';
+          case 'gt':
+            return '>';
+          case 'quot':
+            return '"';
+          case 'apos':
+            return "'";
+          case 'nbsp':
+            return ' ';
+          default:
+            return match;
+        }
+      }
+      return match;
+    },
+  );
 }

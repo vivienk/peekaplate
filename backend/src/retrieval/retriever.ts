@@ -34,9 +34,8 @@ export async function retrieveMenuEvidence(
   options: RetrievalExecutionOptions = {},
 ): Promise<BoundedRetrievalResult> {
   const warnings: string[] = [];
-  const maxFetchedSources = options.maxFetchedSources ?? MAX_FETCHED_SOURCES;
 
-  // 1. Validate request against agreed schema
+  // 1. Validate request against the agreed schema.
   let request: RetrievalRequest;
   try {
     request = RetrievalRequestSchema.parse(rawRequest);
@@ -55,11 +54,40 @@ export async function retrieveMenuEvidence(
   let successfulSourceCount = 0;
   let failedSourceCount = 0;
 
-  // 2. Process directly provided sources
+  // 2. Process directly provided sources.
   if (request.sources && request.sources.length > 0) {
     for (const src of request.sources) {
+      const sourceProvenance = {
+        source_sha256: src.sha256,
+        original_url:
+          src.location && (src.kind === 'url' || src.kind === 'website') ? src.location : undefined,
+        retrieved_at: src.retrieved_at,
+      };
+
       if (src.segments && src.segments.length > 0) {
+        let validSegmentCount = 0;
+        let failedSegmentCount = 0;
+
         for (const seg of src.segments) {
+          if (seg.warnings && seg.warnings.length > 0) {
+            for (const warning of seg.warnings) {
+              warnings.push(`[${seg.segment_id}] ${warning}`);
+            }
+          }
+
+          if (seg.status === 'failed' || seg.status === 'skipped' || seg.error) {
+            failedSegmentCount++;
+            warnings.push(
+              `Source '${src.source_id}' segment '${seg.segment_id}' marked as ${seg.status ?? 'failed'}${seg.error ? `: ${seg.error}` : ''}`,
+            );
+            // Never index a segment marked failed or skipped.
+            continue;
+          }
+
+          if (!seg.text || seg.text.trim().length === 0) {
+            continue;
+          }
+
           allSegments.push({
             sourceId: src.source_id,
             segment: {
@@ -67,16 +95,39 @@ export async function retrieveMenuEvidence(
               text: seg.text,
               ...(seg.page_number !== undefined ? { page_number: seg.page_number } : {}),
               method: seg.method || 'text',
+              ...(seg.metadata ? { metadata: seg.metadata } : {}),
+              provenance: sourceProvenance,
             },
           });
+
+          validSegmentCount++;
         }
-        successfulSourceCount++;
-      } else if (src.content) {
-        if (src.kind === 'html') {
-          const parsed = parseHtmlSource(src.content, src.source_id, src.location);
-          for (const seg of parsed.segments) {
-            allSegments.push({ sourceId: src.source_id, segment: seg });
+
+        if (validSegmentCount > 0) {
+          successfulSourceCount++;
+
+          if (failedSegmentCount > 0) {
+            warnings.push(
+              `Source '${src.source_id}' partially indexed (${validSegmentCount} valid, ${failedSegmentCount} failed/skipped)`,
+            );
           }
+        } else {
+          failedSourceCount++;
+          warnings.push(
+            `Source '${src.source_id}' contained no usable segments (${failedSegmentCount} failed/skipped)`,
+          );
+        }
+      } else if (src.content) {
+        if (src.kind === 'html' || src.kind === 'website') {
+          const parsed = parseHtmlSource(src.content, src.source_id, src.location);
+
+          for (const seg of parsed.segments) {
+            allSegments.push({
+              sourceId: src.source_id,
+              segment: { ...seg, provenance: sourceProvenance },
+            });
+          }
+
           warnings.push(...parsed.warnings);
         } else {
           const parsed = parsePlainTextSource(
@@ -84,17 +135,23 @@ export async function retrieveMenuEvidence(
             src.source_id,
             src.kind === 'pdf' ? 'pdf_native' : 'text',
           );
+
           for (const seg of parsed.segments) {
-            allSegments.push({ sourceId: src.source_id, segment: seg });
+            allSegments.push({
+              sourceId: src.source_id,
+              segment: { ...seg, provenance: sourceProvenance },
+            });
           }
+
           warnings.push(...parsed.warnings);
         }
+
         successfulSourceCount++;
       }
     }
   }
 
-  // 3. Process candidate URLs and follow discovered menu links within one bound.
+  // 3. Fetch candidate URLs and discover further menu links within one bound.
   const maxSources = Math.min(
     MAX_FETCHED_SOURCES,
     Math.max(0, options.maxFetchedSources ?? MAX_FETCHED_SOURCES),
@@ -107,7 +164,10 @@ export async function retrieveMenuEvidence(
 
   for (let i = 0; i < urlQueue.length && fetchedSourceCount < maxSources; i++) {
     const url = urlQueue[i];
-    if (!url || processedUrls.has(url)) continue;
+
+    if (!url || processedUrls.has(url)) {
+      continue;
+    }
 
     processedUrls.add(url);
     fetchedSourceCount++;
@@ -121,14 +181,22 @@ export async function retrieveMenuEvidence(
         warnings.push(`Source '${url}' redirected ${fetchResult.redirectCount} time(s)`);
       }
 
+      const urlProvenance = {
+        source_sha256: fetchResult.sha256,
+        original_url: url,
+        final_url: fetchResult.finalUrl,
+        retrieved_at: fetchResult.retrievedAt,
+      };
+
       const contentType = fetchResult.contentType.toLowerCase();
+
       const hasPdfMagicBytes =
         fetchResult.bytes.length >= 5 &&
-        fetchResult.bytes[0] === 0x25 && // %
-        fetchResult.bytes[1] === 0x50 && // P
-        fetchResult.bytes[2] === 0x44 && // D
-        fetchResult.bytes[3] === 0x46 && // F
-        fetchResult.bytes[4] === 0x2d; // -
+        fetchResult.bytes[0] === 0x25 &&
+        fetchResult.bytes[1] === 0x50 &&
+        fetchResult.bytes[2] === 0x44 &&
+        fetchResult.bytes[3] === 0x46 &&
+        fetchResult.bytes[4] === 0x2d;
 
       const isPdf =
         contentType.includes('application/pdf') ||
@@ -150,7 +218,10 @@ export async function retrieveMenuEvidence(
 
           for (let pageIndex = 0; pageIndex < extracted.text.length; pageIndex++) {
             const pageText = extracted.text[pageIndex]?.trim();
-            if (!pageText) continue;
+
+            if (!pageText) {
+              continue;
+            }
 
             allSegments.push({
               sourceId,
@@ -161,6 +232,7 @@ export async function retrieveMenuEvidence(
                 method: 'pdf_native',
                 is_menu_scope:
                   /menu|appetizer|entree|main|dessert|beverage|dish|price|\$\s*\d+/i.test(pageText),
+                provenance: urlProvenance,
               },
             });
 
@@ -186,7 +258,10 @@ export async function retrieveMenuEvidence(
         const parsed = parseHtmlSource(fetchResult.content, sourceId, fetchResult.finalUrl);
 
         for (const seg of parsed.segments) {
-          allSegments.push({ sourceId, segment: seg });
+          allSegments.push({
+            sourceId,
+            segment: { ...seg, provenance: urlProvenance },
+          });
         }
 
         warnings.push(...parsed.warnings);
@@ -210,7 +285,10 @@ export async function retrieveMenuEvidence(
         const parsed = parsePlainTextSource(fetchResult.content, sourceId, 'text');
 
         for (const seg of parsed.segments) {
-          allSegments.push({ sourceId, segment: seg });
+          allSegments.push({
+            sourceId,
+            segment: { ...seg, provenance: urlProvenance },
+          });
         }
 
         warnings.push(...parsed.warnings);
@@ -231,7 +309,7 @@ export async function retrieveMenuEvidence(
     }
   }
 
-  // 4. Handle catastrophic failure: all sources failed to fetch or none available
+  // 4. Handle catastrophic failure: all sources failed or none were available.
   if (successfulSourceCount === 0 && failedSourceCount > 0) {
     return BoundedRetrievalResultSchema.parse({
       schema_version: 1,
@@ -250,10 +328,12 @@ export async function retrieveMenuEvidence(
     });
   }
 
-  // 5. Extract and rank candidate passages
+  // 5. Extract and rank candidate passages.
   const candidatePassages: CandidatePassage[] = [];
+
   for (const item of allSegments) {
     const candidate = extractPassageFromSegment(item.sourceId, item.segment, query, queryTokens);
+
     if (candidate) {
       candidatePassages.push(candidate);
     }
@@ -264,7 +344,7 @@ export async function retrieveMenuEvidence(
     maxContextChars: request.max_context_chars,
   });
 
-  // 6. Determine final retrieval status
+  // 6. Determine the final retrieval status.
   if (passages.length === 0) {
     return BoundedRetrievalResultSchema.parse({
       schema_version: 1,
@@ -278,6 +358,7 @@ export async function retrieveMenuEvidence(
     warnings.push(
       'Ambiguous evidence detected: multiple candidate menu entries matched with differing details',
     );
+
     return BoundedRetrievalResultSchema.parse({
       schema_version: 1,
       status: 'ambiguous',

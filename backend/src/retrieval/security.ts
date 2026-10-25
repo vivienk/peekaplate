@@ -185,15 +185,15 @@ export async function validateDestination(
   }
 
   // Localhost checks
-  if (
-    hostname === 'localhost' ||
-    hostname.endsWith('.localhost') ||
+  const isLoopbackHost = hostname === 'localhost' || hostname.endsWith('.localhost');
+  const isInternalDomain =
     hostname.endsWith('.local') ||
     hostname.endsWith('.internal') ||
     hostname.endsWith('.lan') ||
-    hostname.endsWith('.home.arpa')
-  ) {
-    if (!options.allowLocalTestDestinations) {
+    hostname.endsWith('.home.arpa');
+
+  if (isInternalDomain || isLoopbackHost) {
+    if (!(options.allowLocalTestDestinations && isLoopbackHost)) {
       throw new SecurityValidationError(
         `Destination hostname '${hostname}' is an internal domain`,
         'PROHIBITED_HOSTNAME',
@@ -204,7 +204,8 @@ export async function validateDestination(
   // Check if hostname is an IP literal
   const ipVersion = isIP(hostname);
   if (ipVersion !== 0) {
-    if (!options.allowLocalTestDestinations && isProhibitedIP(hostname)) {
+    const isLoopbackIp = hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+    if (!(options.allowLocalTestDestinations && isLoopbackIp) && isProhibitedIP(hostname)) {
       throw new SecurityValidationError(
         `Direct connection to private/reserved IP '${hostname}' is prohibited`,
         'PROHIBITED_IP',

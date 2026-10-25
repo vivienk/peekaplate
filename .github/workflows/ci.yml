@@ -71,10 +71,16 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Code quality and unit tests
         run: pnpm verify lint typecheck test
+      - name: Python processing tests and package
+        run: |
+          python3 -m venv "$RUNNER_TEMP/peekaplate-uv"
+          "$RUNNER_TEMP/peekaplate-uv/bin/pip" install --disable-pip-version-check uv==0.12.10
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --frozen
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --frozen python -m unittest discover -s processing/tests
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" build --project processing
       - run: pnpm verify build
       - name: Context freshness
         if: ${{ !cancelled() }}
@@ -99,7 +105,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify test:db
 
@@ -116,7 +121,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:e2e

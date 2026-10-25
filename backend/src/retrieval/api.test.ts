@@ -188,4 +188,159 @@ describe('Retrieval API HTTP Boundary (/venues/:venueId/menu-evidence)', () => {
     expect(authorizeVenue).toHaveBeenCalledWith('actor-123', venueId, {});
     expect(retrieveMock).not.toHaveBeenCalled();
   });
+
+  describe('Finding P1: authorizeStaffVenue transaction-local actor context & RLS enforcement', () => {
+    it('sets transaction-local app.actor_id before querying membership and allows owner', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+      const executedQueries: { text: string; values?: unknown[] | undefined }[] = [];
+
+      const mockClient = {
+        query: vi.fn(async (text: string, values?: unknown[]) => {
+          executedQueries.push({ text, values });
+          if (text === 'BEGIN') return { rows: [] };
+          if (text.includes("set_config('app.actor_id'")) {
+            return { rows: [{ set_config: actorId }] };
+          }
+          if (text.includes('FROM app_private.staff_membership')) {
+            // Verify app.actor_id was established BEFORE this query was run
+            const actorContextQuery = executedQueries.find((q) =>
+              q.text.includes("set_config('app.actor_id'"),
+            );
+            expect(actorContextQuery).toBeDefined();
+            expect(actorContextQuery?.values).toEqual([actorId]);
+            return { rows: [{ permission: 'owner' }] };
+          }
+          if (text === 'COMMIT') return { rows: [] };
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await expect(
+        authorizeStaffVenue(mockClient as any, actorId, venueId),
+      ).resolves.toBeUndefined();
+
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith("SET LOCAL statement_timeout = '5s'");
+      expect(mockClient.query).toHaveBeenCalledWith("SET LOCAL lock_timeout = '3s'");
+      expect(mockClient.query).toHaveBeenCalledWith("SELECT set_config('app.actor_id', $1, true)", [
+        actorId,
+      ]);
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('allows editor under established actor context', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+
+      const mockClient = {
+        query: vi.fn(async (text: string) => {
+          if (text.includes('FROM app_private.staff_membership')) {
+            return { rows: [{ permission: 'editor' }] };
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await expect(
+        authorizeStaffVenue(mockClient as any, actorId, venueId),
+      ).resolves.toBeUndefined();
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('denies viewer with 403 CommandError and issues ROLLBACK', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+
+      const mockClient = {
+        query: vi.fn(async (text: string) => {
+          if (text.includes('FROM app_private.staff_membership')) {
+            return { rows: [{ permission: 'viewer' }] };
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await expect(authorizeStaffVenue(mockClient as any, actorId, venueId)).rejects.toMatchObject({
+        code: 'forbidden',
+        status: 403,
+      });
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).not.toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('denies nonmember (no membership rows) with 403 CommandError and issues ROLLBACK', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+
+      const mockClient = {
+        query: vi.fn(async (text: string) => {
+          if (text.includes('FROM app_private.staff_membership')) {
+            return { rows: [] }; // No matching membership row
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await expect(authorizeStaffVenue(mockClient as any, actorId, venueId)).rejects.toMatchObject({
+        code: 'forbidden',
+        status: 403,
+      });
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).not.toHaveBeenCalledWith('COMMIT');
+    });
+
+    it('issues ROLLBACK when a database error occurs during authorization', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+
+      const mockClient = {
+        query: vi.fn(async (text: string) => {
+          if (text.includes('FROM app_private.staff_membership')) {
+            throw new Error('Connection timeout during query');
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await expect(authorizeStaffVenue(mockClient as any, actorId, venueId)).rejects.toThrow(
+        'Connection timeout during query',
+      );
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    it('uses is_local = true in set_config to prevent actor context leakage across transactions', async () => {
+      const actorId = '00000000-0000-4000-8000-000000000001';
+      const venueId = '00000000-0000-4000-8000-000000000002';
+
+      const setConfigCalls: unknown[][] = [];
+      const mockClient = {
+        query: vi.fn(async (text: string, values?: unknown[]) => {
+          if (text.includes("set_config('app.actor_id'")) {
+            setConfigCalls.push(values ?? []);
+          }
+          if (text.includes('FROM app_private.staff_membership')) {
+            return { rows: [{ permission: 'owner' }] };
+          }
+          return { rows: [] };
+        }),
+      };
+
+      const { authorizeStaffVenue } = await import('../index');
+      await authorizeStaffVenue(mockClient as any, actorId, venueId);
+
+      // Verify third parameter of set_config is true (transaction-local)
+      expect(mockClient.query).toHaveBeenCalledWith("SELECT set_config('app.actor_id', $1, true)", [
+        actorId,
+      ]);
+    });
+  });
 });
