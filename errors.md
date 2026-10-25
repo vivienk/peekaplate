@@ -476,3 +476,17 @@ connection refusal when socket readiness preceded TCP, then passed all six tests
 after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
+## October 24 DATA-01 endpoint local verification
+
+```json
+{"id":"OBS-20261024-DATA01-LOOPBACK-001","status":"environment_blocked","area":"local-test-runtime","observation":"The broader backend/contracts Vitest run passed 43 tests but 12 existing auth tests could not reach their ephemeral 127.0.0.1 JWKS fixture; every failure was EACCES and surfaced as AuthUnavailableError.","cause":"This sandbox blocks the test process from connecting to its loopback JWKS server; the failures are outside the DATA-01 diff and do not establish an auth regression.","prevention":"Run the full suite in CI or a local environment that permits bounded loopback test servers; keep focused contract/endpoint/menu-token tests independent of network fixtures.","regression":"Focused DATA-01 tests passed 29/29, contracts and backend typechecks passed, and the scoped Biome check passed. The full auth suite remains environment-blocked here."}
+```
+```json
+{"kind":"resolution","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"status":"resolved_for_scoped_change","regression":"After privacy-safe conflict evidence and shared Queue contract fixes, focused DATA-01 tests pass 31/31; contracts/backend typechecks and scoped Biome checks pass. The unrelated loopback JWKS restriction remains an environment limit for the broader auth suite."}
+```
+```json
+{"kind":"verification-update","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"result":"Focused DATA-01 tests now pass 32/32 after adding raw-in-memory checksum conflict detection for two invalid same-metadata copies; no raw rejected field is placed in the Queue contract. Contracts/backend typechecks remain green."}
+```
+```json
+{"kind":"verification-update","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"result":"Focused DATA-01 tests pass 33/33 after replacing recursive canonical JSON with an explicit-stack implementation and adding a 12,000-level invalid JSON regression. Contracts/backend typechecks and scoped Biome checks pass."}
+```

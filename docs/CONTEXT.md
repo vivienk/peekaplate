@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. observation.v2 now validates every approved P0 event, coherent receipts and versioned normal/conflict Queue envelopes; conflict evidence contains only validated events or fixed privacy-safe metadata. Retrieval offsets, ranks and aggregate context limits remain enforced.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Source/DLQ delivery is paused; controlled access-removal acceptance and production remain separate checks. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No ingestion route, Queue handler, direct live publication or canonical observation writes are added; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker retains staff commands, staging analytics and bounded S3-VIS-04 retrieval, and adds the local POST /observations boundary: 30-minute menu-token authority, token-scoped rate limiting, 32 KiB/25-item envelopes, coherent receipts, privacy-safe conflict quarantine and accept-only-after-Queue-send. Live rate-limit/consumer activation, canonical writes and hosted acceptance remain pending; Queues stay paused.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -81,6 +81,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/menu-token.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/observation-ingest.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
