@@ -4,7 +4,7 @@
 
 **Deployed and positively verified October 22, 2026 (America/Phoenix).** [Deployment run 39907285014](https://github.com/vivienk/peekaplate/actions/runs/39907285014) released main commit `afe45dbe99967a9010f73bce7fb5f82a3597313d`. Both read APIs returned 200 using `hemu77`'s own GitHub identity. Four synthetic events were readable; strict redaction, missing/invalid-token rejection and query limits passed. Supabase migration `20261021130000`, its history entry, project scope and restricted function grants were verified again. The [operations record](operations.md#team-analytics-hosted-verification--october-22-2026) records the deployed Worker version and all results.
 
-**Full hosted acceptance is still open for the two 403 cases:** a valid non-collaborator identity and a controlled collaborator removed after a successful request. No extra identity or real teammate was used for these tests. Random credentials correctly return 401 and cannot substitute for either case. The maintainer requested completion of the remaining work while deferring these hosted checks. Production is not configured, and no production release was attempted.
+**The hosted non-collaborator check passed on October 23, 2026 (America/Phoenix).** Harshita helped run the repository checker using a valid non-collaborator account: GitHub identity returned 200 and both analytics endpoints returned 403 with `error=forbidden`, twice. See [the dated evidence](operations.md#non-collaborator-confirmation--october-23-2026). Collaborators can use the staging API with their own credentials. Full hosted acceptance still requires the separate controlled collaborator-removal test. Production is not configured or tested.
 
 The access rule includes **every accepted repository collaborator**, not a named group. New collaborators qualify automatically; pending invitations must be accepted first. Nobody needs a Supabase database account for this API. PostHog dashboard access is a separate invitation and is not granted by this API.
 
@@ -49,6 +49,21 @@ Errors: 401 means missing/invalid GitHub user token; 403 means not a current rep
 
 Verified staging base URL: `https://peekaplate-api-staging.vxkong.workers.dev`. A PR/local test alone does not activate a hosted endpoint; the deployment above does. There is no browser sign-in screen in this slice; use a local API client. A future UI must use a reviewed OAuth flow and origin controls rather than embedding privileged tokens.
 
+### Run the non-collaborator check without pasting a token
+
+From a checkout containing [the verification command](../scripts/verify-team-access.mjs), use Node 24 and GitHub CLI. No pnpm installation or provider credentials are needed for this command. Sign in to **your own GitHub account**, then replace `YOUR_GITHUB_USERNAME` with that account's login:
+
+```sh
+gh auth login --hostname github.com
+node scripts/verify-team-access.mjs --login YOUR_GITHUB_USERNAME
+```
+
+If already signed in, skip `gh auth login`. Check the active account rather than borrowing someone else's credential. The script reads GitHub CLI's credential privately, verifies its identity before contacting the fixed staging Worker, and prints each step. It has **no hidden token-entry prompt**; credential lookup and each HTTP request have a ten-second timeout. It does not print/save tokens, follow redirects or read analytics bodies when access unexpectedly succeeds. The historical one-hour query window is intentional: this is an authorization test, not a freshness check.
+
+PASS requires GitHub identity `200` with the expected username and **both** staging endpoints returning `403` with `error=forbidden`. An invalid token/`401`, unexpected access/`200`, redirect, malformed denial or provider error is a failed/incomplete test and exits nonzero. Share only the printed sanitized report (UTC time, login, statuses and safe request IDs). Do not share tokens or full authorization headers.
+
+The local `verify-denial.ps1` from an earlier manual attempt is not part of this repository. This command replaces that ad hoc workflow; it does not diagnose that private file or change the API's access rules. The [recorded outsider check passed](operations.md#non-collaborator-confirmation--october-23-2026); use this command when repeating it. Removing a controlled disposable collaborator after successful access is still a **separate**, pending acceptance case. Production is not tested.
+
 ## Operator: scope and revocation
 
 Apply migration `20261021130000` before the reviewed Worker deployment. The private `team_api_private.project_scope` row enables only staging PostHog project `675372`. No teammate list is copied into the public repository or manually maintained in Supabase. The Worker obtains the caller's login from GitHub's authenticated `/user` response, then calls the fixed repository's collaborator-check endpoint using the private server token. Client-supplied usernames or editable profile fields are never authority.
@@ -69,7 +84,7 @@ The October 21 absence of environment configuration is historical. Vivien subseq
 
 ## Repository owner: activate and hand over
 
-Initial migration, environment configuration and deployment steps are complete for `afe45db`. Keep this checklist for future releases; the two hosted 403 cases in step 6 remain pending. Positive access, 401 rejection, response redaction, query bounds, recent export runs and database permission checks have passed. This is staging development access, not completed pilot or production acceptance.
+Initial migration, environment configuration and deployment steps are complete for `afe45db`. Keep this checklist for future releases; only the controlled collaborator-removal case in step 6 remains pending. Positive access, genuine outsider denial, 401 rejection, response redaction, query bounds, recorded export runs and database permission checks have passed within their dated scopes. This is staging development access, not completed pilot or production acceptance.
 
 1. Open [repository environment settings](https://github.com/vivienk/peekaplate/settings/environments) and create `staging`. Restrict deployment branches to `main` and require an independent deployment reviewer using the controls available for the repository. Keep `STAGING_DEPLOYMENT_APPROVED` off until these controls are configured.
 2. Inside the `staging` environment, add secrets `CLOUDFLARE_API_TOKEN` and `TEAM_GITHUB_TOKEN`. The Cloudflare token must be scoped to the existing PeekaPlate account and Worker deployment permissions. The **repository owner** should create the expiring GitHub checker token for resource owner `vivienk`, selected repository `peekaplate`, repository permission **Metadata: read**, and no code-write/admin permission. Do not paste either value into a PR, issue, chat or tracked file.

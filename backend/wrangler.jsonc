@@ -24,7 +24,21 @@
           "binding": "HYPERDRIVE",
           "id": "bef46ec5f5044d0ea5f9e48450895b64"
         }
-      ]
+      ],
+      "r2_buckets": [
+        {
+          "binding": "OBSERVATION_ARCHIVE_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "OBSERVATION_QUEUE",
+            "queue": "peekaplate-staging-observations"
+          }
+        ]
+      }
     }
   }
 }
