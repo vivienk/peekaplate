@@ -12,11 +12,13 @@ Staging links: [diner](https://peekaplate-diner-staging.pages.dev/) · [owner/st
 
 ## Implementation status
 
-Team analytics inspection is deployed in staging at release `afe45db`. Both read APIs returned 200 using an accepted repository collaborator's own GitHub token; missing/invalid tokens returned 401. See [team data access](docs/team-data-access.md) for the URL, authentication, safe fields and remaining hosted 403 tests. All accepted repository collaborators are eligible; nobody receives a shared database or deployment credential. These delayed diagnostic counts are separate from owner business reports. Full hosted acceptance remains open for a valid non-collaborator and a controlled collaborator-removal check; production is not configured.
+Team analytics inspection is deployed in staging at release `afe45db`. Both read APIs returned 200 using an accepted repository collaborator's own GitHub token; missing/invalid tokens returned 401. On October 23, a valid non-collaborator received 403 from both endpoints in two reported checker runs. See [team data access](docs/team-data-access.md) for the URL, authentication, safe fields and dated evidence. All accepted repository collaborators are eligible; nobody receives a shared database or deployment credential. These delayed diagnostic counts are separate from owner business reports. The controlled collaborator-removal check remains pending; production is not configured.
 
 The repository contains diner and staff-console shells and a staff-command slice: signed staff-token verification, restaurant membership checks, and atomic dish-revision writes with tenant isolation. Staging hosts both shells and the API. Hosted acceptance with a genuine Supabase session verified authorized writes through Hyperdrive, retries, concurrent updates, cross-restaurant denial and membership revocation. A separate remote probe verified rollback and transaction-context reset. These are bounded synthetic checks, not pilot or production certification. Console login UI, menu publication, intent ingestion, POS integration and visual rendering are not implemented. Feature and pilot acceptance criteria are tracked in the [verification map](docs/verification.md).
 
 ## Technology and architecture
+
+Staging observation infrastructure is provisioned: the source Queue and DLQ are connected, the existing private R2 bucket is reused, and synthetic delivery/retry/DLQ and create-only archive checks pass. Delivery remains paused until the real consumer is reviewed and integrated. The staging producer/R2 binding configuration still needs its reviewed `main` deployment. See the [infrastructure handoff](docs/observation-infrastructure.md) for exact resources, retention, test evidence and Teeyansh's next steps.
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
@@ -25,7 +27,7 @@ The repository contains diner and staff-console shells and a staff-command slice
 | Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
 | Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
 | Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
-| Processing and analysis | Python, uv, pytest | Accepted scope in [ADR 0001](docs/adr/0001-scope-and-repository.md); no job, package or runtime dependency implemented |
+| Processing and analysis | Python, uv, Pydantic | [Local PDF/image acquisition and LLM dish drafts](processing/README.md); needs-review output, application integration and quality acceptance pending |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
 Frontends and backend share contracts. Frontends do not import backend internals or hold database credentials. Authorization belongs to the backend; venue authority must derive from verified identity and membership. Database policies support this boundary; they do not authenticate callers.
@@ -74,6 +76,7 @@ packages/contracts/  Shared runtime schemas and types
 migrations/          Ordered SQL migrations
 tests/               Database and browser integration tests
 scripts/             Repository checks and local test tools
+processing/          Local Python OCR and LLM dish extraction
 docs/                Architecture, decisions, delivery and context
 ```
 
@@ -149,3 +152,9 @@ Each contributor installs and authenticates their own Claude or Codex client and
 ## Optional product analytics
 
 See [PostHog setup and evidence limits](docs/posthog.md) for consent, separate staging/production build variables, taxonomy mapping, validation and manual project setup. Tracking is disabled until configured; current shells do not publish menu or owner-report events.
+
+Python processing uses `uv sync --project processing --frozen` and
+`uv run --project processing --frozen python -m unittest discover -s processing/tests`.
+The local package and review boundaries are described in the
+[processing guide](processing/README.md) and [delivery handoff](docs/ocr-delivery.md).
+Python tests and package builds run in CI alongside the repository checks.

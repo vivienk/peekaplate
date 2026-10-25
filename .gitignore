@@ -12,7 +12,9 @@ test-results/
 work/
 .DS_Store
 Thumbs.db
+PROJECT_CONTEXT.local.md
 *.log
 __pycache__/
 .venv/
 .pytest_cache/
+.pnpm-store/

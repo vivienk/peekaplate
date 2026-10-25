@@ -60,25 +60,29 @@
   --pp-line-height-h4: 2rem; /* 32px */
   --pp-font-size-h5: 1.125rem; /* 18px */
   --pp-line-height-h5: 1.75rem; /* 28px */
+  --pp-line-height-h5-bold: 1.5rem; /* 24px; the H5/Bold text style differs from other weights */
   --pp-font-size-paragraph-1: 1rem; /* 16px */
   --pp-line-height-paragraph-1: 1.5rem; /* 24px */
   --pp-font-size-paragraph-2: 0.875rem; /* 14px */
-  --pp-line-height-paragraph-2: 1.5rem; /* 24px */
+  --pp-line-height-paragraph-2: 1.375rem; /* 22px */
   --pp-font-size-small: 0.75rem; /* 12px */
   --pp-line-height-small: 1rem; /* 16px */
   --pp-font-size-footer: 0.625rem; /* 10px */
-  --pp-line-height-footer: 0.75rem; /* 12px */
+  --pp-line-height-footer: 0.875rem; /* 14px */
 
-  /* Corner radius. The Design System page is marked alpha; radius-full makes pill shapes. */
-  --pp-radius-4: 4px;
+  /* Corner radius. Names follow pixel size; the Figma sizing/radius variable is noted beside each.
+     6, 10 and 20px come from the alpha Corner Radius page only and await design confirmation. */
+  --pp-radius-0: 0px; /* none */
+  --pp-radius-2: 2px; /* xxs */
+  --pp-radius-4: 4px; /* xs */
   --pp-radius-6: 6px;
-  --pp-radius-8: 8px;
+  --pp-radius-8: 8px; /* sm */
   --pp-radius-10: 10px;
-  --pp-radius-12: 12px;
-  --pp-radius-16: 16px;
+  --pp-radius-12: 12px; /* md */
+  --pp-radius-16: 16px; /* lg */
   --pp-radius-20: 20px;
-  --pp-radius-24: 24px;
-  --pp-radius-full: 999px;
+  --pp-radius-24: 24px; /* xl */
+  --pp-radius-full: 999px; /* full */
 }
 
 /* Reduced motion: transitions shrink to 1ms, delays and staggers are removed, and screens

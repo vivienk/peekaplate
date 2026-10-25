@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result and initial dish-intent schemas. HTTP command authority fields are rejected; ingest and broader diner events remain planned. Team analytics query/response schemas enforce bounded dates/results and allowlisted diagnostic fields.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,12 +23,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "17b4bf0b98b5808aa805cf10b4ad7763069bdde6194a2a5614cdeb422f0868e9"
+      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
     },
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem; four weights; Inter family without a loaded font file) and the corner-radius scale (4-24px plus full). The ease-out curve is interim. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
+      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem from the Figma text styles, plus a separate H5 Bold line height; four weights; Inter family without a loaded font file) and the corner-radius scale (0-24px plus full, mapped to Figma names in docs/frontend-design.md). H3 size/line height, the Footer Semi Bold weight and the ease-out curve are interim pending design confirmation. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,7 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "12e5c345df683ab4cd32227a7a676384e43b70f5d6fd8be9637942ff3d271b1f"
+      "sourceFingerprint": "8486697ad76f0d9307e5f2d095eca2068218b735b82c60d809ce7ba9478d1428"
     },
     {
       "id": "diner",
@@ -62,7 +62,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "b94a28cf38b11a84ce82c4fe5ae7df9b29afde2efa893384c5d299fc92f055a8"
+      "sourceFingerprint": "023418a1132fe035424165a74cfb6716c7f402959a267598470cccae6afe8580"
     },
     {
       "id": "console",
@@ -92,23 +92,36 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs and restaurant membership for atomic draft revisions. Existing hosted staff identity/isolation/retry/concurrency evidence remains valid within its dated scope. Staging/local-only team analytics GET endpoints verify individual GitHub identity and current collaboration on the fixed repository; server project, strict seven-day/100-row bounds and redacted responses remain enforced. Main afe45db deployed through protected run 39907285014; both hosted reads returned 200 for hemu77, invalid/missing credentials 401 and invalid queries 400. Full hosted acceptance awaits the two controlled 403 cases. No ingestion or publication endpoint; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Source/DLQ delivery is paused; controlled access-removal acceptance and production remain separate checks. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No ingestion route, Queue handler, direct live publication or canonical observation writes are added; JWT logout revocation remains expiry-bounded.",
       "paths": [
-        "backend/src/index.ts",
-        "backend/src/index.test.ts",
-        "backend/wrangler.jsonc",
-        "backend/src/auth.ts",
-        "backend/src/auth.test.ts",
-        "backend/src/dish-command.ts",
-        "backend/src/dish-command.test.ts",
-        "backend/src/dish.integration.ts",
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
-        "backend/src/team-analytics.ts",
+        "backend/src/auth.test.ts",
+        "backend/src/auth.ts",
+        "backend/src/dish-command.test.ts",
+        "backend/src/dish-command.ts",
+        "backend/src/dish.integration.ts",
+        "backend/src/index.test.ts",
+        "backend/src/index.ts",
+        "backend/src/retrieval/api.test.ts",
+        "backend/src/retrieval/fetcher.ts",
+        "backend/src/retrieval/fetcher.workerd-harness.ts",
+        "backend/src/retrieval/fetcher.workerd.test.ts",
+        "backend/src/retrieval/handoff.test.ts",
+        "backend/src/retrieval/handoff.ts",
+        "backend/src/retrieval/index.ts",
+        "backend/src/retrieval/parser.ts",
+        "backend/src/retrieval/ranker.ts",
+        "backend/src/retrieval/retrieval.test.ts",
+        "backend/src/retrieval/retriever.ts",
+        "backend/src/retrieval/security.test.ts",
+        "backend/src/retrieval/security.ts",
         "backend/src/team-analytics.test.ts",
+        "backend/src/team-analytics.ts",
+        "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
-        "backend/src/team-auth.test.ts"
+        "backend/wrangler.jsonc"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -120,12 +133,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "92f22213bceebd5fb3a213a5a135dc4ebc35532f191e73ffc157d646f0b8b551"
+      "sourceFingerprint": "a49e8af89492163dd04d21cb1fd7afe0633ebc97af38019be0de3d174b7b82d6"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -146,7 +159,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fccd1d02035493216fcb1fae4fb672e25ec554da17005a27354ae2a4f975f7f8"
+      "sourceFingerprint": "5c576f557201a6d1af09e9c2c860bb1e5cd0430a3af8fdc6b3e8f1ee4528c0e6"
     },
     {
       "id": "measurement",
@@ -168,7 +181,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies staging and later production under ADR 0012. Protected manual staging Worker run 39907285014 deployed exact main afe45db successfully after eligible hemu77 approved vivienk request without administrator bypass; flag is true, main-only controls remain and administrator bypass is allowed. Worker version 5922a293-6893-47fd-8bc5-a20f0afd8d0b; 14 hosted HTTP checks and eleven read-only database assertions passed. Existing uncached restricted Hyperdrive verified; hourly PostHog export continues. Token scope/January 20 2027 expiry are operator-confirmed, effective deployment/checker use passed. Two controlled hosted 403 cases deferred. Pages remain at their separate PostHog release. R2 is private/unbound; ingestion, product UI, pilot/load/recovery and production remain separate work.",
+      "summary": "Main supplies staging and later production under ADR0012; protected manual deployment/independent review remain required. Last recorded Worker release afe45db and existing Pages/Hyperdrive are preserved. October 24 inventory found no Queues: missing staging source/DLQ created, 24-hour retention, paused HTTP pull consumers and three source retries. Reused private staging R2. Real conditional-write race and synthetic Queue-to-R2-before-ACK/retry-to-DLQ checks passed; both Queues empty and paused after cleanup. Binding configuration still needs reviewed main deployment. Teeyansh PR31/32 and production resources untouched; actual consumer/DB pipeline remains unverified.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -201,7 +214,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/implementation_plan.md",
         "docs/delivery.md",
         "playwright.posthog.config.ts",
-        "tests/e2e/posthog.spec.ts"
+        "tests/e2e/posthog.spec.ts",
+        "docs/observation-infrastructure.md"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -212,7 +226,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b1981372eb4039e6bc75faa3207a7650e01b080426bbf49c7d1d6628792ca066"
+      "sourceFingerprint": "a6b7acbb465ffd51390a48ec7cc40b6b158a57d0d75817d80f5c04c9a0acf6c7"
     },
     {
       "id": "agents",
@@ -245,7 +259,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consent-gated explicit PostHog capture: hosted diner/console shell views verified in staging. Dish adapter awaits real controls. Private export schema and duplicate/permission tests exist. Two hosted exports of one synthetic interval passed: eight raw copies, four deduplicated events, known diner/console records each matched once, no missing/conflicting/out-of-scope rows. Restricted grants verified; hourly schedule enabled. Next automatic run not observed. Hourly internal copy does not power live owner reports; validated evidence/projections and owner authorization remain planned. Internal inspection API returns safe deduplicated records/counts after live repo-collaborator authorization; no PostHog management token or owner-report endpoint.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -254,7 +268,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/analytics/src/index.test.ts",
         "docs/posthog.md",
         "docs/posthog-export.md",
-        "docs/team-data-access.md"
+        "docs/team-data-access.md",
+        "scripts/verify-team-access.mjs",
+        "scripts/verify-team-access.test.mjs"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -267,7 +283,52 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "f05d04b31c6356819de9070d794df58cff36d0cf0ccafdbc05a9d1bfce270581"
+      "sourceFingerprint": "1dd5e77257b699965de953a06b67cae41efa432a18b804d92f6e69d68988d8e0"
+    },
+    {
+      "id": "processing",
+      "status": "foundation",
+      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending.",
+      "paths": [
+        "processing/.gitignore",
+        "processing/.python-version",
+        "processing/README.md",
+        "processing/pyproject.toml",
+        "processing/src/peekaplate_processing/__init__.py",
+        "processing/src/peekaplate_processing/check_llm.py",
+        "processing/src/peekaplate_processing/errors.py",
+        "processing/src/peekaplate_processing/extract_menus.py",
+        "processing/src/peekaplate_processing/images.py",
+        "processing/src/peekaplate_processing/model_cache.py",
+        "processing/src/peekaplate_processing/ocr_regions.py",
+        "processing/src/peekaplate_processing/ocr_space.py",
+        "processing/src/peekaplate_processing/pdf.py",
+        "processing/src/peekaplate_processing/run_pipeline.py",
+        "processing/src/peekaplate_processing/schemas.py",
+        "processing/src/peekaplate_processing/sources.py",
+        "processing/src/peekaplate_processing/storage.py",
+        "processing/src/peekaplate_processing/workflow.py",
+        "processing/tests/fixture_factory.py",
+        "processing/tests/test_ocr_regions.py",
+        "processing/tests/test_ocr_space.py",
+        "processing/tests/test_pdf_images.py",
+        "processing/tests/test_schemas.py",
+        "processing/tests/test_workflow.py",
+        "processing/uv.lock",
+        "docs/ocr-delivery.md",
+        "processing/tests/fixtures/source-spans.json",
+        "processing/tests/test_handoff.py",
+        "scripts/processing-handoff.test.mjs",
+        "processing/src/peekaplate_processing/ocr.py",
+        "processing/tests/test_ocr_provider.py",
+        "test-data/README.md"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0005-tenancy-and-privacy.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "929fb3bbb31657ffe307c3d5040770955f5ecd7d488af3f0ea329ed0bb05f119"
     }
   ],
   "handoffs": [
@@ -288,23 +349,30 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Confirm the custom ease-out curve, licensed brand font, H2/footer weight typos and semantic token names with Rania. Spacing and elevation are proposed for Harshita; then add approved color and interaction-state tokens and the Button/Card/Input/Typography/Navigation foundations."
     },
     {
-      "summary": "October 22 staging activation is deployed: main afe45db, protected run 39907285014 and Worker 5922a293-6893-47fd-8bc5-a20f0afd8d0b. Fourteen live HTTP checks passed using the maintainer individual GitHub credential; eleven read-only database assertions passed, including migration history and restricted grants. Hyperdrive caching is disabled; recent hourly export runs completed with no new rows, existing eight raw/four unique records unchanged. README, team guide, access/export runbooks and operations now distinguish deployed diagnostics from planned owner reporting. No runtime, grant, schema or deployment change in this documentation handoff.",
+      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
       "modules": [
-        "backend",
         "database",
-        "delivery",
-        "analytics"
+        "delivery"
       ],
-      "next": "Obtain review and merge the documentation update. Contributors can continue local and bounded staging ticket work. Complete valid non-collaborator 403 and controlled collaborator-removal checks before closing full hosted acceptance; they are explicitly deferred. Canonical diner ingestion/owner reports and any production resources/release remain separate approved work."
+      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
     },
     {
-      "summary": "Proposed ADR 0015 for S3-ARC-01, revised after Sai's review: owner metrics only from ADR 0003 canonical facts; POST /observations with a Bearer menu token and accepted/retry/rejected receipts (accepted = durable Queue acceptance), terminal rejected items, uncertain sends retried and in-batch duplicates defined; canonical app_private.observation_index/conflict; D1 ten sessions, D6 observation.v2, D7 session-based rates and D8 timing recorded; ingest limits agreed with Zhiliang (25 items/32 KiB, 24 h age, 5 min skew, per-jti 60/min burst 10, HTTP and reason codes, token claims); D3/D4 scope from matrix v0.1d; bounded 400/413 handling; remaining work split into the Save/UI acceptance decision and owned implementation/release prerequisites; owners Zhiliang (ingest), Teeyansh (consumer), Jeffin (migrations/views), Louis (reports). No contract, migration or collector code changed. Final technical review reconciled develop activation prerequisites; the ADR remains Proposed pending Save/UI confirmation.",
+      "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
+      "modules": [
+        "processing",
+        "backend",
+        "contracts",
+        "delivery"
+      ],
+      "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
+    },
+    {
+      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
       "modules": [
         "contracts",
-        "measurement",
-        "analytics"
+        "backend"
       ],
-      "next": "Harshita confirms the Save/UI transitions, persistence, unsave/Undo, unavailable-storage behaviour and any Saved limit; Adam accepts, then record ADR acceptance. Owners deliver the listed contracts, ingest, consumer, migrations/views, report API, protected bindings, menu token, retention/consent and hosted validation through later PRs."
+      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     },
     {
       "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
@@ -322,34 +390,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Review this documentation PR. Before Actions activation, verify credential permissions, intended staging bindings and the independent approval process; the settings observation is not a successful workflow or deployment test."
     },
     {
-      "summary": "Updated deployment selection to main for both environments per the maintainer's explicit instruction. Configured verified non-secret staging account, issuer and Hyperdrive bindings. Provider audit found existing Supabase migrations, forced RLS, restricted staging login, an ES256 public key and uncached Hyperdrive; no duplicate database branch was created. Hosted request behavior remains unverified.",
+      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
       "modules": [
-        "delivery",
-        "backend"
-      ],
-      "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "Aligned staging to application history through PR #5 and corrected manual deployment selection from develop to staging, including CI push coverage and release documentation. Provider inspection confirmed no Hyperdrive, Pages project or staging Worker; D1 resources do not replace PostgreSQL.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Configure the isolated staging Supabase/auth/Hyperdrive and frontend/API connections, supply scoped GitHub deployment credentials, then verify the deployed staging flow before activation or production promotion."
-    },
-    {
-      "summary": "Prepared history-preserving core import, marketing split, develop CI, PR 13-derived ruleset proposals and disabled staging deployment gate. Reconciled all eight later source commits through b40e3ca, retaining their history and five updated planning links. Application runtime and backend bindings are unchanged. Owner chooses private GitHub Free; branch rules remain inactive and manual PR/CI gates apply.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Obtain independent human review; reconcile open source PRs and establish provider parity before release or archival. Apply manual PR/CI gates because private branch enforcement is unavailable on the selected free plan."
-    },
-    {
-      "summary": "Recovered Windows Docker after checksummed offline disk backups and an official Desktop 4.95 upgrade. Real testing exposed a pnpm.mjs launcher rejection; the DB harness now invokes installed Vitest directly, with a failing-then-passing launcher regression. All 43 SQL assertions, 13 Worker/Postgres cases and local startup/demo/cleanup passed on Windows. Contributor Claude/Codex setup is independently owned.",
-      "modules": [
+        "analytics",
         "database",
         "delivery"
       ],
-      "next": "Finish exact-head review and CI for the local recovery PR. Keep the GitHub protection policy in a separate owner-action PR; stop before Cloudflare/Supabase integration until protected credentials are supplied."
+      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
+    },
+    {
+      "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
+      "modules": [
+        "analytics"
+      ],
+      "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
+    },
+    {
+      "summary": "Provisioned missing staging observation Queue f4979c52a09a4c40ad55e46d32b0ff93 and DLQ 45eda79d781d47fe8bca7bb6f5d05bde, reused private staging-assets R2, configured paused HTTP pull consumers with 24-hour retention/three source retries. R2 conditional race passed; complete synthetic archive-before-ACK and retry-to-DLQ repeat passed at 2026-10-24T17:30:36.147Z. Cleaned only probe objects/messages; both Queues empty/paused. Added staging producer/R2 config and handoff docs; no unfinished consumer, DB or production change.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
     }
   ]
 }

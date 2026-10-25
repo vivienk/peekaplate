@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./retrieval": "./src/retrieval/index.ts"
+  },
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
     "local": "node local.mjs",
