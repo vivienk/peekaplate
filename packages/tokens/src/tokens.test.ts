@@ -73,6 +73,7 @@ describe('design tokens', () => {
       '--pp-space-28': '28px',
       '--pp-space-32': '32px',
       '--pp-space-40': '40px',
+      '--pp-space-48': '48px',
       '--pp-space-80': '80px',
     });
   });
@@ -186,6 +187,7 @@ describe('design tokens', () => {
       '--pp-role-nav-bg': 'var(--pp-color-neutral-800)',
       '--pp-role-nav-icon': 'var(--pp-color-neutral-50)',
       '--pp-role-nav-hover-bg': 'var(--pp-color-orange-500)',
+      '--pp-role-nav-hover-icon': 'var(--pp-color-orange-950)',
       '--pp-role-nav-pressed-bg': 'var(--pp-color-neutral-950)',
       '--pp-role-nav-disabled-bg': 'var(--pp-color-neutral-600)',
 
@@ -194,7 +196,7 @@ describe('design tokens', () => {
       '--pp-role-primary-container': 'var(--pp-color-orange-800)',
       '--pp-role-on-primary-container': 'var(--pp-color-orange-100)',
       '--pp-role-surface': 'var(--pp-color-neutral-800)',
-      '--pp-role-surface-container': 'var(--pp-color-neutral-700)',
+      '--pp-role-surface-container': 'var(--pp-color-neutral-600)',
       '--pp-role-on-surface': 'var(--pp-color-neutral-50)',
       '--pp-role-on-surface-variant': 'var(--pp-color-gray-400)',
       '--pp-role-outline': 'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
@@ -222,6 +224,11 @@ describe('design tokens', () => {
       '--pp-role-button-disabled-border': 'var(--pp-color-neutral-600)',
       '--pp-role-button-outlined-pressed': 'var(--pp-color-neutral-600)',
       '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
+      '--pp-role-chip-active-bg': 'var(--pp-color-neutral-50)',
+      '--pp-role-chip-active-text': 'var(--pp-color-neutral-800)',
+      '--pp-role-chip-inactive-text': 'var(--pp-color-neutral-50)',
+      '--pp-role-chip-inactive-border':
+        'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
       '--pp-role-input-bg': 'var(--pp-color-neutral-800)',
       '--pp-role-input-text': 'var(--pp-color-neutral-50)',
       '--pp-role-input-placeholder': 'var(--pp-color-neutral-400)',
@@ -318,11 +325,31 @@ describe('design tokens', () => {
     }
   });
 
+  it('has no duplicate token names', async () => {
+    const css = (await read('./tokens.css')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const reducedStart = css.indexOf('@media (prefers-reduced-motion: reduce)');
+    const baseCss = css.slice(0, reducedStart);
+    const names = [...baseCss.matchAll(/(--pp-[\w-]+)\s*:/g)].map(([, name]) => name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('maps color roles only to palette colors', async () => {
+    const { base } = await tokenBlocks();
+    const roles = group(base, role);
+    for (const value of Object.values(roles)) {
+      const refs = [...value.matchAll(/var\((--pp-[\w-]+)\)/g)].map(([, name]) => name);
+      expect(refs.length).toBeGreaterThan(0);
+      for (const ref of refs) {
+        expect(ref).toMatch(/^--pp-color-/);
+      }
+    }
+  });
+
   it('are the shared source for both apps', async () => {
     for (const app of ['diner', 'console']) {
       const style = await read(`../../../frontend/${app}/src/style.css`);
       expect(style.startsWith('@import "@peekaplate/tokens/tokens.css";\n')).toBe(true);
-      expect(style).not.toMatch(/--pp-motion-[\w-]+\s*:/);
+      expect(style).not.toMatch(/--pp-[\w-]+\s*:/);
     }
   });
 });
