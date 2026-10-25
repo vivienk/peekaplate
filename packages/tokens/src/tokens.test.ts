@@ -37,6 +37,8 @@ describe('design tokens', () => {
   it('match the Design System corner radius scale', async () => {
     const { base } = await tokenBlocks();
     expect(group(base, radius)).toEqual({
+      '--pp-radius-0': '0px',
+      '--pp-radius-2': '2px',
       '--pp-radius-4': '4px',
       '--pp-radius-6': '6px',
       '--pp-radius-8': '8px',

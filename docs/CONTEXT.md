@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem from the Figma text styles, plus a separate H5 Bold line height; four weights; Inter family without a loaded font file) and the corner-radius scale (4-24px plus full). H3 size/line height, the Footer Semi Bold weight and the ease-out curve are interim pending design confirmation. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
+      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem from the Figma text styles, plus a separate H5 Bold line height; four weights; Inter family without a loaded font file) and the corner-radius scale (0-24px plus full, mapped to Figma names in docs/frontend-design.md). H3 size/line height, the Footer Semi Bold weight and the ease-out curve are interim pending design confirmation. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,7 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "10b7a4a4450030d223aaf44522aad21fdc3ce45f12fa576a6de2f23e7dc9340c"
+      "sourceFingerprint": "8486697ad76f0d9307e5f2d095eca2068218b735b82c60d809ce7ba9478d1428"
     },
     {
       "id": "diner",
@@ -62,7 +62,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0f8777025be9ef1375b19fc580f5a200826465b2b8acfb44021d9f8156f1cc02"
+      "sourceFingerprint": "4107ee97eaf9096f1bcfc032000d09ddd8542fa7b389c4b93ae88e72b8173fe8"
     },
     {
       "id": "console",

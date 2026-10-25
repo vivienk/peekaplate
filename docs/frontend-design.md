@@ -25,6 +25,18 @@ The 390px checklist is a starting review viewport. Confirm typography, colors, r
 
 Both apps import the shared tokens from [`packages/tokens/src/tokens.css`](../packages/tokens/src/tokens.css) as plain CSS custom properties; no styling framework or automated Figma sync is added. S3-TOK-01 authorizes this values-only package; it shares no components, so each app's shell styling stays local as ADR 0001 intends. It currently holds the motion values from the design team's Animation specification, including reduced-motion overrides, the Design System text-style sizes, line heights and weights in rem, and the corner-radius scale. The custom ease-out curve is an interim `ease-out`, and the font family names Inter without loading a font file, until design confirms the curve and a licensed brand font. Color, spacing, elevation and interaction-state tokens are added only after their Figma values and semantic names are approved.
 
+CSS tokens are named by value; the Figma names they correspond to are:
+
+| Figma | CSS token |
+| --- | --- |
+| `sizing/radius/none`, `xxs`, `xs 2`, `sm`, `md`, `lg`, `xl`, `full` | `--pp-radius-0`, `-2`, `-4`, `-8`, `-12`, `-16`, `-24`, `-full` (999px) |
+| Radius 6, 10 and 20px (Corner Radius page only) | `--pp-radius-6`, `-10`, `-20`, pending design confirmation |
+| Text style `H1`–`H5`, `Paragraph 1`/`2`, `Small`, `Footer` | `--pp-font-size-*` and `--pp-line-height-*` with the same names; `H5/Bold` adds `--pp-line-height-h5-bold` |
+| `font/weight/regular`, `medium`, `semibold`, `bold` | `--pp-font-weight-regular`, `-medium`, `-semibold`, `-bold` |
+| `font/family/sans` | `--pp-font-family-base` |
+
+Typography follows the Figma text styles, not the `font/size/*` primitives: `font/size/48` currently resolves to 0 while the H1 styles use 48px, so the CSS keeps 48px until design corrects the variable. Figma's H3 styles (32px/36px) and the Footer Semi Bold weight (500) also await confirmation. Inter is named but not loaded, so browsers render a system font until a font file is added.
+
 The repository currently contains foundation shells. The next dummy UI may use clearly labelled synthetic fixtures to exercise those states while backend publication and photo preparation progress. Start with a small representative set, then a 20-dish layout fixture; do not portray fake records as approved venue data. Connect to real content only through the approved publication contract.
 
 Each UI PR records the chosen screen/state, source version or dated reference, interaction/event mapping and test evidence. Preserve actual publication and dish exposure references. Menu browsing must work without analytics or WebGL. Three.js remains behind an explicit tap-loaded boundary; viewer failure must not remove the photo/text menu. No live image generation is part of diner browsing.
