@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer sizes and line heights in rem, including a separate H5 Bold line height; four weights; Inter without a loaded font file); the corner-radius scale (0-24px plus full); the spacing scale (0-80px, including 48px); three shadow levels plus the chip shadow; and the color palette (orange, neutral, gray, info, success, error, warning, white, black). Color roles map palette colors to Button, Navigation, surface, semantic status, input and chip controls, including a nav hover icon role and color-mix-based outline/button-hover roles. The ease-out curve remains interim; surface/container contrast and additional Figma shadow styles are pending design confirmation.",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); three shadow levels plus chip shadow; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. No Chip roles. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,7 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "94ebacea52b37b75ad4dd88008c4562e5e8c421814afd15d7b5ac38943f0d49b",
+      "sourceFingerprint": "b4ecd31dbfbd36254b7330e5dc9e80b396cc089c533ef298b0fbe060fcb01594"
     },
     {
       "id": "diner",
@@ -62,7 +62,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4107ee97eaf9096f1bcfc032000d09ddd8542fa7b389c4b93ae88e72b8173fe8"
+      "sourceFingerprint": "9aaaee90abd16f6933983c71bd742d56871cff598ea76ae7d7f7ec4735d9441c"
     },
     {
       "id": "console",
@@ -328,13 +328,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Started S3-TOK-01 with a shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides, the Design System text-style scale and weights, and the corner-radius scale, with tests for values, token groups and both imports. No color or component token was invented; shells are not restyled.",
+      "summary": "S3-TOK-01 now ships the shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides; Design System text styles, corner-radius, spacing (0-80px including 48px), shadows and color palette; and semantic color roles using --pp-role-button-<variant>-<state>-<property>, including a nav hover icon role. Chip roles were removed pending Figma values. Surface-container is neutral-700 and needs a --pp-role-outline border; on-error and on-information use neutral-950 for WCAG AA contrast. A WCAG contrast test covers active foreground/background pairs; shells remain locally styled.",
       "modules": [
         "tokens",
         "diner",
         "console"
       ],
-      "next": "Confirm the custom ease-out curve, licensed brand font, H2/footer weight typos and semantic token names with Rania. Spacing and elevation are proposed for Harshita; then add approved color and interaction-state tokens and the Button/Card/Input/Typography/Navigation foundations."
+      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; keep chip roles pending until Figma values arrive."
     },
     {
       "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",

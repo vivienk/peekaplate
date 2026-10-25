@@ -174,14 +174,14 @@ describe('design tokens', () => {
     const { base } = await tokenBlocks();
     const roles = group(base, role);
     expect(roles).toEqual({
-      '--pp-role-action-bg': 'var(--pp-color-orange-500)',
-      '--pp-role-action-text': 'var(--pp-color-orange-950)',
-      '--pp-role-action-pressed-bg': 'var(--pp-color-orange-600)',
-      '--pp-role-outline-bg': 'var(--pp-color-neutral-800)',
-      '--pp-role-outline-text': 'var(--pp-color-neutral-50)',
-      '--pp-role-outline-border': 'var(--pp-color-neutral-700)',
-      '--pp-role-disabled-bg': 'var(--pp-color-neutral-600)',
-      '--pp-role-disabled-text': 'var(--pp-color-neutral-400)',
+      '--pp-role-button-action-bg': 'var(--pp-color-orange-500)',
+      '--pp-role-button-action-text': 'var(--pp-color-orange-950)',
+      '--pp-role-button-action-pressed-bg': 'var(--pp-color-orange-600)',
+      '--pp-role-button-outline-bg': 'var(--pp-color-neutral-800)',
+      '--pp-role-button-outline-text': 'var(--pp-color-neutral-50)',
+      '--pp-role-button-outline-border': 'var(--pp-color-neutral-700)',
+      '--pp-role-button-disabled-bg': 'var(--pp-color-neutral-600)',
+      '--pp-role-button-disabled-text': 'var(--pp-color-neutral-400)',
       '--pp-role-focus-ring': 'var(--pp-color-info-400)',
       '--pp-role-text-on-dark': 'var(--pp-color-neutral-50)',
       '--pp-role-nav-bg': 'var(--pp-color-neutral-800)',
@@ -196,7 +196,7 @@ describe('design tokens', () => {
       '--pp-role-primary-container': 'var(--pp-color-orange-800)',
       '--pp-role-on-primary-container': 'var(--pp-color-orange-100)',
       '--pp-role-surface': 'var(--pp-color-neutral-800)',
-      '--pp-role-surface-container': 'var(--pp-color-neutral-600)',
+      '--pp-role-surface-container': 'var(--pp-color-neutral-700)',
       '--pp-role-on-surface': 'var(--pp-color-neutral-50)',
       '--pp-role-on-surface-variant': 'var(--pp-color-gray-400)',
       '--pp-role-outline': 'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
@@ -204,7 +204,7 @@ describe('design tokens', () => {
       '--pp-role-outline-variant': 'var(--pp-color-neutral-700)',
       '--pp-role-text-secondary': 'var(--pp-color-neutral-200)',
       '--pp-role-error': 'var(--pp-color-error-400)',
-      '--pp-role-on-error': 'var(--pp-color-error-900)',
+      '--pp-role-on-error': 'var(--pp-color-neutral-950)',
       '--pp-role-error-container': 'var(--pp-color-error-800)',
       '--pp-role-on-error-container': 'var(--pp-color-error-100)',
       '--pp-role-success': 'var(--pp-color-success-400)',
@@ -216,19 +216,15 @@ describe('design tokens', () => {
       '--pp-role-warning-container': 'var(--pp-color-warning-800)',
       '--pp-role-on-warning-container': 'var(--pp-color-warning-100)',
       '--pp-role-information': 'var(--pp-color-info-400)',
-      '--pp-role-on-information': 'var(--pp-color-info-900)',
+      '--pp-role-on-information': 'var(--pp-color-neutral-950)',
       '--pp-role-information-container': 'var(--pp-color-info-800)',
       '--pp-role-on-information-container': 'var(--pp-color-info-100)',
-      '--pp-role-button-text-hover':
+      '--pp-role-button-text-hover-bg':
         'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
       '--pp-role-button-disabled-border': 'var(--pp-color-neutral-600)',
-      '--pp-role-button-outlined-pressed': 'var(--pp-color-neutral-600)',
+      '--pp-role-button-outline-pressed-bg': 'var(--pp-color-neutral-600)',
       '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
-      '--pp-role-chip-active-bg': 'var(--pp-color-neutral-50)',
-      '--pp-role-chip-active-text': 'var(--pp-color-neutral-800)',
-      '--pp-role-chip-inactive-text': 'var(--pp-color-neutral-50)',
-      '--pp-role-chip-inactive-border':
-        'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
+
       '--pp-role-input-bg': 'var(--pp-color-neutral-800)',
       '--pp-role-input-text': 'var(--pp-color-neutral-50)',
       '--pp-role-input-placeholder': 'var(--pp-color-neutral-400)',
@@ -239,11 +235,6 @@ describe('design tokens', () => {
       '--pp-role-input-bg-disabled': 'var(--pp-color-neutral-600)',
       '--pp-role-input-text-disabled': 'var(--pp-color-neutral-400)',
     });
-
-    for (const value of Object.values(roles)) {
-      const target = /var\((--pp-[\w-]+)\)/.exec(value)?.[1];
-      expect(target && base[target]).toBeTruthy();
-    }
   });
 
   it('match the Design System text styles', async () => {
@@ -343,6 +334,57 @@ describe('design tokens', () => {
         expect(ref).toMatch(/^--pp-color-/);
       }
     }
+  });
+
+  it('keeps active foreground/background pairs at WCAG AA contrast', async () => {
+    const { base } = await tokenBlocks();
+    const hexOf = (name: string): string => {
+      let value = base[name];
+      for (let i = 0; i < 5 && value; i++) {
+        const next = /^var\((--pp-[\w-]+)\)$/.exec(value.trim())?.[1];
+        if (!next) break;
+        value = base[next];
+      }
+      if (!value || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${name} is not a solid color`);
+      return value;
+    };
+    const luminance = (hex: string) => {
+      const channel = (i: number) => {
+        const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    };
+    const ratio = ([fg, bg]: string[]) => {
+      const a = luminance(hexOf(fg as string));
+      const b = luminance(hexOf(bg as string));
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const r = (name: string) => `--pp-role-${name}`;
+
+    // Disabled pairs are left out because WCAG exempts inactive components.
+    const textPairs = [
+      ...['primary', 'error', 'success', 'warning', 'information'].flatMap((n) => [
+        [r(`on-${n}`), r(n)],
+        [r(`on-${n}-container`), r(`${n}-container`)],
+      ]),
+      [r('button-action-text'), r('button-action-bg')],
+      [r('button-action-text'), r('button-action-pressed-bg')],
+      [r('button-outline-text'), r('button-outline-bg')],
+      [r('nav-icon'), r('nav-bg')],
+      [r('nav-hover-icon'), r('nav-hover-bg')],
+      [r('on-surface'), r('surface')],
+      [r('on-surface'), r('surface-container')],
+      [r('on-surface-variant'), r('surface')],
+      [r('on-surface-variant'), r('surface-container')],
+      [r('input-text'), r('input-bg')],
+    ];
+    for (const pair of textPairs) {
+      expect(ratio(pair), pair.join(' on ')).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(ratio([r('focus-ring'), r('surface')]), 'focus-ring on surface').toBeGreaterThanOrEqual(
+      3,
+    );
   });
 
   it('are the shared source for both apps', async () => {

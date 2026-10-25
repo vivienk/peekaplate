@@ -2,7 +2,7 @@
  * Shared design tokens consumed by the diner and console apps (S3-TOK-01).
  * Motion values come from the design team's Animation specification; typography, corner
  * radius, spacing, shadows and the color palette from the Design System pages. Color roles
- * map palette colors to Button and Navigation controls and to general semantic uses.
+ * map palette colors to Button and Navigation and input controls and to general semantic uses.
  */
 :root {
   /* Easing. The specification's "custom ease-out" curve is not yet supplied; the standard
@@ -70,18 +70,19 @@
   --pp-font-size-footer: 0.625rem; /* 10px */
   --pp-line-height-footer: 0.875rem; /* 14px */
 
-  /* Corner radius. Names follow pixel size; radius-full makes pill shapes. */
-  --pp-radius-0: 0px;
-  --pp-radius-2: 2px;
-  --pp-radius-4: 4px;
+  /* Corner radius. Names follow pixel size; the Figma sizing/radius variable is noted beside each.
+     6, 10 and 20px come from the alpha Corner Radius page only and await design confirmation. */
+  --pp-radius-0: 0px; /* none */
+  --pp-radius-2: 2px; /* xxs */
+  --pp-radius-4: 4px; /* xs */
   --pp-radius-6: 6px;
-  --pp-radius-8: 8px;
+  --pp-radius-8: 8px; /* sm */
   --pp-radius-10: 10px;
-  --pp-radius-12: 12px;
-  --pp-radius-16: 16px;
+  --pp-radius-12: 12px; /* md */
+  --pp-radius-16: 16px; /* lg */
   --pp-radius-20: 20px;
-  --pp-radius-24: 24px;
-  --pp-radius-full: 999px;
+  --pp-radius-24: 24px; /* xl */
+  --pp-radius-full: 999px; /* full */
 
   /* Spacing. The Design System spacing scale, named by pixel size like the radius tokens. */
   --pp-space-0: 0px;
@@ -190,16 +191,16 @@
   --pp-color-warning-800: #744815;
   --pp-color-warning-900: #5b3813;
 
-  /* Color roles for interactive controls (dark-theme Buttons spec). They only reference the
-     palette. Page and card surface roles join once design confirms the dark surface values. */
-  --pp-role-action-bg: var(--pp-color-orange-500);
-  --pp-role-action-text: var(--pp-color-orange-950);
-  --pp-role-action-pressed-bg: var(--pp-color-orange-600);
-  --pp-role-outline-bg: var(--pp-color-neutral-800);
-  --pp-role-outline-text: var(--pp-color-neutral-50);
-  --pp-role-outline-border: var(--pp-color-neutral-700);
-  --pp-role-disabled-bg: var(--pp-color-neutral-600);
-  --pp-role-disabled-text: var(--pp-color-neutral-400);
+  /* Color roles for interactive controls and general semantic uses (dark-theme values). They
+     only reference the palette. */
+  --pp-role-button-action-bg: var(--pp-color-orange-500);
+  --pp-role-button-action-text: var(--pp-color-orange-950);
+  --pp-role-button-action-pressed-bg: var(--pp-color-orange-600);
+  --pp-role-button-outline-bg: var(--pp-color-neutral-800);
+  --pp-role-button-outline-text: var(--pp-color-neutral-50);
+  --pp-role-button-outline-border: var(--pp-color-neutral-700);
+  --pp-role-button-disabled-bg: var(--pp-color-neutral-600);
+  --pp-role-button-disabled-text: var(--pp-color-neutral-400);
   --pp-role-focus-ring: var(--pp-color-info-400);
   --pp-role-text-on-dark: var(--pp-color-neutral-50);
 
@@ -215,8 +216,10 @@
   --pp-role-on-primary: var(--pp-color-orange-950);
   --pp-role-primary-container: var(--pp-color-orange-800);
   --pp-role-on-primary-container: var(--pp-color-orange-100);
+  /* Dark-theme values. surface-container is nearly identical to surface (about 1.04:1), so
+     cards need a --pp-role-outline border until design confirms the separation. */
   --pp-role-surface: var(--pp-color-neutral-800);
-  --pp-role-surface-container: var(--pp-color-neutral-600);
+  --pp-role-surface-container: var(--pp-color-neutral-700);
   --pp-role-on-surface: var(--pp-color-neutral-50);
   --pp-role-on-surface-variant: var(--pp-color-gray-400);
   --pp-role-outline: color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent);
@@ -224,7 +227,7 @@
   --pp-role-outline-variant: var(--pp-color-neutral-700);
   --pp-role-text-secondary: var(--pp-color-neutral-200);
   --pp-role-error: var(--pp-color-error-400);
-  --pp-role-on-error: var(--pp-color-error-900);
+  --pp-role-on-error: var(--pp-color-neutral-950);
   --pp-role-error-container: var(--pp-color-error-800);
   --pp-role-on-error-container: var(--pp-color-error-100);
   --pp-role-success: var(--pp-color-success-400);
@@ -236,14 +239,14 @@
   --pp-role-warning-container: var(--pp-color-warning-800);
   --pp-role-on-warning-container: var(--pp-color-warning-100);
   --pp-role-information: var(--pp-color-info-400);
-  --pp-role-on-information: var(--pp-color-info-900);
+  --pp-role-on-information: var(--pp-color-neutral-950);
   --pp-role-information-container: var(--pp-color-info-800);
   --pp-role-on-information-container: var(--pp-color-info-100);
-  --pp-role-button-text-hover: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
+  --pp-role-button-text-hover-bg: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
   --pp-role-button-disabled-border: var(--pp-color-neutral-600);
-  --pp-role-button-outlined-pressed: var(--pp-color-neutral-600);
+  --pp-role-button-outline-pressed-bg: var(--pp-color-neutral-600);
   --pp-role-nav-icon-disabled: var(--pp-color-neutral-400);
-    /* Input roles. Interim: reuse palette colors until the Input design exists in Figma. */
+  /* Input roles. Interim: reuse palette colors until the Input design exists in Figma. */
   --pp-role-input-bg: var(--pp-color-neutral-800);
   --pp-role-input-text: var(--pp-color-neutral-50);
   --pp-role-input-placeholder: var(--pp-color-neutral-400);
@@ -253,11 +256,6 @@
   --pp-role-input-text-error: var(--pp-color-error-400);
   --pp-role-input-bg-disabled: var(--pp-color-neutral-600);
   --pp-role-input-text-disabled: var(--pp-color-neutral-400);
-    /* Chip roles. Active has a light fill; inactive has a faint outline. Shadow: --pp-shadow-chip. */
-  --pp-role-chip-active-bg: var(--pp-color-neutral-50);
-  --pp-role-chip-active-text: var(--pp-color-neutral-800);
-  --pp-role-chip-inactive-text: var(--pp-color-neutral-50);
-  --pp-role-chip-inactive-border: color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent);
 }
 
 /* Reduced motion: transitions shrink to 1ms, delays and staggers are removed, and screens
