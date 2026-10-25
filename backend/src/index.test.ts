@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import app, { createApp } from './index';
+import app, { consumeJtiRateLimit, createApp } from './index';
 import { ingestObservations } from './observation-ingest';
 
 describe('foundation API', () => {
@@ -256,6 +256,91 @@ describe('observation.v2 HTTP boundary', () => {
     expect(malformed.status).toBe(400);
     expect(enqueueObservation).not.toHaveBeenCalled();
   });
+  it('accepts exactly 32 KiB and rejects 32 KiB plus one byte', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const app = createApp({ ...baseServices, enqueueObservation });
+    const envelope = JSON.stringify({ contract: 'observation.v2', events: [event()] });
+    const encodedLength = new TextEncoder().encode(envelope).byteLength;
+    expect(encodedLength).toBeLessThan(32_768);
+
+    const exact = `${envelope}${' '.repeat(32_768 - encodedLength)}`;
+    const accepted = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: exact,
+      }),
+    );
+    expect(new TextEncoder().encode(exact)).toHaveLength(32_768);
+    expect(accepted.status).toBe(200);
+
+    const oversized = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: `${exact} `,
+      }),
+    );
+    expect(oversized.status).toBe(413);
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts exact time boundaries and rejects a one-millisecond excess', async () => {
+    const now = new Date('2026-10-25T12:00:00.000Z');
+    const inputs = [
+      { ...event(), occurred_at: new Date(now.getTime() - 86_400_000).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() - 86_400_001).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() + 300_000).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() + 300_001).toISOString() },
+    ];
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+    const result = await ingestObservations(
+      inputs,
+      { venueId, publicationId, jti },
+      { enqueue, now: () => now },
+    );
+    expect(result.queueUnavailable).toBe(false);
+    if (result.queueUnavailable) throw new Error('unexpected Queue failure');
+    expect(
+      result.response.receipts.map(({ status, reason_code }) => [status, reason_code]),
+    ).toEqual([
+      ['accepted', null],
+      ['rejected', 'too_old'],
+      ['accepted', null],
+      ['rejected', 'future_time'],
+    ]);
+    expect(enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies both Cloudflare windows to the verified token jti', async () => {
+    const minute = { limit: vi.fn().mockResolvedValue({ success: true }) };
+    const burst = { limit: vi.fn().mockResolvedValue({ success: true }) };
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: true, retryAfterSeconds: 1 });
+    expect(minute.limit).toHaveBeenCalledWith({ key: jti });
+    expect(burst.limit).toHaveBeenCalledWith({ key: jti });
+
+    minute.limit.mockResolvedValueOnce({ success: false });
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: false, retryAfterSeconds: 60 });
+
+    burst.limit.mockResolvedValueOnce({ success: false });
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: false, retryAfterSeconds: 10 });
+  });
+
   it('detects same-ID conflicts before per-item validation and quarantines both copies', async () => {
     const enqueueObservation = vi.fn().mockResolvedValue(undefined);
     const valid = event();

@@ -442,6 +442,181 @@ describe('observation.v2 contract', () => {
     ).toHaveLength(1);
   });
 
+  it('accepts and rejects a fixture for every P0 event payload', () => {
+    const dishId = base.payload.dish_id;
+    const dishRevisionId = base.payload.dish_revision_id;
+    const otherDishId = '50000000-0000-4000-8000-000000000002';
+    const otherDishRevisionId = '60000000-0000-4000-8000-000000000002';
+    const exposureId = '70000000-0000-4000-8000-000000000001';
+    const openingId = '80000000-0000-4000-8000-000000000001';
+    const fixtures = [
+      {
+        valid: { ...base, type: 'menu_viewed', payload: { entry_source: 'qr' } },
+        invalid: { ...base, type: 'menu_viewed', payload: { entry_source: 'table_qr' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 1,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 0,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'menu_card',
+            from_exposure_id: exposureId,
+            nav_relation: 'none',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'direct_link',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_000,
+            final: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_001,
+            final: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: { dish_id: dishId, dish_revision_id: dishRevisionId, opening_id: openingId },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 1,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: otherDishId,
+            other_dish_revision_id: otherDishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: dishId,
+            other_dish_revision_id: dishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: base,
+        invalid: { ...base, payload: { ...base.payload, save_origin: 'toast' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'compare_view',
+            shortlist_size: 0,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'toast',
+            shortlist_size: 0,
+          },
+        },
+      },
+      {
+        valid: { ...base, type: 'shortlist_viewed', payload: { shortlist_size: 1 } },
+        invalid: {
+          ...base,
+          type: 'shortlist_viewed',
+          payload: { shortlist_size: 1, dish_id: dishId },
+        },
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      expect(ObservationV2Schema.safeParse(fixture.valid).success).toBe(true);
+      expect(ObservationV2Schema.safeParse(fixture.invalid).success).toBe(false);
+    }
+  });
+
   it('rejects numeric versions, client authority, unknown fields and removed event types', () => {
     for (const candidate of [
       { ...base, schema_version: 2 },
@@ -484,7 +659,7 @@ describe('observation.v2 contract', () => {
           shortlist_size: 0,
         },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(ObservationV2Schema.safeParse({ ...base, type: 'undo' }).success).toBe(false);
   });
 });

@@ -31,6 +31,18 @@
           "bucket_name": "peekaplate-staging-assets"
         }
       ],
+      "ratelimits": [
+        {
+          "name": "OBSERVATION_RATE_LIMITER_MINUTE",
+          "namespace_id": "9014174611501",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "OBSERVATION_RATE_LIMITER_BURST",
+          "namespace_id": "9014174611502",
+          "simple": { "limit": 10, "period": 10 }
+        }
+      ],
       "queues": {
         "producers": [
           {

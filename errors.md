@@ -490,3 +490,13 @@ disposable local/CI startup only, without a hosted database or application chang
 ```json
 {"kind":"verification-update","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"result":"Focused DATA-01 tests pass 33/33 after replacing recursive canonical JSON with an explicit-stack implementation and adding a 12,000-level invalid JSON regression. Contracts/backend typechecks and scoped Biome checks pass."}
 ```
+
+## October 25 DATA-01 verification tooling and rate-limit boundary
+
+```json
+{"id":"OBS-20261025-DATA01-TOOLS-001","sources":["backend/src/index.test.ts","packages/contracts/src/index.test.ts"],"observation":"The sandboxed pnpm workspace registration and default linker could not create Windows symlinks, and the first Vitest run could not rename its transform cache under the sandbox temp directory.","prevention":"Use a repository-local pnpm store with the hoisted linker, provide the backend package a generated local copy of the workspace contract package when workspace symlinks are unavailable, and point TEMP/TMP at a repository-local ignored directory.","status":"resolved","regression":"Direct repository binaries ran the focused contracts, endpoint and menu-token suites: 50/50 passed. Both TypeScript projects and scoped Biome passed.","area":"local-test-runtime"}
+```
+
+```json
+{"id":"OBS-20261025-DATA01-RATELIMIT-001","followup":"Review whether approximate per-location protection is acceptable for the staging pilot. If strict cross-location enforcement is required, approve and design a per-jti Durable Object limiter before activation.","observation":"Cloudflare Workers Rate Limiting bindings support only 10- or 60-second approximate per-location windows. They are permissive and eventually consistent, so 60/60 plus 10/10 bindings keyed by verified token jti do not prove a strict global token bucket with burst capacity 10.","sources":["backend/src/index.ts","backend/src/index.test.ts","backend/wrangler.jsonc"],"status":"open","regression":"Local dependency tests verify both bindings receive only the verified jti and return bounded Retry-After values. Hosted behavior is not yet tested.","area":"observation-rate-limit"}
+```

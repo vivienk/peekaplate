@@ -288,7 +288,7 @@ export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
 
 const observationUuid = z.uuid().transform((value) => value.toLowerCase());
 const saveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
-const unsaveSurface = z.enum(['menu_card', 'dish_detail', 'saved_screen']);
+const unsaveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
 const dishReference = {
   dish_id: observationUuid,
   dish_revision_id: observationUuid,
@@ -306,16 +306,18 @@ const observationBase = z.strictObject({
 const menuViewed = observationBase.extend({
   type: z.literal('menu_viewed'),
   payload: z.strictObject({
-    menu_exposure_id: observationUuid,
-    entry_source: z.enum(['table_qr', 'direct_link', 'unknown']),
+    entry_source: z.enum(['qr', 'direct_link', 'unknown']),
   }),
 });
 const dishViewed = observationBase.extend({
   type: z.literal('dish_viewed'),
   payload: z.strictObject({
-    card_exposure_id: observationUuid,
     ...dishReference,
-    exposure_basis: z.enum(['threshold', 'activated_before_threshold']),
+    exposure_id: observationUuid,
+    surface: z.literal('menu_list'),
+    position: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    exposure_basis: z.literal('viewport_50pct_1s'),
+    category_filter: z.string().trim().min(1).max(160).optional(),
   }),
 });
 const dishDetailOpened = observationBase.extend({
@@ -323,42 +325,43 @@ const dishDetailOpened = observationBase.extend({
   payload: z.strictObject({
     opening_id: observationUuid,
     ...dishReference,
-    source: z.enum(['menu_card', 'compare_view', 'direct_link']),
-    card_exposure_id: observationUuid.optional(),
+    source: z.enum(['menu_card', 'compare_view', 'direct', 'saved_screen']),
+    from_exposure_id: observationUuid.optional(),
+    nav_relation: z.enum(['none', 'from_compare', 'back_navigation']).optional(),
     save_available: z.boolean(),
   }),
 });
 const dishActivityCheckpoint = observationBase.extend({
   type: z.literal('dish_activity_checkpoint'),
   payload: z.strictObject({
+    ...dishReference,
     opening_id: observationUuid,
-    checkpoint_sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-    active_ms: z.number().int().nonnegative().max(86_400_000),
+    active_ms: z.number().int().nonnegative().max(300_000),
     final: z.boolean(),
-    reason: z.enum(['checkpoint', 'inactivity', 'hidden', 'closed', 'navigation']).optional(),
   }),
 });
 const dishDetailClosed = observationBase.extend({
   type: z.literal('dish_detail_closed'),
   payload: z.strictObject({
+    ...dishReference,
     opening_id: observationUuid,
-    active_ms: z.number().int().nonnegative().max(86_400_000),
-    reason: z.enum(['close', 'back', 'navigation']),
   }),
 });
 const dishCompared = observationBase.extend({
   type: z.literal('dish_compared'),
-  payload: z.strictObject({
-    comparison_id: observationUuid,
-    pair_version: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-    action: z.enum(['start', 'replace']),
-    first_dish_id: observationUuid,
-    first_dish_revision_id: observationUuid,
-    second_dish_id: observationUuid,
-    second_dish_revision_id: observationUuid,
-    originating_opening_id: observationUuid.optional(),
-    save_available: z.boolean(),
-  }),
+  payload: z
+    .strictObject({
+      ...dishReference,
+      other_dish_id: observationUuid,
+      other_dish_revision_id: observationUuid,
+      comparison_id: observationUuid,
+      compare_action: z.enum(['start', 'replace']),
+      save_available: z.boolean(),
+    })
+    .refine((payload) => payload.dish_id !== payload.other_dish_id, {
+      path: ['other_dish_id'],
+      message: 'Compared dishes must be different',
+    }),
 });
 const dishSaved = observationBase.extend({
   type: z.literal('dish_saved'),

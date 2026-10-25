@@ -37,7 +37,10 @@ export type Bindings = {
   LOCAL_GITHUB_API_URL?: string;
   MENU_TOKEN_ISSUER?: string;
   OBSERVATION_QUEUE?: { send(message: ObservationQueueEnvelope): Promise<void> };
-  OBSERVATION_RATE_LIMITER?: {
+  OBSERVATION_RATE_LIMITER_MINUTE?: {
+    limit(input: { key: string }): Promise<{ success: boolean }>;
+  };
+  OBSERVATION_RATE_LIMITER_BURST?: {
     limit(input: { key: string }): Promise<{ success: boolean }>;
   };
 };
@@ -112,6 +115,20 @@ let menuVerifier: {
   local: boolean;
   verify: ReturnType<typeof createMenuTokenVerifier>;
 };
+export async function consumeJtiRateLimit(
+  jti: string,
+  env: Bindings,
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  if (!env.OBSERVATION_RATE_LIMITER_MINUTE || !env.OBSERVATION_RATE_LIMITER_BURST) {
+    throw new MenuTokenUnavailableError();
+  }
+  const minute = await env.OBSERVATION_RATE_LIMITER_MINUTE.limit({ key: jti });
+  const burst = await env.OBSERVATION_RATE_LIMITER_BURST.limit({ key: jti });
+  if (!minute.success) return { allowed: false, retryAfterSeconds: 60 };
+  if (!burst.success) return { allowed: false, retryAfterSeconds: 10 };
+  return { allowed: true, retryAfterSeconds: 1 };
+}
+
 const dependencies: Dependencies = {
   async verify(authorization, env) {
     if (!env.AUTH_ISSUER) throw new AuthUnavailableError();
@@ -144,11 +161,7 @@ const dependencies: Dependencies = {
     }
     return menuVerifier.verify(authorization);
   },
-  async consumeObservationRateLimit(jti, env) {
-    if (!env.OBSERVATION_RATE_LIMITER) throw new MenuTokenUnavailableError();
-    const result = await env.OBSERVATION_RATE_LIMITER.limit({ key: jti });
-    return { allowed: result.success, retryAfterSeconds: 1 };
-  },
+  consumeObservationRateLimit: consumeJtiRateLimit,
   async enqueueObservation(message, env) {
     if (!env.OBSERVATION_QUEUE) throw new MenuTokenUnavailableError();
     await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(message));

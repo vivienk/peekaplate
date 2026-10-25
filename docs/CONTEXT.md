@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. observation.v2 now validates every approved P0 event, coherent receipts and versioned normal/conflict Queue envelopes; conflict evidence contains only validated events or fixed privacy-safe metadata. Retrieval offsets, ranks and aggregate context limits remain enforced.",
+      "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. observation.v2 now matches the October 24 P0 field table, including exposure_id/viewport_50pct_1s, opening-linked 5-minute activity, comparison fields, Save/Unsave and shortlist events; every P0 type has valid/invalid fixture coverage. Queue envelopes remain a strict observation.v2 or privacy-safe observation_conflict.v1 union.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "cf0023525fca5665dbfb181f6d4e021018d22bec33a3b22459625b40706731d6"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff commands, staging analytics and bounded S3-VIS-04 retrieval, and adds the local POST /observations boundary: 30-minute menu-token authority, token-scoped rate limiting, 32 KiB/25-item envelopes, coherent receipts, privacy-safe conflict quarantine and accept-only-after-Queue-send. Live rate-limit/consumer activation, canonical writes and hosted acceptance remain pending; Queues stay paused.",
+      "summary": "Hono Worker retains staff commands, staging analytics and bounded retrieval, and adds the local POST /observations boundary: 30-minute token authority, jti-keyed Cloudflare 60/min plus 10/10-second approximate windows, exact 32 KiB and 24 h/5 min boundaries, coherent receipts, privacy-safe conflict quarantine and accept-only-after-Queue-send. Cloudflare counters are permissive per-location rather than a strict global token bucket; live activation, consumer writes and hosted acceptance remain pending, and Queues stay paused.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -113,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a49e8af89492163dd04d21cb1fd7afe0633ebc97af38019be0de3d174b7b82d6"
+      "sourceFingerprint": "7dbee8aa3492f57b3f982d16402980cc233ea391c848b6bef6071c09f10e4e5e"
     },
     {
       "id": "database",
@@ -313,14 +313,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
-    },
-    {
       "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
       "modules": [
         "processing",
@@ -392,6 +384,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
+    },
+    {
+      "summary": "Rebased the local S3-DATA-01 endpoint onto develop 5c0cb3f and aligned observation.v2 with the October 24 field table. Added strict valid/invalid fixtures for all nine P0 events, exact 32768/32769-byte and 24 h/5 min plus-or-minus 1 ms tests, and jti-keyed Cloudflare bindings for 60/60-second plus 10/10-second protection. Focused contracts/endpoint/menu-token tests pass 50/50 with both TypeScript projects and scoped Biome. Cloudflare documents these counters as approximate and per-location, so this does not establish a strict global token bucket or hosted behavior.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "Prepare the separate PR #31 consumer compatibility patch for strict observation_conflict.v1 persistence/ACK semantics, then run full checks and independent pinned reviews. Keep DIN-02 real controls, hosted rate-limit behavior and browser-to-Queue acceptance explicitly pending."
     }
   ]
 }
