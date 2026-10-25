@@ -113,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7dbee8aa3492f57b3f982d16402980cc233ea391c848b6bef6071c09f10e4e5e"
+      "sourceFingerprint": "43e00b20950a22122829255caca09f0a4868872f38b514751832897346e33fac"
     },
     {
       "id": "database",
@@ -391,7 +391,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "backend"
       ],
-      "next": "Prepare the separate PR #31 consumer compatibility patch for strict observation_conflict.v1 persistence/ACK semantics, then run full checks and independent pinned reviews. Keep DIN-02 real controls, hosted rate-limit behavior and browser-to-Queue acceptance explicitly pending."
+      "next": "Hand off the shared observation.v2/observation_conflict.v1 Queue union and conflict-envelope blocker to Teeyansh, the DATA-02 consumer owner. Wait for consumer compatibility and archive/database/ACK validation before enabling collection. Keep DIN-02 real controls, hosted rate-limit behavior and browser-to-Queue acceptance explicitly pending."
     }
   ]
 }
