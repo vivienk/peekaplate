@@ -85,6 +85,13 @@ describe('design tokens', () => {
       '--pp-shadow-medium': '0 8px 12px rgba(34, 34, 34, 0.1)',
       '--pp-shadow-large': '0 8px 12px rgba(34, 34, 34, 0.14)',
       '--pp-shadow-chip': '0 1px 2px rgba(0, 0, 0, 0.12)',
+      '--pp-shadow-elevation-1': '0 1px 2px rgba(0, 0, 0, 0.12)',
+      '--pp-shadow-elevation-2': '0 8px 24px rgba(0, 0, 0, 0.32)',
+      '--pp-shadow-elevation-3': '0 16px 48px rgba(0, 0, 0, 0.4)',
+      '--pp-shadow-dish': '0 14px 36px rgba(0, 0, 0, 0.45)',
+      '--pp-shadow-dish-contact': '0 14px 36px rgba(0, 0, 0, 0.45)',
+      '--pp-shadow-qr-bg': '0 0 36px rgba(0, 0, 0, 0.35)',
+      '--pp-shadow-bottom-sheet': '0 0 36px rgba(0, 0, 0, 0.45)',
     });
   });
 
