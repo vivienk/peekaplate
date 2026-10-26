@@ -528,3 +528,10 @@ The sandbox blocked the authentication test HTTP listener; rerunning with local 
 ### Preview verification resolution
 
 PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T19:14:22.047Z","exitCode":1}
+```
+
+Resolution: all 212 Vitest assertions passed with four optional skips, and 46 of 47 repository script tests passed. The sole failure is the known Windows sandbox denial when the regression itself attempts to create a symlink; rerunning `node --test --test-skip-pattern="rejects artifact symlinks" scripts/preview.test.mjs` passed the remaining 12 preview tests. Linux CI remains the required evidence for the symlink case.
