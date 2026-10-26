@@ -1,3 +1,10 @@
+import {
+  type ObservationConflictV1QueueEnvelope,
+  type ObservationQueueEnvelope,
+  ObservationTypeSchema,
+  type ObservationV2QueueEnvelope,
+} from '@peekaplate/contracts';
+
 /**
  * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-02).
  *
@@ -6,17 +13,7 @@
  * app_private.observation_conflict).
  */
 
-export const ALLOWED_EVENT_TYPES = [
-  'menu_viewed',
-  'dish_viewed',
-  'dish_detail_opened',
-  'dish_detail_closed',
-  'dish_activity_checkpoint',
-  'dish_compared',
-  'dish_saved',
-  'dish_unsaved',
-  'shortlist_viewed',
-] as const;
+export const ALLOWED_EVENT_TYPES = ObservationTypeSchema.options;
 
 export type AllowedEventType = (typeof ALLOWED_EVENT_TYPES)[number];
 
@@ -36,25 +33,32 @@ export type EventIdentity = {
 };
 
 /**
- * Validated observation item extracted from Queue message.
- * ADR 0015 & PR #32 define:
- * - tenant_id is the server-derived venue_id.
- * - event_id is the UUID identifying the observation.
- * - schema_version is 'observation.v2' (string).
- * - authorized_publication_id is the server-derived authorized publication UUID.
- * - session_id is preserved for downstream typed facts.
+ * Normal observation envelope extracted from Queue message.
+ * Adheres strictly to the canonical shared schema ObservationV2QueueEnvelopeSchema.
  */
-export type ObservationEnvelope = {
-  tenantId: string;
+export type NormalObservationEnvelope = ObservationV2QueueEnvelope & {
   venueId?: string | undefined; // alias for backwards compatibility
-  eventId: string;
-  sessionId?: string | undefined;
-  schemaVersion: 'observation.v2';
-  occurredAt: string;
-  type: string;
-  authorizedPublicationId: string;
-  payload: Record<string, unknown>;
-  firstReceivedAt?: string | undefined;
+};
+
+/**
+ * Backwards-compatible alias for NormalObservationEnvelope.
+ */
+export type ObservationEnvelope = NormalObservationEnvelope;
+
+/**
+ * Conflict observation envelope extracted from Queue message (ADR 0015 / PR #40).
+ * Sent by the producer when a conflicting observation reuse is detected at ingestion.
+ * Carries either a full conflicting payload copy or bounded metadata for invalid copies.
+ */
+export type ConflictObservationEnvelope = ObservationConflictV1QueueEnvelope & {
+  venueId?: string | undefined;
+};
+
+/**
+ * Supported Queue Envelope union variants (ADR 0015 / PR #40).
+ */
+export type QueueObservationEnvelope = ObservationQueueEnvelope & {
+  venueId?: string | undefined;
 };
 
 /**

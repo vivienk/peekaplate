@@ -134,3 +134,69 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 });
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
+
+// Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
+// Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
+export const ObservationTypeSchema = z.enum([
+  'menu_viewed',
+  'dish_viewed',
+  'dish_detail_opened',
+  'dish_detail_closed',
+  'dish_activity_checkpoint',
+  'dish_compared',
+  'dish_saved',
+  'dish_unsaved',
+  'shortlist_viewed',
+]);
+
+export const ObservationV2QueueEnvelopeSchema = z.strictObject({
+  kind: z.literal('observation.v2').default('observation.v2'),
+  tenantId: uuid,
+  eventId: uuid,
+  authorizedPublicationId: uuid,
+  sessionId: z.string().min(1).max(200).optional(),
+  schemaVersion: z.literal('observation.v2'),
+  occurredAt: z.iso.datetime(),
+  firstReceivedAt: z.iso.datetime().optional(),
+  type: ObservationTypeSchema,
+  producerId: z.string().min(1).max(200).optional(),
+  localSequence: z.number().int().nonnegative().optional(),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+const conflictCopySchema = z.strictObject({
+  validation: z.enum(['valid', 'invalid']),
+  canonicalChecksum: hash,
+  event: z.record(z.string(), z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const ObservationConflictV1QueueEnvelopeSchema = z.strictObject({
+  kind: z.literal('observation_conflict.v1'),
+  tenantId: uuid,
+  eventId: uuid,
+  authorizedPublicationId: uuid,
+  sessionId: z.string().min(1).max(200).optional(),
+  occurredAt: z.iso.datetime().optional(),
+  firstReceivedAt: z.iso.datetime().optional(),
+  receivedAt: z.iso.datetime().optional(),
+  type: z.string().min(1).max(64).optional(),
+  incomingChecksum: hash.optional(),
+  conflictReason: z.string().min(1).max(200).optional(),
+  reasonCode: z.string().min(1).max(200).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+  boundedMetadata: z.record(z.string(), z.unknown()).optional(),
+  copies: z.array(conflictCopySchema).min(1).max(25).optional(),
+});
+
+export const ObservationQueueEnvelopeSchema = z.union([
+  ObservationV2QueueEnvelopeSchema,
+  ObservationConflictV1QueueEnvelopeSchema,
+]);
+
+export type ObservationType = z.infer<typeof ObservationTypeSchema>;
+export type ObservationV2QueueEnvelope = z.infer<typeof ObservationV2QueueEnvelopeSchema>;
+export type ObservationConflictV1QueueEnvelope = z.infer<
+  typeof ObservationConflictV1QueueEnvelopeSchema
+>;
+export type ObservationQueueEnvelope = z.infer<typeof ObservationQueueEnvelopeSchema>;

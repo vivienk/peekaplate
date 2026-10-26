@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CreateDishRevisionSchema, DishIntentEventSchema, HealthResponseSchema } from './index';
+import {
+  CreateDishRevisionSchema,
+  DishIntentEventSchema,
+  HealthResponseSchema,
+  ObservationConflictV1QueueEnvelopeSchema,
+  ObservationQueueEnvelopeSchema,
+  ObservationV2QueueEnvelopeSchema,
+} from './index';
 
 const event = {
   eventId: '0199b409-a700-7000-8000-000000000001',
@@ -95,5 +102,176 @@ describe('dish command boundary', () => {
       { commandId: 'not-a-uuid' },
     ])
       expect(CreateDishRevisionSchema.safeParse({ ...command, ...patch }).success).toBe(false);
+  });
+});
+
+describe('ObservationQueueEnvelopeSchema contract boundary', () => {
+  const tenantId = '11111111-1111-4111-8111-111111111111';
+  const eventId = '22222222-2222-4222-8222-222222222222';
+  const pubId = '33333333-3333-4333-8333-333333333333';
+
+  const validNormal = {
+    kind: 'observation.v2' as const,
+    tenantId,
+    eventId,
+    authorizedPublicationId: pubId,
+    sessionId: 'sess-001',
+    schemaVersion: 'observation.v2' as const,
+    occurredAt: '2026-10-24T12:00:00.000Z',
+    type: 'dish_viewed' as const,
+    producerId: 'prod-001',
+    localSequence: 1,
+    payload: { dishId: 'dish-1' },
+  };
+
+  const validConflictPayload = {
+    kind: 'observation_conflict.v1' as const,
+    tenantId,
+    eventId,
+    authorizedPublicationId: pubId,
+    occurredAt: '2026-10-24T12:00:00.000Z',
+    firstReceivedAt: '2026-10-24T12:00:01.000Z',
+    type: 'dish_viewed',
+    incomingChecksum: 'a'.repeat(64),
+    conflictReason: 'event_id_conflict',
+    payload: { dishId: 'dish-conflict' },
+  };
+
+  const validConflictBounded = {
+    kind: 'observation_conflict.v1' as const,
+    tenantId,
+    eventId,
+    authorizedPublicationId: pubId,
+    conflictReason: 'payload_too_large',
+    incomingChecksum: 'b'.repeat(64),
+    boundedMetadata: { size: 35000, reasonCode: 'payload_too_large' },
+  };
+
+  it('validates canonical normal observation.v2 envelopes', () => {
+    const parsed = ObservationQueueEnvelopeSchema.parse(validNormal);
+    expect(parsed.kind).toBe('observation.v2');
+    expect(parsed.tenantId).toBe(tenantId);
+    expect(parsed.eventId).toBe(eventId);
+    expect(parsed.authorizedPublicationId).toBe(pubId);
+
+    // Defaulting kind when schemaVersion is observation.v2
+    const withoutKind = { ...validNormal };
+    delete (withoutKind as any).kind;
+    const parsedDefault = ObservationQueueEnvelopeSchema.parse(withoutKind);
+    expect(parsedDefault.kind).toBe('observation.v2');
+  });
+
+  it('validates canonical conflict observation_conflict.v1 envelopes', () => {
+    const parsedPayload = ObservationQueueEnvelopeSchema.parse(validConflictPayload);
+    expect(parsedPayload.kind).toBe('observation_conflict.v1');
+    expect(parsedPayload.tenantId).toBe(tenantId);
+
+    const parsedBounded = ObservationQueueEnvelopeSchema.parse(validConflictBounded);
+    expect(parsedBounded.kind).toBe('observation_conflict.v1');
+    expect(parsedBounded.eventId).toBe(eventId);
+
+    // Producer multi-copy batch conflict format (S3-DATA-01)
+    const parsedProducerCopies = ObservationQueueEnvelopeSchema.parse({
+      kind: 'observation_conflict.v1',
+      tenantId,
+      eventId,
+      authorizedPublicationId: pubId,
+      firstReceivedAt: '2026-10-24T12:00:00.000Z',
+      reasonCode: 'event_id_conflict',
+      copies: [
+        { validation: 'valid', canonicalChecksum: 'a'.repeat(64), event: { item: 'copy-1' } },
+        {
+          validation: 'invalid',
+          canonicalChecksum: 'b'.repeat(64),
+          metadata: { reason: 'copy-2' },
+        },
+      ],
+    });
+    expect(parsedProducerCopies.kind).toBe('observation_conflict.v1');
+    expect((parsedProducerCopies as any).copies).toHaveLength(2);
+  });
+
+  it('rejects browser-facing snake_case formats at the queue boundary', () => {
+    const snakeCase = {
+      tenant_id: tenantId,
+      event_id: eventId,
+      authorized_publication_id: pubId,
+      schema_version: 'observation.v2',
+      occurred_at: '2026-10-24T12:00:00.000Z',
+      type: 'dish_viewed',
+      payload: {},
+    };
+    expect(ObservationQueueEnvelopeSchema.safeParse(snakeCase).success).toBe(false);
+  });
+
+  it('rejects unknown envelope kinds and unsupported schema versions', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        kind: 'observation.v3',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        schemaVersion: 'observation.v1',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validConflictPayload,
+        kind: 'unknown_conflict',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects invalid UUIDs and unauthorized/malformed identifiers', () => {
+    for (const badUuid of ['not-a-uuid', '12345', '', 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz']) {
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          tenantId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          eventId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          authorizedPublicationId: badUuid,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects unknown observation types', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        type: 'unsupported_event_type',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown extra properties on strict objects', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        extraInjectedField: 'unauthorized',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validConflictPayload,
+        extraInjectedField: 'unauthorized',
+      }).success,
+    ).toBe(false);
   });
 });
