@@ -37,6 +37,16 @@
             "binding": "OBSERVATION_QUEUE",
             "queue": "peekaplate-staging-observations"
           }
+        ],
+        "consumers": [
+          {
+            "queue": "peekaplate-staging-observations",
+            "max_batch_size": 10,
+            "max_batch_timeout": 30,
+            "max_retries": 3,
+            "dead_letter_queue": "peekaplate-staging-observations-dlq",
+            "retry_delay": 10
+          }
         ]
       }
     }

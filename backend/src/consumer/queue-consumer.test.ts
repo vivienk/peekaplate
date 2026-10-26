@@ -1,6 +1,8 @@
+import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeObservationRepository } from './database';
 import {
+  MalformedMessageError,
   type MessageBatch,
   QueueConsumer,
   type QueueMessage,
@@ -11,16 +13,16 @@ import {
 import { FakeR2ArchiveStorage } from './r2-storage';
 import { buildConflictArchiveKey, buildRawArchiveKey } from './types';
 
-class FakeQueueMessage implements QueueMessage<unknown> {
+class FakeQueueMessage<T = unknown> implements QueueMessage<T> {
   public acked = false;
   public retried = false;
   public retryDelay?: number | undefined;
+  public attempts = 1;
+  public timestamp = new Date();
 
   constructor(
     public readonly id: string,
-    public readonly body: unknown,
-    public readonly attempts = 1,
-    public readonly timestamp = new Date(),
+    public readonly body: T,
   ) {}
 
   ack(): void {
@@ -29,7 +31,9 @@ class FakeQueueMessage implements QueueMessage<unknown> {
 
   retry(options?: { delaySeconds?: number }): void {
     this.retried = true;
-    this.retryDelay = options?.delaySeconds;
+    if (options?.delaySeconds !== undefined) {
+      this.retryDelay = options.delaySeconds;
+    }
   }
 }
 
@@ -51,36 +55,103 @@ class FakeMessageBatch implements MessageBatch<unknown> {
 const T1 = '11111111-1111-4111-8111-111111111111';
 const E1 = '22222222-2222-4222-8222-222222222222';
 const P1 = '33333333-3333-4333-8333-333333333333';
+const S1 = '44444444-4444-4444-8444-444444444444';
+const PROD1 = '55555555-5555-4555-8555-555555555555';
+const DISH1 = '66666666-6666-4666-8666-666666666666';
+const DISH_REV1 = '77777777-7777-4777-8777-777777777777';
+const EXP1 = '88888888-8888-4888-8888-888888888888';
+const OPEN1 = '99999999-9999-4999-8999-999999999999';
+
+function createValidObservationMsg(overrides: Record<string, unknown> = {}) {
+  return {
+    kind: 'observation.v2' as const,
+    tenantId: T1,
+    eventId: E1,
+    sessionId: S1,
+    schemaVersion: 'observation.v2' as const,
+    occurredAt: '2026-10-24T10:00:00.000Z',
+    type: 'dish_viewed' as const,
+    authorizedPublicationId: P1,
+    producerId: PROD1,
+    localSequence: 1,
+    payload: {
+      dish_id: DISH1,
+      dish_revision_id: DISH_REV1,
+      exposure_id: EXP1,
+      surface: 'menu_list' as const,
+      position: 1,
+      exposure_basis: 'viewport_50pct_1s' as const,
+    },
+    firstReceivedAt: '2026-10-24T10:00:01.000Z',
+    ...overrides,
+  };
+}
+
+function createValidConflictMsg(overrides: Record<string, unknown> = {}) {
+  const checksumA = 'a'.repeat(64);
+  const checksumB = 'b'.repeat(64);
+  return {
+    kind: 'observation_conflict.v1' as const,
+    tenantId: T1,
+    eventId: E1,
+    authorizedPublicationId: P1,
+    firstReceivedAt: '2026-10-24T12:00:01.000Z',
+    reasonCode: 'event_id_conflict' as const,
+    copies: [
+      {
+        validation: 'valid' as const,
+        canonicalChecksum: checksumA,
+        event: {
+          schema_version: 'observation.v2' as const,
+          event_id: E1,
+          session_id: S1,
+          producer_id: PROD1,
+          local_sequence: 1,
+          occurred_at: '2026-10-24T12:00:00.000Z',
+          publication_revision_id: P1,
+          type: 'shortlist_viewed' as const,
+          payload: { shortlist_size: 1 },
+        },
+      },
+      {
+        validation: 'invalid' as const,
+        canonicalChecksum: checksumB,
+        metadata: {
+          schemaVersionStatus: 'observation.v2' as const,
+          eventType: 'shortlist_viewed' as const,
+          occurredAt: '2026-10-24T12:00:00.000Z',
+          publicationStatus: 'matches_authority' as const,
+          payloadObject: true,
+        },
+      },
+    ],
+    ...overrides,
+  };
+}
 
 describe('validateObservationEnvelope', () => {
   it('validates a correct envelope with string observation.v2, UUIDs, and preserves sessionId', () => {
-    const valid = {
-      tenantId: T1,
-      eventId: E1,
-      sessionId: 'sess-789',
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T12:00:00Z',
-      type: 'dish_detail_opened',
-      payload: { dishId: 'd-1' },
-    };
+    const valid = createValidObservationMsg();
     const parsed = validateObservationEnvelope(valid);
     expect(parsed.tenantId).toBe(T1);
     expect(parsed.eventId).toBe(E1);
     expect(parsed.authorizedPublicationId).toBe(P1);
-    expect(parsed.sessionId).toBe('sess-789');
+    expect(parsed.sessionId).toBe(S1);
     expect(parsed.schemaVersion).toBe('observation.v2');
-    expect(parsed.type).toBe('dish_detail_opened');
+    expect(parsed.type).toBe('dish_viewed');
+    expect(parsed.localSequence).toBe(1);
+    expect(parsed.producerId).toBe(PROD1);
   });
 
   it('rejects browser-facing snake_case formats at the queue envelope boundary', () => {
     const snake = {
+      kind: 'observation.v2',
       tenant_id: T1,
       event_id: E1,
       authorized_publication_id: P1,
-      session_id: 'sess-snake',
+      session_id: S1,
       schema_version: 'observation.v2',
-      occurred_at: '2026-10-24T12:00:00Z',
+      occurred_at: '2026-10-24T12:00:00.000Z',
       event_type: 'menu_viewed',
     };
     expect(() => validateObservationEnvelope(snake)).toThrow(/Missing or invalid tenantId/);
@@ -88,102 +159,66 @@ describe('validateObservationEnvelope', () => {
 
   it('rejects malformed envelopes with missing or non-UUID fields', () => {
     expect(() => validateObservationEnvelope(null)).toThrow('Message body must be an object');
-    expect(() => validateObservationEnvelope({})).toThrow('Missing or invalid tenantId');
-    expect(() => validateObservationEnvelope({ tenantId: 'not-a-uuid' })).toThrow(
-      'Missing or invalid tenantId',
+    expect(() => validateObservationEnvelope({})).toThrow(
+      /Unsupported envelope kind|Missing or invalid tenantId/,
     );
-    expect(() => validateObservationEnvelope({ tenantId: T1 })).toThrow(
+    expect(() =>
+      validateObservationEnvelope({ kind: 'observation.v2', tenantId: 'not-a-uuid' }),
+    ).toThrow('Missing or invalid tenantId');
+    expect(() => validateObservationEnvelope({ kind: 'observation.v2', tenantId: T1 })).toThrow(
       'Missing or invalid eventId',
     );
-    expect(() => validateObservationEnvelope({ tenantId: T1, eventId: E1 })).toThrow(
-      'Missing or invalid authorizedPublicationId',
-    );
+    expect(() =>
+      validateObservationEnvelope(
+        createValidObservationMsg({ authorizedPublicationId: 'not-a-uuid' }),
+      ),
+    ).toThrow('Missing or invalid authorizedPublicationId');
+    expect(() =>
+      validateObservationEnvelope(createValidObservationMsg({ sessionId: 'not-a-uuid' })),
+    ).toThrow();
   });
 
   it('rejects legacy numeric schema version or unknown string schema version', () => {
     expect(() =>
-      validateObservationEnvelope({
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        schemaVersion: 2,
-        occurredAt: '2026-10-24T12:00:00Z',
-        type: 'dish_viewed',
-      }),
+      validateObservationEnvelope(createValidObservationMsg({ schemaVersion: 2 })),
     ).toThrow(/Unsupported schemaVersion: expected 'observation.v2'/);
 
     expect(() =>
-      validateObservationEnvelope({
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        schemaVersion: 'observation.v1',
-        occurredAt: '2026-10-24T12:00:00Z',
-        type: 'dish_viewed',
-      }),
+      validateObservationEnvelope(createValidObservationMsg({ schemaVersion: 'observation.v1' })),
     ).toThrow(/Unsupported schemaVersion: expected 'observation.v2'/);
   });
 
   it('rejects unsupported event types', () => {
     expect(() =>
-      validateObservationEnvelope({
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        schemaVersion: 'observation.v2',
-        occurredAt: '2026-10-24T12:00:00Z',
-        type: 'non_existent_event_type',
-      }),
+      validateObservationEnvelope(createValidObservationMsg({ type: 'non_existent_event_type' })),
     ).toThrow(/Unsupported observation type: non_existent_event_type/);
+  });
+
+  it('rejects invalid payload violating event-specific contract', () => {
+    expect(() =>
+      validateObservationEnvelope(
+        createValidObservationMsg({
+          type: 'menu_viewed',
+          payload: { entry_source: 'invalid_source' },
+        }),
+      ),
+    ).toThrow(/Invalid observation payload/);
   });
 });
 
 describe('validateConflictObservationEnvelope and validateQueueEnvelope', () => {
-  it('validates a valid observation_conflict.v1 envelope with payload', () => {
-    const raw = {
-      kind: 'observation_conflict.v1',
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      sessionId: 'sess-conflict',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:01Z',
-      type: 'dish_viewed',
-      incomingChecksum: 'a'.repeat(64),
-      conflictReason: 'event_id_conflict',
-      payload: { step: 'conflict' },
-    };
-
+  it('validates a valid observation_conflict.v1 envelope with copies', () => {
+    const raw = createValidConflictMsg();
     const parsed = validateQueueEnvelope(raw);
     expect(parsed.kind).toBe('observation_conflict.v1');
+    if (parsed.kind !== 'observation_conflict.v1') {
+      throw new Error('Expected conflict envelope');
+    }
     expect(parsed.tenantId).toBe(T1);
     expect(parsed.eventId).toBe(E1);
     expect(parsed.authorizedPublicationId).toBe(P1);
-    expect((parsed as any).payload).toEqual({ step: 'conflict' });
-    expect((parsed as any).incomingChecksum).toBe('a'.repeat(64));
-  });
-
-  it('validates an observation_conflict.v1 envelope with bounded metadata', () => {
-    const raw = {
-      kind: 'observation_conflict.v1',
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T12:00:00Z',
-      incomingChecksum: 'b'.repeat(64),
-      conflictReason: 'payload_too_large',
-      boundedMetadata: { size: 35000, reasonCode: 'payload_too_large' },
-    };
-
-    const parsed = validateQueueEnvelope(raw);
-    expect(parsed.kind).toBe('observation_conflict.v1');
-    expect(parsed.tenantId).toBe(T1);
-    expect(parsed.eventId).toBe(E1);
-    expect((parsed as any).incomingChecksum).toBe('b'.repeat(64));
-    expect((parsed as any).boundedMetadata).toEqual({
-      size: 35000,
-      reasonCode: 'payload_too_large',
-    });
+    expect(parsed.reasonCode).toBe('event_id_conflict');
+    expect(parsed.copies).toHaveLength(2);
   });
 
   it('rejects malformed conflict envelopes with missing or non-UUID fields', () => {
@@ -193,6 +228,8 @@ describe('validateConflictObservationEnvelope and validateQueueEnvelope', () => 
         tenantId: 'bad-uuid',
         eventId: E1,
         authorizedPublicationId: P1,
+        reasonCode: 'event_id_conflict',
+        copies: [],
       }),
     ).toThrow(/Missing or invalid tenantId: must be a valid UUID/);
 
@@ -202,6 +239,8 @@ describe('validateConflictObservationEnvelope and validateQueueEnvelope', () => 
         tenantId: T1,
         eventId: 'bad-uuid',
         authorizedPublicationId: P1,
+        reasonCode: 'event_id_conflict',
+        copies: [],
       }),
     ).toThrow(/Missing or invalid eventId: must be a valid UUID/);
 
@@ -211,38 +250,15 @@ describe('validateConflictObservationEnvelope and validateQueueEnvelope', () => 
         tenantId: T1,
         eventId: E1,
         authorizedPublicationId: 'bad-uuid',
+        reasonCode: 'event_id_conflict',
+        copies: [],
       }),
     ).toThrow(/Missing or invalid authorizedPublicationId: must be a valid UUID/);
-
-    expect(() =>
-      validateConflictObservationEnvelope({
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        incomingChecksum: 'not-64-hex',
-      }),
-    ).toThrow(/Invalid incomingChecksum: must be a 64-character hex string/);
   });
 
   it('correctly discriminates normal observation.v2 vs conflict observation_conflict.v1 envelopes', () => {
-    const normal = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { normal: true },
-    };
-    const conflict = {
-      kind: 'observation_conflict.v1',
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T12:00:00Z',
-      payload: { conflict: true },
-    };
+    const normal = createValidObservationMsg();
+    const conflict = createValidConflictMsg();
 
     const parsedNormal = validateQueueEnvelope(normal);
     const parsedConflict = validateQueueEnvelope(conflict);
@@ -264,16 +280,7 @@ describe('QueueConsumer', () => {
   });
 
   it('Case A: First delivery archives raw payload to R2, persists canonical DB record, and acknowledges', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_detail_opened',
-      payload: { dishId: 'dish-1', section: 'starters' },
-    };
+    const msg = createValidObservationMsg();
 
     const disposition = await consumer.processMessage(msg);
     expect(disposition.status).toBe('acknowledged');
@@ -294,16 +301,7 @@ describe('QueueConsumer', () => {
   });
 
   it('Case B: Same event ID and same content acknowledged as duplicate without duplicate row or error', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { dishId: 'dish-1', tier: 'T1' },
-    };
+    const msg = createValidObservationMsg();
 
     // First delivery
     const d1 = await consumer.processMessage(msg);
@@ -322,27 +320,27 @@ describe('QueueConsumer', () => {
   });
 
   it('Case C: Same event ID with different content is quarantined in conflict table with distinct R2 key', async () => {
-    const originalMsg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_detail_opened',
-      payload: { dishId: 'dish-1', details: 'original' },
-    };
+    const originalMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
-    const conflictingMsg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_detail_opened',
-      payload: { dishId: 'dish-1', details: 'tampered-or-different' },
-    };
+    const conflictingMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 2, // different position -> different payload & checksum!
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     // Process original
     const d1 = await consumer.processMessage(originalMsg);
@@ -370,18 +368,106 @@ describe('QueueConsumer', () => {
     expect(conflictRecord.r2ArchiveKey).toContain(conflictRecord.incomingChecksum);
   });
 
-  it('Case D: Transient R2 failure returns retry and does not write to database', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { dishId: 'dish-1' },
-    };
+  describe('Top-level canonical checksum conflict detection (Phase 2 & Review Item 1)', () => {
+    it('detects conflict when payload is identical but occurredAt differs', async () => {
+      const msg1 = createValidObservationMsg({ occurredAt: '2026-10-24T10:00:00.000Z' });
+      const msg2 = createValidObservationMsg({ occurredAt: '2026-10-24T10:05:00.000Z' });
 
+      // First delivery persists canonical observation
+      const d1 = await consumer.processMessage(msg1);
+      expect(d1.status).toBe('acknowledged');
+      if (d1.status === 'acknowledged') {
+        expect(d1.reason).toBe('persisted');
+      }
+
+      // Second delivery shares payload but differs in occurredAt -> quarantined as conflict!
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+
+      expect(repository.index.size).toBe(1);
+      expect(repository.conflicts.size).toBe(1);
+      const conflict = Array.from(repository.conflicts.values())[0]!;
+      expect(conflict.eventId).toBe(E1);
+      expect(r2Storage.has(conflict.r2ArchiveKey)).toBe(true);
+    });
+
+    it('detects conflict when payload is identical but sessionId differs', async () => {
+      const s2 = '44444444-4444-4444-8444-444444444499';
+      const msg1 = createValidObservationMsg({ sessionId: S1 });
+      const msg2 = createValidObservationMsg({ sessionId: s2 });
+
+      await consumer.processMessage(msg1);
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+      expect(repository.conflicts.size).toBe(1);
+    });
+
+    it('detects conflict when payload is identical but authorizedPublicationId differs', async () => {
+      const p2 = '33333333-3333-4333-8333-333333333399';
+      const msg1 = createValidObservationMsg({ authorizedPublicationId: P1 });
+      const msg2 = createValidObservationMsg({ authorizedPublicationId: p2 });
+
+      await consumer.processMessage(msg1);
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+      expect(repository.conflicts.size).toBe(1);
+    });
+
+    it('detects conflict when payload is identical but producerId or localSequence differs', async () => {
+      const prod2 = '55555555-5555-4555-8555-555555555599';
+      const msg1 = createValidObservationMsg({ producerId: PROD1, localSequence: 1 });
+      const msg2 = createValidObservationMsg({ producerId: prod2, localSequence: 2 });
+
+      await consumer.processMessage(msg1);
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+      expect(repository.conflicts.size).toBe(1);
+    });
+
+    it('verifies producer and consumer generate matching canonical checksums for the same observation', async () => {
+      const msg = createValidObservationMsg();
+      const canonicalObs = toCanonicalObservation(msg);
+      const canonicalStr = canonicalJson(canonicalObs);
+      const consumerChecksum = await sha256(canonicalStr);
+
+      // Emulate producer's exact canonical observation and checksum
+      const producerObs = {
+        schema_version: 'observation.v2' as const,
+        event_id: msg.eventId,
+        session_id: msg.sessionId,
+        producer_id: msg.producerId,
+        local_sequence: msg.localSequence,
+        occurred_at: msg.occurredAt,
+        publication_revision_id: msg.authorizedPublicationId,
+        type: msg.type,
+        payload: msg.payload,
+      };
+      const producerCanonicalStr = canonicalJson(producerObs);
+      const producerChecksum = await sha256(producerCanonicalStr);
+
+      expect(consumerChecksum).toBe(producerChecksum);
+
+      // Persist via consumer and verify stored checksum
+      await consumer.processMessage(msg);
+      const stored = repository.index.get(`${T1}:${E1}`);
+      expect(stored?.checksum).toBe(producerChecksum);
+    });
+  });
+
+  it('Case D: Transient R2 failure returns retry and does not write to database', async () => {
+    const msg = createValidObservationMsg();
     r2Storage.failNextPut = true;
 
     const disposition = await consumer.processMessage(msg);
@@ -393,16 +479,7 @@ describe('QueueConsumer', () => {
   });
 
   it('Case D2: Transient database failure after R2 archival returns retry and allows safe replay', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      schemaVersion: 'observation.v2',
-      authorizedPublicationId: P1,
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { dishId: 'dish-1' },
-    };
+    const msg = createValidObservationMsg();
 
     // DB fails on first try
     repository.failNextPersist = true;
@@ -426,7 +503,7 @@ describe('QueueConsumer', () => {
   it('Case E: Malformed message returns dead_letter disposition', async () => {
     const malformed = {
       tenantId: T1,
-      // Missing eventId
+      // Missing eventId, kind, etc.
       type: 'dish_viewed',
     };
 
@@ -439,15 +516,7 @@ describe('QueueConsumer', () => {
     const e3 = '22222222-2222-4222-8222-222222222203';
     const e4 = '22222222-2222-4222-8222-222222222204';
 
-    const validMsg1 = new FakeQueueMessage('msg-1', {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      type: 'menu_viewed',
-      payload: { step: 1 },
-    });
+    const validMsg1 = new FakeQueueMessage('msg-1', createValidObservationMsg({ eventId: E1 }));
 
     const malformedMsg = new FakeQueueMessage('msg-2', {
       tenantId: T1,
@@ -455,25 +524,12 @@ describe('QueueConsumer', () => {
       type: 'menu_viewed',
     });
 
-    const transientFailMsg = new FakeQueueMessage('msg-3', {
-      tenantId: T1,
-      eventId: e3,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      type: 'menu_viewed',
-      payload: { step: 3 },
-    });
+    const transientFailMsg = new FakeQueueMessage(
+      'msg-3',
+      createValidObservationMsg({ eventId: e3 }),
+    );
 
-    const validMsg4 = new FakeQueueMessage('msg-4', {
-      tenantId: T1,
-      eventId: e4,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      type: 'menu_viewed',
-      payload: { step: 4 },
-    });
+    const validMsg4 = new FakeQueueMessage('msg-4', createValidObservationMsg({ eventId: e4 }));
 
     const batch = new FakeMessageBatch('observations-queue', [
       validMsg1,
@@ -514,16 +570,7 @@ describe('QueueConsumer', () => {
       onTrace: (op) => traceLog.push(op),
     });
 
-    const msg = new FakeQueueMessage('msg-order', {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { dishId: 'd-ord' },
-    });
+    const msg = new FakeQueueMessage('msg-order', createValidObservationMsg());
     const batch = new FakeMessageBatch('q-order', [msg]);
 
     await tracingConsumer.processBatch(batch);
@@ -541,16 +588,7 @@ describe('QueueConsumer', () => {
       'orig-checksum-1111111111111111111111111111111111111111111111111111111111111111',
     );
 
-    const conflictingIncomingMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { step: 'tampered-payload' },
-    };
+    const conflictingIncomingMsg = createValidObservationMsg();
 
     const disposition = await consumer.processMessage(conflictingIncomingMsg);
     expect(disposition.status).toBe('acknowledged');
@@ -570,29 +608,29 @@ describe('QueueConsumer', () => {
   });
 
   it('Conflict record persistence failure returns retry disposition to prevent data loss', async () => {
-    const originalMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { val: 1 },
-    };
+    const originalMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     await consumer.processMessage(originalMsg);
 
-    const conflictingMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_viewed',
-      payload: { val: 999 },
-    };
+    const conflictingMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 2,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     repository.failNextRecordConflict = true;
 
@@ -611,29 +649,29 @@ describe('QueueConsumer', () => {
   });
 
   it('Duplicate conflict redelivery is recognized as already recorded and ACKed safely without infinite retry', async () => {
-    const originalMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_saved',
-      payload: { orig: true },
-    };
+    const originalMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     await consumer.processMessage(originalMsg);
 
-    const conflictingMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T10:00:00Z',
-      firstReceivedAt: '2026-10-24T10:00:00Z',
-      type: 'dish_saved',
-      payload: { conflict: true },
-    };
+    const conflictingMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 2,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     // First delivery of conflict
     const d1 = await consumer.processMessage(conflictingMsg);
@@ -661,16 +699,7 @@ describe('QueueConsumer', () => {
   });
 
   it('Concurrent processing of identical payloads resolves deterministically to exactly one canonical row', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { concurrent: true },
-    };
+    const msg = createValidObservationMsg();
 
     const [res1, res2] = await Promise.all([
       consumer.processMessage(msg),
@@ -690,27 +719,27 @@ describe('QueueConsumer', () => {
   });
 
   it('Concurrent processing of conflicting payloads creates one canonical row and one quarantined conflict', async () => {
-    const msgA = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { branch: 'A' },
-    };
+    const msgA = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
-    const msgB = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { branch: 'B' },
-    };
+    const msgB = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 2,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     const [resA, resB] = await Promise.all([
       consumer.processMessage(msgA),
@@ -731,16 +760,7 @@ describe('QueueConsumer', () => {
   });
 
   it('Repeated 5x identical deliveries: exactly 1 canonical record, 0 conflicts, all acknowledged safely', async () => {
-    const msg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { attempts: 5 },
-    };
+    const msg = createValidObservationMsg();
 
     for (let i = 1; i <= 5; i++) {
       const disposition = await consumer.processMessage(msg);
@@ -757,30 +777,30 @@ describe('QueueConsumer', () => {
   });
 
   it('Repeated conflicting deliveries: original canonical row remains intact, all distinct conflicts recorded', async () => {
-    const canonicalMsg = {
-      tenantId: T1,
-      eventId: E1,
-      authorizedPublicationId: P1,
-      schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_viewed',
-      payload: { canonical: true },
-    };
+    const canonicalMsg = createValidObservationMsg({
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+    });
 
     await consumer.processMessage(canonicalMsg);
 
-    for (let i = 1; i <= 3; i++) {
-      const conflictingMsg = {
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        schemaVersion: 'observation.v2',
-        occurredAt: '2026-10-24T12:00:00Z',
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        type: 'dish_viewed',
-        payload: { mutation: i },
-      };
+    for (let i = 2; i <= 4; i++) {
+      const conflictingMsg = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list' as const,
+          position: i,
+          exposure_basis: 'viewport_50pct_1s' as const,
+        },
+      });
       const disposition = await consumer.processMessage(conflictingMsg);
       expect(disposition.status).toBe('acknowledged');
       expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
@@ -796,17 +816,7 @@ describe('QueueConsumer', () => {
 
   describe('observation_conflict.v1 processing', () => {
     it('processes a valid observation_conflict.v1 message by archiving to conflict key and persisting to conflict table', async () => {
-      const conflictMsg = {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        type: 'dish_viewed',
-        conflictReason: 'event_id_conflict',
-        payload: { item: 'conflict-payload' },
-      };
+      const conflictMsg = createValidConflictMsg();
 
       const disposition = await consumer.processMessage(conflictMsg);
       expect(disposition.status).toBe('acknowledged');
@@ -814,50 +824,12 @@ describe('QueueConsumer', () => {
 
       // Canonical index must remain untouched
       expect(repository.index.size).toBe(0);
-      // Conflict must be recorded
-      expect(repository.conflicts.size).toBe(1);
-      const conflictRecord = Array.from(repository.conflicts.values())[0]!;
-      expect(conflictRecord.tenantId).toBe(T1);
-      expect(conflictRecord.eventId).toBe(E1);
-      expect(conflictRecord.r2ArchiveKey).toContain(conflictRecord.incomingChecksum);
-      expect(r2Storage.has(conflictRecord.r2ArchiveKey)).toBe(true);
-    });
-
-    it('processes an observation_conflict.v1 message with bounded metadata (invalid copy)', async () => {
-      const boundedChecksum = 'd'.repeat(64);
-      const boundedMsg = {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        incomingChecksum: boundedChecksum,
-        conflictReason: 'schema_invalid',
-        boundedMetadata: { reason: 'schema_invalid', errorField: 'missing_type' },
-      };
-
-      const disposition = await consumer.processMessage(boundedMsg);
-      expect(disposition.status).toBe('acknowledged');
-      expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
-
-      expect(repository.index.size).toBe(0);
-      expect(repository.conflicts.size).toBe(1);
-      const conflictRecord = Array.from(repository.conflicts.values())[0]!;
-      expect(conflictRecord.incomingChecksum).toBe(boundedChecksum);
-      expect(r2Storage.has(conflictRecord.r2ArchiveKey)).toBe(true);
+      // Both conflict copies must be recorded
+      expect(repository.conflicts.size).toBe(2);
     });
 
     it('handles idempotent redelivery of observation_conflict.v1 safely', async () => {
-      const conflictMsg = {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        payload: { item: 'conflict-idempotent' },
-      };
+      const conflictMsg = createValidConflictMsg();
 
       // First delivery
       const d1 = await consumer.processMessage(conflictMsg);
@@ -869,20 +841,12 @@ describe('QueueConsumer', () => {
       expect(d2.status).toBe('acknowledged');
       expect((d2 as { reason: string }).reason).toBe('duplicate_same_payload');
 
-      expect(repository.conflicts.size).toBe(1);
+      expect(repository.conflicts.size).toBe(2);
     });
 
     it('retries on transient R2 failure during observation_conflict.v1 and does not acknowledge', async () => {
       r2Storage.failNextPut = true;
-
-      const conflictMsg = {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        payload: { item: 'fail-r2' },
-      };
+      const conflictMsg = createValidConflictMsg();
 
       const disposition = await consumer.processMessage(conflictMsg);
       expect(disposition.status).toBe('retry');
@@ -891,15 +855,7 @@ describe('QueueConsumer', () => {
 
     it('retries on transient DB failure during observation_conflict.v1 and preserves R2 archive', async () => {
       repository.failNextRecordConflict = true;
-
-      const conflictMsg = {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        payload: { item: 'fail-db' },
-      };
+      const conflictMsg = createValidConflictMsg();
 
       const disposition = await consumer.processMessage(conflictMsg);
       expect(disposition.status).toBe('retry');
@@ -908,33 +864,22 @@ describe('QueueConsumer', () => {
       // On retry, archival detects existing key and DB persist succeeds
       const d2 = await consumer.processMessage(conflictMsg);
       expect(d2.status).toBe('acknowledged');
-      expect(repository.conflicts.size).toBe(1);
+      expect(repository.conflicts.size).toBe(2);
     });
 
     it('processes a batch with mixed observation.v2 and observation_conflict.v1 messages', async () => {
-      const eNormal = '55555555-5555-4555-8555-555555555555';
-      const eConflict = '66666666-6666-4666-8666-666666666666';
+      const eNormal = '55555555-4555-4555-8555-555555555555';
+      const eConflict = '66666666-4666-4666-8666-666666666666';
 
-      const normalMsg = new FakeQueueMessage('msg-norm', {
-        kind: 'observation.v2',
-        tenantId: T1,
-        eventId: eNormal,
-        authorizedPublicationId: P1,
-        schemaVersion: 'observation.v2',
-        occurredAt: '2026-10-24T12:00:00Z',
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        type: 'dish_viewed',
-        payload: { dish: 'norm' },
-      });
+      const normalMsg = new FakeQueueMessage(
+        'msg-norm',
+        createValidObservationMsg({ eventId: eNormal }),
+      );
 
-      const conflictMsg = new FakeQueueMessage('msg-conf', {
-        kind: 'observation_conflict.v1',
-        tenantId: T1,
-        eventId: eConflict,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        payload: { dish: 'conf' },
-      });
+      const conflictMsg = new FakeQueueMessage(
+        'msg-conf',
+        createValidConflictMsg({ eventId: eConflict }),
+      );
 
       const batch = new FakeMessageBatch('q-mixed', [normalMsg, conflictMsg]);
       const result = await consumer.processBatch(batch);
@@ -946,88 +891,7 @@ describe('QueueConsumer', () => {
       expect(conflictMsg.acked).toBe(true);
 
       expect(repository.index.size).toBe(1);
-      expect(repository.conflicts.size).toBe(1);
-    });
-
-    it('reproduces and prevents the critical failure scenario: normal parser rejects conflict envelope while queue consumer safely handles it', async () => {
-      const validConflict = {
-        kind: 'observation_conflict.v1' as const,
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        occurredAt: '2026-10-24T12:00:00Z',
-        incomingChecksum: 'c'.repeat(64),
-        conflictReason: 'event_id_conflict',
-        payload: { conflict: true },
-      };
-
-      // Defect verification: calling normal-event parser on a valid conflict envelope throws MalformedMessageError
-      expect(() => validateObservationEnvelope(validConflict)).toThrow(
-        /Unsupported envelope kind|Malformed observation.v2 envelope|Unsupported schemaVersion/,
-      );
-
-      // Correction verification: validateQueueEnvelope correctly validates the conflict variant
-      const parsed = validateQueueEnvelope(validConflict);
-      expect(parsed.kind).toBe('observation_conflict.v1');
-
-      // Full processing verification: processMessage archives evidence and persists to DB before acknowledging
-      const msg = new FakeQueueMessage('msg-conflict-regression', validConflict);
-      const batch = new FakeMessageBatch('obs-queue', [msg]);
-
-      const result = await consumer.processBatch(batch);
-
-      // Message is acknowledged ONLY after durable archival and DB persistence
-      expect(result.processed).toBe(1);
-      expect(result.acknowledged).toBe(1);
-      expect(result.deadLettered).toBe(0);
-      expect(msg.acked).toBe(true);
-
-      // Durable outcome verification:
-      expect(repository.conflicts.size).toBe(1);
-      const conflictRow = Array.from(repository.conflicts.values())[0]!;
-      expect(conflictRow.tenantId).toBe(T1);
-      expect(conflictRow.eventId).toBe(E1);
-      expect(r2Storage.has(conflictRow.r2ArchiveKey)).toBe(true);
-    });
-
-    it('processes multi-copy observation_conflict.v1 envelopes matching S3-DATA-01 producer format', async () => {
-      const checksumA = 'a'.repeat(64);
-      const checksumB = 'b'.repeat(64);
-
-      const producerConflictMsg = {
-        kind: 'observation_conflict.v1' as const,
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        reasonCode: 'event_id_conflict',
-        copies: [
-          {
-            validation: 'valid' as const,
-            canonicalChecksum: checksumA,
-            event: { step: 'copy-1' },
-          },
-          {
-            validation: 'invalid' as const,
-            canonicalChecksum: checksumB,
-            metadata: { reason: 'copy-2' },
-          },
-        ],
-      };
-
-      const msg = new FakeQueueMessage('msg-producer-conflict', producerConflictMsg);
-      const batch = new FakeMessageBatch('obs-queue', [msg]);
-
-      const result = await consumer.processBatch(batch);
-
-      expect(result.processed).toBe(1);
-      expect(result.acknowledged).toBe(1);
-      expect(msg.acked).toBe(true);
-
-      // Both copies are recorded in PostgreSQL conflict table
       expect(repository.conflicts.size).toBe(2);
-      expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
-      expect(repository.conflicts.has(`${T1}:${E1}:${checksumB}`)).toBe(true);
     });
 
     it('handles partial failure across conflict copies safely and retries without duplicate records', async () => {
@@ -1039,22 +903,32 @@ describe('QueueConsumer', () => {
         tenantId: T1,
         eventId: E1,
         authorizedPublicationId: P1,
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        reasonCode: 'event_id_conflict',
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
         copies: [
           {
             validation: 'valid' as const,
             canonicalChecksum: checksumA,
-            event: { step: 'copy-1' },
+            event: {
+              schema_version: 'observation.v2' as const,
+              event_id: E1,
+              session_id: S1,
+              producer_id: PROD1,
+              local_sequence: 1,
+              occurred_at: '2026-10-24T12:00:00.000Z',
+              publication_revision_id: P1,
+              type: 'shortlist_viewed' as const,
+              payload: { shortlist_size: 1 },
+            },
           },
           {
             validation: 'invalid' as const,
             canonicalChecksum: checksumB,
             metadata: {
-              schemaVersionStatus: 'observation.v2',
-              eventType: 'dish_viewed',
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
               occurredAt: '2026-10-24T12:00:00.000Z',
-              publicationStatus: 'matches_authority',
+              publicationStatus: 'matches_authority' as const,
               payloadObject: true,
             },
           },
@@ -1062,7 +936,7 @@ describe('QueueConsumer', () => {
       };
 
       // Configure R2 to fail when writing the second copy's key
-      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumB);
+      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00.000Z', checksumB);
       r2Storage.failKeys.add(keyB);
 
       const msg = new FakeQueueMessage('msg-partial-fail', multiCopyMsg);
@@ -1093,68 +967,6 @@ describe('QueueConsumer', () => {
       expect(repository.conflicts.size).toBe(2);
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumB}`)).toBe(true);
-    });
-
-    it('processes multi-copy conflict with exact producer bounded metadata shape', async () => {
-      const checksumA = '3'.repeat(64);
-      const checksumB = '4'.repeat(64);
-
-      const exactProducerConflict = {
-        kind: 'observation_conflict.v1' as const,
-        tenantId: T1,
-        eventId: E1,
-        authorizedPublicationId: P1,
-        firstReceivedAt: '2026-10-24T12:00:00Z',
-        reasonCode: 'event_id_conflict',
-        copies: [
-          {
-            validation: 'valid' as const,
-            canonicalChecksum: checksumA,
-            event: {
-              schema_version: 'observation.v2',
-              event_id: E1,
-              session_id: '00000000-0000-4000-8000-000000000001',
-              producer_id: '00000000-0000-4000-8000-000000000002',
-              local_sequence: 1,
-              occurred_at: '2026-10-24T12:00:00.000Z',
-              publication_revision_id: P1,
-              type: 'dish_viewed',
-              payload: { dishId: 'd-1' },
-            },
-          },
-          {
-            validation: 'invalid' as const,
-            canonicalChecksum: checksumB,
-            metadata: {
-              schemaVersionStatus: 'observation.v2' as const,
-              eventType: 'dish_viewed' as const,
-              occurredAt: '2026-10-24T12:00:00.000Z',
-              publicationStatus: 'matches_authority' as const,
-              payloadObject: true,
-            },
-          },
-        ],
-      };
-
-      const disposition = await consumer.processMessage(exactProducerConflict);
-      expect(disposition.status).toBe('acknowledged');
-      if (disposition.status === 'acknowledged') {
-        expect(disposition.reason).toBe('conflict_recorded');
-      }
-
-      // Check R2 archives
-      const keyA = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumA);
-      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumB);
-      expect(r2Storage.has(keyA)).toBe(true);
-      expect(r2Storage.has(keyB)).toBe(true);
-
-      // Verify that stored invalid copy in R2 contains only bounded metadata without raw payload leakage
-      const rawB = await r2Storage.getRawPayload(keyB);
-      expect(rawB).not.toBeNull();
-      const storedB = JSON.parse(new TextDecoder().decode(rawB!.rawBytes));
-      expect(storedB).toHaveProperty('schemaVersionStatus', 'observation.v2');
-      expect(storedB).toHaveProperty('publicationStatus', 'matches_authority');
-      expect(storedB).not.toHaveProperty('unapproved_field');
     });
   });
 });

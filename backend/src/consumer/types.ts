@@ -1,6 +1,8 @@
 import {
+  type ObservationConflictQueueMessage,
   type ObservationConflictV1QueueEnvelope,
   type ObservationQueueEnvelope,
+  type ObservationQueueMessage,
   ObservationTypeSchema,
   type ObservationV2QueueEnvelope,
 } from '@peekaplate/contracts';
@@ -34,9 +36,9 @@ export type EventIdentity = {
 
 /**
  * Normal observation envelope extracted from Queue message.
- * Adheres strictly to the canonical shared schema ObservationV2QueueEnvelopeSchema.
+ * Adheres strictly to the canonical shared schema ObservationQueueMessageSchema.
  */
-export type NormalObservationEnvelope = ObservationV2QueueEnvelope & {
+export type NormalObservationEnvelope = ObservationQueueMessage & {
   venueId?: string | undefined; // alias for backwards compatibility
 };
 
@@ -50,7 +52,7 @@ export type ObservationEnvelope = NormalObservationEnvelope;
  * Sent by the producer when a conflicting observation reuse is detected at ingestion.
  * Carries either a full conflicting payload copy or bounded metadata for invalid copies.
  */
-export type ConflictObservationEnvelope = ObservationConflictV1QueueEnvelope & {
+export type ConflictObservationEnvelope = ObservationConflictQueueMessage & {
   venueId?: string | undefined;
 };
 

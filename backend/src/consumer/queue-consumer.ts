@@ -1,9 +1,11 @@
 import {
-  ObservationConflictV1QueueEnvelopeSchema,
+  canonicalJson,
+  ObservationConflictQueueMessageSchema,
   ObservationQueueEnvelopeSchema,
-  ObservationV2QueueEnvelopeSchema,
+  ObservationQueueMessageSchema,
+  sha256,
+  toCanonicalObservation,
 } from '@peekaplate/contracts';
-import { canonicalizeJson, sha256Hex } from './canonical-json';
 import {
   ALLOWED_EVENT_TYPES,
   type AllowedEventType,
@@ -79,6 +81,8 @@ function formatValidationError(
   if (path === 'incomingChecksum')
     return 'Invalid incomingChecksum: must be a 64-character hex string';
   if (path === 'kind') return `Unsupported envelope kind: ${r.kind}`;
+  if (path === 'payload')
+    return `Invalid observation payload: ${issue.message ?? 'failed schema check'}`;
   return `${issue.path ? issue.path.map(String).join('.') : ''}: ${issue.message ?? 'Unknown validation issue'}`;
 }
 
@@ -119,7 +123,7 @@ export function validateObservationEnvelope(body: unknown): NormalObservationEnv
     throw new MalformedMessageError('Message body must be an object');
   }
 
-  const parsed = ObservationV2QueueEnvelopeSchema.safeParse(body);
+  const parsed = ObservationQueueMessageSchema.safeParse(body);
   if (!parsed.success) {
     throw new MalformedMessageError(formatValidationError(body, parsed.error));
   }
@@ -144,7 +148,7 @@ export function validateConflictObservationEnvelope(body: unknown): ConflictObse
     throw new MalformedMessageError('Message body must be an object');
   }
 
-  const parsed = ObservationConflictV1QueueEnvelopeSchema.safeParse(body);
+  const parsed = ObservationConflictQueueMessageSchema.safeParse(body);
   if (!parsed.success) {
     throw new MalformedMessageError(formatValidationError(body, parsed.error));
   }
@@ -237,9 +241,13 @@ export class QueueConsumer {
       firstReceivedAt,
     } = envelope;
 
-    // Step 2: Canonicalize and hash content
-    const canonicalStr = canonicalizeJson(payload);
-    const checksum = await sha256Hex(canonicalStr);
+    // Step 2: Canonicalize and hash COMPLETE CANONICAL OBSERVATION
+    // As required by ADR 0015 & PR #40, hashing includes all contract-defined fields
+    // that affect observation identity (schemaVersion, eventId, sessionId, producerId,
+    // localSequence, occurredAt, authorizedPublicationId, type, payload)
+    const canonicalObservation = toCanonicalObservation(envelope);
+    const canonicalStr = canonicalJson(canonicalObservation);
+    const checksum = await sha256(canonicalStr);
 
     // Raw bytes of the payload for R2 archival
     let rawBytes: Uint8Array;
@@ -396,179 +404,75 @@ export class QueueConsumer {
   /**
    * Processes an incoming observation_conflict.v1 message from the Queue.
    * Conforms to ADR 0015 / PR #40:
-   * 1. Generates deterministic conflict archive key based on (tenantId, eventId, occurredAt, incomingChecksum).
+   * 1. Generates deterministic conflict archive key based on (tenantId, eventId, copyOccurredAt, copyChecksum).
    * 2. Archives conflicting raw payload or bounded metadata to R2 using atomic create-only writes.
    * 3. Records conflict in PostgreSQL (app_private.observation_conflict) with forced RLS and transaction isolation.
-   * 4. Acknowledges message ONLY after durable archival and persistence succeed.
+   * 4. Acknowledges message ONLY after durable archival and persistence succeed for all copies.
    * 5. Retries on transient R2 or database failures without corrupting existing state.
    */
   private async processConflictMessage(
     envelope: ConflictObservationEnvelope,
-    body: unknown,
+    _body: unknown,
   ): Promise<MessageDisposition> {
-    const { tenantId, eventId, authorizedPublicationId } = envelope;
+    const { tenantId, eventId, firstReceivedAt } = envelope;
 
-    const occurredAt =
-      envelope.occurredAt ??
-      envelope.firstReceivedAt ??
-      envelope.receivedAt ??
-      new Date().toISOString();
-    const receivedAt =
-      envelope.firstReceivedAt ??
-      envelope.receivedAt ??
-      envelope.occurredAt ??
-      new Date().toISOString();
-
-    // If conflict envelope carries multiple conflicting copies from producer (ADR 0015 / S3-DATA-01)
-    if (envelope.copies && envelope.copies.length > 0) {
-      let anyNewRecorded = false;
-      for (const copy of envelope.copies) {
-        const copyChecksum = copy.canonicalChecksum;
-        const copyData = copy.validation === 'valid' ? copy.event : copy.metadata;
-        const copyBytes = new TextEncoder().encode(JSON.stringify(copyData));
-        let copyArchiveKey: string;
-        try {
-          copyArchiveKey = buildConflictArchiveKey(tenantId, eventId, occurredAt, copyChecksum);
-        } catch (err: unknown) {
-          const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
-          this.log('error', 'Malformed conflict archive key, routing to dead letter', { reason });
-          return { status: 'dead_letter', reason };
-        }
-
-        // 1. Archive copy to R2 first (Create-only)
-        try {
-          this.trace('r2.put', { copyArchiveKey, checksum: copyChecksum });
-          await this.deps.r2Storage.putRawPayload(copyArchiveKey, copyBytes, copyChecksum);
-        } catch (err: unknown) {
-          const error = err instanceof Error ? err : new Error(String(err));
-          this.log('error', 'R2 conflict copy archive write failed, triggering retry', {
-            tenantId,
-            eventId,
-            error: error.message,
-          });
-          return { status: 'retry', error };
-        }
-
-        // 2. Persist in PostgreSQL (app_private.observation_conflict)
-        try {
-          this.trace('db.recordConflict', { tenantId, eventId, checksum: copyChecksum });
-          const outcome = await this.deps.repository.recordConflict({
-            tenantId,
-            eventId,
-            incomingChecksum: copyChecksum,
-            r2ArchiveKey: copyArchiveKey,
-            receivedAt,
-          });
-          if (!outcome.alreadyRecorded) anyNewRecorded = true;
-        } catch (err: unknown) {
-          const error = err instanceof Error ? err : new Error(String(err));
-          this.log('error', 'Conflict copy DB persistence failed, triggering retry', {
-            tenantId,
-            eventId,
-            error: error.message,
-          });
-          return { status: 'retry', error };
-        }
+    let anyNewRecorded = false;
+    for (const copy of envelope.copies) {
+      const copyChecksum = copy.canonicalChecksum;
+      const copyData = copy.validation === 'valid' ? copy.event : copy.metadata;
+      const copyBytes = new TextEncoder().encode(JSON.stringify(copyData));
+      const copyOccurredAt =
+        (copy.validation === 'valid' ? copy.event.occurred_at : copy.metadata.occurredAt) ||
+        firstReceivedAt;
+      let copyArchiveKey: string;
+      try {
+        copyArchiveKey = buildConflictArchiveKey(tenantId, eventId, copyOccurredAt, copyChecksum);
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
+        this.log('error', 'Malformed conflict archive key, routing to dead letter', { reason });
+        return { status: 'dead_letter', reason };
       }
 
-      return {
-        status: 'acknowledged',
-        reason: anyNewRecorded ? 'conflict_recorded' : 'duplicate_same_payload',
-      };
-    }
-
-    let checksum = envelope.incomingChecksum;
-    let rawBytes: Uint8Array;
-
-    if (envelope.payload && typeof envelope.payload === 'object') {
-      const canonicalStr = canonicalizeJson(envelope.payload);
-      const computedChecksum = await sha256Hex(canonicalStr);
-      checksum = checksum ?? computedChecksum;
-      if (typeof body === 'string') {
-        rawBytes = new TextEncoder().encode(body);
-      } else if (body instanceof Uint8Array) {
-        rawBytes = body;
-      } else {
-        rawBytes = new TextEncoder().encode(JSON.stringify(envelope.payload));
-      }
-    } else {
-      // Bounded metadata for invalid copies: excludes arbitrary fields, retains only authorized metadata
-      const bounded = envelope.boundedMetadata ?? {
-        tenantId,
-        eventId,
-        authorizedPublicationId,
-        conflictReason: envelope.conflictReason ?? envelope.reasonCode ?? 'event_id_conflict',
-        receivedAt,
-      };
-      if (!checksum || !/^[0-9a-f]{64}$/i.test(checksum)) {
-        checksum = await sha256Hex(canonicalizeJson(bounded));
-      }
-      rawBytes = new TextEncoder().encode(JSON.stringify(bounded));
-    }
-
-    let conflictArchiveKey: string;
-    try {
-      conflictArchiveKey = buildConflictArchiveKey(tenantId, eventId, occurredAt, checksum);
-    } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
-      this.log('error', 'Malformed conflict archive key, routing to dead letter', { reason });
-      return { status: 'dead_letter', reason };
-    }
-
-    // Step 1: Archive conflict payload to R2 first (Create-only)
-    try {
-      this.trace('r2.put', { conflictArchiveKey, checksum });
-      const r2Result = await this.deps.r2Storage.putRawPayload(
-        conflictArchiveKey,
-        rawBytes,
-        checksum,
-      );
-      if (r2Result.status === 'already_exists') {
-        this.log('info', 'Conflict R2 archive key already exists on retry/duplicate', {
-          conflictArchiveKey,
-          existingChecksum: r2Result.existingChecksum,
+      // 1. Archive copy to R2 first (Create-only)
+      try {
+        this.trace('r2.put', { copyArchiveKey, checksum: copyChecksum });
+        await this.deps.r2Storage.putRawPayload(copyArchiveKey, copyBytes, copyChecksum);
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.log('error', 'R2 conflict copy archive write failed, triggering retry', {
+          tenantId,
+          eventId,
+          error: error.message,
         });
+        return { status: 'retry', error };
       }
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.log('error', 'R2 conflict archive write failed, triggering retry', {
-        tenantId,
-        eventId,
-        error: error.message,
-      });
-      return { status: 'retry', error };
+
+      // 2. Persist in PostgreSQL (app_private.observation_conflict)
+      try {
+        this.trace('db.recordConflict', { tenantId, eventId, checksum: copyChecksum });
+        const outcome = await this.deps.repository.recordConflict({
+          tenantId,
+          eventId,
+          incomingChecksum: copyChecksum,
+          r2ArchiveKey: copyArchiveKey,
+          receivedAt: firstReceivedAt,
+        });
+        if (!outcome.alreadyRecorded) anyNewRecorded = true;
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.log('error', 'Conflict copy DB persistence failed, triggering retry', {
+          tenantId,
+          eventId,
+          error: error.message,
+        });
+        return { status: 'retry', error };
+      }
     }
 
-    // Step 2: Persist conflict record in PostgreSQL (app_private.observation_conflict)
-    try {
-      this.trace('db.recordConflict', { tenantId, eventId });
-      const conflictOutcome = await this.deps.repository.recordConflict({
-        tenantId,
-        eventId,
-        incomingChecksum: checksum,
-        r2ArchiveKey: conflictArchiveKey,
-        receivedAt,
-      });
-
-      this.log('info', 'Conflict observation processed and recorded in DB', {
-        tenantId,
-        eventId,
-        alreadyRecorded: conflictOutcome.alreadyRecorded,
-      });
-
-      return {
-        status: 'acknowledged',
-        reason: conflictOutcome.alreadyRecorded ? 'duplicate_same_payload' : 'conflict_recorded',
-      };
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      this.log('error', 'Conflict database persistence failed, triggering retry', {
-        tenantId,
-        eventId,
-        error: error.message,
-      });
-      return { status: 'retry', error };
-    }
+    return {
+      status: 'acknowledged',
+      reason: anyNewRecorded ? 'conflict_recorded' : 'duplicate_same_payload',
+    };
   }
 
   /**

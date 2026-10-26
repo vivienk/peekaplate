@@ -4,6 +4,16 @@
  * and normalizes values according to deterministic JSON rules.
  */
 
+import { canonicalJson, sha256 } from '@peekaplate/contracts';
+
+/**
+ * Canonical JSON serialization helper for deterministic hashing and comparison.
+ * Formats objects with sorted keys recursively, handles primitives safely,
+ * and normalizes values according to deterministic JSON rules.
+ *
+ * Re-exports and aligns with the canonical implementation in @peekaplate/contracts (PR #40).
+ */
+
 export type JsonValue =
   | string
   | number
@@ -20,12 +30,8 @@ export class CanonicalJsonError extends Error {
 }
 
 /**
- * Serializes any JSON-compatible value to a deterministic, canonical JSON string:
- * - Object keys are sorted lexicographically (Unicode code point order).
- * - No extra whitespace.
- * - Rejects non-finite numbers (NaN, Infinity).
- * - Normalizes -0 to 0.
- * - Rejects undefined, functions, symbols, and circular references.
+ * Serializes any JSON-compatible value to a deterministic, canonical JSON string.
+ * Validates inputs against non-finite numbers and circular references before canonicalizing.
  */
 export function canonicalizeJson(value: unknown, seen = new WeakSet<object>()): string {
   if (value === null) {
@@ -43,7 +49,6 @@ export function canonicalizeJson(value: unknown, seen = new WeakSet<object>()): 
     if (!Number.isFinite(num)) {
       throw new CanonicalJsonError('Non-finite numbers cannot be canonicalized');
     }
-    // Normalize -0 to 0
     return Object.is(num, -0) ? '0' : num.toString(10);
   }
 
@@ -69,14 +74,13 @@ export function canonicalizeJson(value: unknown, seen = new WeakSet<object>()): 
         return `[${elements.join(',')}]`;
       }
 
-      // Plain object
-      const keys = Object.keys(obj).sort();
+      // Plain object: sort keys with localeCompare to match PR #40 exactly
+      const keys = Object.keys(obj).sort((a, b) => a.localeCompare(b));
       const entries: string[] = [];
 
       for (const key of keys) {
         const val = (obj as Record<string, unknown>)[key];
         if (val === undefined || typeof val === 'function' || typeof val === 'symbol') {
-          // Omit undefined/function properties from serialized object, matching JSON.stringify
           continue;
         }
         entries.push(`${JSON.stringify(key)}:${canonicalizeJson(val, seen)}`);
@@ -91,16 +95,9 @@ export function canonicalizeJson(value: unknown, seen = new WeakSet<object>()): 
   throw new CanonicalJsonError(`Unsupported type: ${type}`);
 }
 
+export { canonicalJson, sha256 };
+
 /**
  * Computes deterministic SHA-256 hex digest of a string or buffer using Web Crypto API.
- * Cloudflare Workers and modern Node runtimes support crypto.subtle natively.
  */
-export async function sha256Hex(data: string | Uint8Array): Promise<string> {
-  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
-  const hashBuffer = await crypto.subtle.digest(
-    'SHA-256',
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-  );
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
+export const sha256Hex = sha256;

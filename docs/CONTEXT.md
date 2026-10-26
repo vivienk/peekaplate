@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, diner observation queue envelopes (observation.v2 and observation_conflict.v1), and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced; HTTP command authority fields are rejected. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, diner observation canonical schemas (ObservationV2 with 9 P0 events, canonicalJson, sha256), Queue message contracts (ObservationQueueMessageSchema, ObservationConflictQueueMessageSchema with multi-copy conflict schema, and compatibility aliases), and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced; HTTP command authority fields are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "62b3e25496cb31f55c29b3f194bf30e4e516a6252eb95ea59d57065d3360233a"
+      "sourceFingerprint": "3f5ba4e19ca474dd95d7575e34d9c9345a15a7d1fc9f28fcd181c49d196d3ce6"
     },
     {
       "id": "diner",
@@ -69,13 +69,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Source/DLQ delivery is paused; controlled access-removal acceptance and production remain separate checks. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No ingestion route, Queue handler, direct live publication or canonical observation writes are added; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE, OBSERVATION_ARCHIVE_BUCKET, and queue consumer binding with DLQ. Queue consumer handler is wired into Worker entry point for observation.v2 and multi-copy observation_conflict.v1 envelopes with canonical checksum validation and tenant-isolated Postgres persistence. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). Ingestion route, direct live publication or canonical observation writes remain planned; JWT logout revocation remains expiry-bounded.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
+        "backend/src/consumer/canonical-json.test.ts",
+        "backend/src/consumer/canonical-json.ts",
+        "backend/src/consumer/consumer.integration.ts",
+        "backend/src/consumer/database.ts",
+        "backend/src/consumer/index.test.ts",
+        "backend/src/consumer/index.ts",
+        "backend/src/consumer/queue-consumer.test.ts",
+        "backend/src/consumer/queue-consumer.ts",
+        "backend/src/consumer/r2-storage.test.ts",
+        "backend/src/consumer/r2-storage.ts",
+        "backend/src/consumer/types.ts",
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
@@ -110,7 +121,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a49e8af89492163dd04d21cb1fd7afe0633ebc97af38019be0de3d174b7b82d6"
+      "sourceFingerprint": "783b568cbcfdf76b5dc5283414691a4e9620417f6ef45fe8142df19b00f82c43"
     },
     {
       "id": "database",
@@ -158,7 +169,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies staging and later production under ADR0012; protected manual deployment/independent review remain required. Last recorded Worker release afe45db and existing Pages/Hyperdrive are preserved. October 24 inventory found no Queues: missing staging source/DLQ created, 24-hour retention, paused HTTP pull consumers and three source retries. Reused private staging R2. Real conditional-write race and synthetic Queue-to-R2-before-ACK/retry-to-DLQ checks passed; both Queues empty and paused after cleanup. Binding configuration still needs reviewed main deployment. Teeyansh PR31/32 and production resources untouched; actual consumer/DB pipeline remains unverified. A disabled-by-default PR preview workflow builds static diner/console pages without credentials, deploys them to separate preview Pages projects with a Pages-only token and deletes them on PR close; no preview run is verified yet.",
+      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -314,11 +325,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Added a disabled-by-default PR preview workflow for S3 preview deployments. Same-repository PRs using trusted base workflow code build static diner/console pages with analytics disabled and no credentials; a separate job uploads only those files to dedicated peekaplate-diner-preview/peekaplate-console-preview Pages projects under the pr-<number> alias using a Pages-only token in a preview environment, checks both links and updates one PR comment. Closing a PR deletes its deployments; manual dispatch repeats cleanup. Reviewer guide, isolation limits and setup are in docs/previews.md. The preview token name and account variable were verified in GitHub; exact develop/main environment branch restrictions were configured. Project availability, token validity and hosted workflow execution remain unverified. Static-artifact and provider checks fail closed; cleanup is independent of the deployment toggle.",
+      "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
       "modules": [
         "delivery"
       ],
-      "next": "Verify the two preview Pages projects and token scope, then enable PREVIEW_DEPLOYMENT_ENABLED after human review and merge to develop. PR #37 already targets develop. Validate deployment, comment, page load and cleanup; record actual hosted evidence in operations.md."
+      "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
     },
     {
       "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
@@ -370,15 +381,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
     },
     {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
-    },
-    {
       "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
       "modules": [
         "analytics"
@@ -392,6 +394,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
+    },
+    {
+      "summary": "S3-DATA-02 hardened the observation queue consumer and aligned canonical contracts with PR #40. Standardized ObservationV2 canonical serialization and sha256 checksum computation over full observations across contracts and consumer. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "Zhiliang Wang re-review on feat/s3-data-02-queue-consumer. Complete full archive-to-DB/ACK/recovery acceptance with migrated database before enabling collection on staging queue."
     }
   ]
 }

@@ -94,14 +94,18 @@ describe('createQueueHandler', () => {
     });
 
     const msg = new TestQueueMessage('m1', {
+      kind: 'observation.v2',
       tenantId: testTenant,
       eventId: testEvent,
-      authorizedPublicationId: testPublication,
+      sessionId: '44444444-4444-4444-8444-444444444444',
       schemaVersion: 'observation.v2',
-      occurredAt: '2026-10-24T12:00:00Z',
-      firstReceivedAt: '2026-10-24T12:00:00Z',
-      type: 'dish_detail_opened',
-      payload: { test: true },
+      occurredAt: '2026-10-24T12:00:00.000Z',
+      firstReceivedAt: '2026-10-24T12:00:00.000Z',
+      type: 'shortlist_viewed',
+      authorizedPublicationId: testPublication,
+      producerId: '55555555-5555-4555-8555-555555555555',
+      localSequence: 1,
+      payload: { shortlist_size: 1 },
     });
     const batch = new TestMessageBatch('obs-queue', [msg]);
 
