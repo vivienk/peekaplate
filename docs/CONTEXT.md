@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. Missing, draft, unbundled and withdrawn menus share a 404 response. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The documented immutable JSON bundle contract fixes restaurant presentation, complete dish identity/content, T0 variants and explicit-only dietary values while excluding partial, draft and review evidence. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -115,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "384db7c42ab702927528fd06d56bb343ce201b5165bbdee29880bc13870942dc"
+      "sourceFingerprint": "17f404d7d9fd728e803f5e973afabca5f55023437340bd776da88b047c3ed3f8"
     },
     {
       "id": "database",
@@ -321,13 +321,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Started RES-02 on an isolated branch from develop 5c0cb3f. Added strict approval/publish/withdraw contracts and owner-authorized atomic handlers. Review subjects bind one menu revision to separate content/asset approvals; hashes are server-derived. Composite keys prevent cross-menu and forged-hash approvals. Both streams have pure replay; expected-version, idempotency, outbox and withdrawal rules are covered. Type checks and 201 unit tests pass. User-run pnpm verify test:db exited 0 with 92 pgTAP assertions, 25 real integration tests and local startup/demo/cleanup.",
+      "summary": "RES-02 PRs #42/#43 add strict approval/publish/withdraw commands plus anonymous reads of the active approved T0 bundle pointer and publication-scoped ES256 observation tokens. The diner handoff now documents immutable JSON/CORS/image requirements, event identity mapping, QR source semantics, same-publication token refresh and the single 404 versus offline boundary. Local database verification passed 96 pgTAP assertions and all 26 Worker/PostgreSQL integration cases; hosted assets, secrets and deployment remain unverified.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Open a draft PR for human review of the pinned implementation. After RES-01/VIS-03 provide and validate the privileged producer of immutable review subjects, connect public published-menu reads and short-lived observation token issuance without changing browser authority."
+      "next": "Keep PRs #42/#43 Draft pending human review and the privileged immutable-bundle producer. Confirm the content-policy allergen closed list before adding values; do not expose partial content, renew tokens after withdrawal or treat QR query parameters as authority."
     },
     {
       "summary": "Added a disabled-by-default PR preview workflow for S3 preview deployments. Same-repository PRs using trusted base workflow code build static diner/console pages with analytics disabled and no credentials; a separate job uploads only those files to dedicated peekaplate-diner-preview/peekaplate-console-preview Pages projects under the pr-<number> alias using a Pages-only token in a preview environment, checks both links and updates one PR comment. Closing a PR deletes its deployments; manual dispatch repeats cleanup. Reviewer guide, isolation limits and setup are in docs/previews.md. The preview token name and account variable were verified in GitHub; exact develop/main environment branch restrictions were configured. Project availability, token validity and hosted workflow execution remain unverified. Static-artifact and provider checks fail closed; cleanup is independent of the deployment toggle.",
