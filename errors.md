@@ -476,3 +476,25 @@ connection refusal when socket readiness preceded TCP, then passed all six tests
 after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T01:20:35.736Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261025-RES02-DB-001","status":"open","area":"local-database-verification","observation":"The RES-02 disposable database lane did not start. Docker build first lacked access to its Buildx lock; after granting that narrow local permission, Docker Desktop exited without starting the Linux engine and the named pipe remained absent.","prevention":"Confirm docker version reaches the server before starting the recorded database lane. Do not weaken or replace the real PostgreSQL/Worker tests with mocks.","resolutionRequired":"Start the existing Docker Desktop Linux engine, then run pnpm verify test:db to exercise the migration, RLS, atomic commands, idempotency and concurrent publication cases. Current unit/type results do not establish database readiness."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:01:23.539Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-10-26T02:01:23.539Z"},"status":"resolved","cause":"The first user-run verification launched pnpm by absolute JavaScript path, but the verification child expected pnpm.cmd on PATH and exited before database tests.","prevention":"For the bundled Windows runtime, prepend its fallback command and Node directories to the current PowerShell PATH before invoking pnpm verify.","regression":"With the bundled fallback and Node directories on PATH, pnpm verify test:db completed with exit code 0."}
+```
+
+```json
+{"kind":"resolution","resolves":"OBS-20261025-RES02-DB-001","status":"resolved","evidence":"After the user started Docker Desktop and ran the repository verification outside the restricted named-pipe sandbox, pnpm verify test:db exited 0. It passed 92 pgTAP assertions, 25 real Worker/PostgreSQL integration tests, and the fresh local startup/demo/cleanup path.","limit":"This is disposable local evidence, not hosted deployment or upstream review-subject producer acceptance."}
+```
