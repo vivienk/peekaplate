@@ -13,17 +13,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. AI-01 adds a bounded owner-recommendation v1 request/result contract: available rate evidence requires the ten-session privacy floor; withheld states carry no values; outputs are one review-only draft or an explicit abstention with no executable effects. Live report/API/model integration remains planned.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/owner-ai.ts",
+        "packages/contracts/src/owner-ai.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "f3dfbd72ff01568911f1233cf5a1d2d18c588f417885421eec4a012d5d8100f7"
     },
     {
       "id": "diner",
@@ -69,7 +71,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Source/DLQ delivery is paused; controlled access-removal acceptance and production remain separate checks. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No ingestion route, Queue handler, direct live publication or canonical observation writes are added; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Staging Queue/R2 bindings remain disabled pending reviewed deployment. It provides bounded menu evidence retrieval with SSRF defense and deterministic limits. AI-01 adds a pure, server-authority-checked recommendation core that binds one venue/report/window, ignores untrusted summary instructions, returns at most one evidence-linked review draft, and abstains on missing, suppressed, stale, conflicting or unsupported evidence. It exposes no tools or mutation effects; owner HTTP/model/UI integration remains planned.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -98,7 +100,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
-        "backend/wrangler.jsonc"
+        "backend/wrangler.jsonc",
+        "backend/src/owner-ai/index.ts",
+        "backend/src/owner-ai/recommendation.ts",
+        "backend/src/owner-ai/recommendation.test.ts",
+        "docs/owner-ai.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -110,7 +116,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a49e8af89492163dd04d21cb1fd7afe0633ebc97af38019be0de3d174b7b82d6"
+      "sourceFingerprint": "f70838eefaab04ee26b3c67593e7f1113f9f0f1008de0a3695c4f8ba9eed9a8f"
     },
     {
       "id": "database",
@@ -314,6 +320,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Started AI-01 PR C from current develop with strict owner-recommendation v1 contracts and a pure deterministic safety core. Requests bind one venue, report version and window; available rates require at least ten eligible sessions; withheld evidence carries no values. The engine allows 12 evidence items, 8,000 context characters, one attempt, zero tools and zero effects, ignores untrusted summary instructions, returns one review-only draft or explicit abstention, and rejects cross-tenant/report/window evidence. Production thresholds, report API/auth, model adapter, UI and rubric evaluation remain blocked dependencies.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "Obtain the approved AI rubric/guardrails and validated owner-report contract, then add the membership-authorized API/model adapter and independent evaluation without weakening abstention, privacy or zero-effect boundaries."
+    },
+    {
       "summary": "Added a disabled-by-default PR preview workflow for S3 preview deployments. Same-repository PRs using trusted base workflow code build static diner/console pages with analytics disabled and no credentials; a separate job uploads only those files to dedicated peekaplate-diner-preview/peekaplate-console-preview Pages projects under the pr-<number> alias using a Pages-only token in a preview environment, checks both links and updates one PR comment. Closing a PR deletes its deployments; manual dispatch repeats cleanup. Reviewer guide, isolation limits and setup are in docs/previews.md. The preview token name and account variable were verified in GitHub; exact develop/main environment branch restrictions were configured. Project availability, token validity and hosted workflow execution remain unverified. Static-artifact and provider checks fail closed; cleanup is independent of the deployment toggle.",
       "modules": [
         "delivery"
@@ -345,14 +359,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
-    },
-    {
-      "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
-      "modules": [
-        "delivery",
-        "analytics"
-      ],
-      "next": "Review the reconciled PR 27 release after local checks. Read-only hosted audit confirmed migration 20261021130000 is absent; apply and record its forward migration through the database procedure before deployment. Operator OAuth is valid but does not verify GitHub-held tokens. Keep the activation flag off until protected credential/release checks, then deploy reviewed main and run hosted access acceptance."
     },
     {
       "summary": "Recorded the October 22 staging environment settings: exact main branch restriction saved, required reviewers and prevent self-review enabled, administrator bypass allowed, and expected variable/secret names present. Updated stale environment-availability guidance. No secret values, activation flag, workflow code or deployment changed.",
