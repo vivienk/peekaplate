@@ -131,7 +131,7 @@ SELECT is(total_clicks, 10::bigint, 'Resto_10 total_clicks must be 10::bigint') 
 SELECT is(raw_unique_sessions, 10::bigint, 'Resto_10 unique sessions must be 10::bigint') FROM temp_report_results WHERE tenant_id = 'resto_10';
 
 -- RESTO_11 TESTS (Linear Clearance Check)
-SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE theme_id = 'resto_11' OR tenant_id = 'resto_11';
+SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE tenant_id = 'resto_11';
 SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live events only') FROM temp_report_results WHERE tenant_id = 'resto_11';
 SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE tenant_id = 'resto_11';
 
