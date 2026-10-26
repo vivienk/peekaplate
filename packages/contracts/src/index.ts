@@ -135,6 +135,51 @@ export type PublishMenu = z.infer<typeof PublishMenuSchema>;
 export type WithdrawMenu = z.infer<typeof WithdrawMenuSchema>;
 export type MenuPublication = z.infer<typeof MenuPublicationSchema>;
 
+export const PublicMenuBundleSchema = z.strictObject({
+  url: z.url().refine((value) => value.startsWith('https://'), 'Public bundles require HTTPS'),
+  contentHash: hash,
+  assetManifestHash: hash,
+});
+
+export const PublicMenuResponseSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  publicationId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  tier: z.literal('T0'),
+  bundle: PublicMenuBundleSchema,
+  menuToken: z.string().min(1).max(8192),
+  tokenExpiresAt: z.iso.datetime(),
+});
+
+export const MENU_TOKEN_AUDIENCE = 'peekaplate-observations';
+export const MENU_TOKEN_TTL_SECONDS = 30 * 60;
+
+export const MenuTokenClaimsSchema = z
+  .strictObject({
+    venue: uuid,
+    publication: uuid,
+    scope: z.literal('observations'),
+    iat: z.number().int().nonnegative(),
+    exp: z.number().int().positive(),
+    jti: uuid,
+  })
+  .superRefine((claims, ctx) => {
+    if (claims.exp - claims.iat !== MENU_TOKEN_TTL_SECONDS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['exp'],
+        message: 'Menu tokens expire after 30 minutes',
+      });
+    }
+  });
+
+export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
+export type MenuTokenClaims = z.infer<typeof MenuTokenClaimsSchema>;
+
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
 export const MAX_PASSAGES = 10;

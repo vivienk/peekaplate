@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision, RES-02 menu approval/publication/withdrawal, dish-intent, team analytics and bounded menu evidence schemas. Approval commands carry immutable menu revision plus separate content/asset approval identities; hashes are server-derived from the canonical review subject. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, RES-02 approval/publication/withdrawal and anonymous public-menu pointer schemas, dish-intent, team analytics and bounded menu evidence schemas. Public responses bind exact approved content and asset hashes to an immutable HTTPS T0 bundle; menu-token claims fix venue, publication, observations scope, audience and a 30-minute lifetime. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "55fd479c7dfc4c15cfb8d782ac33699f8542d957d66ef056f4a56a39c71fefbf"
+      "sourceFingerprint": "bdaf057bd59604ac62ccf0702d53fd505705825437abc182d310d330aa021654"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Approval requires a trusted same-tenant/menu review subject with separate content and asset approval IDs; the browser cannot supply hashes. Separate review/publication streams have pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows. Public menu reads and token issuance remain deferred.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. Missing, draft, unbundled and withdrawn menus share a 404 response. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -83,6 +83,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/index.ts",
         "backend/src/publication-command.test.ts",
         "backend/src/publication-command.ts",
+        "backend/src/public-menu.test.ts",
+        "backend/src/public-menu.ts",
+        "docs/public-menu.md",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -112,12 +115,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2387b2454ab34e169ba3171c9170bb93137b3007d7c0229b4f2a75dd8d37efe8"
+      "sourceFingerprint": "384db7c42ab702927528fd06d56bb343ce201b5165bbdee29880bc13870942dc"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. RES-02 adds immutable canonical review subjects, append-only exact approvals and tenant review/publication projections. Composite foreign keys prevent cross-menu or forged-hash approval references; runtime may read but cannot create subjects. Local database verification passed 92 pgTAP assertions and 25 real Worker/PostgreSQL cases.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. RES-02 adds immutable canonical review subjects, exact approvals, tenant review/publication projections and append-only public bundle handoffs. Composite foreign keys bind each bundle and approval to the reviewed tenant/menu/revision; runtime may read bundle pointers but cannot create or mutate them. PR A passed 92 pgTAP assertions and 25 real Worker/PostgreSQL cases; PR B passed 96 pgTAP assertions and all 26 real Worker/PostgreSQL cases against a local disposable database. Hosted-environment verification remains separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -127,6 +130,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261014210000_staff_commands.sql",
         "tests/db/staff.sql",
         "migrations/20261025120000_menu_publication.sql",
+        "migrations/20261025130000_public_menu_bundle.sql",
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
@@ -139,7 +143,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "24a607498ff472931ea9038458131a3e2e1b12158a3a5e287d070413ca69759e"
+      "sourceFingerprint": "1bfcdd8cf9d7bfb78f956b584a029c795687a2e9a8b545784e1beec1ba66f2a7"
     },
     {
       "id": "measurement",

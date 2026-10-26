@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
@@ -24,6 +24,9 @@ let env: Bindings;
 let signingKey: CryptoKey;
 let collaboratorEnabled = true;
 const githubCalls: string[] = [];
+let menuPublicJwk: JWK;
+let menuSigningJwk: string;
+let menuTokenIssuer: string;
 let worker: Awaited<ReturnType<typeof unstable_dev>>;
 
 function command(patch = {}) {
@@ -122,6 +125,19 @@ async function registerReviewSubject(
   );
 }
 
+async function registerPublicBundle(menuId: string, menuRevisionId: string, tenant = venue) {
+  await admin.query(
+    `INSERT INTO app_private.public_menu_bundle
+      (tenant_id, menu_id, menu_revision_id, bundle_url)
+     VALUES ($1, $2, $3, $4)`,
+    [tenant, menuId, menuRevisionId, `https://assets.example.test/${menuRevisionId}.json`],
+  );
+}
+
+async function requestPublicMenu(menuId: string, tenant = venue) {
+  return fetch(`http://127.0.0.1:${worker.port}/public/venues/${tenant}/menus/${menuId}`);
+}
+
 async function publicationCounts(menuId: string) {
   const result = await admin.query(
     `SELECT
@@ -163,6 +179,19 @@ beforeAll(async () => {
   const keys = await generateKeyPair('ES256');
   signingKey = keys.privateKey;
   const jwk = { ...(await exportJWK(keys.publicKey)), kid: 'integration', alg: 'ES256' };
+  const menuKeys = await generateKeyPair('ES256', { extractable: true });
+  menuPublicJwk = {
+    ...(await exportJWK(menuKeys.publicKey)),
+    kid: 'menu-integration',
+    alg: 'ES256',
+    use: 'sig',
+  };
+  menuSigningJwk = JSON.stringify({
+    ...(await exportJWK(menuKeys.privateKey)),
+    kid: 'menu-integration',
+    alg: 'ES256',
+    use: 'sig',
+  });
   server = createServer((req, res) => {
     githubCalls.push(req.url ?? '');
     if (req.url === '/user') {
@@ -183,6 +212,12 @@ beforeAll(async () => {
         .end();
       return;
     }
+    if (req.url === '/.well-known/jwks.json') {
+      res
+        .writeHead(200, { 'Content-Type': 'application/jwk-set+json' })
+        .end(JSON.stringify({ keys: [menuPublicJwk] }));
+      return;
+    }
     if (req.url !== '/auth/v1/.well-known/jwks.json') {
       res.writeHead(404).end();
       return;
@@ -192,10 +227,13 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('No local JWKS listener');
+  menuTokenIssuer = `http://127.0.0.1:${address.port}`;
   env = {
     APP_ENV: 'local',
     AUTH_ISSUER: `http://127.0.0.1:${address.port}/auth/v1`,
     LOCAL_DATABASE_URL: runtimeUrl,
+    MENU_TOKEN_ISSUER: menuTokenIssuer,
+    MENU_TOKEN_SIGNING_JWK: menuSigningJwk,
   };
   worker = await unstable_dev(fileURLToPath(new URL('./index.ts', import.meta.url)), {
     config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
@@ -209,6 +247,8 @@ beforeAll(async () => {
       AUTH_ISSUER: env.AUTH_ISSUER!,
       LOCAL_DATABASE_URL: runtimeUrl!,
       POSTHOG_PROJECT_ID: '675372',
+      MENU_TOKEN_ISSUER: menuTokenIssuer,
+      MENU_TOKEN_SIGNING_JWK: menuSigningJwk,
       TEAM_GITHUB_TOKEN: 'fixture-server',
       LOCAL_GITHUB_API_URL: `http://127.0.0.1:${address.port}/`,
     },
@@ -577,6 +617,65 @@ describe('real PostgreSQL staff command', () => {
 });
 
 describe('real PostgreSQL menu publication commands', () => {
+  it('serves only an active approved bundle and binds its menu token to the publication', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    await registerPublicBundle(menuId, approvalInput.menuRevisionId);
+
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+    const approval = await (await requestPublication(menuId, 'approvals', approvalInput)).json();
+    const publication = await (
+      await requestPublication(menuId, 'publications', {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: approval.approvalId,
+      })
+    ).json();
+
+    const response = await requestPublicMenu(menuId);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await response.json();
+    expect(body).toMatchObject({
+      schemaVersion: 1,
+      venueId: venue,
+      menuId,
+      menuRevisionId: approvalInput.menuRevisionId,
+      publicationId: publication.publicationId,
+      publicationHash: publication.publicationHash,
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: `https://assets.example.test/${approvalInput.menuRevisionId}.json`,
+        contentHash: 'a'.repeat(64),
+        assetManifestHash: 'b'.repeat(64),
+      },
+    });
+    const verified = await jwtVerify(
+      body.menuToken,
+      createRemoteJWKSet(new URL('.well-known/jwks.json', `${menuTokenIssuer}/`)),
+      {
+        issuer: `${menuTokenIssuer}/`,
+        audience: 'peekaplate-observations',
+        algorithms: ['ES256'],
+      },
+    );
+    expect(verified.payload).toMatchObject({
+      venue,
+      publication: publication.publicationId,
+      scope: 'observations',
+    });
+    expect(Number(verified.payload.exp) - Number(verified.payload.iat)).toBe(1800);
+
+    const withdrawal = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawal.status).toBe(200);
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+  });
+
   it('keeps approval, publication and withdrawal as separate atomic commands', async () => {
     const menuId = crypto.randomUUID();
     const approvalInput = approvalCommand();
