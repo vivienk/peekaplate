@@ -65,9 +65,22 @@ function docker(args, label, options = {}) {
 
 async function waitForPostgres() {
   for (let attempt = 0; attempt < 30; attempt += 1) {
+    // The temporary bootstrap server accepts Unix sockets before TCP is available.
     const result = spawnSync(
       'docker',
-      ['exec', container, 'pg_isready', '-U', 'postgres', '-d', 'peekaplate'],
+      [
+        'exec',
+        container,
+        'pg_isready',
+        '-h',
+        '127.0.0.1',
+        '-p',
+        '5432',
+        '-U',
+        'postgres',
+        '-d',
+        'peekaplate',
+      ],
       { cwd: root, encoding: 'utf8', timeout: 5_000 },
     );
     if (result.status === 0) return;
