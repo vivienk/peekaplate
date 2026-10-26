@@ -136,7 +136,7 @@ SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live
 SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE venue_id = 'resto_11';
 
 -- RESTO_EMPTY TESTS (Zero-denominator boundary returns 'not measurable')
-SELECT is(reconciled_sessions, 'not measurable', 'Empty restaurant must return not measurable instead of being omitted');
+SELECT is(reconciled_sessions, 'not measurable', 'Empty restaurant must return not measurable instead of being omitted') FROM temp_report_results WHERE venue_id = 'resto_empty';
 
 SELECT * FROM finish();
 
