@@ -32,14 +32,41 @@ export class MalformedMessageError extends Error {
   }
 }
 
+interface ValidationIssueItem {
+  readonly path?: readonly PropertyKey[];
+  readonly message?: string;
+  readonly code?: string;
+}
+
 function formatValidationError(
   raw: unknown,
-  error: { issues: readonly { path?: readonly PropertyKey[]; message?: string }[] },
+  error: { issues: readonly ValidationIssueItem[] },
 ): string {
-  const issue = error.issues[0];
+  let issue: ValidationIssueItem | undefined = error.issues[0];
   if (!issue) return 'Validation failed';
-  const path = String(issue.path?.[0] ?? '');
+
+  // If this is a Zod union error, unwrap the issues from the relevant union branch
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const rawIssue = issue as {
+    code?: string;
+    errors?: readonly { issues: readonly ValidationIssueItem[] }[];
+  };
+  if (rawIssue.code === 'invalid_union' && Array.isArray(rawIssue.errors)) {
+    const branchErrors = rawIssue.errors.map((e) => e.issues ?? []);
+    if (r.kind === 'observation_conflict.v1' && branchErrors[1]?.[0]) {
+      issue =
+        branchErrors[1].find((i: ValidationIssueItem) => String(i.path?.[0] ?? '') !== 'kind') ??
+        branchErrors[1][0];
+    } else if (branchErrors[0]?.[0]) {
+      issue =
+        branchErrors[0].find((i: ValidationIssueItem) => String(i.path?.[0] ?? '') !== 'kind') ??
+        branchErrors[0][0];
+    }
+  }
+
+  if (!issue) return 'Validation failed';
+
+  const path = String(issue.path?.[0] ?? '');
   if (path === 'tenantId') return 'Missing or invalid tenantId: must be a valid UUID';
   if (path === 'eventId') return 'Missing or invalid eventId: must be a valid UUID';
   if (path === 'authorizedPublicationId')
@@ -397,9 +424,8 @@ export class QueueConsumer {
       let anyNewRecorded = false;
       for (const copy of envelope.copies) {
         const copyChecksum = copy.canonicalChecksum;
-        const copyBytes = new TextEncoder().encode(
-          JSON.stringify(copy.event ?? copy.metadata ?? copy),
-        );
+        const copyData = copy.validation === 'valid' ? copy.event : copy.metadata;
+        const copyBytes = new TextEncoder().encode(JSON.stringify(copyData));
         let copyArchiveKey: string;
         try {
           copyArchiveKey = buildConflictArchiveKey(tenantId, eventId, occurredAt, copyChecksum);

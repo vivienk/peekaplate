@@ -1029,5 +1029,132 @@ describe('QueueConsumer', () => {
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumB}`)).toBe(true);
     });
+
+    it('handles partial failure across conflict copies safely and retries without duplicate records', async () => {
+      const checksumA = '1'.repeat(64);
+      const checksumB = '2'.repeat(64);
+
+      const multiCopyMsg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00Z',
+        reasonCode: 'event_id_conflict',
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: checksumA,
+            event: { step: 'copy-1' },
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2',
+              eventType: 'dish_viewed',
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority',
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      // Configure R2 to fail when writing the second copy's key
+      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumB);
+      r2Storage.failKeys.add(keyB);
+
+      const msg = new FakeQueueMessage('msg-partial-fail', multiCopyMsg);
+      const batch1 = new FakeMessageBatch('obs-queue', [msg]);
+
+      const result1 = await consumer.processBatch(batch1);
+      expect(result1.acknowledged).toBe(0);
+      expect(result1.retried).toBe(1);
+      expect(msg.acked).toBe(false);
+      expect(msg.retried).toBe(true);
+
+      // Copy A was persisted, but Copy B failed
+      expect(repository.conflicts.size).toBe(1);
+      expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
+
+      // Now transient R2 failure clears
+      r2Storage.failKeys.delete(keyB);
+
+      // Redeliver same message on retry
+      const retryMsg = new FakeQueueMessage('msg-partial-retry', multiCopyMsg);
+      const batch2 = new FakeMessageBatch('obs-queue', [retryMsg]);
+
+      const result2 = await consumer.processBatch(batch2);
+      expect(result2.acknowledged).toBe(1);
+      expect(retryMsg.acked).toBe(true);
+
+      // Both copies are now recorded; Copy A was recognized as already recorded without duplicate
+      expect(repository.conflicts.size).toBe(2);
+      expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
+      expect(repository.conflicts.has(`${T1}:${E1}:${checksumB}`)).toBe(true);
+    });
+
+    it('processes multi-copy conflict with exact producer bounded metadata shape', async () => {
+      const checksumA = '3'.repeat(64);
+      const checksumB = '4'.repeat(64);
+
+      const exactProducerConflict = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00Z',
+        reasonCode: 'event_id_conflict',
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: checksumA,
+            event: {
+              schema_version: 'observation.v2',
+              event_id: E1,
+              session_id: '00000000-0000-4000-8000-000000000001',
+              producer_id: '00000000-0000-4000-8000-000000000002',
+              local_sequence: 1,
+              occurred_at: '2026-10-24T12:00:00.000Z',
+              publication_revision_id: P1,
+              type: 'dish_viewed',
+              payload: { dishId: 'd-1' },
+            },
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'dish_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(exactProducerConflict);
+      expect(disposition.status).toBe('acknowledged');
+      if (disposition.status === 'acknowledged') {
+        expect(disposition.reason).toBe('conflict_recorded');
+      }
+
+      // Check R2 archives
+      const keyA = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumA);
+      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00Z', checksumB);
+      expect(r2Storage.has(keyA)).toBe(true);
+      expect(r2Storage.has(keyB)).toBe(true);
+
+      // Verify that stored invalid copy in R2 contains only bounded metadata without raw payload leakage
+      const rawB = await r2Storage.getRawPayload(keyB);
+      expect(rawB).not.toBeNull();
+      const storedB = JSON.parse(new TextDecoder().decode(rawB!.rawBytes));
+      expect(storedB).toHaveProperty('schemaVersionStatus', 'observation.v2');
+      expect(storedB).toHaveProperty('publicationStatus', 'matches_authority');
+      expect(storedB).not.toHaveProperty('unapproved_field');
+    });
   });
 });

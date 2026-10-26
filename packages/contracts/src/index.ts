@@ -315,12 +315,26 @@ export const ObservationV2QueueEnvelopeSchema = z.strictObject({
   payload: z.record(z.string(), z.unknown()),
 });
 
-const conflictCopySchema = z.strictObject({
-  validation: z.enum(['valid', 'invalid']),
-  canonicalChecksum: hash,
-  event: z.record(z.string(), z.unknown()).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+export const ConflictMetadataSchema = z.strictObject({
+  schemaVersionStatus: z.enum(['observation.v2', 'other', 'missing']),
+  eventType: ObservationTypeSchema.or(z.enum(['unknown', 'missing'])),
+  occurredAt: z.iso.datetime({ offset: true }).nullable(),
+  publicationStatus: z.enum(['matches_authority', 'mismatch', 'invalid', 'missing']),
+  payloadObject: z.boolean(),
 });
+
+export const ConflictCopySchema = z.discriminatedUnion('validation', [
+  z.strictObject({
+    validation: z.literal('valid'),
+    canonicalChecksum: hash,
+    event: z.record(z.string(), z.unknown()),
+  }),
+  z.strictObject({
+    validation: z.literal('invalid'),
+    canonicalChecksum: hash,
+    metadata: z.record(z.string(), z.unknown()),
+  }),
+]);
 
 export const ObservationConflictV1QueueEnvelopeSchema = z.strictObject({
   kind: z.literal('observation_conflict.v1'),
@@ -337,7 +351,7 @@ export const ObservationConflictV1QueueEnvelopeSchema = z.strictObject({
   reasonCode: z.string().min(1).max(200).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   boundedMetadata: z.record(z.string(), z.unknown()).optional(),
-  copies: z.array(conflictCopySchema).min(1).max(25).optional(),
+  copies: z.array(ConflictCopySchema).min(1).max(25).optional(),
 });
 
 export const ObservationQueueEnvelopeSchema = z.union([
@@ -346,6 +360,8 @@ export const ObservationQueueEnvelopeSchema = z.union([
 ]);
 
 export type ObservationType = z.infer<typeof ObservationTypeSchema>;
+export type ConflictMetadata = z.infer<typeof ConflictMetadataSchema>;
+export type ConflictCopy = z.infer<typeof ConflictCopySchema>;
 export type ObservationV2QueueEnvelope = z.infer<typeof ObservationV2QueueEnvelopeSchema>;
 export type ObservationConflictV1QueueEnvelope = z.infer<
   typeof ObservationConflictV1QueueEnvelopeSchema

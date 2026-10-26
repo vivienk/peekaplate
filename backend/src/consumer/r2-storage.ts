@@ -167,10 +167,11 @@ export class FakeR2ArchiveStorage implements R2ArchiveStorage {
   >();
   public putCalls: { key: string; checksum: string }[] = [];
   public failNextPut = false;
+  public failKeys = new Set<string>();
 
   async putRawPayload(key: string, rawBytes: Uint8Array, checksum: string): Promise<R2PutResult> {
     this.putCalls.push({ key, checksum });
-    if (this.failNextPut) {
+    if (this.failNextPut || this.failKeys.has(key)) {
       this.failNextPut = false;
       throw new Error('R2 storage temporarily unavailable');
     }
