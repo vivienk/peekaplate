@@ -477,6 +477,33 @@ after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 rea
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
 
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T01:20:35.736Z","exitCode":1}
@@ -498,3 +525,17 @@ disposable local/CI startup only, without a hosted database or application chang
 ```json
 {"kind":"resolution","resolves":"OBS-20261025-RES02-DB-001","status":"resolved","evidence":"After the user started Docker Desktop and ran the repository verification outside the restricted named-pipe sandbox, pnpm verify test:db exited 0. It passed 92 pgTAP assertions, 25 real Worker/PostgreSQL integration tests, and the fresh local startup/demo/cleanup path.","limit":"This is disposable local evidence, not hosted deployment or upstream review-subject producer acceptance."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:19:34.003Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:19:51.505Z","exitCode":1}
+```
+
+## OBS-20261025-RES02-DEVELOP-MERGE-WINDOWS
+
+The post-merge pnpm check passed Biome, every workspace TypeScript check and all 201 Vitest cases (four optional cases skipped). Its repository-script phase passed 46 tests and failed only while the newly merged preview regression tried to create a Windows symlink inside the sandbox (EPERM); the earlier temp-directory rename restriction was avoided by moving TEMP and TMP into the writable worktree. Running the preview suite with only that privilege-dependent case skipped passed its remaining 12 tests. Context freshness, the ten-handoff limit, documentation links and git diff --check pass. No RES-02 runtime, contract, migration or database file conflicted with develop. Linux CI must run the symlink regression before merge; this local limitation is not a passing result for that case.
