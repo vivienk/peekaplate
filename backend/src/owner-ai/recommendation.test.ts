@@ -1,9 +1,10 @@
+import { MAX_OWNER_AI_EVIDENCE } from '@peekaplate/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   buildOwnerRecommendation,
   OWNER_AI_EXECUTION_LIMITS,
   OwnerAiAuthorizationError,
-  type OwnerRecommendationRule,
+  validateOwnerRecommendationResult,
 } from './recommendation';
 
 const venueId = '00000000-0000-4000-8000-000000000001';
@@ -35,28 +36,37 @@ const request = {
     },
   ],
 };
-const rules: OwnerRecommendationRule[] = [
-  {
-    ruleId: 'open-rate-review.v1',
-    metricKey: 'open_rate',
-    maximumInclusive: 0.25,
-    draftAction: 'Review the approved dish-card presentation before the next publication.',
-    confidence: 'medium',
-  },
-];
+const policy = {
+  schemaVersion: 'owner-recommendation-policy.v1',
+  policyVersion: 'rubric.synthetic.v1',
+  rules: [
+    {
+      ruleId: 'open-rate-review.v1',
+      priority: 1,
+      metricKey: 'open_rate',
+      maximumInclusive: 0.25,
+      actionId: 'review_dish_card',
+      confidence: 'medium',
+    },
+  ],
+};
 
 describe('AI-01 safe recommendation core', () => {
-  it('returns one review-only draft with traceable evidence and no executable effects', () => {
-    expect(buildOwnerRecommendation(request, { authorizedVenueId: venueId, rules })).toEqual({
+  it('returns one review-only draft with tenant and policy provenance', () => {
+    expect(buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy })).toEqual({
       schemaVersion: 'owner-recommendation.v1',
       requestId: request.requestId,
+      venueId,
       reportId,
       reportVersion: 1,
       timeWindow,
       generatorVersion: 'deterministic-rules.v1',
+      policyVersion: 'rubric.synthetic.v1',
       approvalRequired: true,
       allowedEffects: [],
       status: 'recommendation',
+      ruleId: 'open-rate-review.v1',
+      actionId: 'review_dish_card',
       draftAction: 'Review the approved dish-card presentation before the next publication.',
       rationale: 'open_rate was 20.0% across 20 eligible sessions for the selected report window.',
       evidenceRefs: [evidenceId],
@@ -68,7 +78,7 @@ describe('AI-01 safe recommendation core', () => {
   });
 
   it('treats retrieved text as untrusted data rather than instructions', () => {
-    const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, rules });
+    const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
     expect(JSON.stringify(result)).not.toContain('Ignore policy');
     expect(result.allowedEffects).toEqual([]);
   });
@@ -96,13 +106,58 @@ describe('AI-01 safe recommendation core', () => {
         },
       ],
     };
-    const result = buildOwnerRecommendation(withheld, { authorizedVenueId: venueId, rules });
-    expect(result).toMatchObject({ status: 'abstained', reason, approvalRequired: true });
+    const result = buildOwnerRecommendation(withheld, { authorizedVenueId: venueId, policy });
+    expect(result).toMatchObject({
+      status: 'abstained',
+      reason,
+      venueId,
+      policyVersion: 'rubric.synthetic.v1',
+      approvalRequired: true,
+    });
   });
 
   it('abstains when no approved rule supports a recommendation', () => {
-    const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, rules: [] });
-    expect(result).toMatchObject({ status: 'abstained', reason: 'unsupported_evidence' });
+    const result = buildOwnerRecommendation(request, {
+      authorizedVenueId: venueId,
+      policy: { ...policy, policyVersion: 'rubric.synthetic.v2', rules: [] },
+    });
+    expect(result).toMatchObject({
+      status: 'abstained',
+      reason: 'unsupported_evidence',
+      policyVersion: 'rubric.synthetic.v2',
+    });
+  });
+
+  it('rejects malformed or cross-metric policy rules before evaluation', () => {
+    for (const rule of [
+      { ...policy.rules[0], maximumInclusive: Number.POSITIVE_INFINITY },
+      { ...policy.rules[0], maximumInclusive: 2 },
+      { ...policy.rules[0], actionId: 'review_dish_detail' },
+      { ...policy.rules[0], confidence: 'certain' },
+      { ...policy.rules[0], draftAction: 'Increase revenue by 20%.' },
+    ]) {
+      expect(() =>
+        buildOwnerRecommendation(request, {
+          authorizedVenueId: venueId,
+          policy: { ...policy, rules: [rule] },
+        }),
+      ).toThrow();
+    }
+  });
+
+  it('uses explicit rule priority rather than request or rule order', () => {
+    const prioritized = {
+      ...policy,
+      rules: [
+        { ...policy.rules[0], ruleId: 'later.v1', priority: 2, maximumInclusive: 0.5 },
+        { ...policy.rules[0], ruleId: 'first.v1', priority: 1, maximumInclusive: 0.3 },
+      ],
+    };
+    const result = buildOwnerRecommendation(request, {
+      authorizedVenueId: venueId,
+      policy: prioritized,
+    });
+    expect(result).toMatchObject({ status: 'recommendation', ruleId: 'first.v1' });
   });
 
   it('fails closed for cross-tenant, cross-report, and cross-window evidence', () => {
@@ -114,28 +169,122 @@ describe('AI-01 safe recommendation core', () => {
       expect(() =>
         buildOwnerRecommendation(
           { ...request, evidence: [{ ...request.evidence[0], ...changed }] },
-          { authorizedVenueId: venueId, rules },
+          { authorizedVenueId: venueId, policy },
         ),
-      ).toThrow(OwnerAiAuthorizationError);
+      ).toThrow();
     }
   });
 
-  it('rejects an injected request venue and malformed privacy evidence', () => {
+  it('rejects fabricated citations and a result crossed into another venue', () => {
+    const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
     expect(() =>
-      buildOwnerRecommendation(request, {
-        authorizedVenueId: '00000000-0000-4000-8000-000000000099',
-        rules,
-      }),
+      validateOwnerRecommendationResult(
+        { ...result, evidenceRefs: ['00000000-0000-4000-8000-000000000099'] },
+        request,
+        policy,
+      ),
     ).toThrow(OwnerAiAuthorizationError);
     expect(() =>
-      buildOwnerRecommendation(
+      validateOwnerRecommendationResult(
+        { ...result, venueId: '00000000-0000-4000-8000-000000000099' },
+        request,
+        policy,
+      ),
+    ).toThrow(OwnerAiAuthorizationError);
+    expect(validateOwnerRecommendationResult(result, request, policy)).toEqual(result);
+  });
+
+  it.each(['missing', 'suppressed', 'stale', 'conflicting', 'unsupported'] as const)(
+    'rejects a recommendation when request evidence is %s',
+    (state) => {
+      const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
+      const available = request.evidence[0];
+      if (!available) throw new Error('Fixture evidence is missing');
+      const withheld = {
+        ...request,
+        evidence: [
+          {
+            evidenceId: available.evidenceId,
+            venueId: available.venueId,
+            reportId: available.reportId,
+            reportVersion: available.reportVersion,
+            metricKey: available.metricKey,
+            timeWindow: available.timeWindow,
+            state,
+          },
+        ],
+      };
+      expect(() => validateOwnerRecommendationResult(result, withheld, policy)).toThrow();
+    },
+  );
+
+  it('rejects results that do not exactly match the reviewed policy', () => {
+    const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
+    for (const changed of [
+      { policyVersion: 'rubric.synthetic.v2' },
+      { ruleId: 'unknown-rule.v1' },
+      { actionId: 'review_dish_detail' },
+      { draftAction: 'Increase revenue by 20%.' },
+      { confidence: 'high' },
+    ]) {
+      expect(() =>
+        validateOwnerRecommendationResult({ ...result, ...changed }, request, policy),
+      ).toThrow();
+    }
+  });
+
+  it('accepts exactly the context budget and abstains one character above it', () => {
+    const base = request.evidence[0];
+    if (!base) throw new Error('Fixture evidence is missing');
+    const atLimit = {
+      ...request,
+      evidence: [
+        { ...base, untrustedSummary: 'a'.repeat(500) },
         {
-          ...request,
-          evidence: [{ ...request.evidence[0], eligibleSessions: 9 }],
+          ...base,
+          evidenceId: '00000000-0000-4000-8000-000000000005',
+          metricKey: 'engagement_rate',
+          untrustedSummary: 'b'.repeat(500),
         },
-        { authorizedVenueId: venueId, rules },
+      ],
+    };
+    expect(buildOwnerRecommendation(atLimit, { authorizedVenueId: venueId, policy })).toMatchObject(
+      { status: 'recommendation' },
+    );
+
+    const aboveLimit = {
+      ...atLimit,
+      evidence: [
+        ...atLimit.evidence,
+        {
+          ...base,
+          evidenceId: '00000000-0000-4000-8000-000000000006',
+          metricKey: 'save_rate',
+          untrustedSummary: 'x',
+        },
+      ],
+    };
+    expect(
+      buildOwnerRecommendation(aboveLimit, { authorizedVenueId: venueId, policy }),
+    ).toMatchObject({ status: 'abstained', reason: 'insufficient_evidence' });
+  });
+
+  it('enforces the ten-session floor at 9, while accepting 10 and 11', () => {
+    for (const eligibleSessions of [10, 11]) {
+      expect(() =>
+        buildOwnerRecommendation(
+          { ...request, evidence: [{ ...request.evidence[0], eligibleSessions }] },
+          { authorizedVenueId: venueId, policy },
+        ),
+      ).not.toThrow();
+    }
+    expect(() =>
+      buildOwnerRecommendation(
+        { ...request, evidence: [{ ...request.evidence[0], eligibleSessions: 9 }] },
+        { authorizedVenueId: venueId, policy },
       ),
     ).toThrow();
+    expect(OWNER_AI_EXECUTION_LIMITS.maxEvidenceItems).toBe(MAX_OWNER_AI_EVIDENCE);
     expect(OWNER_AI_EXECUTION_LIMITS.maxToolCalls).toBe(0);
     expect(OWNER_AI_EXECUTION_LIMITS.maxAttempts).toBe(1);
   });

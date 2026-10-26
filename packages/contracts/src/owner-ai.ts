@@ -9,10 +9,15 @@ const boundedText = (max: number) =>
     .max(max)
     .refine((value) => !value.includes('\u0000'), 'NUL is not supported');
 
-export const MAX_OWNER_AI_EVIDENCE = 12;
-export const MAX_OWNER_AI_CONTEXT_CHARS = 8_000;
+export const MAX_OWNER_AI_EVIDENCE = 3;
+export const MAX_OWNER_AI_CONTEXT_CHARS = 1_000;
 
 export const OwnerAiMetricKeySchema = z.enum(['open_rate', 'engagement_rate', 'save_rate']);
+export const OwnerAiActionIdSchema = z.enum([
+  'review_dish_card',
+  'review_dish_detail',
+  'review_save_affordance',
+]);
 
 export const OwnerAiTimeWindowSchema = z
   .strictObject({
@@ -59,32 +64,107 @@ export const OwnerRecommendationRequestSchema = z
     reportId: uuid,
     reportVersion: z.number().int().positive().max(2_147_483_647),
     timeWindow: OwnerAiTimeWindowSchema,
-    question: boundedText(500).optional(),
     evidence: z.array(OwnerAiEvidenceSchema).max(MAX_OWNER_AI_EVIDENCE),
   })
   .superRefine((request, ctx) => {
-    const seen = new Set<string>();
+    const evidenceIds = new Set<string>();
+    const metricKeys = new Set<string>();
     for (let index = 0; index < request.evidence.length; index++) {
       const item = request.evidence[index];
       if (!item) continue;
-      if (seen.has(item.evidenceId)) {
+      if (evidenceIds.has(item.evidenceId)) {
         ctx.addIssue({
           code: 'custom',
           path: ['evidence', index, 'evidenceId'],
           message: 'Evidence IDs must be unique',
         });
       }
-      seen.add(item.evidenceId);
+      if (metricKeys.has(item.metricKey)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['evidence', index, 'metricKey'],
+          message: 'Each report metric may appear only once',
+        });
+      }
+      if (
+        item.venueId !== request.venueId ||
+        item.reportId !== request.reportId ||
+        item.reportVersion !== request.reportVersion ||
+        item.timeWindow.start !== request.timeWindow.start ||
+        item.timeWindow.end !== request.timeWindow.end
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['evidence', index],
+          message: 'Evidence must belong to the request venue, report version and window',
+        });
+      }
+      evidenceIds.add(item.evidenceId);
+      metricKeys.add(item.metricKey);
+    }
+  });
+
+export const OwnerRecommendationRuleSchema = z.strictObject({
+  ruleId: boundedText(64).regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+  priority: z.number().int().positive().max(10_000),
+  metricKey: OwnerAiMetricKeySchema,
+  maximumInclusive: z.number().finite().min(0).max(1),
+  actionId: OwnerAiActionIdSchema,
+  confidence: z.enum(['low', 'medium', 'high']),
+});
+
+export const OwnerRecommendationPolicySchema = z
+  .strictObject({
+    schemaVersion: z.literal('owner-recommendation-policy.v1'),
+    policyVersion: boundedText(64).regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+    rules: z.array(OwnerRecommendationRuleSchema).max(24),
+  })
+  .superRefine((policy, ctx) => {
+    const ruleIds = new Set<string>();
+    const priorities = new Set<number>();
+    for (let index = 0; index < policy.rules.length; index++) {
+      const rule = policy.rules[index];
+      if (!rule) continue;
+      if (ruleIds.has(rule.ruleId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rules', index, 'ruleId'],
+          message: 'Duplicate rule ID',
+        });
+      }
+      if (priorities.has(rule.priority)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rules', index, 'priority'],
+          message: 'Duplicate rule priority',
+        });
+      }
+      ruleIds.add(rule.ruleId);
+      priorities.add(rule.priority);
+      const expectedAction = {
+        open_rate: 'review_dish_card',
+        engagement_rate: 'review_dish_detail',
+        save_rate: 'review_save_affordance',
+      }[rule.metricKey];
+      if (rule.actionId !== expectedAction) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rules', index, 'actionId'],
+          message: 'Action is not approved for this metric',
+        });
+      }
     }
   });
 
 const ownerRecommendationBase = {
   schemaVersion: z.literal('owner-recommendation.v1'),
   requestId: uuid,
+  venueId: uuid,
   reportId: uuid,
   reportVersion: z.number().int().positive().max(2_147_483_647),
   timeWindow: OwnerAiTimeWindowSchema,
   generatorVersion: boundedText(64),
+  policyVersion: boundedText(64),
   approvalRequired: z.literal(true),
   allowedEffects: z.tuple([]),
 };
@@ -92,6 +172,8 @@ const ownerRecommendationBase = {
 export const OwnerRecommendationSchema = z.strictObject({
   ...ownerRecommendationBase,
   status: z.literal('recommendation'),
+  ruleId: boundedText(64),
+  actionId: OwnerAiActionIdSchema,
   draftAction: boundedText(500),
   rationale: boundedText(1_000),
   evidenceRefs: z.array(uuid).min(1).max(3),
@@ -120,6 +202,8 @@ export const OwnerRecommendationResultSchema = z.discriminatedUnion('status', [
 ]);
 
 export type OwnerAiMetricKey = z.infer<typeof OwnerAiMetricKeySchema>;
+export type OwnerAiActionId = z.infer<typeof OwnerAiActionIdSchema>;
 export type OwnerAiEvidence = z.infer<typeof OwnerAiEvidenceSchema>;
 export type OwnerRecommendationRequest = z.infer<typeof OwnerRecommendationRequestSchema>;
+export type OwnerRecommendationPolicy = z.infer<typeof OwnerRecommendationPolicySchema>;
 export type OwnerRecommendationResult = z.infer<typeof OwnerRecommendationResultSchema>;

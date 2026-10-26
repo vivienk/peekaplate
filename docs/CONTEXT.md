@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f3dfbd72ff01568911f1233cf5a1d2d18c588f417885421eec4a012d5d8100f7"
+      "sourceFingerprint": "b6c64945ecb35ae8b1bb2b972c6534b4e01c0260991fc53ff8c0617bab871f58"
     },
     {
       "id": "diner",
@@ -116,7 +116,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f70838eefaab04ee26b3c67593e7f1113f9f0f1008de0a3695c4f8ba9eed9a8f"
+      "sourceFingerprint": "2f491962a5b461d906c268e9dfe4cba8f8e7bf173da4dd043e7d54c9aea7f3f5"
     },
     {
       "id": "database",
@@ -320,7 +320,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Started AI-01 PR C from current develop with strict owner-recommendation v1 contracts and a pure deterministic safety core. Requests bind one venue, report version and window; available rates require at least ten eligible sessions; withheld evidence carries no values. The engine allows 12 evidence items, 8,000 context characters, one attempt, zero tools and zero effects, ignores untrusted summary instructions, returns one review-only draft or explicit abstention, and rejects cross-tenant/report/window evidence. Production thresholds, report API/auth, model adapter, UI and rubric evaluation remain blocked dependencies.",
+      "summary": "Started AI-01 PR C from current develop with strict owner-recommendation v1 contracts and a pure deterministic safety core. Requests bind one venue, report version and window; available rates require at least ten eligible sessions; withheld evidence carries no values. The engine allows 12 evidence items, 4,000 context characters, one attempt, zero tools and zero effects, ignores untrusted summary instructions, returns one review-only draft or explicit abstention, and rejects cross-tenant/report/window evidence. Results carry venue and versioned policy/rule/action provenance; only fixed metric-compatible actions are allowed, and contextual validation rejects fabricated citations. Production thresholds, report API/auth, model adapter, UI and rubric evaluation remain blocked dependencies.",
       "modules": [
         "contracts",
         "backend"
