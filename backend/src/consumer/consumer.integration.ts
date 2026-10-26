@@ -1,3 +1,4 @@
+import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { canonicalizeJson, sha256Hex } from './canonical-json';
@@ -135,22 +136,38 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
 
       const eventId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
+      const dishId = crypto.randomUUID();
+      const dishRevId = crypto.randomUUID();
+      const expId = crypto.randomUUID();
       const now = new Date().toISOString();
-      const payload = { dishId: 'dish-123', viewDurationMs: 4200 };
-      const expectedChecksum = await sha256Hex(canonicalizeJson(payload));
-      const expectedArchiveKey = buildRawArchiveKey(tenant1, eventId, now);
-
-      const msg = new TestQueueMessage('msg-1', {
+      const payload = {
+        dish_id: dishId,
+        dish_revision_id: dishRevId,
+        exposure_id: expId,
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      };
+      const envelope = {
+        kind: 'observation.v2' as const,
         tenantId: tenant1,
         eventId,
-        sessionId: 'session-abc-123',
-        schemaVersion: 'observation.v2',
-        type: 'dish_viewed',
+        sessionId,
+        producerId,
+        localSequence: 1,
+        schemaVersion: 'observation.v2' as const,
+        type: 'dish_viewed' as const,
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
         payload,
-      });
+      };
+      const expectedChecksum = await sha256(canonicalJson(toCanonicalObservation(envelope)));
+      const expectedArchiveKey = buildRawArchiveKey(tenant1, eventId, now);
+
+      const msg = new TestQueueMessage('msg-1', envelope);
 
       const disposition = await consumer.processMessage(msg.body);
       expect(disposition.status).toBe('acknowledged');
@@ -193,14 +210,20 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
 
       const eventId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
       const now = new Date().toISOString();
-      const payload = { menuId: 'menu-1' };
+      const payload = { entry_source: 'qr' as const };
 
       const body = {
+        kind: 'observation.v2' as const,
         tenantId: tenant1,
         eventId,
-        schemaVersion: 'observation.v2',
-        type: 'menu_viewed',
+        sessionId,
+        producerId,
+        localSequence: 1,
+        schemaVersion: 'observation.v2' as const,
+        type: 'menu_viewed' as const,
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
@@ -241,38 +264,64 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
 
       const eventId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
+      const dishId = crypto.randomUUID();
+      const dishRevId = crypto.randomUUID();
       const now = new Date().toISOString();
-      const payloadA = { action: 'first_action' };
-      const checksumA = await sha256Hex(canonicalizeJson(payloadA));
-
-      const payloadB = { action: 'second_action_conflict' };
-      const checksumB = await sha256Hex(canonicalizeJson(payloadB));
-      expect(checksumA).not.toBe(checksumB);
-
-      // Deliver first payload
-      const dispA = await consumer.processMessage({
+      const payloadA = {
+        dish_id: dishId,
+        dish_revision_id: dishRevId,
+        save_origin: 'direct' as const,
+        save_surface: 'menu_card' as const,
+        shortlist_size: 1,
+      };
+      const envA = {
+        kind: 'observation.v2' as const,
         tenantId: tenant1,
         eventId,
-        schemaVersion: 'observation.v2',
-        type: 'dish_saved',
+        sessionId,
+        producerId,
+        localSequence: 1,
+        schemaVersion: 'observation.v2' as const,
+        type: 'dish_saved' as const,
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
         payload: payloadA,
-      });
-      expect(dispA.status).toBe('acknowledged');
+      };
+      const checksumA = await sha256(canonicalJson(toCanonicalObservation(envA)));
 
-      // Deliver conflicting payload with same (tenant_id, event_id)
-      const dispB = await consumer.processMessage({
+      const payloadB = {
+        dish_id: dishId,
+        dish_revision_id: dishRevId,
+        save_origin: 'undo' as const,
+        save_surface: 'menu_card' as const,
+        shortlist_size: 2,
+      };
+      const envB = {
+        kind: 'observation.v2' as const,
         tenantId: tenant1,
         eventId,
-        schemaVersion: 'observation.v2',
-        type: 'dish_saved',
+        sessionId,
+        producerId,
+        localSequence: 2,
+        schemaVersion: 'observation.v2' as const,
+        type: 'dish_saved' as const,
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
         payload: payloadB,
-      });
+      };
+      const checksumB = await sha256(canonicalJson(toCanonicalObservation(envB)));
+      expect(checksumA).not.toBe(checksumB);
+
+      // Deliver first payload
+      const dispA = await consumer.processMessage(envA);
+      expect(dispA.status).toBe('acknowledged');
+
+      // Deliver conflicting payload with same (tenant_id, event_id)
+      const dispB = await consumer.processMessage(envB);
       expect(dispB.status).toBe('acknowledged');
       if (dispB.status === 'acknowledged') {
         expect(dispB.reason).toBe('conflict_recorded');
@@ -313,14 +362,44 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
 
       const eventId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
+      const dish1 = crypto.randomUUID();
+      const dishRev1 = crypto.randomUUID();
+      const dish2 = crypto.randomUUID();
+      const dishRev2 = crypto.randomUUID();
+      const dish3 = crypto.randomUUID();
+      const dishRev3 = crypto.randomUUID();
+      const comp1 = crypto.randomUUID();
+      const comp2 = crypto.randomUUID();
       const now = new Date().toISOString();
-      const payloadA = { action: 'initial' };
-      const payloadB = { action: 'conflicting_payload' };
+      const payloadA = {
+        dish_id: dish1,
+        dish_revision_id: dishRev1,
+        other_dish_id: dish2,
+        other_dish_revision_id: dishRev2,
+        comparison_id: comp1,
+        compare_action: 'start' as const,
+        save_available: true,
+      };
+      const payloadB = {
+        dish_id: dish1,
+        dish_revision_id: dishRev1,
+        other_dish_id: dish3,
+        other_dish_revision_id: dishRev3,
+        comparison_id: comp2,
+        compare_action: 'replace' as const,
+        save_available: false,
+      };
 
       // Deliver original
       await consumer.processMessage({
+        kind: 'observation.v2',
         tenantId: tenant1,
         eventId,
+        sessionId,
+        producerId,
+        localSequence: 1,
         schemaVersion: 'observation.v2',
         type: 'dish_compared',
         authorizedPublicationId: pubId1,
@@ -330,10 +409,14 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       });
 
       const conflictMsg = {
+        kind: 'observation.v2' as const,
         tenantId: tenant1,
         eventId,
-        schemaVersion: 'observation.v2',
-        type: 'dish_compared',
+        sessionId,
+        producerId,
+        localSequence: 2,
+        schemaVersion: 'observation.v2' as const,
+        type: 'dish_compared' as const,
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
@@ -590,19 +673,23 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
 
       const eventId = crypto.randomUUID();
-      const sessionId = 'session-front-end-trace-456';
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
       const now = new Date().toISOString();
 
       const disposition = await consumer.processMessage({
+        kind: 'observation.v2',
         tenantId: tenant1,
         eventId,
         sessionId,
+        producerId,
+        localSequence: 1,
         schemaVersion: 'observation.v2',
         type: 'shortlist_viewed',
         authorizedPublicationId: pubId1,
         occurredAt: now,
         firstReceivedAt: now,
-        payload: { count: 3 },
+        payload: { shortlist_size: 3 },
       });
 
       expect(disposition.status).toBe('acknowledged');
