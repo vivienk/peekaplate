@@ -76,13 +76,30 @@ INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_che
 -- 4. Analytical calculation view (Excluding venue/publication authorization logic per contract guidance)
 CREATE TEMPORARY TABLE temp_report_results AS
 SELECT 
-    venue_id,
-    CASE WHEN COUNT(DISTINCT session_id) < 10 THEN NULL ELSE COUNT(event_id) END AS total_clicks,
-    CASE WHEN COUNT(DISTINCT session_id) < 10 THEN NULL ELSE COUNT(DISTINCT session_id) END AS raw_unique_sessions,
-    -- CORRECTIF WANG: Using canonical 'insufficient_data' string token
-    CASE WHEN COUNT(DISTINCT session_id) < 10 THEN 'insufficient_data' ELSE CAST(COUNT(DISTINCT session_id) AS TEXT) END AS reconciled_sessions,
-    CASE WHEN COUNT(DISTINCT session_id) < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS status
-FROM (
+    v.venue_id,
+    CASE 
+        WHEN COUNT(DISTINCT ce.session_id) = 0 THEN NULL
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL 
+        ELSE COUNT(ce.event_id) 
+    END AS total_clicks,
+    CASE 
+        WHEN COUNT(DISTINCT ce.session_id) = 0 THEN NULL
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL 
+        ELSE COUNT(DISTINCT ce.session_id) 
+    END AS raw_unique_sessions,
+    -- Using canonical string tokens for insufficient data boundaries
+    CASE 
+        WHEN COUNT(DISTINCT ce.session_id) = 0 THEN 'not measurable'
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'insufficient_data' 
+        ELSE CAST(COUNT(DISTINCT ce.session_id) AS TEXT) 
+    END AS reconciled_sessions,
+    CASE 
+        WHEN COUNT(DISTINCT ce.session_id) = 0 THEN 'NOT MEASURABLE'
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'SUPPRESSED' 
+        ELSE 'NORMAL' 
+    END AS status
+FROM (SELECT DISTINCT venue_id FROM temp_events) v
+LEFT JOIN (
     SELECT MIN(id) as id, venue_id, event_id, session_id
     FROM temp_events
     WHERE 
@@ -95,8 +112,8 @@ FROM (
             SELECT venue_id, event_id FROM temp_events GROUP BY venue_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
         )
     GROUP BY venue_id, event_id, session_id
-) AS cleaned_events
-GROUP BY venue_id;
+) AS ce ON v.venue_id = ce.venue_id
+GROUP BY v.venue_id;
 
 -- =====================================================================
 -- PGTAP ASSERTS
@@ -118,7 +135,8 @@ SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_r
 SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live events only') FROM temp_report_results WHERE venue_id = 'resto_11';
 SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE venue_id = 'resto_11';
 
-SELECT ok(NOT EXISTS (SELECT 1 FROM temp_report_results WHERE venue_id = 'resto_empty'), 'Zero denominator venue correctly yields zero measurable records');
+-- RESTO_EMPTY TESTS (Zero-denominator boundary returns 'not measurable')
+SELECT is(reconciled_sessions, 'not measurable', 'Empty restaurant must return not measurable instead of being omitted');
 
 SELECT * FROM finish();
 
