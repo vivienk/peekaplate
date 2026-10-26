@@ -159,6 +159,15 @@ describe('ObservationQueueEnvelopeSchema contract boundary', () => {
     delete (withoutKind as any).kind;
     const parsedDefault = ObservationQueueEnvelopeSchema.parse(withoutKind);
     expect(parsedDefault.kind).toBe('observation.v2');
+
+    // Accepts ISO datetime with explicit timezone offset (e.g., +02:00, -04:00)
+    const withOffset = {
+      ...validNormal,
+      occurredAt: '2026-10-24T14:00:00+02:00',
+      firstReceivedAt: '2026-10-24T08:00:00-04:00',
+    };
+    const parsedOffset = ObservationQueueEnvelopeSchema.parse(withOffset);
+    expect(parsedOffset.occurredAt).toBe('2026-10-24T14:00:00+02:00');
   });
 
   it('validates canonical conflict observation_conflict.v1 envelopes', () => {
