@@ -14,7 +14,7 @@ SELECT plan(11);
 
 CREATE TEMPORARY TABLE temp_events (
     id SERIAL PRIMARY KEY,
-    venue_id TEXT,
+    tenant_id TEXT, -- Updated from venue_id per Jeffin's alignment
     event_id TEXT,
     session_id TEXT,
     event_type TEXT,
@@ -25,7 +25,7 @@ CREATE TEMPORARY TABLE temp_events (
 );
 
 -- Inserting boundary test fixtures (9 / 10 / 11) and abnormal scenarios
-INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_checksum, traffic_class, occurred_at, received_at) VALUES
+INSERT INTO temp_events (tenant_id, event_id, session_id, event_type, payload_checksum, traffic_class, occurred_at, received_at) VALUES
     -- CASE 9: Frontier 9 (Must be suppressed and counts hidden)
     ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()),
     ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()), 
@@ -73,10 +73,10 @@ INSERT INTO temp_events (venue_id, event_id, session_id, event_type, payload_che
     ('resto_empty', 'evt_905', 'bad_sess_6', 'dish_detail_opened', 'sha_conf_A', 'live', NOW(), NOW()),
     ('resto_empty', 'evt_905', 'bad_sess_7', 'dish_detail_opened', 'sha_conf_B', 'live', NOW(), NOW());
 
--- 4. Analytical calculation view (Excluding venue/publication authorization logic per contract guidance)
+-- 4. Analytical calculation view (Excluding tenant/publication authorization logic per contract guidance)
 CREATE TEMPORARY TABLE temp_report_results AS
 SELECT 
-    v.venue_id,
+    v.tenant_id,
     CASE 
         WHEN COUNT(DISTINCT ce.session_id) = 0 THEN NULL
         WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL 
@@ -98,9 +98,9 @@ SELECT
         WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'SUPPRESSED' 
         ELSE 'NORMAL' 
     END AS status
-FROM (SELECT DISTINCT venue_id FROM temp_events) v
+FROM (SELECT DISTINCT tenant_id FROM temp_events) v
 LEFT JOIN (
-    SELECT MIN(id) as id, venue_id, event_id, session_id
+    SELECT MIN(id) as id, tenant_id, event_id, session_id
     FROM temp_events
     WHERE 
         traffic_class = 'live'
@@ -108,35 +108,35 @@ LEFT JOIN (
         AND event_id IS NOT NULL
         AND occurred_at >= received_at - INTERVAL '24 hours'
         AND occurred_at <= received_at + INTERVAL '5 minutes'
-        AND (venue_id, event_id) NOT IN (
-            SELECT venue_id, event_id FROM temp_events GROUP BY venue_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
+        AND (tenant_id, event_id) NOT IN (
+            SELECT tenant_id, event_id FROM temp_events GROUP BY tenant_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
         )
-    GROUP BY venue_id, event_id, session_id
-) AS ce ON v.venue_id = ce.venue_id
-GROUP BY v.venue_id;
+    GROUP BY tenant_id, event_id, session_id
+) AS ce ON v.tenant_id = ce.tenant_id
+GROUP BY v.tenant_id;
 
 -- =====================================================================
 -- PGTAP ASSERTS
 -- =====================================================================
 
 -- RESTO_9 TESTS (Suppressed Frontier)
-SELECT is(status, 'SUPPRESSED', 'Resto_9 status must be SUPPRESSED') FROM temp_report_results WHERE venue_id = 'resto_9';
-SELECT is(total_clicks, NULL::bigint, 'Resto_9 total_clicks must be NULL::bigint') FROM temp_report_results WHERE venue_id = 'resto_9';
-SELECT is(raw_unique_sessions, NULL::bigint, 'Resto_9 raw_unique_sessions must be NULL::bigint') FROM temp_report_results WHERE venue_id = 'resto_9';
-SELECT is(reconciled_sessions, 'insufficient_data', 'Resto_9 display text must be canonical insufficient_data') FROM temp_report_results WHERE venue_id = 'resto_9';
+SELECT is(status, 'SUPPRESSED', 'Resto_9 status must be SUPPRESSED') FROM temp_report_results WHERE tenant_id = 'resto_9';
+SELECT is(total_clicks, NULL::bigint, 'Resto_9 total_clicks must be NULL::bigint') FROM temp_report_results WHERE tenant_id = 'resto_9';
+SELECT is(raw_unique_sessions, NULL::bigint, 'Resto_9 raw_unique_sessions must be NULL::bigint') FROM temp_report_results WHERE tenant_id = 'resto_9';
+SELECT is(reconciled_sessions, 'insufficient_data', 'Resto_9 display text must be canonical insufficient_data') FROM temp_report_results WHERE tenant_id = 'resto_9';
 
 -- RESTO_10 TESTS (Normal Frontier)
-SELECT is(status, 'NORMAL', 'Resto_10 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_10';
-SELECT is(total_clicks, 10::bigint, 'Resto_10 total_clicks must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
-SELECT is(raw_unique_sessions, 10::bigint, 'Resto_10 unique sessions must be 10::bigint') FROM temp_report_results WHERE venue_id = 'resto_10';
+SELECT is(status, 'NORMAL', 'Resto_10 status must be NORMAL') FROM temp_report_results WHERE tenant_id = 'resto_10';
+SELECT is(total_clicks, 10::bigint, 'Resto_10 total_clicks must be 10::bigint') FROM temp_report_results WHERE tenant_id = 'resto_10';
+SELECT is(raw_unique_sessions, 10::bigint, 'Resto_10 unique sessions must be 10::bigint') FROM temp_report_results WHERE tenant_id = 'resto_10';
 
 -- RESTO_11 TESTS (Linear Clearance Check)
-SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE venue_id = 'resto_11';
-SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live events only') FROM temp_report_results WHERE venue_id = 'resto_11';
-SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE venue_id = 'resto_11';
+SELECT is(status, 'NORMAL', 'Resto_11 status must be NORMAL') FROM temp_report_results WHERE theme_id = 'resto_11' OR tenant_id = 'resto_11';
+SELECT is(total_clicks, 11::bigint, 'Resto_11 total_clicks must match clean live events only') FROM temp_report_results WHERE tenant_id = 'resto_11';
+SELECT is(raw_unique_sessions, 11::bigint, 'Resto_11 unique sessions must match exactly 11') FROM temp_report_results WHERE tenant_id = 'resto_11';
 
 -- RESTO_EMPTY TESTS (Zero-denominator boundary returns 'not measurable')
-SELECT is(reconciled_sessions, 'not measurable', 'Empty restaurant must return not measurable instead of being omitted') FROM temp_report_results WHERE venue_id = 'resto_empty';
+SELECT is(reconciled_sessions, 'not measurable', 'Empty restaurant must return not measurable instead of being omitted') FROM temp_report_results WHERE tenant_id = 'resto_empty';
 
 SELECT * FROM finish();
 
