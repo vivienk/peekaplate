@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, and S3-VIS-01 / VIS-02 menu extraction and structured dish draft contracts (MenuExtractionResultSchema, ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, ExtractionSourceRecordSchema, ExtractionSourceSegmentSchema, ExtractionCaptureRequestSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Offsets, rank sequences, decimal price precision, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "944d9b73746bee8d75509ab8c86156e35e03a00554b1490040f1bc966851c340"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Dated hosted 200/401/400 and genuine outsider 403 evidence remains in operations. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Source/DLQ delivery is paused; controlled access-removal acceptance and production remain separate checks. Provides S3-VIS-04 bounded menu evidence retrieval (SSRF defense, deterministic ranking, aggregate context limits, and VIS-02/S3-VIS-01 structured candidate handoff). No ingestion route, Queue handler, direct live publication or canonical observation writes are added; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Provides S3-VIS-04 bounded menu evidence retrieval and S3-VIS-01 menu ingestion orchestration layer: Python extraction result adapter with exact decimal price and Unicode span validation, transactional persistence repository with worker lease fencing and safe retry upserts, ingestion orchestrator, staff review and draft approval endpoints. Live queue consumer and direct container Python execution boundary remain separate operational dependencies.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -81,6 +81,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/ingestion/adapter.test.ts",
+        "backend/src/ingestion/adapter.ts",
+        "backend/src/ingestion/ingestion.integration.ts",
+        "backend/src/ingestion/orchestrator.test.ts",
+        "backend/src/ingestion/orchestrator.ts",
+        "backend/src/ingestion/repository.test.ts",
+        "backend/src/ingestion/repository.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -110,12 +117,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "a49e8af89492163dd04d21cb1fd7afe0633ebc97af38019be0de3d174b7b82d6"
+      "sourceFingerprint": "fa145fb462d8b304c40005b0bf56621142ca9718c52fcc6055150d1854b3bc76"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS and composite FK behavior, and connection reuse.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -127,7 +134,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261026220000_menu_ingestion_drafts.sql",
+        "tests/db/menu_ingestion.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -136,7 +145,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5c576f557201a6d1af09e9c2c860bb1e5cd0430a3af8fdc6b3e8f1ee4528c0e6"
+      "sourceFingerprint": "451419c7c454c2e61e9e7024807878f42b7231b30e24b34c87e787c9e1eb9c16"
     },
     {
       "id": "measurement",

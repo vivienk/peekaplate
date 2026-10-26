@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import app, { createApp } from './index';
+import app, { createApp, handleQueueBatch } from './index';
 
 describe('foundation API', () => {
   it('returns a minimal liveness response without database or secret configuration', async () => {
@@ -84,5 +84,173 @@ describe('dish HTTP boundary', () => {
     });
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  });
+});
+
+describe('menu ingestion HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000001';
+  const jobId = '00000000-0000-4000-8000-000000000002';
+  const draftId = '00000000-0000-4000-8000-000000000003';
+  const actorId = '00000000-0000-4000-8000-000000000004';
+
+  it('submits a menu ingestion job when authenticated and authorized', async () => {
+    const mockJob = {
+      id: jobId,
+      tenant_id: venueId,
+      source_type: 'url',
+      source_url: 'https://example.com/menu',
+      idempotency_key: 'idem_post_1',
+      status: 'queued',
+    };
+    const submitIngestion = vi.fn().mockResolvedValue(mockJob);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      submitIngestion,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/menus/jobs`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_post_1',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ job: mockJob });
+    expect(submitIngestion).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      {
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_post_1',
+      },
+      {},
+    );
+  });
+
+  it('retrieves an ingestion job status by ID', async () => {
+    const mockJob = {
+      id: jobId,
+      tenant_id: venueId,
+      status: 'complete',
+      draft_count: 5,
+    };
+    const getIngestionJob = vi.fn().mockResolvedValue(mockJob);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      getIngestionJob,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/menus/jobs/${jobId}`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid_token' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ job: mockJob });
+    expect(getIngestionJob).toHaveBeenCalledWith(actorId, venueId, jobId, {});
+  });
+
+  it('lists dish drafts for review', async () => {
+    const mockDrafts = [
+      {
+        id: draftId,
+        tenant_id: venueId,
+        name: 'Soup',
+        review_status: 'pending',
+      },
+    ];
+    const listDrafts = vi.fn().mockResolvedValue(mockDrafts);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      listDrafts,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts?status=pending`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid_token' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ drafts: mockDrafts });
+    expect(listDrafts).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      { status: 'pending', jobId: undefined },
+      {},
+    );
+  });
+
+  it('approves a dish draft and promotes to published revision', async () => {
+    const mockResult = {
+      draft: {
+        id: draftId,
+        review_status: 'accepted',
+        published_dish_id: '00000000-0000-4000-8000-000000000005',
+      },
+      publishedRevision: {
+        dishId: '00000000-0000-4000-8000-000000000005',
+        revisionId: '00000000-0000-4000-8000-000000000006',
+        version: 1,
+        name: 'Soup',
+        description: 'Warm soup',
+      },
+    };
+    const approveDraft = vi.fn().mockResolvedValue(mockResult);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedVersion: 0,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(mockResult);
+    expect(approveDraft).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      draftId,
+      { expectedVersion: 0 },
+      {},
+    );
+  });
+
+  describe('Cloudflare Queue Worker Handler', () => {
+    it('retries all messages when database connection string is unavailable', async () => {
+      const msg1 = { ack: vi.fn(), retry: vi.fn() };
+      const msg2 = { ack: vi.fn(), retry: vi.fn() };
+
+      await handleQueueBatch(
+        { messages: [msg1, msg2] as any },
+        { APP_ENV: 'local' }, // no LOCAL_DATABASE_URL or HYPERDRIVE
+      );
+
+      expect(msg1.retry).toHaveBeenCalledTimes(1);
+      expect(msg2.retry).toHaveBeenCalledTimes(1);
+      expect(msg1.ack).not.toHaveBeenCalled();
+      expect(msg2.ack).not.toHaveBeenCalled();
+    });
   });
 });

@@ -65,6 +65,8 @@ const postgresText = z
 
 export const VenueScopeSchema = z.strictObject({ venueId: uuid });
 export const DishRevisionScopeSchema = z.strictObject({ venueId: uuid, dishId: uuid });
+export const JobScopeSchema = z.strictObject({ venueId: uuid, jobId: uuid });
+export const DraftScopeSchema = z.strictObject({ venueId: uuid, draftId: uuid });
 
 export const CreateDishRevisionSchema = z.strictObject({
   commandId: uuid,
@@ -285,3 +287,180 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 });
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
+
+// ============================================================================
+// S3-VIS-01 / VIS-02: Menu Extraction & Structured Draft Ingestion Contracts
+// ============================================================================
+
+export const ExtractionSourceSpanSchema = z
+  .strictObject({
+    segment_id: z.string().min(1),
+    start: z.number().int().min(0),
+    end: z.number().int().positive(),
+  })
+  .superRefine((span, ctx) => {
+    if (span.start >= span.end) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end'],
+        message: 'end must be strictly greater than start',
+      });
+    }
+  });
+
+export const ExtractionDraftEvidenceSchema = z.strictObject({
+  draft_id: z.string().min(1),
+  draft_index: z.number().int().min(0),
+  spans: z.array(ExtractionSourceSpanSchema).min(1),
+});
+
+export const ExtractionDishDraftSchema = z.strictObject({
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000).nullable().default(null),
+  category: z.string().trim().min(1).nullable().default(null),
+  price_amount: z
+    .union([
+      z.string().regex(/^\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^\d+(\.\d+)?$/),
+      z
+        .number()
+        .nonnegative()
+        .transform((n) => n.toString()),
+    ])
+    .nullable()
+    .default(null),
+  price_currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .nullable()
+    .default(null),
+  ingredients: z.array(z.string().trim().min(1)).nullable().default(null),
+  source_id: z.string().min(1),
+  source_text: z.string().min(1),
+  image_id: z.string().trim().min(1).nullable().default(null),
+  review_warnings: z.array(z.string().trim().min(1)).default([]),
+  status: z.literal('needs_review').default('needs_review'),
+});
+
+export const ExtractionSourceRecordSchema = z.strictObject({
+  source_id: z.string().min(1),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  kind: z.enum(['pdf', 'image', 'website', 'text']),
+  location: z.string().min(1),
+  retrieved_at: z.iso.datetime({ offset: true }),
+  size_bytes: z.number().int().min(1).max(12_000_000),
+  snapshot_base64: z.string().min(1),
+});
+
+export const ExtractionSourceSegmentSchema = z.strictObject({
+  segment_id: z.string().min(1),
+  page_number: z.number().int().min(1).nullable().default(null),
+  method: z.enum(['text', 'html', 'pdf_native', 'ocr_space_engine3']),
+  status: z.enum(['ready', 'skipped', 'failed']).default('ready'),
+  text: z.string().default(''),
+  native_text: z.string().nullable().default(null),
+  error: z.string().nullable().default(null),
+  warnings: z.array(z.string()).default([]),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const ExtractionCaptureCandidateSchema = z.strictObject({
+  asset_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  filename: z.string().min(1),
+  restaurant_id: z.string().min(1),
+  captured_at: z.iso.datetime({ offset: true }).nullable().default(null),
+  uploaded_at: z.iso.datetime({ offset: true }),
+  capture_evidence: z.string().min(1),
+  rights_confirmed: z.literal(true),
+  origin: z.literal('restaurant_capture'),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  review_status: z.literal('needs_review').default('needs_review'),
+  warnings: z.array(z.string()).default([]),
+});
+
+export const ExtractionCaptureRequestSchema = z.strictObject({
+  draft_id: z.string().min(1),
+  dish_name: z.string().min(1),
+  status: z.enum(['capture_missing', 'needs_review']).default('capture_missing'),
+  candidates: z.array(ExtractionCaptureCandidateSchema).default([]),
+});
+
+export const MenuExtractionResultSchema = z.strictObject({
+  schema_version: z.literal(1),
+  pipeline_version: z.literal('2'),
+  status: z.enum(['complete', 'incomplete', 'failed']),
+  source: ExtractionSourceRecordSchema.nullable().default(null),
+  started_at: z.iso.datetime({ offset: true }),
+  finished_at: z.iso.datetime({ offset: true }).nullable().default(null),
+  extraction_mode: z.enum(['local', 'layout', 'ai']).default('layout'),
+  extraction_model: z.string().nullable().default(null),
+  ocr_engine: z.literal(3).default(3),
+  library_versions: z.record(z.string(), z.string()).default({}),
+  configuration: z.record(z.string(), z.unknown()).default({}),
+  segments: z.array(ExtractionSourceSegmentSchema).default([]),
+  drafts: z.array(ExtractionDishDraftSchema).default([]),
+  evidence: z.array(ExtractionDraftEvidenceSchema).default([]),
+  capture_requests: z.array(ExtractionCaptureRequestSchema).default([]),
+  warnings: z.array(z.string()).default([]),
+  errors: z.array(z.string()).default([]),
+});
+
+export const StructuredDishDraftSchema = z.strictObject({
+  draft_id: z.string().min(1),
+  draft_index: z.number().int().min(0),
+  name: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000).nullable(),
+  category: z.string().trim().min(1).nullable(),
+  price_amount: z
+    .string()
+    .regex(/^\d+(\.\d+)?$/)
+    .nullable(),
+  price_currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .nullable(),
+  ingredients: z.array(z.string().trim().min(1)).nullable(),
+  source_id: z.string().min(1),
+  source_text: z.string().min(1),
+  image_id: z.string().trim().min(1).nullable(),
+  code_point_spans: z.array(ExtractionSourceSpanSchema).min(1),
+  utf16_spans: z.array(ExtractionSourceSpanSchema).min(1),
+  review_warnings: z.array(z.string()),
+  status: z.literal('needs_review'),
+});
+
+export type ExtractionSourceSpan = z.infer<typeof ExtractionSourceSpanSchema>;
+export type ExtractionDraftEvidence = z.infer<typeof ExtractionDraftEvidenceSchema>;
+export type ExtractionDishDraft = z.infer<typeof ExtractionDishDraftSchema>;
+export type ExtractionSourceRecord = z.infer<typeof ExtractionSourceRecordSchema>;
+export type ExtractionSourceSegment = z.infer<typeof ExtractionSourceSegmentSchema>;
+export type ExtractionCaptureCandidate = z.infer<typeof ExtractionCaptureCandidateSchema>;
+export type ExtractionCaptureRequest = z.infer<typeof ExtractionCaptureRequestSchema>;
+export type MenuExtractionResult = z.infer<typeof MenuExtractionResultSchema>;
+export type StructuredDishDraft = z.infer<typeof StructuredDishDraftSchema>;
+
+export const SubmitMenuIngestionRequestSchema = z.strictObject({
+  sourceType: z.enum(['url', 'pdf', 'photo', 'text']),
+  sourceUrl: z.string().url().optional(),
+  sourceHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  sourceStorageKey: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1),
+});
+export type SubmitMenuIngestionRequest = z.infer<typeof SubmitMenuIngestionRequestSchema>;
+
+export const ApproveDishDraftRequestSchema = z.strictObject({
+  commandId: z.uuid().optional(),
+  expectedVersion: z.number().int().nonnegative().default(0),
+});
+export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;
+
+export const MenuIngestionQueueMessageSchema = z.strictObject({
+  version: z.literal(1),
+  tenantId: uuid,
+  jobId: uuid,
+  queuedAt: z.string().datetime(),
+});
+export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;

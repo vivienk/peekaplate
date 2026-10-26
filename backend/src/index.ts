@@ -1,8 +1,15 @@
 import {
+  type ApproveDishDraftRequest,
+  ApproveDishDraftRequestSchema,
   type BoundedRetrievalResult,
   CreateDishRevisionSchema,
+  type DishRevision,
   DishRevisionScopeSchema,
+  DraftScopeSchema,
   type HealthResponse,
+  JobScopeSchema,
+  type SubmitMenuIngestionRequest,
+  SubmitMenuIngestionRequestSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   VenueScopeSchema,
@@ -12,6 +19,20 @@ import { bodyLimit } from 'hono/body-limit';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
 import { CommandError, createDishRevision } from './dish-command';
+import {
+  type PythonExtractor,
+  processIngestionQueueBatch,
+  type QueueMessage,
+  submitMenuIngestion,
+} from './ingestion/orchestrator';
+import {
+  approveDishDraft,
+  type DishDraftRow,
+  getIngestionJob,
+  IngestionError,
+  listDishDrafts,
+  type MenuIngestionJobRow,
+} from './ingestion/repository';
 import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
@@ -24,6 +45,7 @@ export type Bindings = {
   POSTHOG_PROJECT_ID?: string;
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
+  INGESTION_QUEUE?: { send(message: unknown): Promise<void> };
 };
 
 type Dependencies = {
@@ -43,6 +65,36 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
+  submitIngestion?: (
+    actorId: string,
+    venueId: string,
+    request: SubmitMenuIngestionRequest,
+    env: Bindings,
+  ) => Promise<MenuIngestionJobRow>;
+  getIngestionJob?: (
+    actorId: string,
+    venueId: string,
+    jobId: string,
+    env: Bindings,
+  ) => Promise<MenuIngestionJobRow | null>;
+  listDrafts?: (
+    actorId: string,
+    venueId: string,
+    filter: {
+      status?: 'pending' | 'accepted' | 'rejected' | 'edited' | 'superseded';
+      jobId?: string;
+    },
+    env: Bindings,
+  ) => Promise<DishDraftRow[]>;
+  approveDraft?: (
+    actorId: string,
+    venueId: string,
+    draftId: string,
+    options: ApproveDishDraftRequest,
+    env: Bindings,
+  ) => Promise<{ draft: DishDraftRow; publishedRevision: DishRevision }>;
+  extractor?: PythonExtractor;
+  processQueueBatch?: typeof processIngestionQueueBatch;
 };
 
 export async function authorizeStaffVenue(
@@ -252,10 +304,199 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await retrieverFn(retrievalRequest);
     return c.json(result);
   });
+  app.post('/venues/:venueId/menus/jobs', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = SubmitMenuIngestionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const submitFn =
+      services.submitIngestion ??
+      (async (actorId, venueId, req, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          await authorizeStaffVenue(client, actorId, venueId);
+          const queueProducer = env.INGESTION_QUEUE
+            ? { send: (msg: unknown) => env.INGESTION_QUEUE!.send(msg) }
+            : undefined;
+          return await submitMenuIngestion(client, { venueId, ...req }, queueProducer);
+        } finally {
+          await client.end();
+        }
+      });
+
+    const job = await submitFn(actorId, scope.data.venueId, parsed.data, c.env ?? {});
+    return c.json({ job }, 202);
+  });
+  app.get('/venues/:venueId/menus/jobs/:jobId', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = JobScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const getJobFn =
+      services.getIngestionJob ??
+      (async (actorId, venueId, jobId, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          await authorizeStaffVenue(client, actorId, venueId);
+          return await getIngestionJob(client, venueId, jobId);
+        } finally {
+          await client.end();
+        }
+      });
+
+    const job = await getJobFn(actorId, scope.data.venueId, scope.data.jobId, c.env ?? {});
+    if (!job) return c.json({ error: 'not_found' }, 404);
+    return c.json({ job });
+  });
+  app.get('/venues/:venueId/drafts', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const params = new URL(c.req.url).searchParams;
+    const statusParam = (params.get('status') ?? undefined) as any;
+    const jobIdParam = params.get('jobId') ?? undefined;
+
+    const listFn =
+      services.listDrafts ??
+      (async (actorId, venueId, filter, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          await authorizeStaffVenue(client, actorId, venueId);
+          return await listDishDrafts(client, {
+            tenantId: venueId,
+            ...(filter.status !== undefined ? { reviewStatus: filter.status } : {}),
+            ...(filter.jobId !== undefined ? { jobId: filter.jobId } : {}),
+          });
+        } finally {
+          await client.end();
+        }
+      });
+
+    const drafts = await listFn(
+      actorId,
+      scope.data.venueId,
+      {
+        ...(statusParam !== undefined ? { status: statusParam } : {}),
+        ...(jobIdParam !== undefined ? { jobId: jobIdParam } : {}),
+      },
+      c.env ?? {},
+    );
+    return c.json({ drafts });
+  });
+  app.post('/venues/:venueId/drafts/:draftId/approve', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = DraftScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown = {};
+    try {
+      body = await c.req.json();
+    } catch {
+      // empty body is acceptable for defaults
+    }
+    const parsed = ApproveDishDraftRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const approveFn =
+      services.approveDraft ??
+      (async (actorId, venueId, draftId, options, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          await authorizeStaffVenue(client, actorId, venueId);
+
+          const draftRes = await client.query<{ name: string; description: string | null }>(
+            `SELECT name, description FROM app_private.dish_drafts
+             WHERE tenant_id = $1 AND id = $2 AND review_status = 'pending'
+             FOR UPDATE;`,
+            [venueId, draftId],
+          );
+          const draft = draftRes.rows[0];
+          if (!draft) throw new IngestionError('draft_not_pending_or_not_found', 404);
+
+          const newDishId = crypto.randomUUID();
+          const revision = await createDishRevision(client, actorId, venueId, {
+            commandId: options.commandId ?? crypto.randomUUID(),
+            dishId: newDishId,
+            expectedVersion: options.expectedVersion ?? 0,
+            name: draft.name,
+            description: draft.description ?? draft.name,
+          });
+
+          const updatedDraft = await approveDishDraft(client, {
+            actorId,
+            tenantId: venueId,
+            draftId,
+            publishedDishId: revision.dishId,
+          });
+
+          return { draft: updatedDraft, publishedRevision: revision };
+        } finally {
+          await client.end();
+        }
+      });
+
+    const result = await approveFn(
+      actorId,
+      scope.data.venueId,
+      scope.data.draftId,
+      parsed.data,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
+    if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
       JSON.stringify({ event: 'command_failed', requestId: c.res.headers.get('X-Request-ID') }),
@@ -266,4 +507,50 @@ export function createApp(services: Dependencies = dependencies) {
   return app;
 }
 
-export default createApp();
+/**
+ * Handles incoming Cloudflare Queue message batches for menu ingestion.
+ */
+export async function handleQueueBatch(
+  batch: { messages: readonly QueueMessage<unknown>[] },
+  env: Bindings,
+  services: Dependencies = dependencies,
+): Promise<void> {
+  const connectionString =
+    env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    for (const msg of batch.messages) msg.retry();
+    return;
+  }
+
+  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  try {
+    await client.connect();
+    const extractor =
+      services.extractor ??
+      (async () => {
+        throw new IngestionError(
+          'extractor_unavailable',
+          503,
+          'Python extraction boundary not configured in current environment',
+        );
+      });
+
+    const processBatchFn = services.processQueueBatch ?? processIngestionQueueBatch;
+    await processBatchFn(client, batch, extractor);
+  } catch {
+    for (const msg of batch.messages) {
+      try {
+        msg.retry();
+      } catch {}
+    }
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+const defaultApp = createApp();
+(defaultApp as any).queue = async (batch: any, env: Bindings) => {
+  await handleQueueBatch(batch, env);
+};
+
+export default defaultApp;
