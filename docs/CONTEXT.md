@@ -145,7 +145,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "451419c7c454c2e61e9e7024807878f42b7231b30e24b34c87e787c9e1eb9c16"
+      "sourceFingerprint": "fb01d32d535a883a4121e27fb36a047b1b8da53b4117c1a9848fc395d5bcfef4"
     },
     {
       "id": "measurement",

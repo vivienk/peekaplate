@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(25);
+SELECT plan(19);
 
 -- Setup test venues
 INSERT INTO app_private.venues (id, name) VALUES
@@ -55,7 +55,7 @@ SELECT throws_like(
     VALUES
       ('00000000-0000-0000-0000-000000000702', '00000000-0000-0000-0000-000000000501', '00000000-0000-0000-0000-000000000601',
        'draft:soup_02', 1, 'Bread', 'src_1', 'Bread $2.00', '{}'::jsonb, 'approved')$$,
-  'new row violates check constraint "dish_drafts_extraction_status_check"%',
+  'new row for relation "dish_drafts" violates check constraint "dish_drafts_extraction_status_check"%',
   'extraction_status rejects approved on draft creation'
 );
 
@@ -66,7 +66,7 @@ SELECT throws_like(
     VALUES
       ('00000000-0000-0000-0000-000000000703', '00000000-0000-0000-0000-000000000501', '00000000-0000-0000-0000-000000000601',
        'draft:soup_03', 2, 'Salad', 'src_1', 'Salad $5.00', '{}'::jsonb, 'pending', '00000000-0000-0000-0000-000000000801')$$,
-  'new row violates check constraint "dish_drafts_check"%',
+  'new row for relation "dish_drafts" violates check constraint "dish_drafts_check%',
   'pending draft cannot have reviewed_by populated'
 );
 
@@ -99,8 +99,8 @@ SELECT throws_like(
 -- 4. Composite Foreign Key Deletion Behavior Verification
 -- Setup published dish in dish_current for Venue B
 SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000502', true);
-INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key, status)
-  VALUES ('00000000-0000-0000-0000-000000000603', '00000000-0000-0000-0000-000000000502', 'pdf', 'key_b1', 'complete');
+INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key, status, started_at, finished_at)
+  VALUES ('00000000-0000-0000-0000-000000000603', '00000000-0000-0000-0000-000000000502', 'pdf', 'key_b1', 'complete', now(), now());
 
 INSERT INTO app_private.dish_current (tenant_id, dish_id, version, revision_id, name, description)
   VALUES ('00000000-0000-0000-0000-000000000502', '00000000-0000-0000-0000-000000000888', 1, '00000000-0000-0000-0000-000000000999', 'Active Dish', 'Desc');
