@@ -11,11 +11,9 @@ import {
   MAX_PASSAGES,
   ObservationBatchV2Schema,
   ObservationConflictQueueMessageSchema,
-  ObservationConflictV1QueueEnvelopeSchema,
   ObservationQueueEnvelopeSchema,
   ObservationQueueMessageSchema,
   ObservationReceiptSchema,
-  ObservationV2QueueEnvelopeSchema,
   ObservationV2Schema,
   RetrievalRequestSchema,
   SourceReferenceSchema,
@@ -1073,9 +1071,10 @@ describe('canonical observation checksum and identity', () => {
   });
 });
 
-describe('observation schema aliases and rename consistency', () => {
-  it('exposes identical schema instances under canonical and alias names', () => {
-    expect(ObservationV2QueueEnvelopeSchema).toBe(ObservationQueueMessageSchema);
-    expect(ObservationConflictV1QueueEnvelopeSchema).toBe(ObservationConflictQueueMessageSchema);
+describe('observation canonical queue schema export verification', () => {
+  it('exports canonical ObservationQueueMessageSchema and ObservationConflictQueueMessageSchema', () => {
+    expect(ObservationQueueMessageSchema).toBeDefined();
+    expect(ObservationConflictQueueMessageSchema).toBeDefined();
+    expect(ObservationQueueEnvelopeSchema).toBeDefined();
   });
 });

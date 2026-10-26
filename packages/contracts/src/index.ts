@@ -551,18 +551,12 @@ export const ObservationReceiptBatchSchema = z.strictObject({
   receipts: z.array(ObservationReceiptSchema).min(1).max(25),
 });
 
-// Aliases for consumer compatibility
-export const ObservationV2QueueEnvelopeSchema = ObservationQueueMessageSchema;
-export const ObservationConflictV1QueueEnvelopeSchema = ObservationConflictQueueMessageSchema;
-
 export type ObservationType = z.infer<typeof ObservationTypeSchema>;
 export type ObservationV2 = z.infer<typeof ObservationV2Schema>;
 export type ConflictMetadata = z.infer<typeof ConflictMetadataSchema>;
 export type ConflictCopy = z.infer<typeof ConflictCopySchema>;
 export type ObservationQueueMessage = z.infer<typeof ObservationQueueMessageSchema>;
 export type ObservationConflictQueueMessage = z.infer<typeof ObservationConflictQueueMessageSchema>;
-export type ObservationV2QueueEnvelope = ObservationQueueMessage;
-export type ObservationConflictV1QueueEnvelope = ObservationConflictQueueMessage;
 export type ObservationQueueEnvelope = z.infer<typeof ObservationQueueEnvelopeSchema>;
 export type ObservationBatchV2 = z.infer<typeof ObservationBatchV2Schema>;
 export type ObservationReceipt = z.infer<typeof ObservationReceiptSchema>;

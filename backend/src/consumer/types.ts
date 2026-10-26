@@ -1,10 +1,8 @@
 import {
   type ObservationConflictQueueMessage,
-  type ObservationConflictV1QueueEnvelope,
   type ObservationQueueEnvelope,
   type ObservationQueueMessage,
   ObservationTypeSchema,
-  type ObservationV2QueueEnvelope,
 } from '@peekaplate/contracts';
 
 /**

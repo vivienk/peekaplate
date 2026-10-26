@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, diner observation canonical schemas (ObservationV2 with 9 P0 events, canonicalJson, sha256), Queue message contracts (ObservationQueueMessageSchema, ObservationConflictQueueMessageSchema with multi-copy conflict schema, and compatibility aliases), and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced; HTTP command authority fields are rejected. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, diner observation canonical schemas (ObservationV2 with 9 P0 events, canonicalJson, sha256), Queue message contracts (ObservationQueueMessageSchema, ObservationConflictQueueMessageSchema with multi-copy conflict schema), and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced; HTTP command authority fields are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3f5ba4e19ca474dd95d7575e34d9c9345a15a7d1fc9f28fcd181c49d196d3ce6"
+      "sourceFingerprint": "c895690d262a710beb386b7dce22afce05d831090f6bd51ab3b250559cf4f291"
     },
     {
       "id": "diner",
@@ -121,7 +121,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "783b568cbcfdf76b5dc5283414691a4e9620417f6ef45fe8142df19b00f82c43"
+      "sourceFingerprint": "e5726e6988ed4d4edec35ddbfa54dfa4440491f3b3cca4a6eb48bbea13789906"
     },
     {
       "id": "database",
