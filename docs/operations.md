@@ -194,6 +194,10 @@ The October 22 environment settings record supersedes the earlier assumption tha
 
 The staff-command cloud checks above are complete within their recorded scope: existing migration versions and effective runtime grants, genuine login, restricted uncached Hyperdrive, isolation, retries, concurrency, membership revocation, rollback and transaction-context reset. Do not recreate accounts or resources merely to repeat initial setup. Remaining pilot work includes the session-lifetime policy, representative latency/load, physical pooled-connection reuse evidence and backup restoration. A fresh hosted migration rehearsal remains unrun. Local connection reuse is evidence for application logic, not proof of a hosted pool. Supabase remains the accepted provider under ADR 0005; a Neon switch needs an explicit decision and equivalent auth integration evidence.
 
+## PR previews
+
+Static diner and console previews for PRs use separate `*-preview` Pages projects and a Pages-only token in the `preview` GitHub environment. They are switched off until `PREVIEW_DEPLOYMENT_ENABLED` is `true`. Setup, isolation limits, retention and the PR #37 validation steps are in [PR previews](previews.md). No preview run has been verified yet.
+
 ## Later Actions-based staging activation
 
 Team analytics API release and collaborator access are documented in [team data access](team-data-access.md). The forward migration grants only checked function execution to the existing runtime. Merging the release does not establish hosted activation.
@@ -245,3 +249,13 @@ Released exact main commit `2a135faa4386fc3e1002aef3d1a150930e5ff9bf` after [PR 
 - Worker and database were unchanged by this frontend release.
 - Live isolated-browser checks passed on both stable URLs: no capture before consent, HTTP 200 after consent, expected minimal properties, and no new capture after withdrawal/reload. Both matching generated IDs were visible in PostHog. Synthetic data only.
 - Private Supabase export is a separate change; see [its current status](posthog-export.md). These results do not prove diner-event ingestion, menu functionality or owner reports.
+
+## PR preview hardening — October 25, 2026
+
+Continued [PR #41](https://github.com/vivienk/peekaplate/pull/41) for [PR preview deployments](https://app.clickup.com/t/86bcqxkwf). The workflow is now `deploy-preview.yml`, with trusted-base orchestration, credential-free PR builds, static-artifact validation and project isolation preflight. Cleanup remains active when new previews are disabled.
+
+GitHub readback confirmed `CLOUDFLARE_PREVIEW_API_TOKEN` by name and the nonempty `CLOUDFLARE_ACCOUNT_ID` environment variable. The preview environment was restricted to exactly `develop` and `main` branches; no required reviewers are configured and administrator bypass remains enabled. `PREVIEW_DEPLOYMENT_ENABLED` is absent. No secret value was read or copied.
+
+PASS: `pnpm check` (189 Vitest tests, 47 script tests including 13 preview regressions), actionlint 1.7.7, both frontend builds, context and documentation checks. Exact PR #37 head `23cfe85f7d0a823a1e8aa09092c54e6ed203266f` builds both apps with analytics disabled; their artifact payloads pass the static sanitizer. Existing PR #37 CI was green. These are local/CI checks, not hosted preview acceptance.
+
+NOT VERIFIED: Cloudflare project existence/configuration, GitHub-held token scope/validity, real upload, rendered PR content, bot comment and live cleanup. Read-only local Cloudflare inspection failed at the network/TLS transport. Keep new deployments disabled until provider prerequisites are verified and PR #41 is human-reviewed and merged into the trusted base. No staging or production workflow or cloud resource was changed.
