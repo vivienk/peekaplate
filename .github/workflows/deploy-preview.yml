@@ -95,7 +95,9 @@ jobs:
       - name: Install pinned upload tool without deployment credentials
         run: npm install --prefix "$RUNNER_TEMP/preview-tools" --ignore-scripts --no-audit --no-fund wrangler@4.149.0
       - name: Validate static artifacts
-        run: node scripts/preview.mjs sanitize preview
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/preview.mjs sanitize preview "$SHA"
       - name: Deploy to the preview Pages projects
         id: deploy
         env:
@@ -118,13 +120,12 @@ jobs:
             (cd "$RUNNER_TEMP" && node "$RUNNER_TEMP/preview-tools/node_modules/wrangler/bin/wrangler.js" pages deploy "$GITHUB_WORKSPACE/preview/$app" \
               --project-name "$project" --branch "pr-$PR" --commit-hash "$SHA" --commit-dirty=true)
             url="https://pr-$PR.$project.pages.dev"
-            for attempt in 1 2 3 4 5 6; do
-              status=$(curl -sS -o /dev/null -w '%{http_code}' "$url") || status=000
-              test "$status" = 200 && break
-              test "$attempt" = 6 && { echo "Preview did not become available"; exit 1; }
-              sleep 10
-            done
             echo "${app}_url=$url" >> "$GITHUB_OUTPUT"
+          done
+          for attempt in 1 2 3 4 5 6; do
+            if node scripts/preview.mjs verify "$SHA"; then break; fi
+            test "$attempt" = 6 && { echo "Preview did not serve the requested commit"; exit 1; }
+            sleep 10
           done
       - name: Post or update the preview comment
         env:
