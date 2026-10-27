@@ -166,7 +166,21 @@ describe('Ingestion Orchestrator', () => {
       status: 400,
     });
 
-    // Accepts valid pdf and derives sourceStorageKey when omitted
+    // Rejects cross-tenant source storage key override
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'menu-ingestion/sources/00000000-0000-0000-0000-000000000999/job/source',
+        idempotencyKey: 'idem_cross_tenant_key',
+      }),
+    ).rejects.toMatchObject({
+      code: 'unauthorized_source_storage_key',
+      status: 400,
+    });
+
+    // Accepts valid pdf and derives canonical menu-ingestion sourceStorageKey when omitted
     const job = await submitMenuIngestion(client, {
       venueId,
       sourceType: 'pdf',
@@ -178,7 +192,7 @@ describe('Ingestion Orchestrator', () => {
     expect(job.source_type).toBe('pdf');
     expect(job.source_hash).toBe('b'.repeat(64));
     expect(job.source_storage_key).toMatch(
-      new RegExp(`^sources/${venueId}/[a-f0-9-]+/source\\.pdf$`),
+      new RegExp(`^menu-ingestion/sources/${venueId}/[a-f0-9-]+/source$`),
     );
   });
 

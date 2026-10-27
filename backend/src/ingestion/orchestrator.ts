@@ -82,20 +82,29 @@ export async function submitMenuIngestion(
   }
 
   const jobId = crypto.randomUUID();
-  let sourceStorageKey = request.sourceStorageKey ?? null;
+  const canonicalSourceKey = `menu-ingestion/sources/${request.venueId}/${jobId}/source`;
+  let sourceStorageKey = canonicalSourceKey;
 
-  if (sourceStorageKey) {
-    if (sourceStorageKey.includes('..') || sourceStorageKey.startsWith('/')) {
+  if (request.sourceStorageKey) {
+    if (request.sourceStorageKey.includes('..') || request.sourceStorageKey.startsWith('/')) {
       throw new IngestionError(
         'invalid_source_storage_key',
         400,
         'Invalid source storage key format',
       );
     }
-  } else {
-    // Derive canonical tenant/job-derived source key
-    const ext = request.sourceType === 'pdf' ? 'pdf' : 'jpg';
-    sourceStorageKey = `sources/${request.venueId}/${jobId}/source.${ext}`;
+    // Prevent cross-tenant arbitrary object access
+    const tenantScopeMatch = request.sourceStorageKey.match(
+      /(?:menu-ingestion\/)?sources\/([0-9a-f-]{36})\//i,
+    );
+    if (tenantScopeMatch && tenantScopeMatch[1] && tenantScopeMatch[1] !== request.venueId) {
+      throw new IngestionError(
+        'unauthorized_source_storage_key',
+        400,
+        'Source storage key must match the authorized venue scope',
+      );
+    }
+    sourceStorageKey = request.sourceStorageKey;
   }
 
   const job = await createIngestionJob(client, {

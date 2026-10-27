@@ -54,6 +54,7 @@ export type Bindings = {
   };
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
+  EXTRACTION_SOURCE_SIGNING_SECRET?: string;
   EXTRACTION_TIMEOUT_MS?: string;
 };
 
@@ -547,6 +548,9 @@ export async function handleQueueBatch(
             serviceUrl: env.EXTRACTION_SERVICE_URL,
             ...(env.EXTRACTION_SERVICE_SECRET !== undefined
               ? { authToken: env.EXTRACTION_SERVICE_SECRET }
+              : {}),
+            ...(env.EXTRACTION_SOURCE_SIGNING_SECRET !== undefined
+              ? { sourceSigningSecret: env.EXTRACTION_SOURCE_SIGNING_SECRET }
               : {}),
             ...(extractionTimeoutMs !== undefined ? { timeoutMs: extractionTimeoutMs } : {}),
           })

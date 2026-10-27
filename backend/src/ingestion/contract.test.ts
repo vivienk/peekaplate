@@ -6,6 +6,7 @@ import {
   StructuredDishDraftSchema,
 } from '@peekaplate/contracts';
 import { describe, expect, it } from 'vitest';
+import { readExtractionCapability } from '../extraction-capability.js';
 import { adaptPythonExtractionResult } from './adapter.js';
 import { createHttpPythonExtractor, DEFAULT_EXTRACTION_TIMEOUT_MS } from './transport.js';
 
@@ -579,6 +580,72 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       await expect(extractor(fakeJob)).rejects.toMatchObject({
         code: 'malformed_extraction_response',
         status: 502,
+      });
+    });
+
+    it('mints signed source capability grant and attaches X-Source-Capability and X-Source-Hash headers', async () => {
+      const signingSecret = 'synthetic-job-signing-key-'.repeat(3);
+      const uuidJob: any = {
+        id: '00000000-0000-4000-8000-000000000001',
+        tenant_id: '00000000-0000-4000-8000-000000000002',
+        source_type: 'pdf',
+        source_storage_key:
+          'menu-ingestion/sources/00000000-0000-4000-8000-000000000002/00000000-0000-4000-8000-000000000001/source',
+        source_hash: 'a'.repeat(64),
+        idempotency_key: 'idem_transport_cap',
+      };
+      let capturedRequest: Request | null = null;
+
+      const fetchFn = async (input: RequestInfo | URL, init?: RequestInit) => {
+        capturedRequest = new Request(input, init);
+        return Response.json({
+          schema_version: 2,
+          pipeline_version: '3',
+          status: 'complete',
+          segments: [],
+          drafts: [],
+          evidence: [],
+          warnings: [],
+          errors: [],
+        });
+      };
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        authToken: 'service-bearer-token',
+        sourceSigningSecret: signingSecret,
+        fetchFn: fetchFn as any,
+      });
+
+      await extractor(uuidJob);
+
+      expect(capturedRequest).not.toBeNull();
+      expect(capturedRequest!.headers.get('Authorization')).toBe('Bearer service-bearer-token');
+      expect(capturedRequest!.headers.get('X-Job-ID')).toBe(uuidJob.id);
+      expect(capturedRequest!.headers.get('X-Tenant-ID')).toBe(uuidJob.tenant_id);
+      expect(capturedRequest!.headers.get('X-Source-Hash')).toBe(uuidJob.source_hash);
+
+      const capabilityToken = capturedRequest!.headers.get('X-Source-Capability');
+      expect(capabilityToken).toBeTruthy();
+
+      const verifiedScope = await readExtractionCapability(capabilityToken!, signingSecret);
+      expect(verifiedScope).toEqual({
+        tenantId: uuidJob.tenant_id,
+        jobId: uuidJob.id,
+        sourceHash: uuidJob.source_hash,
+      });
+    });
+
+    it('fails closed when capability signing secret is invalid', async () => {
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        sourceSigningSecret: 'too-short', // Less than 48 chars
+        fetchFn: (async () => Response.json({})) as any,
+      });
+
+      await expect(extractor(fakeJob)).rejects.toMatchObject({
+        code: 'capability_minting_failed',
+        status: 500,
       });
     });
   });

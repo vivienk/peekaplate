@@ -1,4 +1,5 @@
 import type { MenuExtractionResult } from '@peekaplate/contracts';
+import { mintExtractionCapability } from '../extraction-capability.js';
 import { IngestionError, type MenuIngestionJobRow } from './repository.js';
 
 /**
@@ -11,6 +12,7 @@ export const DEFAULT_EXTRACTION_TIMEOUT_MS = 600_000;
 export type HttpExtractorConfig = {
   serviceUrl: string;
   authToken?: string | undefined;
+  sourceSigningSecret?: string | undefined;
   timeoutMs?: number | undefined;
   fetchFn?: typeof fetch | undefined;
   signal?: AbortSignal | undefined;
@@ -32,22 +34,43 @@ export function createHttpPythonExtractor(config: HttpExtractorConfig) {
     job: MenuIngestionJobRow,
     callOptions?: ExtractorCallOptions,
   ): Promise<MenuExtractionResult | unknown> {
-    const endpoint = new URL('/extract', config.serviceUrl).toString();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Job-ID': job.id,
-      'X-Tenant-ID': job.tenant_id,
-    };
-    if (config.authToken) {
-      headers['Authorization'] = `Bearer ${config.authToken}`;
-    }
-
     if (!job.source_storage_key || !job.source_hash) {
       throw new IngestionError(
         'missing_materialized_source',
         400,
         'Extraction service requires a materialized source_storage_key and source_hash',
       );
+    }
+
+    const endpoint = new URL('/extract', config.serviceUrl).toString();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Job-ID': job.id,
+      'X-Tenant-ID': job.tenant_id,
+      'X-Source-Hash': job.source_hash,
+    };
+    if (config.authToken) {
+      headers['Authorization'] = `Bearer ${config.authToken}`;
+    }
+
+    if (config.sourceSigningSecret) {
+      try {
+        const capability = await mintExtractionCapability(
+          {
+            tenantId: job.tenant_id,
+            jobId: job.id,
+            sourceHash: job.source_hash,
+          },
+          config.sourceSigningSecret,
+        );
+        headers['X-Source-Capability'] = capability;
+      } catch (err: unknown) {
+        throw new IngestionError(
+          'capability_minting_failed',
+          500,
+          `Failed to mint source extraction capability: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     const payload = {
