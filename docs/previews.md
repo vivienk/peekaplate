@@ -29,10 +29,10 @@ Analytics are disabled in every preview build. Trusted response headers addition
 
 ## How it works
 
-[`.github/workflows/deploy-preview.yml`](../.github/workflows/deploy-preview.yml) runs on `pull_request_target` from the trusted base revision, with three isolated jobs. It does not use PR-authored workflow code. There are no path filters, so closing a PR always schedules cleanup:
+[`.github/workflows/deploy-preview.yml`](../.github/workflows/deploy-preview.yml) runs on `pull_request_target` from the repository's trusted default branch (`main`), with three isolated jobs. Both this workflow and `scripts/preview.mjs` must exist on `main`, even for PRs targeting `develop`. It does not use PR-authored workflow code. There are no path filters, so closing a PR always schedules cleanup:
 
 - **build** runs for same-repository PRs. It checks out the exact PR head SHA with persisted Git credentials disabled, installs dependencies, builds both apps with analytics disabled and uploads the files as a three-day artifact. It has no deployment credentials.
-- **deploy** runs no PR code. It checks out only the trusted base, rejects server-side functions, Workers, redirects, configuration and symlinks in the artifact, verifies both target projects, and uploads static files with Wrangler to the dedicated `peekaplate-diner-preview` and `peekaplate-console-preview` Pages projects, using the branch alias `pr-<number>`. It checks that both links return 200, then posts or updates the PR comment.
+- **deploy** runs no PR code. It checks out the trusted default-branch commit, rejects server-side functions, Workers, redirects, configuration, symlinks and a supplied `peekaplate-preview.json`, then writes trusted headers and that commit marker using the requested PR head SHA. It verifies both target projects and uploads static files with Wrangler under the `pr-<number>` branch alias. Both aliases must return the expected SHA in their marker before the PR comment is updated; HTTP 200 alone can belong to an older build. Marker checks retry up to six times with ten seconds between attempts.
 - **cleanup** runs when the PR closes or merges. It deletes every deployment for that PR's branch alias from both projects and marks the comment as removed.
 
 The normal **CI** workflow remains the required build and test check. **PR preview** is separate and not required, so a credentials or provider outage cannot block merges.
@@ -66,7 +66,7 @@ An administrator with Cloudflare and GitHub access does this once. No step chang
 
 PR #37 (design tokens) is the first validation case:
 
-1. Merge this workflow into `develop`. The `pull_request_target` workflow and deployment helper must exist in the trusted base. PR #37 already targets `develop`. Manual cleanup also requires the workflow on the default branch (`main`) before GitHub exposes dispatch.
+1. Merge the reviewed preview workflow, helper, tests and documentation into the default branch (`main`). A merge into `develop` alone cannot activate `pull_request_target` or manual dispatch. Promote this delivery-only slice separately from unreleased application changes; then synchronize its fixes back into `develop`. PR #37 may continue to target `develop`.
 2. Push a commit to PR #37 or close and reopen it.
 3. Confirm the **PR preview** check passes, the comment shows both links, and both pages load with the PR's tokens.
 4. Record the run link, commit and result in [operations](operations.md).
@@ -74,9 +74,33 @@ PR #37 (design tokens) is the first validation case:
 
 ## October 25 verification boundary
 
+Historical observations below describe the earlier local setup attempt; see the current follow-up for the later settings and verification boundary.
+
 - PR #37 head `23cfe85f7d0a823a1e8aa09092c54e6ed203266f` has passing existing CI. Both local frontend builds and the static artifact sanitizer pass; this is not a preview deployment result.
 - GitHub readback confirmed the preview token secret name and nonempty account variable. Secret values were not read; token scope/validity remains unverified.
 - Preview environment branch restrictions were set to `develop` and `main`.
 - Repository variable `PREVIEW_DEPLOYMENT_ENABLED` is absent, so deployment stays off.
 - Live Cloudflare project inspection was blocked by a local connection failure. Project existence/configuration and live deploy/cleanup remain unverified.
 - Continue tracking [PR preview deployments for diner and console](https://app.clickup.com/t/86bcqxkwf). Review and merge PR #41 before triggering the trusted workflow for PR #37.
+
+## October 26 follow-up
+
+The initial October 26 check found PR #41 merged into `develop` as `aa7c717` with green CI and `PREVIEW_DEPLOYMENT_ENABLED=true`, while `main` still lacked the workflow/helper. The activation and lifecycle evidence below supersedes that missing-workflow state.
+
+The follow-up supplies the preview slice to `main`, adds exact-SHA readiness, and makes the symlink regression portable: Windows uses a directory junction, while other platforms use a directory symlink. Both exercise the same real `lstat` rejection; no security assertion is skipped.
+
+Read-only provider inspection confirmed the two existing preview projects pass isolation preflight and the manual PR #37 aliases still return HTTP 200 with restrictive CSP. Both staging frontends and authenticated team data reads remain available, with unchanged deployed versions. See the [dated operations evidence](operations.md#pr-preview-repair--october-26-2026). No hosted deployment, cleanup or credential change was performed in this pass.
+
+GitHub changed this event's source/reference to the default branch in December 2025. See the [official event and environment-protection change](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/). Keep the preview environment restricted to trusted branches; do not work around activation by giving a PR-head workflow secrets.
+
+## Hosted lifecycle acceptance — October 26
+
+[PR #47](https://github.com/vivienk/peekaplate/pull/47) merged the reviewed delivery slice into `main` as `ab6f9c4`; [main CI passed](https://github.com/vivienk/peekaplate/actions/runs/40393030720). The following checks used synthetic PR #48 at `1339089062625ebde44b52b00be2a14ae6ae48ab`:
+
+- [Automatic preview run](https://github.com/vivienk/peekaplate/actions/runs/40393096652): build and deploy passed using GitHub-held credentials. Build took 19 seconds and deploy 41 seconds; the full run including queue time took 84 seconds.
+- Both provider records were `preview` deployments under `pr-48`, with the exact head SHA. Both aliases returned that same trusted marker and HTTP 200 with `connect-src 'none'`.
+- Both rendered screens were visible at 390×844, without uncaught JavaScript errors or horizontal overflow. These are browser checks, not real-phone performance measurements.
+- One [bot comment](https://github.com/vivienk/peekaplate/pull/48#issuecomment-6426202331) contained both links and the correct commit.
+- Closing the test PR triggered [automatic cleanup](https://github.com/vivienk/peekaplate/actions/runs/40393553935). The cleanup job passed in 16 seconds; provider readback found no `pr-48` deployments in either project. The same bot comment changed to removed. Edge retirement briefly returned transient errors; by `2026-10-26T20:13:56Z`, both page and marker URLs returned 404.
+
+The test PR is reopened for the final reviewed documentation/merge step; its eventual merge repeats cleanup. No Worker, Supabase, Queue/R2, PostHog or production deployment was changed. Repeat lifecycle acceptance when changing the workflow or provider configuration.
