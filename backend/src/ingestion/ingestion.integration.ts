@@ -335,4 +335,73 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
     expect(persistedZero.price_amount).toBe('0.00');
     expect(persistedPrecise.price_amount).toBe('1250.755');
   });
+
+  it('persists and reloads schema 2 / pipeline 3 fields (subcategory, price_text, category_page_number, candidate_id)', async () => {
+    const jobId = crypto.randomUUID();
+    await createIngestionJob(adminClient, {
+      id: jobId,
+      tenantId: venueId,
+      sourceType: 'pdf',
+      sourceStorageKey: 'menus/v2_source.pdf',
+      idempotencyKey: `idem_v2_fields_${jobId}`,
+    });
+
+    const claim = (await claimIngestionJob(adminClient, {
+      tenantId: venueId,
+      jobId,
+      workerId: 'worker_v2_fields',
+    }))!;
+
+    const v2Draft: StructuredDishDraft = {
+      draft_id: 'draft_v2_grouped',
+      candidate_id: 'cand_v2_grouped',
+      draft_index: 0,
+      name: 'Artisan Soup Duo',
+      description: 'Choice of seasonal warm soups',
+      category: 'Starters',
+      subcategory: 'Soup Flights',
+      category_page_number: 1,
+      price_text: '8.50 / 12.50 CAD',
+      price_amount: null, // Multi-option scalar null
+      price_currency: 'CAD',
+      ingredients: ['squash', 'herbs'],
+      source_id: 'src_doc_v2',
+      source_text: 'Artisan Soup Duo 8.50 / 12.50 CAD',
+      image_id: null,
+      code_point_spans: [
+        { segment_id: 'seg_1', start: 0, end: 16 },
+        { segment_id: 'seg_1', start: 17, end: 34 },
+      ],
+      utf16_spans: [
+        { segment_id: 'seg_1', start: 0, end: 16 },
+        { segment_id: 'seg_1', start: 17, end: 34 },
+      ],
+      review_warnings: ['Grouped price options'],
+      status: 'needs_review',
+    };
+
+    await persistExtractedDrafts(adminClient, {
+      tenantId: venueId,
+      jobId,
+      claimToken: claim.claimToken,
+      drafts: [v2Draft],
+      status: 'complete',
+    });
+
+    const drafts = await listDishDrafts(adminClient, { tenantId: venueId, jobId });
+    expect(drafts).toHaveLength(1);
+    const persisted = drafts[0]!;
+
+    expect(persisted.draft_id).toBe('draft_v2_grouped');
+    expect(persisted.candidate_id).toBe('cand_v2_grouped');
+    expect(persisted.name).toBe('Artisan Soup Duo');
+    expect(persisted.category).toBe('Starters');
+    expect(persisted.subcategory).toBe('Soup Flights');
+    expect(persisted.category_page_number).toBe(1);
+    expect(persisted.price_text).toBe('8.50 / 12.50 CAD');
+    expect(persisted.price_amount).toBeNull();
+    expect(persisted.price_currency).toBe('CAD');
+    expect(persisted.review_status).toBe('pending');
+    expect(persisted.extraction_status).toBe('needs_review');
+  });
 });

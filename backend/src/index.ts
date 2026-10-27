@@ -33,6 +33,7 @@ import {
   listDishDrafts,
   type MenuIngestionJobRow,
 } from './ingestion/repository';
+import { createHttpPythonExtractor } from './ingestion/transport';
 import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
@@ -46,6 +47,8 @@ export type Bindings = {
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
   INGESTION_QUEUE?: { send(message: unknown): Promise<void> };
+  EXTRACTION_SERVICE_URL?: string;
+  EXTRACTION_SERVICE_SECRET?: string;
 };
 
 type Dependencies = {
@@ -527,13 +530,20 @@ export async function handleQueueBatch(
     await client.connect();
     const extractor =
       services.extractor ??
-      (async () => {
-        throw new IngestionError(
-          'extractor_unavailable',
-          503,
-          'Python extraction boundary not configured in current environment',
-        );
-      });
+      (env.EXTRACTION_SERVICE_URL
+        ? createHttpPythonExtractor({
+            serviceUrl: env.EXTRACTION_SERVICE_URL,
+            ...(env.EXTRACTION_SERVICE_SECRET !== undefined
+              ? { authToken: env.EXTRACTION_SERVICE_SECRET }
+              : {}),
+          })
+        : async () => {
+            throw new IngestionError(
+              'extractor_unavailable',
+              503,
+              'Python extraction boundary not configured in current environment',
+            );
+          });
 
     const processBatchFn = services.processQueueBatch ?? processIngestionQueueBatch;
     await processBatchFn(client, batch, extractor);

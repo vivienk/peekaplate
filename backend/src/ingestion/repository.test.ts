@@ -225,6 +225,12 @@ describe('Ingestion Repository', () => {
     mock.setHandler((text, values) => {
       expect(text).toContain('UPDATE app_private.menu_ingestion_jobs');
       expect(text).toContain('error_code = $1');
+      expect(text).toContain(
+        "SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END",
+      );
+      expect(text).toContain(
+        'finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END',
+      );
       expect(values![0]).toBe('timeout_error');
       return { rows: [], rowCount: 1 };
     });
@@ -238,6 +244,120 @@ describe('Ingestion Repository', () => {
     });
 
     expect(mock.queries.length).toBe(1);
+  });
+
+  it('Finding B: preserves original producer draft_index across filtering and persistence', async () => {
+    const mock = createMockClient();
+    const insertedIndices: number[] = [];
+
+    mock.setHandler((text, values) => {
+      if (text === 'BEGIN;') return { rows: [], rowCount: 0 };
+      if (text.includes('FOR UPDATE')) return { rows: [{ lease_generation: '1' }], rowCount: 1 };
+      if (text.includes('INSERT INTO app_private.dish_drafts')) {
+        // Parameter $6 is draft_index
+        insertedIndices.push(values![5] as number);
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+
+    // Producer drafts had original indices 0, 2, 7 (e.g., drafts 1, 3-6 were filtered or rejected)
+    const drafts: StructuredDishDraft[] = [
+      {
+        draft_id: 'draft_0',
+        candidate_id: 'cand_0',
+        draft_index: 0,
+        name: 'Dish Zero',
+        description: null,
+        category: 'Starters',
+        subcategory: 'Soups',
+        category_page_number: 1,
+        price_text: '5.00',
+        price_amount: '5.00',
+        price_currency: 'USD',
+        ingredients: null,
+        source_id: 'src_1',
+        source_text: 'Dish Zero $5.00',
+        image_id: null,
+        code_point_spans: [{ segment_id: 'seg_1', start: 0, end: 15 }],
+        utf16_spans: [{ segment_id: 'seg_1', start: 0, end: 15 }],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      },
+      {
+        draft_id: 'draft_2',
+        candidate_id: 'cand_2',
+        draft_index: 2,
+        name: 'Dish Two',
+        description: null,
+        category: 'Mains',
+        subcategory: null,
+        category_page_number: 2,
+        price_text: '15.00',
+        price_amount: '15.00',
+        price_currency: 'USD',
+        ingredients: null,
+        source_id: 'src_1',
+        source_text: 'Dish Two $15.00',
+        image_id: null,
+        code_point_spans: [{ segment_id: 'seg_1', start: 16, end: 31 }],
+        utf16_spans: [{ segment_id: 'seg_1', start: 16, end: 31 }],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      },
+      {
+        draft_id: 'draft_7',
+        candidate_id: 'cand_7',
+        draft_index: 7,
+        name: 'Dish Seven',
+        description: null,
+        category: 'Desserts',
+        subcategory: 'Cakes',
+        category_page_number: 3,
+        price_text: '8.00',
+        price_amount: '8.00',
+        price_currency: 'USD',
+        ingredients: null,
+        source_id: 'src_1',
+        source_text: 'Dish Seven $8.00',
+        image_id: null,
+        code_point_spans: [{ segment_id: 'seg_1', start: 32, end: 48 }],
+        utf16_spans: [{ segment_id: 'seg_1', start: 32, end: 48 }],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      },
+    ];
+
+    const result = await persistExtractedDrafts(mock.client, {
+      tenantId,
+      jobId,
+      claimToken: 'active_token',
+      drafts,
+      status: 'complete',
+    });
+
+    expect(result.persistedCount).toBe(3);
+    // Crucial Finding B assertion: must preserve [0, 2, 7], NOT replaced by array index [0, 1, 2]
+    expect(insertedIndices).toEqual([0, 2, 7]);
+  });
+
+  it('Finding C: claimIngestionJob resets finished_at to NULL when reclaiming a job', async () => {
+    const mock = createMockClient();
+    mock.setHandler((text) => {
+      expect(text).toContain('finished_at = NULL');
+      return {
+        rows: [{ claim_token: '00000000-0000-0000-0000-000000000999', lease_generation: '2' }],
+        rowCount: 1,
+      };
+    });
+
+    const claim = await claimIngestionJob(mock.client, {
+      tenantId,
+      jobId,
+      workerId: 'worker_retry',
+    });
+
+    expect(claim).not.toBeNull();
   });
 
   it('approveDishDraft accepts pending draft and links published dish projection', async () => {

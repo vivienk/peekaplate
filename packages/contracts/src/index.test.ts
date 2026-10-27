@@ -538,18 +538,34 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       expect(draftNumeric.price_amount).toBe('14.99');
     });
 
-    it('rejects unsupported schema and pipeline versions', () => {
+    it('accepts supported versions (1/2 and 2/3) and rejects unsupported versions', () => {
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 1,
+          pipeline_version: '2',
+        }).success,
+      ).toBe(true);
+
       expect(
         MenuExtractionResultSchema.safeParse({
           ...validExtractionResult,
           schema_version: 2,
+          pipeline_version: '3',
+        }).success,
+      ).toBe(true);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 99,
         }).success,
       ).toBe(false);
 
       expect(
         MenuExtractionResultSchema.safeParse({
           ...validExtractionResult,
-          pipeline_version: '3',
+          pipeline_version: '4',
         }).success,
       ).toBe(false);
     });
@@ -623,14 +639,14 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       expect(
         ExtractionDishDraftSchema.safeParse({
           ...validDishDraft,
-          subcategory: 'Hot Soups', // unmerged proposal
+          unexpected_extra_field: 'unsupported',
         }).success,
       ).toBe(false);
 
       expect(
         ExtractionDishDraftSchema.safeParse({
           ...validDishDraft,
-          price_text: '$8.50', // unmerged proposal
+          model_confidence: 0.99, // unsupported confidence field
         }).success,
       ).toBe(false);
     });

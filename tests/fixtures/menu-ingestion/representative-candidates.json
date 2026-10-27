@@ -1,0 +1,68 @@
+[
+  {
+    "draft_id": "draft:steak_01",
+    "candidate_id": "draft:steak_01",
+    "draft_index": 0,
+    "name": "Steak",
+    "description": "Grilled sirloin steak with herb butter",
+    "category": "Mains",
+    "subcategory": null,
+    "category_page_number": null,
+    "price_text": null,
+    "price_amount": "24.95",
+    "price_currency": "USD",
+    "ingredients": ["beef", "butter", "herbs"],
+    "source_id": "src_doc_v1",
+    "source_text": "Steak 24.95 USD",
+    "image_id": null,
+    "code_point_spans": [
+      {
+        "segment_id": "seg_1",
+        "start": 0,
+        "end": 15
+      }
+    ],
+    "utf16_spans": [
+      {
+        "segment_id": "seg_1",
+        "start": 0,
+        "end": 15
+      }
+    ],
+    "review_warnings": ["Verify cook temperature."],
+    "status": "needs_review"
+  },
+  {
+    "draft_id": "draft:water_01",
+    "candidate_id": "draft:water_01",
+    "draft_index": 1,
+    "name": "Mineral Water",
+    "description": null,
+    "category": "Beverages",
+    "subcategory": null,
+    "category_page_number": null,
+    "price_text": null,
+    "price_amount": "0.00",
+    "price_currency": "USD",
+    "ingredients": null,
+    "source_id": "src_doc_v1",
+    "source_text": "Mineral Water 0.00 USD",
+    "image_id": null,
+    "code_point_spans": [
+      {
+        "segment_id": "seg_1",
+        "start": 16,
+        "end": 38
+      }
+    ],
+    "utf16_spans": [
+      {
+        "segment_id": "seg_1",
+        "start": 16,
+        "end": 38
+      }
+    ],
+    "review_warnings": [],
+    "status": "needs_review"
+  }
+]

@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(19);
+SELECT plan(23);
 
 -- Setup test venues
 INSERT INTO app_private.venues (id, name) VALUES
@@ -46,6 +46,16 @@ SELECT lives_ok(
       ('00000000-0000-0000-0000-000000000701', '00000000-0000-0000-0000-000000000501', '00000000-0000-0000-0000-000000000601',
        'draft:soup_01', 0, 'Tomato Soup', 'Warm soup', 'Starters', 0.00, 'CAD', 'src_1', 'Tomato Soup $0.00', '{"spans": [{"start": 0, "end": 17}]}'::jsonb)$$,
   'runtime can insert draft with explicit 0.00 price'
+);
+
+-- Insert draft preserving subcategory, category_page_number, price_text, candidate_id with null price_amount (multi-option)
+SELECT lives_ok(
+  $$INSERT INTO app_private.dish_drafts
+      (id, tenant_id, job_id, draft_id, candidate_id, draft_index, name, description, category, subcategory, category_page_number, price_text, price_amount, price_currency, source_id, source_text, evidence)
+    VALUES
+      ('00000000-0000-0000-0000-000000000707', '00000000-0000-0000-0000-000000000501', '00000000-0000-0000-0000-000000000601',
+       'draft:soup_v2', 'cand:soup_v2', 3, 'Split Pea Soup', 'Hot soup', 'Starters', 'Soups', 1, '8.50 / 12.50 CAD', NULL, 'CAD', 'src_1', 'Split Pea Soup 8.50 / 12.50 CAD', '{"spans": [{"start": 0, "end": 31}]}'::jsonb)$$,
+  'runtime can insert draft with subcategory, category_page_number, price_text, and null price_amount'
 );
 
 -- Rejects unauthorized extraction_status (must be needs_review)
@@ -138,6 +148,26 @@ SELECT lives_ok(
       ('00000000-0000-0000-0000-000000000706', '00000000-0000-0000-0000-000000000502', '00000000-0000-0000-0000-000000000603',
        'draft:superseded_01', 1, 'Old Item', 'src_1', 'Old Item', '{}'::jsonb, 'superseded', ARRAY['superseded_by_retry'])$$,
   'runtime can create superseded draft without reviewed_by/reviewed_at'
+);
+
+-- 6. Finding C: Incomplete job requires finished_at timestamptz (check constraint verification)
+SELECT throws_like(
+  $$INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key, status, finished_at)
+    VALUES ('00000000-0000-0000-0000-000000000604', '00000000-0000-0000-0000-000000000502', 'pdf', 'key_inc_null', 'incomplete', NULL)$$,
+  'new row for relation "menu_ingestion_jobs" violates check constraint "menu_ingestion_jobs_check%',
+  'incomplete job requires finished_at NOT NULL'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key, status, started_at, finished_at)
+    VALUES ('00000000-0000-0000-0000-000000000605', '00000000-0000-0000-0000-000000000502', 'pdf', 'key_inc_ok', 'incomplete', now(), now())$$,
+  'incomplete job with finished_at populated satisfies check constraint'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key, status, started_at, finished_at)
+    VALUES ('00000000-0000-0000-0000-000000000606', '00000000-0000-0000-0000-000000000502', 'pdf', 'key_failed_ok', 'failed', now(), now())$$,
+  'failed job with finished_at populated satisfies check constraint'
 );
 
 RESET ROLE;

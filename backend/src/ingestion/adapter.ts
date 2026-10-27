@@ -119,28 +119,42 @@ export function adaptPythonExtractionResult(
     if (!draft) continue;
 
     const draftErrors: string[] = [];
+    const targetIndex = draft.draft_index ?? i;
 
     // Locate matching evidence
     const evidence = extraction.evidence.find(
-      (e) => e.draft_index === i || (e.draft_id && e.draft_id.includes(draft.name)),
+      (e) =>
+        e.draft_index === targetIndex ||
+        (draft.draft_id !== undefined && e.draft_id === draft.draft_id) ||
+        (draft.candidate_id !== undefined && e.draft_id === draft.candidate_id) ||
+        (e.draft_id && e.draft_id.includes(draft.name)),
     );
 
     if (!evidence || evidence.spans.length === 0) {
       invalidDrafts.push({
-        draftIndex: i,
+        draftIndex: targetIndex,
         name: draft.name,
-        errors: [`Missing evidence spans for draft at index ${i} ("${draft.name}")`],
+        errors: [`Missing evidence spans for draft at index ${targetIndex} ("${draft.name}")`],
       });
       continue;
     }
 
     const codePointSpans: ExtractionSourceSpan[] = [];
     const utf16Spans: ExtractionSourceSpan[] = [];
+    const codePointSlices: string[] = [];
+    const utf16Slices: string[] = [];
 
     for (const span of evidence.spans) {
       const seg = segmentsMap.get(span.segment_id);
       if (!seg) {
         draftErrors.push(`Source segment "${span.segment_id}" not found in extraction segments`);
+        continue;
+      }
+
+      if (seg.status === 'failed' || seg.status === 'skipped') {
+        draftErrors.push(
+          `Source segment "${span.segment_id}" has invalid status "${seg.status}" for evidence`,
+        );
         continue;
       }
 
@@ -154,15 +168,9 @@ export function adaptPythonExtractionResult(
         continue;
       }
 
-      // Verify exact slice equality in Unicode code points
+      // Verify slice in Unicode code points
       const actualCodePointSlice = Array.from(segText).slice(span.start, span.end).join('');
-
-      if (strictSlice && actualCodePointSlice !== draft.source_text) {
-        draftErrors.push(
-          `Span slice mismatch: segment slice "${actualCodePointSlice}" does not match draft source_text "${draft.source_text}"`,
-        );
-        continue;
-      }
+      codePointSlices.push(actualCodePointSlice);
 
       // Convert to UTF-16 code units
       let utf16Start: number;
@@ -177,15 +185,8 @@ export function adaptPythonExtractionResult(
         continue;
       }
 
-      if (strictSlice) {
-        const actualUtf16Slice = segText.slice(utf16Start, utf16End);
-        if (actualUtf16Slice !== draft.source_text) {
-          draftErrors.push(
-            `UTF-16 slice mismatch: segment slice "${actualUtf16Slice}" does not match draft source_text "${draft.source_text}"`,
-          );
-          continue;
-        }
-      }
+      const actualUtf16Slice = segText.slice(utf16Start, utf16End);
+      utf16Slices.push(actualUtf16Slice);
 
       codePointSpans.push({
         segment_id: span.segment_id,
@@ -200,10 +201,33 @@ export function adaptPythonExtractionResult(
       });
     }
 
+    // Verify evidence spans reconstruct the draft source_text
+    if (strictSlice && codePointSlices.length > 0 && draftErrors.length === 0) {
+      const singleMatch = codePointSlices.length === 1 && codePointSlices[0] === draft.source_text;
+      const multiJoinSpace = codePointSlices.join(' ') === draft.source_text;
+      const multiJoinNewline = codePointSlices.join('\n') === draft.source_text;
+      const multiJoinEmpty = codePointSlices.join('') === draft.source_text;
+      const allContained =
+        codePointSlices.length > 1 &&
+        codePointSlices.every((slice) => draft.source_text.includes(slice));
+
+      if (
+        !singleMatch &&
+        !multiJoinSpace &&
+        !multiJoinNewline &&
+        !multiJoinEmpty &&
+        !allContained
+      ) {
+        draftErrors.push(
+          `Span slice mismatch: segment slice(s) [${codePointSlices.map((s) => `"${s}"`).join(', ')}] do not match draft source_text "${draft.source_text}"`,
+        );
+      }
+    }
+
     if (draftErrors.length > 0 || codePointSpans.length === 0) {
       invalidDrafts.push({
-        draftIndex: i,
-        draftId: evidence.draft_id,
+        draftIndex: draft.draft_index ?? evidence.draft_index ?? i,
+        draftId: evidence.draft_id ?? draft.draft_id ?? draft.candidate_id,
         name: draft.name,
         errors: draftErrors.length > 0 ? draftErrors : ['No valid spans found'],
       });
@@ -217,8 +241,8 @@ export function adaptPythonExtractionResult(
         normalizedPrice = normalizePriceAmount(draft.price_amount);
       } catch (err) {
         invalidDrafts.push({
-          draftIndex: i,
-          draftId: evidence.draft_id,
+          draftIndex: draft.draft_index ?? evidence.draft_index ?? i,
+          draftId: evidence.draft_id ?? draft.draft_id ?? draft.candidate_id,
           name: draft.name,
           errors: [(err as Error).message],
         });
@@ -226,12 +250,20 @@ export function adaptPythonExtractionResult(
       }
     }
 
+    const effectiveDraftIndex = draft.draft_index ?? evidence.draft_index ?? i;
+    const effectiveDraftId = evidence.draft_id ?? draft.draft_id ?? `draft_${effectiveDraftIndex}`;
+    const effectiveCandidateId = draft.candidate_id ?? evidence.draft_id ?? effectiveDraftId;
+
     const structuredDraft: StructuredDishDraft = {
-      draft_id: evidence.draft_id,
-      draft_index: i,
+      draft_id: effectiveDraftId,
+      candidate_id: effectiveCandidateId,
+      draft_index: effectiveDraftIndex,
       name: draft.name,
       description: draft.description ?? null,
       category: draft.category ?? null,
+      subcategory: draft.subcategory ?? null,
+      category_page_number: draft.category_page_number ?? null,
+      price_text: draft.price_text ?? null,
       price_amount: normalizedPrice,
       price_currency: draft.price_currency ?? null,
       ingredients: draft.ingredients ?? null,
@@ -248,8 +280,8 @@ export function adaptPythonExtractionResult(
     const draftValidation = StructuredDishDraftSchema.safeParse(structuredDraft);
     if (!draftValidation.success) {
       invalidDrafts.push({
-        draftIndex: i,
-        draftId: evidence.draft_id,
+        draftIndex: effectiveDraftIndex,
+        draftId: effectiveDraftId,
         name: draft.name,
         errors: draftValidation.error.issues.map((iss) => iss.message),
       });

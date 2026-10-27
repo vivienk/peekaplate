@@ -27,6 +27,11 @@ export type IngestionRequest = {
 
 export type PythonExtractor = (job: MenuIngestionJobRow) => Promise<MenuExtractionResult | unknown>;
 
+export type ReportStorage = {
+  put(key: string, data: string): Promise<void>;
+  get?(key: string): Promise<string | null>;
+};
+
 export type QueueProducer = {
   send(message: unknown): Promise<void>;
 };
@@ -120,6 +125,7 @@ export async function executeIngestionWorkflow(
     jobId: string;
     workerId: string;
     extractor: PythonExtractor;
+    reportStorage?: ReportStorage | undefined;
     leaseTimeoutMinutes?: number | undefined;
   },
 ): Promise<{
@@ -177,7 +183,22 @@ export async function executeIngestionWorkflow(
       };
     }
 
-    // 4. Persist drafts under transaction fencing
+    // 4. Durably retain complete private report and timing artifact if storage is configured
+    let resultStorageKey: string | null = null;
+    if (params.reportStorage) {
+      resultStorageKey = `reports/${params.tenantId}/${params.jobId}/extraction.json`;
+      try {
+        await params.reportStorage.put(resultStorageKey, JSON.stringify(rawResult));
+      } catch (storageErr) {
+        throw new IngestionError(
+          'report_storage_failed',
+          500,
+          `Failed to persist extraction report artifact: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`,
+        );
+      }
+    }
+
+    // 5. Persist drafts under transaction fencing
     const targetStatus = adapted.status === 'incomplete' ? 'incomplete' : 'complete';
     const persistenceResult = await persistExtractedDrafts(client, {
       tenantId: params.tenantId,
@@ -185,6 +206,7 @@ export async function executeIngestionWorkflow(
       claimToken: claim.claimToken,
       drafts: adapted.drafts,
       status: targetStatus,
+      resultStorageKey,
       ...(params.leaseTimeoutMinutes !== undefined
         ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
         : {}),
@@ -232,6 +254,7 @@ export async function processIngestionQueueBatch(
   options?: {
     workerId?: string;
     leaseTimeoutMinutes?: number;
+    reportStorage?: ReportStorage;
   },
 ): Promise<{
   processed: number;
@@ -263,6 +286,7 @@ export async function processIngestionQueueBatch(
         jobId,
         workerId: options?.workerId ?? 'cf-queue-worker',
         extractor,
+        ...(options?.reportStorage !== undefined ? { reportStorage: options.reportStorage } : {}),
         ...(options?.leaseTimeoutMinutes !== undefined
           ? { leaseTimeoutMinutes: options.leaseTimeoutMinutes }
           : {}),

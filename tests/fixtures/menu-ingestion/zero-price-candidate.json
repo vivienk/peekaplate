@@ -1,0 +1,33 @@
+{
+  "draft_id": "draft:tap_water",
+  "candidate_id": "cand:tap_water",
+  "draft_index": 2,
+  "name": "Filtered Still Water",
+  "description": "Complimentary chilled house-filtered still water",
+  "category": "Beverages",
+  "subcategory": "Water",
+  "category_page_number": 1,
+  "price_text": "0.00 CAD",
+  "price_amount": "0.00",
+  "price_currency": "CAD",
+  "ingredients": null,
+  "source_id": "src_doc_single",
+  "source_text": "Filtered Still Water 0.00 CAD",
+  "image_id": null,
+  "code_point_spans": [
+    {
+      "segment_id": "seg_water",
+      "start": 0,
+      "end": 29
+    }
+  ],
+  "utf16_spans": [
+    {
+      "segment_id": "seg_water",
+      "start": 0,
+      "end": 29
+    }
+  ],
+  "review_warnings": [],
+  "status": "needs_review"
+}

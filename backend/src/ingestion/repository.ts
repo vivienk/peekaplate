@@ -47,10 +47,14 @@ export type DishDraftRow = {
   tenant_id: string;
   job_id: string;
   draft_id: string;
+  candidate_id?: string | null;
   draft_index: number;
   name: string;
   description: string | null;
   category: string | null;
+  subcategory?: string | null;
+  category_page_number?: number | null;
+  price_text?: string | null;
   price_amount: string | null;
   price_currency: string | null;
   ingredients: unknown[] | null;
@@ -134,7 +138,8 @@ export async function claimIngestionJob(
          locked_at = now(),
          locked_by = $1,
          attempt_count = attempt_count + 1,
-         started_at = COALESCE(started_at, now())
+         started_at = COALESCE(started_at, now()),
+         finished_at = NULL
      WHERE id = $2 AND tenant_id = $3
        AND (
          status = 'queued'
@@ -221,22 +226,27 @@ export async function persistExtractedDrafts(
 
     // 3. Batch-upsert drafts
     let persistedCount = 0;
-    for (const [index, draft] of params.drafts.entries()) {
+    for (const draft of params.drafts) {
       const draftUuid = crypto.randomUUID();
 
       const insertResult = await client.query(
         `INSERT INTO app_private.dish_drafts (
-          id, tenant_id, job_id, draft_id, draft_index, name, description, category,
-          price_amount, price_currency, ingredients, source_id, source_text, image_id,
-          evidence, review_warnings, extraction_status, review_status
+          id, tenant_id, job_id, draft_id, candidate_id, draft_index, name, description, category,
+          subcategory, category_page_number, price_text, price_amount, price_currency,
+          ingredients, source_id, source_text, image_id, evidence, review_warnings,
+          extraction_status, review_status
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'needs_review', 'pending'
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'needs_review', 'pending'
         )
         ON CONFLICT (tenant_id, job_id, draft_index) DO UPDATE
         SET draft_id = EXCLUDED.draft_id,
+            candidate_id = EXCLUDED.candidate_id,
             name = EXCLUDED.name,
             description = EXCLUDED.description,
             category = EXCLUDED.category,
+            subcategory = EXCLUDED.subcategory,
+            category_page_number = EXCLUDED.category_page_number,
+            price_text = EXCLUDED.price_text,
             price_amount = EXCLUDED.price_amount,
             price_currency = EXCLUDED.price_currency,
             ingredients = EXCLUDED.ingredients,
@@ -252,10 +262,14 @@ export async function persistExtractedDrafts(
           params.tenantId,
           params.jobId,
           draft.draft_id,
-          index,
+          draft.candidate_id ?? draft.draft_id,
+          draft.draft_index,
           draft.name,
           draft.description ?? null,
           draft.category ?? null,
+          draft.subcategory ?? null,
+          draft.category_page_number ?? null,
+          draft.price_text ?? null,
           draft.price_amount ?? null,
           draft.price_currency ?? null,
           draft.ingredients ? JSON.stringify(draft.ingredients) : null,
@@ -276,14 +290,15 @@ export async function persistExtractedDrafts(
     }
 
     // 4. Mark surplus pending drafts as superseded (not human-rejected)
+    const persistedIndices = params.drafts.map((d) => d.draft_index);
     const supersedeResult = await client.query(
       `UPDATE app_private.dish_drafts
        SET review_warnings = array_append(review_warnings, 'superseded_by_retry'),
            review_status = 'superseded',
            updated_at = now()
        WHERE tenant_id = $1 AND job_id = $2
-         AND draft_index >= $3 AND review_status = 'pending';`,
-      [params.tenantId, params.jobId, params.drafts.length],
+         AND NOT (draft_index = ANY($3::integer[])) AND review_status = 'pending';`,
+      [params.tenantId, params.jobId, persistedIndices],
     );
     const supersededCount = supersedeResult.rowCount ?? 0;
 
@@ -345,7 +360,7 @@ export async function failIngestionJob(
   const timeout = params.leaseTimeoutMinutes ?? 10;
   await client.query(
     `UPDATE app_private.menu_ingestion_jobs
-     SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'incomplete' END,
+     SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
          error_code = $1,
          error_details = $2,
          finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,

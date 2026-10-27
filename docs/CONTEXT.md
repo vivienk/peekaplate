@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, and S3-VIS-01 / VIS-02 menu extraction and structured dish draft contracts (MenuExtractionResultSchema, ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, ExtractionSourceRecordSchema, ExtractionSourceSegmentSchema, ExtractionCaptureRequestSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Offsets, rank sequences, decimal price precision, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, and S3-VIS-01 / VIS-02 menu extraction and structured dish draft contracts (MenuExtractionResultSchema supporting schema 1/pipeline 2 and schema 2/pipeline 3 with subcategory, category_page_number, price_text, candidate_id, draft_index; ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, ExtractionSourceRecordSchema, ExtractionSourceSegmentSchema, ExtractionCaptureRequestSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Offsets, rank sequences, decimal price precision, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "944d9b73746bee8d75509ab8c86156e35e03a00554b1490040f1bc966851c340"
+      "sourceFingerprint": "0917d5edaf9a600fca7c8182a60dae228ee62a3fe8aa2171b78acf973dc65177"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Provides S3-VIS-04 bounded menu evidence retrieval and S3-VIS-01 menu ingestion orchestration layer: Python extraction result adapter with exact decimal price and Unicode span validation, transactional persistence repository with worker lease fencing and safe retry upserts, ingestion orchestrator, staff review and draft approval endpoints. Live queue consumer and direct container Python execution boundary remain separate operational dependencies.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Provides S3-VIS-04 bounded menu evidence retrieval and S3-VIS-01 menu ingestion orchestration layer: Python extraction result adapter supporting schema 1/2 and pipeline 2/3 with subcategory, category_page_number, price_text, and multi-span evidence reconstruction; transactional persistence repository with producer draft_index preservation and valid retry state transitions; report storage retention via result_storage_key; typed HTTP extraction transport; Cloudflare Queue bindings and consumer handler; staff review and draft approval endpoints. Live queue consumer provisioning and container Python RPC service remain staging dependencies.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -83,11 +83,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/index.ts",
         "backend/src/ingestion/adapter.test.ts",
         "backend/src/ingestion/adapter.ts",
+        "backend/src/ingestion/contract.test.ts",
         "backend/src/ingestion/ingestion.integration.ts",
         "backend/src/ingestion/orchestrator.test.ts",
         "backend/src/ingestion/orchestrator.ts",
         "backend/src/ingestion/repository.test.ts",
         "backend/src/ingestion/repository.ts",
+        "backend/src/ingestion/transport.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -117,12 +119,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "fa145fb462d8b304c40005b0bf56621142ca9718c52fcc6055150d1854b3bc76"
+      "sourceFingerprint": "23d7384034a76ccfbbd205a849722e9f64bd29f89c6b3adb0b02d368df7d4140"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS and composite FK behavior, and connection reuse.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, candidate_id, subcategory, category_page_number, price_text, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS, retry constraint behavior, and composite FK behavior, and connection reuse.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -145,7 +147,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fb01d32d535a883a4121e27fb36a047b1b8da53b4117c1a9848fc395d5bcfef4"
+      "sourceFingerprint": "8473e0447aaf5ab34f1b8b5eb2b201b3e05140104bf3094b218cb1ead2a1c5fd"
     },
     {
       "id": "measurement",
@@ -319,14 +321,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
-    },
-    {
       "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
       "modules": [
         "processing",
@@ -398,6 +392,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
+    },
+    {
+      "summary": "Completed S3-VIS-01 menu ingestion integration (PR #45): supported VIS-02 schema 2/pipeline 3 alongside legacy schema 1/pipeline 2; preserved subcategory, category_page_number, price_text, candidate_id, draft_index, and multi-span evidence through contracts, adapter, repository, and reload. Closed Mohammad's findings: retained full extraction report via result_storage_key (Finding A), preserved producer draft_index across persistence/superseding (Finding B), and resolved retry failure status/finished_at CHECK constraint violation (Finding C). Added HTTP extraction transport and Cloudflare Queue bindings. All 23 menu_ingestion pgTAP assertions, 207 contract/unit tests, and DB integration tests passed.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Coordinate staging queue infrastructure provisioning (peekaplate-staging-menu-ingestion and DLQ), Python extraction RPC service deployment and credentials, and staging database migration application before live end-to-end verification."
     }
   ]
 }

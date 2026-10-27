@@ -86,6 +86,7 @@ function createMockClient() {
         if (store.job) {
           store.job.status = values![0] as any;
           store.job.draft_count = values![1] as number;
+          store.job.result_storage_key = values![2] as string | null;
           store.job.claim_token = null;
           store.job.locked_at = null;
         }
@@ -522,6 +523,166 @@ describe('Ingestion Orchestrator', () => {
       expect(result.acknowledged).toBe(0);
       expect(msg.retry).toHaveBeenCalledTimes(1);
       expect(msg.ack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Finding A: Durable Report and Timing Artifact Retention', () => {
+    it('persists complete report artifact to storage and records result_storage_key on job', async () => {
+      const { client, store } = createMockClient();
+      const storageMap = new Map<string, string>();
+      const mockStorage = {
+        async put(key: string, data: string) {
+          storageMap.set(key, data);
+        },
+        async get(key: string) {
+          return storageMap.get(key) ?? null;
+        },
+      };
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_finding_a_1',
+      });
+
+      const fullReport = {
+        schema_version: 2,
+        pipeline_version: '3',
+        status: 'complete',
+        source: {
+          source_id: 'src_finding_a',
+          sha256: 'a'.repeat(64),
+          kind: 'website' as const,
+          location: 'https://example.com/menu',
+          retrieved_at: '2026-10-27T10:00:00.000Z',
+          size_bytes: 1024,
+          snapshot_base64: 'c29tZSBkYXRh',
+        },
+        started_at: '2026-10-27T10:00:00.000Z',
+        finished_at: '2026-10-27T10:00:05.000Z',
+        extraction_mode: 'ai' as const,
+        configuration: {
+          timings_seconds: { acquisition: 0.5, inference: 3.2 },
+          llm_batches: [{ batch: 1, duration: 3.2 }],
+        },
+        segments: [
+          {
+            segment_id: 'seg_1',
+            text: 'Special Pasta $18.00',
+            status: 'ready' as const,
+            method: 'text' as const,
+            warnings: [],
+            metadata: {},
+          },
+        ],
+        drafts: [
+          {
+            draft_id: 'draft_pasta',
+            name: 'Special Pasta',
+            price_amount: '18.00',
+            price_currency: 'USD',
+            price_text: '$18.00',
+            source_id: 'src_finding_a',
+            source_text: 'Special Pasta $18.00',
+            status: 'needs_review' as const,
+            review_warnings: [],
+          },
+        ],
+        evidence: [
+          {
+            draft_id: 'draft_pasta',
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_1', start: 0, end: 20 }],
+          },
+        ],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      };
+
+      const outcome = await executeIngestionWorkflow(client, {
+        tenantId: venueId,
+        jobId: job.id,
+        workerId: 'worker_storage_test',
+        extractor: async () => fullReport,
+        reportStorage: mockStorage,
+      });
+
+      expect(outcome.job.status).toBe('complete');
+      const expectedStorageKey = `reports/${venueId}/${job.id}/extraction.json`;
+      expect(outcome.job.result_storage_key).toBe(expectedStorageKey);
+
+      // Verify artifact was durably written to storage
+      const storedData = await mockStorage.get(expectedStorageKey);
+      expect(storedData).not.toBeNull();
+      const parsedStored = JSON.parse(storedData!);
+      expect(parsedStored.configuration.timings_seconds.inference).toBe(3.2);
+
+      // Verify sensitive timings are NOT leaked in returned structured drafts
+      expect((outcome.drafts[0] as any).timings_seconds).toBeUndefined();
+      expect((outcome.drafts[0] as any).llm_batches).toBeUndefined();
+    });
+
+    it('fails the job cleanly and does not report full success if report storage fails', async () => {
+      const { client } = createMockClient();
+      const failingStorage = {
+        async put(_key: string, _data: string): Promise<void> {
+          throw new Error('R2 write permission denied');
+        },
+      };
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_finding_a_fail',
+      });
+
+      await expect(
+        executeIngestionWorkflow(client, {
+          tenantId: venueId,
+          jobId: job.id,
+          workerId: 'worker_storage_fail',
+          extractor: async () => ({
+            schema_version: 1,
+            pipeline_version: '2',
+            status: 'complete',
+            started_at: '2026-10-27T10:00:00.000Z',
+            segments: [
+              {
+                segment_id: 'seg_1',
+                text: 'Dish $10.00',
+                status: 'ready',
+                method: 'text',
+                warnings: [],
+                metadata: {},
+              },
+            ],
+            drafts: [
+              {
+                name: 'Dish',
+                source_id: 'src_1',
+                source_text: 'Dish $10.00',
+                status: 'needs_review',
+                review_warnings: [],
+              },
+            ],
+            evidence: [
+              {
+                draft_id: 'draft_1',
+                draft_index: 0,
+                spans: [{ segment_id: 'seg_1', start: 0, end: 11 }],
+              },
+            ],
+            warnings: [],
+            errors: [],
+          }),
+          reportStorage: failingStorage,
+        }),
+      ).rejects.toMatchObject({
+        code: 'report_storage_failed',
+      });
     });
   });
 });

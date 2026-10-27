@@ -315,9 +315,31 @@ export const ExtractionDraftEvidenceSchema = z.strictObject({
 });
 
 export const ExtractionDishDraftSchema = z.strictObject({
-  name: z.string().trim().min(1).max(160),
-  description: z.string().trim().min(1).max(4000).nullable().default(null),
+  draft_id: z.string().min(1).optional(),
+  candidate_id: z.string().min(1).optional(),
+  draft_index: z.number().int().min(0).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 160, 'name must be at most 160 code points'),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 4000, 'description must be at most 4000 code points')
+    .nullable()
+    .default(null),
   category: z.string().trim().min(1).nullable().default(null),
+  subcategory: z.string().trim().min(1).nullable().optional(),
+  category_page_number: z.number().int().min(1).nullable().optional(),
+  price_text: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 160, 'price_text must be at most 160 code points')
+    .nullable()
+    .optional(),
   price_amount: z
     .union([
       z.string().regex(/^\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^\d+(\.\d+)?$/),
@@ -386,8 +408,8 @@ export const ExtractionCaptureRequestSchema = z.strictObject({
 });
 
 export const MenuExtractionResultSchema = z.strictObject({
-  schema_version: z.literal(1),
-  pipeline_version: z.literal('2'),
+  schema_version: z.union([z.literal(1), z.literal(2)]),
+  pipeline_version: z.union([z.literal('2'), z.literal('3')]),
   status: z.enum(['complete', 'incomplete', 'failed']),
   source: ExtractionSourceRecordSchema.nullable().default(null),
   started_at: z.iso.datetime({ offset: true }),
@@ -407,10 +429,29 @@ export const MenuExtractionResultSchema = z.strictObject({
 
 export const StructuredDishDraftSchema = z.strictObject({
   draft_id: z.string().min(1),
+  candidate_id: z.string().min(1).nullable().optional(),
   draft_index: z.number().int().min(0),
-  name: z.string().trim().min(1).max(160),
-  description: z.string().trim().min(1).max(4000).nullable(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 160, 'name must be at most 160 code points'),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 4000, 'description must be at most 4000 code points')
+    .nullable(),
   category: z.string().trim().min(1).nullable(),
+  subcategory: z.string().trim().min(1).nullable().optional(),
+  category_page_number: z.number().int().min(1).nullable().optional(),
+  price_text: z
+    .string()
+    .trim()
+    .min(1)
+    .refine((val) => Array.from(val).length <= 160, 'price_text must be at most 160 code points')
+    .nullable()
+    .optional(),
   price_amount: z
     .string()
     .regex(/^\d+(\.\d+)?$/)
