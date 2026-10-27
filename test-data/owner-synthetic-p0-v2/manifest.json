@@ -1,0 +1,140 @@
+{
+  "pack_id": "owner-synthetic-p0-v2",
+  "status": "DRAFT_FOR_INDEPENDENT_REVIEW",
+  "fictional_only": true,
+  "purpose": "Repeatable synthetic fixtures for P0 v2 event handling, metric calculations, privacy, negative testing, and AI grounding.",
+  "fixture_schema_status": "Proposed fixture schema only. Production event/API mapping and metric definitions require approval.",
+  "datasets": {
+    "starter": {
+      "event_file": "events/two_session_story.jsonl",
+      "sessions": 2,
+      "delivery_lines": 21,
+      "unique_observations": 20,
+      "detail_openings": 2
+    },
+    "full": {
+      "event_file": "events/full_dataset.jsonl",
+      "generation_script": "generate_full_dataset.py",
+      "validation_script": "validate_full_dataset.py",
+      "repeated_story_pairs": 150,
+      "sessions": 300,
+      "delivery_lines": 3150,
+      "unique_observations": 3000,
+      "detail_openings": 300,
+      "final_checkpoints": 300,
+      "comparison_starts": 150,
+      "direct_saves": 450,
+      "undo_restorations": 150,
+      "successful_unsaves": 450
+    }
+  },
+  "dishes": [
+    {
+      "dish_id": "dish-A",
+      "name": "Soup",
+      "fictional_revision": "synthetic-dish-v1"
+    },
+    {
+      "dish_id": "dish-B",
+      "name": "Salad",
+      "fictional_revision": "synthetic-dish-v1"
+    },
+    {
+      "dish_id": "dish-C",
+      "name": "Bowl",
+      "fictional_revision": "synthetic-dish-v1"
+    }
+  ],
+  "schema_file": "schema.json",
+  "expected_answers": "expected_answers.json",
+  "expected_answers_scope": "Two-session internal oracle only; full-dataset expectations are checked by validate_full_dataset.py.",
+  "test_files": [
+    "tests/test_fixture.py",
+    "tests/test_metric_examples.py",
+    "tests/test_negative_cases.py",
+    "tests/test_session_completion.py",
+    "tests/test_validator_integration.py",
+    "tests/test_ai_report_inputs.py"
+],
+"negative_cases": {
+  "file": "negative_cases.json",
+  "defined": 25,
+  "helper_tests_implemented": 10,
+  "validator_integration_tests": 19,
+  "execution_scope": "LOCAL_HELPER_AND_VALIDATOR_TESTS_ONLY",
+  "catalog_mapping_file": "negative_case_test_mapping.json",
+  "catalog_mapping_status": "PARTIAL_LOCAL_COVERAGE_DOCUMENTED",
+  "catalog_cases_with_partial_local_coverage": 10,
+  "catalog_cases_not_confirmed": 15,
+  "application_execution_status": "NOT_RUN",
+  "remaining_status": "NOT_ALL_DOCUMENTED_CASES_EXECUTED"
+},
+  "ai_evaluation": {
+    "file": "ai_evaluation_cases.json",
+    "defined": 20,
+    "execution_status": "NOT_RUN_AGAINST_APPLICATION_AI"
+  },
+  "evidence": {
+    "unit_test_results": "test_results.txt",
+    "dataset_validation_results": "validation_results.txt",
+    "unit_tests_passed": 62,
+    "validation_status": "LOCAL_SYNTHETIC_CHECKS_PASSED"
+  },
+  "privacy": {
+    "behavioral_suppression_threshold": 10,
+    "starter_fixture": "SUPPRESSED",
+    "full_fixture": "Threshold eligibility and authorized reporting require separate verification.",
+    "warning": "Repeated synthetic sessions do not establish real independent users or production privacy compliance."
+  },
+  "not_for": [
+    "production database import",
+    "shared or hosted database upload",
+    "claiming production dashboard or assistant behavior is validated",
+    "treating proposed event/API fields as approved production contracts",
+    "claiming AI evaluation cases have passed"
+  ],
+  "review_gates": [
+    "Louis: metric units, formulas, and cohorts",
+    "Jeffin and Zhiliang: event/API field mapping",
+    "Harshita: actual UI success and failure behavior",
+    "Adam and Vivien: outstanding product decisions",
+    "Sai: independent privacy, architecture, and handoff review"
+  ],
+  "dataset_version": "p0-v2-synthetic-1.0",
+  "source_revisions": {
+  "preparation_guide_revision": null,
+  "event_taxonomy_revision": null,
+  "status": "PENDING_SOURCE_OWNER_CONFIRMATION",
+  "note": "The exact preparation-guide and event taxonomy revisions used to construct these fixtures have not been verified. Dataset and fixture schema versions are documented separately."
+},
+  "metric_examples": {
+    "file": "metric_examples.json",
+    "defined": 6,
+    "local_tests": "PASSED",
+    "rule_status": "PROPOSED_PENDING_METRIC_OWNER_APPROVAL"
+  },
+  "observation_window": {
+    "start": "2026-10-20T10:00:00+05:00",
+    "end": "2026-10-20T11:00:07+05:00",
+    "start_inclusive": true,
+    "end_inclusive": true,
+    "timezone": "UTC+05:00",
+    "duration_seconds": 3607,
+    "scope": "Synthetic event timestamp range, not a production reporting window"
+},
+  "dish_revision_note": "Fictional documentation placeholders only; dish revision IDs are not present in event records and are not production identifiers.",
+  "initial_saved_state": {
+    "session-X": [],
+    "session-Y": [],
+    "replicated_sessions": "Each replicated session inherits the empty initial Saved state.",
+    "status": "EXPLICIT_SYNTHETIC_FIXTURE_ASSUMPTION"
+  },
+  "session_completion_policy": {
+    "status": "PROPOSED_PENDING_METRIC_OWNER_APPROVAL",
+    "completed": "Explicit session completion event or approved inactivity-timeout rule.",
+    "unfinished": "No confirmed completion event or approved timeout.",
+    "finalized_retention": "Numerator: completed sessions that directly saved the dish and still have it Saved at completion. Denominator: completed sessions that directly saved that dish. Exclude unfinished sessions and completed sessions that never directly saved the dish. If the denominator is zero, the rate is null.",
+    "unfinished_retention": "Exclude from finalized retention; report separately as pending.",
+    "existing_fixture_limitation": "Current event fixture does not establish explicit session completion; existing final_saved assertions represent end-of-fixture state, not verified completed-session retention."
+  }
+}

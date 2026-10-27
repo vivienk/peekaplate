@@ -1,0 +1,32 @@
+{
+  "fixture_id": "engagement",
+  "report_type": "authorized_engagement_definitions",
+  "data_scope": "fictional_synthetic_restaurant",
+  "definitions": {
+    "active_visible_time": "Use completed active-visible time derived from linked opening checkpoints. Do not add cumulative checkpoint values together.",
+    "checkpoint_semantics": "Cumulative checkpoints describe progress within the same opening. The completed active time comes from the final valid checkpoint.",
+    "comparison_picker": "Opening a comparison picker does not count as a displayed comparison.",
+    "qualifying_comparison": "A comparison qualifies only when it is displayed and linked to a valid dish opening.",
+    "considered_dish": "A dish qualifies with at least 10000 milliseconds of completed active-visible time OR a qualifying displayed comparison.",
+    "short_opening": "Opening a dish for fewer than 10 seconds does not automatically establish meaningful engagement.",
+    "deduplication": "Count each qualifying dish once per visit."
+  },
+  "comparison_attribution": {
+    "status": "PROVISIONAL_PENDING_PRODUCT_CONFIRMATION",
+    "current_test_assumption": "Only the dish linked to the opening qualifies.",
+    "unresolved_question": "Should a displayed comparison qualify both displayed dishes?"
+  },
+  "metrics": [
+    {
+      "metric": "considered_dishes_per_visit",
+      "status": "SUPPRESSED",
+      "value": null
+    }
+  ],
+  "privacy": {
+    "minimum_eligible_sessions": 10,
+    "raw_events_included": false,
+    "checkpoint_histories_included": false,
+    "individual_diner_data_included": false
+  }
+}

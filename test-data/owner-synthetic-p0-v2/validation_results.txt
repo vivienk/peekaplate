@@ -1,0 +1,32 @@
+﻿PASS: All event deliveries match schema.json.
+PASS: Declared full dataset counts match.
+PASS: All events use the correct schema version.
+PASS: All event timestamps are valid and timezone-aware.
+PASS: No duplicate sequence numbers within sessions.
+PASS: Duplicate deliveries are identical.
+PASS: All detail openings link to valid earlier exposures.
+Validated openings: 300
+PASS: All checkpoints link to valid earlier openings.
+Validated checkpoints: 450
+PASS: All comparisons have valid opening links and displayed pairs.
+Validated comparisons: 150
+PASS: Save, Unsave, and Undo transitions are valid.
+Direct Saves: 450
+Undo restorations: 150
+Successful Unsaves: 450
+PASS: All shortlist sizes match saved state.
+Validated shortlist sizes: 1050
+PASS: Final retained dishes match the expected story.
+Session X copies with Dish A saved: 150
+Session Y copies with no saved dishes: 150
+PASS: Completed active-time metrics match expectations.
+Completed openings: 300
+10-second openings: 150
+5-second openings: 150
+Average active time: 7.5 seconds
+PASS: Full-dataset metric checks.
+Exposure sessions: A=300, B=300, C=150
+Opening sessions: A=150, B=150, C=0
+Linked opening rates: A=50%, B=50%, C=0%
+Save adoption: 300/300 = 100%
+Displayed A/B comparison sessions: 150

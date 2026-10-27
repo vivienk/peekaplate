@@ -644,3 +644,25 @@ Begin with **three representative dishes**, then expand the approved photo/text 
 Use weekly Tuesday-to-Tuesday sprint headings within the requested 15–20-day delivery window. Reconfirm capacity and dates before committing. Each ticket needs a plain title, research/design/implementation label, estimated effort, required roles, source links, acceptance examples and its prerequisite PR. Include review and integration time in the estimate.
 
 The first integrated demo should show permitted staff saving, reviewing and publishing a dish, and a diner seeing that approved version. Layout, manual content preparation and event-definition review can proceed alongside backend work. Accept tracking and reports only after their real data paths and calculations are tested; a collector alone is not a finished dashboard.
+
+## P0 v2 owner synthetic dataset — October 27, 2026
+
+The reviewed synthetic dataset package is located at
+`test-data/owner-synthetic-p0-v2/`.
+
+It provides fictional event fixtures, expected metric outputs, negative
+cases, schema validation, and reproducible automated tests for the
+PeekaPlate P0 evaluation work.
+
+Verification completed in the repository copy:
+- 62/62 automated tests passed, including 19 validator integration tests.
+- Full dataset validation passed.
+- Starter dataset validation passed.
+
+To reproduce the results, follow
+[test-data/owner-synthetic-p0-v2/GUIDE.md](../test-data/owner-synthetic-p0-v2/GUIDE.md).
+
+These results establish synthetic fixture and validator correctness only.
+Application AI evaluation remains NOT RUN. Production integration and
+hosted privacy acceptance are not established. Outstanding product
+decisions remain PENDING.

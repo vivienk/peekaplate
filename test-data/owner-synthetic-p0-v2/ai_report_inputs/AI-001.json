@@ -1,0 +1,30 @@
+{
+  "fixture_id": "AI-001",
+  "report_type": "authorized_privacy_filtered_metrics",
+  "reporting_window": {
+    "start": "2026-10-20T10:00:00+05:00",
+    "end": "2026-10-20T11:00:07+05:00"
+  },
+  "privacy_policy": {
+    "minimum_eligible_sessions": 10,
+    "suppression_applied": true
+  },
+  "metrics": [
+  {
+    "metric": "dish_openings",
+    "dimension": "dish",
+    "status": "SUPPRESSED",
+    "value": null
+  },
+  {
+    "metric": "dish_save_rate",
+    "dimension": "dish",
+    "status": "SUPPRESSED",
+    "value": null
+  }
+],
+  "verified_orders": {
+    "status": "UNAVAILABLE",
+    "value": null
+  }
+}

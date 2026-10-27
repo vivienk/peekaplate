@@ -1,0 +1,181 @@
+[
+  {
+    "case_id": "NEG-001",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_001_identical_retry",
+      "tests/test_fixture.py::test_duplicate_is_undo_restoration"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-002",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_002_conflicting_retry"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-003",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_003_missing_event_id",
+      "tests/test_negative_cases.py::test_reject_invalid_timestamp",
+      "tests/test_validator_integration.py::test_invalid_timestamp",
+      "tests/test_validator_integration.py::test_empty_event_id"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-004",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-005",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_005_duplicate_checkpoint",
+      "tests/test_fixture.py::test_active_time_from_events"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-006",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-007",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-008",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_008_invalid_comparison_pair"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-009",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-010",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_010_privacy_threshold",
+      "tests/test_fixture.py::test_privacy_suppression",
+      "tests/test_ai_report_inputs.py::test_all_suppressed_metrics_hide_values"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-011",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-012",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-013",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-014",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-015",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-016",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-017",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_validator_integration.py::test_undo_without_prior_unsave",
+      "tests/test_validator_integration.py::test_undo_without_matching_prior_unsave"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-018",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-019",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_010_privacy_threshold"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-020",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_negative_cases.py::test_neg_020_zero_denominator",
+      "tests/test_session_completion.py::test_no_eligible_completed_savers"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-021",
+    "coverage_status": "PARTIAL_LOCAL_COVERAGE",
+    "test_references": [
+      "tests/test_session_completion.py::test_unfinished_session_excluded_from_retention"
+    ],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-022",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-023",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-024",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  },
+  {
+    "case_id": "NEG-025",
+    "coverage_status": "NOT_CONFIRMED",
+    "test_references": [],
+    "application_execution_status": "NOT_RUN"
+  }
+]

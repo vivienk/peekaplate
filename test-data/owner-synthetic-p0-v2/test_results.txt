@@ -1,0 +1,165 @@
+﻿python : test_ai001_fixture_exists (test_ai_report_inputs.T
+estAIReportInputs.test_ai001_fixture_exists) ... ok
+At line:1 char:1
++ python -B -m unittest discover -s tests -v 2>&1 |
+Out-File -FilePath  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_ai001_fi
+   xt..._exists) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+test_ai001_no_private_event_data (test_ai_report_inputs.Tes
+tAIReportInputs.test_ai001_no_private_event_data) ... ok
+test_ai001_not_run (test_ai_report_inputs.TestAIReportInput
+s.test_ai001_not_run) ... ok
+test_ai001_suppressed_values_hidden (test_ai_report_inputs.
+TestAIReportInputs.test_ai001_suppressed_values_hidden)
+... ok
+test_all_cases_remain_not_run (test_ai_report_inputs.TestAI
+ReportInputs.test_all_cases_remain_not_run) ... ok
+test_all_fixtures_exclude_private_event_data (test_ai_repor
+t_inputs.TestAIReportInputs.test_all_fixtures_exclude_priva
+te_event_data) ... ok
+test_all_suppressed_metrics_hide_values (test_ai_report_inp
+uts.TestAIReportInputs.test_all_suppressed_metrics_hide_val
+ues) ... ok
+test_all_twenty_cases_have_valid_fixtures (test_ai_report_i
+nputs.TestAIReportInputs.test_all_twenty_cases_have_valid_f
+ixtures) ... ok
+test_active_time_from_events
+(test_fixture.FixtureTests.test_active_time_from_events)
+... ok
+test_average_active_time_from_events (test_fixture.FixtureT
+ests.test_average_active_time_from_events) ... ok
+test_card_exposure_counts
+(test_fixture.FixtureTests.test_card_exposure_counts) ...
+ok
+test_comparison_from_events
+(test_fixture.FixtureTests.test_comparison_from_events)
+... ok
+test_detail_opening_exposure_links (test_fixture.FixtureTes
+ts.test_detail_opening_exposure_links) ... ok
+test_duplicate_is_undo_restoration (test_fixture.FixtureTes
+ts.test_duplicate_is_undo_restoration) ... ok
+test_event_counts_match_expected (test_fixture.FixtureTests
+.test_event_counts_match_expected) ... ok
+test_final_save_retention
+(test_fixture.FixtureTests.test_final_save_retention) ...
+ok
+test_linked_detail_open_rates
+(test_fixture.FixtureTests.test_linked_detail_open_rates)
+... ok
+test_open_count
+(test_fixture.FixtureTests.test_open_count) ... ok
+test_privacy_suppression
+(test_fixture.FixtureTests.test_privacy_suppression) ... ok
+test_required_fields
+(test_fixture.FixtureTests.test_required_fields) ... ok
+test_save_adoption
+(test_fixture.FixtureTests.test_save_adoption) ... ok
+test_save_undo_unsave_counts
+(test_fixture.FixtureTests.test_save_undo_unsave_counts)
+... ok
+test_session_sequence_order
+(test_fixture.FixtureTests.test_session_sequence_order)
+... ok
+test_strict_engaged_pairs_draft_structure (test_fixture.Fix
+tureTests.test_strict_engaged_pairs_draft_structure) ... ok
+test_time_arithmetic
+(test_fixture.FixtureTests.test_time_arithmetic) ... ok
+test_time_based_consideration_candidates (test_fixture.Fixt
+ureTests.test_time_based_consideration_candidates) ... ok
+test_unique_event_ids
+(test_fixture.FixtureTests.test_unique_event_ids) ... ok
+test_all_six_examples_exist (test_metric_examples.TestMetri
+cExamples.test_all_six_examples_exist) ... ok
+test_expected_metric_results (test_metric_examples.TestMetr
+icExamples.test_expected_metric_results) ... ok
+test_neg_001_identical_retry (test_negative_cases.TestNegat
+iveCases.test_neg_001_identical_retry) ... ok
+test_neg_002_conflicting_retry (test_negative_cases.TestNeg
+ativeCases.test_neg_002_conflicting_retry) ... ok
+test_neg_003_missing_event_id (test_negative_cases.TestNega
+tiveCases.test_neg_003_missing_event_id) ... ok
+test_neg_005_duplicate_checkpoint (test_negative_cases.Test
+NegativeCases.test_neg_005_duplicate_checkpoint) ... ok
+test_neg_008_invalid_comparison_pair (test_negative_cases.T
+estNegativeCases.test_neg_008_invalid_comparison_pair) ...
+ok
+test_neg_010_privacy_threshold (test_negative_cases.TestNeg
+ativeCases.test_neg_010_privacy_threshold) ... ok
+test_neg_020_zero_denominator (test_negative_cases.TestNega
+tiveCases.test_neg_020_zero_denominator) ... ok
+test_neg_invalid_schema_version (test_negative_cases.TestNe
+gativeCases.test_neg_invalid_schema_version) ... ok
+test_reject_invalid_schema_version (test_negative_cases.Tes
+tNegativeCases.test_reject_invalid_schema_version) ... ok
+test_reject_invalid_timestamp (test_negative_cases.TestNega
+tiveCases.test_reject_invalid_timestamp) ... ok
+test_undo_without_prior_unsave_helper (test_negative_cases.
+TestNegativeCases.test_undo_without_prior_unsave_helper)
+... ok
+test_completed_saver_who_unsaved_is_not_retained (test_sess
+ion_completion.TestSessionCompletion.test_completed_saver_w
+ho_unsaved_is_not_retained) ... ok
+test_no_eligible_completed_savers (test_session_completion.
+TestSessionCompletion.test_no_eligible_completed_savers)
+... ok
+test_unfinished_session_excluded_from_retention (test_sessi
+on_completion.TestSessionCompletion.test_unfinished_session
+_excluded_from_retention) ... ok
+test_checkpoint_active_time_exceeds_elapsed (test_validator
+_integration.TestValidatorIntegration.test_checkpoint_activ
+e_time_exceeds_elapsed) ... ok
+test_checkpoint_timestamp_before_opening (test_validator_in
+tegration.TestValidatorIntegration.test_checkpoint_timestam
+p_before_opening) ... ok
+test_checkpoint_wrong_dish (test_validator_integration.Test
+ValidatorIntegration.test_checkpoint_wrong_dish) ... ok
+test_comparison_missing_identity_fields (test_validator_int
+egration.TestValidatorIntegration.test_comparison_missing_i
+dentity_fields) ... ok
+test_duplicate_local_sequence (test_validator_integration.T
+estValidatorIntegration.test_duplicate_local_sequence) ...
+ok
+test_empty_event_id (test_validator_integration.TestValidat
+orIntegration.test_empty_event_id) ... ok
+test_invalid_schema_version (test_validator_integration.Tes
+tValidatorIntegration.test_invalid_schema_version) ... ok
+test_invalid_timestamp (test_validator_integration.TestVali
+datorIntegration.test_invalid_timestamp) ... ok
+test_missing_retries_renamed_file (test_validator_integrati
+on.TestValidatorIntegration.test_missing_retries_renamed_fi
+le) ... ok
+test_save_missing_surface_fields (test_validator_integratio
+n.TestValidatorIntegration.test_save_missing_surface_fields
+) ... ok
+test_supplied_full_dataset (test_validator_integration.Test
+ValidatorIntegration.test_supplied_full_dataset) ... ok
+test_supplied_starter_dataset (test_validator_integration.T
+estValidatorIntegration.test_supplied_starter_dataset) ...
+ok
+test_timestamp_without_timezone (test_validator_integration
+.TestValidatorIntegration.test_timestamp_without_timezone)
+... ok
+test_undo_without_matching_prior_unsave (test_validator_int
+egration.TestValidatorIntegration.test_undo_without_matchin
+g_prior_unsave) ... ok
+test_undo_without_prior_unsave (test_validator_integration.
+TestValidatorIntegration.test_undo_without_prior_unsave)
+... ok
+test_unknown_event_type (test_validator_integration.TestVal
+idatorIntegration.test_unknown_event_type) ... ok
+test_unsave_missing_surface_fields (test_validator_integrat
+ion.TestValidatorIntegration.test_unsave_missing_surface_fi
+elds) ... ok
+test_valid_baseline (test_validator_integration.TestValidat
+orIntegration.test_valid_baseline) ... ok
+test_zero_sequence (test_validator_integration.TestValidato
+rIntegration.test_zero_sequence) ... ok
+
+-----------------------------------------------------------
+-----------
+Ran 62 tests in 19.251s
+
+OK
