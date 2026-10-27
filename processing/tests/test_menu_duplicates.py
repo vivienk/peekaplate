@@ -78,6 +78,33 @@ class MenuDuplicateTests(unittest.TestCase):
                 self.assertTrue(all(item["price_amount"] is None and item["price_text"] is None for item in result))
                 self.assertEqual(result[0]["description"],"Seasonal vegetables")
 
+    def test_same_line_columns_preserve_genuine_unpriced_entry(self):
+        text="Soup Seasonal vegetables    Soup 5"
+        def box(label,x,width):
+            return dict(text=label,left=x,top=60,width=width,height=20)
+        metadata=dict(ocr_region_status="available",ocr_coordinate_space="uploaded_image_pixels",
+                      upload_width=1000,upload_height=400,
+                      ocr_regions=[box("Soup",20,40),box("Seasonal vegetables",65,170),
+                                   box("Soup",520,100),box("5",820,40)])
+        originals=[dict(dish(),description="Seasonal vegetables"),dish()]
+        for evidence in [metadata,None]:
+            with self.subTest(layout=evidence is not None):
+                items=[]
+                for original in originals:
+                    cleaned,warnings=grounded_draft(ExtractedDish(**original),text,dish_names=["Soup"],ocr_metadata=evidence)
+                    items.append({**cleaned.model_dump(),"review_warnings":warnings})
+                result,_=self.run_case(items,text,metadata=evidence,originals=originals)
+                self.assertEqual(len(result),2)
+                self.assertTrue(all(item["price_amount"] is None and item["price_text"] is None for item in result))
+                self.assertEqual(result[0]["description"],"Seasonal vegetables")
+
+    def test_caption_proof_only_excludes_the_actual_alt_span(self):
+        text="![Soup](photo)\nSOUP\n5\nNotes    Soup seasonal vegetables"
+        first=dish("Soup")
+        second=dict(dish("SOUP"),price_amount="5")
+        result,_=self.run_case([first,second],text)
+        self.assertEqual(len(result),2)
+
     def test_null_original_does_not_bridge_conflicts(self):
         items=[dict(dish(),price_amount="5",price_text="5") for _ in range(3)]
         originals=[dict(dish(),price_amount=value) for value in ["5","7",None]]

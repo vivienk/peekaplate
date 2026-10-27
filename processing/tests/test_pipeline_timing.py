@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import tempfile
@@ -64,6 +65,53 @@ class PipelineTimingTests(unittest.TestCase):
                 for candidate in exported.candidates:
                     span=candidate.evidence[0]
                     self.assertEqual(text[span.start:span.end], candidate.original.source_text)
+
+    def test_partial_price_groups_abstain_through_export(self):
+        cases=[("decimal_overlay", "95.50", "95", None),
+               ("middle_option_overlay", "75 / 95 / 120", "95", None),
+               ("truncated_text_list", "8.50 / 12.50 / 15.50", None, "8.50 / 12.50")]
+        for label, source_price, overlay, supplied in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as folder:
+                text=f"Soup\nSeasonal vegetables and fresh herbs\n{source_price}"
+                path=Path(folder)/"menu.pdf"
+                path.write_bytes(make_pdf([{"text":text}]))
+                acquired=extract_source(path)
+                segment=acquired.segments[0]
+                segment.text=text
+                if overlay is not None:
+                    segment.method="ocr_space_engine3"
+                    segment.metadata=dict(ocr_region_status="available", ocr_coordinate_space="uploaded_image_pixels",
+                        upload_width=800, upload_height=400, ocr_regions=[
+                            dict(text="Soup",left=20,top=20,width=100,height=10),
+                            dict(text=overlay,left=250,top=20,width=100,height=10)])
+                before=copy.deepcopy(segment)
+                class PartialPriceLLM(FakeLLM):
+                    def invoke(client, messages):
+                        answer=super().invoke(messages)
+                        dish=ExtractedDish(page_number=1,name="Soup",description=None,category=None,
+                            price_amount=None,price_text=supplied,price_currency=None,ingredients=None)
+                        answer["raw"].content=DishBatch(dishes=[dish],sections=[
+                            PageSection(page_number=1,category=None,continues_previous=False)]).model_dump_json()
+                        return answer
+                client=PartialPriceLLM()
+                with patch("peekaplate_processing.run_pipeline.extract_source", return_value=acquired):
+                    report=run_pipeline(path, Path(folder)/"run", llm=client, cache_dir=None, llm_cache_dir=None)
+                self.assertEqual(report.segments[0].text, before.text)
+                self.assertEqual(report.segments[0].metadata, before.metadata)
+                self.assertEqual(client.calls, [[{"page_number":1,"text":text}]])
+                exported=prepare_review_candidates(report)
+                self.assertEqual(len(exported.candidates), 1)
+                candidate=exported.candidates[0]
+                self.assertIsNone(candidate.original.price_amount)
+                self.assertIsNone(candidate.original.price_text)
+                self.assertEqual(candidate.original.status, "needs_review")
+                self.assertTrue(candidate.original.review_warnings)
+                self.assertEqual(exported.segments[0].text, before.text)
+                self.assertEqual(exported.segments[0].metadata, before.metadata)
+                self.assertEqual(candidate.original.source_text, report.drafts[0].source_text)
+                self.assertEqual(candidate.evidence, report.evidence[0].spans)
+                span=candidate.evidence[0]
+                self.assertEqual(text[span.start:span.end], candidate.original.source_text)
 
     def test_cache_flags(self):
         for flags,cache_dir in [([], "work/ocr-cache"), (["--no-ocr-cache"], None)]:

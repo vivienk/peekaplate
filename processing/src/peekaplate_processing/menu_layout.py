@@ -9,7 +9,7 @@ import math
 import re
 from typing import NamedTuple
 
-from .menu_context import detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches
+from .menu_context import detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches
 
 _NUMBER = r"\d+(?:\.\d+)?"
 _AMOUNT = rf"(?:(?:[$€£₱]|PHP|P)[ \t]*)?{_NUMBER}"
@@ -109,7 +109,7 @@ def _source_price(value, text, names):
     if not _PRICE.fullmatch(value):
         return None
     literals = set()
-    for match in phrase_matches(value, text):
+    for match in price_matches(value, text):
         if any(match.start() < n.end() and match.end() > n.start() for n in names):
             continue
         if len(match.group()) > 160 or not _PRICE.fullmatch(match.group()):
@@ -165,9 +165,13 @@ def _is_caption(name, label, text):
     """Only distinguishable explicit image-alt text proves a caption role."""
     normalize=lambda value:" ".join(_MARKUP.sub("", value, count=1).split())
     label=normalize(label)
-    captions={normalize(value) for value in re.findall(r"!\[([^\]\n]+)\]\([^\n)]*\)", text)}
-    entries={normalize(match.group()) for match in entry_matches(name, text)}
-    return label in captions and label not in entries
+    captions=list(re.finditer(r"!\[([^\]\n]+)\]\([^\n)]*\)", text))
+    if label not in {normalize(caption.group(1)) for caption in captions}:
+        return False
+    return not any(normalize(match.group()) == label
+                   and not any(caption.start(1) <= match.start() and match.end() <= caption.end(1)
+                               for caption in captions)
+                   for match in phrase_matches(name, text))
 
 
 def _card_price(name, text, dish_names, parts, heading, runs, prices):
@@ -185,7 +189,7 @@ def _card_price(name, text, dish_names, parts, heading, runs, prices):
     if len(below) != 1:
         return None
     box,literal=below[0]
-    if _collides(box, runs) or not phrase_matches(literal, block):
+    if _collides(box, runs) or not price_matches(literal, block):
         return None
     return literal
 

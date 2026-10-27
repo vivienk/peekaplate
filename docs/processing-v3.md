@@ -49,6 +49,12 @@ in longer slash-separated lists. When multiple prices are printed together, the
 amount stays null and the draft carries a review
 warning. No small/large, serving or other option meanings are invented.
 
+A printed-price suggestion or OCR box must corroborate a complete numeric group,
+not a decimal/thousands fragment or a subset of a slash-separated option list.
+Clipped boxes and truncated suggestions are withheld rather than promoted to a
+scalar price. Explicit money beside a separately labelled calorie/portion count
+remains distinct; these checks do not turn units into prices.
+
 Numbers are checked against the matched dish entry, bounded by other known or
 possible entry headings, including omitted entries with inline prices, rather than
 every number on the page. Photo captions are not preferred entry anchors.
@@ -74,8 +80,12 @@ image-alt text can exclude a caption occurrence; an unmarked or indistinguishabl
 repeat stays ambiguous, even when another occurrence has a valid price. Every
 source entry occurrence must be reconciled: an entry whose boxes join its title
 and description cannot disappear from the competing count merely because that
-combined run is not a price-eligible heading. This can clear previously retained
-prices rather than guess which entry they describe.
+combined run is not a price-eligible heading. Repeated source phrases inside one
+flattened OCR line also compete; line-start matching alone cannot prove one entry
+across columns. Only a distinguishable occurrence inside actual image-alt syntax
+can be excluded as a caption. Repeated mentions can therefore cause conservative
+abstention even when a human could identify one entry. This can clear previously
+retained prices rather than guess which entry they describe.
 
 Malformed, excessive or competing geometry abstains rather than widening back
 to the page's text. Missing/unavailable geometry uses the text checks, but several

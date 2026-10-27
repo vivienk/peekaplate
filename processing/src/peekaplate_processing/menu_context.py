@@ -2,8 +2,11 @@
 import re
 
 
+_UNITS = r"(?:kcal|calories|cals?|pcs?|pieces?|servings?|grams?|kg|g|ml|oz)"
+
+
 def nonprice_unit(text, start, end):
-    units=r"(?:kcal|calories|cals?|pcs?|pieces?|servings?|grams?|kg|g|ml|oz)"
+    units=_UNITS
     before=text[text.rfind("\n", 0, start)+1:start]
     if re.match(rf"[ \t]*{units}\b", text[end:], re.I) or re.search(rf"\b{units}[ \t]*:?[ \t]*$", before, re.I):
         return True
@@ -24,14 +27,66 @@ def phrase_matches(value, text):
     return list(re.finditer(pattern, text, re.I))
 
 
+def complete_price_match(match, text):
+    """Price evidence must not be a numeric fragment or part of a slash group."""
+    before,after=text[:match.start()],text[match.end():]
+    currency=r"(?:[$€£₱]|\bPHP|\bP|\b(?-i:[A-Z]{3})[ \t]+)"
+    # A source marker outside the supplied literal must not hide a sign or slash.
+    before=re.sub(rf"{currency}[ \t]*\Z", "", before, flags=re.I)
+    if re.search(r"[\w.,+\-−]\Z", before) or re.match(r"\w|[.,]\d", after):
+        return False
+    # Include malformed/signed neighbors when checking completeness, not as new
+    # supported price formats. Never salvage a suffix of an unsupported group.
+    number=r"[+\-−]?[.,]?\d+(?:[.,]\d+)*"
+    prior=re.search(rf"({number})(?:[ \t]+[A-Z]{{3}})?\s*/\s*$", before, re.I)
+    if prior and not nonprice_unit(text, prior.start(1), prior.end(1)):
+        return False
+    following=re.match(rf"(?:[ \t]+[A-Z]{{3}})?\s*/\s*(?:{currency}[ \t]*)?({number})", after, re.I)
+    if following:
+        # Explicit money beside a directly labelled calorie/portion count is
+        # separate evidence; an indirectly labelled option is still a partial list.
+        end=match.end()+following.end(1)
+        if not re.match(rf"[ \t]*{_UNITS}\b", text[end:], re.I):
+            return False
+    return True
+
+
+def price_matches(value, text):
+    """Match printed prices without the heading-markup rules used for names."""
+    words=value.split()
+    if not words:
+        return []
+    pattern=r"(?<!\w)"+r"\s+".join(re.escape(word) for word in words)+r"(?!\w)"
+    return [match for match in re.finditer(pattern, text, re.I) if complete_price_match(match, text)]
+
+
 def entry_matches(name, text):
     entries=[]
     for match in phrase_matches(name, text):
-        prefix=text[text.rfind("\n", 0, match.start())+1:match.start()]
-        # A repeated name in an ingredient list is not a new menu entry.
-        if re.fullmatch(r"[ \t#*▼►•-]*", prefix) and not text[match.end():].lstrip(" \t").startswith(","):
+        line_start=text.rfind("\n", 0, match.start())+1
+        prefix=text[line_start:match.start()]
+        # Repeated titles can share one flattened column line. Mentions on a
+        # separate description/ingredient line are not automatically new entries.
+        same_line=bool(entries and entries[-1].start() >= line_start)
+        if (re.fullmatch(r"[ \t#*▼►•-]*", prefix) or same_line) and not text[match.end():].lstrip(" \t").startswith(","):
             entries.append(match)
     return entries
+
+
+def single_source_entry(name, text):
+    """Repeated phrases compete even inside flattened column text."""
+    entries=entry_matches(name, text)
+    if len(entries) != 1:
+        return False
+    normalize=lambda value:" ".join(re.sub(r"^[ \t#*▼►•>-]*", "", value).split())
+    entry=normalize(entries[0].group())
+    captions=[match for match in re.finditer(r"!\[([^\]\n]+)\]\([^\n)]*\)", text)
+              if normalize(match.group(1)) != entry]
+    occurrences=[match for match in phrase_matches(name, text)
+                 if not any(caption.start(1) <= match.start() and match.end() <= caption.end(1)
+                            and normalize(match.group()) == normalize(caption.group(1))
+                            for caption in captions)]
+    return len(occurrences) == 1
 
 
 def dish_block(name, text, dish_names):

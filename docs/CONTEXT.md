@@ -37,7 +37,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a40245412d80ac95041c402aaa35367bcf13b53f620a81d2fe3d3787016914de"
+      "sourceFingerprint": "5206460c32c8c6e741aab15926f9c0d0d9327bce7ecace5f292b3acc9433d3a8"
     },
     {
       "id": "diner",
@@ -358,7 +358,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "de1c7361eabf5bb5768fe8adf528f18466fa505997d6eafcdc81776dce3456c9"
+      "sourceFingerprint": "b82c4ac98365617623e763d32a3182c319aa2784917dd6d290c42ccb6092172f"
     }
   ],
   "handoffs": [

@@ -18,7 +18,7 @@ from pydantic_core import ErrorType
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.model_cache import cache_path, read_candidates, write_candidates
-from peekaplate_processing.menu_context import apply_sections, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches
+from peekaplate_processing.menu_context import apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
 from peekaplate_processing.menu_layout import entry_price
 from peekaplate_processing.timing import measure
 
@@ -130,7 +130,7 @@ def grounding_issues(dish: ExtractedDish, text: str, *, dish_names=(), price_blo
     block=dish_block(dish.name, text, dish_names) if price_block is None else price_block
     if dish.price_text is not None:
         supported=False
-        for match in phrase_matches(dish.price_text, block):
+        for match in price_matches(dish.price_text, block):
             numbers=list(re.finditer(r"\d+(?:\.\d+)?", match.group()))
             if numbers and all(not nonprice_unit(block, match.start()+number.start(), match.start()+number.end()) for number in numbers):
                 supported=True
@@ -162,7 +162,8 @@ def check_grounding(dish: ExtractedDish, text: str):
 def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadata=None):
     layout=entry_price(dish.name, text, ocr_metadata, dish_names=dish_names)
     block=dish_block(dish.name, text, dish_names) if layout is None else layout["price_text"] or ""
-    ambiguous=(layout is not None and not block) or (layout is None and detached_prices(block))
+    ambiguous=(layout is not None and not block) or (
+        layout is None and (len(entry_matches(dish.name,text)) > 1 or detached_prices(block)))
     if ambiguous:
         block=""
     issues = grounding_issues(dish, text, dish_names=dish_names, price_block=block)
@@ -180,7 +181,8 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
     elif ambiguous:
         warnings.append("Price association is ambiguous; price fields remain unknown.")
     pair_pattern=r"(?<![\w.,])\d+(?:\.\d+)?(?:[ \t]*/[ \t]*\d+(?:\.\d+)?)+(?!\w|[.,]\d)"
-    pairs=[match for match in re.finditer(pair_pattern, block) if not nonprice_unit(block, match.start(), match.end())]
+    pairs=[match for match in re.finditer(pair_pattern, block)
+           if complete_price_match(match, block) and not nonprice_unit(block, match.start(), match.end())]
     price_text=updates.get("price_text", dish.price_text)
     supplied_pair=re.search(pair_pattern, price_text) if price_text else None
     matching_pairs=[]
@@ -220,7 +222,7 @@ def deduplicate_dishes(items, originals, pages, metadata):
         names=[item["name"] for item in items if item["page_number"] == page]
         layout=entry_price(name, pages[page], metadata.get(page), dish_names=names)
         unique=(layout is not None and layout["anchor"] is not None) or (
-            layout is None and len(entry_matches(name, pages[page])) == 1)
+            layout is None and single_source_entry(name, pages[page]))
         label=layout["label"] if layout else name
         preferred=sorted(indices, key=lambda index:(
             " ".join(items[index]["name"].split()) == label,

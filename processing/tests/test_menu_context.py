@@ -66,6 +66,39 @@ class MenuContextTests(unittest.TestCase):
                 self.assertIsNone(dish.price_amount)
                 self.assertIsNone(dish.price_text)
 
+    def test_price_text_requires_complete_numeric_group(self):
+        cases=[("95.50", "95"), ("95.50", "50"), ("1,095.50", "095.50"),
+               (".95", "95"), ("-95", "95"), ("+95", "95"),
+               ("-$95", "95"), ("−95", "95"), ("$75 / $95", "95"),
+               ("75 / CAD 95", "75"), ("95 CAD / 120", "95"),
+               ("75 / 95 / 120", "95"), ("75 / 95 / 120", "75 / 95"),
+               ("75 / 95 / 120", "95 / 120"),
+               ("8.50 / 12.50 / 15.50", "8.50 / 12.50"),
+               ("8.50 / 12.50 / 15.50", "12.50 / 15.50"),
+               ("75 / -95 / 120", "75"), ("75 / 95.50", "75 / 95"),
+               ("75 / 1,095", "75 / 1"),
+               ("$75 / 95 / 120 kcal", "$75 / 95")]
+        for source, supplied in cases:
+            with self.subTest(source=source, supplied=supplied):
+                dish,warnings=grounded_draft(self.dish(name="Soup", price_text=supplied), f"Soup\n{source}")
+                self.assertIsNone(dish.price_text)
+                self.assertIsNone(dish.price_amount)
+                self.assertTrue(any("price_text" in warning for warning in warnings))
+
+    def test_complete_price_literals_and_immediate_units(self):
+        for printed in ["0.00", "PHP0.00", "75  /  95 / 120", "CAD 95", "95 CAD"]:
+            with self.subTest(printed=printed):
+                dish,_=grounded_draft(self.dish(name="Soup", price_text=printed), f"Soup ({printed})")
+                self.assertEqual(dish.price_text, printed)
+        for printed in ["$8.50", "PHP0.00"]:
+            for separator in [" /200kcal", " / 200 kcal"]:
+                with self.subTest(printed=printed, separator=separator):
+                    amount="0.00" if printed.startswith("PHP") else "8.50"
+                    dish,warnings=grounded_draft(self.dish(name="Soup", price_text=printed, price_amount=amount),
+                                              f"Soup\n{printed}{separator}")
+                    self.assertEqual((dish.price_text, dish.price_amount), (printed, amount))
+                    self.assertEqual(warnings, [])
+
     def test_price_options_many(self):
         text="Soup\n8.50 / 12.50 / 15.50 CAD"
         for amount in ["8.50", "12.50", "15.50"]:
@@ -90,6 +123,14 @@ class MenuContextTests(unittest.TestCase):
                     self.assertTrue(any("price_text" in warning for warning in warnings))
             dish,warnings=grounded_draft(self.dish(name="Soup", price_amount="8.50", price_text="8.50 CAD"), source)
             self.assertEqual((dish.price_amount, dish.price_text), ("8.50", "8.50 CAD"))
+
+    def test_flattened_repeated_entries_do_not_borrow_the_last_price(self):
+        source="Soup Seasonal vegetables    Soup 5"
+        candidate=self.dish(name="Soup",price_amount="5",price_text="5")
+        cleaned,warnings=grounded_draft(candidate,source,dish_names=["Soup"])
+        self.assertIsNone(cleaned.price_amount)
+        self.assertIsNone(cleaned.price_text)
+        self.assertTrue(any("ambiguous" in warning.lower() for warning in warnings))
 
     def test_wrong_dish_price(self):
         text="ALL-AMERICAN SLAM\nEggs and bacon\n395 / 595\nTHE ORIGINAL GRAND SLAM\nPancakes and eggs\n345 / 545"

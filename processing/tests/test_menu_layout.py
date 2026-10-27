@@ -46,6 +46,10 @@ class MenuLayoutTests(unittest.TestCase):
                 self.assert_price("Garden Bowl", f"{value}\nGarden Bowl",
                                   layout(box("Garden Bowl", 20, 20), box(value, 220, 20)), value)
 
+    def test_inline_source_heading_is_not_stripped_as_currency(self):
+        self.assert_price("Garden Bowl", "Garden Bowl 95",
+            layout(box("Garden Bowl",20,20),box("95",220,20)), "95")
+
     def test_literal_slash_spacing_is_not_rewritten(self):
         self.assert_price("Garden Bowl", "Garden Bowl\n75  /  95 / 120",
                           layout(box("Garden Bowl", 20, 20), box("75", 220, 20, 25),
@@ -245,6 +249,27 @@ class MenuLayoutTests(unittest.TestCase):
             layout(box("Garden Bowl", 20, 20), box("95", 220, 20))), UNKNOWN)
         self.assertEqual(entry_price("Garden Bowl", "Garden Bowl\n95",
             layout(box("Other Bowl", 20, 20), box("95", 220, 20))), UNKNOWN)
+
+    def test_partial_source_numeric_group_is_not_overlay_evidence(self):
+        cases=[("95.50", "95"), ("95.50", "50"), ("1,095.50", "095.50"),
+               (".95", "95"), ("-95", "95"), ("+95", "95"),
+               ("-$95", "95"), ("−95", "95"), ("$75 / $95", "95"),
+               ("75 / CAD 95", "75"), ("95 CAD / 120", "95"),
+               ("75 / 95 / 120", "95"), ("75 / 95 / 120", "75 / 95"),
+               ("75 / 95 / 120", "95 / 120"), ("75 / -95 / 120", "75"),
+               ("75 / 95.50", "75 / 95"), ("75 / 1,095", "75 / 1")]
+        for source, overlay in cases:
+            with self.subTest(source=source, overlay=overlay):
+                metadata=layout(box("Soup",20,20),box(overlay,220,20,180))
+                before=copy.deepcopy(metadata)
+                self.assertEqual(entry_price("Soup", f"Soup\n{source}", metadata), UNKNOWN)
+                self.assertEqual(metadata, before)
+
+    def test_complete_money_literal_beside_immediate_calorie_unit(self):
+        for printed in ["$8.50", "PHP0.00"]:
+            with self.subTest(printed=printed):
+                self.assert_price("Soup", f"Soup\n{printed} /200kcal",
+                    layout(box("Soup",20,20),box(printed,220,20)), printed)
 
     def test_bounded_layout_and_price_length(self):
         self.assertEqual(entry_price("Garden Bowl", "Garden Bowl\n95",
