@@ -157,7 +157,7 @@ export async function retrieveMenuEvidence(
     Math.max(0, options.maxFetchedSources ?? MAX_FETCHED_SOURCES),
   );
 
-  const urlQueue = [...(request.candidate_urls ?? []).slice(0, maxSources)];
+  const urlQueue = [...new Set(request.candidate_urls ?? [])].slice(0, maxSources);
   const queuedUrls = new Set(urlQueue);
   const processedUrls = new Set<string>();
   let fetchedSourceCount = 0;

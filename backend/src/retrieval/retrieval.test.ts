@@ -203,6 +203,56 @@ Sourdough bread topped with mashed hass avocado, radish, and chili flakes: $11.5
       expect(result.passages.some((p) => p.text.includes('Tuscan White Bean Soup'))).toBe(true);
     });
 
+    it('deduplicates candidate URLs before applying the source limit', async () => {
+      const pdfBytes = createTestPdf('Saffron Lobster Ravioli: $29.00');
+      const fetchedUrls: string[] = [];
+
+      const mockFetch: typeof fetch = async (input) => {
+        const url = String(input);
+        fetchedUrls.push(url);
+
+        if (url === 'https://trattoria.example.com/menu') {
+          return new Response(sampleMenuHtml, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          });
+        }
+
+        if (url === 'https://trattoria.example.com/menu-winter-2026.pdf') {
+          return new Response(pdfBytes.slice().buffer as ArrayBuffer, {
+            status: 200,
+            headers: { 'Content-Type': 'application/pdf' },
+          });
+        }
+
+        throw new Error(`Unexpected URL fetched: ${url}`);
+      };
+
+      const result = await retrieveMenuEvidence(
+        {
+          query: 'Saffron Lobster Ravioli',
+          candidate_urls: [
+            'https://trattoria.example.com/menu',
+            'https://trattoria.example.com/menu',
+          ],
+        },
+        {
+          customFetch: mockFetch,
+          allowLocalTestDestinations: true,
+          maxFetchedSources: 2,
+        },
+      );
+
+      expect(fetchedUrls).toEqual([
+        'https://trattoria.example.com/menu',
+        'https://trattoria.example.com/menu-winter-2026.pdf',
+      ]);
+      expect(result.status).toBe('success');
+      expect(
+        result.passages.some((passage) => passage.text.includes('Saffron Lobster Ravioli')),
+      ).toBe(true);
+    });
+
     it('does not fetch discovered links when the source budget is exhausted', async () => {
       const fetchedUrls: string[] = [];
 
