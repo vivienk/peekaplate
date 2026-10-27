@@ -503,3 +503,33 @@ The sandbox blocked the authentication test HTTP listener; rerunning with local 
 ### Preview verification resolution
 
 PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+# ERR-20261026-PREVIEW-REPAIR
+
+PR #41 merged successfully into develop, but automatic previews did not run:
+GitHub now reads pull_request_target workflow code and github.sha from the
+default branch, which still lacked the workflow and helper. Repository readback
+showed the enable variable true; a variable cannot supply missing trusted code.
+The follow-up promotes only preview orchestration to main and corrects the
+activation guide. GitHub-held token/lifecycle acceptance remains separate.
+
+`node --test scripts/preview.test.mjs` also reproduced 12 passes and one Windows
+EPERM while creating a file symlink to `/etc/passwd`; this failed before the
+sanitizer was exercised. The fixture now uses a real Windows directory junction
+or a directory symlink elsewhere. All rejection assertions remain enabled.
+
+A new exact-commit marker regression failed with ENOENT before implementation.
+Sanitization now generates the marker from a checked SHA, rejects supplied
+markers and verifies both deployed aliases against that SHA before announcing
+readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
+commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
+
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
