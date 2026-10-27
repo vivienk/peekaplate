@@ -64,7 +64,7 @@
       "story_end_saved_counts": {
         "dish-A": 1,
         "dish-B": 0
-},
+      },
       "story_end_saved_rate_among_direct_savers": {
         "dish-A": {
           "numerator": 1,
@@ -128,34 +128,33 @@
   },
   "unfinished_session_example": {
     "status": "PROPOSED_SYNTHETIC_TEST",
-  "sessions": [
-  {
-    "session_id": "session-A",
-    "completion_status": "completed",
-    "directly_saved_dishes": ["dish-A"],
-    "saved_dishes": ["dish-A"]
-  },
-  {
-    "session_id": "session-B",
-    "completion_status": "completed",
-    "directly_saved_dishes": [],
-    "saved_dishes": []
-  },
-  {
-    "session_id": "session-C",
-    "completion_status": "unfinished",
-    "directly_saved_dishes": ["dish-A"],
-    "saved_dishes": ["dish-A"]
-  }
-],
+    "sessions": [
+      {
+        "session_id": "session-A",
+        "completion_status": "completed",
+        "directly_saved_dishes": ["dish-A"],
+        "saved_dishes": ["dish-A"]
+      },
+      {
+        "session_id": "session-B",
+        "completion_status": "completed",
+        "directly_saved_dishes": [],
+        "saved_dishes": []
+      },
+      {
+        "session_id": "session-C",
+        "completion_status": "unfinished",
+        "directly_saved_dishes": ["dish-A"],
+        "saved_dishes": ["dish-A"]
+      }
+    ],
 
-
-"expected": {
-  "eligible_completed_savers": 1,
-  "retained_sessions": 1,
-  "finalized_retention_rate": 1.0,
-  "excluded_unfinished_sessions": 1
-},
+    "expected": {
+      "eligible_completed_savers": 1,
+      "retained_sessions": 1,
+      "finalized_retention_rate": 1.0,
+      "excluded_unfinished_sessions": 1
+    },
     "note": "Standalone test scenario; not derived from the full event dataset. Completion criteria require metric-owner approval."
   }
 }

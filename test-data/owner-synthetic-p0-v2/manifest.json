@@ -55,20 +55,20 @@
     "tests/test_session_completion.py",
     "tests/test_validator_integration.py",
     "tests/test_ai_report_inputs.py"
-],
-"negative_cases": {
-  "file": "negative_cases.json",
-  "defined": 25,
-  "helper_tests_implemented": 10,
-  "validator_integration_tests": 19,
-  "execution_scope": "LOCAL_HELPER_AND_VALIDATOR_TESTS_ONLY",
-  "catalog_mapping_file": "negative_case_test_mapping.json",
-  "catalog_mapping_status": "PARTIAL_LOCAL_COVERAGE_DOCUMENTED",
-  "catalog_cases_with_partial_local_coverage": 10,
-  "catalog_cases_not_confirmed": 15,
-  "application_execution_status": "NOT_RUN",
-  "remaining_status": "NOT_ALL_DOCUMENTED_CASES_EXECUTED"
-},
+  ],
+  "negative_cases": {
+    "file": "negative_cases.json",
+    "defined": 25,
+    "helper_tests_implemented": 10,
+    "validator_integration_tests": 19,
+    "execution_scope": "LOCAL_HELPER_AND_VALIDATOR_TESTS_ONLY",
+    "catalog_mapping_file": "negative_case_test_mapping.json",
+    "catalog_mapping_status": "PARTIAL_LOCAL_COVERAGE_DOCUMENTED",
+    "catalog_cases_with_partial_local_coverage": 10,
+    "catalog_cases_not_confirmed": 15,
+    "application_execution_status": "NOT_RUN",
+    "remaining_status": "NOT_ALL_DOCUMENTED_CASES_EXECUTED"
+  },
   "ai_evaluation": {
     "file": "ai_evaluation_cases.json",
     "defined": 20,
@@ -102,11 +102,11 @@
   ],
   "dataset_version": "p0-v2-synthetic-1.0",
   "source_revisions": {
-  "preparation_guide_revision": null,
-  "event_taxonomy_revision": null,
-  "status": "PENDING_SOURCE_OWNER_CONFIRMATION",
-  "note": "The exact preparation-guide and event taxonomy revisions used to construct these fixtures have not been verified. Dataset and fixture schema versions are documented separately."
-},
+    "preparation_guide_revision": null,
+    "event_taxonomy_revision": null,
+    "status": "PENDING_SOURCE_OWNER_CONFIRMATION",
+    "note": "The exact preparation-guide and event taxonomy revisions used to construct these fixtures have not been verified. Dataset and fixture schema versions are documented separately."
+  },
   "metric_examples": {
     "file": "metric_examples.json",
     "defined": 6,
@@ -121,7 +121,7 @@
     "timezone": "UTC+05:00",
     "duration_seconds": 3607,
     "scope": "Synthetic event timestamp range, not a production reporting window"
-},
+  },
   "dish_revision_note": "Fictional documentation placeholders only; dish revision IDs are not present in event records and are not production identifiers.",
   "initial_saved_state": {
     "session-X": [],

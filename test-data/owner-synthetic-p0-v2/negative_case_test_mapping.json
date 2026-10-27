@@ -11,9 +11,7 @@
   {
     "case_id": "NEG-002",
     "coverage_status": "PARTIAL_LOCAL_COVERAGE",
-    "test_references": [
-      "tests/test_negative_cases.py::test_neg_002_conflicting_retry"
-    ],
+    "test_references": ["tests/test_negative_cases.py::test_neg_002_conflicting_retry"],
     "application_execution_status": "NOT_RUN"
   },
   {
@@ -57,9 +55,7 @@
   {
     "case_id": "NEG-008",
     "coverage_status": "PARTIAL_LOCAL_COVERAGE",
-    "test_references": [
-      "tests/test_negative_cases.py::test_neg_008_invalid_comparison_pair"
-    ],
+    "test_references": ["tests/test_negative_cases.py::test_neg_008_invalid_comparison_pair"],
     "application_execution_status": "NOT_RUN"
   },
   {
@@ -132,9 +128,7 @@
   {
     "case_id": "NEG-019",
     "coverage_status": "PARTIAL_LOCAL_COVERAGE",
-    "test_references": [
-      "tests/test_negative_cases.py::test_neg_010_privacy_threshold"
-    ],
+    "test_references": ["tests/test_negative_cases.py::test_neg_010_privacy_threshold"],
     "application_execution_status": "NOT_RUN"
   },
   {

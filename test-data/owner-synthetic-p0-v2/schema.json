@@ -1,4 +1,3 @@
-
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "PeekaPlate Owner Synthetic P0 v2 Event Schema",
@@ -64,7 +63,7 @@
     "cumulative_active_ms": {
       "type": "integer",
       "minimum": 0
-},
+    },
     "is_final": {
       "type": "boolean"
     },
@@ -72,10 +71,7 @@
       "type": "string"
     },
     "compare_action": {
-      "enum": [
-        "start",
-        "replace"
-      ]
+      "enum": ["start", "replace"]
     },
     "pair_version": {
       "type": "integer",
@@ -91,31 +87,16 @@
       "uniqueItems": true
     },
     "display_state": {
-      "enum": [
-        "displayed"
-      ]
+      "enum": ["displayed"]
     },
     "save_origin": {
-      "enum": [
-        "direct",
-        "undo"
-      ]
+      "enum": ["direct", "undo"]
     },
     "save_surface": {
-      "enum": [
-        "menu_card",
-        "dish_detail",
-        "compare_view",
-        "saved_screen"
-      ]
+      "enum": ["menu_card", "dish_detail", "compare_view", "saved_screen"]
     },
     "unsave_surface": {
-      "enum": [
-        "menu_card",
-        "dish_detail",
-        "compare_view",
-        "saved_screen"
-      ]
+      "enum": ["menu_card", "dish_detail", "compare_view", "saved_screen"]
     },
     "shortlist_size": {
       "type": "integer",
@@ -123,73 +104,57 @@
     }
   },
   "allOf": [
-  {
-    "if": {
-      "properties": {
-        "event_type": {"const": "dish_saved"}
-      },
-      "required": ["event_type"]
-    },
-    "then": {
-      "required": [
-        "dish_id",
-        "save_origin",
-        "save_surface",
-        "surface",
-        "shortlist_size"
-      ]
-    }
-  },
     {
-    "if": {
-      "properties": {
-        "event_type": {"const": "dish_unsaved"}
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_saved" }
+        },
+        "required": ["event_type"]
       },
-      "required": ["event_type"]
+      "then": {
+        "required": ["dish_id", "save_origin", "save_surface", "surface", "shortlist_size"]
+      }
     },
-    "then": {
-      "required": [
-        "dish_id",
-        "surface",
-        "unsave_surface",
-        "shortlist_size"
-      ]
-    }
-  },
-  {
-    "if": {
-      "properties": {
-        "event_type": {"const": "dish_compared"}
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_unsaved" }
+        },
+        "required": ["event_type"]
       },
-      "required": ["event_type"]
+      "then": {
+        "required": ["dish_id", "surface", "unsave_surface", "shortlist_size"]
+      }
     },
-    "then": {
-      "required": [
-        "comparison_id",
-        "compare_action",
-        "pair_version",
-        "dish_ids",
-        "opening_id",
-        "display_state"
-      ]
-    }
-  },
-  {
-    "if": {
-      "properties": {
-        "event_type": {"const": "dish_activity_checkpoint"}
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_compared" }
+        },
+        "required": ["event_type"]
       },
-      "required": ["event_type"]
+      "then": {
+        "required": [
+          "comparison_id",
+          "compare_action",
+          "pair_version",
+          "dish_ids",
+          "opening_id",
+          "display_state"
+        ]
+      }
     },
-    "then": {
-      "required": [
-        "dish_id",
-        "opening_id",
-        "cumulative_active_ms",
-        "is_final"
-      ]
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_activity_checkpoint" }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["dish_id", "opening_id", "cumulative_active_ms", "is_final"]
+      }
     }
-  }
-],
-"additionalProperties": true
+  ],
+  "additionalProperties": true
 }

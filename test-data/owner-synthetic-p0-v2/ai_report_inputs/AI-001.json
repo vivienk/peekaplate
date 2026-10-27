@@ -10,19 +10,19 @@
     "suppression_applied": true
   },
   "metrics": [
-  {
-    "metric": "dish_openings",
-    "dimension": "dish",
-    "status": "SUPPRESSED",
-    "value": null
-  },
-  {
-    "metric": "dish_save_rate",
-    "dimension": "dish",
-    "status": "SUPPRESSED",
-    "value": null
-  }
-],
+    {
+      "metric": "dish_openings",
+      "dimension": "dish",
+      "status": "SUPPRESSED",
+      "value": null
+    },
+    {
+      "metric": "dish_save_rate",
+      "dimension": "dish",
+      "status": "SUPPRESSED",
+      "value": null
+    }
+  ],
   "verified_orders": {
     "status": "UNAVAILABLE",
     "value": null
