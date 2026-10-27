@@ -436,6 +436,69 @@ describe('QueueConsumer', () => {
       expect(repository.conflicts.size).toBe(1);
     });
 
+    it('detects conflict when eventId is identical but type differs', async () => {
+      const msg1 = createValidObservationMsg({
+        type: 'dish_detail_closed',
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          opening_id: '88888888-8888-4888-8888-888888888888',
+        },
+      });
+      const msg2 = createValidObservationMsg({
+        type: 'dish_activity_checkpoint',
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          opening_id: '88888888-8888-4888-8888-888888888888',
+          active_ms: 10000,
+          final: true,
+        },
+      });
+
+      // First delivery persists canonical observation
+      const d1 = await consumer.processMessage(msg1);
+      expect(d1.status).toBe('acknowledged');
+      if (d1.status === 'acknowledged') {
+        expect(d1.reason).toBe('persisted');
+      }
+
+      // Second delivery shares eventId but differs in type -> quarantined as conflict!
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+
+      expect(repository.index.size).toBe(1);
+      const original = repository.index.get(`${T1}:${E1}`);
+      expect(original?.eventType).toBe('dish_detail_closed');
+      expect(repository.conflicts.size).toBe(1);
+      const conflict = Array.from(repository.conflicts.values())[0]!;
+      expect(conflict.eventId).toBe(E1);
+      expect(r2Storage.has(conflict.r2ArchiveKey)).toBe(true);
+    });
+
+    it('rejects message as malformed when type is changed but payload is invalid for that type', async () => {
+      // dish_viewed payload with type menu_viewed violates ObservationQueueMessageSchema superRefine
+      const msg = createValidObservationMsg({
+        type: 'menu_viewed',
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list',
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s',
+        },
+      });
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('dead_letter');
+      expect(repository.index.size).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+    });
+
     it('verifies producer and consumer generate matching canonical checksums for the same observation', async () => {
       const msg = createValidObservationMsg();
       const canonicalObs = toCanonicalObservation(msg);
@@ -500,15 +563,140 @@ describe('QueueConsumer', () => {
     expect(await repository.lookupExisting(T1, E1)).not.toBeNull();
   });
 
-  it('Case E: Malformed message returns dead_letter disposition', async () => {
-    const malformed = {
-      tenantId: T1,
-      // Missing eventId, kind, etc.
-      type: 'dish_viewed',
-    };
+  describe('Malformed envelope regressions and safe DLQ handling (Findings B & C / Section 5 & 8.B)', () => {
+    it('Case E: Malformed message returns dead_letter disposition and does not write to R2 or DB', async () => {
+      const malformed = {
+        tenantId: T1,
+        // Missing eventId, kind, etc.
+        type: 'dish_viewed',
+      };
 
-    const disposition = await consumer.processMessage(malformed);
-    expect(disposition.status).toBe('dead_letter');
+      const disposition = await consumer.processMessage(malformed);
+      expect(disposition.status).toBe('dead_letter');
+      expect(repository.index.size).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+      expect(r2Storage.putCalls.length).toBe(0);
+    });
+
+    it('rejects envelope missing required top-level fields', async () => {
+      const fields = [
+        'kind',
+        'tenantId',
+        'eventId',
+        'sessionId',
+        'schemaVersion',
+        'occurredAt',
+        'type',
+        'authorizedPublicationId',
+        'producerId',
+        'localSequence',
+        'payload',
+        'firstReceivedAt',
+      ] as const;
+
+      for (const field of fields) {
+        const msg = createValidObservationMsg();
+        delete (msg as Record<string, unknown>)[field];
+        const disposition = await consumer.processMessage(msg);
+        expect(disposition.status).toBe('dead_letter');
+      }
+      expect(repository.index.size).toBe(0);
+      expect(r2Storage.putCalls.length).toBe(0);
+    });
+
+    it('rejects envelope with invalid types for required fields', async () => {
+      // localSequence must be positive safe integer
+      const nonIntSeq = createValidObservationMsg({ localSequence: '1' as unknown as number });
+      expect((await consumer.processMessage(nonIntSeq)).status).toBe('dead_letter');
+
+      const zeroSeq = createValidObservationMsg({ localSequence: 0 });
+      expect((await consumer.processMessage(zeroSeq)).status).toBe('dead_letter');
+
+      const negSeq = createValidObservationMsg({ localSequence: -5 });
+      expect((await consumer.processMessage(negSeq)).status).toBe('dead_letter');
+
+      // schemaVersion must be string literal 'observation.v2'
+      const numSchemaVer = createValidObservationMsg({
+        schemaVersion: 2 as unknown as 'observation.v2',
+      });
+      expect((await consumer.processMessage(numSchemaVer)).status).toBe('dead_letter');
+    });
+
+    it('rejects envelope with invalid timestamps or identifiers', async () => {
+      const badTimestamp = createValidObservationMsg({ occurredAt: '2026-13-45T99:99:99.999Z' });
+      expect((await consumer.processMessage(badTimestamp)).status).toBe('dead_letter');
+
+      const badEventId = createValidObservationMsg({ eventId: 'not-a-valid-uuid' });
+      expect((await consumer.processMessage(badEventId)).status).toBe('dead_letter');
+
+      const badTenantId = createValidObservationMsg({ tenantId: 'not-a-valid-uuid' });
+      expect((await consumer.processMessage(badTenantId)).status).toBe('dead_letter');
+    });
+
+    it('rejects envelope with missing or malformed nested payloads', async () => {
+      const nullPayload = createValidObservationMsg({
+        payload: null as unknown as Record<string, unknown>,
+      });
+      expect((await consumer.processMessage(nullPayload)).status).toBe('dead_letter');
+
+      // dish_viewed requires dish_id, dish_revision_id, exposure_id, surface, position, exposure_basis
+      const emptyPayload = createValidObservationMsg({ payload: {} });
+      expect((await consumer.processMessage(emptyPayload)).status).toBe('dead_letter');
+
+      const missingProp = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          // missing exposure_id, surface, position, exposure_basis
+        },
+      });
+      expect((await consumer.processMessage(missingProp)).status).toBe('dead_letter');
+    });
+
+    it('rejects unsupported event types or schema versions', async () => {
+      const badType = createValidObservationMsg({ type: 'unknown_event' as unknown as any });
+      expect((await consumer.processMessage(badType)).status).toBe('dead_letter');
+
+      const badSchemaVer = createValidObservationMsg({
+        schemaVersion: 'observation.v3' as unknown as any,
+      });
+      expect((await consumer.processMessage(badSchemaVer)).status).toBe('dead_letter');
+    });
+
+    it('rejects legacy permissive envelope formats from PR #31 initial implementation', async () => {
+      // Legacy PR #31 accepted permissive shape with numeric schemaVersion, venueId instead of tenantId, arbitrary type
+      const legacyPermissive = {
+        venueId: T1,
+        eventId: E1,
+        sessionId: S1,
+        schemaVersion: 2,
+        occurredAt: '2026-10-24T12:00:00.000Z',
+        type: 'custom_unregistered_event',
+        payload: { arbitrary: 'data' },
+      };
+      const disposition = await consumer.processMessage(legacyPermissive);
+      expect(disposition.status).toBe('dead_letter');
+      expect(repository.index.size).toBe(0);
+    });
+
+    it('routes dead_letter messages to retry for Cloudflare DLQ exhaustion, never prematurely calling ack()', async () => {
+      const malformedMsg = new FakeQueueMessage('msg-bad', {
+        tenantId: T1,
+        type: 'unsupported',
+      });
+      const batch = new FakeMessageBatch('peekaplate-staging-observations', [malformedMsg]);
+
+      const result = await consumer.processBatch(batch);
+      expect(result.processed).toBe(1);
+      expect(result.acknowledged).toBe(0);
+      expect(result.retried).toBe(1);
+      expect(result.deadLettered).toBe(1);
+
+      // Crucial: msg.ack() must NOT be called on malformed message
+      expect(malformedMsg.acked).toBe(false);
+      // msg.retry() must be called so Cloudflare Queues delivers to configured DLQ on max retries
+      expect(malformedMsg.retried).toBe(true);
+    });
   });
 
   it('DEF-03 regression: safely processes an observation payload with undefined optional properties without crashing batch', async () => {
