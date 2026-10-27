@@ -37,7 +37,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5206460c32c8c6e741aab15926f9c0d0d9327bce7ecace5f292b3acc9433d3a8"
+      "sourceFingerprint": "cf67c1a2116c5fefeceae2fc1c6f21709fe3336095d5bd279f5e9eed03a8a60d"
     },
     {
       "id": "diner",
@@ -291,7 +291,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/image acquisition validates OCR.space Engine3-compatible results and preserves sibling pages on failure. Pipeline3/schema2 retains hierarchy, heading provenance, printed options and final timings. Conservative source-preserving geometry and group-wide raw compatibility guard prices/dedup. RES-01.1 exports both version pairs with stable IDs, code-point evidence, partial failures and needs_review state. Provider/batch/concurrency defaults are unchanged. The existing optional FastAPI service authenticates the Worker, verifies tenant/job-derived R2 source hashes and runs a bounded subprocess, preserving valid CLI exit2 reports; no database, arbitrary URL or publication access. Hosting/credentials, PR45 admission/deadlines/report adapter, representative quality and PM acceptance remain pending.",
+      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Image hashes/mode/context isolate caches; geometry and group-wide raw compatibility guard prices/dedup. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. Private service artifact transport, hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -331,11 +331,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/.dockerignore",
         "processing/src/peekaplate_processing/menu_context.py",
         "processing/src/peekaplate_processing/menu_layout.py",
+        "processing/src/peekaplate_processing/vision.py",
+        "processing/src/peekaplate_processing/review_suggestions.py",
         "processing/src/peekaplate_processing/review_candidates.py",
         "processing/src/peekaplate_processing/timing.py",
         "processing/tests/test_menu_context.py",
         "processing/tests/test_menu_layout.py",
         "processing/tests/test_menu_duplicates.py",
+        "processing/tests/test_input_modes.py",
         "processing/tests/test_pipeline_timing.py",
         "processing/tests/test_review_candidates.py",
         "docs/processing-v3.md",
@@ -358,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b82c4ac98365617623e763d32a3182c319aa2784917dd6d290c42ccb6092172f"
+      "sourceFingerprint": "a8b396b835efb733712e6938de80c8ed2b1bcacb8be848e80879e25ec90ff99b"
     }
   ],
   "handoffs": [
@@ -372,12 +375,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
     },
     {
-      "summary": "Prepared the VIS-02 pipeline3 and RES-01.1 producer/export follow-up additively on current develop. Retained conservative OCR-entry price grounding, duplicate conflict guards, printed options, explicit category provenance, final timing sidecars and paired-version review exports. Shared synthetic fixtures cover three candidates plus partial/invalid cases and Unicode evidence. Newer retrieval, analytics, preview and operational histories are preserved; no provider tuning, service, persistence, source menus or private benchmark artifacts are included.",
+      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service artifact transport is a separately tested follow-up. Real-menu runs, images, credentials and private reports remain excluded.",
       "modules": [
         "processing",
         "contracts"
       ],
-      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Raw rejected-suggestion retention and image-only evidence remain unagreed."
+      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Private suggestion retention follows Sai's bounded clarification; a public image-backed RES contract, variant model and human quality acceptance remain deferred."
     },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",

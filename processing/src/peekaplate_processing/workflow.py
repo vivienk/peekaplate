@@ -1,5 +1,7 @@
 """The supplied orchestrator / Send workers / synthesizer pattern for menus."""
 import json
+import base64
+import hashlib
 import asyncio
 import math
 import re
@@ -21,6 +23,9 @@ from peekaplate_processing.model_cache import cache_path, read_candidates, write
 from peekaplate_processing.menu_context import apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
 from peekaplate_processing.menu_layout import entry_price
 from peekaplate_processing.timing import measure
+from peekaplate_processing.review_suggestions import suggestion_record
+
+INPUT_MODES=("ocr", "ocr_image", "image")
 
 
 def required_schema_fields(schema):
@@ -180,16 +185,17 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
             warnings.append("Price fields recovered from a unique OCR entry row; verify source association.")
     elif ambiguous:
         warnings.append("Price association is ambiguous; price fields remain unknown.")
-    pair_pattern=r"(?<![\w.,])\d+(?:\.\d+)?(?:[ \t]*/[ \t]*\d+(?:\.\d+)?)+(?!\w|[.,]\d)"
-    pairs=[match for match in re.finditer(pair_pattern, block)
+    option=r"(?:(?:[$€£₱]|PHP|P)[ \t]*)?\d+(?:\.\d+)?"
+    pair_pattern=rf"(?<![\w.,]){option}(?:[ \t]*/[ \t]*{option})+(?!\w|[.,]\d)"
+    pairs=[match for match in re.finditer(pair_pattern, block, re.I)
            if complete_price_match(match, block) and not nonprice_unit(block, match.start(), match.end())]
     price_text=updates.get("price_text", dish.price_text)
-    supplied_pair=re.search(pair_pattern, price_text) if price_text else None
+    supplied_pair=re.search(pair_pattern, price_text, re.I) if price_text else None
     matching_pairs=[]
     if dish.price_amount is not None and "price_amount" not in issues:
         amount=Decimal(dish.price_amount)
         for pair in pairs:
-            option_amounts=[Decimal(value.strip()) for value in pair.group().split("/")]
+            option_amounts=[Decimal(value) for value in re.findall(r"\d+(?:\.\d+)?",pair.group())]
             if amount in option_amounts:
                 matching_pairs.append(pair)
     if supplied_pair or matching_pairs:
@@ -333,11 +339,41 @@ def parse_dish_content(content):
     return DishBatch.model_validate(data)
 
 
-def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=10, cache_dir=None, source_sha256=None):
+def model_images(pages, context_pages, input_mode):
+    """Return multimodal blocks and byte-verified image cache identities."""
+    blocks=[]
+    identities=[]
+    total=0
+    for role,values in [("target",pages),("context",context_pages if input_mode=="image" else [])]:
+        for page in values:
+            url=page.get("image_url", "")
+            if not isinstance(url,str) or len(url)>11_000_000 or not url.startswith(("data:image/png;base64,","data:image/jpeg;base64,")):
+                raise ExtractionError("A bounded source image is required for every vision page.")
+            try:
+                data=base64.b64decode(url.split(",",1)[1],validate=True)
+            except ValueError:
+                raise ExtractionError("Invalid source-image encoding.") from None
+            digest=hashlib.sha256(data).hexdigest()
+            if not data or len(data)>8_000_000 or digest!=page.get("image_reference",{}).get("sha256"):
+                raise ExtractionError("Source image does not match its bounded evidence hash.")
+            total+=len(data)
+            if total>16_000_000:
+                raise ExtractionError("Vision batch exceeds 16 MB; choose a smaller --batch-pages value.")
+            blocks.extend([{"type":"text","text":f"{role.upper()} PAGE {page['page_number']}"},
+                           {"type":"image_url","image_url":{"url":url}}])
+            identities.append({"role":role,"page_number":page["page_number"],"sha256":digest})
+    return blocks,identities
+
+
+def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=10, cache_dir=None, source_sha256=None, input_mode="ocr"):
     if type(batch_pages) is not int or not 1 <= batch_pages <= 10:
         raise ExtractionError("LLM batch pages must be an integer between 1 and 10.")
     if not math.isfinite(request_timeout) or not 0 < request_timeout <= 300:
         raise ExtractionError("LLM deadline must be greater than zero and at most 300 seconds.")
+    if input_mode not in INPUT_MODES:
+        raise ExtractionError("Input mode must be ocr, ocr_image or image.")
+    vision_instructions="Target images are source menu-page evidence. Read their layout as well as any supplied OCR text. In image-only mode no OCR text is supplied. Context pages are not extraction targets. Copy literal names and printed price formatting; never insert slashes between separate columns or invent variant labels. Image-read values remain unvalidated review suggestions when source text does not support them."
+    prompt=PROMPT if input_mode=="ocr" else PROMPT.replace("\nREQUIRED JSON SCHEMA:\n","\n"+vision_instructions+"\n\nREQUIRED JSON SCHEMA:\n",1)
     structured_llm = llm.with_structured_output(DishBatch.model_json_schema(), method="json_schema", strict=True, include_raw=True)
     request_start_lock = asyncio.Lock()
     last_request_start = None
@@ -351,24 +387,34 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
         workers=[]
         for index,batch in enumerate(state["batches"], start=1):
             previous=by_number.get(batch[0]["page_number"]-1)
-            context=[] if previous is None or not previous["text"].strip() else [
-                {"page_number":previous["page_number"], "text":previous["text"][:3000]}
-            ]
+            if input_mode=="image":
+                context=[] if previous is None or not previous.get("image_url") else [previous]
+            else:
+                context=[] if previous is None or not previous.get("text", "").strip() else [
+                    {"page_number":previous["page_number"], "text":previous["text"][:3000]}
+                ]
             workers.append(Send("extract_worker", {"pages":batch, "worker_id":index, "context_pages":context}))
         return workers
 
     async def extract_worker(state: WorkerState):
         nonlocal last_request_start
-        finding = {"worker_id": state["worker_id"], "dishes": [], "sections": [], "errors": [], "warnings": [], "cache_hit": False, "timings_seconds": {}}
-        if not any(p["text"].strip() for p in state["pages"]): return {"worker_findings": [finding]}
+        finding = {"worker_id": state["worker_id"], "dishes": [], "sections": [], "raw_sections": [], "suggestions": [], "model_status":"skipped", "errors": [], "warnings": [], "cache_hit": False, "timings_seconds": {}}
+        if input_mode=="ocr" and not any(p.get("text", "").strip() for p in state["pages"]): return {"worker_findings": [finding]}
         started = time.perf_counter()
         timings=finding["timings_seconds"]
         try:
-            request={"pages":[{"page_number":page["page_number"], "text":page["text"]} for page in state["pages"]]}
+            request={"pages":[{"page_number":page["page_number"], **({"text":page.get("text", "")} if input_mode!="image" else {})} for page in state["pages"]]}
             if state["context_pages"]:
-                request["context_pages"]=state["context_pages"]
+                request["context_pages"]=[{"page_number":page["page_number"], **({"text":page["text"]} if input_mode!="image" else {})} for page in state["context_pages"]]
+            human=json.dumps(request,ensure_ascii=False)
+            cache_request=request
+            if input_mode!="ocr":
+                images,identities=model_images(state["pages"],state["context_pages"],input_mode)
+                human=[{"type":"text","text":human},*images]
+                cache_request={"input_mode":input_mode,"request":request,"images":identities}
+            finding["model_status"]="failed"
             with measure(timings, "cache_read"):
-                path = cache_path(cache_dir, llm, source_sha256, request, PROMPT, DishBatch.model_json_schema())
+                path = cache_path(cache_dir, llm, source_sha256, cache_request, prompt, DishBatch.model_json_schema())
                 cached = read_candidates(path)
             if cached is not None:
                 try:
@@ -387,12 +433,16 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                 print(f"Batch {state['worker_id']}: requesting dishes from {len(state['pages'])} pages...", file=sys.stderr, flush=True)
                 with measure(timings, "model_request"):
                     answer = await asyncio.wait_for(
-                        structured_llm.ainvoke([("system", PROMPT), ("human", json.dumps(request, ensure_ascii=False))]),
+                        structured_llm.ainvoke([("system", prompt), ("human", human)]),
                         timeout=request_timeout,
                     )
                 raw = answer.get("raw")
                 if on_response is not None:
                     on_response(raw)
+                usage=getattr(raw,"usage_metadata",None) or getattr(raw,"response_metadata",{}).get("token_usage",{})
+                if isinstance(usage,dict):
+                    finding["usage"]={field:usage[field] for field in ("input_tokens","output_tokens","total_tokens","prompt_tokens","completion_tokens")
+                                      if type(usage.get(field)) is int and usage[field]>=0}
                 finish = getattr(raw, "response_metadata", {}).get("finish_reason")
                 if finish == "length":
                     raise ExtractionError("Provider output reached its token limit; batch rejected.")
@@ -402,9 +452,14 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                     raise ExtractionError("Provider refused the output; batch rejected.")
                 with measure(timings, "parse"):
                     parsed = parse_dish_content(getattr(raw, "content", None))
-            pages = {p["page_number"]: p["text"] for p in state["pages"]}
+            source_pages={p["page_number"]:p for p in state["pages"]}
+            pages = {p["page_number"]: p.get("text", "") for p in state["pages"]}
             metadata = {p["page_number"]: p.get("ocr_metadata") for p in state["pages"]}
             if len(parsed.dishes) > 100: raise ExtractionError("A batch exceeds the 100-dish limit.")
+            finding["model_status"]="complete"
+            finding["raw_sections"]=[section.model_dump() for section in parsed.sections]
+            finding["suggestions"]=[suggestion_record(dish,state["worker_id"],index,source_pages.get(dish.page_number))
+                                    for index,dish in enumerate(parsed.dishes,start=1)]
             if not finding["cache_hit"]:
                 try:
                     with measure(timings, "cache_write"):
@@ -422,12 +477,16 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
             for index, dish in enumerate(parsed.dishes, start=1):
                 try:
                     if dish.page_number not in pages: raise ExtractionError("Dish cites a page outside its batch.")
+                    if input_mode=="image":
+                        continue
                     with measure(timings, "grounding"):
                         names=[other.name for other in parsed.dishes if other.page_number == dish.page_number]
                         cleaned, warnings = grounded_draft(dish, pages[dish.page_number], dish_names=names, ocr_metadata=metadata[dish.page_number])
                 except ExtractionError as error:
                     finding["errors"].append(f"Batch {state['worker_id']}, dish {index}, page {dish.page_number}: {error}")
+                    finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages.get(dish.page_number),rejection=str(error))
                     continue
+                finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages[dish.page_number],cleaned=cleaned,warnings=warnings)
                 item = cleaned.model_dump()
                 if warnings:
                     item["review_warnings"] = warnings
@@ -453,10 +512,10 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
         started=time.perf_counter()
         findings = sorted(state["worker_findings"], key=lambda f: f["worker_id"])
         dishes=sorted([dish for finding in findings for dish in finding["dishes"]], key=lambda dish:dish["page_number"])
-        sections=[section for finding in findings if finding.get("status") != "failed" for section in finding["sections"]]
-        section_warnings=apply_sections(dishes, sections, state["pages"])
-        batches=[{"worker_id":finding["worker_id"], "page_numbers":[page["page_number"] for page in state["batches"][finding["worker_id"]-1]], "elapsed_seconds":finding.get("elapsed_seconds", 0), "status":finding.get("status", "skipped"), "cache_hit":finding["cache_hit"], "timings_seconds":finding["timings_seconds"]} for finding in findings]
-        return {"final_report": {"dishes":dishes, "sections":sections, "errors":[error for finding in findings for error in finding["errors"]], "warnings":[warning for finding in findings for warning in finding["warnings"]]+section_warnings, "batches":batches, "synthesis_seconds":round(time.perf_counter()-started, 6)}}
+        sections=[] if input_mode=="image" else [section for finding in findings if finding.get("status") != "failed" for section in finding["sections"]]
+        section_warnings=[] if input_mode=="image" else apply_sections(dishes, sections, state["pages"])
+        batches=[{"worker_id":finding["worker_id"], "page_numbers":[page["page_number"] for page in state["batches"][finding["worker_id"]-1]], "elapsed_seconds":finding.get("elapsed_seconds", 0), "status":finding.get("status", "skipped"), "cache_hit":finding["cache_hit"], "model_status":finding["model_status"], "usage":finding.get("usage",{}), "timings_seconds":finding["timings_seconds"]} for finding in findings]
+        return {"final_report": {"dishes":dishes, "sections":sections, "suggestions":[suggestion for finding in findings for suggestion in finding["suggestions"]], "raw_sections":[{"worker_id":finding["worker_id"],"sections":finding["raw_sections"]} for finding in findings], "errors":[error for finding in findings for error in finding["errors"]], "warnings":[warning for finding in findings for warning in finding["warnings"]]+section_warnings, "batches":batches, "synthesis_seconds":round(time.perf_counter()-started, 6)}}
 
     builder = StateGraph(OverallState)
     builder.add_node("orchestrator", orchestrator)
@@ -469,11 +528,11 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
     return builder.compile()
 
 
-def run_menu_graph(llm, pages, *, request_timeout=90, on_response=None, batch_pages=10, concurrency=1, cache_dir=None, source_sha256=None):
+def run_menu_graph(llm, pages, *, request_timeout=90, on_response=None, batch_pages=10, concurrency=1, cache_dir=None, source_sha256=None, input_mode="ocr"):
     """Run all batches on one event loop so cancelled HTTP requests are awaited."""
     if type(concurrency) is not int or concurrency not in (1, 2):
         raise ExtractionError("LLM concurrency must be 1 or 2.")
-    return asyncio.run(build_menu_graph(llm, request_timeout=request_timeout, on_response=on_response, batch_pages=batch_pages, cache_dir=cache_dir, source_sha256=source_sha256).ainvoke(
+    return asyncio.run(build_menu_graph(llm, request_timeout=request_timeout, on_response=on_response, batch_pages=batch_pages, cache_dir=cache_dir, source_sha256=source_sha256, input_mode=input_mode).ainvoke(
         {"pages": pages, "batches": [], "worker_findings": []},
         config={"max_concurrency": concurrency},
     ))["final_report"]

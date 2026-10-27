@@ -35,12 +35,18 @@ under `work/` remain outside Git.
    source page. Missing/failed pages, unclear continuation and mixed main sections
    clear this context. No additional LLM call.
 
-The LLM sees target `pages`, plus up to 3,000 characters of previous-page
-`context_pages` when available, its schema and extraction instructions. Context
+The default `--input-mode ocr_image` sends target page images together with
+acquired source text. `--input-mode ocr` preserves the earlier text-only path.
+Both receive up to 3,000 characters of previous-page `context_pages` when available.
+`--input-mode image` sends target images and a labelled previous-page image,
+without OCR or native-text extraction. It produces private unvalidated suggestions,
+not fabricated text-grounded candidates. See [input modes](../docs/processing-v3.md#input-modes-and-private-review-artifacts).
+
+The model receives the existing dish schema and extraction instructions. Context
 pages cannot produce dishes. The prompt includes the exact generated JSON schema
 and a complete synthetic input/output example, showing separate `price_amount`
 and `price_currency` keys and required unknown fields set to null. This reinforces
-provider-side schema requests; local strict validation remains mandatory. It does not receive OCR overlays or source images.
+provider-side schema requests; local strict validation remains mandatory. OCR overlay coordinates stay local; only the selected vision modes receive source images.
 Names/attributes are matched against their cited page while tolerating wrapped
 OCR headings. Price evidence is limited to the associated entry; ambiguous entry
 boundaries and explicit calorie/portion units cannot support a numeric price. Original
@@ -84,7 +90,8 @@ currently OCR.space Engine 3-compatible only: returned `settings` must contain
 the integer `OCREngine=3`. Both input paths reject incompatible settings before
 accepting text, so another engine cannot silently produce Engine 3 evidence.
 Supporting a different provider requires an explicit evidence-contract update.
-The default provider, CLI flags and environment names are unchanged.
+The provider and credential environment names are unchanged. The new input-mode
+flag deliberately defaults to OCR plus image; existing text-only callers can select `ocr`.
 
 From `processing`, configure your private `.env` using `.env.example`:
 

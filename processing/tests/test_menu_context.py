@@ -112,6 +112,16 @@ class MenuContextTests(unittest.TestCase):
         self.assertEqual(dish.price_text, printed)
         self.assertIsNone(dish.price_amount)
 
+    def test_currency_marked_options_never_keep_a_scalar(self):
+        for printed in ["$8.50 / $12.50", "PHP 8.50 / PHP 12.50"]:
+            for supplied in [printed,None]:
+                with self.subTest(printed=printed,supplied=supplied):
+                    cleaned,warnings=grounded_draft(self.dish(name="Soup",price_amount="8.50",price_text=supplied),f"Soup\n{printed}")
+                    self.assertEqual(cleaned.price_text,printed)
+                    self.assertIsNone(cleaned.price_amount)
+                    self.assertIsNone(cleaned.price_currency)
+                    self.assertTrue(any("Multiple" in warning for warning in warnings))
+
     def test_calorie_options(self):
         for source in ["Soup\nCalories: 200 / 300 / 400\n8.50 CAD", "Soup\n200 / 300 / 400 kcal\n8.50 CAD"]:
             for value in ["200", "300", "400", "200 / 300", "300 / 400"]:
@@ -206,6 +216,18 @@ class MenuContextTests(unittest.TestCase):
                 self.assertIsNone(dish.price_amount)
                 self.assertIsNone(dish.price_text)
                 self.assertTrue(any("ambiguous" in warning.lower() for warning in warnings))
+
+    def test_beef_pares_445_is_not_the_neighbor_460(self):
+        text="Other Dish\nRoasted vegetables\nBeef Pares\nBraised beef\n460\n445"
+        def box(label,x):
+            return dict(text=label,left=x,top=20,width=100,height=20)
+        metadata=dict(ocr_region_status="available",ocr_coordinate_space="uploaded_image_pixels",
+                      upload_width=1000,upload_height=300,
+                      ocr_regions=[box("Other Dish",20),box("460",220),box("Beef Pares",520),box("445",820)])
+        cleaned,warnings=grounded_draft(self.dish(name="Beef Pares",price_amount="460",price_text="460"),text,
+            dish_names=["Other Dish","Beef Pares"],ocr_metadata=metadata)
+        self.assertEqual((cleaned.price_amount,cleaned.price_text),("445","445"))
+        self.assertTrue(any("recovered" in warning for warning in warnings))
 
     def test_pair_identity(self):
         text="Nachos\nTortilla chips\nWings\nSpicy chicken\n375 / 695\n495 / 795"

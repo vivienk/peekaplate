@@ -53,7 +53,7 @@ class PipelineTimingTests(unittest.TestCase):
                 before=json.dumps(acquired.segments[0].metadata, sort_keys=True)
                 client=LayoutLLM()
                 with patch("peekaplate_processing.run_pipeline.extract_source", return_value=acquired):
-                    report=run_pipeline(path, Path(folder)/"run", llm=client, cache_dir=None, llm_cache_dir=None)
+                    report=run_pipeline(path, Path(folder)/"run", llm=client, cache_dir=None, llm_cache_dir=None,input_mode="ocr")
                 self.assertEqual([(d.name,d.model_dump(mode="json")["price_amount"],d.price_text) for d in report.drafts],
                     [("WINGS",None,"495 / 795"),("FRIES","295","295"),("NOODLES","445","445")])
                 self.assertEqual(report.segments[0].text, text)
@@ -95,7 +95,7 @@ class PipelineTimingTests(unittest.TestCase):
                         return answer
                 client=PartialPriceLLM()
                 with patch("peekaplate_processing.run_pipeline.extract_source", return_value=acquired):
-                    report=run_pipeline(path, Path(folder)/"run", llm=client, cache_dir=None, llm_cache_dir=None)
+                    report=run_pipeline(path, Path(folder)/"run", llm=client, cache_dir=None, llm_cache_dir=None,input_mode="ocr")
                 self.assertEqual(report.segments[0].text, before.text)
                 self.assertEqual(report.segments[0].metadata, before.metadata)
                 self.assertEqual(client.calls, [[{"page_number":1,"text":text}]])
@@ -152,7 +152,7 @@ class PipelineTimingTests(unittest.TestCase):
             path=Path(folder)/"menu.pdf"
             path.write_bytes(make_pdf([{"text":"Dish 1 8.50 CAD - synthetic menu"}]))
             run=Path(folder)/"run"
-            result=run_pipeline(path, run, llm=FakeLLM(), llm_cache_dir=None)
+            result=run_pipeline(path, run, llm=FakeLLM(), llm_cache_dir=None,input_mode="ocr")
             timing=json.loads((run/"timings.json").read_text())
             self.assertEqual(result.schema_version, 2)
             self.assertEqual(result.pipeline_version, "3")
@@ -170,10 +170,10 @@ class PipelineTimingTests(unittest.TestCase):
             path=Path(folder)/"menu.pdf"
             path.write_bytes(make_pdf([{"text":"Dish 1 8.50 CAD - synthetic menu"}]))
             first=Path(folder)/"first"
-            run_pipeline(path, first, llm=FakeLLM(), llm_cache_dir=None)
+            run_pipeline(path, first, llm=FakeLLM(), llm_cache_dir=None,input_mode="ocr")
             second=Path(folder)/"second"
             with patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR")):
-                run_pipeline(path, second, llm=FakeLLM(), pages_json=first/"pages.json", llm_cache_dir=None)
+                run_pipeline(path, second, llm=FakeLLM(), pages_json=first/"pages.json", llm_cache_dir=None,input_mode="ocr")
             timing=json.loads((second/"timings.json").read_text())
             self.assertEqual(timing["acquisition_mode"], "saved_pages")
             self.assertTrue(timing["pages"][0]["reused"])
@@ -202,7 +202,7 @@ class PipelineTimingTests(unittest.TestCase):
             path.write_bytes(make_pdf([{"text":"Dish 1 8.50 CAD - synthetic menu"}]))
             run=Path(folder)/"failed"
             with self.assertRaises(RuntimeError):
-                run_pipeline(path, run, llm=Broken())
+                run_pipeline(path, run, llm=Broken(),input_mode="ocr")
             timing=json.loads((run/"timings.json").read_text())
             self.assertEqual(timing["status"], "failed")
             self.assertIn("llm_wall", timing["timings_seconds"])

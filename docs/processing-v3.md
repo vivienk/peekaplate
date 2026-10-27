@@ -5,6 +5,55 @@ deploy a service, approve a dish or implement RES review persistence.
 The existing OCR provider, model, bounded Python/LangGraph flow and strict local
 validation are reused. No extra verification model or new dependency is added.
 
+## Input modes and private review artifacts
+
+`run_pipeline.py` and its Python function accept three explicit `input_mode` values:
+
+- `ocr_image` (default): source text plus original/bounded target-page images.
+- `ocr`: the earlier source-text-only model input; native PDF text/OCR acquisition is unchanged.
+- `image`: target-page images plus a labelled previous-page image, without OCR or native-text extraction.
+
+The default input change is explicit follow-up scope, not independent quality or
+PM acceptance. Batch size, concurrency, model/provider and reasoning defaults remain
+unchanged. The graph's lower-level text default remains compatible with existing callers.
+No mode silently falls back or makes an extra model request.
+
+All modes save private `review-suggestions.json` beside `extraction.json` and final
+`timings.json`. It retains schema-validated raw dish fields, changed/rejected field
+values and reasons, original page references and model section suggestions. Hidden
+reasoning/provider messages are not stored. Cleared prices and rejected composed
+names remain unvalidated, separate from `candidates[].original`. Base-heading and
+printed-option inspection uses the retained original page; no variant relationship
+or new review field is invented.
+
+Vision references contain actual image hashes, dimensions and whole-page regions,
+not inferred dish rectangles. Their `path` is local-run-only; source hash and page
+identify the immutable source snapshot retained in the full report. A source menu
+page is not a verified dish photograph. Keep these artifacts private and deliver
+them only to authorized reviewers.
+
+Image-only has no source text, grounded drafts or text spans. A successful model
+trial therefore leaves the standard grounding report `incomplete` (CLI exit 2),
+while private suggestion status can be `complete`. A failed image-model request
+remains failed. This distinction avoids declaring image-read values OCR-grounded
+or treating diagnostic completion as publication approval.
+
+Images are limited to 8 MB each and 16 MB per model batch, including context.
+PDF rendering retains the existing 40-page/6-megapixel bounds; bounded image
+preparation respects orientation and preserves original PNG/JPEG bytes when safe.
+The model cache distinguishes input mode, prompt/schema, context and verified image
+bytes; it never stores image data URLs. OCR geometry remains local validation data.
+
+```sh
+uv run --frozen python -m peekaplate_processing.run_pipeline --input work/menu.pdf --run-dir work/combined --input-mode ocr_image --batch-pages 2 --llm-concurrency 2
+uv run --frozen python -m peekaplate_processing.run_pipeline --input work/menu.pdf --run-dir work/text --input-mode ocr --batch-pages 2 --llm-concurrency 2
+uv run --frozen python -m peekaplate_processing.run_pipeline --input work/menu.pdf --run-dir work/images --input-mode image --batch-pages 2 --llm-concurrency 2
+```
+
+Choose new output directories. `--pages-json` may reuse verified text in `ocr` and
+`ocr_image`; image-only rejects it instead of secretly reading OCR. Vision modes
+still need original source bytes. No image-backed RES schema is introduced here.
+
 ## Output and category handling
 
 New reports use `schema_version: 2` and `pipeline_version: "3"`. The loader can
@@ -162,7 +211,8 @@ OCR acquisition as well as extraction. Always choose a new run directory.
 Application defaults remain ten pages per batch and one simultaneous model call.
 The two-page/concurrency-two command above is an explicit opt-in, not a new default.
 Provider/model selection and reasoning configuration are unchanged from develop;
-separate private experiments do not authorize provider-specific tuning here.
+separate private experiments do not authorize provider-specific tuning here. The
+input-mode default is deliberately OCR plus image; it is independent of those settings.
 
 Run deterministic checks without live provider calls:
 

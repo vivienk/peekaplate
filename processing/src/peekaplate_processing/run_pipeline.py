@@ -1,4 +1,4 @@
-"""Local PDF/image -> page text -> page-batch workers -> dish schema. No verification LLM."""
+"""PDF/photo -> selected model input -> grounded drafts and private suggestions."""
 import argparse
 import base64
 
@@ -20,9 +20,11 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult
 from peekaplate_processing.storage import save_json
-from peekaplate_processing.workflow import run_menu_graph
+from peekaplate_processing.workflow import INPUT_MODES, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
+from peekaplate_processing.vision import image_source, page_images
+from peekaplate_processing.review_suggestions import private_result
 
 
 def configured_llm():
@@ -86,7 +88,11 @@ def saved_page_text(source, pages_json):
     )
 
 
-def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache"):
+def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image"):
+    if input_mode not in INPUT_MODES:
+        raise ExtractionError("Input mode must be ocr, ocr_image or image.")
+    if input_mode=="image" and pages_json is not None:
+        raise ExtractionError("Image-only mode cannot use --pages-json; no OCR text is read.")
     if type(llm_concurrency) is not int or llm_concurrency not in (1, 2):
         raise ExtractionError("LLM concurrency must be 1 or 2.")
     if type(batch_pages) is not int or not 1 <= batch_pages <= 10:
@@ -102,23 +108,36 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     report=None
     completed=False
     try:
-        print("Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
+        print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
-            report = saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir)
+            report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir)
+        report.configuration.update(input_mode=input_mode,ocr_enabled=input_mode!="image")
         report.configuration["timings_seconds"]=timings
         report.configuration.update(llm_deadline_seconds=llm_timeout, llm_batch_pages=batch_pages, llm_concurrency=llm_concurrency)
         cache_hits=0 if pages_json is not None else sum(segment.metadata.get("cache_hit") is True for segment in report.segments)
-        print(f"Page text acquired in {timings['acquisition']:.1f}s; {cache_hits} OCR cache hits, {sum(s.status == 'failed' for s in report.segments)} failed pages.", file=sys.stderr, flush=True)
+        print("Image-only source prepared without OCR." if input_mode=="image" else f"Page text acquired in {timings['acquisition']:.1f}s; {cache_hits} OCR cache hits, {sum(s.status == 'failed' for s in report.segments)} failed pages.", file=sys.stderr, flush=True)
         with measure(timings, "pages_write"):
             save_json(report.model_dump(mode="json"), directory / "pages.json")
         report.extraction_mode="ai"
         report.extraction_model=getattr(llm, "model_name", None)
-        if report.source and any(segment.status == "ready" and segment.text.strip() for segment in report.segments) and sum(len(segment.text) for segment in report.segments) <= 100_000:
-            pages=[{"page_number":segment.page_number, "text":segment.text if segment.status == "ready" else "",
-                    "ocr_metadata":segment.metadata if segment.method == "ocr_space_engine3" and segment.status == "ready" else None}
-                   for segment in report.segments]
+        images=[]
+        if input_mode!="ocr" and report.source:
+            with measure(timings,"source_images"):
+                images,image_errors=page_images(report.source,directory)
+            report.errors.extend(image_errors)
+        pages=[{"page_number":segment.page_number,"segment_id":segment.segment_id,
+                "text":segment.text if segment.status=="ready" and segment.error is None else "",
+                "ocr_metadata":segment.metadata if segment.method=="ocr_space_engine3" and segment.status=="ready" and segment.error is None else None}
+               for segment in report.segments]
+        if input_mode=="image":
+            pages=images
+        elif input_mode=="ocr_image":
+            by_number={page["page_number"]:page for page in images}
+            pages=[{**page,**by_number[page["page_number"]]} for page in pages if page["page_number"] in by_number]
+        output={"suggestions":[],"batches":[],"raw_sections":[]}
+        if report.source and (any(page.get("text", "").strip() for page in pages) or input_mode!="ocr" and pages) and sum(len(segment.text) for segment in report.segments) <= 100_000:
             with measure(timings, "llm_wall"):
-                output=run_menu_graph(llm, pages, request_timeout=llm_timeout, batch_pages=batch_pages, concurrency=llm_concurrency, cache_dir=llm_cache_dir, source_sha256=report.source.sha256)
+                output=run_menu_graph(llm, pages, request_timeout=llm_timeout, batch_pages=batch_pages, concurrency=llm_concurrency, cache_dir=llm_cache_dir, source_sha256=report.source.sha256,input_mode=input_mode)
             report.errors.extend(output["errors"])
             report.warnings.extend(output["warnings"])
             report.configuration["llm_batches"]=output["batches"]
@@ -138,8 +157,20 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     start=segment.text.find(draft.source_text)
                     report.drafts.append(draft)
                     report.evidence.append(DraftEvidence(draft_id=draft_id, draft_index=index, spans=[SourceSpan(segment_id=segment.segment_id, start=start, end=start+len(draft.source_text))]))
-        if not report.drafts: report.errors.append("No reviewable dishes were extracted.")
-        report.status="incomplete" if report.errors and report.drafts else "failed" if report.errors else "complete"
+        if input_mode=="image":
+            report.warnings.append("Image-only suggestions are private and unvalidated; no OCR-grounded candidates or text spans were created.")
+            report.status="incomplete"
+        else:
+            if not report.drafts: report.errors.append("No reviewable dishes were extracted.")
+            report.status="incomplete" if report.errors and report.drafts else "failed" if report.errors else "complete"
+        if report.source:
+            suggestions=private_result(report.source,input_mode,pages,output)
+            if input_mode=="image" and suggestions["status"]=="failed":
+                report.status="failed"
+                report.errors.append("No usable image-only model response was obtained.")
+            suggestions["errors"]=list(report.errors)
+            save_json(suggestions,directory/"review-suggestions.json")
+            report.configuration["private_suggestions_file"]="review-suggestions.json"
         report.finished_at=datetime.now(timezone.utc)
         report.warnings.append("LLM verification is not implemented; all dishes remain needs_review.")
         with measure(timings, "extraction_write"):
@@ -148,7 +179,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         return report
     finally:
         timings["total"]=round(time.perf_counter()-started, 6)
-        summary={"schema_version":1, "status":report.status if completed else "failed", "acquisition_mode":"saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
+        summary={"schema_version":1, "status":report.status if completed else "failed", "input_mode":input_mode, "acquisition_mode":"images_without_ocr" if input_mode=="image" else "saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
         if report is not None:
             summary["batches"]=report.configuration.get("llm_batches", [])
             summary["pages"]=[{"page_number":segment.page_number, "method":segment.method, "status":segment.status, "reused":pages_json is not None, "cache_hit":segment.metadata.get("cache_hit") if pages_json is None else None, "timings_seconds":segment.metadata.get("timings_seconds") if pages_json is None else None} for segment in report.segments]
@@ -163,6 +194,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
+    parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), or image (no OCR; private suggestions only).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--llm-timeout", type=float, default=90, help="Cancellable deadline per LLM batch in seconds (default: 90; maximum: 300).")
     parser.add_argument("--batch-pages", type=int, default=10, help="Pages per LLM request, from 1 to 10 (default: 10); smaller batches make more calls.")
@@ -172,10 +204,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
     try:
-        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache")
+        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode)
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")
+    if args.input_mode=="image":
+        print("Image-only results are private unvalidated suggestions in review-suggestions.json; no OCR-grounded candidates were created.")
     for error in report.errors: print(error)
     return 0 if report.status == "complete" else 2 if report.status == "incomplete" else 1
 

@@ -12,7 +12,7 @@ including pages without embedded raster images. Images use the same bounded,
 oriented preparation. Reports retain original source bytes/hash, page identities,
 native text, extraction method, available word regions, warnings and failures.
 
-LangGraph dispatches numbered text batches to ChatOpenAI for strict dish-schema
+LangGraph dispatches numbered page batches with the selected input mode to ChatOpenAI for strict dish-schema
 extraction. Python merges results and attaches source spans. Unsupported names
 or page citations reject the dish; unsupported optional fields become null with
 review warnings. Candidate-cache hits are revalidated. All dishes remain
@@ -26,10 +26,13 @@ review schema](review-candidates.md) preserve both version pairs, source evidenc
 original candidate IDs, null/zero distinctions and partial failures. This is an
 offline producer/consumer foundation, not an accepted deployed handoff.
 
-Application defaults remain ten pages per batch and one simultaneous call;
-provider/model/reasoning settings are unchanged. Smaller batches/concurrency two
-remain explicit options. Neither geometry nor a complete processing status proves
-facts correct, and no image-input production switch is included.
+Batch/concurrency defaults remain ten pages and one simultaneous call;
+provider/model/reasoning settings are unchanged. The explicit follow-up default
+is now OCR plus image, with OCR-only and true image-only available through
+`--input-mode`. Private raw/cleared suggestions remain separate from grounded
+originals; image-only never invents text spans. See [mode and evidence behavior](processing-v3.md#input-modes-and-private-review-artifacts).
+Neither local code nor a complete processing status proves facts correct or a
+hosted rollout accepted. No deployment is performed by this follow-up.
 
 `python -m peekaplate_processing.extract_menus` acquires page text without LLM
 calls. `python -m peekaplate_processing.run_pipeline` performs extraction.

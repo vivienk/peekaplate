@@ -78,8 +78,11 @@ raw model suggestions were not retained as facts by the processor: when it clear
 an unsupported optional field without a unique source-supported replacement,
 the export preserves its null and warning. Source-price recoveries and duplicate
 handling occur in the processor before the report is saved, never during export;
-separate raw-suggestion retention still requires an agreed contract. Do not
-infer a stable field error code by parsing warning prose. No numerical confidence
+private `review-suggestions.json` now retains schema-validated originals, changed
+field values, rejection reasons and page/image references, following the bounded
+reviewer-retention handoff. It is not part of this review payload. Literal-name
+validation stays in place; composed variants remain unvalidated suggestions until
+owners agree their representation. Do not infer a stable field error code by parsing warning prose. No numerical confidence
 is available; no percentage is fabricated. Ingredients are not an allergen claim.
 
 The source byte snapshot stays in the private full `extraction.json`; the export
@@ -96,10 +99,13 @@ in originals and draft save/reload, with corrections stored separately. Coordina
 changes to the shared Python schema with the VIS-03 asset models; candidate IDs
 are extraction references, not backend dish/revision UUIDs.
 
-The image-only experiment produced raw dish JSON, not this evidence-linked report.
-This exporter still requires source text and valid text spans. It does not invent
-OCR text or adapt image-only results into text evidence. That modality requires an
-agreed contract before integration.
+The processor supports OCR-only, OCR-plus-image (default), and true image-only
+model inputs; see [input modes and private artifacts](processing-v3.md#input-modes-and-private-review-artifacts).
+This exporter still requires actual source text and valid text spans. Unsupported
+vision values stay private rather than becoming invented OCR facts. Image-only
+writes an explicit incomplete standard report with no grounded candidates, plus
+private suggestions and actual page-image references. Exporting that report cannot
+create image-backed candidates; such a public evidence contract remains deferred.
 
 Offsets count Python Unicode code points: zero-based start, exclusive end. The
 source text is never normalized by the exporter. TypeScript validates slices via

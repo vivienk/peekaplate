@@ -136,7 +136,7 @@ class ReviewCandidateTests(unittest.TestCase):
                 client=MenuLLM()
                 client.partial=partial
                 with patch("peekaplate_processing.workflow.asyncio.sleep"), patch("peekaplate_processing.ocr_space.OCRSpaceClient.extract", side_effect=AssertionError("Unexpected OCR call")):
-                    report=run_pipeline(source, path / "run", llm=client, cache_dir=None, llm_cache_dir=None, batch_pages=1)
+                    report=run_pipeline(source, path / "run", llm=client, cache_dir=None, llm_cache_dir=None, batch_pages=1,input_mode="ocr")
                 result=export_review_candidates(path / "run/extraction.json", path / "review.json")
                 self.assertEqual(result.status, "incomplete" if partial else "complete")
                 self.assertEqual(len(client.calls), 3)

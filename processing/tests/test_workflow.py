@@ -53,7 +53,7 @@ class WorkflowTests(unittest.TestCase):
         path = Path(directory)/"menu.pdf"
         path.write_bytes(make_pdf([{"text":f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, count+1)]))
         with patch("peekaplate_processing.workflow.asyncio.sleep"):
-            return run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=10, llm_concurrency=1)
+            return run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=10, llm_concurrency=1,input_mode="ocr")
 
     def test_35_pages_dispatch_10_10_10_5_and_keep_source_spans(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -275,13 +275,13 @@ class WorkflowTests(unittest.TestCase):
             first = self.run_case(directory, 1, llm)
             saved = Path(directory)/"run/pages.json"
             with patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR when pages are reused")):
-                second = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved)
+                second = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
                 self.assertEqual(second.status, "complete", second.errors)
                 self.assertEqual(second.drafts, first.drafts)
                 other = Path(directory)/"other.pdf"
                 other.write_bytes(make_pdf([{"text": "Different source"}]))
                 with self.assertRaisesRegex(ExtractionError, "match"):
-                    run_pipeline(other, Path(directory)/"third", llm=FakeLLM(), pages_json=saved)
+                    run_pipeline(other, Path(directory)/"third", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
 
     def test_reused_failed_page_stays_incomplete_without_repeating_ocr(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -291,7 +291,7 @@ class WorkflowTests(unittest.TestCase):
             data["segments"][1].update(status="failed", text="", error="OCR unavailable")
             saved.write_text(json.dumps(data))
             with patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR")):
-                report = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved)
+                report = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
         self.assertEqual(report.status, "incomplete")
         self.assertEqual(len(report.drafts), 1)
         self.assertIn("Page 2: OCR unavailable", report.errors)
@@ -359,7 +359,7 @@ class WorkflowTests(unittest.TestCase):
                 saved.write_text(json.dumps(invalid))
                 with self.subTest(index=index), patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR")):
                     with self.assertRaises(ExtractionError):
-                        run_pipeline(Path(directory)/"menu.pdf", Path(directory)/f"bad{index}", llm=FakeLLM(), pages_json=saved)
+                        run_pipeline(Path(directory)/"menu.pdf", Path(directory)/f"bad{index}", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
 
     def test_a2agent_settings_override_nara_and_generic_without_provider_extras(self):
         settings = {"a2agent_api_key": "synthetic-a2", "a2agent_url": "https://api.a2agent.me/v1/chat/completions", "a2agent_api_MODEL": "minimax-m3", "NARA_ROUTER_KEY": "synthetic-nara", "NARA_ROUTER_URL": "https://router.bynara.id/v1", "NARA_ROUTER_MODEL": "old-model", "MENU_AI_API_KEY": "synthetic-old", "MENU_AI_API_URL": "https://openrouter.ai/api/v1", "MENU_AI_MODEL": "old-model"}
@@ -460,7 +460,7 @@ class WorkflowTests(unittest.TestCase):
             path.write_bytes(make_pdf([{"text": f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, 36)]))
             llm = FakeLLM()
             with patch("peekaplate_processing.workflow.asyncio.sleep"):
-                report = run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=2)
+                report = run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=2,input_mode="ocr")
             self.assertEqual(report.status, "complete", report.errors)
             self.assertEqual([len(p) for p in llm.calls], [2]*17+[1])
             self.assertEqual([p["page_number"] for batch in llm.calls for p in batch], list(range(1,36)))
@@ -549,7 +549,7 @@ class WorkflowTests(unittest.TestCase):
             path = Path(directory)/"menu.pdf"
             path.write_bytes(make_pdf([{"text": "\n".join(f"Dish {i} variant {v} 8.50 CAD" for v in range(5))} for i in range(1,36)]))
             with patch("peekaplate_processing.workflow.asyncio.sleep"):
-                report = run_pipeline(path, Path(directory)/"run", llm=Many(), batch_pages=2)
+                report = run_pipeline(path, Path(directory)/"run", llm=Many(), batch_pages=2,input_mode="ocr")
         self.assertEqual(report.status, "complete", report.errors)
         self.assertEqual(len(report.drafts), 175)
         self.assertEqual(len(report.evidence), 175)
