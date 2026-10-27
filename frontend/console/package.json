@@ -13,7 +13,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "@peekaplate/analytics": "workspace:*",
-    "@peekaplate/tokens": "workspace:*"
+    "@peekaplate/tokens": "workspace:*",
+    "@peekaplate/ui": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

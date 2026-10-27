@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. Chip roles (active/inactive) added from Figma; hover/pressed pending. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending.",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, button label, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. Chip roles (active/inactive) added from Figma; hover/pressed pending. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending. Component dims reuse --pp-space-16/20; button label uses 14px/24px tokens; no other dimension tokens.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,7 +39,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "08eb483673a616f0443af6f0a35036978bb856631e5452d20c593c1450883b69"
+      "sourceFingerprint": "53d94c934bc753e8d3b7fb7ad28271c41799a5989bdc2c3efeabebc5d98513c8"
+    },
+    {
+      "id": "ui",
+      "status": "foundation",
+      "summary": "Shared framework-agnostic component CSS built only on @peekaplate/tokens (Button, Card, Input, Typography, Nav) with variants, states, responsive and reduced-motion rules. CSS-only so the diner keeps its static no-JS shell and JS budget; console wraps these classes in React. Consumed via @peekaplate/ui/components.css alongside tokens.css.",
+      "paths": [
+        "packages/ui/package.json",
+        "packages/ui/src/index.ts",
+        "packages/ui/src/components.css"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md"
+      ],
+      "dependsOn": [
+        "tokens"
+      ],
+      "sourceFingerprint": "05fd780dddb7ac48367264010d214cb17d5883be82ec650743641b91a8f663a8"
     },
     {
       "id": "diner",
@@ -62,7 +79,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5bd2fc5c56032c8f68ea3179d768da5dd2c18f3cfc31ba20edbecf4ee929aa9e"
+      "sourceFingerprint": "d08f53d1c49393f7eac8dc4e6060b73e005fb8503094ed776c6ddb0ee9e6978f"
     },
     {
       "id": "console",
@@ -82,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f8c87694012c4d8b67d4947f635d6453235bb8fb2494448b2b5a487f1adca2f0"
+      "sourceFingerprint": "f1b02c1d28ca55dc35cdf29d0c01439824c7c34f778fc029e6104e8e9f13ac0c"
     },
     {
       "id": "backend",
@@ -332,13 +349,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-TOK-01 now ships the shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides; Design System text styles, corner-radius, spacing (0-80px including 48px), shadows and color palette; and semantic color roles using --pp-role-button-<variant>-<state>-<property>, including a nav hover icon role and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a --pp-role-outline border; on-error and on-information use neutral-950 for WCAG AA contrast. A WCAG contrast test covers active foreground/background pairs; shells remain locally styled.",
+      "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
       "modules": [
         "tokens",
+        "ui",
         "diner",
         "console"
       ],
-      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma."
+      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
     },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",

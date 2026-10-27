@@ -1,0 +1,224 @@
+/* Shared component styles built only on @peekaplate/tokens (S3-TOK-01).
+   Import tokens.css first, then this file. No framework dependency. */
+
+/* Typography */
+.pp-text--h1 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-h1);
+  line-height: var(--pp-line-height-h1);
+  font-weight: var(--pp-font-weight-bold);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--h2 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-h2);
+  line-height: var(--pp-line-height-h2);
+  font-weight: var(--pp-font-weight-bold);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--h3 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+  font-weight: var(--pp-font-weight-semibold);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--h4 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-h4);
+  line-height: var(--pp-line-height-h4);
+  font-weight: var(--pp-font-weight-semibold);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--h5 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--paragraph {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-regular);
+  color: var(--pp-role-on-surface);
+  margin: 0;
+}
+.pp-text--paragraph-2 {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+  font-weight: var(--pp-font-weight-regular);
+  color: var(--pp-role-on-surface-variant);
+  margin: 0;
+}
+.pp-text--small {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-regular);
+  color: var(--pp-role-on-surface-variant);
+  margin: 0;
+}
+.pp-text--footer {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-footer);
+  line-height: var(--pp-line-height-footer);
+  font-weight: var(--pp-font-weight-medium);
+  color: var(--pp-role-on-surface-variant);
+  margin: 0;
+}
+.pp-text--button-label {
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-button-label);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+  margin: 0;
+}
+
+/* Button */
+.pp-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-8);
+  /* stopgap: spacing token used as height; pending --pp-size-* tokens */
+  min-height: var(--pp-space-40);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-8);
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-button-label);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    transform var(--pp-motion-duration-press) var(--pp-motion-ease-out);
+}
+.pp-button:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
+.pp-button:active:not(:disabled) {
+  transform: scale(var(--pp-motion-scale-press));
+}
+.pp-button:disabled,
+.pp-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  background-color: var(--pp-role-button-disabled-bg);
+  color: var(--pp-role-button-disabled-text);
+  border-color: var(--pp-role-button-disabled-border);
+}
+.pp-button--action {
+  background-color: var(--pp-role-button-action-bg);
+  color: var(--pp-role-button-action-text);
+}
+.pp-button--action:hover:not(:disabled) {
+  background-color: var(--pp-role-button-action-hover-bg);
+}
+.pp-button--action:active:not(:disabled) {
+  background-color: var(--pp-role-button-action-pressed-bg);
+}
+.pp-button--outline {
+  background-color: var(--pp-role-button-outline-bg);
+  color: var(--pp-role-button-outline-text);
+  border-color: var(--pp-role-button-outline-border);
+}
+.pp-button--outline:active:not(:disabled) {
+  background-color: var(--pp-role-button-outline-pressed-bg);
+}
+.pp-button--text {
+  background-color: transparent;
+  color: var(--pp-role-button-outline-text);
+}
+.pp-button--text:hover:not(:disabled) {
+  background-color: var(--pp-role-button-text-hover-bg);
+}
+.pp-button--text:active:not(:disabled) {
+  background-color: var(--pp-role-button-text-pressed-bg);
+}
+
+/* Card */
+.pp-card {
+  background-color: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  border: 1px solid var(--pp-role-outline);
+  border-radius: var(--pp-radius-12);
+  padding: var(--pp-space-16);
+  box-shadow: var(--pp-shadow-small);
+}
+.pp-card--elevated {
+  box-shadow: var(--pp-shadow-elevation-2);
+}
+
+/* Input */
+.pp-input {
+  width: 100%;
+  /* stopgap: spacing token used as height; pending --pp-size-* tokens */
+  min-height: var(--pp-space-40);
+  padding: var(--pp-space-8) var(--pp-space-12);
+  border: 1px solid var(--pp-role-input-border);
+  border-radius: var(--pp-radius-8);
+  background-color: var(--pp-role-input-bg);
+  color: var(--pp-role-input-text);
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  transition: border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out);
+}
+.pp-input::placeholder {
+  color: var(--pp-role-input-placeholder);
+}
+.pp-input:focus-visible {
+  outline: none;
+  border-color: var(--pp-role-input-border-focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-role-input-border-focus) 30%, transparent);
+}
+.pp-input[aria-invalid="true"] {
+  border-color: var(--pp-role-input-border-error);
+  color: var(--pp-role-input-text-error);
+}
+.pp-input:disabled {
+  background-color: var(--pp-role-input-bg-disabled);
+  color: var(--pp-role-input-text-disabled);
+  cursor: not-allowed;
+}
+
+/* Nav */
+.pp-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  background-color: var(--pp-role-nav-bg);
+  padding: var(--pp-space-8) var(--pp-space-12);
+}
+.pp-nav__icon {
+  color: var(--pp-role-nav-icon);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pp-nav__icon--hover {
+  color: var(--pp-role-nav-hover-icon);
+}
+.pp-nav__icon--disabled {
+  color: var(--pp-role-nav-icon-disabled);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pp-button,
+  .pp-input {
+    transition: none;
+  }
+}

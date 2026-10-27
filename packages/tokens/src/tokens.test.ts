@@ -182,6 +182,8 @@ describe('design tokens', () => {
     const roles = group(base, role);
     expect(roles).toEqual({
       '--pp-role-button-action-bg': 'var(--pp-color-orange-500)',
+      '--pp-role-button-action-hover-bg':
+        'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
       '--pp-role-button-action-text': 'var(--pp-color-orange-950)',
       '--pp-role-button-action-pressed-bg': 'var(--pp-color-orange-600)',
       '--pp-role-button-outline-bg': 'var(--pp-color-neutral-800)',
@@ -228,9 +230,10 @@ describe('design tokens', () => {
       '--pp-role-on-information-container': 'var(--pp-color-info-100)',
       '--pp-role-button-text-hover-bg':
         'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
+      '--pp-role-button-text-pressed-bg': 'var(--pp-color-orange-900)',
       '--pp-role-button-disabled-border': 'var(--pp-color-neutral-600)',
       '--pp-role-button-outline-pressed-bg': 'var(--pp-color-neutral-600)',
-      '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
+      '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-500)',
 
       '--pp-role-chip-active-bg': 'var(--pp-color-neutral-50)',
       '--pp-role-chip-active-text': 'var(--pp-color-neutral-800)',
@@ -277,6 +280,8 @@ describe('design tokens', () => {
       '--pp-line-height-small': '1rem',
       '--pp-font-size-footer': '0.625rem',
       '--pp-line-height-footer': '0.875rem',
+      '--pp-font-size-button-label': '0.875rem',
+      '--pp-line-height-button-label': '1.5rem',
     });
   });
 
