@@ -3,7 +3,14 @@ import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { deploymentIds, manage, projects, sanitize, validateProject } from './preview.mjs';
+import {
+  deploymentIds,
+  manage,
+  projects,
+  sanitize,
+  validateProject,
+  verifyPreview,
+} from './preview.mjs';
 
 const project = (name) => ({
   name,
@@ -11,6 +18,7 @@ const project = (name) => ({
   domains: [`${name}.pages.dev`],
   deployment_configs: { preview: { build_image_major_version: 3, env_vars: {}, d1_databases: {} } },
 });
+const head = 'a'.repeat(40);
 async function fixture(t) {
   const dir = await mkdtemp(join(tmpdir(), 'preview-test-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -22,8 +30,16 @@ async function fixture(t) {
 }
 test('static output gets a policy blocking APIs, analytics, forms and frames', async (t) => {
   const dir = await fixture(t);
-  await sanitize(dir);
+  await sanitize(dir, head);
   assert.match(await readFile(join(dir, 'diner/_headers'), 'utf8'), /connect-src 'none'/);
+});
+test('static output identifies the exact trusted PR commit', async (t) => {
+  const dir = await fixture(t);
+  await sanitize(dir, head);
+  assert.deepEqual(JSON.parse(await readFile(join(dir, 'diner/peekaplate-preview.json'), 'utf8')), {
+    schemaVersion: 1,
+    commit: head,
+  });
 });
 for (const entry of [
   '_worker.js',
@@ -32,17 +48,56 @@ for (const entry of [
   'wrangler.toml',
   '.env',
   'package.json',
+  'peekaplate-preview.json',
 ]) {
   test(`rejects executable or routing configuration ${entry}`, async (t) => {
     const dir = await fixture(t);
     await writeFile(join(dir, 'diner', entry), 'bad');
-    await assert.rejects(sanitize(dir));
+    await assert.rejects(sanitize(dir, head));
   });
 }
 test('rejects artifact symlinks', async (t) => {
   const dir = await fixture(t);
-  await symlink('/etc/passwd', join(dir, 'diner/leak.txt'));
-  await assert.rejects(sanitize(dir), /symlinks/);
+  await symlink(
+    dir,
+    join(dir, 'diner/linked-directory'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  );
+  await assert.rejects(sanitize(dir, head), /symlinks/);
+});
+test('static output rejects a missing or invalid commit', async (t) => {
+  const dir = await fixture(t);
+  for (const sha of [undefined, '', '../main', 'g'.repeat(40)])
+    await assert.rejects(sanitize(dir, sha), /Invalid preview commit/);
+});
+test('readiness checks both aliases against the exact commit without credentials', async () => {
+  const urls = [];
+  await verifyPreview('37', head, async (url, options) => {
+    urls.push(url);
+    assert.equal(options.redirect, 'error');
+    assert.equal(options.cache, 'no-store');
+    assert.equal(options.headers, undefined);
+    return { ok: true, json: async () => ({ schemaVersion: 1, commit: head }) };
+  });
+  assert.deepEqual(
+    urls,
+    projects.map(
+      (name) => `https://pr-37.${name}.pages.dev/peekaplate-preview.json?commit=${head}`,
+    ),
+  );
+});
+test('HTTP 200 from a stale alias cannot certify a new preview', async () => {
+  await assert.rejects(
+    verifyPreview('37', head, async () => ({
+      ok: true,
+      json: async () => ({ schemaVersion: 1, commit: 'b'.repeat(40) }),
+    })),
+    /not serving the requested commit/,
+  );
+  await assert.rejects(
+    verifyPreview('37', head, async () => ({ ok: false, status: 404 })),
+    /commit check failed/,
+  );
 });
 test('rejects production branches, Git sources, custom domains and bindings', () => {
   const name = projects[0];
@@ -124,4 +179,10 @@ test('workflow executes base deployment code with isolated credential-free PR bu
   const cleanup = workflow.split('  cleanup:')[1];
   assert.doesNotMatch(cleanup, /PREVIEW_DEPLOYMENT_ENABLED/);
   assert.match(cleanup, /ref: \$\{\{ github.sha \}\}/);
+  const deploy = workflow.split('  deploy:')[1].split('  cleanup:')[0];
+  assert.match(deploy, /node scripts\/preview.mjs sanitize preview "\$SHA"/);
+  assert.match(deploy, /node scripts\/preview.mjs verify "\$SHA"/);
+  assert.ok(
+    deploy.indexOf('preview.mjs verify') < deploy.indexOf('Post or update the preview comment'),
+  );
 });

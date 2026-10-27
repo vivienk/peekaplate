@@ -32,6 +32,7 @@ const reserved = new Set([
   '_headers',
   'node_modules',
   'package.json',
+  'peekaplate-preview.json',
 ]);
 export const headers = `/*
   X-Robots-Tag: noindex, nofollow
@@ -40,7 +41,12 @@ export const headers = `/*
   X-Content-Type-Options: nosniff
 `;
 
-export async function sanitize(root) {
+function validateCommit(sha) {
+  if (!/^[a-f0-9]{40}$/.test(sha ?? '')) throw new Error('Invalid preview commit');
+}
+
+export async function sanitize(root, sha) {
+  validateCommit(sha);
   let count = 0;
   async function walk(path) {
     const stat = await lstat(path);
@@ -66,6 +72,25 @@ export async function sanitize(root) {
     const index = await lstat(resolve(dir, 'index.html'));
     if (!index.isFile()) throw new Error('Preview index missing');
     await writeFile(resolve(dir, '_headers'), headers);
+    await writeFile(
+      resolve(dir, 'peekaplate-preview.json'),
+      `${JSON.stringify({ schemaVersion: 1, commit: sha })}\n`,
+    );
+  }
+}
+
+export async function verifyPreview(pr, sha, fetcher = fetch) {
+  deploymentIds([], pr);
+  validateCommit(sha);
+  for (const project of projects) {
+    const response = await fetcher(
+      `https://pr-${pr}.${project}.pages.dev/peekaplate-preview.json?commit=${sha}`,
+      { cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10000) },
+    );
+    if (!response.ok) throw new Error(`Preview commit check failed (${response.status})`);
+    const body = await response.json();
+    if (body.schemaVersion !== 1 || body.commit !== sha)
+      throw new Error('Preview is not serving the requested commit');
   }
 }
 
@@ -154,7 +179,8 @@ export async function manage(mode, env = process.env, fetcher = fetch) {
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   try {
-    if (process.argv[2] === 'sanitize') await sanitize(process.argv[3]);
+    if (process.argv[2] === 'sanitize') await sanitize(process.argv[3], process.argv[4]);
+    else if (process.argv[2] === 'verify') await verifyPreview(process.env.PR, process.argv[3]);
     else await manage(process.argv[2]);
   } catch (error) {
     console.error(error.message);
