@@ -225,7 +225,7 @@
   --pp-role-chip-active-bg: var(--pp-color-neutral-50);
   --pp-role-chip-active-text: var(--pp-color-neutral-800);
   --pp-role-chip-inactive-text: var(--pp-color-neutral-50);
-  --pp-role-chip-inactive-border: color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent);
+  --pp-role-chip-inactive-border: var(--pp-role-outline);
 
   --pp-role-primary: var(--pp-color-orange-500);
   --pp-role-on-primary: var(--pp-color-orange-950);
