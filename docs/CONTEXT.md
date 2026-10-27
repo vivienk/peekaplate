@@ -115,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. ADR 0015 observation_index and observation_conflict tables exist locally: (tenant_id, event_id) identity, append-only, forced RLS, runtime select/insert only; not applied to staging and no writer is merged. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. ADR 0015 observation index/conflict and typed P0 facts (accepted same-type rows only) are append-only, forced-RLS, runtime select/insert; owner_* views are security-invoker and live-only. Not on staging; no writer merged. Physical hosted pool reuse and restore remain unverified.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -129,7 +129,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261021130000_team_analytics.sql",
         "tests/db/team-analytics.sql",
         "migrations/20261023120000_observation_index.sql",
-        "tests/db/observations.sql"
+        "tests/db/observations.sql",
+        "migrations/20261026120000_observation_facts.sql",
+        "tests/db/observation-facts.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -139,7 +141,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "e50b952880c41ec01ee738704be36eae27ff85578cf17a46e65e75694c9b493d"
+      "sourceFingerprint": "d3011d25d56e4426dbe2bcf9ee997818bf40b8bfa46441bfe6a575101f214deb"
     },
     {
       "id": "measurement",
@@ -317,6 +319,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Added the S3-DATA-02 typed observation facts on top of the observation index: observation_event holds the session, producer, publication revision and server-derived traffic class for each accepted event, and eight detail tables hold the matrix v0.1g P0 fields (menu view, exposure, opening, activity checkpoint, close, comparison, save/unsave, Saved screen). Composite foreign keys allow facts only for an accepted index row of the same event type. All facts are append-only with forced tenant RLS and runtime select/insert only. owner_observation_v1 exposes accepted live events and owner_opening_activity_v1 takes the greatest cumulative active time per opening. Local Docker test:db passed, including 29 new assertions.",
+      "modules": [
+        "database"
+      ],
+      "next": "Agree the table/view names and traffic_class values with Louis and Zhiliang, then switch PR #22 from temp_events to owner_observation_v1. Teeyansh's consumer writes the envelope and detail row in the same transaction as the accepted index row. Merge after PR #32; Sai and Vivien apply migrations to staging."
+    },
+    {
       "summary": "Added the ADR 0015 canonical observation identity migration: app_private.observation_index keyed by (tenant_id, event_id) with checksum, observation.v2, P0 type, authorized publication, occurred/first-received times, R2 key and accepted/rejected disposition, plus app_private.observation_conflict for quarantined reuse. Both are append-only with forced tenant RLS and runtime select/insert grants. pgTAP covers identity, isolation, grants, time window, reason codes and idempotent conflict recording. tenant_id naming and the column list are proposals pending Louis, Teeyansh and Zhiliang.",
       "modules": [
         "database"
@@ -370,14 +379,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review this documentation PR. Before Actions activation, verify credential permissions, intended staging bindings and the independent approval process; the settings observation is not a successful workflow or deployment test."
-    },
-    {
-      "summary": "Updated deployment selection to main for both environments per the maintainer's explicit instruction. Configured verified non-secret staging account, issuer and Hyperdrive bindings. Provider audit found existing Supabase migrations, forced RLS, restricted staging login, an ES256 public key and uncached Hyperdrive; no duplicate database branch was created. Hosted request behavior remains unverified.",
-      "modules": [
-        "delivery",
-        "backend"
-      ],
-      "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
     },
     {
       "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
