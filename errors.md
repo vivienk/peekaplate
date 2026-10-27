@@ -345,3 +345,192 @@ These records describe local validation limits, not application failures.
 ```json
 {"kind": "resolution", "references": {"id": "OBS-20261021-GITHUB-ENV-001"}, "status": "resolved", "cause": "Vivien configured the protected staging environment and credentials after the earlier administrator-access block.", "regression": "Run 39907285014 completed after an eligible separate reviewer approved it. Both hosted analytics GET endpoints returned 200 for hemu77; no secret value was published.", "remaining": "Valid non-collaborator and controlled collaborator-removal hosted 403 checks remain deferred; this resolution does not mark full hosted acceptance complete."}
 ```
+
+## October 23 hosted denial verification tooling
+
+```json
+{"id":"OBS-20261023-TEAM-CHECK-001","status":"resolved","area":"acceptance-tooling","observation":"An ad hoc local credential-input script supplied no completed identity or HTTP evidence. Its source is not in this repository, so its waiting state and underlying cause were not diagnosed.","prevention":"Use the repository-owned Node command with an expected GitHub login, private GitHub CLI credential lookup, visible steps and bounded requests. Never treat a hidden input prompt, invalid-token 401 or successful collaborator access as proof of outsider denial.","regression":"Ten focused tests pass, including timeout, wrong identity, 401/503/redirect, unexpected access and secret-redaction cases. A live collaborator control returned GitHub 200 and Worker 200/200 and correctly exited nonzero without reading analytics bodies.","remaining":"Valid non-collaborator 403/403 and controlled collaborator-removal hosted acceptance remain pending.","sources":["scripts/verify-team-access.mjs","scripts/verify-team-access.test.mjs","docs/team-data-access.md"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-24T05:35:02.469Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-24T05:35:02.469Z"},"status":"resolved","cause":"The first analytics context update exceeded the existing 1000-character summary limit.","prevention":"Keep module summaries bounded and put detailed verification in the handoff and linked runbook.","regression":"Shortened the summary, refreshed fingerprints, and reran pnpm check; context now validates nine modules and ten handoffs."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-24T17:29:37.191Z","exitCode":1}
+```
+
+## October 24 staging observation infrastructure
+
+```json
+{"id":"OBS-20261024-QUEUE-PROBE-001","status":"resolved","area":"hosted-infrastructure-verification","observation":"The first synthetic HTTP-pull probe received 409 after the resume request completed: the delivery plane still reported that the Queue was paused. Cleanup re-paused both Queues and retained the unacknowledged synthetic retry message.","cause":"Queue resume control-plane completion did not immediately establish delivery-plane readiness.","prevention":"Use bounded retries only for the explicit paused-delivery propagation response after an authorized resume; do not suppress other HTTP failures or infer readiness from settings alone. Always re-pause in cleanup and never purge unrelated work.","regression":"Recovered the exact synthetic retry through the configured DLQ, then a fresh complete hosted run passed archive/readback before ACK and attempts 0,1,2,3 followed by DLQ arrival. Both Queues read back empty and paused. See docs/observation-infrastructure.md for UTC evidence.","sources":["docs/observation-infrastructure.md","backend/wrangler.jsonc"]}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-24T17:29:37.191Z"},"status":"resolved","cause":"The staging binding configuration changed fingerprinted backend inputs before the context update was finished.","prevention":"Update affected node summaries and paths, then refresh fingerprints before the final check.","regression":"Updated backend/delivery summaries, added the infrastructure handoff and ran pnpm context:refresh; final verification is recorded in the PR."}
+```
+
+```json
+{"id":"OBS-20261024-INFRA-TOOLING-001","status":"resolved","area":"operator-tooling","observation":"Initial account-wide R2 inventory could not choose between two authorized accounts; a CORS read returned the documented no-configuration 404. A local probe syntax check, one atomic documentation patch and an intermediate scan-draft schema submission also rejected invalid local input before completion.","cause":"Account selection must be explicit for these commands; no CORS configuration is represented by provider error 10059. Local tooling input did not match its file/API schema.","prevention":"Pin the intended non-secret account, distinguish the exact no-CORS response from other errors, syntax-check probes before execution, inspect patch context and use documented scan fields. Never print credential-bearing subprocess output.","regression":"Corrected account-specific inventory, private-bucket readback, real R2/Queue probes and scan checkpoint succeeded. No token, raw analytics payload or private conversation was retained."}
+```
+
+## OBS-20261022-VIS02-DRAFT-PREPARATION
+
+- Observation: the imported processing source has whitespace-only blank lines that
+  fail the default `git diff --check`; the user source style is retained for this
+  draft. This is a known review-preparation limitation, not a runtime test result.
+- Observation: the first offline package build could not create a temporary lock
+  in the read-only user uv cache. Repeating with a task-local writable cache
+  built both wheel and source distribution successfully.
+- Evidence: `uv --cache-dir /tmp/peeka-uv-cache build --offline --project
+  /tmp/peeka-vis02-review/processing --out-dir /tmp/peeka-vis02-dist` passed.
+  The isolated current processing suite passed all 82 tests with mocked providers.
+- Scope: no provider calls, application behavior change or performance refinement.
+
+## OBS-20261023-VIS02-REVIEW-CORRECTIONS
+
+- Cause: document iteration loaded each page before the per-page try block.
+  A failing synthetic middle-page load aborted extraction before the later page.
+- Correction: iterate bounded page indices and load inside the existing guard;
+  the regression now preserves ready/failed/ready segments and exact identities.
+- Test portability: cache hit/retry checks remain unconditional; mode 0600 is
+  asserted only on POSIX, without claiming verified Windows ACL privacy.
+- Test scheduling: SDK cancellation waits for mocked HTTP start; existing
+  wall-clock deadline tests cover timeout rejection and sibling-batch retention.
+- Cleanup: removed only the 18 imported whitespace-only lines flagged in review.
+  Reconciled current develop documentation and refreshed affected fingerprints.
+- No live provider calls or latency refinements were made for these corrections.
+
+- Packaging check: an existing ignored source-directory .env was included by the build backend. Added explicit source exclusions (also applied to wheels), retained the local env, and rebuilt the distributions for archive inspection. No artifacts were uploaded.
+
+## OBS-20261023-VIS02-LIVE-PDF
+
+Fresh OCR acquired all35pages in268.779s without old cache reuse. Allfour default LLM batches hit90s deadlines; a one-page/concurrency2 follow-up reused the fresh OCR and retained161 needs_review drafts in549.035s. Four pages timed out and six unsupported names were rejected; result remains incomplete. Source spans verified, field accuracy and acceptance pending. Defaults were not changed. See docs/ocr-delivery.md and test-data/README.md.
+
+## OBS-20261023-VIS02-CI-FORMAT
+
+Hosted run39931137291 failed biome formatting in scripts/processing-handoff.test.mjs; browser/database and docs/context/PR checks passed. Applied only the requested call/destructuring wraps. The same run showed account cache egress quota exhaustion and a roughly10minute setup delay; removed optional pnpm cache restore while preserving frozen installs and all checks. Node24.16.0/pnpm11.25.0 are available in temporary local tooling for native verification.
+
+Native verification: biome/typecheck/context/docs passed using pinned Node24.16.0/pnpm11.25.0. All56 Vitest cases and23 repository-script tests passed with bounded workers. One initial script-test invocation lacked the pnpm executable on PATH; rerunning in the installed pnpm environment passed without a source change.
+
+## OBS-20261024-VIS02-OCR-PROVENANCE
+
+An injected provider returning Engine 2 settings was accepted as complete while
+segment/report labels claimed Engine 3, for both image and PDF input. The new
+regressions reproduced this before the fix. Both callers now validate the
+current Engine-3-compatible response contract before accepting text; incompatible
+or missing settings fail the segment while native sibling pages survive.
+The 89-test Python suite passes with mocked providers; no live calls were made.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-24T06:28:20.278Z","exitCode":1}
+```
+
+Local verification initially lacked the cached pnpm launcher on PATH; native
+commands were rerun with that directory included. A main-checkout package-manager
+autostart was avoided by running its dependency-free context/link scripts directly.
+The first archive inspection also attempted to read uv's non-archive metadata;
+restricting inspection to wheel/sdist files passed. These were local command
+setup issues; no dependency, runtime or environment configuration was changed.
+
+The current develop branch advanced to 5da1642 before publication. GitHub blocked
+pull-request CI on shared context/error-ledger conflicts. Reconciled those files
+by preserving develop nodes/records and retaining this processing node/handoff;
+processing sources were unchanged. Repeated 89 Python tests and native quality,
+context and documentation checks passed on the reconciled tree.
+
+## OBS-20261024-VIS02-SHARED-DOC-MERGE
+
+Current develop 245b780 conflicted with the VIS-02 branch in shared context and
+error records. Retained develop module descriptions and recent infrastructure/
+team-access handoffs, the processing node and both appended error histories.
+Only the older design-link-only handoff was retired within the ten-entry cap.
+Processing files are unchanged from reviewed 0e3f204. The 89 Python tests, four
+context/Unicode script tests, context freshness and local documentation links
+passed. PR #23 remains separate; reconcile its merged result and rerun CI before
+the final integrated approval in the agreed #23 -> #24 -> #25 order.
+
+## OBS-20261024-DB-TCP-READINESS
+
+Develop run [40146434333](https://github.com/vivienk/peekaplate/actions/runs/40146434333)
+passed 73 SQL assertions and 20 Worker/Postgres cases, then failed the separate
+local-development smoke test while installing its fresh database schema:
+`connect: connection refused`. The aggregate `ci` failure followed that database
+failure; quality and browser checks passed.
+
+The hostless readiness command could accept PostgreSQL's temporary Unix-socket
+bootstrap server before the TCP listener used by dbmate existed. The installed
+official image entrypoint starts that temporary server with `listen_addresses=''`.
+The shared probe now explicitly checks `127.0.0.1:5432`; its existing bounded wait
+and immediate migration-error handling remain intact.
+
+Regression: `node --test scripts/test-db.test.mjs` reproduced the same migration
+connection refusal when socket readiness preceded TCP, then passed all six tests
+after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
+integration cases and the fresh local startup/demo/cleanup path. This changes
+disposable local/CI startup only, without a hosted database or application change.
+
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+# ERR-20261026-PREVIEW-REPAIR
+
+PR #41 merged successfully into develop, but automatic previews did not run:
+GitHub now reads pull_request_target workflow code and github.sha from the
+default branch, which still lacked the workflow and helper. Repository readback
+showed the enable variable true; a variable cannot supply missing trusted code.
+The follow-up promotes only preview orchestration to main and corrects the
+activation guide. GitHub-held token/lifecycle acceptance remains separate.
+
+`node --test scripts/preview.test.mjs` also reproduced 12 passes and one Windows
+EPERM while creating a file symlink to `/etc/passwd`; this failed before the
+sanitizer was exercised. The fixture now uses a real Windows directory junction
+or a directory symlink elsewhere. All rejection assertions remain enabled.
+
+A new exact-commit marker regression failed with ENOENT before implementation.
+Sanitization now generates the marker from a checked SHA, rejects supplied
+markers and verifies both deployed aliases against that SHA before announcing
+readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
+commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
+
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
+

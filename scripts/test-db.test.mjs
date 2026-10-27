@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import test from 'node:test';
-import { ensureSuccess, runIntegrationTests, validateTap } from './test-db.mjs';
+import childProcess, { spawnSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import test, { mock } from 'node:test';
+import { ensureSuccess, runIntegrationTests, startDatabase, validateTap } from './test-db.mjs';
 
 test('integration launcher accepts pnpm mjs entry points and preserves failure reporting', (t) => {
   const originalExecPath = process.env.npm_execpath;
@@ -67,4 +68,36 @@ test('validateTap fails closed for invalid TAP', () => {
   ]) {
     assert.throws(() => validateTap(output));
   }
+});
+
+test('database initialization waits for TCP instead of the temporary bootstrap socket', async (t) => {
+  let tcpReady = false;
+  let tcpChecks = 0;
+  let migrations = 0;
+  const subprocess = mock.method(childProcess, 'spawnSync', (_command, args, options = {}) => {
+    const result = { status: 0, stdout: '', stderr: '' };
+    if (args.includes('pg_isready')) {
+      // PostgreSQL's bootstrap server accepts socket connections before TCP exists.
+      if (!args.includes('-h')) return result;
+      tcpReady = ++tcpChecks >= 2;
+      return { ...result, status: tcpReady ? 0 : 1 };
+    }
+    if (args.includes('ghcr.io/amacneil/dbmate:2.36.0')) {
+      if (!tcpReady) return { ...result, status: 2, stderr: 'TCP connection refused' };
+      migrations += 1;
+    }
+    if (options.input?.startsWith('SELECT count(*)')) result.stdout = '1\n';
+    if (args[0] === 'port') result.stdout = '127.0.0.1:55432\n';
+    return result;
+  });
+  t.after(() => {
+    subprocess.mock.restore();
+    syncBuiltinESMExports();
+  });
+  syncBuiltinESMExports();
+
+  const database = await startDatabase();
+  assert.equal(tcpChecks, 2);
+  assert.equal(migrations, 3);
+  assert.match(database.runtimeUrl, /@127\.0\.0\.1:55432\/peekaplate/);
 });

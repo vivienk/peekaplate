@@ -41,13 +41,15 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
 | Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
-| PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging | Finish the two hosted 403 tests and monitor export runs; real menu events are still separate work |
+| PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Accepted extension in the architecture | Implement, test and choose a runtime for the first specific job |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
 
 ### Where to open staging
+
+The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is now provisioned and tested with synthetic messages. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. The staging binding configuration needs its reviewed release before the API Worker can use it; actual archive-to-database processing remains separate work.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -229,7 +231,7 @@ Before connecting a job to staging, test a successful result, bad input, a timeo
 
 ### What PostHog adds, and what it does not
 
-For team inspection, the deployed read API lets any current repository collaborator use their own GitHub token to ask the Worker for safe staging events or technical counts. Nobody needs our export password or database administrator key. The Worker verifies their GitHub identity and current collaborator status before asking Supabase; data still arrives through PostHog's hourly export. Both endpoints returned 200 using Sai's GitHub account, and missing or invalid tokens returned 401. The genuine non-collaborator and controlled removal checks remain pending; full hosted acceptance is not complete. This is a development tool, not the restaurant-owner dashboard. See [team data access](team-data-access.md) for the URL, authentication, examples and remaining checks.
+For team inspection, the deployed read API lets any current repository collaborator use their own GitHub token to ask the Worker for safe staging events or technical counts. Nobody needs our export password or database administrator key. The Worker verifies their GitHub identity and current collaborator status before asking Supabase; data still arrives through PostHog's hourly export. Both endpoints returned 200 using Sai's GitHub account, and missing or invalid tokens returned 401. On October 23, Harshita helped verify that a valid non-collaborator received 403 from both endpoints, twice. The separate controlled collaborator-removal check remains pending. This is a development tool, not the restaurant-owner dashboard. See [team data access](team-data-access.md) for the URL, authentication, examples and dated evidence.
 
 **Both hosted staging pages now send consented test events to PostHog, and those records were checked in PostHog.** For now, the two screens are starter pages. Clicking **Allow optional analytics** sends one `app_shell_viewed` event: a small record saying which screen was viewed and that this is staging. PostHog turns those records into an internal chart. It does not mean a diner opened a published menu or ordered food.
 
@@ -258,7 +260,7 @@ PostHog remains useful for the team's optional usage charts and later checks aga
 
 **Files behind this:** [analytics/index.ts](../packages/analytics/src/index.ts) checks configuration and consent, builds the allowed event fields and limits network requests. [analytics/consent.ts](../packages/analytics/src/consent.ts) provides the opt-in button. [diner/main.ts](../frontend/diner/src/main.ts) and [console/main.tsx](../frontend/console/src/main.tsx) connect it to each screen. [Unit tests](../packages/analytics/src/index.test.ts) and [browser tests](../tests/e2e/posthog.spec.ts) check allowed, blocked and failed capture. [posthog.md](posthog.md) is the operator's setup and verification record.
 
-**What comes next:** finalize the diner design states, build approved menu controls and connect their agreed events. The private Supabase export and separate team inspection API are deployed; use [the access guide](team-data-access.md) with your own GitHub token. Finish the two hosted 403 checks before closing full access acceptance. Local work with synthetic fixtures can continue. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
+**What comes next:** finalize the diner design states, build approved menu controls and connect their agreed events. The private Supabase export and separate team inspection API are deployed; use [the access guide](team-data-access.md) with your own GitHub token. Collaborator access and genuine outsider denial have passed; the controlled collaborator-removal check remains before full access acceptance. Local work with synthetic fixtures can continue. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
 
 ### What T0, T1 and T2 mean
 
@@ -427,6 +429,7 @@ The six current tables have simple jobs: `venues` identifies restaurants; `staff
 | [.github/dependabot.yml](../.github/dependabot.yml) | Monthly grouped routine updates and separate security-update grouping |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | The five purposeful CI jobs described above |
 | [.github/workflows/deploy-staging.yml](../.github/workflows/deploy-staging.yml) | Manual main-branch Worker deployment using a staging environment and protected credentials |
+| [.github/workflows/deploy-preview.yml](../.github/workflows/deploy-preview.yml) | Static diner/console preview links for same-repository PRs, deleted when the PR closes; see [PR previews](previews.md) |
 
 ### Agent files: who does which job
 
@@ -451,6 +454,7 @@ The profiles and selected prompt behaviors were evaluated. The builder initially
 | [docs/architecture.md](architecture.md) | System boundaries, data flows and what remains unimplemented |
 | [docs/delivery.md](delivery.md) | Ordered feature slices, dependencies, responsibilities and acceptance gates |
 | [docs/operations.md](operations.md) | Local commands, API use, cloud setup, release controls and recovery work |
+| [docs/previews.md](previews.md) | How reviewers open PR preview links, their isolation, retention and one-time setup |
 | [docs/verification.md](verification.md) | Connects product/architecture requirements to existing and future test evidence |
 | [docs/frontend-design.md](frontend-design.md) | Records the evolving design reference and what the real UI must eventually demonstrate |
 | [docs/CONTEXT.md](CONTEXT.md) | Small JSON knowledge map: modules, source paths, dependencies, status, fingerprints and recent handoffs |
