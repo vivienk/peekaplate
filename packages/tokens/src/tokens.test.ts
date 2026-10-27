@@ -339,15 +339,26 @@ describe('design tokens', () => {
   it('maps color roles only to palette colors', async () => {
     const { base } = await tokenBlocks();
     const roles = group(base, role);
+    const parseRefs = (cssValue: string): string[] => {
+      const refs: string[] = [];
+      for (const match of cssValue.matchAll(/var\((--pp-[\w-]+)\)/g)) {
+        const ref = match[1];
+        if (!ref) throw new Error(`Could not parse a token reference from: ${cssValue}`);
+        refs.push(ref);
+      }
+      return refs;
+    };
+
     for (const [name, value] of Object.entries(roles)) {
-      const refs = [...value.matchAll(/var\((--pp-[\w-]+)\)/g)].map(([, ref]) => ref);
+      const refs = parseRefs(value);
       expect(refs.length).toBeGreaterThan(0);
       const resolvedRefs = refs.flatMap((ref) => {
         if (ref.startsWith('--pp-role-')) {
           const nested = base[ref];
-          return nested
-            ? [...nested.matchAll(/var\((--pp-[\w-]+)\)/g)].map(([, nestedRef]) => nestedRef)
-            : [];
+          if (nested === undefined) {
+            throw new Error(`Role ${name} references unknown role ${ref}`);
+          }
+          return parseRefs(nested);
         }
         return [ref];
       });
@@ -395,7 +406,7 @@ describe('design tokens', () => {
       [r('button-outline-text'), r('button-outline-bg')],
       [r('nav-icon'), r('nav-bg')],
       [r('nav-hover-icon'), r('nav-hover-bg')],
-[r('chip-active-text'), r('chip-active-bg')],
+      [r('chip-active-text'), r('chip-active-bg')],
       [r('on-surface'), r('surface')],
       [r('on-surface'), r('surface-container')],
       [r('on-surface-variant'), r('surface')],

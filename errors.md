@@ -551,3 +551,18 @@ both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
 alone does not establish instantaneous edge retirement. Staging deployment
 IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:54:53.626Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-27T20:04:00.236Z","exitCode":1}
+```
