@@ -173,7 +173,7 @@ export const PublicMenuCompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(true),
   name: publicMenuText.min(1).max(160),
-  description: publicMenuText.max(4000),
+  description: publicMenuText.min(1).max(4000),
   price: z.strictObject({
     amount: z.string().regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/),
     currency: z.string().regex(/^[A-Z]{3}$/),
@@ -206,7 +206,6 @@ export const PublicMenuContentBundleSchema = z
     venue_id: uuid,
     menu_id: uuid,
     menu_revision_id: uuid,
-    publication_id: uuid,
     restaurant: z.strictObject({
       name: publicMenuText.min(1).max(160),
       logo: PublicMenuImageSchema.nullable(),
@@ -283,7 +282,6 @@ export const PublicMenuDeliverySchema = z
       ['venue_id', response.venueId, content.venue_id],
       ['menu_id', response.menuId, content.menu_id],
       ['menu_revision_id', response.menuRevisionId, content.menu_revision_id],
-      ['publication_id', response.publicationId, content.publication_id],
     ] as const;
     for (const [field, expected, actual] of identities) {
       if (actual !== expected) {

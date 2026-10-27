@@ -22,7 +22,7 @@ The immutable bundle is UTF-8 JSON served with `Content-Type: application/json`.
 
 | Location | Exact fields |
 | --- | --- |
-| Root | `schema_version: 1`; UUID strings `venue_id`, `menu_id`, `menu_revision_id`, `publication_id`; `restaurant`; ordered `categories` |
+| Root | `schema_version: 1`; UUID strings `venue_id`, `menu_id`, `menu_revision_id`; `restaurant`; ordered `categories` |
 | `restaurant` | trimmed `name`; `logo`, which is either an image object or `null` |
 | Category | UUID `category_id`; trimmed `name`; ordered `dishes` |
 | Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; unique approved `dietary` values; required T0 `images.card` and `images.detail` |
@@ -30,11 +30,13 @@ The immutable bundle is UTF-8 JSON served with `Content-Type: application/json`.
 | Ingredient | UUID `ingredient_id`; trimmed `name`; `description` string or `null` |
 | Image | immutable HTTPS `url`; positive integer `width` and `height`; non-empty `alt` text |
 
-`PublicMenuDeliverySchema` validates the fetched content together with `PublicMenuResponseSchema` and rejects any mismatch in venue, menu, menu revision or publication identity. The response `publicationId` maps to `publication_revision_id` in `observation.v2`; dish events copy `dish_id` and `dish_revision_id` from the selected bundle item.
+`PublicMenuDeliverySchema` validates the fetched content together with `PublicMenuResponseSchema` and rejects any mismatch in venue, menu or menu-revision identity. The bundle is created before publication and is revision-scoped, so it does not contain the later-generated publication ID. The response `publicationId` remains the sole publication identity and maps to `publication_revision_id` in `observation.v2`; dish events copy `dish_id` and `dish_revision_id` from the selected bundle item.
+
+`PublicMenuDeliverySchema` performs shape and identity validation only; it does not prove hash integrity. Before parsing or display, the DIN-03 adapter must verify the producer-defined hash input against `response.bundle.contentHash`. The producer and consumer must agree whether that input is exact UTF-8 bytes or a canonical serialization; until that rule is recorded and tested, a schema-valid fetch is not approved-content evidence.
 
 Dietary values are limited to explicit approved `Vegan`, `Vegetarian` and `Gluten-free` values and are never inferred. Version 1 contains no allergen or 2.5D fields: arbitrary allergen strings and unapproved spatial formats are rejected as unknown fields. A future approved allergen list or spatial asset format requires a new reviewed schema version; T0 card and detail images remain mandatory.
 
-Only the current approved publication may appear. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
+Only the revision referenced by the current approved publication may be displayed. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
 
 ### Publication change and queued observations
 
@@ -68,7 +70,7 @@ The Worker signs an `ES256` JWT with the protected private JWK in `MENU_TOKEN_SI
 - `iat` and `exp`: exactly 30 minutes apart;
 - `jti`: a fresh UUID used for token-scoped rate limiting.
 
-The token travels only in `Authorization: Bearer <menu_token>` when the observation endpoint is integrated. QR navigation uses `/venues/:venueId/menus/:menuId`; an optional `?src=qr` records only `entry_source` and is never part of menu identity or authorization. It is not restaurant authority for staff commands. Withdrawal blocks new public reads immediately; already issued tokens may remain cryptographically valid until expiry. The diner re-reads the public endpoint on load and before token expiry. If the same publication is still active, that read issues a fresh token and queued observations for that same publication may resume. If the read returns 404 or a different publication, the diner must stop collection and must not relabel old observations. An expired token cannot submit until a successful same-publication refresh; withdrawal never issues a replacement token. The API intentionally does not distinguish missing, draft and withdrawn content. The diner may show one menu-unavailable state for HTTP 404, while transport/offline failure remains a separate retryable state.
+The token travels only in `Authorization: Bearer <menu_token>` when the observation endpoint is integrated. QR navigation uses `/venues/:venueId/menus/:menuId`; an optional `?src=qr` records only `entry_source` and is never part of menu identity or authorization. It is not restaurant authority for staff commands. Withdrawal blocks new public reads immediately; already issued tokens may remain cryptographically valid until expiry. The diner re-reads the public endpoint on load and before token expiry. That current-publication GET refreshes only the token for the publication it returns; it cannot authorize an old queue after replacement or withdrawal. The separately defined RES-02 renewal operation must either verify the original allowed exposure and issue a token for that same original publication, or return a bounded terminal rejection. Its eligibility policy for replaced and withdrawn publications, request proof and errors are not yet specified or implemented. Until they are, the client preserves unchanged old events subject to its normal 24-hour/size bounds and must not claim post-expiry delivery support. The API intentionally does not distinguish missing, draft and withdrawn content. The diner may show one menu-unavailable state for HTTP 404, while transport/offline failure remains a separate retryable state.
 
 ## Verification boundary
 

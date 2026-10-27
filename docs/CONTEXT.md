@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision, RES-02 approval/publication/withdrawal, anonymous public-menu pointer and versioned immutable T0 content-bundle schemas, plus dish-intent, team analytics and bounded menu evidence schemas. Public delivery validation binds venue, menu, revision and publication identities across the pointer and content; complete dishes require approved prices, ingredients and HTTPS card/detail images, while incomplete dishes cannot leak partial claims. Menu-token claims fix venue, publication, observations scope, audience and a 30-minute lifetime. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, RES-02 approval/publication/withdrawal, anonymous public-menu pointer and versioned immutable T0 content-bundle schemas, plus dish-intent, team analytics and bounded menu evidence schemas. Public delivery validation binds venue, menu and revision identities across the pointer and pre-publication content; complete dishes require approved prices, ingredients and HTTPS card/detail images, while incomplete dishes cannot leak partial claims. Menu-token claims fix venue, publication, observations scope, audience and a 30-minute lifetime. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d1b79e577c0de2ae9d24397b7bd8628fbbeced85ddc654361fea32c89e3de8de"
+      "sourceFingerprint": "a3e8f17094c78fdb5455508bb943a51f15185d1836de99a4861ac78a03d35142"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The shared immutable JSON bundle schema fixes exact snake-case identities, restaurant presentation, complete dish content, decimal-string prices, ingredient identities, HTTPS T0 variants and explicit-only dietary values while rejecting partial, allergen, spatial, draft and review fields. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The shared immutable JSON bundle schema fixes exact revision-scoped snake-case identities, restaurant presentation, complete dish content, decimal-string prices, ingredient identities, HTTPS T0 variants and explicit-only dietary values while rejecting partial, allergen, spatial, draft and review fields. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -115,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "58291e42763d520e41a2dc7cd347d5c055b89f1dad35b4729ed34b654c997f7b"
+      "sourceFingerprint": "74c1996fb54c810849154596bf95ba9c387e54d96da9090aa1c0acb6e5f007cb"
     },
     {
       "id": "database",

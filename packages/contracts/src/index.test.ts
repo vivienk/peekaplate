@@ -176,7 +176,6 @@ describe('RES-02 immutable diner bundle boundary', () => {
     venue_id: '00000000-0000-4000-8000-000000000101',
     menu_id: '00000000-0000-4000-8000-000000000102',
     menu_revision_id: '00000000-0000-4000-8000-000000000103',
-    publication_id: '00000000-0000-4000-8000-000000000104',
     restaurant: {
       name: 'Synthetic Test Kitchen',
       logo: null,
@@ -261,6 +260,17 @@ describe('RES-02 immutable diner bundle boundary', () => {
         categories: [
           {
             ...bundle.categories[0],
+            dishes: [{ ...completeDish, description: '   ' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
             dishes: [
               {
                 ...completeDish,
@@ -279,25 +289,30 @@ describe('RES-02 immutable diner bundle boundary', () => {
     ).toBe(false);
   });
 
-  it('rejects content identities that do not match the active public response', () => {
+  it('accepts a pre-publication bundle only for its exact published menu revision', () => {
+    const response = {
+      schemaVersion: 1,
+      venueId: bundle.venue_id,
+      menuId: bundle.menu_id,
+      menuRevisionId: bundle.menu_revision_id,
+      publicationId: '00000000-0000-4000-8000-000000000104',
+      publicationHash: 'a'.repeat(64),
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: 'https://assets.example.test/menu.json',
+        contentHash: 'b'.repeat(64),
+        assetManifestHash: 'c'.repeat(64),
+      },
+      menuToken: 'synthetic-token',
+      tokenExpiresAt: '2026-10-27T00:30:00.000Z',
+    } as const;
+    expect(PublicMenuDeliverySchema.safeParse({ response, content: bundle }).success).toBe(true);
     expect(
       PublicMenuDeliverySchema.safeParse({
         response: {
-          schemaVersion: 1,
-          venueId: bundle.venue_id,
-          menuId: bundle.menu_id,
-          menuRevisionId: bundle.menu_revision_id,
-          publicationId: '00000000-0000-4000-8000-000000000999',
-          publicationHash: 'a'.repeat(64),
-          availabilityVersion: 1,
-          tier: 'T0',
-          bundle: {
-            url: 'https://assets.example.test/menu.json',
-            contentHash: 'b'.repeat(64),
-            assetManifestHash: 'c'.repeat(64),
-          },
-          menuToken: 'synthetic-token',
-          tokenExpiresAt: '2026-10-27T00:30:00.000Z',
+          ...response,
+          menuRevisionId: '00000000-0000-4000-8000-000000000999',
         },
         content: bundle,
       }).success,
