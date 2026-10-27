@@ -13,17 +13,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. AI-02 provides strict review-only ingredient assessments and a RES-01 consumer adapter that validates draft/source identity and Unicode evidence slices; it provides no authentication, approval or publication.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/ingredient-intelligence.ts",
+        "packages/contracts/src/ingredient-intelligence.test.ts",
+        "processing/tests/fixtures/ingredient-review.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "e79d03ed6fdfe166bde676b18de27aab05cd7e4e00cde45d77d2907368e553fd"
     },
     {
       "id": "diner",
@@ -269,7 +272,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending.",
+      "summary": "Local PDF/image extraction retains needs_review drafts and source evidence. AI-02 adds offline deterministic ingredient normalization and review-only allergen/diet exclusion candidates in ingredient-review.json without changing the VIS-02 v1 output. Unknowns, qualifiers and invalid evidence abstain; all suggestions require owner confirmation. RES-01 authenticated import/persistence/UI, confirmation and publication integration remain pending.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -302,17 +305,29 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/processing-handoff.test.mjs",
         "processing/src/peekaplate_processing/ocr.py",
         "processing/tests/test_ocr_provider.py",
-        "test-data/README.md"
+        "test-data/README.md",
+        "processing/src/peekaplate_processing/ingredient_intelligence.py",
+        "processing/tests/test_ingredient_intelligence.py",
+        "processing/tests/fixtures/ingredient-review.json",
+        "docs/ingredient-intelligence.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "929fb3bbb31657ffe307c3d5040770955f5ecd7d488af3f0ea329ed0bb05f119"
+      "sourceFingerprint": "15fa32e59c7fddce92737ca1d7195f796f21b8e9f87df02e9b647c2f069465dd"
     }
   ],
   "handoffs": [
+    {
+      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Native Python dependencies cannot install on this Intel Mac; classifier tests run with portable locked dependencies. Hosted full pipeline checks and authenticated RES-01 integration remain distinct acceptance work. See ingredient-intelligence.md and the implementation PR for exact verification.",
+      "modules": [
+        "processing",
+        "contracts"
+      ],
+      "next": "Complete independent review and hosted pipeline checks, then integrate trusted imports, authenticated owner corrections/confirmation and publication enforcement through RES-01/RES-02."
+    },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
       "modules": [
@@ -384,14 +399,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "analytics"
       ],
       "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
-    },
-    {
-      "summary": "Provisioned missing staging observation Queue f4979c52a09a4c40ad55e46d32b0ff93 and DLQ 45eda79d781d47fe8bca7bb6f5d05bde, reused private staging-assets R2, configured paused HTTP pull consumers with 24-hour retention/three source retries. R2 conditional race passed; complete synthetic archive-before-ACK and retry-to-DLQ repeat passed at 2026-10-24T17:30:36.147Z. Cleaned only probe objects/messages; both Queues empty/paused. Added staging producer/R2 config and handoff docs; no unfinished consumer, DB or production change.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
     }
   ]
 }

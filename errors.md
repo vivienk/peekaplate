@@ -534,3 +534,42 @@ both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
 alone does not establish instantaneous edge retirement. Staging deployment
 IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
+
+## AI-02 local verification environment
+
+- A fresh `uv sync --project processing --frozen` could not install locked
+  `onnxruntime==1.31.0`: no Intel macOS wheel/source distribution is available.
+  Excluding that package then exposed a native build failure for locked
+  `pymupdf==2.0`. No lockfile or production dependency was downgraded.
+- Installed the remaining locked dependencies with both native packages excluded
+  to run the independent classifier regressions. Docker is unavailable here.
+  Full PDF/pipeline verification requires a supported environment/hosted CI;
+  passing classifier tests must not be reported as passing native PDF tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T06:22:34.246Z","exitCode":1}
+```
+
+AI-02 verification preparation: the initial context handoff omitted the required
+`modules` and `next` keys; the initial generated JSON fixture needed repository
+formatting. Added the required keys and formatted the fixture before rerunning
+context refresh and the checks. No behavior or fixture values changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-27T06:23:19.298Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-10-27T06:24:02.218Z","exitCode":1}
+```
+
+The initial JS test run was sandbox-blocked: localhost listen returned EPERM and
+local session setup could not finish. The authorized unsandboxed rerun passed all
+210 active Vitest tests (four optional workerd tests skipped). The dry-run Worker
+build also completed after local log access was available. Initial browser tests
+could not launch because the pinned Chromium revision was absent; installed the
+repository-required browser before retrying. These were environment failures;
+no test assertion or application behavior was weakened.
