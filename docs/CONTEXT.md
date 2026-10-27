@@ -176,7 +176,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies staging and later production under ADR0012; protected manual deployment/independent review remain required. Last recorded Worker release afe45db and existing Pages/Hyperdrive are preserved. October 24 inventory found no Queues: missing staging source/DLQ created, 24-hour retention, paused HTTP pull consumers and three source retries. Reused private staging R2. Real conditional-write race and synthetic Queue-to-R2-before-ACK/retry-to-DLQ checks passed; both Queues empty and paused after cleanup. Binding configuration still needs reviewed main deployment. Teeyansh PR31/32 and production resources untouched; actual consumer/DB pipeline remains unverified.",
+      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -210,7 +210,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/delivery.md",
         "playwright.posthog.config.ts",
         "tests/e2e/posthog.spec.ts",
-        "docs/observation-infrastructure.md"
+        "docs/observation-infrastructure.md",
+        ".github/workflows/deploy-preview.yml",
+        "docs/previews.md",
+        "scripts/preview.mjs",
+        "scripts/preview.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -221,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a6b7acbb465ffd51390a48ec7cc40b6b158a57d0d75817d80f5c04c9a0acf6c7"
+      "sourceFingerprint": "6fd3f20a6d1ebc5428942487183593bdaaa7ab7c35d8b20dd9559add0f5fa997"
     },
     {
       "id": "agents",
@@ -337,6 +341,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Confirm the custom ease-out curve, licensed brand font, H2/footer weight typos and semantic token names with Rania. Spacing and elevation are proposed for Harshita; then add approved color and interaction-state tokens and the Button/Card/Input/Typography/Navigation foundations."
     },
     {
+      "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
+      "modules": [
+        "delivery"
+      ],
+      "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
+    },
+    {
       "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
       "modules": [
         "database",
@@ -384,15 +395,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     },
     {
       "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
