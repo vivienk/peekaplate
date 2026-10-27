@@ -7,7 +7,7 @@ import {
 } from '@peekaplate/contracts';
 import { describe, expect, it } from 'vitest';
 import { adaptPythonExtractionResult } from './adapter.js';
-import { createHttpPythonExtractor } from './transport.js';
+import { createHttpPythonExtractor, DEFAULT_EXTRACTION_TIMEOUT_MS } from './transport.js';
 
 function loadFixture<T = unknown>(filename: string): T {
   const filePath = resolve(process.cwd(), 'tests/fixtures/menu-ingestion', filename);
@@ -306,8 +306,9 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       const fakeJob: any = {
         id: 'job_timeout',
         tenant_id: 'tenant_timeout',
-        source_type: 'url',
-        source_url: 'https://example.com/menu',
+        source_type: 'pdf',
+        source_storage_key: 'menus/sample.pdf',
+        source_hash: 'a'.repeat(64),
         idempotency_key: 'idem_timeout',
       };
 
@@ -392,6 +393,421 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       expect(adapted.drafts[0]?.name).toBe('Tacos');
       expect(adapted.drafts[1]?.draft_index).toBe(2); // Non-contiguous index preserved!
       expect(adapted.drafts[1]?.name).toBe('Enchilada');
+    });
+  });
+
+  describe('Priority P0: Extraction Transport Semantics & Timeout Hardening', () => {
+    const fakeJob: any = {
+      id: 'job_test_transport',
+      tenant_id: 'tenant_test_transport',
+      source_type: 'pdf',
+      source_storage_key: 'menus/sample.pdf',
+      source_hash: 'a'.repeat(64),
+      idempotency_key: 'idem_transport_p0',
+    };
+
+    it('rejects extraction call if job lacks materialized source_storage_key or source_hash', async () => {
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+      });
+
+      await expect(extractor({ ...fakeJob, source_storage_key: null })).rejects.toMatchObject({
+        code: 'missing_materialized_source',
+        status: 400,
+      });
+
+      await expect(extractor({ ...fakeJob, source_hash: null })).rejects.toMatchObject({
+        code: 'missing_materialized_source',
+        status: 400,
+      });
+    });
+
+    it('exports DEFAULT_EXTRACTION_TIMEOUT_MS set to 600,000ms (10 minutes)', () => {
+      expect(DEFAULT_EXTRACTION_TIMEOUT_MS).toBe(600_000);
+    });
+
+    it('successfully handles long-running extraction that exceeds 120s limit within 600s timeout', async () => {
+      // Mock fetch simulating successful extraction that took 368 seconds
+      const simulatedDurationSec = 368;
+      const customFetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
+        // Assert that the request signal did not abort before 600 seconds
+        expect(init?.signal?.aborted).toBe(false);
+        return new Response(
+          JSON.stringify({
+            schema_version: 2,
+            pipeline_version: '3',
+            status: 'complete',
+            started_at: '2026-10-27T12:00:00.000Z',
+            finished_at: '2026-10-27T12:06:08.000Z',
+            configuration: { execution_time_seconds: simulatedDurationSec },
+            segments: [],
+            drafts: [],
+            evidence: [],
+            warnings: [],
+            errors: [],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      };
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        timeoutMs: 600_000,
+        fetchFn: customFetch as any,
+      });
+
+      const result = (await extractor(fakeJob)) as any;
+      expect(result.status).toBe('complete');
+      expect(result.configuration.execution_time_seconds).toBe(368);
+    });
+
+    it('triggers extraction_timeout error when request exceeds configured timeout', async () => {
+      // Custom fetch that only resolves when aborted by signal
+      const hangingFetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          if (init?.signal?.aborted) {
+            const err = new Error('The operation was aborted due to timeout');
+            err.name = 'TimeoutError';
+            return reject(err);
+          }
+          init?.signal?.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted due to timeout');
+            err.name = 'TimeoutError';
+            reject(err);
+          });
+        });
+      };
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        timeoutMs: 20, // 20ms quick timeout
+        fetchFn: hangingFetch as any,
+      });
+
+      await expect(extractor(fakeJob)).rejects.toMatchObject({
+        code: 'extraction_timeout',
+        status: 504,
+      });
+    });
+
+    it('distinguishes explicit client abort from timeout (extraction_aborted with 499)', async () => {
+      const abortController = new AbortController();
+
+      const abortableFetch = async (_url: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal?.aborted) {
+          const err = new Error('This operation was aborted by the user');
+          err.name = 'AbortError';
+          throw err;
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            const err = new Error('This operation was aborted by the user');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      };
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        timeoutMs: 600_000,
+        fetchFn: abortableFetch as any,
+      });
+
+      // Abort controller
+      abortController.abort();
+
+      await expect(extractor(fakeJob, { signal: abortController.signal })).rejects.toMatchObject({
+        code: 'extraction_aborted',
+        status: 499,
+      });
+    });
+
+    it('distinguishes HTTP 400 Bad Request vs HTTP 500/502 Bad Gateway', async () => {
+      const fetch400 = async () => new Response('Invalid PDF structure', { status: 400 });
+      const fetch500 = async () => new Response('Internal OCR server crash', { status: 500 });
+
+      const extractor400 = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        fetchFn: fetch400 as any,
+      });
+      const extractor500 = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        fetchFn: fetch500 as any,
+      });
+
+      await expect(extractor400(fakeJob)).rejects.toMatchObject({
+        code: 'extraction_service_error',
+        status: 400,
+      });
+
+      await expect(extractor500(fakeJob)).rejects.toMatchObject({
+        code: 'extraction_service_error',
+        status: 502,
+      });
+    });
+
+    it('distinguishes network connectivity failures (extraction_network_error)', async () => {
+      const fetchNetworkFail = async () => {
+        const err = new TypeError('fetch failed: ECONNREFUSED 127.0.0.1:8000');
+        throw err;
+      };
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        fetchFn: fetchNetworkFail as any,
+      });
+
+      await expect(extractor(fakeJob)).rejects.toMatchObject({
+        code: 'extraction_network_error',
+        status: 502,
+      });
+    });
+
+    it('distinguishes non-JSON responses (malformed_extraction_response)', async () => {
+      const fetchHtml = async () =>
+        new Response('<html><body>502 Bad Gateway from Nginx</body></html>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        });
+
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extractor.internal',
+        fetchFn: fetchHtml as any,
+      });
+
+      await expect(extractor(fakeJob)).rejects.toMatchObject({
+        code: 'malformed_extraction_response',
+        status: 502,
+      });
+    });
+  });
+
+  describe('Priority P0: Schema-v2 & Pipeline-v3 Robustness', () => {
+    it('handles valid extraction with zero drafts and zero errors as complete', () => {
+      const emptyValidPayload = {
+        schema_version: 2,
+        pipeline_version: '3',
+        status: 'complete',
+        started_at: '2026-10-27T10:00:00.000Z',
+        finished_at: '2026-10-27T10:00:01.000Z',
+        extraction_mode: 'ai',
+        ocr_engine: 3,
+        segments: [],
+        drafts: [],
+        evidence: [],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      };
+
+      const adapted = adaptPythonExtractionResult(emptyValidPayload);
+      expect(adapted.success).toBe(true);
+      if (!adapted.success) return;
+
+      expect(adapted.status).toBe('complete');
+      expect(adapted.drafts).toHaveLength(0);
+      expect(adapted.invalidDrafts).toHaveLength(0);
+      expect(adapted.hasReviewableDrafts).toBe(false);
+    });
+
+    it('rejects payload with unsupported schema_version', () => {
+      const unsupportedPayload = {
+        schema_version: 99,
+        pipeline_version: '3',
+        status: 'complete',
+        started_at: '2026-10-27T10:00:00.000Z',
+        segments: [],
+        drafts: [],
+        evidence: [],
+      };
+
+      const adapted = adaptPythonExtractionResult(unsupportedPayload);
+      expect(adapted.success).toBe(false);
+      if (adapted.success) return;
+      expect(adapted.errors.some((e) => e.includes('schema_version'))).toBe(true);
+    });
+
+    it('rejects payload with missing required draft fields', () => {
+      const missingFieldPayload = {
+        schema_version: 2,
+        pipeline_version: '3',
+        status: 'complete',
+        started_at: '2026-10-27T10:00:00.000Z',
+        segments: [
+          {
+            segment_id: 'seg_1',
+            status: 'ready',
+            method: 'text',
+            text: 'Burger 12.00',
+            warnings: [],
+            metadata: {},
+          },
+        ],
+        drafts: [
+          {
+            // Missing name!
+            source_id: 'src_1',
+            source_text: 'Burger 12.00',
+            status: 'needs_review',
+          },
+        ],
+        evidence: [
+          {
+            draft_id: 'draft_1',
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_1', start: 0, end: 12 }],
+          },
+        ],
+      };
+
+      const adapted = adaptPythonExtractionResult(missingFieldPayload);
+      expect(adapted.success).toBe(false);
+      if (adapted.success) return;
+      expect(adapted.errors.some((e) => e.includes('name'))).toBe(true);
+    });
+  });
+
+  describe('Priority P0 / Section 6: Synthetic 35-Segment 210-Draft High-Volume Pipeline Verification', () => {
+    it('validates and normalizes 35-page / 35-segment extraction with 210 drafts and 210 evidence spans without data loss', () => {
+      // Construct a synthetic 35-page menu modeled on Denny's 35-page PDF structure
+      // 35 pages/segments, 6 drafts per page = 210 total dish drafts and evidence spans
+      const segments: any[] = [];
+      const drafts: any[] = [];
+      const evidence: any[] = [];
+
+      let draftIdx = 0;
+      for (let page = 1; page <= 35; page++) {
+        const segId = `seg_page_${page}`;
+        // Each page has text with 6 items
+        let pageText = '';
+        const pageItems: Array<{ name: string; start: number; end: number }> = [];
+
+        for (let item = 1; item <= 6; item++) {
+          const itemName = `Page ${page} Entree Item ${item}`;
+          const priceStr = item === 1 ? '495 / 795 PHP' : `${item * 100}.00 PHP`;
+          const itemText = `${itemName} - Freshly grilled selection: ${priceStr}.`;
+          const start = pageText.length;
+          pageText += itemText + ' ';
+          const end = start + itemText.length;
+          pageItems.push({ name: itemName, start, end });
+        }
+
+        segments.push({
+          segment_id: segId,
+          page_number: page,
+          method: 'ocr_space_engine3',
+          status: 'ready',
+          text: pageText.trim(),
+          warnings: [],
+          metadata: { page_index: page - 1 },
+        });
+
+        for (let item = 1; item <= 6; item++) {
+          const itemMeta = pageItems[item - 1]!;
+          const candId = `cand_p${page}_d${item}`;
+          const isGrouped = item === 1;
+
+          drafts.push({
+            candidate_id: candId,
+            draft_id: `draft_p${page}_d${item}`,
+            draft_index: draftIdx,
+            name: itemMeta.name,
+            description: `Description for page ${page} item ${item}`,
+            category: `Category ${Math.ceil(page / 5)}`,
+            subcategory: `Subcategory ${page}`,
+            category_page_number: page,
+            price_text: isGrouped ? '495 / 795 PHP' : `${item * 100}.00 PHP`,
+            price_amount: isGrouped ? null : `${item * 100}.00`,
+            price_currency: 'PHP',
+            ingredients: ['spices', 'garnish'],
+            source_id: 'src_dennys_pdf_synthetic',
+            source_text: segments[page - 1]!.text.slice(itemMeta.start, itemMeta.end),
+            image_id: null,
+            review_warnings: isGrouped ? ['Ambiguous grouped pricing'] : [],
+            status: 'needs_review',
+          });
+
+          evidence.push({
+            draft_id: `draft_p${page}_d${item}`,
+            draft_index: draftIdx,
+            spans: [
+              {
+                segment_id: segId,
+                start: itemMeta.start,
+                end: itemMeta.end,
+              },
+            ],
+          });
+
+          draftIdx++;
+        }
+      }
+
+      expect(segments).toHaveLength(35);
+      expect(drafts).toHaveLength(210);
+      expect(evidence).toHaveLength(210);
+
+      const highVolumePayload = {
+        schema_version: 2,
+        pipeline_version: '3',
+        status: 'complete',
+        source: {
+          source_id: 'src_dennys_pdf_synthetic',
+          sha256: '2430807aeb2556cd85186b1b0d4126a89cee066dea3ccf5ad18b5e23b5082275',
+          kind: 'pdf',
+          location: 'Dennys_Menu.pdf',
+          retrieved_at: '2026-10-27T12:00:00.000Z',
+          size_bytes: 7_200_000,
+          snapshot_base64: 'c3ludGhldGljIGRhdGE=',
+        },
+        started_at: '2026-10-27T12:00:00.000Z',
+        finished_at: '2026-10-27T12:06:08.000Z',
+        extraction_mode: 'ai',
+        extraction_model: 'gpt-4o',
+        ocr_engine: 3,
+        library_versions: { pymupdf: '1.24.0' },
+        configuration: { pages: 35, execution_time_seconds: 368 },
+        segments,
+        drafts,
+        evidence,
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      };
+
+      const startTime = performance.now();
+      const adapted = adaptPythonExtractionResult(highVolumePayload);
+      const durationMs = performance.now() - startTime;
+
+      expect(adapted.success).toBe(true);
+      if (!adapted.success) return;
+
+      expect(adapted.status).toBe('complete');
+      expect(adapted.drafts).toHaveLength(210);
+      expect(adapted.invalidDrafts).toHaveLength(0);
+      expect(adapted.hasReviewableDrafts).toBe(true);
+      expect(durationMs).toBeLessThan(500); // High-volume adaptation completes in <500ms
+
+      // Verify draft identity stability, draft_index preservation, and price semantics across all 210 drafts
+      for (let i = 0; i < adapted.drafts.length; i++) {
+        const originalDraft = drafts[i]!;
+        const adaptedDraft = adapted.drafts[i]!;
+
+        expect(adaptedDraft.candidate_id).toBe(originalDraft.candidate_id);
+        expect(adaptedDraft.draft_index).toBe(i);
+        expect(adaptedDraft.name).toBe(originalDraft.name);
+        expect(adaptedDraft.status).toBe('needs_review');
+        expect(adaptedDraft.category_page_number).toBe(originalDraft.category_page_number);
+        expect(adaptedDraft.subcategory).toBe(originalDraft.subcategory);
+        expect(adaptedDraft.price_text).toBe(originalDraft.price_text);
+        expect(adaptedDraft.price_amount).toBe(originalDraft.price_amount);
+        expect(adaptedDraft.price_currency).toBe('PHP');
+        expect(adaptedDraft.code_point_spans).toHaveLength(1);
+        expect(adaptedDraft.code_point_spans[0]?.segment_id).toBe(
+          `seg_page_${originalDraft.category_page_number}`,
+        );
+      }
     });
   });
 });

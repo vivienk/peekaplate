@@ -1,11 +1,23 @@
 import type { MenuExtractionResult } from '@peekaplate/contracts';
 import { IngestionError, type MenuIngestionJobRow } from './repository.js';
 
+/**
+ * Default extraction HTTP transport timeout in milliseconds (600 seconds = 10 minutes).
+ * Accommodates long-running multi-page OCR (e.g. 35-page runs taking ~368s)
+ * and cold multimodal LLM batch processing (~500s).
+ */
+export const DEFAULT_EXTRACTION_TIMEOUT_MS = 600_000;
+
 export type HttpExtractorConfig = {
   serviceUrl: string;
   authToken?: string | undefined;
   timeoutMs?: number | undefined;
   fetchFn?: typeof fetch | undefined;
+  signal?: AbortSignal | undefined;
+};
+
+export type ExtractorCallOptions = {
+  signal?: AbortSignal | undefined;
 };
 
 /**
@@ -14,10 +26,11 @@ export type HttpExtractorConfig = {
  */
 export function createHttpPythonExtractor(config: HttpExtractorConfig) {
   const fetchImpl = config.fetchFn ?? fetch;
-  const timeoutMs = config.timeoutMs ?? 120_000;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_EXTRACTION_TIMEOUT_MS;
 
   return async function httpPythonExtractor(
     job: MenuIngestionJobRow,
+    callOptions?: ExtractorCallOptions,
   ): Promise<MenuExtractionResult | unknown> {
     const endpoint = new URL('/extract', config.serviceUrl).toString();
     const headers: Record<string, string> = {
@@ -29,15 +42,28 @@ export function createHttpPythonExtractor(config: HttpExtractorConfig) {
       headers['Authorization'] = `Bearer ${config.authToken}`;
     }
 
+    if (!job.source_storage_key || !job.source_hash) {
+      throw new IngestionError(
+        'missing_materialized_source',
+        400,
+        'Extraction service requires a materialized source_storage_key and source_hash',
+      );
+    }
+
     const payload = {
       job_id: job.id,
       tenant_id: job.tenant_id,
       source_type: job.source_type,
-      source_url: job.source_url,
       source_storage_key: job.source_storage_key,
       source_hash: job.source_hash,
       idempotency_key: job.idempotency_key,
     };
+
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const externalSignal = callOptions?.signal ?? config.signal;
+    const combinedSignal = externalSignal
+      ? AbortSignal.any([externalSignal, timeoutSignal])
+      : timeoutSignal;
 
     let response: Response;
     try {
@@ -45,15 +71,31 @@ export function createHttpPythonExtractor(config: HttpExtractorConfig) {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: combinedSignal,
       });
     } catch (err: unknown) {
+      if (err instanceof IngestionError) {
+        throw err;
+      }
+      const errObj = err as Error;
+
+      if (externalSignal?.aborted) {
+        throw new IngestionError(
+          'extraction_aborted',
+          499,
+          `Extraction request was aborted: ${errObj.message}`,
+        );
+      }
+
       const isTimeout =
-        (err as Error).name === 'TimeoutError' || (err as Error).name === 'AbortError';
+        errObj.name === 'TimeoutError' ||
+        timeoutSignal.aborted ||
+        (errObj.name === 'AbortError' && !externalSignal?.aborted);
+
       throw new IngestionError(
         isTimeout ? 'extraction_timeout' : 'extraction_network_error',
         isTimeout ? 504 : 502,
-        `Extraction service call failed: ${(err as Error).message}`,
+        `Extraction service call failed: ${errObj.message}`,
       );
     }
 

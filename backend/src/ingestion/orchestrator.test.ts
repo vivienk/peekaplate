@@ -112,36 +112,74 @@ function createMockClient() {
 describe('Ingestion Orchestrator', () => {
   const venueId = '00000000-0000-0000-0000-000000000501';
 
-  it('submitMenuIngestion validates URLs and protocol', async () => {
+  it('submitMenuIngestion rejects unmaterialized url/text and enforces sourceHash on pdf/photo', async () => {
     const { client } = createMockClient();
 
+    // Rejects url
     await expect(
       submitMenuIngestion(client, {
         venueId,
         sourceType: 'url',
-        sourceUrl: 'ftp://example.com/menu',
-        idempotencyKey: 'idem_1',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_url_reject',
       }),
-    ).rejects.toThrow(IngestionError);
+    ).rejects.toMatchObject({
+      code: 'unsupported_source_type',
+      status: 400,
+    });
 
+    // Rejects text
     await expect(
       submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'not-a-valid-url',
-        idempotencyKey: 'idem_2',
+        sourceType: 'text',
+        idempotencyKey: 'idem_text_reject',
       }),
-    ).rejects.toThrow(IngestionError);
+    ).rejects.toMatchObject({
+      code: 'unsupported_source_type',
+      status: 400,
+    });
 
+    // Rejects pdf without sourceHash
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        idempotencyKey: 'idem_missing_hash',
+      }),
+    ).rejects.toMatchObject({
+      code: 'missing_source_hash',
+      status: 400,
+    });
+
+    // Rejects invalid storage key
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: '../malicious/path.pdf',
+        idempotencyKey: 'idem_invalid_key',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_source_storage_key',
+      status: 400,
+    });
+
+    // Accepts valid pdf and derives sourceStorageKey when omitted
     const job = await submitMenuIngestion(client, {
       venueId,
-      sourceType: 'url',
-      sourceUrl: 'https://restaurant.example.com/menu',
-      idempotencyKey: 'idem_3',
+      sourceType: 'pdf',
+      sourceHash: 'b'.repeat(64),
+      idempotencyKey: 'idem_valid_pdf',
     });
 
     expect(job.status).toBe('queued');
-    expect(job.source_type).toBe('url');
+    expect(job.source_type).toBe('pdf');
+    expect(job.source_hash).toBe('b'.repeat(64));
+    expect(job.source_storage_key).toMatch(
+      new RegExp(`^sources/${venueId}/[a-f0-9-]+/source\\.pdf$`),
+    );
   });
 
   it('executeIngestionWorkflow coordinates successful extraction, adaptation, and persistence', async () => {
@@ -149,8 +187,9 @@ describe('Ingestion Orchestrator', () => {
 
     const job = await submitMenuIngestion(client, {
       venueId,
-      sourceType: 'url',
-      sourceUrl: 'https://restaurant.example.com/menu',
+      sourceType: 'pdf',
+      sourceHash: 'a'.repeat(64),
+      sourceStorageKey: 'sources/sample.pdf',
       idempotencyKey: 'idem_flow_1',
     });
 
@@ -233,6 +272,7 @@ describe('Ingestion Orchestrator', () => {
     const job = await submitMenuIngestion(client, {
       venueId,
       sourceType: 'pdf',
+      sourceHash: 'a'.repeat(64),
       sourceStorageKey: 'menus/sample.pdf',
       idempotencyKey: 'idem_flow_fail',
     });
@@ -282,8 +322,9 @@ describe('Ingestion Orchestrator', () => {
         client,
         {
           venueId: queueVenueId,
-          sourceType: 'url',
-          sourceUrl: 'https://example.com/menu',
+          sourceType: 'pdf',
+          sourceHash: 'a'.repeat(64),
+          sourceStorageKey: 'sources/sample.pdf',
           idempotencyKey: 'idem_queue_prod_1',
         },
         mockQueueProducer,
@@ -310,8 +351,9 @@ describe('Ingestion Orchestrator', () => {
           client,
           {
             venueId: queueVenueId,
-            sourceType: 'url',
-            sourceUrl: 'https://example.com/menu',
+            sourceType: 'pdf',
+            sourceHash: 'a'.repeat(64),
+            sourceStorageKey: 'sources/sample.pdf',
             idempotencyKey: 'idem_queue_prod_fail',
           },
           mockFailingProducer,
@@ -341,8 +383,9 @@ describe('Ingestion Orchestrator', () => {
       // First submit and complete a job
       const job = await submitMenuIngestion(client, {
         venueId: queueVenueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
         idempotencyKey: 'idem_dup_1',
       });
 
@@ -403,8 +446,9 @@ describe('Ingestion Orchestrator', () => {
       const { client } = createMockClient();
       const job = await submitMenuIngestion(client, {
         venueId: queueVenueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
         idempotencyKey: 'idem_valid_queue_1',
       });
 
@@ -492,8 +536,9 @@ describe('Ingestion Orchestrator', () => {
       const { client } = createMockClient();
       const job = await submitMenuIngestion(client, {
         venueId: queueVenueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
         idempotencyKey: 'idem_transient_1',
       });
 
@@ -524,6 +569,76 @@ describe('Ingestion Orchestrator', () => {
       expect(msg.retry).toHaveBeenCalledTimes(1);
       expect(msg.ack).not.toHaveBeenCalled();
     });
+
+    it('retries queue delivery when extraction fails with retryable error and job resets to queued', async () => {
+      const { client, store } = createMockClient();
+      const job = await submitMenuIngestion(client, {
+        venueId: queueVenueId,
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
+        idempotencyKey: 'idem_retryable_status',
+      });
+
+      // Extractor returns failed status, but attempt_count is < max_attempts (job resets to 'queued')
+      const failingExtractor = async (): Promise<MenuExtractionResult> => ({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'failed',
+        source: null,
+        started_at: '2026-10-27T10:00:00.000Z',
+        finished_at: '2026-10-27T10:00:01.000Z',
+        extraction_mode: 'layout',
+        extraction_model: null,
+        ocr_engine: 3,
+        library_versions: {},
+        configuration: {},
+        segments: [],
+        drafts: [],
+        evidence: [],
+        capture_requests: [],
+        warnings: [],
+        errors: ['OCR service temporary 503 error'],
+      });
+
+      // Override client query so failIngestionJob sets status to 'queued' (retryable)
+      const originalQuery = client.query.bind(client);
+      client.query = async (text: string, values?: unknown[]) => {
+        if (text.includes('SET status = CASE WHEN attempt_count >= max_attempts')) {
+          if (store.job) {
+            store.job.status = 'queued'; // Requeued for retry
+            store.job.error_code = values![0] as string;
+            store.job.error_details = values![1] as string;
+            store.job.claim_token = null;
+          }
+          return { rows: [], rowCount: 1 };
+        }
+        return originalQuery(text, values);
+      };
+
+      const msg: QueueMessage<unknown> = {
+        id: 'msg_retryable_1',
+        body: {
+          version: 1,
+          tenantId: queueVenueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result = await processIngestionQueueBatch(
+        client,
+        { messages: [msg] },
+        failingExtractor,
+      );
+
+      expect(result.retried).toBe(1);
+      expect(result.acknowledged).toBe(0);
+      expect(msg.retry).toHaveBeenCalledTimes(1);
+      expect(msg.ack).not.toHaveBeenCalled();
+    });
   });
 
   describe('Finding A: Durable Report and Timing Artifact Retention', () => {
@@ -541,8 +656,9 @@ describe('Ingestion Orchestrator', () => {
 
       const job = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
         idempotencyKey: 'idem_finding_a_1',
       });
 
@@ -634,8 +750,9 @@ describe('Ingestion Orchestrator', () => {
 
       const job = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: 'sources/sample.pdf',
         idempotencyKey: 'idem_finding_a_fail',
       });
 

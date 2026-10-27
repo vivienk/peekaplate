@@ -15,17 +15,18 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 - `backend/src/ingestion/adapter.ts`: Extraction adapter with multi-span evidence reconstruction and grouped price handling.
 - `backend/src/ingestion/repository.ts`: Job lifecycle and draft persistence with lease fencing, Finding B `draft_index` fix, and Finding C retry status fix.
 - `backend/src/ingestion/orchestrator.ts`: Orchestration pipeline with report storage retention (Finding A).
-- `backend/src/ingestion/transport.ts`: Typed HTTP transport to Python extraction service.
-- `backend/src/ingestion/contract.test.ts`: Layer A fixture and contract verification suite across all 9 fixtures.
-- `backend/src/index.ts`: Authenticated staff endpoints and Cloudflare Queue consumer handler.
-- `backend/wrangler.jsonc`: Queue producer and consumer bindings.
+- `backend/src/ingestion/transport.ts`: Typed HTTP transport to Python extraction service with configurable 600s timeout (`DEFAULT_EXTRACTION_TIMEOUT_MS = 600_000`), required materialized source validation (`source_storage_key` and `source_hash`), client cancellation signal support, and granular error mapping.
+- `backend/src/ingestion/contract.test.ts`: Layer A fixture and contract verification suite across all 9 fixtures and high-volume 35-page/210-draft synthetic verification (22 tests).
+- `backend/src/ingestion/orchestrator.ts`: Rejection of unmaterialized URL/text inputs at submission boundary, tenant/job sourceStorageKey derivation, and queue retry on requeued status.
+- `backend/src/index.ts`: Authenticated staff endpoints, Cloudflare Queue consumer handler with connected `INGESTION_REPORTS_BUCKET`, 15-minute lease budget, and `EXTRACTION_TIMEOUT_MS` binding support.
+- `backend/wrangler.jsonc`: Queue producer and consumer bindings with `max_batch_size: 1`, and `INGESTION_REPORTS_BUCKET` R2 binding.
 - `migrations/20261026220000_menu_ingestion_drafts.sql`: Forward-only migration with forced RLS and new schema 2 draft columns.
 - `tests/db/menu_ingestion.sql`: pgTAP test suite (23 assertions).
 - `tests/fixtures/menu-ingestion/`: 9 synthetic/reconstructed test fixtures.
 
 ## Verification
 
-- PASS: `vitest run packages/contracts/ backend/src/ingestion/ backend/src/index.test.ts` (84 passed across 6 suites)
+- PASS: `vitest run packages/contracts/ backend/src/ingestion/ backend/src/index.test.ts` (99 passed across 6 suites)
 - PASS: `tsc --noEmit -p packages/contracts/tsconfig.json && tsc --noEmit -p backend/tsconfig.json` (0 errors)
 - PASS: `biome check packages/contracts/ backend/src/` (37 files checked, 0 errors)
 - PASS: `git diff --check` (no whitespace errors)

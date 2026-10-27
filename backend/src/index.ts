@@ -23,6 +23,7 @@ import {
   type PythonExtractor,
   processIngestionQueueBatch,
   type QueueMessage,
+  type ReportStorage,
   submitMenuIngestion,
 } from './ingestion/orchestrator';
 import {
@@ -47,8 +48,13 @@ export type Bindings = {
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
   INGESTION_QUEUE?: { send(message: unknown): Promise<void> };
+  INGESTION_REPORTS_BUCKET?: {
+    put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
+    get?(key: string): Promise<unknown>;
+  };
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
+  EXTRACTION_TIMEOUT_MS?: string;
 };
 
 type Dependencies = {
@@ -97,6 +103,7 @@ type Dependencies = {
     env: Bindings,
   ) => Promise<{ draft: DishDraftRow; publishedRevision: DishRevision }>;
   extractor?: PythonExtractor;
+  reportStorage?: ReportStorage;
   processQueueBatch?: typeof processIngestionQueueBatch;
 };
 
@@ -528,6 +535,11 @@ export async function handleQueueBatch(
   const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
   try {
     await client.connect();
+    const extractionTimeoutMs =
+      env.EXTRACTION_TIMEOUT_MS && /^\d+$/.test(env.EXTRACTION_TIMEOUT_MS)
+        ? Number.parseInt(env.EXTRACTION_TIMEOUT_MS, 10)
+        : undefined;
+
     const extractor =
       services.extractor ??
       (env.EXTRACTION_SERVICE_URL
@@ -536,6 +548,7 @@ export async function handleQueueBatch(
             ...(env.EXTRACTION_SERVICE_SECRET !== undefined
               ? { authToken: env.EXTRACTION_SERVICE_SECRET }
               : {}),
+            ...(extractionTimeoutMs !== undefined ? { timeoutMs: extractionTimeoutMs } : {}),
           })
         : async () => {
             throw new IngestionError(
@@ -545,8 +558,31 @@ export async function handleQueueBatch(
             );
           });
 
+    const reportStorage: ReportStorage | undefined =
+      services.reportStorage ??
+      (env.INGESTION_REPORTS_BUCKET
+        ? {
+            async put(key: string, data: string): Promise<void> {
+              await env.INGESTION_REPORTS_BUCKET!.put(key, data);
+            },
+            async get(key: string): Promise<string | null> {
+              if (!env.INGESTION_REPORTS_BUCKET?.get) return null;
+              const res = await env.INGESTION_REPORTS_BUCKET.get(key);
+              if (!res) return null;
+              return typeof res === 'string'
+                ? res
+                : (res as any).text
+                  ? await (res as any).text()
+                  : String(res);
+            },
+          }
+        : undefined);
+
     const processBatchFn = services.processQueueBatch ?? processIngestionQueueBatch;
-    await processBatchFn(client, batch, extractor);
+    await processBatchFn(client, batch, extractor, {
+      ...(reportStorage !== undefined ? { reportStorage } : {}),
+      leaseTimeoutMinutes: 15,
+    });
   } catch {
     for (const msg of batch.messages) {
       try {

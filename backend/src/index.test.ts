@@ -252,5 +252,77 @@ describe('menu ingestion HTTP boundary', () => {
       expect(msg1.ack).not.toHaveBeenCalled();
       expect(msg2.ack).not.toHaveBeenCalled();
     });
+
+    it('connects INGESTION_REPORTS_BUCKET to reportStorage and passes leaseTimeoutMinutes 15', async () => {
+      const mockPut = vi.fn().mockResolvedValue(undefined);
+      const mockBucket = { put: mockPut };
+      const msg = { ack: vi.fn(), retry: vi.fn() };
+      const mockProcessBatch = vi
+        .fn()
+        .mockImplementation(async (_client, _batch, _extractor, options) => {
+          expect(options.leaseTimeoutMinutes).toBe(15);
+          expect(options.reportStorage).toBeDefined();
+          // Invoke put to verify bucket wiring
+          await options.reportStorage.put('reports/t1/j1/extraction.json', '{"test":true}');
+        });
+
+      // Provide mock database URL to pass the initial connection check
+      // Mock Client connection
+      const mockEnv = {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://user:pass@localhost:5432/testdb',
+        INGESTION_REPORTS_BUCKET: mockBucket,
+      };
+
+      // Mock Client prototype
+      const { Client } = await import('pg');
+      const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined as any);
+      const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined as any);
+
+      try {
+        await handleQueueBatch({ messages: [msg as any] }, mockEnv, {
+          verify: vi.fn(),
+          execute: vi.fn(),
+          processQueueBatch: mockProcessBatch,
+        });
+
+        expect(mockProcessBatch).toHaveBeenCalledTimes(1);
+        expect(mockPut).toHaveBeenCalledWith('reports/t1/j1/extraction.json', '{"test":true}');
+      } finally {
+        connectSpy.mockRestore();
+        endSpy.mockRestore();
+      }
+    });
+
+    it('retries queue message when report storage throws before completion/ACK', async () => {
+      const msg = { ack: vi.fn(), retry: vi.fn() };
+      const mockFailingProcessBatch = vi.fn().mockImplementation(async () => {
+        throw new Error('R2 write failed: INGESTION_REPORTS_BUCKET unavailable');
+      });
+
+      const mockEnv = {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://user:pass@localhost:5432/testdb',
+        INGESTION_REPORTS_BUCKET: { put: vi.fn().mockRejectedValue(new Error('R2 write failed')) },
+      };
+
+      const { Client } = await import('pg');
+      const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined as any);
+      const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined as any);
+
+      try {
+        await handleQueueBatch({ messages: [msg as any] }, mockEnv, {
+          verify: vi.fn(),
+          execute: vi.fn(),
+          processQueueBatch: mockFailingProcessBatch,
+        });
+
+        expect(msg.retry).toHaveBeenCalledTimes(1);
+        expect(msg.ack).not.toHaveBeenCalled();
+      } finally {
+        connectSpy.mockRestore();
+        endSpy.mockRestore();
+      }
+    });
   });
 });

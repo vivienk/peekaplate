@@ -17,7 +17,8 @@
       "vars": {
         "APP_ENV": "staging",
         "POSTHOG_PROJECT_ID": "675372",
-        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1"
+        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
+        "EXTRACTION_TIMEOUT_MS": "600000"
       },
       "hyperdrive": [
         {
@@ -28,6 +29,10 @@
       "r2_buckets": [
         {
           "binding": "OBSERVATION_ARCHIVE_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "INGESTION_REPORTS_BUCKET",
           "bucket_name": "peekaplate-staging-assets"
         }
       ],
@@ -45,7 +50,7 @@
         "consumers": [
           {
             "queue": "peekaplate-staging-menu-ingestion",
-            "max_batch_size": 10,
+            "max_batch_size": 1,
             "max_batch_timeout": 30,
             "max_retries": 3,
             "dead_letter_queue": "peekaplate-staging-menu-ingestion-dlq"

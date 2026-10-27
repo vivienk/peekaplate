@@ -72,6 +72,8 @@ export type DishDraftRow = {
   updated_at: string;
 };
 
+export const DEFAULT_LEASE_TIMEOUT_MINUTES = 15;
+
 /**
  * Creates or retrieves an idempotent menu ingestion job.
  */
@@ -129,7 +131,7 @@ export async function claimIngestionJob(
     leaseTimeoutMinutes?: number | undefined;
   },
 ): Promise<{ claimToken: string; leaseGeneration: string } | null> {
-  const timeout = params.leaseTimeoutMinutes ?? 10;
+  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
   const result = await client.query<{ claim_token: string; lease_generation: string }>(
     `UPDATE app_private.menu_ingestion_jobs
      SET status = 'running',
@@ -169,7 +171,7 @@ export async function renewJobLease(
     leaseTimeoutMinutes?: number | undefined;
   },
 ): Promise<boolean> {
-  const timeout = params.leaseTimeoutMinutes ?? 10;
+  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
   const result = await client.query(
     `UPDATE app_private.menu_ingestion_jobs
      SET locked_at = now()
@@ -198,7 +200,7 @@ export async function persistExtractedDrafts(
     leaseTimeoutMinutes?: number | undefined;
   },
 ): Promise<{ persistedCount: number; supersededCount: number }> {
-  const timeout = params.leaseTimeoutMinutes ?? 10;
+  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
   const targetStatus = params.status ?? 'complete';
 
   // 1. Transaction and RLS scope
@@ -357,7 +359,7 @@ export async function failIngestionJob(
     leaseTimeoutMinutes?: number | undefined;
   },
 ): Promise<void> {
-  const timeout = params.leaseTimeoutMinutes ?? 10;
+  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
   await client.query(
     `UPDATE app_private.menu_ingestion_jobs
      SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,

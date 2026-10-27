@@ -293,7 +293,11 @@ export function adaptPythonExtractionResult(
 
   // Determine overall status
   let finalStatus: 'complete' | 'incomplete' | 'failed';
-  if (validDrafts.length > 0 && invalidDrafts.length === 0 && extraction.status === 'complete') {
+  if (
+    invalidDrafts.length === 0 &&
+    extraction.status === 'complete' &&
+    extraction.errors.length === 0
+  ) {
     finalStatus = 'complete';
   } else if (validDrafts.length > 0) {
     finalStatus = 'incomplete';

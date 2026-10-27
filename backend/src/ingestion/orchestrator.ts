@@ -63,34 +63,48 @@ export async function submitMenuIngestion(
     throw new IngestionError('invalid_request', 400, 'venueId and idempotencyKey are required');
   }
 
-  if (request.sourceType === 'url') {
-    if (!request.sourceUrl) {
-      throw new IngestionError('invalid_request', 400, 'sourceUrl is required for url ingestion');
-    }
-    try {
-      const parsed = new URL(request.sourceUrl);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        throw new IngestionError('invalid_url_protocol', 400, 'Only http and https URLs supported');
-      }
-    } catch {
-      throw new IngestionError('malformed_url', 400, 'Invalid URL format');
-    }
-  } else if (request.sourceType === 'pdf' || request.sourceType === 'photo') {
-    if (!request.sourceStorageKey && !request.sourceUrl) {
+  // Reject unmaterialized URL and raw text sources at submission boundary
+  if (request.sourceType === 'url' || request.sourceType === 'text') {
+    throw new IngestionError(
+      'unsupported_source_type',
+      400,
+      `Source type "${request.sourceType}" is not supported for direct extraction. URL and text menu ingestion requires prior retrieval materialization to private R2. Please submit 'pdf' or 'photo' with sourceHash and sourceStorageKey.`,
+    );
+  }
+
+  // PDF and photo sources require SHA-256 hash
+  if (!request.sourceHash || !/^[0-9a-f]{64}$/.test(request.sourceHash)) {
+    throw new IngestionError(
+      'missing_source_hash',
+      400,
+      'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
+    );
+  }
+
+  const jobId = crypto.randomUUID();
+  let sourceStorageKey = request.sourceStorageKey ?? null;
+
+  if (sourceStorageKey) {
+    if (sourceStorageKey.includes('..') || sourceStorageKey.startsWith('/')) {
       throw new IngestionError(
-        'missing_source_reference',
+        'invalid_source_storage_key',
         400,
-        'sourceStorageKey or sourceUrl required',
+        'Invalid source storage key format',
       );
     }
+  } else {
+    // Derive canonical tenant/job-derived source key
+    const ext = request.sourceType === 'pdf' ? 'pdf' : 'jpg';
+    sourceStorageKey = `sources/${request.venueId}/${jobId}/source.${ext}`;
   }
 
   const job = await createIngestionJob(client, {
+    id: jobId,
     tenantId: request.venueId,
     sourceType: request.sourceType,
     sourceUrl: request.sourceUrl ?? null,
-    sourceHash: request.sourceHash ?? null,
-    sourceStorageKey: request.sourceStorageKey ?? null,
+    sourceHash: request.sourceHash,
+    sourceStorageKey,
     idempotencyKey: request.idempotencyKey,
   });
 
@@ -281,7 +295,7 @@ export async function processIngestionQueueBatch(
     const { tenantId, jobId } = parseResult.data;
 
     try {
-      await executeIngestionWorkflow(client, {
+      const workflowOutcome = await executeIngestionWorkflow(client, {
         tenantId,
         jobId,
         workerId: options?.workerId ?? 'cf-queue-worker',
@@ -292,9 +306,18 @@ export async function processIngestionQueueBatch(
           : {}),
       });
 
-      msg.ack();
-      acknowledged += 1;
-      processed += 1;
+      if (workflowOutcome.job.status === 'queued') {
+        msg.retry();
+        retried += 1;
+        errors.push({
+          jobId,
+          error: `Job requeued for retry: ${workflowOutcome.job.error_code ?? 'unknown_error'}`,
+        });
+      } else {
+        msg.ack();
+        acknowledged += 1;
+        processed += 1;
+      }
     } catch (err: unknown) {
       if (err instanceof IngestionError) {
         if (err.code === 'job_already_locked_or_complete') {
