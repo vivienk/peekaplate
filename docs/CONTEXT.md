@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision, RES-02 approval/publication/withdrawal and anonymous public-menu pointer schemas, dish-intent, team analytics and bounded menu evidence schemas. Public responses bind exact approved content and asset hashes to an immutable HTTPS T0 bundle; menu-token claims fix venue, publication, observations scope, audience and a 30-minute lifetime. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, RES-02 approval/publication/withdrawal, anonymous public-menu pointer and versioned immutable T0 content-bundle schemas, plus dish-intent, team analytics and bounded menu evidence schemas. Public delivery validation binds venue, menu, revision and publication identities across the pointer and content; complete dishes require approved prices, ingredients and HTTPS card/detail images, while incomplete dishes cannot leak partial claims. Menu-token claims fix venue, publication, observations scope, audience and a 30-minute lifetime. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bdaf057bd59604ac62ccf0702d53fd505705825437abc182d310d330aa021654"
+      "sourceFingerprint": "d1b79e577c0de2ae9d24397b7bd8628fbbeced85ddc654361fea32c89e3de8de"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The documented immutable JSON bundle contract fixes restaurant presentation, complete dish identity/content, T0 variants and explicit-only dietary values while excluding partial, draft and review evidence. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The shared immutable JSON bundle schema fixes exact snake-case identities, restaurant presentation, complete dish content, decimal-string prices, ingredient identities, HTTPS T0 variants and explicit-only dietary values while rejecting partial, allergen, spatial, draft and review fields. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -115,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "17f404d7d9fd728e803f5e973afabca5f55023437340bd776da88b047c3ed3f8"
+      "sourceFingerprint": "58291e42763d520e41a2dc7cd347d5c055b89f1dad35b4729ed34b654c997f7b"
     },
     {
       "id": "database",
@@ -321,16 +321,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "RES-02 PRs #42/#43 add strict approval/publish/withdraw commands plus anonymous reads of the active approved T0 bundle pointer and publication-scoped ES256 observation tokens. The diner handoff now documents immutable JSON/CORS/image requirements, event identity mapping, QR source semantics, same-publication token refresh and the single 404 versus offline boundary. Local database verification passed 96 pgTAP assertions and all 26 Worker/PostgreSQL integration cases; hosted assets, secrets and deployment remain unverified.",
+      "summary": "RES-02 PRs #42/#43 add strict approval/publish/withdraw commands plus anonymous reads of the active approved T0 bundle pointer and publication-scoped ES256 observation tokens. The diner handoff now supplies the exact strict bundle keys/types, pointer/content identity validation, immutable HTTPS image requirements, event identity mapping, QR source semantics, same-publication refresh, immutable old-event handling and atomic new-publication replacement. Original-publication token renewal is a named RES-02 backend dependency and is not implemented by the current public-read endpoint. CORS remains an environment-owner allowlist decision; static PR previews stay disconnected. Local database verification passed 96 pgTAP assertions and all 26 Worker/PostgreSQL integration cases; hosted assets, secrets and deployment remain unverified.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Keep PRs #42/#43 Draft pending human review and the privileged immutable-bundle producer. Confirm the content-policy allergen closed list before adding values; do not expose partial content, renew tokens after withdrawal or treat QR query parameters as authority."
+      "next": "Keep PRs #42/#43 Draft pending human review and the privileged immutable-bundle producer. Define and implement the RES-02 original-publication token-renewal endpoint before relying on delivery after token expiry. Have an authorized deployment administrator confirm exact staging/production CORS origins; keep static PR previews disconnected. Jeffin, Ehab and Harshita can implement the shared schema, immutable outbox transition and UI states in DIN-03 without inventing keys or tokens. Confirm the allergen list or 2.5D format only through a new reviewed schema version."
     },
     {
-      "summary": "Added a disabled-by-default PR preview workflow for S3 preview deployments. Same-repository PRs using trusted base workflow code build static diner/console pages with analytics disabled and no credentials; a separate job uploads only those files to dedicated peekaplate-diner-preview/peekaplate-console-preview Pages projects under the pr-<number> alias using a Pages-only token in a preview environment, checks both links and updates one PR comment. Closing a PR deletes its deployments; manual dispatch repeats cleanup. Reviewer guide, isolation limits and setup are in docs/previews.md. The preview token name and account variable were verified in GitHub; exact develop/main environment branch restrictions were configured. Project availability, token validity and hosted workflow execution remain unverified. Static-artifact and provider checks fail closed; cleanup is independent of the deployment toggle.",
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
       "modules": [
         "delivery"

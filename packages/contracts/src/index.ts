@@ -141,6 +141,124 @@ export const PublicMenuBundleSchema = z.strictObject({
   assetManifestHash: hash,
 });
 
+const publicMenuText = postgresText.trim();
+const publicHttpsUrl = z
+  .url()
+  .refine((value) => value.startsWith('https://'), 'Public menu assets require HTTPS');
+
+export const PublicMenuImageSchema = z.strictObject({
+  url: publicHttpsUrl,
+  width: z.number().int().positive().max(16_384),
+  height: z.number().int().positive().max(16_384),
+  alt: publicMenuText.min(1).max(500),
+});
+
+export const PublicMenuIngredientSchema = z.strictObject({
+  ingredient_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.max(1000).nullable(),
+});
+
+const publicMenuDishIdentity = {
+  dish_id: uuid,
+  dish_revision_id: uuid,
+};
+
+export const PublicMenuIncompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(false),
+});
+
+export const PublicMenuCompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(true),
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.max(4000),
+  price: z.strictObject({
+    amount: z.string().regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  }),
+  ingredients: z.array(PublicMenuIngredientSchema).max(100),
+  dietary: z
+    .array(z.enum(['Vegan', 'Vegetarian', 'Gluten-free']))
+    .max(3)
+    .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
+  images: z.strictObject({
+    card: PublicMenuImageSchema,
+    detail: PublicMenuImageSchema,
+  }),
+});
+
+export const PublicMenuDishSchema = z.discriminatedUnion('complete', [
+  PublicMenuIncompleteDishSchema,
+  PublicMenuCompleteDishSchema,
+]);
+
+export const PublicMenuCategorySchema = z.strictObject({
+  category_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  dishes: z.array(PublicMenuDishSchema).max(500),
+});
+
+export const PublicMenuContentBundleSchema = z
+  .strictObject({
+    schema_version: z.literal(1),
+    venue_id: uuid,
+    menu_id: uuid,
+    menu_revision_id: uuid,
+    publication_id: uuid,
+    restaurant: z.strictObject({
+      name: publicMenuText.min(1).max(160),
+      logo: PublicMenuImageSchema.nullable(),
+    }),
+    categories: z.array(PublicMenuCategorySchema).max(100),
+  })
+  .superRefine((bundle, ctx) => {
+    const categoryIds = new Set<string>();
+    const dishIds = new Set<string>();
+    for (const [categoryIndex, category] of bundle.categories.entries()) {
+      if (categoryIds.has(category.category_id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['categories', categoryIndex, 'category_id'],
+          message: 'Category IDs must be unique',
+        });
+      }
+      categoryIds.add(category.category_id);
+      for (const [dishIndex, dish] of category.dishes.entries()) {
+        if (dishIds.has(dish.dish_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['categories', categoryIndex, 'dishes', dishIndex, 'dish_id'],
+            message: 'Dish IDs must be unique across the menu',
+          });
+        }
+        dishIds.add(dish.dish_id);
+        if (dish.complete) {
+          const ingredientIds = new Set<string>();
+          for (const [ingredientIndex, ingredient] of dish.ingredients.entries()) {
+            if (ingredientIds.has(ingredient.ingredient_id)) {
+              ctx.addIssue({
+                code: 'custom',
+                path: [
+                  'categories',
+                  categoryIndex,
+                  'dishes',
+                  dishIndex,
+                  'ingredients',
+                  ingredientIndex,
+                  'ingredient_id',
+                ],
+                message: 'Ingredient IDs must be unique within a dish',
+              });
+            }
+            ingredientIds.add(ingredient.ingredient_id);
+          }
+        }
+      }
+    }
+  });
+
 export const PublicMenuResponseSchema = z.strictObject({
   schemaVersion: z.literal(1),
   venueId: uuid,
@@ -154,6 +272,29 @@ export const PublicMenuResponseSchema = z.strictObject({
   menuToken: z.string().min(1).max(8192),
   tokenExpiresAt: z.iso.datetime(),
 });
+
+export const PublicMenuDeliverySchema = z
+  .strictObject({
+    response: PublicMenuResponseSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .superRefine(({ response, content }, ctx) => {
+    const identities = [
+      ['venue_id', response.venueId, content.venue_id],
+      ['menu_id', response.menuId, content.menu_id],
+      ['menu_revision_id', response.menuRevisionId, content.menu_revision_id],
+      ['publication_id', response.publicationId, content.publication_id],
+    ] as const;
+    for (const [field, expected, actual] of identities) {
+      if (actual !== expected) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['content', field],
+          message: `${field} must match the active public response`,
+        });
+      }
+    }
+  });
 
 export const MENU_TOKEN_AUDIENCE = 'peekaplate-observations';
 export const MENU_TOKEN_TTL_SECONDS = 30 * 60;
@@ -179,6 +320,12 @@ export const MenuTokenClaimsSchema = z
 
 export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
 export type MenuTokenClaims = z.infer<typeof MenuTokenClaimsSchema>;
+export type PublicMenuImage = z.infer<typeof PublicMenuImageSchema>;
+export type PublicMenuIngredient = z.infer<typeof PublicMenuIngredientSchema>;
+export type PublicMenuDish = z.infer<typeof PublicMenuDishSchema>;
+export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
+export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
+export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
 
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;

@@ -18,9 +18,40 @@ The immutable JSON bundle is the versioned content payload; this endpoint is the
 
 ## Diner bundle contract
 
-The immutable bundle is UTF-8 JSON served with `Content-Type: application/json` and browser-readable CORS for the approved diner origins. It has top-level restaurant identity and presentation (restaurant name and optional immutable logo), the exact `venueId`, `menuId`, `menuRevisionId` and `publicationId`, and an ordered category/dish collection. The response `publicationId` is the observation contract's `publication_revision_id`; there is no second browser-selected publication revision. Each complete dish supplies its canonical `dish_id` and `dish_revision_id`, price plus currency, category identity/name, ordered ingredient names, and T0 card/detail image variants with dimensions and alt text. Dietary values are limited to explicit approved `Vegan`, `Vegetarian` and `Gluten-free` values and are never inferred. Allergen values remain absent until the content-policy closed list is approved; arbitrary allergen strings are not allowed. An approved 2.5D asset is optional and must retain the T0 image fallback.
+The immutable bundle is UTF-8 JSON served with `Content-Type: application/json`. `PublicMenuContentBundleSchema` in `packages/contracts/src/index.ts` is the authoritative version 1 shape; all objects are strict and reject unknown fields. Array order is display order.
 
-Only the current approved publication may appear. A content-incomplete dish carries only its IDs and `complete: false`; it exposes no partial price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
+| Location | Exact fields |
+| --- | --- |
+| Root | `schema_version: 1`; UUID strings `venue_id`, `menu_id`, `menu_revision_id`, `publication_id`; `restaurant`; ordered `categories` |
+| `restaurant` | trimmed `name`; `logo`, which is either an image object or `null` |
+| Category | UUID `category_id`; trimmed `name`; ordered `dishes` |
+| Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; unique approved `dietary` values; required T0 `images.card` and `images.detail` |
+| Incomplete dish | only UUID `dish_id`, UUID `dish_revision_id` and `complete: false` |
+| Ingredient | UUID `ingredient_id`; trimmed `name`; `description` string or `null` |
+| Image | immutable HTTPS `url`; positive integer `width` and `height`; non-empty `alt` text |
+
+`PublicMenuDeliverySchema` validates the fetched content together with `PublicMenuResponseSchema` and rejects any mismatch in venue, menu, menu revision or publication identity. The response `publicationId` maps to `publication_revision_id` in `observation.v2`; dish events copy `dish_id` and `dish_revision_id` from the selected bundle item.
+
+Dietary values are limited to explicit approved `Vegan`, `Vegetarian` and `Gluten-free` values and are never inferred. Version 1 contains no allergen or 2.5D fields: arbitrary allergen strings and unapproved spatial formats are rejected as unknown fields. A future approved allergen list or spatial asset format requires a new reviewed schema version; T0 card and detail images remain mandatory.
+
+Only the current approved publication may appear. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
+
+### Publication change and queued observations
+
+Every queued observation keeps its original event ID, `publication_revision_id`, dish identity and original publication token relationship. It is never relabelled to a newer publication.
+
+- While the original token remains valid, the diner may send queued events for that publication.
+- Before expiry, the diner re-reads the public endpoint. If it returns the same publication, the new token may resume that publication's queue.
+- A `404` or a different `publicationId` stops creation of old-publication events. Unsent old events may use only a token bound to their original publication. If that token expires, the events remain unchanged in the bounded outbox while the client requests renewal for the original allowed exposure; they are never relabelled or sent with the new publication's token. The normal 24-hour/size limits and terminal ingest receipts still govern removal.
+- On a different publication, the diner fetches the new immutable bundle and validates the complete response/content pair with `PublicMenuDeliverySchema`. Only then does it replace the displayed menu atomically and begin a new publication-bound event stream. It must never mix old content with the new token. A failed content fetch or validation shows the retryable menu error state rather than continuing collection against stale content.
+
+Jeffin's DIN-03 adapter owns runtime parsing and the fixture/live mapping. Ehab's re-read/outbox path owns the pre-expiry check, original-event preservation and publication transition. Harshita's DIN-03 surface owns the loading/error/menu-replacement states. RES-02 owns this shared contract and the server-side original-publication token-renewal boundary; DIN-03 must not ship renewal by substituting a current-publication token. The current public-read endpoint does not yet implement that renewal operation, so this remains a named backend dependency rather than completed behavior.
+
+### CORS ownership
+
+This contract does not approve deployment origins. An authorized deployment administrator must record the exact staging and production diner origins and configure both the Worker response and immutable-object host with a bounded allowlist and `Vary: Origin`. Repository CODEOWNERS are `@vivienk` and `@hemu77` (Sai Hemanth Kilaru); one of them must confirm the environment-level allowlist.
+
+PR preview origins are intentionally excluded for now. Preview pages are static, carry `connect-src 'none'`, and have no API, database or analytics connection. Do not use `*`, the whole `pages.dev` domain or an unchecked reflected origin. Enabling API-connected previews requires a separately reviewed preview API boundary and an explicit origin pattern.
 ## Upstream producer contract
 
 The forward migration creates `app_private.public_menu_bundle`, keyed by `(tenant_id, menu_id, menu_revision_id)` and foreign-keyed to `menu_review_subject`. Rows are append-only and tenant-scoped. The restricted runtime role has `SELECT` only: it cannot manufacture or replace an approved bundle. RES-01/VIS-03 must write the bundle row through its separately reviewed privileged ingestion path before owner approval/publication can become publicly readable.
