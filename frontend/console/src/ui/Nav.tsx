@@ -2,8 +2,9 @@ import type { HTMLAttributes } from 'react';
 
 export interface NavProps extends HTMLAttributes<HTMLElement> {}
 
-export function Nav(props: NavProps) {
-  return <nav className="pp-nav" {...props} />;
+export function Nav({ className, ...props }: NavProps) {
+  const classes = ['pp-nav', className].filter(Boolean).join(' ');
+  return <nav className={classes} {...props} />;
 }
 
 export function NavIcon({
