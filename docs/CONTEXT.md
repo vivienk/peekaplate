@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c895690d262a710beb386b7dce22afce05d831090f6bd51ab3b250559cf4f291"
+      "sourceFingerprint": "e2f86334300bfcedd72056e4eec57901fbed6dd4989eba48294d521b0b4758fb"
     },
     {
       "id": "diner",
@@ -121,7 +121,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e5726e6988ed4d4edec35ddbfa54dfa4440491f3b3cca4a6eb48bbea13789906"
+      "sourceFingerprint": "29822edc2313bc28ad647c4ea0386345fa3430ce25d3b2dfd6a3c97ba939984c"
     },
     {
       "id": "database",
@@ -396,7 +396,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
     },
     {
-      "summary": "S3-DATA-02 hardened the observation queue consumer and aligned canonical contracts with PR #40. Standardized ObservationV2 canonical serialization and sha256 checksum computation over full observations across contracts and consumer. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
+      "summary": "S3-DATA-01 hardened the observation queue consumer and aligned canonical contracts with PR #40. Standardized ObservationV2 canonical serialization and sha256 checksum computation over full observations across contracts and consumer. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
       "modules": [
         "contracts",
         "backend"

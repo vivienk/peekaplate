@@ -286,7 +286,7 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
 
-// Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
+// Observation Queue contract (ADR 0015 / S3-DATA-01).
 // Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
 const observationUuid = z.uuid().transform((value) => value.toLowerCase());
 const saveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
@@ -591,15 +591,21 @@ export function toCanonicalObservation(message: {
 
 /**
  * Deterministic JSON canonicalization matching the producer implementation in PR #40.
+ * Safely handles undefined object properties (omitted), undefined array elements (null),
+ * numbers (-0 normalized to 0, rejects non-finite), and circular references.
  */
 export function canonicalJson(value: unknown): string {
   const output: string[] = [];
-  const stack: ({ value: unknown } | { text: string })[] = [{ value }];
+  const stack: ({ value: unknown } | { text: string; exitSeen?: object })[] = [{ value }];
+  const seen = new WeakSet<object>();
   let nodes = 0;
 
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
+    if ('exitSeen' in current && current.exitSeen) {
+      seen.delete(current.exitSeen);
+    }
     if ('text' in current) {
       output.push(current.text);
       continue;
@@ -608,25 +614,43 @@ export function canonicalJson(value: unknown): string {
     if (nodes > 65_536) throw new Error('Observation payload is too complex.');
     const entry = current.value;
     if (entry === null || typeof entry !== 'object') {
+      if (typeof entry === 'number') {
+        if (!Number.isFinite(entry)) throw new Error('Non-finite numbers cannot be canonicalized');
+        if (Object.is(entry, -0)) {
+          output.push('0');
+          continue;
+        }
+      }
       const encoded = JSON.stringify(entry);
       if (encoded === undefined) throw new Error('Observation payload is not JSON-compatible.');
       output.push(encoded);
       continue;
     }
+    if (seen.has(entry)) {
+      throw new Error('Circular reference detected');
+    }
+    seen.add(entry);
+
     if (Array.isArray(entry)) {
       output.push('[');
-      stack.push({ text: ']' });
+      stack.push({ text: ']', exitSeen: entry });
       for (let index = entry.length - 1; index >= 0; index -= 1) {
         if (index < entry.length - 1) stack.push({ text: ',' });
-        stack.push({ value: entry[index] });
+        const val = entry[index];
+        stack.push({
+          value:
+            val === undefined || typeof val === 'function' || typeof val === 'symbol' ? null : val,
+        });
       }
       continue;
     }
-    const fields = Object.entries(entry as Record<string, unknown>).sort(([left], [right]) =>
-      left.localeCompare(right),
-    );
+    const fields = Object.entries(entry as Record<string, unknown>)
+      .filter(
+        ([_, val]) => val !== undefined && typeof val !== 'function' && typeof val !== 'symbol',
+      )
+      .sort(([left], [right]) => left.localeCompare(right));
     output.push('{');
-    stack.push({ text: '}' });
+    stack.push({ text: '}', exitSeen: entry });
     for (let index = fields.length - 1; index >= 0; index -= 1) {
       const field = fields[index];
       if (!field) continue;

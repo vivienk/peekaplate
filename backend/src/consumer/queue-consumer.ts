@@ -244,27 +244,34 @@ export class QueueConsumer {
     // Step 2: Canonicalize and hash COMPLETE CANONICAL OBSERVATION
     // As required by ADR 0015 & PR #40, hashing includes all contract-defined fields
     // that affect observation identity (schemaVersion, eventId, sessionId, producerId,
-    // localSequence, occurredAt, authorizedPublicationId, type, payload)
-    const canonicalObservation = toCanonicalObservation(envelope);
-    const canonicalStr = canonicalJson(canonicalObservation);
-    const checksum = await sha256(canonicalStr);
-
-    // Raw bytes of the payload for R2 archival
+    // localSequence, occurredAt, authorizedPublicationId, type, payload).
+    // Isolate serialization and archive-key construction to protect the batch from unhandled crashes.
+    let canonicalStr: string;
+    let checksum: string;
     let rawBytes: Uint8Array;
-    if (typeof body === 'string') {
-      rawBytes = new TextEncoder().encode(body);
-    } else if (body instanceof Uint8Array) {
-      rawBytes = body;
-    } else {
-      rawBytes = new TextEncoder().encode(JSON.stringify(body));
-    }
-
     let archiveKey: string;
+
     try {
+      const canonicalObservation = toCanonicalObservation(envelope);
+      canonicalStr = canonicalJson(canonicalObservation);
+      checksum = await sha256(canonicalStr);
+
+      // Raw bytes of the payload for R2 archival
+      if (typeof body === 'string') {
+        rawBytes = new TextEncoder().encode(body);
+      } else if (body instanceof Uint8Array) {
+        rawBytes = body;
+      } else {
+        rawBytes = new TextEncoder().encode(JSON.stringify(body));
+      }
+
       archiveKey = buildRawArchiveKey(tenantId, eventId, occurredAt);
     } catch (err: unknown) {
-      const reason = err instanceof Error ? err.message : 'Invalid archive key';
-      this.log('error', 'Malformed message key, routing to dead letter', { reason });
+      const reason =
+        err instanceof Error ? err.message : 'Invalid canonical observation or archive key';
+      this.log('error', 'Malformed message serialization or key, routing to dead letter', {
+        reason,
+      });
       return { status: 'dead_letter', reason };
     }
 

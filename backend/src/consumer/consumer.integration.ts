@@ -43,7 +43,9 @@ class TestQueueMessage implements QueueMessage<unknown> {
 beforeAll(async () => {
   await admin.connect();
 
-  // Ensure PR #32 schema exists on disposable test database if not already migrated
+  // Transitional test bootstrap: replicates the canonical schema from unmerged PR #32
+  // (migrations/20261023120000_observation_index.sql) for local disposable database execution.
+  // Once PR #32 is merged into develop, dbmate will apply the migration automatically during test:db bootstrap.
   await admin.query(`
     CREATE TABLE IF NOT EXISTS app_private.observation_index (
       tenant_id uuid NOT NULL REFERENCES app_private.venues(id) ON DELETE RESTRICT,
@@ -96,6 +98,8 @@ beforeAll(async () => {
 
     ALTER TABLE app_private.observation_index ENABLE ROW LEVEL SECURITY;
     ALTER TABLE app_private.observation_index FORCE ROW LEVEL SECURITY;
+    ALTER TABLE app_private.observation_conflict ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE app_private.observation_conflict FORCE ROW LEVEL SECURITY;
     DO $$
     BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'observation_index_tenant_scope') THEN
@@ -125,7 +129,7 @@ afterAll(async () => {
   await admin.end();
 });
 
-describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () => {
+describe('real PostgreSQL Queue Consumer integration (S3-DATA-01 / PR #32)', () => {
   it('A. First accepted observation persists all canonical columns with forced RLS', async () => {
     const client = new Client({ connectionString: runtimeUrl });
     await client.connect();
@@ -763,5 +767,98 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       await client1.end();
       await client2.end();
     }
+  });
+
+  it('K. Schema conformance verification: validates exact columns, primary keys, RLS flags, and append-only triggers against the canonical observation contract', async () => {
+    // 1. Column definitions and types for observation_index
+    const colsRes = await admin.query<{
+      column_name: string;
+      data_type: string;
+      is_nullable: string;
+    }>(
+      `SELECT column_name, data_type, is_nullable
+       FROM information_schema.columns
+       WHERE table_schema = 'app_private' AND table_name = 'observation_index'
+       ORDER BY column_name`,
+    );
+    const colMap = new Map(colsRes.rows.map((r) => [r.column_name, r]));
+
+    const expectedCols: Record<string, { type: string; nullable: string }> = {
+      tenant_id: { type: 'uuid', nullable: 'NO' },
+      event_id: { type: 'uuid', nullable: 'NO' },
+      canonical_payload_checksum: { type: 'text', nullable: 'NO' },
+      schema_version: { type: 'text', nullable: 'NO' },
+      event_type: { type: 'text', nullable: 'NO' },
+      authorized_publication_id: { type: 'uuid', nullable: 'NO' },
+      occurred_at: { type: 'timestamp with time zone', nullable: 'NO' },
+      first_received_at: { type: 'timestamp with time zone', nullable: 'NO' },
+      r2_archive_key: { type: 'text', nullable: 'NO' },
+      disposition: { type: 'text', nullable: 'NO' },
+      reason_code: { type: 'text', nullable: 'YES' },
+    };
+
+    for (const [colName, expected] of Object.entries(expectedCols)) {
+      const actual = colMap.get(colName);
+      expect(actual, `Column ${colName} must exist on app_private.observation_index`).toBeDefined();
+      expect(actual?.data_type).toBe(expected.type);
+      expect(actual?.is_nullable).toBe(expected.nullable);
+    }
+
+    // 2. Primary key on observation_index: (tenant_id, event_id)
+    const pkIndexRes = await admin.query<{ kcu_column: string }>(
+      `SELECT kcu.column_name AS kcu_column
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.key_column_usage kcu
+         ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+       WHERE tc.table_schema = 'app_private'
+         AND tc.table_name = 'observation_index'
+         AND tc.constraint_type = 'PRIMARY KEY'
+       ORDER BY kcu.ordinal_position`,
+    );
+    expect(pkIndexRes.rows.map((r) => r.kcu_column)).toEqual(['tenant_id', 'event_id']);
+
+    // 3. Primary key on observation_conflict: (tenant_id, event_id, incoming_checksum)
+    const pkConflictRes = await admin.query<{ kcu_column: string }>(
+      `SELECT kcu.column_name AS kcu_column
+       FROM information_schema.table_constraints tc
+       JOIN information_schema.key_column_usage kcu
+         ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+       WHERE tc.table_schema = 'app_private'
+         AND tc.table_name = 'observation_conflict'
+         AND tc.constraint_type = 'PRIMARY KEY'
+       ORDER BY kcu.ordinal_position`,
+    );
+    expect(pkConflictRes.rows.map((r) => r.kcu_column)).toEqual([
+      'tenant_id',
+      'event_id',
+      'incoming_checksum',
+    ]);
+
+    // 4. Forced Row-Level Security on observation_index and observation_conflict
+    const rlsRes = await admin.query<{
+      relname: string;
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `SELECT relname, relrowsecurity, relforcerowsecurity
+       FROM pg_class
+       JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+       WHERE pg_namespace.nspname = 'app_private'
+         AND relname IN ('observation_index', 'observation_conflict')`,
+    );
+    expect(rlsRes.rows.length).toBe(2);
+    for (const row of rlsRes.rows) {
+      expect(row.relrowsecurity, `RLS must be enabled on ${row.relname}`).toBe(true);
+      expect(row.relforcerowsecurity, `RLS must be forced on ${row.relname}`).toBe(true);
+    }
+
+    // 5. Append-only triggers
+    const triggerRes = await admin.query<{ tgname: string }>(
+      `SELECT tgname FROM pg_trigger
+       WHERE tgname IN ('observation_index_append_only', 'observation_conflict_append_only')`,
+    );
+    const triggerNames = triggerRes.rows.map((r) => r.tgname);
+    expect(triggerNames).toContain('observation_index_append_only');
+    expect(triggerNames).toContain('observation_conflict_append_only');
   });
 });

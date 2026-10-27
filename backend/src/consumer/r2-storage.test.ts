@@ -1,3 +1,4 @@
+import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudflareR2Storage, type R2BucketLike } from './r2-storage';
 
@@ -104,6 +105,54 @@ describe('CloudflareR2Storage (Atomic create-only)', () => {
     if (result.status === 'already_exists') {
       // Checksum computed from body matches 64 hex characters
       expect(result.existingChecksum).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it('DEF-02 regression: computes fallback checksum matching canonical observation when customMetadata is absent', async () => {
+    const envelope = {
+      kind: 'observation.v2' as const,
+      tenantId: '00000000-0000-4000-8000-000000000001',
+      eventId: '00000000-0000-4000-8000-000000000002',
+      sessionId: '00000000-0000-4000-8000-000000000003',
+      schemaVersion: 'observation.v2' as const,
+      occurredAt: '2026-10-24T12:00:00.000Z',
+      type: 'dish_viewed' as const,
+      authorizedPublicationId: '00000000-0000-4000-8000-000000000004',
+      producerId: '00000000-0000-4000-8000-000000000005',
+      localSequence: 1,
+      payload: {
+        dish_id: '00000000-0000-4000-8000-000000000006',
+        dish_revision_id: '00000000-0000-4000-8000-000000000007',
+        exposure_id: '00000000-0000-4000-8000-000000000008',
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      },
+      firstReceivedAt: '2026-10-24T12:00:01.000Z',
+    };
+
+    const canonical = toCanonicalObservation(envelope);
+    const expectedCanonicalChecksum = await sha256(canonicalJson(canonical));
+    const envelopeBytes = new TextEncoder().encode(JSON.stringify(envelope));
+    const arrayBuf = new Uint8Array(envelopeBytes).buffer as ArrayBuffer;
+
+    const mockBucket: R2BucketLike = {
+      put: vi.fn(async () => null),
+      get: vi.fn(async () => ({
+        key,
+        arrayBuffer: async (): Promise<ArrayBuffer> => arrayBuf,
+      })),
+    };
+
+    const storage = new CloudflareR2Storage(mockBucket);
+    const result = await storage.putRawPayload(key, envelopeBytes, expectedCanonicalChecksum);
+
+    expect(result.status).toBe('already_exists');
+    if (result.status === 'already_exists') {
+      // Must match the canonical observation checksum, NOT sha256(envelope.payload)
+      expect(result.existingChecksum).toBe(expectedCanonicalChecksum);
+      const innerOnlyChecksum = await sha256(canonicalJson(envelope.payload));
+      expect(result.existingChecksum).not.toBe(innerOnlyChecksum);
     }
   });
 

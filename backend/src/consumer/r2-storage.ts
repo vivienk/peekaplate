@@ -1,5 +1,40 @@
+import { canonicalJson, toCanonicalObservation } from '@peekaplate/contracts';
 import { canonicalizeJson, sha256Hex } from './canonical-json';
 import type { R2ArchiveStorage, R2PutResult } from './types';
+
+/**
+ * Computes deterministic fallback checksum from an R2 object's stored body
+ * when customMetadata['payload-checksum'] is absent.
+ * Accurately reconstructs the canonical observation from stored envelopes to ensure
+ * parity with initial delivery hashing (ADR 0015 / PR #40).
+ */
+async function computeFallbackChecksum(rawBytesOrBuf: ArrayBuffer | Uint8Array): Promise<string> {
+  const bytes = rawBytesOrBuf instanceof Uint8Array ? rawBytesOrBuf : new Uint8Array(rawBytesOrBuf);
+  try {
+    const text = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') {
+      // 1. If stored object is a queue envelope (camelCase), map to canonical observation
+      if (
+        (parsed.kind === 'observation.v2' || parsed.schemaVersion === 'observation.v2') &&
+        typeof parsed.eventId === 'string' &&
+        typeof parsed.authorizedPublicationId === 'string'
+      ) {
+        const canonical = toCanonicalObservation(parsed);
+        return await sha256Hex(canonicalJson(canonical));
+      }
+      // 2. If stored object is already a canonical observation (snake_case)
+      if (parsed.schema_version === 'observation.v2' && typeof parsed.event_id === 'string') {
+        return await sha256Hex(canonicalJson(parsed));
+      }
+      // 3. Fallback for generic JSON objects (such as conflict copies or raw events)
+      return await sha256Hex(canonicalJson(parsed));
+    }
+  } catch {
+    // Non-JSON object: hash raw bytes directly
+  }
+  return await sha256Hex(bytes);
+}
 
 /**
  * Cloudflare R2 bucket interface subset needed for archive operations.
@@ -94,20 +129,7 @@ export class CloudflareR2Storage implements R2ArchiveStorage {
     let existingChecksum = existing.customMetadata?.['payload-checksum'];
     if (!existingChecksum) {
       const buf = await existing.arrayBuffer();
-      try {
-        const text = new TextDecoder().decode(buf);
-        const parsed = JSON.parse(text);
-        const payload =
-          parsed &&
-          typeof parsed === 'object' &&
-          parsed.payload &&
-          typeof parsed.payload === 'object'
-            ? parsed.payload
-            : parsed;
-        existingChecksum = await sha256Hex(canonicalizeJson(payload));
-      } catch {
-        existingChecksum = await sha256Hex(new Uint8Array(buf));
-      }
+      existingChecksum = await computeFallbackChecksum(buf);
     }
 
     return {
@@ -124,20 +146,7 @@ export class CloudflareR2Storage implements R2ArchiveStorage {
     const rawBytes = new Uint8Array(buf);
     let checksum = obj.customMetadata?.['payload-checksum'];
     if (!checksum) {
-      try {
-        const text = new TextDecoder().decode(rawBytes);
-        const parsed = JSON.parse(text);
-        const payload =
-          parsed &&
-          typeof parsed === 'object' &&
-          parsed.payload &&
-          typeof parsed.payload === 'object'
-            ? parsed.payload
-            : parsed;
-        checksum = await sha256Hex(canonicalizeJson(payload));
-      } catch {
-        checksum = await sha256Hex(rawBytes);
-      }
+      checksum = await computeFallbackChecksum(rawBytes);
     }
     return { rawBytes, checksum };
   }

@@ -511,6 +511,27 @@ describe('QueueConsumer', () => {
     expect(disposition.status).toBe('dead_letter');
   });
 
+  it('DEF-03 regression: safely processes an observation payload with undefined optional properties without crashing batch', async () => {
+    const msgWithUndefined = createValidObservationMsg({
+      eventId: '22222222-2222-4222-8222-222222222299',
+      payload: {
+        dish_id: DISH1,
+        dish_revision_id: DISH_REV1,
+        exposure_id: EXP1,
+        surface: 'menu_list',
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s',
+        category_filter: undefined, // optional field explicitly set to undefined
+      },
+    });
+
+    const disposition = await consumer.processMessage(msgWithUndefined);
+    expect(disposition.status).toBe('acknowledged');
+    if (disposition.status === 'acknowledged') {
+      expect(disposition.reason).toBe('persisted');
+    }
+  });
+
   it('Case F: Partial batch failure handles messages independently', async () => {
     const e2 = '22222222-2222-4222-8222-222222222202';
     const e3 = '22222222-2222-4222-8222-222222222203';

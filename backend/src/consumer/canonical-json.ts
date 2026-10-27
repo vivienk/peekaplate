@@ -31,68 +31,15 @@ export class CanonicalJsonError extends Error {
 
 /**
  * Serializes any JSON-compatible value to a deterministic, canonical JSON string.
- * Validates inputs against non-finite numbers and circular references before canonicalizing.
+ * Delegates to the authoritative canonicalJson implementation in @peekaplate/contracts (ADR 0015).
  */
-export function canonicalizeJson(value: unknown, seen = new WeakSet<object>()): string {
-  if (value === null) {
-    return 'null';
+export function canonicalizeJson(value: unknown): string {
+  try {
+    return canonicalJson(value);
+  } catch (err: unknown) {
+    if (err instanceof CanonicalJsonError) throw err;
+    throw new CanonicalJsonError(err instanceof Error ? err.message : String(err));
   }
-
-  const type = typeof value;
-
-  if (type === 'boolean') {
-    return value ? 'true' : 'false';
-  }
-
-  if (type === 'number') {
-    const num = value as number;
-    if (!Number.isFinite(num)) {
-      throw new CanonicalJsonError('Non-finite numbers cannot be canonicalized');
-    }
-    return Object.is(num, -0) ? '0' : num.toString(10);
-  }
-
-  if (type === 'string') {
-    return JSON.stringify(value);
-  }
-
-  if (type === 'object') {
-    const obj = value as object;
-    if (seen.has(obj)) {
-      throw new CanonicalJsonError('Circular reference detected');
-    }
-    seen.add(obj);
-
-    try {
-      if (Array.isArray(obj)) {
-        const elements = obj.map((el) => {
-          if (el === undefined || typeof el === 'function' || typeof el === 'symbol') {
-            return 'null';
-          }
-          return canonicalizeJson(el, seen);
-        });
-        return `[${elements.join(',')}]`;
-      }
-
-      // Plain object: sort keys with localeCompare to match PR #40 exactly
-      const keys = Object.keys(obj).sort((a, b) => a.localeCompare(b));
-      const entries: string[] = [];
-
-      for (const key of keys) {
-        const val = (obj as Record<string, unknown>)[key];
-        if (val === undefined || typeof val === 'function' || typeof val === 'symbol') {
-          continue;
-        }
-        entries.push(`${JSON.stringify(key)}:${canonicalizeJson(val, seen)}`);
-      }
-
-      return `{${entries.join(',')}}`;
-    } finally {
-      seen.delete(obj);
-    }
-  }
-
-  throw new CanonicalJsonError(`Unsupported type: ${type}`);
 }
 
 export { canonicalJson, sha256 };

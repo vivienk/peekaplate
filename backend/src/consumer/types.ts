@@ -6,7 +6,7 @@ import {
 } from '@peekaplate/contracts';
 
 /**
- * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-02).
+ * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-01).
  *
  * Conforms to ADR 0015, the DATA-01 -> DATA-02 mapping v0.2, and the canonical
  * PostgreSQL schema defined in PR #32 (app_private.observation_index and
