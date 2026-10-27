@@ -429,7 +429,7 @@ export const ObservationQueueMessageSchema = z
     payload: z.record(z.string(), z.unknown()),
     firstReceivedAt: z.iso.datetime({ offset: true }),
   })
-  .superRefine((message, ctx) => {
+  .transform((message, ctx) => {
     const observation = ObservationV2Schema.safeParse({
       schema_version: message.schemaVersion,
       event_id: message.eventId,
@@ -443,7 +443,12 @@ export const ObservationQueueMessageSchema = z
     });
     if (!observation.success) {
       ctx.addIssue({ code: 'custom', path: ['payload'], message: 'Invalid observation payload' });
+      return z.NEVER;
     }
+    return {
+      ...message,
+      payload: observation.data.payload as Record<string, unknown>,
+    };
   });
 
 export const ConflictMetadataSchema = z.strictObject({
@@ -563,7 +568,8 @@ export type ObservationReceipt = z.infer<typeof ObservationReceiptSchema>;
 export type ObservationReceiptBatch = z.infer<typeof ObservationReceiptBatchSchema>;
 
 /**
- * Reconstructs a complete canonical observation from an observation.v2 queue envelope.
+ * Reconstructs a complete canonical observation from an observation.v2 queue envelope,
+ * preserving normalized values (e.g. lowercase UUIDs, trimmed strings) produced by shared schema validation.
  */
 export function toCanonicalObservation(message: {
   schemaVersion: 'observation.v2';
@@ -576,7 +582,7 @@ export function toCanonicalObservation(message: {
   type: ObservationV2['type'];
   payload: Record<string, unknown>;
 }): ObservationV2 {
-  return {
+  const candidate = {
     schema_version: message.schemaVersion,
     event_id: message.eventId,
     session_id: message.sessionId,
@@ -586,7 +592,12 @@ export function toCanonicalObservation(message: {
     publication_revision_id: message.authorizedPublicationId,
     type: message.type,
     payload: message.payload,
-  } as ObservationV2;
+  };
+  const parsed = ObservationV2Schema.safeParse(candidate);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  return candidate as ObservationV2;
 }
 
 /**

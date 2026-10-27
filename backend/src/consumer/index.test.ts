@@ -114,6 +114,6 @@ describe('createQueueHandler', () => {
     expect(msg.acked).toBe(true);
     expect(cleanupCalled).toBe(true);
     expect(repository.index.size).toBe(1);
-    expect(r2Storage.has(`raw/observations/${testTenant}/2026/10/24/${testEvent}.json`)).toBe(true);
+    expect(r2Storage.has(`raw/observations/${testTenant}/${testEvent}.json`)).toBe(true);
   });
 });

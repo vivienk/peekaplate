@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeObservationRepository } from './database';
@@ -87,42 +88,55 @@ function createValidObservationMsg(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function computeSyncChecksum(data: unknown): string {
+  return crypto.createHash('sha256').update(canonicalJson(data)).digest('hex');
+}
+
 function createValidConflictMsg(overrides: Record<string, unknown> = {}) {
-  const checksumA = 'a'.repeat(64);
-  const checksumB = 'b'.repeat(64);
+  const eventId = (overrides.eventId as string) || E1;
+  const pubId = (overrides.authorizedPublicationId as string) || P1;
+
+  const event1 = {
+    schema_version: 'observation.v2' as const,
+    event_id: eventId,
+    session_id: S1,
+    producer_id: PROD1,
+    local_sequence: 1,
+    occurred_at: '2026-10-24T12:00:00.000Z',
+    publication_revision_id: pubId,
+    type: 'shortlist_viewed' as const,
+    payload: { shortlist_size: 1 },
+  };
+
+  const event2 = {
+    schema_version: 'observation.v2' as const,
+    event_id: eventId,
+    session_id: S1,
+    producer_id: PROD1,
+    local_sequence: 1,
+    occurred_at: '2026-10-24T12:00:00.000Z',
+    publication_revision_id: pubId,
+    type: 'shortlist_viewed' as const,
+    payload: { shortlist_size: 2 },
+  };
+
   return {
     kind: 'observation_conflict.v1' as const,
     tenantId: T1,
-    eventId: E1,
-    authorizedPublicationId: P1,
+    eventId,
+    authorizedPublicationId: pubId,
     firstReceivedAt: '2026-10-24T12:00:01.000Z',
     reasonCode: 'event_id_conflict' as const,
     copies: [
       {
         validation: 'valid' as const,
-        canonicalChecksum: checksumA,
-        event: {
-          schema_version: 'observation.v2' as const,
-          event_id: E1,
-          session_id: S1,
-          producer_id: PROD1,
-          local_sequence: 1,
-          occurred_at: '2026-10-24T12:00:00.000Z',
-          publication_revision_id: P1,
-          type: 'shortlist_viewed' as const,
-          payload: { shortlist_size: 1 },
-        },
+        canonicalChecksum: computeSyncChecksum(event1),
+        event: event1,
       },
       {
-        validation: 'invalid' as const,
-        canonicalChecksum: checksumB,
-        metadata: {
-          schemaVersionStatus: 'observation.v2' as const,
-          eventType: 'shortlist_viewed' as const,
-          occurredAt: '2026-10-24T12:00:00.000Z',
-          publicationStatus: 'matches_authority' as const,
-          payloadObject: true,
-        },
+        validation: 'valid' as const,
+        canonicalChecksum: computeSyncChecksum(event2),
+        event: event2,
       },
     ],
     ...overrides,
@@ -191,7 +205,7 @@ describe('validateObservationEnvelope', () => {
   it('rejects unsupported event types', () => {
     expect(() =>
       validateObservationEnvelope(createValidObservationMsg({ type: 'non_existent_event_type' })),
-    ).toThrow(/Unsupported observation type: non_existent_event_type/);
+    ).toThrow(/Unsupported observation type/);
   });
 
   it('rejects invalid payload violating event-specific contract', () => {
@@ -289,7 +303,7 @@ describe('QueueConsumer', () => {
     }
 
     // Verify R2 archival occurred first with expected key
-    const expectedKey = `raw/observations/${T1}/2026/10/24/${E1}.json`;
+    const expectedKey = `raw/observations/${T1}/${E1}.json`;
     expect(r2Storage.has(expectedKey)).toBe(true);
     expect(r2Storage.putCalls.length).toBe(1);
     expect(r2Storage.putCalls[0]!.key).toBe(expectedKey);
@@ -551,7 +565,7 @@ describe('QueueConsumer', () => {
     expect(d1.status).toBe('retry');
 
     // R2 archive already created
-    const expectedKey = `raw/observations/${T1}/2026/10/24/${E1}.json`;
+    const expectedKey = `raw/observations/${T1}/${E1}.json`;
     expect(r2Storage.has(expectedKey)).toBe(true);
 
     // DB was not persisted
@@ -790,7 +804,7 @@ describe('QueueConsumer', () => {
 
   it('R2 mismatching checksum on existing key is quarantined as conflict with distinct conflict key', async () => {
     // Seed R2 with existing archive for this event with a different checksum
-    const existingKey = `raw/observations/${T1}/2026/10/24/${E1}.json`;
+    const existingKey = `raw/observations/${T1}/${E1}.json`;
     r2Storage.setExisting(
       existingKey,
       new TextEncoder().encode(JSON.stringify({ step: 'original-payload' })),
@@ -1104,8 +1118,30 @@ describe('QueueConsumer', () => {
     });
 
     it('handles partial failure across conflict copies safely and retries without duplicate records', async () => {
-      const checksumA = '1'.repeat(64);
-      const checksumB = '2'.repeat(64);
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+      const eventB = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 2 },
+      };
+      const checksumA = computeSyncChecksum(eventA);
+      const checksumB = computeSyncChecksum(eventB);
 
       const multiCopyMsg = {
         kind: 'observation_conflict.v1' as const,
@@ -1118,34 +1154,18 @@ describe('QueueConsumer', () => {
           {
             validation: 'valid' as const,
             canonicalChecksum: checksumA,
-            event: {
-              schema_version: 'observation.v2' as const,
-              event_id: E1,
-              session_id: S1,
-              producer_id: PROD1,
-              local_sequence: 1,
-              occurred_at: '2026-10-24T12:00:00.000Z',
-              publication_revision_id: P1,
-              type: 'shortlist_viewed' as const,
-              payload: { shortlist_size: 1 },
-            },
+            event: eventA,
           },
           {
-            validation: 'invalid' as const,
+            validation: 'valid' as const,
             canonicalChecksum: checksumB,
-            metadata: {
-              schemaVersionStatus: 'observation.v2' as const,
-              eventType: 'shortlist_viewed' as const,
-              occurredAt: '2026-10-24T12:00:00.000Z',
-              publicationStatus: 'matches_authority' as const,
-              payloadObject: true,
-            },
+            event: eventB,
           },
         ],
       };
 
       // Configure R2 to fail when writing the second copy's key
-      const keyB = buildConflictArchiveKey(T1, E1, '2026-10-24T12:00:00.000Z', checksumB);
+      const keyB = buildConflictArchiveKey(T1, E1, checksumB);
       r2Storage.failKeys.add(keyB);
 
       const msg = new FakeQueueMessage('msg-partial-fail', multiCopyMsg);
@@ -1176,6 +1196,527 @@ describe('QueueConsumer', () => {
       expect(repository.conflicts.size).toBe(2);
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumA}`)).toBe(true);
       expect(repository.conflicts.has(`${T1}:${E1}:${checksumB}`)).toBe(true);
+    });
+  });
+
+  describe('Zhiliang Wang Review Item 1: Conflict-Copy Integrity Validation', () => {
+    it('rejects copy with mismatched event_id and causes no R2 writes or PostgreSQL persistence', async () => {
+      const mismatchedEventId = '99999999-9999-4999-8999-999999999999';
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+      const eventB = {
+        ...eventA,
+        event_id: mismatchedEventId, // Mismatched event_id
+        payload: { shortlist_size: 2 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventB),
+            event: eventB,
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('dead_letter');
+      expect((disposition as { reason: string }).reason).toContain('event_id');
+
+      // Verify zero R2 writes and zero DB records
+      expect(r2Storage.putCalls.length).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+      expect(repository.index.size).toBe(0);
+
+      // Verify routed to retry/DLQ in batch without calling ack()
+      const queueMsg = new FakeQueueMessage('msg-mismatch-event', msg);
+      const batch = new FakeMessageBatch('obs-queue', [queueMsg]);
+      const batchResult = await consumer.processBatch(batch);
+      expect(batchResult.acknowledged).toBe(0);
+      expect(batchResult.retried).toBe(1);
+      expect(batchResult.deadLettered).toBe(1);
+      expect(queueMsg.acked).toBe(false);
+      expect(queueMsg.retried).toBe(true);
+    });
+
+    it('rejects copy with mismatched publication_revision_id and causes no R2 writes or PostgreSQL persistence', async () => {
+      const mismatchedPubId = '99999999-9999-4999-8999-999999999999';
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+      const eventB = {
+        ...eventA,
+        publication_revision_id: mismatchedPubId, // Mismatched publication_revision_id
+        payload: { shortlist_size: 2 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventB),
+            event: eventB,
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('dead_letter');
+      expect((disposition as { reason: string }).reason).toContain('publication_revision_id');
+
+      // Verify zero R2 writes and zero DB records
+      expect(r2Storage.putCalls.length).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+      expect(repository.index.size).toBe(0);
+    });
+
+    it('rejects copy with incorrect canonicalChecksum and causes no R2 writes or PostgreSQL persistence', async () => {
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+      const eventB = {
+        ...eventA,
+        payload: { shortlist_size: 2 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: 'f'.repeat(64), // Forged / incorrect checksum!
+            event: eventB,
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('dead_letter');
+      expect((disposition as { reason: string }).reason).toContain('canonicalChecksum');
+
+      // Verify zero R2 writes and zero DB records
+      expect(r2Storage.putCalls.length).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+      expect(repository.index.size).toBe(0);
+    });
+
+    it('rejects message with multiple copies when one copy is valid and another copy is invalid, ensuring valid copy is not archived or persisted', async () => {
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+
+      // Copy B has validation: 'invalid'
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: 'b'.repeat(64),
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('dead_letter');
+
+      // Crucial: Copy A must NOT have been partially archived or persisted!
+      expect(r2Storage.putCalls.length).toBe(0);
+      expect(repository.conflicts.size).toBe(0);
+      expect(repository.index.size).toBe(0);
+    });
+  });
+
+  describe('Zhiliang Wang Review Item 2: Normal R2 Archive-Key Identity', () => {
+    it('normal archive key depends strictly on stable event identity (tenantId, eventId) and not client-controlled occurredAt', () => {
+      const keyDate1 = buildRawArchiveKey(T1, E1, '2026-10-24T10:00:00.000Z');
+      const keyDate2 = buildRawArchiveKey(T1, E1, '2026-11-15T22:30:00.000Z');
+      const keyNoDate = buildRawArchiveKey(T1, E1);
+
+      expect(keyDate1).toBe(`raw/observations/${T1}/${E1}.json`);
+      expect(keyDate2).toBe(`raw/observations/${T1}/${E1}.json`);
+      expect(keyNoDate).toBe(`raw/observations/${T1}/${E1}.json`);
+      expect(keyDate1).toBe(keyDate2);
+    });
+
+    it('same tenant and event ID with different occurredAt UTC date does not create a second normal archive object and preserves original normal evidence', async () => {
+      const msg1 = createValidObservationMsg({
+        occurredAt: '2026-10-24T23:59:59.000Z',
+      });
+      const msg2 = createValidObservationMsg({
+        occurredAt: '2026-10-25T00:00:01.000Z', // Different UTC date!
+      });
+
+      // First delivery creates normal archive object
+      const d1 = await consumer.processMessage(msg1);
+      expect(d1.status).toBe('acknowledged');
+      if (d1.status === 'acknowledged') {
+        expect(d1.reason).toBe('persisted');
+      }
+
+      const normalKey = `raw/observations/${T1}/${E1}.json`;
+      expect(r2Storage.has(normalKey)).toBe(true);
+      const originalNormal = await r2Storage.getRawPayload(normalKey);
+      expect(originalNormal).not.toBeNull();
+
+      // Second delivery with different date has same normal key -> R2 detects already_exists
+      // Because occurredAt changed, checksum differs -> quarantined to conflict key!
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+
+      // Existing normal archive object remains completely unchanged
+      const currentNormal = await r2Storage.getRawPayload(normalKey);
+      expect(currentNormal?.checksum).toBe(originalNormal?.checksum);
+
+      // No second normal archive object exists (no 2026/10/25 path or second normal key)
+      const normalObjects = Array.from(r2Storage.keys()).filter(
+        (k) => !/-[0-9a-f]{64}\.json$/.test(k),
+      );
+      expect(normalObjects).toEqual([normalKey]);
+
+      // Changed content stored ONLY under designated conflict key
+      expect(repository.conflicts.size).toBe(1);
+      const conflict = Array.from(repository.conflicts.values())[0]!;
+      expect(conflict.eventId).toBe(E1);
+      expect(conflict.r2ArchiveKey).toBe(
+        buildConflictArchiveKey(T1, E1, conflict.incomingChecksum),
+      );
+      expect(r2Storage.has(conflict.r2ArchiveKey)).toBe(true);
+    });
+
+    it('same tenant and event ID with different content stores changed content only under conflict key and preserves original normal archive', async () => {
+      const msg1 = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list' as const,
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s' as const,
+        },
+      });
+      const msg2 = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list' as const,
+          position: 2, // Changed content!
+          exposure_basis: 'viewport_50pct_1s' as const,
+        },
+      });
+
+      const d1 = await consumer.processMessage(msg1);
+      expect(d1.status).toBe('acknowledged');
+
+      const normalKey = `raw/observations/${T1}/${E1}.json`;
+      const originalNormal = await r2Storage.getRawPayload(normalKey);
+
+      const d2 = await consumer.processMessage(msg2);
+      expect(d2.status).toBe('acknowledged');
+      if (d2.status === 'acknowledged') {
+        expect(d2.reason).toBe('conflict_recorded');
+      }
+
+      // Original normal object unchanged
+      const currentNormal = await r2Storage.getRawPayload(normalKey);
+      expect(currentNormal?.checksum).toBe(originalNormal?.checksum);
+
+      // Changed content stored under conflict key
+      const conflictRecord = Array.from(repository.conflicts.values())[0]!;
+      expect(r2Storage.has(conflictRecord.r2ArchiveKey)).toBe(true);
+      expect(conflictRecord.r2ArchiveKey).toContain(conflictRecord.incomingChecksum);
+
+      // Total normal objects remains exactly 1
+      const normalKeys = Array.from(r2Storage.keys()).filter(
+        (k) => !/-[0-9a-f]{64}\.json$/.test(k),
+      );
+      expect(normalKeys).toEqual([normalKey]);
+    });
+
+    it('concurrent or repeated identical deliveries do not create duplicate normal objects', async () => {
+      const msg = createValidObservationMsg();
+
+      // Redeliver 3 times
+      const [r1, r2, r3] = await Promise.all([
+        consumer.processMessage(msg),
+        consumer.processMessage(msg),
+        consumer.processMessage(msg),
+      ]);
+
+      expect(r1.status).toBe('acknowledged');
+      expect(r2.status).toBe('acknowledged');
+      expect(r3.status).toBe('acknowledged');
+
+      const normalKeys = Array.from(r2Storage.keys()).filter(
+        (k) => !/-[0-9a-f]{64}\.json$/.test(k),
+      );
+      expect(normalKeys.length).toBe(1);
+      expect(repository.index.size).toBe(1);
+      expect(repository.conflicts.size).toBe(0);
+    });
+  });
+
+  describe('Zhiliang Wang Review Item 3: Preserve Normalized Payload Values', () => {
+    it('normalizes uppercase payload UUIDs to lowercase across validation, checksum, and DB persistence', async () => {
+      const uppercaseDish = '66666666-6666-4666-8666-666666666666'.toUpperCase();
+      const uppercaseDishRev = '77777777-7777-4777-8777-777777777777'.toUpperCase();
+      const uppercaseExposure = '88888888-8888-4888-8888-888888888888'.toUpperCase();
+
+      const msg = createValidObservationMsg({
+        payload: {
+          dish_id: uppercaseDish,
+          dish_revision_id: uppercaseDishRev,
+          exposure_id: uppercaseExposure,
+          surface: 'menu_list' as const,
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s' as const,
+        },
+      });
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('acknowledged');
+
+      // Database persistence received normalized lowercase values
+      const stored = repository.index.get(`${T1}:${E1}`);
+      expect(stored).toBeDefined();
+      expect(stored?.payload.dish_id).toBe(DISH1.toLowerCase());
+      expect(stored?.payload.dish_revision_id).toBe(DISH_REV1.toLowerCase());
+      expect(stored?.payload.exposure_id).toBe(EXP1.toLowerCase());
+
+      // Checksum matches canonical lowercase observation checksum
+      const canonicalObs = toCanonicalObservation(msg);
+      const expectedChecksum = await sha256(canonicalJson(canonicalObs));
+      expect(stored?.checksum).toBe(expectedChecksum);
+    });
+
+    it('normalizes string fields with trim (e.g. category_filter) across validation, checksum, and DB persistence', async () => {
+      const msgUntrimmed = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list' as const,
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s' as const,
+          category_filter: '   Chef Specials   ',
+        },
+      });
+
+      const disposition1 = await consumer.processMessage(msgUntrimmed);
+      expect(disposition1.status).toBe('acknowledged');
+
+      // Verify DB record has trimmed string
+      const stored = repository.index.get(`${T1}:${E1}`);
+      expect(stored?.payload.category_filter).toBe('Chef Specials');
+
+      // An identical message with pre-trimmed string produces matching checksum and is recognized as duplicate
+      const msgTrimmed = createValidObservationMsg({
+        payload: {
+          dish_id: DISH1,
+          dish_revision_id: DISH_REV1,
+          exposure_id: EXP1,
+          surface: 'menu_list' as const,
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s' as const,
+          category_filter: 'Chef Specials',
+        },
+      });
+
+      const disposition2 = await consumer.processMessage(msgTrimmed);
+      expect(disposition2.status).toBe('acknowledged');
+      if (disposition2.status === 'acknowledged') {
+        expect(disposition2.reason).toBe('duplicate_same_payload');
+      }
+    });
+  });
+
+  describe('Zhiliang Wang Review Item 4: Keep Malformed Raw Values Out of Logs', () => {
+    it('does not log raw malformed field values, invalid envelopes, or untrusted payload contents', async () => {
+      const loggedMessages: Array<{
+        level: string;
+        msg: string;
+        meta?: Record<string, unknown> | undefined;
+      }> = [];
+      const traces: Array<{ op: string; meta?: Record<string, unknown> | undefined }> = [];
+
+      const loggingConsumer = new QueueConsumer({
+        r2Storage,
+        repository,
+        log: (level, msg, meta) => loggedMessages.push({ level, msg, meta }),
+        onTrace: (op, meta) => traces.push({ op, meta }),
+      });
+
+      const SENSITIVE_TYPE = 'SECRET_MALICIOUS_TYPE_<script>alert(1)</script>';
+      const SENSITIVE_SCHEMA = 'MALICIOUS_SCHEMA_VERSION_DROP_TABLE';
+      const SENSITIVE_PAYLOAD = 'CONFIDENTIAL_CREDIT_CARD_DATA_9876_5432';
+      const SENSITIVE_KIND = 'MALICIOUS_ENVELOPE_KIND_ATTACK';
+
+      // 1. Test malformed type
+      await loggingConsumer.processMessage({
+        kind: 'observation.v2',
+        tenantId: T1,
+        eventId: E1,
+        sessionId: S1,
+        schemaVersion: 'observation.v2',
+        occurredAt: '2026-10-24T12:00:00.000Z',
+        type: SENSITIVE_TYPE,
+        authorizedPublicationId: P1,
+        producerId: PROD1,
+        localSequence: 1,
+        payload: { secret: SENSITIVE_PAYLOAD },
+      });
+
+      // 2. Test malformed schema version
+      await loggingConsumer.processMessage({
+        kind: 'observation.v2',
+        tenantId: T1,
+        eventId: E1,
+        sessionId: S1,
+        schemaVersion: SENSITIVE_SCHEMA,
+        occurredAt: '2026-10-24T12:00:00.000Z',
+        type: 'shortlist_viewed',
+        authorizedPublicationId: P1,
+        producerId: PROD1,
+        localSequence: 1,
+        payload: { secret: SENSITIVE_PAYLOAD },
+      });
+
+      // 3. Test malformed kind
+      await loggingConsumer.processMessage({
+        kind: SENSITIVE_KIND,
+        tenantId: T1,
+        eventId: E1,
+        payload: { secret: SENSITIVE_PAYLOAD },
+      });
+
+      // 4. Test malformed conflict copy
+      await loggingConsumer.processMessage({
+        kind: 'observation_conflict.v1',
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict',
+        copies: [
+          {
+            validation: 'invalid',
+            canonicalChecksum: 'a'.repeat(64),
+            metadata: {
+              leak: SENSITIVE_PAYLOAD,
+            },
+          },
+          {
+            validation: 'invalid',
+            canonicalChecksum: 'b'.repeat(64),
+            metadata: {},
+          },
+        ],
+      });
+
+      // Verify that NONE of the sensitive tokens ever appear in any log output or trace
+      const allLogText = JSON.stringify(loggedMessages) + JSON.stringify(traces);
+      expect(allLogText).not.toContain(SENSITIVE_TYPE);
+      expect(allLogText).not.toContain(SENSITIVE_SCHEMA);
+      expect(allLogText).not.toContain(SENSITIVE_PAYLOAD);
+      expect(allLogText).not.toContain(SENSITIVE_KIND);
+
+      // Verify logs use safe structured metadata
+      for (const log of loggedMessages) {
+        expect(log.meta).toBeDefined();
+        if (log.meta?.category) {
+          expect([
+            'validation_failure',
+            'conflict_integrity_failure',
+            'serialization_failure',
+          ]).toContain(log.meta.category);
+        }
+      }
     });
   });
 });

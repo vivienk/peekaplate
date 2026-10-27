@@ -129,7 +129,7 @@ afterAll(async () => {
   await admin.end();
 });
 
-describe('real PostgreSQL Queue Consumer integration (S3-DATA-01 / PR #32)', () => {
+describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () => {
   it('A. First accepted observation persists all canonical columns with forced RLS', async () => {
     const client = new Client({ connectionString: runtimeUrl });
     await client.connect();

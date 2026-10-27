@@ -6,7 +6,7 @@ import {
 } from '@peekaplate/contracts';
 
 /**
- * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-01).
+ * Contracts and domain types for the Cloudflare Queue Consumer (S3-DATA-02).
  *
  * Conforms to ADR 0015, the DATA-01 -> DATA-02 mapping v0.2, and the canonical
  * PostgreSQL schema defined in PR #32 (app_private.observation_index and
@@ -152,14 +152,16 @@ export interface ObservationRepository {
 }
 
 /**
- * Formats R2 archive key following ADR 0015 and repository conventions.
- * Format: raw/observations/{tenant_id}/{yyyy}/{mm}/{dd}/{event_id}.json
+ * Formats normal R2 archive key following ADR 0015 and repository conventions.
+ * Format: raw/observations/{tenant_id}/{event_id}.json
+ * Anchored to stable event identity (tenant_id, event_id), completely independent
+ * of client-controlled occurredAt timestamps to prevent split-archive object creation.
  * Sanitizes and validates inputs to prevent path traversal or invalid keys.
  */
 export function buildRawArchiveKey(
   tenantId: string,
   eventId: string,
-  occurredAtIso: string,
+  _occurredAtIso?: string,
 ): string {
   if (!tenantId || tenantId.includes('/') || tenantId.includes('\\') || tenantId.includes('..')) {
     throw new InvalidKeyError(`Invalid tenantId for archive key: ${tenantId}`);
@@ -168,27 +170,20 @@ export function buildRawArchiveKey(
     throw new InvalidKeyError(`Invalid eventId for archive key: ${eventId}`);
   }
 
-  const date = new Date(occurredAtIso);
-  if (Number.isNaN(date.getTime())) {
-    throw new InvalidKeyError(`Invalid occurredAt date for archive key: ${occurredAtIso}`);
-  }
-
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `raw/observations/${tenantId}/${yyyy}/${mm}/${dd}/${eventId}.json`;
+  return `raw/observations/${tenantId}/${eventId}.json`;
 }
 
 /**
  * Formats R2 conflict archive key ensuring distinct payloads reusing the same
  * (tenant_id, event_id) get unique, deterministic, path-traversal-safe keys.
- * Format: raw/observations/{tenant_id}/{yyyy}/{mm}/{dd}/{event_id}-{incoming_checksum}.json
+ * Format: raw/observations/{tenant_id}/{event_id}-{incoming_checksum}.json
+ * Anchored to stable event identity and checksum, independent of client-controlled timestamps.
  */
 export function buildConflictArchiveKey(
   tenantId: string,
   eventId: string,
-  occurredAtIso: string,
-  incomingChecksum: string,
+  occurredAtOrChecksum: string,
+  maybeChecksum?: string,
 ): string {
   if (!tenantId || tenantId.includes('/') || tenantId.includes('\\') || tenantId.includes('..')) {
     throw new InvalidKeyError(`Invalid tenantId for conflict archive key: ${tenantId}`);
@@ -196,17 +191,11 @@ export function buildConflictArchiveKey(
   if (!eventId || eventId.includes('/') || eventId.includes('\\') || eventId.includes('..')) {
     throw new InvalidKeyError(`Invalid eventId for conflict archive key: ${eventId}`);
   }
-  if (!/^[0-9a-f]{64}$/i.test(incomingChecksum)) {
-    throw new InvalidKeyError(`Invalid checksum for conflict archive key: ${incomingChecksum}`);
+
+  const checksum = maybeChecksum !== undefined ? maybeChecksum : occurredAtOrChecksum;
+  if (!/^[0-9a-f]{64}$/i.test(checksum)) {
+    throw new InvalidKeyError(`Invalid checksum for conflict archive key: ${checksum}`);
   }
 
-  const date = new Date(occurredAtIso);
-  if (Number.isNaN(date.getTime())) {
-    throw new InvalidKeyError(`Invalid occurredAt date for conflict archive key: ${occurredAtIso}`);
-  }
-
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `raw/observations/${tenantId}/${yyyy}/${mm}/${dd}/${eventId}-${incomingChecksum.toLowerCase()}.json`;
+  return `raw/observations/${tenantId}/${eventId}-${checksum.toLowerCase()}.json`;
 }

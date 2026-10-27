@@ -219,4 +219,8 @@ export class FakeR2ArchiveStorage implements R2ArchiveStorage {
   has(key: string): boolean {
     return this.objects.has(key);
   }
+
+  keys(): IterableIterator<string> {
+    return this.objects.keys();
+  }
 }
