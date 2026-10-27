@@ -573,3 +573,16 @@ build also completed after local log access was available. Initial browser tests
 could not launch because the pinned Chromium revision was absent; installed the
 repository-required browser before retrying. These were environment failures;
 no test assertion or application behavior was weakened.
+
+AI-02 environment resolution: the browser retry passed all eight cases. Linux CI
+[40461046251](https://github.com/vivienk/peekaplate/actions/runs/40461046251) on
+initial PR51 head e67a574 passed frozen Python tests/package, browser, database
+and quality checks. This resolves missing full-suite evidence for that revision;
+the Intel Mac installation limitation itself remains.
+
+AI-02 review negative control: reviewers assumed Zod string max length measured
+UTF-16 units. A 256-astral-code-point Python fixture passed the unchanged consumer
+and 257 was rejected. Inspection of pinned Zod 4.6.7 confirmed code-point counting;
+the finding was withdrawn. Retained the shared 256/257 regression and made no
+unnecessary runtime change. Verify installed dependency semantics before
+classifying a hypothesis as a defect.

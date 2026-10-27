@@ -19,6 +19,14 @@ const expected = {
 };
 
 describe('AI-02 → RES-01 review boundary', () => {
+  it('accepts the Python 256-code-point boundary including astral characters', () => {
+    const unicode = JSON.parse(
+      readFileSync('processing/tests/fixtures/ingredient-review-unicode.json', 'utf8'),
+    );
+    expect(IngredientReviewHandoffSchema.safeParse(unicode).success).toBe(true);
+    unicode.assessments[0].ingredients[0].original += 'x';
+    expect(IngredientReviewHandoffSchema.safeParse(unicode).success).toBe(false);
+  });
   it('consumes the exact Python fixture and preserves unknowns and source spans', () => {
     const result = ingredientAssessmentForReview(fixture, expected);
     expect(result.ingredients[0]?.original).toBe('milk');

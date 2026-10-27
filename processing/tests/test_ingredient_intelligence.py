@@ -132,7 +132,7 @@ class IngredientIntelligenceTests(unittest.TestCase):
                 IngredientReviewHandoff.model_validate(data)
 
     def test_bounded_ingredients(self):
-        for ingredients in (['milk'] * 101, ['x' * 257]):
+        for ingredients in (['milk'] * 101, ['x' * 257], ['𠮷' * 257]):
             with self.assertRaises(ExtractionError):
                 build_review_handoff(report_for(ingredients))
 
@@ -151,3 +151,7 @@ class IngredientIntelligenceTests(unittest.TestCase):
     def test_shared_fixture_matches_python_output(self):
         fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review.json').read_text())
         self.assertEqual(fixture, build_review_handoff(report_for(['milk', 'house sauce'])).model_dump(mode='json'))
+
+    def test_shared_unicode_boundary_fixture(self):
+        fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review-unicode.json').read_text())
+        self.assertEqual(fixture, build_review_handoff(report_for(['𠮷' * 256])).model_dump(mode='json'))

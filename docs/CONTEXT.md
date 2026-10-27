@@ -19,14 +19,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/index.test.ts",
         "packages/contracts/src/ingredient-intelligence.ts",
         "packages/contracts/src/ingredient-intelligence.test.ts",
-        "processing/tests/fixtures/ingredient-review.json"
+        "processing/tests/fixtures/ingredient-review.json",
+        "processing/tests/fixtures/ingredient-review-unicode.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "e79d03ed6fdfe166bde676b18de27aab05cd7e4e00cde45d77d2907368e553fd"
+      "sourceFingerprint": "f39ed9aacabb187db3fc460c5318b02a91457da84281eaac3400f7cd46fcb414"
     },
     {
       "id": "diner",
@@ -309,19 +310,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/ingredient_intelligence.py",
         "processing/tests/test_ingredient_intelligence.py",
         "processing/tests/fixtures/ingredient-review.json",
-        "docs/ingredient-intelligence.md"
+        "docs/ingredient-intelligence.md",
+        "processing/tests/fixtures/ingredient-review-unicode.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "15fa32e59c7fddce92737ca1d7195f796f21b8e9f87df02e9b647c2f069465dd"
+      "sourceFingerprint": "5d7c78f81f5ed32c3f37cba5268408d8848c2f533d8499d6c7f3359dced3ed26"
     }
   ],
   "handoffs": [
     {
-      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Native Python dependencies cannot install on this Intel Mac; classifier tests run with portable locked dependencies. Hosted full pipeline checks and authenticated RES-01 integration remain distinct acceptance work. See ingredient-intelligence.md and the implementation PR for exact verification.",
+      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Initial PR51 head e67a574 passed full Linux CI40461046251, including frozen Python/package, browser and DB checks; Intel Mac native dependency limits are documented in errors.md. Independent automated review found no supported defect after disproving an assumed Zod Unicode mismatch; a boundary regression was added. See ingredient-intelligence.md for remaining authenticated RES-01 integration.",
       "modules": [
         "processing",
         "contracts"
