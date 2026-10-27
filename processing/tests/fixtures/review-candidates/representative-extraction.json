@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "pipeline_version": "2",
+  "status": "incomplete",
+  "source": {
+    "source_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+    "sha256": "505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+    "kind": "pdf",
+    "location": "synthetic-review-menu.pdf",
+    "retrieved_at": "2026-10-25T12:00:00Z",
+    "size_bytes": 1231,
+    "snapshot_base64": "JVBERi0xLjcKJcK1wrYKJSBXcml0dGVuIGJ5IE11UERGIDEuMjguNQoKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFIvSW5mbzw8L1Byb2R1Y2VyKE11UERGIDEuMjguNSk+Pj4+CmVuZG9iagoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0NvdW50IDMvS2lkc1s0IDAgUiA4IDAgUiAxMCAwIFJdPj4KZW5kb2JqCgozIDAgb2JqCjw8L0ZvbnQ8PC9oZWx2IDUgMCBSPj4+PgplbmRvYmoKCjQgMCBvYmoKPDwvVHlwZS9QYWdlL01lZGlhQm94WzAgMCA2MDAgODAwXS9Sb3RhdGUgMC9SZXNvdXJjZXMgMyAwIFIvUGFyZW50IDIgMCBSL0NvbnRlbnRzWzYgMCBSXT4+CmVuZG9iagoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2EvRW5jb2RpbmcvV2luQW5zaUVuY29kaW5nPj4KZW5kb2JqCgo2IDAgb2JqCjw8L0xlbmd0aCAxNTkvRmlsdGVyL0ZsYXRlRGVjb2RlPj4Kc3RyZWFtCnjaXU27CgJBDOzzFakFNZudZO/gsBBt7ITtDitvDwstbPx+46MQExLCZB50p22lxBKdGMIlpt5ofWnXByflOvM4WLYezYAOFrtHVsEEC8w2p3og4WXyFbqO647GAcVTUYebNxXLPhcroqKTSvFAi1uBJ1c/x5U/n9xpy5aDh4wEvJ3rIvIRDv4qc/tBNTIsXPDVS+jlT7+vdKQn80gy9gplbmRzdHJlYW0KZW5kb2JqCgo3IDAgb2JqCjw8Pj4KZW5kb2JqCgo4IDAgb2JqCjw8L1R5cGUvUGFnZS9NZWRpYUJveFswIDAgNjAwIDgwMF0vUm90YXRlIDAvUmVzb3VyY2VzIDcgMCBSL1BhcmVudCAyIDAgUj4+CmVuZG9iagoKOSAwIG9iago8PD4+CmVuZG9iagoKMTAgMCBvYmoKPDwvVHlwZS9QYWdlL01lZGlhQm94WzAgMCA2MDAgODAwXS9Sb3RhdGUgMC9SZXNvdXJjZXMgOSAwIFIvUGFyZW50IDIgMCBSPj4KZW5kb2JqCgp4cmVmCjAgMTEKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDQyIDAwMDAwIG4gCjAwMDAwMDAxMjAgMDAwMDAgbiAKMDAwMDAwMDE4NSAwMDAwMCBuIAowMDAwMDAwMjI2IDAwMDAwIG4gCjAwMDAwMDAzMzMgMDAwMDAgbiAKMDAwMDAwMDQyMiAwMDAwMCBuIAowMDAwMDAwNjUwIDAwMDAwIG4gCjAwMDAwMDA2NzEgMDAwMDAgbiAKMDAwMDAwMDc2MiAwMDAwMCBuIAowMDAwMDAwNzgzIDAwMDAwIG4gCgp0cmFpbGVyCjw8L1NpemUgMTEvUm9vdCAxIDAgUi9JRFs8NEVDM0IxQzJBM0MyOEFDMzk4QzM4MjNGMEEzRUMyODI+PEZBMjlBNDQ5QkI3QkZEOUIyNDk3OEVFNzc4MTI2RjM4Pl0+PgpzdGFydHhyZWYKODc1CiUlRU9GCg=="
+  },
+  "started_at": "2026-10-25T12:00:00Z",
+  "finished_at": "2026-10-25T12:00:00Z",
+  "extraction_mode": "ai",
+  "extraction_model": "synthetic-no-provider-call",
+  "ocr_engine": 3,
+  "library_versions": {},
+  "configuration": {},
+  "segments": [
+    {
+      "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-1",
+      "page_number": 1,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD\n",
+      "native_text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD\n",
+      "error": null,
+      "warnings": [],
+      "metadata": {
+        "width": 600,
+        "height": 800,
+        "coordinate_space": "page_points"
+      }
+    },
+    {
+      "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-2",
+      "page_number": 2,
+      "method": "ocr_space_engine3",
+      "status": "failed",
+      "text": "",
+      "native_text": null,
+      "error": "Synthetic OCR failure.",
+      "warnings": ["Synthetic failure fixture; no OCR request was made."],
+      "metadata": {}
+    },
+    {
+      "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-3",
+      "page_number": 3,
+      "method": "pdf_native",
+      "status": "skipped",
+      "text": "",
+      "native_text": null,
+      "error": null,
+      "warnings": ["Synthetic skipped page."],
+      "metadata": {}
+    }
+  ],
+  "drafts": [
+    {
+      "name": "Garden Soup",
+      "description": null,
+      "category": null,
+      "price_amount": "8.50",
+      "price_currency": "CAD",
+      "ingredients": null,
+      "source_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+      "source_text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD",
+      "image_id": null,
+      "review_warnings": ["Page-level evidence; dish/price association needs human verification."],
+      "status": "needs_review"
+    },
+    {
+      "name": "Coffee",
+      "description": null,
+      "category": null,
+      "price_amount": null,
+      "price_currency": null,
+      "ingredients": null,
+      "source_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+      "source_text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD",
+      "image_id": null,
+      "review_warnings": ["Page-level evidence; dish/price association needs human verification."],
+      "status": "needs_review"
+    },
+    {
+      "name": "Bread",
+      "description": null,
+      "category": null,
+      "price_amount": "0.00",
+      "price_currency": "CAD",
+      "ingredients": null,
+      "source_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+      "source_text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD",
+      "image_id": null,
+      "review_warnings": ["Page-level evidence; dish/price association needs human verification."],
+      "status": "needs_review"
+    }
+  ],
+  "evidence": [
+    {
+      "draft_id": "draft:27d0c94f31358afb46af7b114ab8703f",
+      "draft_index": 0,
+      "spans": [
+        {
+          "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-1",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:0b9c3b7caadc96906a82405bd345e10d",
+      "draft_index": 1,
+      "spans": [
+        {
+          "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-1",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:6f2d983eef50397bdba0b9c105251008",
+      "draft_index": 2,
+      "spans": [
+        {
+          "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-1",
+          "start": 0,
+          "end": 74
+        }
+      ]
+    }
+  ],
+  "capture_requests": [],
+  "warnings": [
+    "Synthetic integration fixture; no OCR or model calls.",
+    "Page-level evidence; dish/price association needs human verification."
+  ],
+  "errors": ["Page 2: Synthetic OCR failure."]
+}

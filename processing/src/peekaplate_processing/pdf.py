@@ -1,11 +1,13 @@
 """Extract native PDF text; OCR pages with fewer than 20 visible characters."""
 import math
+import time
 import pymupdf
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.images import prepare_ocr_image
 from peekaplate_processing.ocr import OCRProvider, validate_ocr_settings
 from peekaplate_processing.schemas import SourceSegment
+from peekaplate_processing.timing import measure
 
 MAX_PDF_PAGES = 40
 MAX_RENDER_PIXELS = 6_000_000
@@ -24,10 +26,13 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
             raise ExtractionError("PDF must contain between 1 and 40 pages.")
         pages = []
         for index in range(len(document)):
+            started=time.perf_counter()
+            timings={}
             segment = SourceSegment(segment_id=f"{source_id}#page-{index+1}", page_number=index+1, method="pdf_native")
             try:
-                page = document.load_page(index)
-                text = page.get_text("text", sort=True).strip()
+                with measure(timings, "native_text"):
+                    page = document.load_page(index)
+                    text = page.get_text("text", sort=True).strip()
                 if len(text) > 100_000:
                     raise ExtractionError("PDF page text exceeds the extraction limit.")
                 has_images = bool(page.get_image_info())
@@ -47,9 +52,12 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
                     if not all(math.isfinite(v) and 0 < v <= 14_400 for v in (width, height)):
                         raise ExtractionError("PDF page dimensions exceed the rendering limit.")
                     scale = min(2, math.sqrt(MAX_RENDER_PIXELS / (width * height)))
-                    pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csRGB, alpha=False)
-                    prepared, metadata = prepare_ocr_image(pixmap.tobytes("png"))
-                    response = ocr.extract(prepared)
+                    with measure(timings, "render"):
+                        pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csRGB, alpha=False)
+                    with measure(timings, "image_prepare"):
+                        prepared, metadata = prepare_ocr_image(pixmap.tobytes("png"))
+                    with measure(timings, "ocr"):
+                        response = ocr.extract(prepared)
                     validate_ocr_settings(response)
                     segment.text = response["text"]
                     segment.metadata.update({**metadata, "ocr_settings": response["settings"], "cache_hit": response["cache_hit"], "ocr_image_sha256": response.get("image_sha256"), "ocr_regions": response.get("regions", []), "ocr_region_status": response.get("region_status", "unavailable"), "ocr_coordinate_space": "uploaded_image_pixels"})
@@ -58,5 +66,8 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
             except (ExtractionError, RuntimeError, ValueError, OSError) as error:
                 segment.status = "failed"
                 segment.error = str(error) if isinstance(error, ExtractionError) else "PDF page extraction failed."
+            finally:
+                timings["total"]=round(time.perf_counter()-started, 6)
+                segment.metadata["timings_seconds"]=timings
             pages.append(segment)
         return pages

@@ -1,0 +1,180 @@
+# Pipeline 3: category context, printed prices and elapsed time
+
+This processing change extends the merged VIS-02 foundation. It does not
+deploy a service, approve a dish or implement RES review persistence.
+The existing OCR provider, model, bounded Python/LangGraph flow and strict local
+validation are reused. No extra verification model or new dependency is added.
+
+## Output and category handling
+
+New reports use `schema_version: 2` and `pipeline_version: "3"`. The loader can
+still read saved schema 1 / pipeline 2 page reports. This is a new output version,
+not a relabeling of the earlier integration contract.
+
+The same extraction LLM identifies a main `category`, optional `subcategory`, and
+page section metadata. Wrapped OCR headings such as `# SIGNATURE` / `# SLAMS`
+can support `SIGNATURE SLAMS` without changing the original source text or offsets.
+OCR Markdown headings alone do not establish categories: dish names can be
+headings too.
+
+Workers receive at most 3,000 characters of the immediately preceding page as
+context. Dishes must cite target pages, not context pages. Python then walks
+results in page order, retaining an explicit supported main heading only across
+contiguous readable pages whose extraction marks `continues_previous: true`.
+Missing section metadata, failed/unreadable pages, gaps, uncertain continuation
+and multiple supported main categories clear carry-over. Section headings and
+explicit dish categories are considered together before filling unknown categories;
+conflicting roots do not supply a default for that page or the next. No automatic
+child-group inheritance is invented when a continuation page does not establish it.
+
+For example, a synthetic page 9 dish may retain category `BREAKFAST` with
+`category_page_number: 8`; its original dish text/evidence still cites page 9.
+The earlier heading page and inherited-category warning remain available for
+human review. Consumers must read this explicit provenance rather than require
+every category heading to appear inside the dish's own page text.
+
+A synthetic drink can retain `category: "COLD BEVERAGES"` and
+`subcategory: "FRUIT JUICES"`. The model identifies the roles; literal checking
+and continuity rules cannot independently prove semantic correctness.
+Subcategories that repeat the dish name or main category are cleared with a
+review warning. The main-category comparison also runs after section inheritance.
+A flat item such as single-serve brewed coffee has no subgroup simply because its
+name appears on its own line.
+
+## Prices
+
+`price_amount` remains a decimal string or null, with currency explicit or null.
+`price_text` preserves printed options such as `345 / 545`, including all amounts
+in longer slash-separated lists. When multiple prices are printed together, the
+amount stays null and the draft carries a review
+warning. No small/large, serving or other option meanings are invented.
+
+Numbers are checked against the matched dish entry, bounded by other known or
+possible entry headings, including omitted entries with inline prices, rather than
+every number on the page. Photo captions are not preferred entry anchors.
+Ambiguous boundaries can produce nulls and warnings. Calorie/portion units apply
+across a slash-separated numeric list and cannot support a price; a genuine
+monetary amount beside a separate calorie count remains eligible. Recognized
+monetary prefixes are not entry names and stop unit propagation across a slash;
+a unit attached directly to a number still invalidates that number.
+
+On OCR pages, existing uploaded-image word/line boxes also support local price
+association. Valid source-supported headings, including wrapped names, bind only
+to unique same-row prices in their column. A price below a description additionally
+needs a bounded text entry and an unambiguous column interval before the next
+known entry. A unique literal scalar or slash list can replace a wrong suggestion
+or populate an unknown price, with a recovery warning; currency and option labels
+are not inferred. Every known entry's heading parts and name spans are excluded
+from other entries' price candidates, including wrapped numeric names and inline
+price headings. These are approximate geometry checks, not factual approval.
+
+An extra unpriced occurrence of the same name remains a competing entry. Missing
+prices do not prove that it is a photo caption. Only distinguishable, explicit
+image-alt text can exclude a caption occurrence; an unmarked or indistinguishable
+repeat stays ambiguous, even when another occurrence has a valid price. Every
+source entry occurrence must be reconciled: an entry whose boxes join its title
+and description cannot disappear from the competing count merely because that
+combined run is not a price-eligible heading. This can clear previously retained
+prices rather than guess which entry they describe.
+
+Malformed, excessive or competing geometry abstains rather than widening back
+to the page's text. Missing/unavailable geometry uses the text checks, but several
+standalone price groups in an entry remain ambiguous even if a suggested number
+appears in that cluster. Overlay labels omitted from the OCR text can be image
+logos or captions: they cannot supply facts and do not invalidate unrelated
+entry associations. Original text, geometry and Unicode offsets are not rewritten.
+
+Compatible same-name candidates collapse only when they resolve to one source
+entry and one unchanged candidate contains the other's supported facts. Names
+are compared by case/whitespace only, every field's non-null supplied values must
+agree across the whole group even when grounding cleared them, and warnings are
+retained. A candidate with null fields cannot bridge conflicting originals. Different pages, distinct
+entries, semantic aliases, variants and complementary/conflicting records are not
+silently merged. Ambiguous same-name records remain separate with review warnings.
+This happens before IDs are created for a new run; existing reports and IDs are
+never rewritten or deduplicated by the review exporter.
+
+This reduces cross-dish mistakes but does not establish extraction accuracy.
+All drafts still require human review. Original OCR text and page evidence are
+retained so missing or wrongly grouped values can be corrected later.
+
+## Timings on each started run
+
+Each new run directory receives `timings.json`, including failed stages. Invalid
+options, credentials or an existing output directory fail before a run starts.
+The final timing file includes:
+
+| Scope | Stages |
+| --- | --- |
+| Run | Acquisition, page-report write, LLM wall time, draft assembly, extraction-report write and total. |
+| PDF page | Native text, rendering, image preparation, OCR/cache lookup and page total, where applicable. |
+| Image | Preparation, OCR/cache lookup and total; failed image input retains its measured total. |
+| LLM batch | Cache lookup, start-spacing wait, model request, local parsing, cache write, grounding and worker elapsed time. |
+
+Stage timers record time even when an operation fails. The console also prints
+the run breakdown. `extraction.json` contains the timing snapshot available when
+it was serialized; **`timings.json` is the final measurement**, including output
+write time. The total ends before saving the small timing summary itself.
+
+`acquisition_mode: "saved_pages"` marks reused OCR. Those page records have
+`reused: true` and null current page timing/cache fields: old acquisition times
+are not presented as work done by the new run. A genuine source acquisition
+records actual current cache hits and per-page costs.
+
+Batch wall times overlap at concurrency 2; do not add them to estimate elapsed
+time. Compare the run's `llm_wall` and `total`. A cache-only model replay measures
+local reuse/validation, not live model latency. Interrupted graphs retain overall
+stage time but may not return completed per-batch graph results.
+
+## Run and test
+
+From `processing`, use a fresh run directory:
+
+```sh
+uv run --frozen python -m peekaplate_processing.run_pipeline \
+  --input work/menu.pdf --run-dir work/menu-v3-001 \
+  --batch-pages 2 --llm-concurrency 2
+```
+
+Add `--pages-json work/previous-run/pages.json` to reuse verified saved OCR for
+the same PDF. This still calls the extraction model for uncached batches. The
+schema, prompt, model/settings and previous-page context participate in the new
+candidate cache identity. Cached candidates and section metadata are revalidated.
+OCR geometry stays local: it is not added to the model request or cache identity;
+cached raw candidates pass through the current grounding and duplicate checks.
+Deadlines and disabled SDK retries remain; no silent fallback model is introduced.
+
+For a full fresh test, omit `--pages-json` and add both `--no-ocr-cache` and
+`--no-llm-cache`. These flags bypass cache reads and writes; existing files are
+preserved. This makes new OCR and model requests, so its elapsed time includes
+OCR acquisition as well as extraction. Always choose a new run directory.
+
+Application defaults remain ten pages per batch and one simultaneous model call.
+The two-page/concurrency-two command above is an explicit opt-in, not a new default.
+Provider/model selection and reasoning configuration are unchanged from develop;
+separate private experiments do not authorize provider-specific tuning here.
+
+Run deterministic checks without live provider calls:
+
+```sh
+uv run --frozen python -m unittest discover -s tests
+uv build --no-sources
+```
+
+Speed is measured before setting an acceptance target. More concurrency or larger
+batches are not automatically faster; retain actual failures and timeout counts
+when reporting elapsed time. Cache acquisition and live model latency are separate.
+
+## Integration boundary
+
+The local RES-01.1 exporter and shared review contract accept schema 1 / pipeline 2
+and schema 2 / pipeline 3. The latter preserves hierarchy, heading provenance and
+printed prices without treating a null scalar amount as missing when printed
+options exist. VIS-01 consumers still need to accept the new version before
+integration. The source-page/draft evidence shape is preserved; the new fields
+and schema version still require team review. No caller should silently discard them.
+
+Price validation excludes numbers inside dish names and does not replace supplied
+price text with a different source pair. It can retain a single printed pair when
+it supports the supplied scalar amount; multiple candidate pairs remain unresolved
+with a review warning. Flattened OCR still cannot establish every visual association.

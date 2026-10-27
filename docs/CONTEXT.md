@@ -13,17 +13,31 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3, preserving IDs, printed prices, hierarchy and code-point evidence with synthetic fixtures. This is an offline contract, not an accepted deployed review API. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/review-candidates.ts",
+        "packages/contracts/src/review-candidates.test.ts",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/source-spans.json",
+        "processing/tests/fixtures/review-candidates/README.md",
+        "processing/tests/fixtures/review-candidates/field-limits.json",
+        "processing/tests/fixtures/review-candidates/invalid-extraction.json",
+        "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
+        "processing/tests/fixtures/review-candidates/priced-candidate.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "a40245412d80ac95041c402aaa35367bcf13b53f620a81d2fe3d3787016914de"
     },
     {
       "id": "diner",
@@ -277,7 +291,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending. Optional staging FastAPI/Uvicorn service authenticates a trusted Worker, verifies tenant/job-derived private R2 sources and hashes, and runs the existing pipeline in a bounded subprocess. It has no database access, URL fetch path or publication ability; hosting/credentials and PR45 admission/deadline/report-adapter alignment remain pending. Expected CLI exit2 retains validated partial/failed reports instead of converting them to transport errors.",
+      "summary": "Bounded PDF/image acquisition validates OCR.space Engine3-compatible results and preserves sibling pages on failure. Pipeline3/schema2 retains hierarchy, heading provenance, printed options and final timings. Conservative source-preserving geometry and group-wide raw compatibility guard prices/dedup. RES-01.1 exports both version pairs with stable IDs, code-point evidence, partial failures and needs_review state. Provider/batch/concurrency defaults are unchanged. The existing optional FastAPI service authenticates the Worker, verifies tenant/job-derived R2 source hashes and runs a bounded subprocess, preserving valid CLI exit2 reports; no database, arbitrary URL or publication access. Hosting/credentials, PR45 admission/deadlines/report adapter, representative quality and PM acceptance remain pending.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -314,14 +328,37 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
         "processing/Dockerfile",
-        "processing/.dockerignore"
+        "processing/.dockerignore",
+        "processing/src/peekaplate_processing/menu_context.py",
+        "processing/src/peekaplate_processing/menu_layout.py",
+        "processing/src/peekaplate_processing/review_candidates.py",
+        "processing/src/peekaplate_processing/timing.py",
+        "processing/tests/test_menu_context.py",
+        "processing/tests/test_menu_layout.py",
+        "processing/tests/test_menu_duplicates.py",
+        "processing/tests/test_pipeline_timing.py",
+        "processing/tests/test_review_candidates.py",
+        "docs/processing-v3.md",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/review-candidates/README.md",
+        "processing/tests/fixtures/review-candidates/field-limits.json",
+        "processing/tests/fixtures/review-candidates/invalid-extraction.json",
+        "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
+        "processing/tests/fixtures/review-candidates/priced-candidate.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
-      "dependsOn": [],
-      "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
+      "dependsOn": [
+        "contracts"
+      ],
+      "sourceFingerprint": "de1c7361eabf5bb5768fe8adf528f18466fa505997d6eafcdc81776dce3456c9"
     }
   ],
   "handoffs": [
@@ -333,6 +370,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
+    },
+    {
+      "summary": "Prepared the VIS-02 pipeline3 and RES-01.1 producer/export follow-up additively on current develop. Retained conservative OCR-entry price grounding, duplicate conflict guards, printed options, explicit category provenance, final timing sidecars and paired-version review exports. Shared synthetic fixtures cover three candidates plus partial/invalid cases and Unicode evidence. Newer retrieval, analytics, preview and operational histories are preserved; no provider tuning, service, persistence, source menus or private benchmark artifacts are included.",
+      "modules": [
+        "processing",
+        "contracts"
+      ],
+      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Raw rejected-suggestion retention and image-only evidence remain unagreed."
     },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
@@ -398,13 +443,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
-    },
-    {
-      "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
-      "modules": [
-        "analytics"
-      ],
-      "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
     }
   ]
 }

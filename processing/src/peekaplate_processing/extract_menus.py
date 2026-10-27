@@ -3,6 +3,7 @@ import argparse
 import base64
 import hashlib
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -32,10 +33,11 @@ def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-
             result.segments = extract_pdf(data, source_id, ocr)
 
         else:
+            started=time.perf_counter()
             try:
                 result.segments = [extract_image(data, source_id, ocr)]
             except ExtractionError as error:
-                result.segments = [SourceSegment(segment_id=f"{source_id}#image-1", page_number=1, method="ocr_space_engine3", status="failed", error=str(error))]
+                result.segments = [SourceSegment(segment_id=f"{source_id}#image-1", page_number=1, method="ocr_space_engine3", status="failed", error=str(error), metadata={"timings_seconds":{"total":round(time.perf_counter()-started, 6)}})]
 
         for index, segment in enumerate(result.segments, start=1):
             segment.page_number = segment.page_number or index

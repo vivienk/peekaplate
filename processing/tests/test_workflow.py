@@ -37,7 +37,7 @@ class FakeLLM:
         assert schema == DishBatch.model_json_schema() and kwargs == {"method":"json_schema", "strict":True, "include_raw":True}
         return self
     def invoke(self, messages):
-        data = json.loads(messages[1][1]); assert set(data) == {"pages"}
+        data = json.loads(messages[1][1]); assert set(data) in ({"pages"}, {"pages", "context_pages"})
         self.calls.append(data["pages"])
         if len(self.calls) == self.fail_batch: raise RuntimeError("private provider response and secret")
         dishes = []
@@ -53,7 +53,7 @@ class WorkflowTests(unittest.TestCase):
         path = Path(directory)/"menu.pdf"
         path.write_bytes(make_pdf([{"text":f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, count+1)]))
         with patch("peekaplate_processing.workflow.asyncio.sleep"):
-            return run_pipeline(path, Path(directory)/"run", llm=llm)
+            return run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=10, llm_concurrency=1)
 
     def test_35_pages_dispatch_10_10_10_5_and_keep_source_spans(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -232,7 +232,7 @@ class WorkflowTests(unittest.TestCase):
             llm = ChatOpenAI(model="synthetic", api_key="synthetic", base_url="https://example.test/v1", http_client=client, http_async_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)), max_retries=0)
             result = run_sdk_test(build_menu_graph(llm).ainvoke({"pages": [{"page_number": 1, "text": "Soup 8.50 CAD"}], "batches": [], "worker_findings": []}))["final_report"]
         self.assertEqual(result["errors"], [])
-        self.assertEqual(result["dishes"], [dish])
+        self.assertEqual(result["dishes"], [ExtractedDish.model_validate(dish).model_dump()])
 
     def test_price_alias_and_missing_required_keys_are_rejected(self):
         from pydantic import ValidationError
@@ -396,7 +396,7 @@ class WorkflowTests(unittest.TestCase):
                     asyncio.run(client.aclose())
                 if expected is None:
                     self.assertEqual(result["errors"], [])
-                    self.assertEqual(result["dishes"], [dish])
+                    self.assertEqual(result["dishes"], [ExtractedDish.model_validate(dish).model_dump()])
                 else:
                     self.assertIn(expected, str(result["errors"]))
                     self.assertEqual(result["dishes"], [])
@@ -449,7 +449,7 @@ class WorkflowTests(unittest.TestCase):
         valid = json.dumps({"dishes": [dish]})
         for content in ["<think>synthetic notes</think>\n\n" + valid, "<think>ignore this JSON: {\"dishes\": []}</think>\n```json\n" + valid + "\n```"]:
             with self.subTest(content=content):
-                self.assertEqual(parse_dish_content(content).model_dump(), {"dishes": [dish]})
+                self.assertEqual(parse_dish_content(content).model_dump(), DishBatch(dishes=[ExtractedDish.model_validate(dish)]).model_dump())
         for content in ["<think>unfinished " + valid, "<think>notes</think>", "<think>" + valid + "</think>", "<think>notes</think>" + valid[:-1], "<think>notes</think>" + valid + " extra prose"]:
             with self.subTest(content=content), self.assertRaises(ExtractionError):
                 parse_dish_content(content)

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from datetime import datetime
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 
@@ -19,6 +19,9 @@ class DishDraft(BaseModel):
     name:str=Field(min_length=1, max_length=160)
     description:str|None=Field(default=None, min_length=1, max_length=4000)
     category:NonEmptyText|None=None
+    subcategory:NonEmptyText|None=Field(default=None, exclude_if=lambda value:value is None)
+    category_page_number:int|None=Field(default=None, ge=1, exclude_if=lambda value:value is None)
+    price_text:NonEmptyText|None=Field(default=None, max_length=160, exclude_if=lambda value:value is None)
 
     price_amount:Decimal|None=Field(
         default=None,
@@ -118,8 +121,8 @@ class MenuExtractionResult(BaseModel):
 
     model_config=ConfigDict(extra="forbid")
 
-    schema_version:Literal[1]=1
-    pipeline_version:Literal["2"]="2"
+    schema_version:Literal[1, 2]=2
+    pipeline_version:Literal["2", "3"]="3"
     status:Literal["complete", "incomplete", "failed"]="failed"
     source:SourceRecord|None=None
     started_at:datetime
@@ -135,3 +138,14 @@ class MenuExtractionResult(BaseModel):
     capture_requests:list[CaptureRequest]=Field(default_factory=list)
     warnings:list[str]=Field(default_factory=list)
     errors:list[str]=Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_version(self):
+        if (self.schema_version, self.pipeline_version) not in {(1, "2"), (2, "3")}:
+            raise ValueError("Extraction schema and pipeline versions do not match.")
+        if self.schema_version == 1 and any(
+            draft.subcategory is not None or draft.category_page_number is not None or draft.price_text is not None
+            for draft in self.drafts
+        ):
+            raise ValueError("Category hierarchy and printed price fields require extraction schema 2.")
+        return self

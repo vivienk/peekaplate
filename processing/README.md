@@ -30,17 +30,46 @@ under `work/` remain outside Git.
    LangGraph `Send` dispatches batches. The CLI defaults to one request at a time;
    `--llm-concurrency 2` allows two overlapping calls, with dispatches spaced
    at least 3.1 seconds apart.
-5. **Synthesizer:** combine worker results in page order using Python. No LLM call.
+5. **Synthesizer:** combine worker results in page order using Python. Carry an
+   explicit category into a supported continuation page and retain the heading's
+   source page. Missing/failed pages, unclear continuation and mixed main sections
+   clear this context. No additional LLM call.
 
-The LLM sees only `{"pages": [{"page_number": 1, "text": "..."}]}` plus its schema
-and extraction instructions. The prompt includes the exact generated JSON schema
+The LLM sees target `pages`, plus up to 3,000 characters of previous-page
+`context_pages` when available, its schema and extraction instructions. Context
+pages cannot produce dishes. The prompt includes the exact generated JSON schema
 and a complete synthetic input/output example, showing separate `price_amount`
 and `price_currency` keys and required unknown fields set to null. This reinforces
 provider-side schema requests; local strict validation remains mandatory. It does not receive OCR overlays or source images.
-Names/prices/attributes are checked literally against their cited page. Original
+Names/attributes are matched against their cited page while tolerating wrapped
+OCR headings. Price evidence is limited to the associated entry; ambiguous entry
+boundaries and explicit calorie/portion units cannot support a numeric price. Original
 page text is attached by code as evidence, avoiding model-generated source quotes.
 This is page-level evidence, not proof of correct dish/price associations.
 Unknown facts stay null and every dish remains `needs_review`.
+
+New results use **schema 2 / pipeline 3**, with `subcategory`, `price_text` for
+printed price options and `category_page_number` for heading provenance. Never
+pick a single price or invent option labels for `345 / 545`. The final run timing
+breakdown is in `timings.json`; see [pipeline changes and timing](../docs/processing-v3.md).
+
+The RES-01.1 exporter supports both earlier **schema 1 / pipeline 2** and current
+**schema 2 / pipeline 3** reports. Preparing saved results for the review API/UI
+needs no provider calls:
+
+```sh
+uv run --frozen python -m peekaplate_processing.review_candidates \
+  --input work/my-run/extraction.json --output work/my-run/review-candidates.json
+```
+
+This keeps original dishes, stable IDs, source/page evidence, processing failures
+and warnings. It checks the handoff data; human review still decides correctness.
+See [the review handoff guide](../docs/review-candidates.md) for the flow, schema,
+synthetic examples and manual tests.
+
+The matching shared review schema preserves hierarchy, heading provenance and
+printed price options. VIS-01 and review API consumers still need explicit
+version-2 integration; mixed version pairs are rejected rather than relabeled.
 
 **LLM verification is yours to add.** No verification/review agent is included.
 Add your verification node after `synthesizer` in `workflow.py` when ready.
@@ -156,9 +185,10 @@ uv run --frozen python -m peekaplate_processing.run_pipeline \
   --llm-timeout 90
 ```
 
-For the approved smaller-batch trial, add `--batch-pages 2` and choose a fresh
-run directory. A 35-page document produces up to 18 sequential requests
+For an explicitly selected smaller-batch trial, add `--batch-pages 2` and choose
+a fresh run directory. A 35-page document then produces up to 18 requests
 (17 pairs and one final page), compared with four at the default size of ten.
+Add `--llm-concurrency 2` only when two overlapping calls are intended.
 This reduces work per request but may increase total calls and pacing overhead;
 live performance must be measured. Deadlines, strict validation and page-level
 evidence are unchanged. Invalid batch sizes are rejected before acquisition.

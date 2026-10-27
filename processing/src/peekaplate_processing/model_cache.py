@@ -16,7 +16,7 @@ def cache_path(directory, llm, source_sha256, pages, prompt, schema):
         "max_tokens", "temperature", "top_p", "seed", "reasoning_effort",
         "reasoning", "extra_body", "model_kwargs",
     )}
-    identity = {"version": 1, "source_sha256": source_sha256, "model": model,
+    identity = {"version": 2, "source_sha256": source_sha256, "model": model,
                 "endpoint": str(endpoint), "settings": settings, "pages": pages,
                 "prompt": prompt, "schema": schema}
     digest = hashlib.sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
@@ -32,15 +32,15 @@ def read_candidates(path):
         if len(data) > 2_000_000:
             raise ValueError
         record = json.loads(data)
-        if set(record) != {"cache_key", "dishes"} or record["cache_key"] != path.stem:
+        if set(record) != {"cache_key", "dishes", "sections"} or record["cache_key"] != path.stem:
             raise ValueError
-        return {"dishes": record["dishes"]}
+        return {"dishes": record["dishes"], "sections":record["sections"]}
     except (OSError, ValueError, TypeError, RecursionError):
         raise ExtractionError("Model candidate cache is invalid; remove that entry or use --no-llm-cache.") from None
 
 
-def write_candidates(path, dishes):
+def write_candidates(path, dishes, sections=None):
     if path is None:
         return
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    save_json({"cache_key": path.stem, "dishes": dishes}, path)
+    save_json({"cache_key": path.stem, "dishes": dishes, "sections":sections or []}, path)

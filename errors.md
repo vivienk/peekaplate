@@ -581,3 +581,25 @@ IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:21:00.026Z","exitCode":1}
 ```
+
+## VIS-02 / RES-01.1 follow-up prevention records
+
+These records summarize development regressions imported with the producer/export
+follow-up. Historical private runs and their source data are not published here;
+the PR records verification of the reconciled canonical tree separately.
+
+```json
+{"id":"OBS-VIS02-PRODUCER-GROUNDING-001","status":"resolved","area":"processing-grounding","observation":"Failing synthetic regressions reproduced cross-entry scalar/slash price borrowing, truncated options, calorie values treated as prices, numeric dish names used as prices, conflicting section inheritance and destructive duplicate collapse through unknown values.","correction":"Preserve source text and complete printed options; use bounded entry text or unique source-supported OCR geometry, exclude all heading/name spans and abstain on competing entries. Require exactly one source occurrence independently of price-eligible heading parsing, retain genuine unpriced repeats and require group-wide compatibility of raw non-null fields before deduplication.","regression":"test_menu_context.py, test_menu_layout.py, test_menu_duplicates.py and the pipeline-to-export geometry case cover the imported fail-first reproductions, including joined title/description boxes, explicit image-alt caption proof and three-way null bridges. These tests are not whole-menu accuracy acceptance.","sources":["processing/src/peekaplate_processing/menu_context.py","processing/src/peekaplate_processing/menu_layout.py","processing/src/peekaplate_processing/workflow.py","processing/tests/test_menu_context.py","processing/tests/test_menu_layout.py","processing/tests/test_menu_duplicates.py","processing/tests/test_pipeline_timing.py"]}
+```
+
+```json
+{"id":"OBS-RES01-EXPORT-CONTRACT-001","status":"resolved","area":"review-candidate-contract","observation":"Development regressions exposed mixed schema/pipeline versions, populated hierarchy fields under the old version, invalid heading-page references, blank provenance references and timezone-free dates accepted by only one implementation.","correction":"Support only paired schema1/pipeline2 and schema2/pipeline3; preserve original IDs and fields, exact ordered code-point spans, known zero, printed options and partial failures. Require ready/error-free nonblank heading pages and reject invalid joins/snapshots before writing a new export.","regression":"Shared labeled synthetic v1/v2 fixtures and Python/TypeScript negative cases cover preservation, version rejection, missing/failed/skipped/error-bearing heading pages, Unicode offsets, invalid extraction and create-only export. Live adapter/save/reload and human acceptance remain separate.","sources":["processing/src/peekaplate_processing/review_candidates.py","processing/tests/test_review_candidates.py","packages/contracts/src/review-candidates.ts","packages/contracts/src/review-candidates.test.ts","processing/tests/fixtures/review-candidates/README.md"]}
+```
+
+```json
+{"id":"OBS-VIS02-PR-DEFAULTS-001","status":"resolved","area":"processing-scope","observation":"During canonical reconciliation, three intentional fail-first assertions caught private experiment defaults and provider-specific reasoning tuning entering the candidate import: API/CLI batch settings were2/2 instead of develop's10/1 and the model effort waslow instead of unspecified.","correction":"Exclude the experimental provider tuning and preserve canonical API/CLI defaults and help. Retain smaller-batch/concurrency flags as explicit opt-ins and passive timing/no-cache controls without changing the default provider behavior.","regression":"Socket-blocked test_pipeline_timing.py failed in these three tests before reconciliation and passed all9 tests afterward with zero network attempts. API signature, CLI kwargs and configured model settings are asserted directly.","sources":["processing/src/peekaplate_processing/run_pipeline.py","processing/tests/test_pipeline_timing.py","processing/README.md","docs/processing-v3.md"]}
+```
+
+```json
+{"id":"OBS-VIS02-PR-PNPM-LAUNCHER-001","status":"resolved","area":"local-check-launcher","observation":"The temporary pnpm link pointed to a cached non-executable JavaScript entry, so dependency installation and context refresh could not launch; no project check had run through that launcher.","correction":"Use an external executable wrapper that invokes the existing pinned pnpm entry through pinned Node. No repository dependency, lockfile or executable permission was changed.","regression":"The corrected launcher reports pnpm11.25.0, resolves the existing lockfile from cache and successfully runs context:refresh. Final project gates are recorded independently in the PR.","sources":["package.json","scripts/context.mjs"]}
+```

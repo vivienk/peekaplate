@@ -18,11 +18,25 @@ or page citations reject the dish; unsupported optional fields become null with
 review warnings. Candidate-cache hits are revalidated. All dishes remain
 `needs_review`; the separate LLM verification node is pending.
 
+The follow-up [pipeline 3 contract](processing-v3.md) adds category/subcategory,
+heading-page provenance, printed price options, conservative local OCR-geometry
+association and a final `timings.json` sidecar. New output is schema 2 / pipeline 3;
+saved schema 1 / pipeline 2 remains readable. The [RES-01.1 exporter and shared
+review schema](review-candidates.md) preserve both version pairs, source evidence,
+original candidate IDs, null/zero distinctions and partial failures. This is an
+offline producer/consumer foundation, not an accepted deployed handoff.
+
+Application defaults remain ten pages per batch and one simultaneous call;
+provider/model/reasoning settings are unchanged. Smaller batches/concurrency two
+remain explicit options. Neither geometry nor a complete processing status proves
+facts correct, and no image-input production switch is included.
+
 `python -m peekaplate_processing.extract_menus` acquires page text without LLM
 calls. `python -m peekaplate_processing.run_pipeline` performs extraction.
-The focused suite has 89 fixture/mocked-provider tests; the
-source handoff passed them locally. CI runs the frozen dependencies, tests and
-wheel/sdist build. Check the PR for exact commands and current execution results.
+The merged foundation's handoff recorded 89 fixture/mocked-provider tests.
+Follow-up regressions cover context/geometry, duplicate safety and review-export
+contracts. CI runs frozen dependencies, the complete suite and wheel/sdist build.
+Check the PR for exact final-tree commands and current execution results.
 
 ## Integration review requested
 
@@ -87,7 +101,8 @@ Cache behavior is tested on every platform; only POSIX systems assert mode
 cancellation test waits for its mocked transport to start before cancellation;
 the separate wall-clock deadline and partial-batch tests remain in place.
 
-These corrections and the interface refactor update the existing PR #24.
+These corrections and the interface refactor were included in merged PR #24;
+the pipeline 3 and RES-01.1 work above is a separate follow-up.
 
 ## Fresh live PDF test — 23 October 2026
 
@@ -130,6 +145,7 @@ results and errors to Uneeza; obtain Sai's independent validation and Vivien's
 PM acceptance. A naturally mixed native/scanned menu is still to be verified.
 Existing deterministic tests exercise native, image-only and fallback routing.
 
-Performance profiling/refinements and further live retries remain deferred.
-This PR is for implementation and integration review;
-its test count does not satisfy the task's quality acceptance criteria.
+The follow-up records passive timings without changing provider/default tuning.
+Further live retries and the representative evaluation matrix remain separate.
+Implementation and integration review, including the shared schema handoff, do not
+satisfy the task's quality acceptance criteria or PM sign-off.
