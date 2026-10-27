@@ -227,3 +227,12 @@ uv run --frozen python -m unittest discover -s tests
 The inherited schema remains a Python draft contract; final TypeScript/backend
 integration and the ClickUp ground-truth evaluation are still separate work.
 Menu imagery is text evidence, not approved photographs of plated dishes.
+
+## Ingredient intelligence (AI-02)
+
+Pipeline runs also save `ingredient-review.json`, a separately versioned,
+review-only sidecar. Exact ingredient rules retain original text, source spans,
+unknowns and mandatory owner confirmation. This does not approve or publish a
+menu. Existing extractions can be analyzed offline without another model call;
+see [the AI-02 guide](../docs/ingredient-intelligence.md) for the command,
+contract, limitations and remaining RES-01 integration.

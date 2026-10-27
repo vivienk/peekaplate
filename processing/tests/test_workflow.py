@@ -63,6 +63,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(len(report.drafts), 35)
             self.assertTrue((Path(directory)/"run/pages.json").exists())
             self.assertFalse((Path(directory)/"run/review.json").exists())
+            from peekaplate_processing.ingredient_intelligence import IngredientReviewHandoff
+            handoff = IngredientReviewHandoff.model_validate_json((Path(directory)/"run/ingredient-review.json").read_text())
+            self.assertEqual(len(handoff.assessments), 35)
+            self.assertTrue(all(a.status == "unknown" and not a.publishable for a in handoff.assessments))
+            self.assertEqual([a.draft_id for a in handoff.assessments], [e.draft_id for e in report.evidence])
             for index, evidence in enumerate(report.evidence):
                 span = evidence.spans[0]; segment = report.segments[index]
                 self.assertEqual(segment.segment_id, span.segment_id)

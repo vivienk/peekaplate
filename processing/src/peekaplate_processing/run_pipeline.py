@@ -20,6 +20,7 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult
 from peekaplate_processing.storage import save_json
+from peekaplate_processing.ingredient_intelligence import build_review_handoff
 from peekaplate_processing.workflow import run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 
@@ -133,6 +134,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     report.finished_at = datetime.now(timezone.utc)
     report.warnings.append("LLM verification is not implemented; all dishes remain needs_review.")
     save_json(report.model_dump(mode="json"), directory / "extraction.json")
+    save_json(build_review_handoff(report).model_dump(mode="json"), directory / "ingredient-review.json")
     return report
 
 
