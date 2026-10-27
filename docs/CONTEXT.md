@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. Staging configuration adds OBSERVATION_QUEUE and OBSERVATION_ARCHIVE_BUCKET; live activation awaits reviewed main deployment. Provides S3-VIS-04 bounded menu evidence retrieval and S3-VIS-01 menu ingestion orchestration layer: Python extraction result adapter supporting schema 1/2 and pipeline 2/3 with subcategory, category_page_number, price_text, and multi-span evidence reconstruction; transactional persistence repository with producer draft_index preservation and valid retry state transitions; report storage retention via result_storage_key; typed HTTP extraction transport; Cloudflare Queue bindings and consumer handler; staff review and draft approval endpoints. Live queue consumer provisioning and container Python RPC service remain staging dependencies.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and GitHub collaboration for bounded analytics. Observation and menu Queue/bucket bindings declared for staging; live queues remain paused. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion layer provides: schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and multi-span evidence; transactional persistence preserving draft_index; report storage retention via result_storage_key; typed HTTP extraction transport with 600s timeout; Queue consumer handler and approval endpoints. Staging-only authenticated extraction host prepared for container source relay with 15-minute signed capability; hosted service activation remains pending. Source intake validates 64-hex hash and derives R2 storage keys; URL/text inputs rejected until reviewed materialization.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -79,6 +79,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/extraction-capability.ts",
+        "backend/src/extraction-host.test.ts",
+        "backend/src/extraction-host.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
         "backend/src/ingestion/adapter.test.ts",
@@ -107,7 +110,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
-        "backend/wrangler.jsonc"
+        "backend/wrangler.extraction.jsonc",
+        "backend/wrangler.jsonc",
+        "docs/menu-ingestion-infrastructure.md",
+        "scripts/menu-ingestion-infra.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -119,7 +125,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "824628f7b02dc8f0823b779ca3227307574e08b09afe01cb14ec1f25dddae8d9"
+      "sourceFingerprint": "86ba0e68e7fac9399921d9025aecac087f923528ea8688959d8cf2fbe9db0c64"
     },
     {
       "id": "database",
@@ -207,7 +213,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         ".github/workflows/deploy-preview.yml",
         "docs/previews.md",
         "scripts/preview.mjs",
-        "scripts/preview.test.mjs"
+        "scripts/preview.test.mjs",
+        "docs/menu-ingestion-infrastructure.md",
+        "scripts/menu-ingestion-infra.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -218,7 +226,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6fd3f20a6d1ebc5428942487183593bdaaa7ab7c35d8b20dd9559add0f5fa997"
+      "sourceFingerprint": "9c1804bdbaae73df04a628a3ab6c590a2fe8753f9c264f3a9cb1d77050f087e9"
     },
     {
       "id": "agents",
@@ -280,7 +288,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending.",
+      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending. Optional staging FastAPI/Uvicorn service authenticates a trusted Worker, verifies tenant/job-derived private R2 sources and hashes, and runs the existing pipeline in a bounded subprocess. It has no database access, URL fetch path or publication ability; hosting/credentials and PR45 admission/deadline/report-adapter alignment remain pending. Expected CLI exit2 retains validated partial/failed reports instead of converting them to transport errors.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -313,17 +321,39 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/processing-handoff.test.mjs",
         "processing/src/peekaplate_processing/ocr.py",
         "processing/tests/test_ocr_provider.py",
-        "test-data/README.md"
+        "test-data/README.md",
+        "processing/src/peekaplate_processing/service.py",
+        "processing/tests/test_service.py",
+        "processing/Dockerfile",
+        "processing/.dockerignore"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "929fb3bbb31657ffe307c3d5040770955f5ecd7d488af3f0ea329ed0bb05f119"
+      "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
     }
   ],
   "handoffs": [
+    {
+      "summary": "Completed S3-VIS-01 menu ingestion orchestration and cross-component integration (PR #45): supported VIS-02 schema 2/pipeline 3 alongside legacy schema 1/pipeline 2; preserved subcategory, category_page_number, price_text, candidate_id, draft_index, and multi-span evidence through contracts, adapter, repository, and reload; retained full extraction report via result_storage_key and connected INGESTION_REPORTS_BUCKET; aligned budgets with 600s transport timeout, 15m lease timeout, and max_batch_size: 1 queue retry; enforced 64-hex sourceHash and tenant/job R2 key derivation while rejecting unmaterialized URL/text inputs at submission boundary. All 99 contract, unit, and queue consumer tests pass.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Verify staging database migration application, deploy the reviewed extraction container once Workers Paid container eligibility is active, unpause the staging queue consumer, and perform live end-to-end extraction verification."
+    },
+    {
+      "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
+    },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
       "modules": [
@@ -387,23 +417,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "analytics"
       ],
       "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
-    },
-    {
-      "summary": "Provisioned missing staging observation Queue f4979c52a09a4c40ad55e46d32b0ff93 and DLQ 45eda79d781d47fe8bca7bb6f5d05bde, reused private staging-assets R2, configured paused HTTP pull consumers with 24-hour retention/three source retries. R2 conditional race passed; complete synthetic archive-before-ACK and retry-to-DLQ repeat passed at 2026-10-24T17:30:36.147Z. Cleaned only probe objects/messages; both Queues empty/paused. Added staging producer/R2 config and handoff docs; no unfinished consumer, DB or production change.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
-    },
-    {
-      "summary": "Completed S3-VIS-01 menu ingestion integration (PR #45): supported VIS-02 schema 2/pipeline 3 alongside legacy schema 1/pipeline 2; preserved subcategory, category_page_number, price_text, candidate_id, draft_index, and multi-span evidence through contracts, adapter, repository, and reload. Closed Mohammad's findings: retained full extraction report via result_storage_key (Finding A), preserved producer draft_index across persistence/superseding (Finding B), and resolved retry failure status/finished_at CHECK constraint violation (Finding C). Added HTTP extraction transport and Cloudflare Queue bindings. All 23 menu_ingestion pgTAP assertions, 207 contract/unit tests, and DB integration tests passed.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Coordinate staging queue infrastructure provisioning (peekaplate-staging-menu-ingestion and DLQ), Python extraction RPC service deployment and credentials, and staging database migration application before live end-to-end verification."
     }
   ]
 }

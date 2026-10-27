@@ -46,15 +46,6 @@
             "binding": "INGESTION_QUEUE",
             "queue": "peekaplate-staging-menu-ingestion"
           }
-        ],
-        "consumers": [
-          {
-            "queue": "peekaplate-staging-menu-ingestion",
-            "max_batch_size": 1,
-            "max_batch_timeout": 30,
-            "max_retries": 3,
-            "dead_letter_queue": "peekaplate-staging-menu-ingestion-dlq"
-          }
         ]
       }
     }
