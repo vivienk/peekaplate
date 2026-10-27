@@ -17,6 +17,13 @@ function createMockClient() {
   const client: DatabaseClient = {
     async query<R>(text: string, values?: unknown[]): Promise<{ rows: R[]; rowCount: number }> {
       if (text.includes('INSERT INTO app_private.menu_ingestion_jobs')) {
+        if (
+          store.job &&
+          store.job.tenant_id === values![1] &&
+          store.job.idempotency_key === values![6]
+        ) {
+          return { rows: [store.job as unknown as R], rowCount: 1 };
+        }
         const job: MenuIngestionJobRow = {
           id: values![0] as string,
           tenant_id: values![1] as string,

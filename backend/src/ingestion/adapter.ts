@@ -121,14 +121,20 @@ export function adaptPythonExtractionResult(
     const draftErrors: string[] = [];
     const targetIndex = draft.draft_index ?? i;
 
-    // Locate matching evidence
-    const evidence = extraction.evidence.find(
-      (e) =>
-        e.draft_index === targetIndex ||
-        (draft.draft_id !== undefined && e.draft_id === draft.draft_id) ||
-        (draft.candidate_id !== undefined && e.draft_id === draft.candidate_id) ||
-        (e.draft_id && e.draft_id.includes(draft.name)),
-    );
+    // Locate matching evidence in explicit priority order:
+    // 1. Exact draft_id match
+    // 2. Exact candidate_id match
+    // 3. Exact targetIndex (draft_index) match
+    // 4. Fallback name-based heuristic match
+    const evidence =
+      (draft.draft_id !== undefined
+        ? extraction.evidence.find((e) => e.draft_id === draft.draft_id)
+        : undefined) ??
+      (draft.candidate_id !== undefined
+        ? extraction.evidence.find((e) => e.draft_id === draft.candidate_id)
+        : undefined) ??
+      extraction.evidence.find((e) => e.draft_index === targetIndex) ??
+      extraction.evidence.find((e) => e.draft_id && e.draft_id.includes(draft.name));
 
     if (!evidence || evidence.spans.length === 0) {
       invalidDrafts.push({

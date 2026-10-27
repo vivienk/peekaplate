@@ -395,6 +395,83 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       expect(adapted.drafts[1]?.draft_index).toBe(2); // Non-contiguous index preserved!
       expect(adapted.drafts[1]?.name).toBe('Enchilada');
     });
+
+    it('prioritizes exact draft_id match over earlier index match when index collision occurs', () => {
+      // Scenario requested in Raghav finding / Task B:
+      // Draft has draft_id "draft:salmon".
+      // Earlier evidence entry has draft_index 0, but belongs to draft "draft:soup".
+      // Later evidence entry has draft_id "draft:salmon" (with matching spans for salmon).
+      // The adapter MUST match the later exact draft_id rather than erroneously grabbing the earlier index-0 match.
+      const payload: any = {
+        schema_version: 2,
+        pipeline_version: '3',
+        status: 'complete',
+        started_at: '2026-10-27T12:00:00.000Z',
+        finished_at: '2026-10-27T12:00:01.000Z',
+        extraction_mode: 'ai',
+        segments: [
+          {
+            segment_id: 'seg_1',
+            page_number: 1,
+            method: 'pdf_native',
+            status: 'ready',
+            text: 'Daily Soup $6.00\nGrilled Salmon $22.00',
+            warnings: [],
+            metadata: {},
+          },
+        ],
+        drafts: [
+          {
+            candidate_id: 'cand_salmon',
+            draft_id: 'draft:salmon',
+            draft_index: 0, // Note: draft says draft_index: 0
+            name: 'Grilled Salmon',
+            price_amount: '22.00',
+            price_currency: 'USD',
+            source_id: 'src_1',
+            source_text: 'Grilled Salmon $22.00',
+            status: 'needs_review',
+            review_warnings: [],
+          },
+        ],
+        evidence: [
+          // Earlier evidence entry: matches index 0, BUT belongs to a different draft ("draft:soup") with soup spans
+          {
+            draft_id: 'draft:soup',
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_1', start: 0, end: 17 }], // "Daily Soup $6.00"
+          },
+          // Later evidence entry: exact match for "draft:salmon" with salmon spans
+          {
+            draft_id: 'draft:salmon',
+            draft_index: 1,
+            spans: [{ segment_id: 'seg_1', start: 17, end: 38 }], // "Grilled Salmon $22.00"
+          },
+        ],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      };
+
+      const adapted = adaptPythonExtractionResult(payload);
+      expect(adapted.success).toBe(true);
+      if (!adapted.success) return;
+
+      expect(adapted.drafts).toHaveLength(1);
+      const draft = adapted.drafts[0]!;
+      expect(draft.name).toBe('Grilled Salmon');
+      expect(draft.draft_id).toBe('draft:salmon');
+      expect(draft.source_text).toBe('Grilled Salmon $22.00');
+
+      // Crucial assertion: Selected evidence must be the salmon spans [17, 38], NOT the soup spans [0, 17]!
+      expect(draft.code_point_spans).toEqual([
+        {
+          segment_id: 'seg_1',
+          start: 17,
+          end: 38,
+        },
+      ]);
+    });
   });
 
   describe('Priority P0: Extraction Transport Semantics & Timeout Hardening', () => {

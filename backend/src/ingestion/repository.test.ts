@@ -9,6 +9,7 @@ import {
   getIngestionJob,
   IngestionError,
   listDishDrafts,
+  type MenuIngestionJobRow,
   persistExtractedDrafts,
   renewJobLease,
 } from './repository';
@@ -57,6 +58,8 @@ describe('Ingestion Repository', () => {
             tenant_id: values![1],
             source_type: values![2],
             source_url: values![3],
+            source_hash: values![4],
+            source_storage_key: values![5],
             idempotency_key: values![6],
             status: 'queued',
           },
@@ -76,6 +79,125 @@ describe('Ingestion Repository', () => {
     expect(job.id).toBe(jobId);
     expect(job.tenant_id).toBe(tenantId);
     expect(job.status).toBe('queued');
+  });
+
+  it('createIngestionJob returns existing job when called with identical idempotency key and identical source', async () => {
+    const mock = createMockClient();
+    const existingJob: MenuIngestionJobRow = {
+      id: jobId,
+      tenant_id: tenantId,
+      source_type: 'pdf',
+      source_url: null,
+      source_hash: 'a'.repeat(64),
+      source_storage_key: `menu-ingestion/sources/${tenantId}/${jobId}/source`,
+      result_storage_key: null,
+      idempotency_key: 'idem_same_source',
+      status: 'queued',
+      attempt_count: 0,
+      max_attempts: 3,
+      claim_token: null,
+      lease_generation: '0',
+      locked_at: null,
+      locked_by: null,
+      error_code: null,
+      error_details: null,
+      draft_count: 0,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      finished_at: null,
+    };
+
+    mock.setHandler((text) => {
+      expect(text).toContain('ON CONFLICT (tenant_id, idempotency_key)');
+      return { rows: [existingJob], rowCount: 1 };
+    });
+
+    const result = await createIngestionJob(mock.client, {
+      id: crypto.randomUUID(), // New job ID attempt
+      tenantId,
+      sourceType: 'pdf',
+      sourceHash: 'a'.repeat(64),
+      sourceStorageKey: `menu-ingestion/sources/${tenantId}/${jobId}/source`,
+      idempotencyKey: 'idem_same_source',
+    });
+
+    expect(result.id).toBe(jobId); // Returns the original job row
+    expect(result.source_hash).toBe('a'.repeat(64));
+    expect(result.idempotency_key).toBe('idem_same_source');
+  });
+
+  it('createIngestionJob rejects with 409 idempotency_conflict when idempotency key collides with conflicting source fields', async () => {
+    const mock = createMockClient();
+    const existingJob: MenuIngestionJobRow = {
+      id: jobId,
+      tenant_id: tenantId,
+      source_type: 'pdf',
+      source_url: null,
+      source_hash: 'a'.repeat(64),
+      source_storage_key: `menu-ingestion/sources/${tenantId}/${jobId}/source`,
+      result_storage_key: null,
+      idempotency_key: 'idem_conflict_source',
+      status: 'queued',
+      attempt_count: 0,
+      max_attempts: 3,
+      claim_token: null,
+      lease_generation: '0',
+      locked_at: null,
+      locked_by: null,
+      error_code: null,
+      error_details: null,
+      draft_count: 0,
+      created_at: new Date().toISOString(),
+      started_at: null,
+      finished_at: null,
+    };
+
+    mock.setHandler(() => ({ rows: [existingJob], rowCount: 1 }));
+
+    // Attempt 1: Differing source hash
+    await expect(
+      createIngestionJob(mock.client, {
+        id: crypto.randomUUID(),
+        tenantId,
+        sourceType: 'pdf',
+        sourceHash: 'b'.repeat(64), // CONFLICTING HASH!
+        sourceStorageKey: `menu-ingestion/sources/${tenantId}/${jobId}/source`,
+        idempotencyKey: 'idem_conflict_source',
+      }),
+    ).rejects.toMatchObject({
+      code: 'idempotency_conflict',
+      status: 409,
+    });
+
+    // Attempt 2: Differing source type
+    await expect(
+      createIngestionJob(mock.client, {
+        id: crypto.randomUUID(),
+        tenantId,
+        sourceType: 'photo', // CONFLICTING SOURCE TYPE!
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: `menu-ingestion/sources/${tenantId}/${jobId}/source`,
+        idempotencyKey: 'idem_conflict_source',
+      }),
+    ).rejects.toMatchObject({
+      code: 'idempotency_conflict',
+      status: 409,
+    });
+
+    // Attempt 3: Differing source storage key
+    await expect(
+      createIngestionJob(mock.client, {
+        id: crypto.randomUUID(),
+        tenantId,
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        sourceStorageKey: `menu-ingestion/sources/${tenantId}/another-job/source`, // CONFLICTING STORAGE KEY!
+        idempotencyKey: 'idem_conflict_source',
+      }),
+    ).rejects.toMatchObject({
+      code: 'idempotency_conflict',
+      status: 409,
+    });
   });
 
   it('claimIngestionJob returns claim token and generation when claimable', async () => {

@@ -115,6 +115,27 @@ export async function createIngestionJob(
 
   const row = result.rows[0];
   if (!row) throw new IngestionError('job_creation_failed', 500);
+
+  // If a row was returned via ON CONFLICT DO UPDATE, verify source fields are identical
+  const sourceUrl = params.sourceUrl ?? null;
+  const sourceHash = params.sourceHash ?? null;
+  const sourceStorageKey = params.sourceStorageKey ?? null;
+
+  if (
+    row.source_type !== params.sourceType ||
+    (sourceHash !== null && row.source_hash !== null && row.source_hash !== sourceHash) ||
+    (sourceUrl !== null && row.source_url !== null && row.source_url !== sourceUrl) ||
+    (sourceStorageKey !== null &&
+      row.source_storage_key !== null &&
+      row.source_storage_key !== sourceStorageKey)
+  ) {
+    throw new IngestionError(
+      'idempotency_conflict',
+      409,
+      `Idempotency key "${params.idempotencyKey}" already exists for tenant "${params.tenantId}" with differing source parameters`,
+    );
+  }
+
   return row;
 }
 
