@@ -232,6 +232,12 @@ describe('design tokens', () => {
       '--pp-role-button-outline-pressed-bg': 'var(--pp-color-neutral-600)',
       '--pp-role-nav-icon-disabled': 'var(--pp-color-neutral-400)',
 
+      '--pp-role-chip-active-bg': 'var(--pp-color-neutral-50)',
+      '--pp-role-chip-active-text': 'var(--pp-color-neutral-800)',
+      '--pp-role-chip-inactive-text': 'var(--pp-color-neutral-50)',
+      '--pp-role-chip-inactive-border':
+        'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
+
       '--pp-role-input-bg': 'var(--pp-color-neutral-800)',
       '--pp-role-input-text': 'var(--pp-color-neutral-50)',
       '--pp-role-input-placeholder': 'var(--pp-color-neutral-400)',

@@ -1,0 +1,196 @@
+name: PR preview
+
+# Static diner and console previews for same-repository PRs. Previews use their own Pages
+# projects and a Pages-only token; they never touch staging, the Worker, the database or PostHog.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, closed]
+    branches: [develop, main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number whose preview deployments should be deleted
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+env:
+  DINER_PROJECT: peekaplate-diner-preview
+  CONSOLE_PROJECT: peekaplate-console-preview
+  WRANGLER_VERSION: 4.149.0
+  MARKER: '<!-- peekaplate-preview -->'
+
+jobs:
+  build:
+    # Fork and Dependabot PRs receive no Actions secrets, so they get CI only.
+    if: >-
+      github.event_name == 'pull_request_target' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      vars.PREVIEW_DEPLOYMENT_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.16.0
+      - run: pnpm install --frozen-lockfile
+      - name: Build both apps with analytics disabled
+        env:
+          VITE_POSTHOG_ENABLED: 'false'
+          VITE_POSTHOG_KEY: ''
+          VITE_POSTHOG_HOST: ''
+          VITE_POSTHOG_ENVIRONMENT: ''
+          VITE_POSTHOG_ALLOWED_ORIGIN: ''
+        run: |
+          pnpm --filter @peekaplate/diner build
+          pnpm --filter @peekaplate/console build
+          mkdir -p "$RUNNER_TEMP/preview"
+          cp -R frontend/diner/dist "$RUNNER_TEMP/preview/diner"
+          cp -R frontend/console/dist "$RUNNER_TEMP/preview/console"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: preview-dist
+          path: ${{ runner.temp }}/preview
+          retention-days: 3
+          if-no-files-found: error
+
+  deploy:
+    # Runs no PR code: it only uploads the built files, so the token is never exposed to the build.
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Only trusted base code is checked out on the credential-bearing runner.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.16.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: preview-dist
+          path: preview
+      - name: Install pinned upload tool without deployment credentials
+        run: npm install --prefix "$RUNNER_TEMP/preview-tools" --ignore-scripts --no-audit --no-fund wrangler@4.149.0
+      - name: Validate static artifacts
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/preview.mjs sanitize preview "$SHA"
+      - name: Deploy to the preview Pages projects
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node scripts/preview.mjs preflight
+          # Do not publish a closed or superseded head after waiting for the environment.
+          current=$(gh api "repos/$REPO/pulls/$PR")
+          test "$(echo "$current" | jq -r .state)" = open
+          test "$(echo "$current" | jq -r .head.sha)" = "$SHA"
+          for app in diner console; do
+            project="$DINER_PROJECT"
+            test "$app" = console && project="$CONSOLE_PROJECT"
+            # No repository config, functions or package hooks in the upload working directory.
+            (cd "$RUNNER_TEMP" && node "$RUNNER_TEMP/preview-tools/node_modules/wrangler/bin/wrangler.js" pages deploy "$GITHUB_WORKSPACE/preview/$app" \
+              --project-name "$project" --branch "pr-$PR" --commit-hash "$SHA" --commit-dirty=true)
+            url="https://pr-$PR.$project.pages.dev"
+            echo "${app}_url=$url" >> "$GITHUB_OUTPUT"
+          done
+          for attempt in 1 2 3 4 5 6; do
+            if node scripts/preview.mjs verify "$SHA"; then break; fi
+            test "$attempt" = 6 && { echo "Preview did not serve the requested commit"; exit 1; }
+            sleep 10
+          done
+      - name: Post or update the preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          DINER_URL: ${{ steps.deploy.outputs.diner_url }}
+          CONSOLE_URL: ${{ steps.deploy.outputs.console_url }}
+        run: |
+          body="$MARKER
+          ### Preview
+          | App | Link |
+          | --- | --- |
+          | Diner | $DINER_URL |
+          | Console | $CONSOLE_URL |
+
+          Built from \`${SHA:0:7}\`. Static pages only: no API, database or analytics. Deleted when this PR closes. See [preview guide](https://github.com/$REPO/blob/develop/docs/previews.md)."
+          echo "$body" >> "$GITHUB_STEP_SUMMARY"
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -f body="$body" > /dev/null
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+
+  cleanup:
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.user.login != 'dependabot[bot]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.16.0
+      - name: Delete this PR's preview deployments
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PREVIEW_API_TOKEN }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+        run: |
+          node scripts/preview.mjs cleanup
+      - name: Mark the preview comment as removed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+        run: |
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\"))) | .id" | head -n1)
+          test -n "$id" || exit 0
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" \
+            -f body="$MARKER
+          ### Preview
+          Removed after this PR closed." > /dev/null

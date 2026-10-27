@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. No Chip roles. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending.",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. Chip roles (active/inactive) added from Figma; hover/pressed pending. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,7 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "b160aaf44c3f59647d3061021c724356e03d07a881d591542b8f30211fbb70f2"
+      "sourceFingerprint": "993dd8e4549ac8597b4b16ec8d6e408e3bd67823188e6eee951c1829d494c284"
     },
     {
       "id": "diner",
@@ -62,7 +62,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a6c76455ed63d8619e3e5ae6e35c77b6abbda4d0940d8028804d23c0d98ba8b5"
+      "sourceFingerprint": "5bd2fc5c56032c8f68ea3179d768da5dd2c18f3cfc31ba20edbecf4ee929aa9e"
     },
     {
       "id": "console",
@@ -176,7 +176,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies staging and later production under ADR0012; protected manual deployment/independent review remain required. Last recorded Worker release afe45db and existing Pages/Hyperdrive are preserved. October 24 inventory found no Queues: missing staging source/DLQ created, 24-hour retention, paused HTTP pull consumers and three source retries. Reused private staging R2. Real conditional-write race and synthetic Queue-to-R2-before-ACK/retry-to-DLQ checks passed; both Queues empty and paused after cleanup. Binding configuration still needs reviewed main deployment. Teeyansh PR31/32 and production resources untouched; actual consumer/DB pipeline remains unverified.",
+      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -210,7 +210,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/delivery.md",
         "playwright.posthog.config.ts",
         "tests/e2e/posthog.spec.ts",
-        "docs/observation-infrastructure.md"
+        "docs/observation-infrastructure.md",
+        ".github/workflows/deploy-preview.yml",
+        "docs/previews.md",
+        "scripts/preview.mjs",
+        "scripts/preview.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -221,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a6b7acbb465ffd51390a48ec7cc40b6b158a57d0d75817d80f5c04c9a0acf6c7"
+      "sourceFingerprint": "6fd3f20a6d1ebc5428942487183593bdaaa7ab7c35d8b20dd9559add0f5fa997"
     },
     {
       "id": "agents",
@@ -328,13 +332,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-TOK-01 now ships the shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides; Design System text styles, corner-radius, spacing (0-80px including 48px), shadows and color palette; and semantic color roles using --pp-role-button-<variant>-<state>-<property>, including a nav hover icon role. Chip roles were removed pending Figma values. Surface-container is neutral-700 and needs a --pp-role-outline border; on-error and on-information use neutral-950 for WCAG AA contrast. A WCAG contrast test covers active foreground/background pairs; shells remain locally styled.",
+      "summary": "S3-TOK-01 now ships the shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides; Design System text styles, corner-radius, spacing (0-80px including 48px), shadows and color palette; and semantic color roles using --pp-role-button-<variant>-<state>-<property>, including a nav hover icon role and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a --pp-role-outline border; on-error and on-information use neutral-950 for WCAG AA contrast. A WCAG contrast test covers active foreground/background pairs; shells remain locally styled.",
       "modules": [
         "tokens",
         "diner",
         "console"
       ],
-      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; keep chip roles pending until Figma values arrive."
+      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma."
+    },
+    {
+      "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
+      "modules": [
+        "delivery"
+      ],
+      "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
     },
     {
       "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
@@ -400,14 +411,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "analytics"
       ],
       "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
-    },
-    {
-      "summary": "Provisioned missing staging observation Queue f4979c52a09a4c40ad55e46d32b0ff93 and DLQ 45eda79d781d47fe8bca7bb6f5d05bde, reused private staging-assets R2, configured paused HTTP pull consumers with 24-hour retention/three source retries. R2 conditional race passed; complete synthetic archive-before-ACK and retry-to-DLQ repeat passed at 2026-10-24T17:30:36.147Z. Cleaned only probe objects/messages; both Queues empty/paused. Added staging producer/R2 config and handoff docs; no unfinished consumer, DB or production change.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review binding-only change and deploy an approved exact main release. Teeyansh then integrates the real consumer using these binding names and Jeffin migrations; replace temporary HTTP pull source consumer without dropping messages, run full archive-to-DB/ACK/recovery acceptance, then enable collection. Keep queues paused until then; pause does not stop 24-hour expiry."
     }
   ]
 }

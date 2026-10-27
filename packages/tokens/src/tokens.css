@@ -221,6 +221,12 @@
   --pp-role-nav-pressed-bg: var(--pp-color-neutral-950);
   --pp-role-nav-disabled-bg: var(--pp-color-neutral-600);
 
+  /* Chips: active/inactive toggle pills from Figma. Inactive has no fill. */
+  --pp-role-chip-active-bg: var(--pp-color-neutral-50);
+  --pp-role-chip-active-text: var(--pp-color-neutral-800);
+  --pp-role-chip-inactive-text: var(--pp-color-neutral-50);
+  --pp-role-chip-inactive-border: color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent);
+
   --pp-role-primary: var(--pp-color-orange-500);
   --pp-role-on-primary: var(--pp-color-orange-950);
   --pp-role-primary-container: var(--pp-color-orange-800);
