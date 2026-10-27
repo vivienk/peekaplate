@@ -169,7 +169,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies staging and later production under ADR0012; protected manual deployment/independent review remain required. Last recorded Worker release afe45db and existing Pages/Hyperdrive are preserved. October 24 inventory found no Queues: missing staging source/DLQ created, 24-hour retention, paused HTTP pull consumers and three source retries. Reused private staging R2. Real conditional-write race and synthetic Queue-to-R2-before-ACK/retry-to-DLQ checks passed; both Queues empty and paused after cleanup. Binding configuration still needs reviewed main deployment. Teeyansh PR31/32 and production resources untouched; actual consumer/DB pipeline remains unverified.",
+      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -203,7 +203,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/delivery.md",
         "playwright.posthog.config.ts",
         "tests/e2e/posthog.spec.ts",
-        "docs/observation-infrastructure.md"
+        "docs/observation-infrastructure.md",
+        ".github/workflows/deploy-preview.yml",
+        "docs/previews.md",
+        "scripts/preview.mjs",
+        "scripts/preview.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -214,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a6b7acbb465ffd51390a48ec7cc40b6b158a57d0d75817d80f5c04c9a0acf6c7"
+      "sourceFingerprint": "6fd3f20a6d1ebc5428942487183593bdaaa7ab7c35d8b20dd9559add0f5fa997"
     },
     {
       "id": "agents",
@@ -321,6 +325,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
+      "modules": [
+        "delivery"
+      ],
+      "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
+    },
+    {
       "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
       "modules": [
         "processing",
@@ -360,14 +371,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "Recovered Windows Docker after checksummed offline disk backups and an official Desktop 4.95 upgrade. Real testing exposed a pnpm.mjs launcher rejection; the DB harness now invokes installed Vitest directly, with a failing-then-passing launcher regression. All 43 SQL assertions, 13 Worker/Postgres cases and local startup/demo/cleanup passed on Windows. Contributor Claude/Codex setup is independently owned.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Finish exact-head review and CI for the local recovery PR. Keep the GitHub protection policy in a separate owner-action PR; stop before Cloudflare/Supabase integration until protected credentials are supplied."
     },
     {
       "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",

@@ -477,6 +477,63 @@ after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 rea
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
 
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+# ERR-20261026-PREVIEW-REPAIR
+
+PR #41 merged successfully into develop, but automatic previews did not run:
+GitHub now reads pull_request_target workflow code and github.sha from the
+default branch, which still lacked the workflow and helper. Repository readback
+showed the enable variable true; a variable cannot supply missing trusted code.
+The follow-up promotes only preview orchestration to main and corrects the
+activation guide. GitHub-held token/lifecycle acceptance remains separate.
+
+`node --test scripts/preview.test.mjs` also reproduced 12 passes and one Windows
+EPERM while creating a file symlink to `/etc/passwd`; this failed before the
+sanitizer was exercised. The fixture now uses a real Windows directory junction
+or a directory symlink elsewhere. All rejection assertions remain enabled.
+
+A new exact-commit marker regression failed with ENOENT before implementation.
+Sanitization now generates the marker from a checked SHA, rejects supplied
+markers and verifies both deployed aliases against that SHA before announcing
+readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
+commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
+
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T11:12:33.369Z","exitCode":1}

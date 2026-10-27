@@ -429,6 +429,7 @@ The six current tables have simple jobs: `venues` identifies restaurants; `staff
 | [.github/dependabot.yml](../.github/dependabot.yml) | Monthly grouped routine updates and separate security-update grouping |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | The five purposeful CI jobs described above |
 | [.github/workflows/deploy-staging.yml](../.github/workflows/deploy-staging.yml) | Manual main-branch Worker deployment using a staging environment and protected credentials |
+| [.github/workflows/deploy-preview.yml](../.github/workflows/deploy-preview.yml) | Static diner/console preview links for same-repository PRs, deleted when the PR closes; see [PR previews](previews.md) |
 
 ### Agent files: who does which job
 
@@ -453,6 +454,7 @@ The profiles and selected prompt behaviors were evaluated. The builder initially
 | [docs/architecture.md](architecture.md) | System boundaries, data flows and what remains unimplemented |
 | [docs/delivery.md](delivery.md) | Ordered feature slices, dependencies, responsibilities and acceptance gates |
 | [docs/operations.md](operations.md) | Local commands, API use, cloud setup, release controls and recovery work |
+| [docs/previews.md](previews.md) | How reviewers open PR preview links, their isolation, retention and one-time setup |
 | [docs/verification.md](verification.md) | Connects product/architecture requirements to existing and future test evidence |
 | [docs/frontend-design.md](frontend-design.md) | Records the evolving design reference and what the real UI must eventually demonstrate |
 | [docs/CONTEXT.md](CONTEXT.md) | Small JSON knowledge map: modules, source paths, dependencies, status, fingerprints and recent handoffs |

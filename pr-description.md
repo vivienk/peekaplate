@@ -1,7 +1,3 @@
-> **Status: Ready for Review (External Staging Blockers Documented)**
->
-> This PR implements the complete S3-VIS-01 menu ingestion workflow, reconciling with Mohammad's VIS-02 extraction contract (schema 1/pipeline 2 and schema 2/pipeline 3) and Raghav's PR #44 (ADR 0016). All local unit, contract, pgTAP, and PostgreSQL integration tests pass. Staging E2E verification remains blocked pending external infrastructure provisioning.
-
 ## Outcome
 
 Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordinating URL, PDF, and photo menu intake into reviewable dish drafts without publishing unreviewed content.
@@ -9,22 +5,22 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 ## Contract and context
 
 - Spec, issue, or ADR: S3-VIS-01 (menu ingestion orchestration), ADR 0002 (selective event sourcing), ADR 0005 (tenancy and privacy), ADR 0015 (integration contracts), ADR 0016 (unified menu ingestion orchestration).
-- Data/API/migration impact: Adds `app_private.menu_ingestion_jobs` and `app_private.dish_drafts` with forced RLS and lease fencing; adds Hono staff routes and queue producer/consumer bindings.
+- Data/API/migration impact: Adds `app_private.menu_ingestion_jobs` and `app_private.dish_drafts` with forced RLS and worker lease fencing; adds Hono staff routes and queue producer/consumer bindings.
 - Documentation or ADR update: `docs/menu-ingestion-persistence-proposal.md` and `docs/CONTEXT.md` refreshed.
 
 ## Summary
 
 - **Shared contracts:** Define menu ingestion requests, versioned queue messages, extraction results, and draft approval payloads in `@peekaplate/contracts`. Supports schema 1 / pipeline 2 and schema 2 / pipeline 3, preserving `subcategory`, `category_page_number`, `price_text`, `candidate_id`, and `draft_index`.
 - **Extraction adapter:** Implements `adaptPythonExtractionResult` with multi-span evidence reconstruction, Unicode code-point boundary enforcement (`Array.from(str).length`), segment failure rejection, non-contiguous `draft_index` matching, and grouped printed price handling (`price_text` preserved with null scalar `price_amount`).
-- **Persistence & Findings B/C:**
+- **Persistence & Finding Resolutions:**
   - Persists extracted drafts to `app_private.dish_drafts` preserving producer's original `draft_index` (**Finding B**).
   - Supersedes unreviewed pending drafts via `NOT (draft_index = ANY($3::integer[]))`.
-  - Fixes table CHECK constraint violation on retryable failures by setting `status = 'queued'` and `finished_at = NULL` (**Finding C**).
+  - Resolves table CHECK constraint violation on retryable failures by setting `status = 'queued'` and `finished_at = NULL` (**Finding C**).
   - Enforces worker lease fencing (`claim_token` and `lease_generation`) under row locks.
 - **R2 Report Storage (Finding A):** Durably persists full extraction report JSON to `reports/${tenantId}/${jobId}/extraction.json` via `ReportStorage` interface and records `result_storage_key`.
 - **Queue integration:** Configures `INGESTION_QUEUE` producer (`peekaplate-staging-menu-ingestion`) and consumer with 3 retries and DLQ (`peekaplate-staging-menu-ingestion-dlq`).
 - **Transport:** Adds typed `createHttpPythonExtractor` with correlation IDs, timeout abort signals, authorization headers, and schema validation.
-- **Staff review workflow:** Add job submission, job status, draft listing, and draft approval endpoints with authentication and venue-boundary enforcement. All drafts strictly enforce `status: "needs_review"`.
+- **Staff review workflow:** Adds job submission, job status, draft listing, and draft approval endpoints with authentication and venue-boundary enforcement. All drafts strictly enforce `status: "needs_review"`.
 
 ## Changes
 
@@ -51,19 +47,10 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 - PASS: `node scripts/context.mjs check` (10 modules, 10 handoffs fresh)
 - PASS: `node scripts/check-docs.mjs` (43 files checked)
 - PASS: `node scripts/test-db.mjs` (pgTAP 96 assertions passed: menu_ingestion 23/23, foundation 27/27, posthog 15/15, staff 16/16, team-analytics 15/15; Vitest db integration 25/25; worker check passed)
-- NOT RUN (BLOCKED): Staging end-to-end flow
+- NOT RUN: Staging end-to-end verification has not yet been performed.
 
 > [!NOTE]
-> Synthetic contract tests prove the TypeScript adapter mapping and schema bounds. Local pgTAP tests prove PostgreSQL RLS policies and table constraints. Vitest integration tests prove database queries execute against a real PostgreSQL 16 instance. `representative-extraction-v2.json` is a synthetic/reconstructed fixture. **None of these constitute end-to-end staging verification.**
-
-## External Blockers
-
-Staging E2E verification remains blocked on external dependencies:
-1. **Sai (DevOps):** Provision staging Cloudflare Queues (`peekaplate-staging-menu-ingestion` and DLQ `peekaplate-staging-menu-ingestion-dlq`), inject Worker secrets (`EXTRACTION_SERVICE_URL`, `EXTRACTION_SERVICE_SECRET`), and configure R2 bucket permissions.
-2. **Mohammad (Platform):** Deploy the containerized Python extraction service with health check endpoints, and provide a genuine raw schema-2/pipeline-3 extraction payload to replace the synthetic fixture.
-3. **Jeffin (Database):** Review and apply forward migration `20261026220000_menu_ingestion_drafts.sql` to hosted Supabase staging.
-4. **Teeyansh (S3-VIS-01 DRI):** Run live staging end-to-end verification once external dependencies are active.
-5. **Vivien (Maintainer):** Review and approval.
+> Synthetic contract tests prove the TypeScript adapter mapping and schema bounds. Local pgTAP tests prove PostgreSQL RLS policies and table constraints. Vitest integration tests prove database queries execute against a real PostgreSQL 16 instance. `representative-extraction-v2.json` is a synthetic/reconstructed fixture. **None of these constitute live end-to-end staging verification, which has not yet been performed.**
 
 ## Architecture Boundaries
 
