@@ -119,7 +119,7 @@ def dish_block(name, text, dish_names):
         label=line.strip().strip("#*▼►•- ")
         heading=re.fullmatch(r"([A-Za-z][A-Za-z '&’\-]*?)(?:[ \t]+(?:[$€£₱]|PHP[ \t]*|P)?\d.*)?", label, re.I)
         label=heading.group(1) if heading else ""
-        if label.upper() in CURRENCY_CODES|{"P"}:
+        if re.sub(r"[\s\-−]+$", "", label).upper() in CURRENCY_CODES|{"P"}:
             label=""
         words=label.split()
         if label and (label.istitle() or label.isupper() or len(words) == 1):

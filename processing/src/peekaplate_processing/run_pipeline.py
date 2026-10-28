@@ -148,7 +148,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 for item in output["dishes"]:
                     segment=by_page[item["page_number"]]
                     try:
-                        draft=DishDraft(**{key:value for key,value in item.items() if key not in {"page_number", "review_warnings"}}, source_id=report.source.source_id, source_text=segment.text.strip(), review_warnings=["Page-level evidence; dish/price association needs human verification.", *item.get("review_warnings", [])])
+                        draft_fields = {key:value for key,value in item.items() if key not in {"page_number", "review_warnings", "box_evidence"}}
+                        draft=DishDraft(**draft_fields, source_id=report.source.source_id, source_text=segment.text.strip(), review_warnings=["Page-level evidence; dish/price association needs human verification.", *item.get("review_warnings", [])])
                     except ValidationError:
                         report.errors.append(f"Page {segment.page_number}: dish failed schema validation.")
                         continue
@@ -156,7 +157,13 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     draft_id="draft:"+hashlib.sha256(f"{report.source.sha256}:{index}:{draft.model_dump_json()}".encode()).hexdigest()[:32]
                     start=segment.text.find(draft.source_text)
                     report.drafts.append(draft)
-                    report.evidence.append(DraftEvidence(draft_id=draft_id, draft_index=index, spans=[SourceSpan(segment_id=segment.segment_id, start=start, end=start+len(draft.source_text))]))
+                    box_evidence_items = item.get("box_evidence", [])
+                    report.evidence.append(DraftEvidence(
+                        draft_id=draft_id,
+                        draft_index=index,
+                        spans=[SourceSpan(segment_id=segment.segment_id, start=start, end=start+len(draft.source_text))],
+                        box_evidence=box_evidence_items,
+                    ))
         if input_mode=="image":
             report.warnings.append("Image-only suggestions are private and unvalidated; no OCR-grounded candidates or text spans were created.")
             report.status="incomplete"

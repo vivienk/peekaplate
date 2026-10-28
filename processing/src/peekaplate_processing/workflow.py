@@ -21,7 +21,7 @@ from pydantic_core import ErrorType
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.model_cache import cache_path, read_candidates, write_candidates
 from peekaplate_processing.menu_context import MONEY_MARKER, PRICE_GROUP, apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
-from peekaplate_processing.menu_layout import entry_price
+from peekaplate_processing.menu_layout import corroborate_box_price, entry_price
 from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
 
@@ -165,7 +165,7 @@ def check_grounding(dish: ExtractedDish, text: str):
     if issues: raise ExtractionError(next(iter(issues.values())))
 
 
-def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadata=None):
+def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadata=None, return_box_evidence=False):
     layout=entry_price(dish.name, text, ocr_metadata, dish_names=dish_names)
     block=dish_block(dish.name, text, dish_names) if layout is None else layout["price_text"] or ""
     ambiguous=(layout is not None and not block) or (
@@ -175,15 +175,39 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
     issues = grounding_issues(dish, text, dish_names=dish_names, price_block=block)
     if "name" in issues: raise ExtractionError(issues["name"])
     recovered=layout is not None and bool(block)
+    # If the dish block contains price options / slashes, text-based options govern.
+    raw_block = dish_block(dish.name, text, dish_names)
+    text_has_options = "/" in raw_block and any(c.isdigit() for c in raw_block)
+    box_evidence = []
+    if not recovered and not text_has_options and ocr_metadata:
+        c_text, c_amount, c_boxes = corroborate_box_price(
+            dish.name, dish.price_text, dish.price_amount, ocr_metadata, dish_names=tuple(dish_names)
+        )
+        if c_text is not None:
+            box_evidence = c_boxes
+            block = c_text
+            recovered = True
+            issues.pop("price_text", None)
+            issues.pop("price_amount", None)
+            box_corroborated = True
+        else:
+            box_corroborated = False
+    else:
+        box_corroborated = False
+
     warnings = [f"{field} cleared to null: {message}" for field, message in issues.items()
                 if not recovered or field not in {"price_text", "price_amount"}]
     updates = {field: None for field in issues}
     if recovered:
-        values=re.findall(r"\d+(?:\.\d+)?", block)
-        amount=values[0] if len(values) == 1 else None
-        updates.update(price_text=block, price_amount=amount)
-        if (dish.price_text, dish.price_amount) != (block, amount):
-            warnings.append("Price fields recovered from a unique OCR entry row; verify source association.")
+        if box_corroborated:
+            updates.update(price_text=c_text, price_amount=c_amount)
+            warnings.append("Price grounded via OCR box evidence; verify row alignment.")
+        else:
+            values=re.findall(r"\d+(?:\.\d+)?", block)
+            amount=values[0] if len(values) == 1 else None
+            updates.update(price_text=block, price_amount=amount)
+            if (dish.price_text, dish.price_amount) != (block, amount):
+                warnings.append("Price fields recovered from a unique OCR entry row; verify source association.")
     elif ambiguous:
         warnings.append("Price association is ambiguous; price fields remain unknown.")
     pairs=[match for match in re.finditer(PRICE_GROUP, block, re.I)
@@ -207,7 +231,10 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
             updates["price_text"]=pairs[0].group()
         warnings.append("Multiple printed prices; option meanings require human review.")
     if dish.ingredients == []: updates["ingredients"] = None
-    return dish.model_copy(update=updates), warnings
+    cleaned = dish.model_copy(update=updates)
+    if return_box_evidence:
+        return cleaned, warnings, box_evidence
+    return cleaned, warnings
 
 
 def deduplicate_dishes(items, originals, pages, metadata):
@@ -509,13 +536,18 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                         continue
                     with measure(timings, "grounding"):
                         names=[other.name for other in parsed.dishes if other.page_number == dish.page_number]
-                        cleaned, warnings = grounded_draft(dish, pages[dish.page_number], dish_names=names, ocr_metadata=metadata[dish.page_number])
+                        cleaned, warnings, box_ev = grounded_draft(
+                            dish, pages[dish.page_number], dish_names=names,
+                            ocr_metadata=metadata[dish.page_number], return_box_evidence=True
+                        )
                 except ExtractionError as error:
                     finding["errors"].append(f"Batch {state['worker_id']}, dish {index}, page {dish.page_number}: {error}")
                     finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages.get(dish.page_number),rejection=str(error))
                     continue
                 finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages[dish.page_number],cleaned=cleaned,warnings=warnings)
                 item = cleaned.model_dump()
+                if box_ev:
+                    item["box_evidence"] = box_ev
                 if warnings:
                     item["review_warnings"] = warnings
                     finding["warnings"].extend(f"Batch {state['worker_id']}, dish {index}, page {dish.page_number}: {warning}" for warning in warnings)

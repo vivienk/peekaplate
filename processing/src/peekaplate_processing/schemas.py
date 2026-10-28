@@ -80,6 +80,16 @@ class SourceSpan(BaseModel):
     end:int=Field(gt=0)
 
 
+class BoxEvidence(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    page_number:int=Field(ge=1)
+    box:dict[str,int]
+    text:str
+    saved_region_index:int=Field(ge=0)
+
+
 class DraftEvidence(BaseModel):
 
     model_config=ConfigDict(extra="forbid")
@@ -87,6 +97,7 @@ class DraftEvidence(BaseModel):
     draft_id:NonEmptyText
     draft_index:int=Field(ge=0)
     spans:list[SourceSpan]=Field(min_length=1)
+    box_evidence:list[BoxEvidence]=Field(default_factory=list)
 
 
 class CaptureCandidate(BaseModel):

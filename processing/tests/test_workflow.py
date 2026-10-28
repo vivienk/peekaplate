@@ -710,3 +710,54 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result["errors"], [])
         self.assertTrue(any("could not be cached" in w for w in result["warnings"]))
         self.assertNotIn("private storage error", str(result))
+
+    def test_workflow_corroborates_box_evidence_when_text_omits_prices(self):
+        from peekaplate_processing.workflow import run_menu_graph, DishBatch, ExtractedDish
+        from types import SimpleNamespace
+        class MultiColumnLLM(FakeLLM):
+            def invoke(self, messages):
+                dishes = [
+                    ExtractedDish(
+                        page_number=1,
+                        name="PLAIN CHEESE",
+                        description=None,
+                        category=None,
+                        subcategory=None,
+                        price_text="6.00 33.00",
+                        price_amount=None,
+                        price_currency=None,
+                        ingredients=None,
+                    )
+                ]
+                batch = DishBatch(dishes=dishes)
+                return {
+                    "parsed": batch,
+                    "raw": SimpleNamespace(response_metadata={"finish_reason": "stop"}, content=batch.model_dump_json()),
+                    "parsing_error": None,
+                }
+        metadata = {
+            "ocr_region_status": "available",
+            "ocr_coordinate_space": "uploaded_image_pixels",
+            "upload_width": 1000,
+            "upload_height": 1000,
+            "ocr_regions": [
+                {"text": "PLAIN CHEESE", "left": 50, "top": 100, "width": 200, "height": 30},
+                {"text": "6.00", "left": 600, "top": 100, "width": 70, "height": 30},
+                {"text": "33.00", "left": 700, "top": 100, "width": 70, "height": 30},
+            ]
+        }
+        # In OCR text, prices are missing or dropped from the text segment:
+        pages = [{"page_number": 1, "text": "PLAIN CHEESE", "ocr_metadata": metadata}]
+        result = run_menu_graph(MultiColumnLLM(), pages)
+        self.assertEqual(len(result["dishes"]), 1)
+        dish = result["dishes"][0]
+        self.assertEqual(dish["name"], "PLAIN CHEESE")
+        self.assertEqual(dish["price_text"], "6.00 / 33.00")
+        self.assertIsNone(dish["price_amount"])
+        # Check warnings carry the box corroboration note
+        self.assertTrue(any("Price grounded via OCR box evidence; verify row alignment." in w for w in result["warnings"]))
+        # Check box_evidence in the dish item
+        self.assertIn("box_evidence", dish)
+        self.assertEqual(len(dish["box_evidence"]), 2)
+        self.assertEqual(dish["box_evidence"][0]["text"], "6.00")
+        self.assertEqual(dish["box_evidence"][1]["text"], "33.00")

@@ -5,16 +5,195 @@ unique association. Anchors are (left, top, width, height) unions of supplied
 heading boxes, including an inline price when its box cannot be subdivided.
 No character coordinates, source offsets, currencies or option labels are inferred.
 """
+from decimal import Decimal
 import math
 import re
 from typing import NamedTuple
 
-from .menu_context import PRICE_OPTION, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches
+from .menu_context import MONEY_MARKER, CURRENCY_CODE, PRICE_OPTION, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches
 
 _NUMBER = r"\d+(?:\.\d+)?"
 _PRICE = re.compile(rf"{PRICE_OPTION}(?:[ \t]*/[ \t]*{PRICE_OPTION})*", re.I)
 _MARKUP = re.compile(r"[ \t#*▼►•>-]*")
 _UNIT = re.compile(r"(?:kcal|calories|cals?|pcs?|pieces?|servings?|grams?|kg|g|ml|oz)", re.I)
+
+_BOX_NUMBER = r"(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,2})?"
+_BOX_OPTION = rf"(?:(?:SM|LG)[ \t]*)?(?:{MONEY_MARKER}[ \t]*)?({_BOX_NUMBER})(?:[ \t]+{CURRENCY_CODE})?"
+_BOX_PRICE = re.compile(rf"{_BOX_OPTION}(?:[ \t]*/[ \t]*{_BOX_OPTION})*", re.I)
+_BOX_MODEL_SEQUENCE = re.compile(rf"{_BOX_OPTION}(?:[ \t]+{_BOX_OPTION})+", re.I)
+_BOX_OPTION_PATTERN = re.compile(_BOX_OPTION, re.I)
+_BOX_DIGITS = re.compile(_BOX_NUMBER)
+
+
+def _numbers(literal):
+    value = literal.strip()
+    if len(value) > 160 or not _BOX_PRICE.fullmatch(value):
+        return None
+    return tuple(Decimal(match.group()) for match in _BOX_DIGITS.finditer(value))
+
+
+def _model_numbers(literal):
+    values = _numbers(literal)
+    if values is not None:
+        return values
+    # Saved vision readings can separate complete options by whitespace. Bare
+    # integer fragments ("3 50") cannot establish such a sequence. This parses
+    # only the model reading; no separator is ever added to OCR evidence.
+    value = literal.strip()
+    if len(value) > 160 or not _BOX_MODEL_SEQUENCE.fullmatch(value):
+        return None
+    for option in _BOX_OPTION_PATTERN.finditer(value):
+        number_match = _BOX_DIGITS.search(option.group())
+        if not number_match:
+            return None
+        number = number_match.group()
+        if "." not in number and option.group().strip() == number:
+            return None
+    return tuple(Decimal(match.group()) for match in _BOX_DIGITS.finditer(value))
+
+
+def _scalar(literal):
+    if literal is None or not re.fullmatch(_BOX_NUMBER, str(literal)):
+        return None
+    return (Decimal(str(literal)),)
+
+
+def _competing_title(name, heading_index, boxes):
+    """Negative-only bounded title runs; never produce a quote, box or span."""
+    labels = [" ".join(box.text.split()) for box in boxes]
+    normalized = " ".join(name.casefold().split())
+    raw = " ".join(name.split())
+
+    def matches(value):
+        return phrase_matches(raw, value) or phrase_matches(normalized, " ".join(value.casefold().split()))
+
+    def is_prefix(value):
+        norm_v = " ".join(value.casefold().split())
+        return (normalized.startswith(norm_v + " ") or re.match(re.escape(value) + r"\s+", raw, re.I))
+
+    if any(i != heading_index and matches(label) for i, label in enumerate(labels)):
+        return True
+    budget = 10_000
+    for first, label in enumerate(labels):
+        if first == heading_index or not is_prefix(label):
+            continue
+        pending = [(first, (first,), label)]
+        while pending:
+            last, path, prefix = pending.pop()
+            if len(path) >= 8:
+                return True
+            previous = boxes[last]
+            for i, box in enumerate(boxes):
+                budget -= 1
+                if budget < 0:
+                    return True
+                if i == heading_index or i in path:
+                    continue
+                gap = box.left - previous.right
+                adjacent = _same_row(previous, box) and 0 <= gap <= 1.5 * min(previous.height, box.height)
+                wrapped = (box.top >= previous.bottom and box.top - previous.bottom <= previous.height
+                           and abs(box.left - boxes[first].left) <= 2 * min(previous.height, box.height))
+                if not (adjacent or wrapped):
+                    continue
+                joined = prefix + " " + labels[i]
+                if matches(joined):
+                    return True
+                if is_prefix(joined):
+                    pending.append((i, (*path, i), joined))
+    return False
+
+
+def corroborate_box_price(name: str, model_price_text: str | None, model_price_amount: str | None,
+                          metadata: dict | None, *, dish_names: tuple[str, ...] = ()):
+    """Corroborate prices from OCR TextOverlay bounding boxes when ParsedText lacks them.
+
+    Returns:
+        tuple: (corroborated_price_text, corroborated_price_amount, box_evidence_list)
+        or (None, None, []) if not corroborated.
+    """
+    if metadata is None or metadata == {}:
+        return None, None, []
+    if not isinstance(metadata, dict):
+        return None, None, []
+    if metadata.get("ocr_coordinate_space") != "uploaded_image_pixels" or metadata.get("ocr_region_status") != "available":
+        return None, None, []
+    raw_regions = metadata.get("ocr_regions")
+    if not isinstance(raw_regions, list) or not raw_regions:
+        return None, None, []
+    for raw in raw_regions:
+        if not isinstance(raw, dict) or set(raw) != {"text", "left", "top", "width", "height"}:
+            return None, None, []
+
+    boxes = _regions(metadata)
+    if not boxes or len(boxes) != len(raw_regions):
+        return None, None, []
+    # Reject duplicates and positive-area collisions in the full overlay
+    for index, box in enumerate(boxes):
+        if any(_overlap(box, other) > 0 and min(box.right, other.right) > max(box.left, other.left)
+               for other in boxes[:index]):
+            return None, None, []
+
+    normalized_name = " ".join(name.casefold().split())
+    headings = [i for i, b in enumerate(boxes) if " ".join(b.text.casefold().split()) == normalized_name]
+    if len(headings) != 1:
+        return None, None, []
+    heading_index = headings[0]
+    heading = boxes[heading_index]
+
+    all_names = {*dish_names, name}
+    if sum(" ".join(other.casefold().split()) == normalized_name for other in all_names) != 1:
+        return None, None, []
+    if _competing_title(name, heading_index, boxes):
+        return None, None, []
+
+    other_indices = [i for i, b in enumerate(boxes) if i != heading_index and _same_row(heading, b)]
+    if any(boxes[i].right <= heading.left for i in other_indices):
+        return None, None, []
+    right = [i for i in other_indices if boxes[i].left >= heading.right]
+    right.sort(key=lambda i: boxes[i].left)
+
+    if any(i != heading_index and i not in other_indices
+           and (_overlap(heading, b) > 0 or any(_overlap(boxes[j], b) > 0 for j in right))
+           for i, b in enumerate(boxes)):
+        return None, None, []
+    if not right:
+        return None, None, []
+
+    numbers = []
+    box_records = []
+    other_dish_names = {" ".join(other.casefold().split()) for other in dish_names if other != name}
+    for i in right:
+        price_box = boxes[i]
+        vals = _numbers(price_box.text)
+        if vals is None:
+            return None, None, []
+        if any(j not in {heading_index, i} and _numbers(other.text) is None
+               and _overlap(other, price_box) > 0 and heading.left < other.right
+               for j, other in enumerate(boxes)):
+            return None, None, []
+        if any(j != heading_index and " ".join(other.text.casefold().split()) in other_dish_names and _same_row(other, price_box)
+               for j, other in enumerate(boxes)):
+            return None, None, []
+        numbers.extend(vals)
+        raw = raw_regions[i]
+        box_records.append({
+            "saved_region_index": i,
+            "text": raw["text"],
+            "box": {"left": raw["left"], "top": raw["top"], "width": raw["width"], "height": raw["height"]},
+        })
+
+    if model_price_text is None and model_price_amount is None:
+        return None, None, []
+    expected = _model_numbers(model_price_text) if model_price_text is not None else _scalar(model_price_amount)
+    if expected is None or tuple(numbers) != expected:
+        return None, None, []
+    if model_price_amount is not None:
+        if len(numbers) != 1 or _scalar(model_price_amount) != (numbers[0],):
+            return None, None, []
+
+    corroborated_text = " / ".join(record["text"] for record in box_records)
+    corroborated_amount = str(numbers[0]) if len(numbers) == 1 else None
+    return corroborated_text, corroborated_amount, box_records
 
 
 class _Box(NamedTuple):

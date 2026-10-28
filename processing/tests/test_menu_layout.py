@@ -278,6 +278,66 @@ class MenuLayoutTests(unittest.TestCase):
         self.assertEqual(entry_price("Garden Bowl", f"Garden Bowl\n{long_price}",
             layout(box("Garden Bowl", 20, 20), box(long_price, 220, 20, 700))), UNKNOWN)
 
+    def test_corroborate_box_price_recovers_multi_column_price(self):
+        from peekaplate_processing.menu_layout import corroborate_box_price
+        # Dish title on left, prices on right in separate OCR boxes (e.g. multi-column layout)
+        metadata = layout(
+            box("PLAIN CHEESE", 50, 100, 200, 30),
+            box("6.00", 600, 100, 70, 30),
+            box("33.00", 700, 100, 70, 30),
+            box("FRESH MOZZARELLA", 50, 200, 250, 30),
+            box("7.00", 600, 200, 70, 30),
+            box("37.00", 700, 200, 70, 30),
+        )
+        # PLAIN CHEESE dish text lacks the price tokens
+        price_text, price_amount, boxes = corroborate_box_price("PLAIN CHEESE", "6.00 33.00", None, metadata)
+        self.assertEqual(price_text, "6.00 / 33.00")
+        self.assertIsNone(price_amount)
+        self.assertEqual(len(boxes), 2)
+        self.assertEqual(boxes[0]["text"], "6.00")
+        self.assertEqual(boxes[1]["text"], "33.00")
+
+    def test_corroborate_box_price_single_amount(self):
+        from peekaplate_processing.menu_layout import corroborate_box_price
+        metadata = layout(
+            box("WATER", 50, 800, 100, 20),
+            box("3.50", 800, 800, 60, 20),
+        )
+        price_text, price_amount, boxes = corroborate_box_price("WATER", "3.50", "3.50", metadata)
+        self.assertEqual(price_text, "3.50")
+        self.assertEqual(price_amount, "3.50")
+        self.assertEqual(len(boxes), 1)
+        self.assertEqual(boxes[0]["text"], "3.50")
+
+    def test_corroborate_box_price_abstains_on_competing_titles(self):
+        from peekaplate_processing.menu_layout import corroborate_box_price
+        # Two titles at same vertical level with price in between
+        metadata = layout(
+            box("CHEESE SLICE", 50, 100, 150, 30),
+            box("PEPPERONI SLICE", 250, 100, 150, 30),
+            box("6.00", 500, 100, 80, 30),
+        )
+        # Should abstain due to competing title PEPPERONI SLICE between CHEESE SLICE and price
+        price_text, price_amount, boxes = corroborate_box_price(
+            "CHEESE SLICE", "6.00", "6.00", metadata, dish_names=("CHEESE SLICE", "PEPPERONI SLICE")
+        )
+        self.assertIsNone(price_text)
+        self.assertIsNone(price_amount)
+        self.assertEqual(boxes, [])
+
+    def test_corroborate_box_price_abstains_on_number_mismatch(self):
+        from peekaplate_processing.menu_layout import corroborate_box_price
+        metadata = layout(
+            box("PLAIN CHEESE", 50, 100, 200, 30),
+            box("6.00", 600, 100, 70, 30),
+            box("33.00", 700, 100, 70, 30),
+        )
+        # Vision suggestion says 6.00 35.00 but OCR boxes have 6.00 33.00
+        price_text, price_amount, boxes = corroborate_box_price("PLAIN CHEESE", "6.00 35.00", None, metadata)
+        self.assertIsNone(price_text)
+        self.assertIsNone(price_amount)
+        self.assertEqual(boxes, [])
+
 
 if __name__ == "__main__":
     unittest.main()
