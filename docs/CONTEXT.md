@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01 adds a replaceable menu source, wire-to-diner adapter and labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -37,7 +37,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/check-bundle.mjs",
         "scripts/check-bundle.test.mjs",
         "docs/frontend-design.md",
-        "frontend/diner/package.json"
+        "frontend/diner/package.json",
+        "frontend/diner/src/menu/types.ts",
+        "frontend/diner/src/menu/adapter.ts",
+        "frontend/diner/src/menu/fixtures.ts",
+        "frontend/diner/src/menu/fixtures.test.ts",
+        "vitest.config.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -45,7 +50,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "277a8be5e4b45ef41eba68d87907024a6aa89c030677e64af388f97f6d5f5221"
+      "sourceFingerprint": "e6e420253f2fa410a6e9a1165c01761fec4ec1969aa47b188466181c86b91f0d"
     },
     {
       "id": "console",
@@ -326,6 +331,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Started S3-DIN-01 fixtures: a MenuSource interface, an adapter from the draft RES-02 content bundle (PR #43 shape plus fixture-only allergens) to diner dishes, and labelled synthetic fixtures named after Rania's Figma dishes. The adapter makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, suppresses Gluten-free when Gluten is listed and never drops allergens. Fixtures cover the ticket edge cases, a withdrawal between loads, a 20-dish layout set and empty/unavailable/error/offline/slow states. 18 Vitest cases pass.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource; DIN-03 adds a published source behind the same interface and swaps the local wire types for @peekaplate/contracts once RES-02 merges. Adam/Zhiliang to settle whether a complete dish may have zero ingredients and how allergens are supplied."
+    },
+    {
       "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",
       "modules": [
         "backend",
@@ -398,13 +410,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
-    },
-    {
-      "summary": "PR #33 added the first-party staging denial checker. Harshita then helped run the valid outsider check twice, including from a fresh develop clone: GitHub identity 200 and both routes 403 forbidden. The maintainer supplied sanitized reports at 2026-10-24T05:52:32.802Z and 06:07:16.871Z (October 23 Phoenix). Recorded request IDs and updated README, team guide, access runbook, operations and context; no runtime, credential, grant, migration or deployment changed. Earlier collaborator 200 and invalid-token 401 evidence remains distinct.",
-      "modules": [
-        "analytics"
-      ],
-      "next": "Collaborators can continue tickets using their own GitHub identity and the bounded staging API. An authorized operator still needs the separate disposable collaborator-removal test before full hosted access acceptance. Production, real menu ingestion and owner-report delivery remain separate work; do not infer their readiness from this check."
     }
   ]
 }
