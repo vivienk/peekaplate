@@ -573,6 +573,52 @@ class FixtureTests(unittest.TestCase):
             privacy["threshold"]
         )
 
+    def test_depth_stage_sessions(self):
+        """Count each session once per activity stage."""
+        rows = {
+            row["event_id"]: row
+            for row in EVENTS
+        }.values()
+
+        stages = {
+            "menu_viewed": set(),
+            "dish_opened": set(),
+            "compared": set(),
+            "saved": set(),
+        }
+
+        for row in rows:
+            event_type = row["event_type"]
+            session_id = row["session_id"]
+
+            if event_type == "menu_viewed":
+                stages["menu_viewed"].add(session_id)
+
+            elif event_type == "dish_detail_opened":
+                stages["dish_opened"].add(session_id)
+
+            elif (
+                event_type == "dish_compared"
+                and row.get("display_state") == "displayed"
+            ):
+                stages["compared"].add(session_id)
+
+            elif (
+                event_type == "dish_saved"
+                and row.get("save_origin") == "direct"
+            ):
+                stages["saved"].add(session_id)
+
+        actual = {
+            stage: len(sessions)
+            for stage, sessions in stages.items()
+        }
+
+        self.assertEqual(
+            actual,
+            ANSWERS["depth_stage_sessions"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

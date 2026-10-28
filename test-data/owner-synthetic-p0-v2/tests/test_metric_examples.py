@@ -162,6 +162,60 @@ class TestMetricExamples(unittest.TestCase):
                     example["expected_count"],
                 )
 
+    def test_comparison_reentry_uses_new_flow_id(self):
+        events = [
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "compare_action": "start",
+                "comparison_id": "flow-1",
+                "pair_version": 1,
+                "display_state": "displayed",
+            },
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "compare_action": "replace",
+                "comparison_id": "flow-1",
+                "pair_version": 2,
+                "display_state": "displayed",
+            },
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "compare_action": "start",
+                "comparison_id": "flow-2",
+                "pair_version": 1,
+                "display_state": "displayed",
+            },
+        ]
+
+        starts = [
+            event for event in events
+            if event["compare_action"] == "start"
+        ]
+
+        self.assertEqual(len(starts), 2)
+        self.assertNotEqual(
+            starts[0]["comparison_id"],
+            starts[1]["comparison_id"]
+        )
+
+        self.assertEqual(
+            events[0]["comparison_id"],
+            events[1]["comparison_id"]
+        )
+
+        self.assertEqual(
+            [event["pair_version"] for event in events],
+            [1, 2, 1]
+        )
+
+        self.assertEqual(
+            len({event["comparison_id"] for event in events}),
+            2
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

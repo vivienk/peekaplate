@@ -109,7 +109,13 @@
                                                              "status":  "SUPPRESSED",
                                                              "eligible_sessions":  2,
                                                              "threshold":  10
-                                                         }
+                                                         },
+                     "depth_stage_sessions":  {
+                                                  "menu_viewed":  2,
+                                                  "dish_opened":  2,
+                                                  "compared":  1,
+                                                  "saved":  2
+                                              }
                  },
     "full_dataset_proposed_engagement":  {
                                              "status":  "PROPOSED_PENDING_METRIC_OWNER_APPROVAL",

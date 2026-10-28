@@ -1,10 +1,4 @@
-python : test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
-At line:1 char:1
-+ python -m unittest discover -s test-data/owner-synthetic-p0-v2/tests  ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (test_ai001_fixt..._exists) ... ok:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
-
+test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
 test_ai001_no_private_event_data (test_ai_report_inputs.TestAIReportInputs.test_ai001_no_private_event_data) ... ok
 test_ai001_not_run (test_ai_report_inputs.TestAIReportInputs.test_ai001_not_run) ... ok
 test_ai001_suppressed_values_hidden (test_ai_report_inputs.TestAIReportInputs.test_ai001_suppressed_values_hidden) ... ok
@@ -16,6 +10,8 @@ test_active_time_from_events (test_fixture.FixtureTests.test_active_time_from_ev
 test_average_active_time_from_events (test_fixture.FixtureTests.test_average_active_time_from_events) ... ok
 test_card_exposure_counts (test_fixture.FixtureTests.test_card_exposure_counts) ... ok
 test_comparison_from_events (test_fixture.FixtureTests.test_comparison_from_events) ... ok
+test_depth_stage_sessions (test_fixture.FixtureTests.test_depth_stage_sessions)
+Count each session once per activity stage. ... ok
 test_detail_opening_exposure_links (test_fixture.FixtureTests.test_detail_opening_exposure_links) ... ok
 test_duplicate_is_undo_restoration (test_fixture.FixtureTests.test_duplicate_is_undo_restoration) ... ok
 test_event_counts_match_expected (test_fixture.FixtureTests.test_event_counts_match_expected) ... ok
@@ -33,6 +29,7 @@ test_time_based_consideration_candidates (test_fixture.FixtureTests.test_time_ba
 test_unique_event_ids (test_fixture.FixtureTests.test_unique_event_ids) ... ok
 test_all_six_examples_exist (test_metric_examples.TestMetricExamples.test_all_six_examples_exist) ... ok
 test_comparison_before_opening_does_not_qualify (test_metric_examples.TestMetricExamples.test_comparison_before_opening_does_not_qualify) ... ok
+test_comparison_reentry_uses_new_flow_id (test_metric_examples.TestMetricExamples.test_comparison_reentry_uses_new_flow_id) ... ok
 test_cross_session_comparison_does_not_qualify (test_metric_examples.TestMetricExamples.test_cross_session_comparison_does_not_qualify) ... ok
 test_expected_metric_results (test_metric_examples.TestMetricExamples.test_expected_metric_results) ... ok
 test_replace_comparison_qualifies (test_metric_examples.TestMetricExamples.test_replace_comparison_qualifies) ... ok
@@ -74,6 +71,6 @@ test_valid_baseline (test_validator_integration.TestValidatorIntegration.test_va
 test_zero_sequence (test_validator_integration.TestValidatorIntegration.test_zero_sequence) ... ok
 
 ----------------------------------------------------------------------
-Ran 68 tests in 25.783s
+Ran 70 tests in 20.667s
 
 OK

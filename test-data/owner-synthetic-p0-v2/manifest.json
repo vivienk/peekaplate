@@ -84,7 +84,7 @@
     "evidence":  {
                      "unit_test_results":  "test_results.txt",
                      "dataset_validation_results":  "validation_results.txt",
-                     "unit_tests_passed":  68,
+                     "unit_tests_passed":  70,
                      "validation_status":  "LOCAL_SYNTHETIC_CHECKS_PASSED",
                      "starter_validation_results":  "starter_validation_results.txt"
                  },
