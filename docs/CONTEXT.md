@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and GitHub collaboration for bounded analytics. Observation and menu Queue/bucket bindings declared for staging; live queues remain paused. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion layer provides: schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and multi-span evidence; transactional persistence preserving draft_index; report storage retention via result_storage_key; typed HTTP extraction transport with 600s timeout; Queue consumer handler and approval endpoints. Staging-only authenticated extraction host prepared for container source relay with 15-minute signed capability; hosted service activation remains pending. Source intake validates 64-hex hash and derives R2 storage keys; URL/text inputs rejected until reviewed materialization.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and GitHub collaboration for bounded analytics. Observation and menu Queue/bucket bindings declared for staging; live queues remain paused. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion layer provides: schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and multi-span evidence; transactional persistence preserving draft_index; report storage retention via result_storage_key; typed HTTP extraction transport with 720s timeout aligned with Python service budget; Queue consumer handler and approval endpoints. Staging-only authenticated extraction host prepared for container source relay with 15-minute signed capability; hosted service activation remains pending. Source intake validates URL, PDF, and photo sources, derives canonical R2 storage keys and deterministic SHA-256 digests; raw text inputs rejected.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -93,6 +93,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/repository.test.ts",
         "backend/src/ingestion/repository.ts",
         "backend/src/ingestion/transport.ts",
+        "backend/src/ingestion/workflow.integration.test.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -125,7 +126,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "fc3249dcd99642fc7ff1e41a4f75a64e7bce213da258cac92d87648041193967"
+      "sourceFingerprint": "41699d49b049be1a169ff56df2e8d5c05b152eeb5f5c72bd64ba8628bfcdcdaa"
     },
     {
       "id": "database",

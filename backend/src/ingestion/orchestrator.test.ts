@@ -122,16 +122,90 @@ describe('Ingestion Orchestrator', () => {
   it('submitMenuIngestion rejects unmaterialized url/text and enforces sourceHash on pdf/photo', async () => {
     const { client } = createMockClient();
 
-    // Rejects url
+    // Accepts url with valid sourceUrl (content digest null when omitted prior to materialization)
+    const urlJob = await submitMenuIngestion(client, {
+      venueId,
+      sourceType: 'url',
+      sourceUrl: 'https://example.com/menu',
+      idempotencyKey: 'idem_url_accept',
+    });
+    expect(urlJob.status).toBe('queued');
+    expect(urlJob.source_type).toBe('url');
+    expect(urlJob.source_url).toBe('https://example.com/menu');
+    expect(urlJob.source_hash).toBeNull();
+    expect(urlJob.source_storage_key).toMatch(
+      new RegExp(`^menu-ingestion/sources/${venueId}/[a-f0-9-]+/source$`),
+    );
+
+    // Accepts url with pre-materialized content digest
+    const urlJobWithHash = await submitMenuIngestion(client, {
+      venueId,
+      sourceType: 'url',
+      sourceUrl: 'https://example.com/menu2',
+      sourceHash: 'a'.repeat(64),
+      idempotencyKey: 'idem_url_with_hash',
+    });
+    expect(urlJobWithHash.source_hash).toBe('a'.repeat(64));
+
+    // Rejects url with invalid protocol (SSRF defense)
     await expect(
       submitMenuIngestion(client, {
         venueId,
         sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
-        idempotencyKey: 'idem_url_reject',
+        sourceUrl: 'ftp://not-http-url',
+        idempotencyKey: 'idem_url_invalid',
       }),
     ).rejects.toMatchObject({
-      code: 'unsupported_source_type',
+      code: 'ssrf_destination_prohibited',
+      status: 400,
+    });
+
+    // Rejects url targeting loopback or cloud metadata (SSRF defense)
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'http://169.254.169.254/latest/meta-data',
+        idempotencyKey: 'idem_ssrf_metadata',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ssrf_destination_prohibited',
+      status: 400,
+    });
+
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'http://localhost/menu',
+        idempotencyKey: 'idem_ssrf_localhost',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ssrf_destination_prohibited',
+      status: 400,
+    });
+
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://user:pass@example.com/menu',
+        idempotencyKey: 'idem_ssrf_userinfo',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ssrf_destination_prohibited',
+      status: 400,
+    });
+
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com:8080/menu',
+        idempotencyKey: 'idem_ssrf_port',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ssrf_destination_prohibited',
       status: 400,
     });
 

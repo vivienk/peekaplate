@@ -121,13 +121,25 @@ export async function createIngestionJob(
   const sourceHash = params.sourceHash ?? null;
   const sourceStorageKey = params.sourceStorageKey ?? null;
 
+  const rowSourceUrl = row.source_url ?? null;
+  const rowSourceHash = row.source_hash ?? null;
+  const rowSourceStorageKey = row.source_storage_key ?? null;
+
+  const isDefaultCanonicalKey = (key: string | null, tenant: string, jobId: string) =>
+    key === `menu-ingestion/sources/${tenant}/${jobId}/source`;
+
+  const keysConflict =
+    sourceStorageKey !== rowSourceStorageKey &&
+    !(
+      isDefaultCanonicalKey(sourceStorageKey, params.tenantId, id) &&
+      isDefaultCanonicalKey(rowSourceStorageKey, row.tenant_id, row.id)
+    );
+
   if (
     row.source_type !== params.sourceType ||
-    (sourceHash !== null && row.source_hash !== null && row.source_hash !== sourceHash) ||
-    (sourceUrl !== null && row.source_url !== null && row.source_url !== sourceUrl) ||
-    (sourceStorageKey !== null &&
-      row.source_storage_key !== null &&
-      row.source_storage_key !== sourceStorageKey)
+    sourceHash !== rowSourceHash ||
+    sourceUrl !== rowSourceUrl ||
+    keysConflict
   ) {
     throw new IngestionError(
       'idempotency_conflict',

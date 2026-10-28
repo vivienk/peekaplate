@@ -18,7 +18,7 @@
         "APP_ENV": "staging",
         "POSTHOG_PROJECT_ID": "675372",
         "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
-        "EXTRACTION_TIMEOUT_MS": "600000"
+        "EXTRACTION_TIMEOUT_MS": "720000"
       },
       "hyperdrive": [
         {

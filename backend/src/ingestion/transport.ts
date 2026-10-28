@@ -3,11 +3,11 @@ import { mintExtractionCapability } from '../extraction-capability.js';
 import { IngestionError, type MenuIngestionJobRow } from './repository.js';
 
 /**
- * Default extraction HTTP transport timeout in milliseconds (600 seconds = 10 minutes).
- * Accommodates long-running multi-page OCR (e.g. 35-page runs taking ~368s)
- * and cold multimodal LLM batch processing (~500s).
+ * Default extraction HTTP transport timeout in milliseconds (720 seconds = 12 minutes).
+ * Accommodates long-running multi-page OCR (e.g. 35-page runs taking ~368s),
+ * cold multimodal LLM batch processing (~500s), and Python service cap (700s) + transport.
  */
-export const DEFAULT_EXTRACTION_TIMEOUT_MS = 600_000;
+export const DEFAULT_EXTRACTION_TIMEOUT_MS = 720_000;
 
 export type HttpExtractorConfig = {
   serviceUrl: string;
@@ -34,6 +34,14 @@ export function createHttpPythonExtractor(config: HttpExtractorConfig) {
     job: MenuIngestionJobRow,
     callOptions?: ExtractorCallOptions,
   ): Promise<MenuExtractionResult | unknown> {
+    if (job.source_type !== 'pdf' && job.source_type !== 'photo') {
+      throw new IngestionError(
+        'unsupported_extractor_source_type',
+        400,
+        `Python extraction service requires materialized 'pdf' or 'photo' source. Source type "${job.source_type}" must be processed via retrieval handoff or materialized prior to extraction.`,
+      );
+    }
+
     if (!job.source_storage_key || !job.source_hash) {
       throw new IngestionError(
         'missing_materialized_source',

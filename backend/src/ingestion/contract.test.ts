@@ -319,6 +319,42 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       });
     });
 
+    it('rejects unsupported extractor source_type without silent coercion', async () => {
+      const extractor = createHttpPythonExtractor({
+        serviceUrl: 'https://extraction.example.internal',
+        authToken: 'test-token',
+        fetchFn: (async () => Response.json({})) as any,
+      });
+
+      const urlJob: any = {
+        id: 'job_url',
+        tenant_id: 'tenant_url',
+        source_type: 'url',
+        source_storage_key: 'menus/sample.html',
+        source_hash: 'a'.repeat(64),
+        idempotency_key: 'idem_url',
+      };
+
+      await expect(extractor(urlJob)).rejects.toMatchObject({
+        code: 'unsupported_extractor_source_type',
+        status: 400,
+      });
+
+      const textJob: any = {
+        id: 'job_text',
+        tenant_id: 'tenant_text',
+        source_type: 'text',
+        source_storage_key: 'menus/sample.txt',
+        source_hash: 'b'.repeat(64),
+        idempotency_key: 'idem_text',
+      };
+
+      await expect(extractor(textJob)).rejects.toMatchObject({
+        code: 'unsupported_extractor_source_type',
+        status: 400,
+      });
+    });
+
     it('correctly matches evidence and preserves original draft_index when drafts are non-contiguous', () => {
       const payload: any = {
         schema_version: 2,
@@ -500,8 +536,8 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       });
     });
 
-    it('exports DEFAULT_EXTRACTION_TIMEOUT_MS set to 600,000ms (10 minutes)', () => {
-      expect(DEFAULT_EXTRACTION_TIMEOUT_MS).toBe(600_000);
+    it('exports DEFAULT_EXTRACTION_TIMEOUT_MS set to 720,000ms (12 minutes)', () => {
+      expect(DEFAULT_EXTRACTION_TIMEOUT_MS).toBe(720_000);
     });
 
     it('successfully handles long-running extraction that exceeds 120s limit within 600s timeout', async () => {

@@ -1,9 +1,11 @@
+import { isIP } from 'node:net';
 import {
   type MenuExtractionResult,
   MenuExtractionResultSchema,
   MenuIngestionQueueMessageSchema,
   type StructuredDishDraft,
 } from '@peekaplate/contracts';
+import { isProhibitedIP } from '../retrieval/security';
 import { adaptPythonExtractionResult } from './adapter';
 import {
   claimIngestionJob,
@@ -24,6 +26,80 @@ export type IngestionRequest = {
   sourceStorageKey?: string | null | undefined;
   idempotencyKey: string;
 };
+
+/**
+ * Validates destination URL format and enforces SSRF restrictions
+ * (protocol, userinfo, port, localhost, internal domains, and private/reserved IP literals).
+ */
+export function validateIngestionUrl(rawUrl: string): URL {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new IngestionError('invalid_source_url', 400, 'Invalid destination URL format');
+  }
+
+  // Restrict protocols
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Unsupported protocol '${url.protocol}'; only http: and https: are permitted`,
+    );
+  }
+
+  // Reject credentials in URL
+  if (url.username || url.password) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      'URLs containing user credentials are not permitted',
+    );
+  }
+
+  // Restrict ports (must be 80 for http, 443 for https)
+  const explicitPort = url.port ? Number.parseInt(url.port, 10) : null;
+  const standardPort = url.protocol === 'https:' ? 443 : 80;
+  if (explicitPort !== null && explicitPort !== standardPort) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Non-standard port ${explicitPort} is prohibited for ${url.protocol}`,
+    );
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname) {
+    throw new IngestionError('invalid_source_url', 400, 'Missing hostname in URL');
+  }
+
+  // Localhost & internal domain checks
+  const isLoopbackHost = hostname === 'localhost' || hostname.endsWith('.localhost');
+  const isInternalDomain =
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan') ||
+    hostname.endsWith('.home.arpa');
+
+  if (isInternalDomain || isLoopbackHost) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Destination hostname '${hostname}' is an internal domain`,
+    );
+  }
+
+  // Check if hostname is a private/reserved IP literal
+  if (isIP(hostname) !== 0 && isProhibitedIP(hostname)) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Direct connection to private/reserved IP '${hostname}' is prohibited`,
+    );
+  }
+
+  return url;
+}
 
 export type PythonExtractor = (job: MenuIngestionJobRow) => Promise<MenuExtractionResult | unknown>;
 
@@ -63,22 +139,48 @@ export async function submitMenuIngestion(
     throw new IngestionError('invalid_request', 400, 'venueId and idempotencyKey are required');
   }
 
-  // Reject unmaterialized URL and raw text sources at submission boundary
-  if (request.sourceType === 'url' || request.sourceType === 'text') {
+  // Reject raw text sources at submission boundary
+  if (request.sourceType === 'text') {
     throw new IngestionError(
       'unsupported_source_type',
       400,
-      `Source type "${request.sourceType}" is not supported for direct extraction. URL and text menu ingestion requires prior retrieval materialization to private R2. Please submit 'pdf' or 'photo' with sourceHash and sourceStorageKey.`,
+      'Source type "text" is not supported for direct extraction.',
     );
   }
 
-  // PDF and photo sources require SHA-256 hash
-  if (!request.sourceHash || !/^[0-9a-f]{64}$/.test(request.sourceHash)) {
-    throw new IngestionError(
-      'missing_source_hash',
-      400,
-      'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
-    );
+  let sourceHash = request.sourceHash ?? null;
+
+  if (request.sourceType === 'url') {
+    if (!request.sourceUrl || typeof request.sourceUrl !== 'string') {
+      throw new IngestionError(
+        'invalid_source_url',
+        400,
+        'A valid http or https sourceUrl is required for URL menu ingestion',
+      );
+    }
+    // Validate destination and enforce SSRF protections
+    validateIngestionUrl(request.sourceUrl);
+
+    if (sourceHash) {
+      if (!/^[0-9a-f]{64}$/.test(sourceHash)) {
+        throw new IngestionError(
+          'invalid_source_hash',
+          400,
+          'A valid 64-character SHA-256 hex sourceHash is required if provided for URL menu extraction',
+        );
+      }
+    } else {
+      sourceHash = null;
+    }
+  } else {
+    // PDF and photo sources require SHA-256 hash
+    if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
+      throw new IngestionError(
+        'missing_source_hash',
+        400,
+        'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
+      );
+    }
   }
 
   const jobId = crypto.randomUUID();
@@ -86,7 +188,11 @@ export async function submitMenuIngestion(
   let sourceStorageKey = canonicalSourceKey;
 
   if (request.sourceStorageKey) {
-    if (request.sourceStorageKey.includes('..') || request.sourceStorageKey.startsWith('/')) {
+    if (
+      request.sourceStorageKey.includes('..') ||
+      request.sourceStorageKey.startsWith('/') ||
+      request.sourceStorageKey.includes('\\')
+    ) {
       throw new IngestionError(
         'invalid_source_storage_key',
         400,
@@ -112,7 +218,7 @@ export async function submitMenuIngestion(
     tenantId: request.venueId,
     sourceType: request.sourceType,
     sourceUrl: request.sourceUrl ?? null,
-    sourceHash: request.sourceHash,
+    sourceHash,
     sourceStorageKey,
     idempotencyKey: request.idempotencyKey,
   });
