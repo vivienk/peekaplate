@@ -80,6 +80,13 @@ Private raw/cleared/rejected values are kept separately in
 `review-suggestions.json`; they are not silently substituted into grounded originals. VIS-01 and review API consumers still need explicit
 version-2 integration; mixed version pairs are rejected rather than relabeled.
 
+A separate [private OCR-box prototype](../docs/processing-v3.md#private-ocr-box-prototype)
+compares saved single-image overlays with saved image-model readings offline. It
+writes its own unvalidated transcript/proposals; it never populates standard draft
+prices, changes RES evidence or joins suggestion IDs to final candidates. The
+service does not retain it automatically. No new provider call or verification
+model is involved; keep inputs and output private.
+
 **LLM verification is yours to add.** No verification/review agent is included.
 Add your verification node after `synthesizer` in `workflow.py` when ready.
 

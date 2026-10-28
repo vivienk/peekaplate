@@ -37,7 +37,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "cf67c1a2116c5fefeceae2fc1c6f21709fe3336095d5bd279f5e9eed03a8a60d"
+      "sourceFingerprint": "97f0ac3968fa537b22ad30000266f4652cd6f2cabdf51fac66ec48606655725b"
     },
     {
       "id": "diner",
@@ -295,7 +295,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/photo processing exposes ocr, default ocr_image and true no-OCR image inputs via the existing model/graph. Private raw/cleared/rejected suggestions retain source/image references; grounded RES originals and code-point spans stay strict. Image-only has no grounded candidates and an incomplete report. Vision groups split before calls; image/context hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported. Opt-in CLI/Python isTable=false has separate cache identity; true/service defaults remain unchanged. The bounded column-menu trial returned identical price-less text: recovery remains unresolved. The authenticated service has no database/publication access and bundles final timings/suggestions before cleanup. Docker excludes nested env/history. Host persistence is locally tested, not a deployed guarantee; hosting, PR45 integration, representative quality and human approval remain gates.",
+      "summary": "Bounded PDF/photo processing exposes ocr, default ocr_image and true no-OCR image inputs via the existing graph. Private suggestions retain source/image references; public RES originals and code-point spans stay strict. Image-only has no grounded candidates and an incomplete report. Vision groups split before calls; hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported. Opt-in isTable=false has separate cache identity but its bounded trial did not restore prices. The offline overlay_review prototype retains exact box transcripts and unvalidated complete-sequence numeric proposals; ambiguity/conflicts abstain. It never changes standard drafts/IDs, metadata, RES schemas or service bundles. Source consistency is not same-run proof. The service has no database/publication access; Docker excludes env/history. Hosted integration, representative quality and human approval remain gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -309,6 +309,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/model_cache.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
+        "processing/src/peekaplate_processing/overlay_review.py",
         "processing/src/peekaplate_processing/pdf.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
         "processing/src/peekaplate_processing/schemas.py",
@@ -318,6 +319,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixture_factory.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
+        "processing/tests/test_overlay_review.py",
+        "processing/tests/test_overlay_saved_inputs.py",
         "processing/tests/test_pdf_images.py",
         "processing/tests/test_schemas.py",
         "processing/tests/test_workflow.py",
@@ -368,7 +371,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "940435f08de9f824024c38c5abf4c885f03541e5310115f9f4063a6c07ad8db4"
+      "sourceFingerprint": "a301c9a35315c14276c7c0b13dffcb913104354ac592c016e56712f170b1423e"
     }
   ],
   "handoffs": [

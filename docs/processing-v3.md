@@ -166,6 +166,8 @@ standalone price groups in an entry remain ambiguous even if a suggested number
 appears in that cluster. Overlay labels omitted from the OCR text can be image
 logos or captions: they cannot supply facts and do not invalidate unrelated
 entry associations. Original text, geometry and Unicode offsets are not rewritten.
+The separately identified [private OCR-box prototype](#private-ocr-box-prototype)
+may compare these readings offline; it does not relax this grounded-output rule.
 
 Compatible same-name candidates collapse only when they resolve to one source
 entry and one unchanged candidate contains the other's supported facts. Names
@@ -180,6 +182,71 @@ never rewritten or deduplicated by the review exporter.
 This reduces cross-dish mistakes but does not establish extraction accuracy.
 All drafts still require human review. Original OCR text and page evidence are
 retained so missing or wrongly grouped values can be corrected later.
+
+## Private OCR-box prototype
+
+`peekaplate_processing.overlay_review` is an explicitly separate, offline diagnostic,
+not a graph step, verification model, source-text repair or RES evidence extension.
+It reads a saved full `pages.json`/`extraction.json` and image-input
+`review-suggestions.json`, and creates a new private `overlay-review.json`.
+No environment file, image-reference path, provider or pipeline is invoked.
+The service/host bundle does **not** retain this additional artifact automatically.
+
+The artifact has its own `artifact_type: "private_overlay_review"`, schema1 and
+`unvalidated` status on every row. It preserves every valid saved OCR region's
+verbatim text, coordinates and **saved-region index**, not an invented provider ID.
+Its transcript joins region texts in stored order with explicitly recorded newlines.
+Zero-based Unicode code-point spans (exclusive end) identify this transcript only;
+they are never ParsedText offsets or `SourceSpan` evidence. Source snapshot/upload
+hashes and both input hashes bind the artifact. File export hashes exact input bytes;
+the Python in-memory helper hashes deterministic JSON. Source consistency is **not**
+proof that suggestions and OCR came from the same run; existing suggestion IDs omit
+run identity and are not joined to final candidate IDs.
+
+The initial scope is one ready Engine3 segment from an unchanged PNG/JPEG source
+image, orientation1, at most6 megapixels/8 MB, with at most1,000 regions/500
+suggestions. Snapshot size/hash, original image/page references, re-created OCR
+upload hash/dimensions and complete geometry are checked before comparison.
+Unsupported provenance fails without output; unavailable, malformed, overlapping
+or duplicate geometry yields explicit abstentions without a transcript. No fallback
+to page-wide text is permitted. Inputs and standard exports remain unchanged.
+
+Association requires one exact case/whitespace-normalized, single-region title and
+all eligible same-row price cells. Repeated phrases, intervening labels, partly
+aligned cells and extra/conflicting readings abstain. Wrapped, composed and inline
+titles are not recovered. Complete ordered numeric readings must match the saved
+image-model suggestion; an unsupported scalar or convenient subset cannot establish
+agreement. Bounded nonnegative integer/one- or two-decimal amounts and literal
+SM/LG/recognized monetary forms are supported; signs, units, fragments and uncertain
+bare-integer whitespace lists abstain. Model whitespace/slash separators are not
+inserted into OCR evidence. Each proposed part retains its exact source-box literal
+and transcript span. Multiple readings have no scalar; currency always stays null.
+No column meanings, sizes, variants, qualifier relationships or dish rectangles are
+inferred. Both model and OCR can agree on a wrong reading: numeric agreement is
+**not factual approval**. Every original suggestion and abstention reason is kept.
+
+From `processing`, after installing dependencies, choose a fresh private output:
+
+```sh
+uv run --frozen --offline --no-env-file python -m peekaplate_processing.overlay_review \
+  --input work/saved-run/extraction.json \
+  --suggestions work/saved-run/review-suggestions.json \
+  --output work/overlay-prototype/overlay-review.json
+```
+
+Output is create-only with private file permissions. Exit0 means an artifact was
+written, even when all rows abstain; invalid input/existing output exits1. Keep the
+artifact beside its immutable inputs and restrict access. Do not stash it in segment
+metadata: that metadata is exported and is not a private extension point. Public
+box-backed candidates still require coordinated Python/TypeScript evidence schemas,
+consumer acceptance and service/host retention changes; this prototype authorizes none.
+
+The frozen single-image replay retained all14 suggestions/44 regions:10 rows had
+numeric agreement covering18 visually checked price cells;4 abstained. The extra
+veggie reading and imported-drink disagreement were withheld, as were header and
+repeated-phrase ambiguities. A shared OCR/model spelling error was not corrected.
+These selected numeric checks are not whole-menu/name/role accuracy. All14 standard
+candidates, IDs and null prices remained unchanged. No additional paid call occurred.
 
 ## Timings on each started run
 

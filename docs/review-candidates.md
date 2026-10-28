@@ -106,6 +106,10 @@ vision values stay private rather than becoming invented OCR facts. Image-only
 writes an explicit incomplete standard report with no grounded candidates, plus
 private suggestions and actual page-image references. Exporting that report cannot
 create image-backed candidates; such a public evidence contract remains deferred.
+The [private OCR-box prototype](processing-v3.md#private-ocr-box-prototype) has its
+own transcript namespace and unvalidated numeric proposals. It is not accepted by
+this exporter, does not mutate originals/IDs and is not inserted into segment
+metadata or the service bundle. It does not amend the public source-text contract.
 
 Offsets count Python Unicode code points: zero-based start, exclusive end. The
 source text is never normalized by the exporter. TypeScript validates slices via
