@@ -3,14 +3,24 @@ import {
   DIETARY_VALUES,
   type Dish,
   type Menu,
+  type MenuImage,
   type MenuLoadResult,
-  type WireDish,
-  type WireMenuBundle,
 } from './types';
+import type { WireDish, WireImage, WireMenuBundle } from './wire';
+
+export const FIXTURE_NOTICE = 'Fixture data';
 
 // Chip labels compare without case, hyphens or spaces, so "gluten free" equals "Gluten-free".
 export function chipKey(value: string): string {
   return value.toLowerCase().replace(/[\s-]+/g, '');
+}
+
+// Listing either value means the dish cannot also be shown as Gluten-free.
+const EXCLUDES_GLUTEN_FREE = new Set([chipKey('Gluten'), chipKey('Wheat')]);
+
+// Every field is copied by name, so unknown or draft fields in the data never reach screens.
+function toImage(image: WireImage): MenuImage {
+  return { url: image.url, width: image.width, height: image.height, alt: image.alt };
 }
 
 function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish {
@@ -24,11 +34,11 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
     };
   }
   const allergens = [...new Map((dish.allergens ?? []).map((a) => [chipKey(a), a])).values()];
-  const containsGluten = allergens.some((a) => chipKey(a) === chipKey('Gluten'));
+  const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));
   const dietary = DIETARY_VALUES.filter(
     (value) =>
       dish.dietary.some((d) => chipKey(d) === chipKey(value)) &&
-      !(containsGluten && value === 'Gluten-free'),
+      !(glutenFreeExcluded && value === 'Gluten-free'),
   );
   return {
     kind: 'complete',
@@ -38,7 +48,7 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
     categoryName,
     name: dish.name,
     description: dish.description,
-    price: dish.price,
+    price: { amount: dish.price.amount, currency: dish.price.currency },
     ingredients: dish.ingredients.map((i) => ({
       ingredientId: i.ingredient_id,
       name: i.name,
@@ -46,7 +56,9 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
     })),
     allergens,
     dietary,
-    images: dish.images,
+    images: dish.images
+      ? { card: toImage(dish.images.card), detail: toImage(dish.images.detail) }
+      : null,
   };
 }
 
@@ -61,13 +73,15 @@ export function toMenu(
     dishes: c.dishes.map((d) => toDish(d, c.category_id, c.name)),
   }));
   if (categories.every((c) => c.dishes.length === 0)) return { status: 'empty' };
+  const { logo } = bundle.restaurant;
   return {
     status: 'ready',
     menu: {
       source,
+      notice: source === 'fixture' ? FIXTURE_NOTICE : null,
       publicationRevisionId,
       menuRevisionId: bundle.menu_revision_id,
-      restaurant: bundle.restaurant,
+      restaurant: { name: bundle.restaurant.name, logo: logo ? toImage(logo) : null },
       categories,
     },
   };

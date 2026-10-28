@@ -1,16 +1,10 @@
-// Synthetic fixtures for DIN-01. Dish names follow Rania's Figma frames; every value is invented
-// test data, not an approved restaurant menu, and images are labelled placeholders, not food photos.
+// Synthetic fixtures for S3-DIN-01.1. Dish names follow Rania's Figma frames; every value is
+// invented test data, not an approved restaurant menu, and images are labelled placeholders, not
+// food photos. Allergen names follow the PR #51 vocabulary until the P0 allergen list is approved.
 import { toMenu } from './adapter';
-import type {
-  MenuLoadResult,
-  MenuSource,
-  WireCompleteDish,
-  WireDish,
-  WireImage,
-  WireMenuBundle,
-} from './types';
+import type { MenuLoadResult, MenuSource } from './types';
+import type { WireCompleteDish, WireDish, WireImage, WireMenuBundle } from './wire';
 
-export const FIXTURE_LABEL = 'Synthetic fixture data, not a real restaurant menu';
 export const FIXTURE_PUBLICATION_REVISION_ID = 'a5000000-0000-4000-8000-000000000001';
 
 const id = (prefix: string, n: number) =>
@@ -35,8 +29,8 @@ export const DISH = {
   noIngredients: id('a1', 10),
 } as const;
 
-// Used by tests and screens: an allergen value expected to have no icon in the Figma icon frame.
-export const NO_ICON_ALLERGEN = 'Lupin';
+// Wheat is in the PR #51 vocabulary but has no icon in the Figma allergen icon set (1031:8072).
+export const NO_ICON_ALLERGEN = 'Wheat';
 export const NO_ICON_INGREDIENT = 'House sauce';
 
 function placeholderImage(label: string): WireImage {
@@ -75,14 +69,14 @@ const images = (label: string) => ({
 });
 const usd = (amount: string) => ({ amount, currency: 'USD' });
 
-// Three coherent dishes for the end-to-end demo journey.
+// Five coherent dishes for the end-to-end demo journey.
 const avocadoToast = dish(1, {
   name: 'Avocado Toast',
   description:
     'Smashed avocado on toasted sourdough with a poached egg, cherry tomatoes and greens.',
   price: usd('14.00'),
   ingredients: ['Sourdough bread', 'Avocado', 'Poached egg', 'Cherry tomatoes', 'Microgreens'],
-  allergens: ['Gluten', 'Egg'],
+  allergens: ['Wheat', 'Egg'],
   dietary: ['Vegetarian'],
   images: images('Avocado Toast'),
 });
@@ -108,7 +102,7 @@ const eggsBenedict = dish(3, {
     'Chives',
     NO_ICON_INGREDIENT,
   ],
-  allergens: ['Milk', 'Egg', 'Gluten'],
+  allergens: ['Milk', 'Egg', 'Wheat'],
   dietary: [],
   images: images('Classic Eggs Benedict'),
 });
@@ -116,13 +110,14 @@ const eggsBenedict = dish(3, {
 // Edge cases listed in the DIN-01 ticket.
 const manyChips = dish(4, {
   name: 'Garden Avocado Salad',
-  description: 'Mixed leaves, avocado, cucumber and seeds with a mustard dressing.',
+  description: 'Mixed leaves, avocado and walnuts with peanut dressing and sesame tofu croutons.',
   price: usd('13.00'),
-  ingredients: ['Mixed leaves', 'Avocado', 'Cucumber', 'Sunflower seeds', 'Mustard dressing'],
-  allergens: ['Mustard', 'Sesame', 'Celery', 'Sulphites', 'Tree nuts', NO_ICON_ALLERGEN],
-  dietary: ['Vegan', 'Vegetarian', 'Gluten-free'],
+  ingredients: ['Mixed leaves', 'Avocado', 'Walnuts', 'Peanut dressing', 'Tofu croutons'],
+  allergens: ['Tree nut', 'Peanut', 'Soy', 'Sesame', NO_ICON_ALLERGEN],
+  dietary: ['Vegan', 'Vegetarian'],
   images: images('Garden Avocado Salad'),
 });
+// Ticket wording: "Gluten" with "Gluten-free"; reword to Wheat once the P0 allergen list is approved.
 const glutenConflict = dish(5, {
   name: 'Berry Pancake Stack',
   description: 'Buttermilk pancakes with mixed berries and maple syrup.',
@@ -146,7 +141,7 @@ const missingImage = dish(7, {
   description: 'Thick brioche slices with cinnamon custard and whipped cream.',
   price: usd('16.00'),
   ingredients: ['Brioche', 'Egg custard', 'Cinnamon', 'Whipped cream'],
-  allergens: ['Gluten', 'Egg', 'Milk'],
+  allergens: ['Wheat', 'Egg', 'Milk'],
   dietary: ['Vegetarian'],
   images: null,
 });
@@ -156,10 +151,26 @@ const longName = dish(8, {
     'Heirloom tomatoes roasted for three hours, creamy burrata, basil oil, flaky salt and toasted sourdough crumbs, served with a small side of dressed rocket leaves.',
   price: usd('17.50'),
   ingredients: ['Heirloom tomatoes', 'Burrata', 'Basil oil', 'Sourdough crumbs', 'Rocket'],
-  allergens: ['Milk', 'Gluten'],
+  allergens: ['Milk', 'Wheat'],
   dietary: ['Vegetarian'],
   images: images('Heirloom Tomato and Burrata Salad'),
 });
+
+// Draft-like fields the adapter must drop at every level; the value marks any leak in tests.
+export const DRAFT_MARKER = 'DRAFT-ONLY';
+const withDraftFields = (d: WireCompleteDish): WireDish =>
+  Object.assign({}, d, {
+    draft_notes: DRAFT_MARKER,
+    ocr_confidence: 0.42,
+    internal_cost: DRAFT_MARKER,
+    price: { ...d.price, cost_basis: DRAFT_MARKER },
+    ingredients: d.ingredients.map((i) => ({ ...i, supplier: DRAFT_MARKER })),
+    images: d.images && {
+      card: { ...d.images.card, source_file: DRAFT_MARKER },
+      detail: { ...d.images.detail, source_file: DRAFT_MARKER },
+    },
+  });
+const longNameWithDrafts = withDraftFields(longName);
 const incomplete: WireDish = {
   dish_id: DISH.incomplete,
   dish_revision_id: id('a2', 9),
@@ -179,12 +190,13 @@ function bundle(
   revision: number,
   categories: { breakfast: WireDish[]; brunchBowls: WireDish[]; salads: WireDish[] },
 ): WireMenuBundle {
+  const restaurant = { name: 'Ember & Stone', logo: null, internal_code: DRAFT_MARKER };
   return {
     schema_version: 1,
     venue_id: id('a6', 1),
     menu_id: id('a7', 1),
     menu_revision_id: id('a8', revision),
-    restaurant: { name: 'Ember & Stone', logo: null },
+    restaurant,
     categories: [
       { category_id: CATEGORY.breakfast, name: 'Breakfast', dishes: categories.breakfast },
       { category_id: CATEGORY.brunchBowls, name: 'Brunch Bowls', dishes: categories.brunchBowls },
@@ -195,21 +207,21 @@ function bundle(
 
 export const demoBundle = bundle(1, {
   breakfast: [avocadoToast, eggsBenedict],
-  brunchBowls: [harvestPowerBowl],
-  salads: [],
+  brunchBowls: [harvestPowerBowl, salmonPokeBowl],
+  salads: [manyChips],
 });
 
 export const edgeCaseBundle = bundle(2, {
   breakfast: [avocadoToast, eggsBenedict, glutenConflict, missingImage],
   brunchBowls: [harvestPowerBowl, salmonPokeBowl, incomplete],
-  salads: [manyChips, longName, noIngredients],
+  salads: [manyChips, longNameWithDrafts, noIngredients],
 });
 
 // The same menu after an update that withdraws the Salmon Poke Bowl.
 export const edgeCaseAfterWithdrawalBundle = bundle(3, {
   breakfast: [avocadoToast, eggsBenedict, glutenConflict, missingImage],
   brunchBowls: [harvestPowerBowl, incomplete],
-  salads: [manyChips, longName, noIngredients],
+  salads: [manyChips, longNameWithDrafts, noIngredients],
 });
 
 const layoutCategories = { breakfast: [], brunchBowls: [], salads: [] } as {

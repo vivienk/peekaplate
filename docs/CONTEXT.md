@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01 adds a replaceable menu source, wire-to-diner adapter and labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -39,6 +39,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/frontend-design.md",
         "frontend/diner/package.json",
         "frontend/diner/src/menu/types.ts",
+        "frontend/diner/src/menu/wire.ts",
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
@@ -50,7 +51,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "e6e420253f2fa410a6e9a1165c01761fec4ec1969aa47b188466181c86b91f0d"
+      "sourceFingerprint": "c8670eebd7cba8907f223c91aa8d9019b413c975ba910c1534ff09c71f4080a0"
     },
     {
       "id": "console",
@@ -331,11 +332,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Started S3-DIN-01 fixtures: a MenuSource interface, an adapter from the draft RES-02 content bundle (PR #43 shape plus fixture-only allergens) to diner dishes, and labelled synthetic fixtures named after Rania's Figma dishes. The adapter makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, suppresses Gluten-free when Gluten is listed and never drops allergens. Fixtures cover the ticket edge cases, a withdrawal between loads, a 20-dish layout set and empty/unavailable/error/offline/slow states. 18 Vitest cases pass.",
+      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, suppresses Gluten-free when Gluten or Wheat is listed and never drops allergens. Fixtures use PR #51 allergen names and cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set and empty/unavailable/error/offline/slow states. 21 Vitest cases pass.",
       "modules": [
         "diner"
       ],
-      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource; DIN-03 adds a published source behind the same interface and swaps the local wire types for @peekaplate/contracts once RES-02 merges. Adam/Zhiliang to settle whether a complete dish may have zero ingredients and how allergens are supplied."
+      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Vivien to approve the P0 allergen list (reword the Gluten conflict fixture to Wheat; Figma icons use Soya/Nuts/Peanuts vs #51 Soy/Tree nut/Peanut). Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
     },
     {
       "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",

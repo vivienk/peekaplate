@@ -1,15 +1,18 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { chipKey, completeDishes, toMenu } from './adapter';
+import { chipKey, completeDishes, FIXTURE_NOTICE, toMenu } from './adapter';
 import {
   CATEGORY,
   createFixtureMenuSource,
   DISH,
+  DRAFT_MARKER,
   edgeCaseBundle,
   FIXTURE_PUBLICATION_REVISION_ID,
   NO_ICON_ALLERGEN,
   NO_ICON_INGREDIENT,
 } from './fixtures';
 import type { CompleteDish, Menu } from './types';
+import type { WireCompleteDish } from './wire';
 
 async function loadMenu(scenario: Parameters<typeof createFixtureMenuSource>[0]): Promise<Menu> {
   const result = await createFixtureMenuSource(scenario).load();
@@ -28,15 +31,18 @@ function complete(menu: Menu, dishId: string): CompleteDish {
 }
 
 describe('fixture menu source', () => {
-  it('serves three coherent complete dishes for the demo journey', async () => {
+  it('serves five coherent complete dishes for the demo journey', async () => {
     const menu = await loadMenu('demo');
     expect(menu.source).toBe('fixture');
+    expect(menu.notice).toBe('Fixture data');
     expect(menu.publicationRevisionId).toBe(FIXTURE_PUBLICATION_REVISION_ID);
     expect(menu.restaurant.name).toBe('Ember & Stone');
     expect(completeDishes(menu).map((d) => d.name)).toEqual([
       'Avocado Toast',
       'Classic Eggs Benedict',
       'Harvest Power Bowl',
+      'Salmon Poke Bowl',
+      'Garden Avocado Salad',
     ]);
   });
 
@@ -70,11 +76,17 @@ describe('fixture menu source', () => {
     expect(dish.dietary).toEqual(['Vegetarian']);
   });
 
-  it('keeps every validated allergen, including one without an icon', async () => {
+  it('keeps every validated allergen, including one without an icon, for chip wrapping', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.gardenAvocadoSalad);
-    expect(dish.allergens).toHaveLength(6);
-    expect(dish.allergens).toContain(NO_ICON_ALLERGEN);
-    expect(dish.dietary).toEqual(['Vegan', 'Vegetarian', 'Gluten-free']);
+    expect(dish.allergens).toEqual(['Tree nut', 'Peanut', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
+    expect(dish.dietary).toEqual(['Vegan', 'Vegetarian']);
+  });
+
+  it('never shows draft-like fields from the data, at any level', async () => {
+    const menu = await loadMenu('edge-cases');
+    expect(JSON.stringify(menu)).not.toContain(DRAFT_MARKER);
+    expect(JSON.stringify(menu)).not.toMatch(/draft_notes|ocr_confidence|internal_code|supplier/);
+    expect(complete(menu, DISH.longName).price).toEqual({ amount: '17.50', currency: 'USD' });
   });
 
   it('includes an ingredient that has no matching icon', async () => {
@@ -129,6 +141,41 @@ describe('menu adapter', () => {
   it('compares chip labels without case, hyphens or spaces', () => {
     expect(chipKey('Gluten-free')).toBe(chipKey('gluten free'));
     expect(chipKey('Gluten')).not.toBe(chipKey('Gluten-free'));
+  });
+
+  it('also suppresses Gluten-free when Wheat is listed', () => {
+    const wheat: WireCompleteDish = {
+      dish_id: DISH.avocadoToast,
+      dish_revision_id: DISH.avocadoToast,
+      complete: true,
+      name: 'Test',
+      description: 'Test',
+      price: { amount: '1.00', currency: 'USD' },
+      ingredients: [{ ingredient_id: DISH.harvestPowerBowl, name: 'Bread', description: null }],
+      allergens: ['wheat'],
+      dietary: ['Gluten-free', 'Vegan'],
+      images: null,
+    };
+    const result = toMenu(
+      {
+        ...edgeCaseBundle,
+        categories: [{ category_id: CATEGORY.breakfast, name: 'B', dishes: [wheat] }],
+      },
+      'published',
+      FIXTURE_PUBLICATION_REVISION_ID,
+    );
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(complete(result.menu, DISH.avocadoToast).dietary).toEqual(['Vegan']);
+    expect(result.menu.notice).toBeNull();
+    expect(FIXTURE_NOTICE).toBe('Fixture data');
+  });
+
+  it('is the only screen-facing module that reads the data shape', () => {
+    const dir = new URL('.', import.meta.url);
+    const readers = readdirSync(dir)
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .filter((f) => /from '\.\/wire'/.test(readFileSync(new URL(f, dir), 'utf8')));
+    expect(readers.sort()).toEqual(['adapter.ts', 'fixtures.ts']);
   });
 
   it('drops dietary values outside the closed P0 list', () => {
