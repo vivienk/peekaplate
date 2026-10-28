@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(27);
+SELECT plan(29);
 
 INSERT INTO app_private.venues (id, name) VALUES
   ('00000000-0000-0000-0000-0000000000a1', 'Observation venue one'),
@@ -48,6 +48,12 @@ SELECT throws_like(
 SELECT throws_like(
   $$INSERT INTO app_private.observation_index (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type, authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition) VALUES ('00000000-0000-0000-0000-0000000000a1', '60000000-0000-4000-8000-000000000006', repeat('a', 64), 'observation.v2', 'dish_detail_opened', '70000000-0000-4000-8000-000000000001', '2026-10-23 10:05:01Z', '2026-10-23 10:00:00Z', 'raw/observations/a1/6.json', 'accepted')$$,
   'new row for relation "observation_index" violates check constraint%', 'accepted occurred_at more than 5 minutes ahead is refused');
+SELECT lives_ok(
+  $$INSERT INTO app_private.observation_index (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type, authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition) VALUES ('00000000-0000-0000-0000-0000000000a1', '60000000-0000-4000-8000-000000000009', repeat('a', 64), 'observation.v2', 'dish_detail_opened', '70000000-0000-4000-8000-000000000001', timestamptz '2026-10-23 10:00:00Z' - interval '24 hours', '2026-10-23 10:00:00Z', 'raw/observations/a1/9.json', 'accepted')$$,
+  'accepted occurred_at exactly 24 hours old is kept');
+SELECT lives_ok(
+  $$INSERT INTO app_private.observation_index (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type, authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition) VALUES ('00000000-0000-0000-0000-0000000000a1', '60000000-0000-4000-8000-000000000010', repeat('a', 64), 'observation.v2', 'dish_detail_opened', '70000000-0000-4000-8000-000000000001', timestamptz '2026-10-23 10:00:00Z' + interval '5 minutes', '2026-10-23 10:00:00Z', 'raw/observations/a1/10.json', 'accepted')$$,
+  'accepted occurred_at exactly 5 minutes ahead is kept');
 SELECT lives_ok(
   $$INSERT INTO app_private.observation_index (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type, authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition, reason_code) VALUES ('00000000-0000-0000-0000-0000000000a1', '60000000-0000-4000-8000-000000000007', repeat('a', 64), 'observation.v2', 'dish_detail_opened', '70000000-0000-4000-8000-000000000001', '2026-10-21 10:00:00Z', '2026-10-23 10:00:00Z', 'raw/observations/a1/7.json', 'rejected', 'too_old')$$,
   'a too_old rejection is recorded with its reason code');
