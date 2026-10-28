@@ -114,3 +114,13 @@ main; preserve unrelated application release boundaries.
 Related: `.github/workflows/deploy-preview.yml`, `docs/previews.md`.
 Source: https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/
 Pattern: actions.default-branch-trigger; first occurrence, no policy promotion.
+
+
+## LRN-20261027-REMOTE-R2 · Verify the actual storage destination
+
+**Logged**: October 27, 2026 · America/Phoenix
+**Status**: resolved · **Category**: best_practice · **Area**: infra
+
+Programmatic Wrangler local mode with forceLocal did not establish remote R2 writes, despite a remote binding flag. A local201 and independently hosted404 exposed the gap. Use actual remote mode or an explicit remote CLI operation for hosted evidence, then verify through an independent deployed reader. Local source/conditional-write tests remain useful but must be labelled local. Correct the acceptance record when this distinction changes its conclusion.
+
+Related: docs/menu-ingestion-infrastructure.md, docs/operations.md. First task occurrence; no policy promotion.
