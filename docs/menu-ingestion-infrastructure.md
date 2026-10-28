@@ -106,11 +106,56 @@ Example body (synthetic IDs):
   fencing and idempotent draft persistence remain necessary across retries.
 - Each invocation uses a private temporary directory and kills its pipeline
   subprocess after 700 seconds. Cleanup follows success or failure. Provider
-  calls use one-page batches and concurrency two. This is a processing cap, not
+  calls use OCR-plus-image input, one-page batches and concurrency two. This is a processing cap, not
   a promise that a large menu completes in that time. A hosted front proxy and
   Worker deadline must leave room for R2 transfer and response serialization.
 - `GET /health` proves service liveness/configuration, not R2/provider access or
   extraction accuracy. Access logs and public API documentation are disabled.
+
+### Private review artifact retention
+
+The follow-up service explicitly selects `ocr_image`. All three modes remain
+CLI/Python options; the public HTTP request body above is unchanged. The public
+response remains `MenuExtractionResult`, not a new review/UI envelope.
+
+The host negotiates internal `X-Extraction-Artifact-Bundle: 1` with Python. Before
+temporary cleanup, Python captures the validated report, final `timings.json` and
+private `review-suggestions.json`. The bounded internal version1 bundle is limited
+to32 MB (report24 MB, suggestions8 MB, timing1 MB individual read limits). Missing
+or mismatched artifacts fail closed rather than being silently dropped. Expected
+CLI exits0/2 preserve complete/partial reports; exit1 is retained only with an
+actual failed report, still subject to source/schema validation. A process timeout
+without final artifacts remains504, not an invented successful bundle.
+
+After the existing service credential and tenant/job/hash grant checks, the host
+writes a create-only object in the same private bucket:
+
+```text
+menu-ingestion/review-artifacts/<server-set tenant UUID>/<server-set job UUID>/<server-generated attempt UUID>/bundle.json
+```
+
+The key and scope never come from browser fields. Repeated attempts receive
+separate keys; conditional writes cannot overwrite history. No general bucket
+write route is exposed. A storage failure/collision cannot return extraction
+success. The response's existing `configuration` metadata carries
+`private_review_artifact` (version, private key and exact stored-byte SHA-256),
+not the private suggestions themselves. It is a reference, not authorization or
+a public URL. No source-signing key or R2 credentials enter Python.
+
+The stored bundle retains the original source snapshot/hash and actual page-image
+metadata. Rendered image `path` values are local-run references, not cloud URLs;
+authorized reviewers inspect the retained original source/page. Precise dish
+rectangles and image-backed RES fields are not invented. Authenticated reviewer
+asset delivery remains with VIS-01/RES owners; do not expose bucket keys publicly.
+No retention period is invented here; apply approved private-evidence access,
+retention and deletion policy before enabling real jobs.
+
+This archive does not replace PR45's job/report storage, database completion,
+lease/fencing, queue ACK or review corrections. Host and container must be
+released together after owner review: an old unbundled service cannot satisfy
+new retention guarantees. Mocked storage tests and package/dry-run builds do not
+prove hosted R2/Container behavior, memory/disk limits or the full700s budget.
+No deployment or resource/subscription change is part of this follow-up.
 
 ### Run and package
 
@@ -122,8 +167,10 @@ uv run --project processing --extra service --frozen python -m unittest discover
 docker build -t peekaplate-extraction:vis01-staging -f processing/Dockerfile processing
 ```
 
-The Docker context allowlists source, README and lock/config files. It excludes
-`.env`, tests, local inputs, outputs and installed environments. The image runs
+The Docker context allowlists source, README and lock/config files, then explicitly
+denies nested `.env`/`.env.*`, private local notes, JSONL history and bytecode caches
+after the source allowlist. Tests, local inputs, outputs and installed environments
+remain excluded. Static rule regressions do not substitute for a real image build. The image runs
 as UID 10001. Supply secrets through the hosting platform, never build arguments
 or committed env files. A local operator may use an ignored private env file:
 
@@ -137,7 +184,9 @@ Required service configuration: `EXTRACTION_SERVICE_SECRET` (unique random ASCII
 has the existing staging bucket binding and derives each source key from the
 authenticated tenant/job path. It forwards only the service settings and the
 existing pipeline's OCR/LLM variables into its container. Add that OCR and LLM configuration from its private
-environment setup. Neither provider keys nor real test menus enter this repo.
+environment setup. No provider keys or new private live-run inputs/outputs are
+added by this follow-up; previously authorized source fixtures have their own
+provenance notes. Never copy private evaluation folders into a release.
 The application API Worker needs the same service secret and the real HTTPS
 `EXTRACTION_SERVICE_URL`. GitHub secrets are deployment inputs, not shared keys
 that collaborators can retrieve. Use protected operator setup.

@@ -165,7 +165,7 @@ The final timing file includes:
 
 | Scope | Stages |
 | --- | --- |
-| Run | Acquisition, page-report write, LLM wall time, draft assembly, extraction-report write and total. |
+| Run | Acquisition, page-report write, source-image preparation, LLM wall time, draft assembly, private-suggestion write, extraction-report write and total. |
 | PDF page | Native text, rendering, image preparation, OCR/cache lookup and page total, where applicable. |
 | Image | Preparation, OCR/cache lookup and total; failed image input retains its measured total. |
 | LLM batch | Cache lookup, start-spacing wait, model request, local parsing, cache write, grounding and worker elapsed time. |

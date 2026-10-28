@@ -83,7 +83,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWT/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. October 24 deployed observation bindings; source/DLQ remain paused. VIS-04 retrieval enforces SSRF, Unicode spans and aggregate context limits. New config adds a separate menu Queue/report bucket alias, awaiting reviewed main deployment. A separate staging-only authenticated extraction host is prepared for one sleeping Cloudflare Container and exact tenant/job R2 source relay; scoped login is authorized but the explicit staging account still denies Container eligibility, so it is not hosted. No ingestion route, feature consumer, canonical observation writes or publication are added. Hosted access-removal acceptance and production remain separate; JWT logout revocation is expiry-bounded. Source relay requires a15-minute signed tenant/job/hash capability; the distinct signing key never reaches Python.",
+      "summary": "Hono verifies staff JWT/membership for atomic draft revisions and collaborator staging analytics; logout revocation is expiry-bounded. Observation bindings remain separate/paused; VIS04 retrieval guards SSRF, Unicode spans and aggregate limits. The staging extraction host verifies a15-minute tenant/job/hash grant and relays only the derived private source; signing keys never reach Python. Its bounded internal bundle path now retains report, final timings and unvalidated suggestions under create-only tenant/job/attempt R2 keys before returning the usual report with a private reference. No new public request/review fields, source-reading endpoint or database/publication writes are added. Container eligibility, paired host/service release, VIS01 leases/report adapter, hosted access/retention and end-to-end acceptance remain unverified activation gates.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -117,6 +117,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/menu-ingestion-infra.test.mjs",
         "backend/src/extraction-host.ts",
         "backend/src/extraction-host.test.ts",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
         "backend/wrangler.extraction.jsonc",
         "backend/src/extraction-capability.ts"
       ],
@@ -130,7 +132,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1a23a94066950b74261589b2bdaac33259ed9c03aa0f5bd7ff06894e65735500"
+      "sourceFingerprint": "8dad46589f964c35f02c91936ab44b048c4b350f3fa7e90450fff033b11ae020"
     },
     {
       "id": "database",
@@ -229,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9c1804bdbaae73df04a628a3ab6c590a2fe8753f9c264f3a9cb1d77050f087e9"
+      "sourceFingerprint": "71c56ac79dd9b7d1937c72a27362e440a2d1306a9d0e18cd77f975debcab9ef7"
     },
     {
       "id": "agents",
@@ -291,7 +293,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Image hashes/mode/context isolate caches; geometry and group-wide raw compatibility guard prices/dedup. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. Private service artifact transport, hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
+      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Image hashes/mode/context isolate caches; geometry and group-wide raw compatibility guard prices/dedup. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. The internal service bundle captures final timings/private suggestions before cleanup; Docker source rules explicitly exclude nested env/history. Private host persistence is locally tested, not a deployed guarantee. Hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -327,6 +329,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "test-data/README.md",
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
+        "processing/tests/test_service_artifacts.py",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
         "processing/Dockerfile",
         "processing/.dockerignore",
         "processing/src/peekaplate_processing/menu_context.py",
@@ -361,7 +366,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a8b396b835efb733712e6938de80c8ed2b1bcacb8be848e80879e25ec90ff99b"
+      "sourceFingerprint": "9bda3dd17b10f2574e1b25801bfe4dd358f36cc51a3a3039e5eff4af616c8764"
     }
   ],
   "handoffs": [
@@ -375,7 +380,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
     },
     {
-      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service artifact transport is a separately tested follow-up. Real-menu runs, images, credentials and private reports remain excluded.",
+      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service/host retention is tested with a shared synthetic bundle and create-only tenant/job/attempt storage, without new public request or RES fields. Real-menu runs, images, credentials and private reports remain excluded.",
       "modules": [
         "processing",
         "contracts"

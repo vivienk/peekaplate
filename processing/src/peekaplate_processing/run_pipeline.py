@@ -169,7 +169,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 report.status="failed"
                 report.errors.append("No usable image-only model response was obtained.")
             suggestions["errors"]=list(report.errors)
-            save_json(suggestions,directory/"review-suggestions.json")
+            with measure(timings,"suggestions_write"):
+                save_json(suggestions,directory/"review-suggestions.json")
             report.configuration["private_suggestions_file"]="review-suggestions.json"
         report.finished_at=datetime.now(timezone.utc)
         report.warnings.append("LLM verification is not implemented; all dishes remain needs_review.")
