@@ -35,6 +35,49 @@ class OverlaySavedInputTests(unittest.TestCase):
         self.assertEqual(row["disposition"], "abstained")
         self.assertEqual(row["proposed_price_parts"], [])
 
+    def test_split_and_wrapped_competing_titles_abstain(self):
+        competing = [
+            [region("Tomato", 10, 100, 70), region("Soup", 90, 100, 55)],
+            [region("Tomato", 10, 100, 70), region("Soup", 10, 118, 55)],
+            [region("Tomato", 10, 100, 70), region("Soup 9.50", 90, 100, 110)],
+        ]
+        for boxes in competing:
+            report, suggestions = fixture(title="Tomato Soup")
+            report["segments"][0]["metadata"]["ocr_regions"].extend(boxes)
+            row = prepare_overlay_review(report, suggestions)["rows"][0]
+            with self.subTest(boxes=boxes):
+                self.assertEqual(row["disposition"], "abstained")
+                self.assertEqual(row["reason"], "repeated_or_competing_title")
+                self.assertEqual(row["proposed_price_parts"], [])
+
+    def test_negative_title_run_search_is_bounded_without_broadening_recovery(self):
+        report, suggestions = fixture(title="Tomato Soup")
+        report["segments"][0]["metadata"]["ocr_regions"].extend([
+            region("Tomato", 10, 100, 70), region("Soup", 350, 100, 55),
+        ])
+        self.assertEqual(prepare_overlay_review(report, suggestions)["rows"][0]["disposition"], "numeric_agreement")
+
+        title = "Alpha Beta Gamma Delta Epsilon Zeta Eta Theta Iota"
+        report, suggestions = fixture(title=title)
+        report["segments"][0]["metadata"]["ocr_regions"].extend([
+            region(word, 10 + i * 30, 100, 25) for i, word in enumerate(title.split()[:8])
+        ])
+        self.assertEqual(prepare_overlay_review(report, suggestions)["rows"][0]["disposition"], "abstained")
+
+        report, suggestions = fixture(title="Alpha Beta")
+        report["segments"][0]["metadata"]["ocr_regions"].extend([
+            region("Alpha", 10 + (i % 16) * 30, 100 + (i // 16) * 20, 25) for i in range(100)
+        ])
+        self.assertEqual(prepare_overlay_review(report, suggestions)["rows"][0]["disposition"], "abstained")
+
+    def test_casefold_expanded_inline_competing_title_abstains(self):
+        report, suggestions = fixture(title="Weißwurst")
+        report["segments"][0]["metadata"]["ocr_regions"].append(region("WEISSWURST 9.50", 10, 100, 210))
+        row = prepare_overlay_review(report, suggestions)["rows"][0]
+        self.assertEqual(row["disposition"], "abstained")
+        self.assertEqual(row["reason"], "repeated_or_competing_title")
+        self.assertEqual(row["proposed_price_parts"], [])
+
     def test_nonfinite_retained_suggestion_data_is_rejected(self):
         for value in (float("nan"), float("inf")):
             report, suggestions = fixture()

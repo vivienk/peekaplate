@@ -213,8 +213,12 @@ to page-wide text is permitted. Inputs and standard exports remain unchanged.
 
 Association requires one exact case/whitespace-normalized, single-region title and
 all eligible same-row price cells. Repeated phrases, intervening labels, partly
-aligned cells and extra/conflicting readings abstain. Wrapped, composed and inline
-titles are not recovered. Complete ordered numeric readings must match the saved
+aligned cells and extra/conflicting readings abstain. Negative-only title checks
+also search case-folded adjacent/wrapped region runs; they never create an evidence
+quote, box or span. Search is limited to8 regions and10,000 neighbor checks per
+suggestion; exhausted bounds abstain rather than silently discard a possible
+competitor. Positive recovery still requires a single exact title region: wrapped,
+composed and inline titles are not recovered. Complete ordered numeric readings must match the saved
 image-model suggestion; an unsupported scalar or convenient subset cannot establish
 agreement. Bounded nonnegative integer/one- or two-decimal amounts and literal
 SM/LG/recognized monetary forms are supported; signs, units, fragments and uncertain

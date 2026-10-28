@@ -238,6 +238,41 @@ def _transcript(source, segment, inputs):
             "text":"\n".join(raw["text"] for raw in regions), "regions":records}
 
 
+def _competing_title(name, heading_index, boxes):
+    """Negative-only bounded title runs; never produce a quote, box or span."""
+    labels=[_normalize(box.text) for box in boxes]
+    if any(i!=heading_index and phrase_matches(name,label) for i,label in enumerate(labels)):
+        return True
+    budget=10_000
+    for first,label in enumerate(labels):
+        if first==heading_index or not name.startswith(label+" "):
+            continue
+        pending=[(first,(first,),label)]
+        while pending:
+            last,path,prefix=pending.pop()
+            if len(path)>=8:
+                return True
+            previous=boxes[last]
+            for i,box in enumerate(boxes):
+                budget-=1
+                if budget<0:
+                    return True
+                if i==heading_index or i in path:
+                    continue
+                gap=box.left-previous.right
+                adjacent=_same_row(previous,box) and 0<=gap<=1.5*min(previous.height,box.height)
+                wrapped=(box.top>=previous.bottom and box.top-previous.bottom<=previous.height
+                         and abs(box.left-boxes[first].left)<=2*min(previous.height,box.height))
+                if not (adjacent or wrapped):
+                    continue
+                joined=prefix+" "+labels[i]
+                if phrase_matches(name,joined):
+                    return True
+                if name.startswith(joined+" "):
+                    pending.append((i,(*path,i),joined))
+    return False
+
+
 def _associate(index, originals, boxes, transcript):
     original=originals[index]
     name=_normalize(original.name)
@@ -245,7 +280,7 @@ def _associate(index, originals, boxes, transcript):
     if not headings:
         return "unsupported_or_unmatched_title", [], None, None
     if (len(headings)!=1 or sum(_normalize(other.name)==name for other in originals)!=1
-            or any(i not in headings and phrase_matches(original.name,box.text) for i,box in enumerate(boxes))):
+            or _competing_title(name,headings[0],boxes)):
         return "repeated_or_competing_title", [], None, None
     heading_index=headings[0]
     heading=boxes[heading_index]
