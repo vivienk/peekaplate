@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -43,6 +43,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/search.ts",
+        "frontend/diner/src/menu/search.test.ts",
         "vitest.config.ts"
       ],
       "adrs": [
@@ -51,7 +53,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "c8670eebd7cba8907f223c91aa8d9019b413c975ba910c1534ff09c71f4080a0"
+      "sourceFingerprint": "f07be6952f1b181afe1c426491f46a448ecdda73ac1c286118a47ac6a8cf5518"
     },
     {
       "id": "console",
@@ -332,6 +334,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip label via the adapter's chipKey, so \"gluten\" and \"gluten-free\" differ; the description is never searched; incomplete dishes are excluded. allergyNotice is true for a dietary value or an allergen listed in the menu, even with no results. No API call, events or logging. 15 Vitest cases against the S3-DIN-01.1 fixtures pass.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Confirm Search ownership (subtask still says Jeffin) and whether the staff line shows with no results. Share the signature for the DIN-02 Compare picker, which filters kept dishes from dishIds. Wire the search view to Harshita's menu screen and dish card with keyboard, result-count announcement and axe browser tests once they exist."
+    },
+    {
       "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, suppresses Gluten-free when Gluten or Wheat is listed and never drops allergens. Fixtures use PR #51 allergen names and cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set and empty/unavailable/error/offline/slow states. 21 Vitest cases pass.",
       "modules": [
         "diner"
@@ -402,15 +411,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     }
   ]
 }
