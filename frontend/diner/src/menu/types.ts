@@ -37,6 +37,9 @@ export type Menu = {
   source: 'fixture' | 'published';
   // Visible label screens must show for non-published data, e.g. "Fixture data".
   notice: string | null;
+  // Restaurant and menu identity, e.g. so Saved dishes are stored per restaurant (DIN-02).
+  venueId: string;
+  menuId: string;
   publicationRevisionId: string;
   menuRevisionId: string;
   restaurant: { name: string; logo: MenuImage | null };

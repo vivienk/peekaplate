@@ -6,6 +6,7 @@ import {
   createFixtureMenuSource,
   DISH,
   DRAFT_MARKER,
+  demoBundle,
   edgeCaseBundle,
   FIXTURE_PUBLICATION_REVISION_ID,
   NO_ICON_ALLERGEN,
@@ -36,6 +37,8 @@ describe('fixture menu source', () => {
     expect(menu.source).toBe('fixture');
     expect(menu.notice).toBe('Fixture data');
     expect(menu.publicationRevisionId).toBe(FIXTURE_PUBLICATION_REVISION_ID);
+    expect(menu.venueId).toBe(demoBundle.venue_id);
+    expect(menu.menuId).toBe(demoBundle.menu_id);
     expect(menu.restaurant.name).toBe('Ember & Stone');
     expect(completeDishes(menu).map((d) => d.name)).toEqual([
       'Avocado Toast',
@@ -138,6 +141,18 @@ describe('fixture menu source', () => {
 });
 
 describe('menu adapter', () => {
+  it('keeps the restaurant and menu ids so screens can scope state per restaurant', () => {
+    const other = {
+      ...demoBundle,
+      venue_id: 'b1000000-0000-4000-8000-000000000001',
+      menu_id: 'b2000000-0000-4000-8000-000000000001',
+    };
+    const result = toMenu(other, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(result.menu.venueId).toBe(other.venue_id);
+    expect(result.menu.menuId).toBe(other.menu_id);
+  });
+
   it('compares chip labels without case, hyphens or spaces', () => {
     expect(chipKey('Gluten-free')).toBe(chipKey('gluten free'));
     expect(chipKey('Gluten')).not.toBe(chipKey('Gluten-free'));
