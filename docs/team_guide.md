@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Infrastructure and team analytics access updated October 22, 2026. The team research and board inventory below remains the dated October 14 snapshot.
+VIS-01 infrastructure updated October 27, 2026; team analytics evidence remains dated separately. The team research and board inventory below remains the dated October 14 snapshot.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
 
@@ -42,12 +42,23 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
 | Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
-| Python processing | Accepted extension in the architecture | Implement, test and choose a runtime for the first specific job |
+| Python processing | Local OCR/extraction code plus a tested HTTP service and Docker package | Activate the prepared host, connect VIS-01 and verify real menu extraction; see the service handoff |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
 
 ### Where to open staging
+
+**Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
+passed real synthetic delivery tests. Reports will use the existing private R2
+bucket. The new Python HTTP service wraps the existing OCR/extraction code and
+has local tests and a Docker build; its Cloudflare host awaits Vivien's planned
+$5/month Workers Paid upgrade and protected provider credentials.
+Teeyansh must connect the real consumer, report adapter and reviewed database
+changes before live menu tests. The queues stay paused until then. Follow the
+[VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
+interfaces and who does what next. Provisioned infrastructure is not a completed
+menu-processing feature.
 
 The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is now provisioned and tested with synthetic messages. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. The staging binding configuration needs its reviewed release before the API Worker can use it; actual archive-to-database processing remains separate work.
 
@@ -72,7 +83,7 @@ The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md)
 | Supabase PostgreSQL | Keeps lasting application records | Stores restaurants, staff permissions, dish drafts, history, retry results and pending work. |
 | Cloudflare Hyperdrive | Manages Worker connections to PostgreSQL | Uses a restricted staging login. It is not another database. Query caching is disabled for this command path. |
 | Cloudflare R2 | Stores files such as photos and prepared visual assets | Existing staging and production buckets are reserved. Staging is private; uploads and approved asset delivery are not connected yet. |
-| Cloudflare Queues | Holds accepted observations until processing finishes | Planned with event ingestion; not running in the current flow. A failed-message queue will hold work needing recovery. |
+| Cloudflare Queues | Holds work until processing finishes | Separate staging observation and menu-extraction queues/DLQs are provisioned. They remain paused until their real consumers pass acceptance. |
 | Docker | Gives developers a disposable test database | Used locally and in CI. The shared database is hosted by Supabase. |
 
 The **current tested save path** is:

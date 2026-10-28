@@ -1,5 +1,26 @@
 # Local and staging operations
 
+## VIS-01 infrastructure — October 27, 2026
+
+Provisioned only `peekaplate-staging-menu-ingestion` and its DLQ; reused the
+existing private staging-assets bucket. Real synthetic source delivery,
+archive/readback before ACK, attempts 0–3 to DLQ, R2 create-only contention and
+exact cleanup passed at `2026-10-27T18:57:46.560Z`. Both queues are empty/paused,
+with 24-hour retention. Observation resources and production were unchanged.
+The new producer/report aliases need the reviewed `main` staging deployment;
+provisioning does not establish live Worker bindings.
+
+The [VIS-01 infrastructure/service handoff](menu-ingestion-infrastructure.md)
+records provider IDs, private prefixes, the optional Python HTTP service and
+integration order. No deployed extraction URL/secret was found on the existing
+Worker; Containers inventory returned 403, so external hosting availability is
+unconfirmed. Scoped Containers authorization subsequently succeeded; an
+explicit-account inventory still denies Container eligibility. Workers-standard
+is true, but billing readback is denied; no plan upgrade was attempted. See the
+handoff before asking for any subscription change. Service hosting/credentials, Worker admission/deadline alignment,
+the report adapter, feature migrations and full menu-flow acceptance remain
+separate gates. No unfinished ingestion feature PR was modified or deployed.
+
 ## Observation infrastructure — October 24, 2026
 
 Created only the missing staging source Queue and DLQ in the existing account, reused private `peekaplate-staging-assets`, and verified source retry-to-DLQ routing with HTTP pull consumers. The complete synthetic repeat at `2026-10-24T17:30:36.147Z` passed archive/readback before ACK, initial delivery plus three retries, DLQ arrival and exact probe cleanup. A separate real R2 concurrency check allowed exactly one create-only writer and preserved its bytes on conflicting attempts. Provider readback confirms both Queues empty and paused, 24-hour retention, `r2.dev` disabled, no custom domain and no CORS rule. No production resource, application consumer, database fact or unfinished PR changed.
