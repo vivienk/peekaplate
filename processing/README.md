@@ -1,5 +1,12 @@
 # Menu extraction
 
+The optional staging HTTP service wraps this same pipeline; it does not replace
+the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
+for the request contract, Docker commands, secrets, limits and activation gates.
+Install `uv sync --project processing --extra service --frozen` before running
+the complete test suite, including HTTP boundary tests. CLI-only use does not
+need the service extra. No hosted service is implied by this package.
+
 Local PDF/image acquisition plus your LangGraph orchestrator/worker pattern.
 OCR.space code and the existing dish/source schema are retained. The old custom
 LLM client, review/evaluation layer, website reader and pipeline were removed.

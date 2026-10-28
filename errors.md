@@ -559,6 +559,46 @@ IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
 ```json
 {"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-27T19:54:53.626Z"},"status":"resolved","cause":"Color-role palette test edits introduced a Biome formatting violation (misaligned array element).","prevention":"Run pnpm format (biome check --write) on changed files before verification.","regression":"Biome formatting check passes; pnpm lint exits 0."}
+## October 27 VIS-01 infrastructure validation
+
+```json
+{"id":"OBS-20261027-VIS01-QUEUE-CREATE","status":"resolved","area":"operator-resource-provisioning","observation":"Initial Queue create request containing delivery_paused returned HTTP 500/code 10013; exact-name readback confirmed no resource was created.","cause":"The installed Wrangler creation path uses retention settings followed by a separate queue-name/paused PATCH; the provider did not accept the initial request shape in this run. A provider root cause was not established.","prevention":"Follow the installed CLI request contract. Read back exact names after an error before retrying; create with no producers, pause immediately, then attach the controlled consumer. Never repeat a create blindly.","regression":"The corrected sequence provisioned exactly two menu queues. Real source/R2/readback/retry-to-DLQ and cleanup passed; both empty/paused and observation settings unchanged.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS","status":"open","area":"staging-service-activation","observation":"Installed Wrangler containers list stopped before inventory because containers:write is absent from the current OAuth login. Cloudflare host dry-run, Docker build and local HTTP boundary checks are separate evidence.","prevention":"Keep the new host inactive until scoped Container deployment access is authorized. Preserve current Worker/Pages scopes; never request every default scope or infer service readiness from packaging.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"],"resolutionRequired":"Authorize the required scoped deployment access, configure provider/service secrets, deploy the reviewed host and record genuine service/source/extraction acceptance."}
+```
+
+```json
+{"id":"ERR-20261027-CONTEXT-SUMMARY","status":"resolved","area":"context-validation","cause":"Appending service details exceeded the existing context node summary bound; refresh rejected the graph before writing fingerprints.","prevention":"Keep node summaries concise and link detailed runbooks instead of accumulating prose.","regression":"Backend summary condensed without dropping authority/readiness boundaries; context refresh and check required before commit.","sources":["docs/CONTEXT.md","scripts/context.mjs"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-DRYRUN-OUTPUT","status":"resolved","area":"local-verification-artifacts","cause":"A dry-run output directory outside the existing ignored dist path was included by the lint scan.","prevention":"Write operator probe/build outputs outside the checkout or into its established ignored dist path; never format generated bundles to satisfy source lint.","regression":"Moved only the generated evidence directory to the task output folder; final pnpm check must pass on source files.","sources":["docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-COMPAT-DATE","status":"resolved","area":"local-worker-runtime","cause":"The pinned local Wrangler binary supports compatibility dates through October 13; a new October 27 test configuration could not start.","prevention":"Keep this existing project's new Worker on the already tested compatibility date until a separately verified runtime upgrade.","regression":"Actual hosting Worker source/auth routes with remote private R2 passed on the matching October 13 date, including exact cleanup.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-PARTIAL-EXIT","status":"resolved","area":"python-service-result-handling","cause":"The new service used check=True even though the existing CLI writes valid partial/failed reports and returns exit 2; reviewable partial drafts became HTTP 502.","prevention":"Distinguish expected result exit statuses from execution failure and still validate the bounded output report.","regression":"A real child writes an incomplete needs-review report and exits 2; the regression failed with 502 before the fix and passes with 200/preserved drafts afterward.","sources":["processing/src/peekaplate_processing/service.py","processing/tests/test_service.py","processing/src/peekaplate_processing/run_pipeline.py"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-SOURCE-AUTHORITY","status":"resolved","area":"private-source-authorization","cause":"The new source relay initially treated a global service bearer as authorization for caller-selected tenant/job paths, including other jobs.","prevention":"Require a short-lived signed tenant/job/hash capability minted only after backend job authorization. Keep its signing key separate from the service identity and out of Python.","regression":"Valid service identity plus job-A grant requesting job B returned 200 before the fix; focused tests and actual Worker/remote-R2 probes now deny with 403 before source access. Expired/tampered grants and digest mismatch are rejected.","sources":["backend/src/extraction-capability.ts","backend/src/extraction-host.ts","backend/src/extraction-host.test.ts","processing/src/peekaplate_processing/service.py"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS"},"status":"resolved","evidence":"Scoped Wrangler login successfully added containers:write while retaining existing Worker/Pages scopes; credentials remain in the encrypted OS-backed store. No default-scope expansion or subscription change."}
+```
+
+```json
+{"id":"OBS-20261027-CONTAINER-ELIGIBILITY","status":"open","area":"hosted-extraction-activation","observation":"Explicit staging account Container inventory returns HTTP 401 eligibility denial saying Workers Paid is required; workers-standard reports true and subscription readback is 403. Wrangler also asserts after printing the provider denial on Windows; direct API readback confirms the provider error independently.","cause":"Account entitlement/member-role eligibility is not resolved; the available evidence does not establish that the paid plan is missing.","prevention":"Have the account owner verify existing Container entitlement and member access. Do not purchase a duplicate plan or broaden permissions blindly.","resolutionRequired":"Verify eligibility on the existing account, then deploy/test the reviewed host with protected service/provider credentials.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"kind":"clarification","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"pending-external-activation","cause":"The account is on Free; Vivien will activate Workers Paid. The standard flag alone was not billing proof.","next":"Keep the prepared Cloudflare host unchanged. After the owner activates the $5 plan, verify eligibility and configure/deploy the reviewed service; no upgrade was purchased by this task."}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -577,4 +617,9 @@ IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-27T20:04:00.236Z"},"status":"resolved","cause":"Token test edits landed after the module fingerprint was refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:21:00.026Z","exitCode":1}
 ```
