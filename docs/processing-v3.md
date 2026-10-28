@@ -38,7 +38,13 @@ while private suggestion status can be `complete`. A failed image-model request
 remains failed. This distinction avoids declaring image-read values OCR-grounded
 or treating diagnostic completion as publication approval.
 
-Images are limited to 8 MB each and 16 MB per model batch, including context.
+Images are limited to8 MB each and16 MB per model request, including image-only
+context. `--batch-pages` is a maximum, not a promise of exactly that many targets:
+vision groups are greedily split into contiguous, byte-bounded groups before any
+provider call. Original image bytes/quality and page numbers are unchanged; the
+planner accounts for the actual preceding image-only context. No failed request
+is retried or image silently downsampled to fit a group. Malformed images still
+fail the worker's authoritative byte/hash checks, not a planning hint.
 PDF rendering retains the existing 40-page/6-megapixel bounds; bounded image
 preparation respects orientation and preserves original PNG/JPEG bytes when safe.
 The model cache distinguishes input mode, prompt/schema, context and verified image
@@ -215,7 +221,10 @@ For a full fresh test, omit `--pages-json` and add both `--no-ocr-cache` and
 preserved. This makes new OCR and model requests, so its elapsed time includes
 OCR acquisition as well as extraction. Always choose a new run directory.
 
-Application defaults remain ten pages per batch and one simultaneous model call.
+Application defaults remain a maximum of ten target pages per group and one
+simultaneous model call. OCR text retains its existing fixed-page grouping; vision
+may create more, smaller groups to honor the16 MB bound before calls. Consult
+`configuration.llm_batches[].page_numbers` for actual groups and request counts.
 The two-page/concurrency-two command above is an explicit opt-in, not a new default.
 Provider/model selection and reasoning configuration are unchanged from develop;
 separate private experiments do not authorize provider-specific tuning here. The

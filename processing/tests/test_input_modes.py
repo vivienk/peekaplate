@@ -187,6 +187,35 @@ class InputModeTests(unittest.TestCase):
             self.assertEqual(result.drafts,[])
             self.assertEqual(len(json.loads((root/"run/review-suggestions.json").read_text())["suggestions"]),1)
 
+    def test_vision_groups_presplit_before_calls_without_resampling_or_page_loss(self):
+        from PIL.PngImagePlugin import PngInfo
+        def page(number):
+            output=io.BytesIO();info=PngInfo();info.add_text("synthetic","x"*800)
+            with Image.new("RGB",(20,20),"white") as image:
+                image.save(output,format="PNG",pnginfo=info)
+            data=output.getvalue()
+            return {"page_number":number,"text":"Soup 8.50","image_url":"data:image/png;base64,"+base64.b64encode(data).decode(),
+                    "image_reference":{"sha256":hashlib.sha256(data).hexdigest()}}
+        pages=[page(n) for n in range(1,6)]
+        before=copy.deepcopy(pages)
+        for mode,expected in [("ocr_image",[2,2,1]),("image",[2,1,1,1])]:
+            with self.subTest(mode=mode):
+                llm=RecordingLLM()
+                with patch("peekaplate_processing.workflow.MAX_VISION_BATCH_BYTES",2000,create=True),patch("peekaplate_processing.workflow.asyncio.sleep"):
+                    result=run_menu_graph(llm,pages,input_mode=mode,batch_pages=10,concurrency=2)
+                self.assertEqual(result["errors"],[])
+                self.assertEqual([len(b["page_numbers"]) for b in result["batches"]],expected)
+                self.assertEqual([n for b in result["batches"] for n in b["page_numbers"]],list(range(1,6)))
+                self.assertEqual(len(llm.messages),len(expected))
+                for messages in llm.messages:
+                    content=messages[1][1];request=json.loads(content[0]["text"])
+                    blobs=[base64.b64decode(item["image_url"]["url"].split(",",1)[1]) for item in content if item["type"]=="image_url"]
+                    self.assertLessEqual(sum(map(len,blobs)),2000)
+                    self.assertTrue(all(hashlib.sha256(blob).hexdigest()==pages[0]["image_reference"]["sha256"] for blob in blobs))
+                    if mode=="image" and request["pages"][0]["page_number"]>1:
+                        self.assertEqual(request["context_pages"][0]["page_number"],request["pages"][0]["page_number"]-1)
+                self.assertEqual(pages,before)
+
     def test_image_only_model_failure_is_failed_not_a_successful_diagnostic(self):
         class Broken(RecordingLLM):
             async def ainvoke(self,messages):

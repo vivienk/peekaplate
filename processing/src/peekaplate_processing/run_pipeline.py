@@ -198,7 +198,7 @@ def main(argv=None):
     parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), or image (no OCR; private suggestions only).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--llm-timeout", type=float, default=90, help="Cancellable deadline per LLM batch in seconds (default: 90; maximum: 300).")
-    parser.add_argument("--batch-pages", type=int, default=10, help="Pages per LLM request, from 1 to 10 (default: 10); smaller batches make more calls.")
+    parser.add_argument("--batch-pages", type=int, default=10, help="Maximum pages per LLM request, 1 to 10 (default: 10); vision groups split before the 16 MB limit. Smaller groups make more calls.")
     parser.add_argument("--llm-concurrency", type=int, default=1, help="Simultaneous LLM calls, 1 or 2 (default: 1); starts remain spaced apart.")
     parser.add_argument("--no-llm-cache", action="store_true", help="Make fresh model requests instead of reusing complete cached candidates.")
     parser.add_argument("--no-ocr-cache", action="store_true", help="Skip OCR cache reads and writes for fresh OCR requests.")

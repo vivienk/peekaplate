@@ -74,7 +74,9 @@ See [the review handoff guide](../docs/review-candidates.md) for the flow, schem
 synthetic examples and manual tests.
 
 The matching shared review schema preserves hierarchy, heading provenance and
-printed price options. Private raw/cleared/rejected values are kept separately in
+printed price options. Vision groups split before calls to honor the16 MB budget including context;
+`--batch-pages` remains a maximum of10 by default, with no silent image resampling.
+Private raw/cleared/rejected values are kept separately in
 `review-suggestions.json`; they are not silently substituted into grounded originals. VIS-01 and review API consumers still need explicit
 version-2 integration; mixed version pairs are rejected rather than relabeled.
 

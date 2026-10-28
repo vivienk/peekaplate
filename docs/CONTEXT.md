@@ -293,7 +293,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Image hashes/mode/context isolate caches; geometry and group-wide raw compatibility guard prices/dedup. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. The internal service bundle captures final timings/private suggestions before cleanup; Docker source rules explicitly exclude nested env/history. Private host persistence is locally tested, not a deployed guarantee. Hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
+      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Bounded vision groups split before calls. Image/context hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. The internal service bundle captures final timings/private suggestions before cleanup; Docker source rules explicitly exclude nested env/history. Private host persistence is locally tested, not a deployed guarantee. Hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -366,7 +366,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "0875209375de8c4be20d5dd2adf56a5470b64fb4b26528bc73163f838c3f316a"
+      "sourceFingerprint": "4ccb05c83b3727e653ac68e12063185b12e227f7a8eb82f7d8c873e08aa11586"
     }
   ],
   "handoffs": [

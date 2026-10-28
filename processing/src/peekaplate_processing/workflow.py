@@ -26,6 +26,7 @@ from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
 
 INPUT_MODES=("ocr", "ocr_image", "image")
+MAX_VISION_BATCH_BYTES=16_000_000
 
 
 def required_schema_fields(schema):
@@ -340,6 +341,32 @@ def parse_dish_content(content):
     return DishBatch.model_validate(data)
 
 
+def page_batches(pages, batch_pages, input_mode):
+    """Greedy contiguous groups; byte hints plan work, never validate evidence."""
+    if input_mode=="ocr":
+        return [pages[i:i+batch_pages] for i in range(0,len(pages),batch_pages)]
+    def size_hint(page):
+        url=page.get("image_url","")
+        if not isinstance(url,str) or not url.startswith(("data:image/png;base64,","data:image/jpeg;base64,")):
+            return 0
+        encoded=url.split(",",1)[1]
+        if len(encoded)%4:return 0
+        return len(encoded)//4*3-(2 if encoded.endswith("==") else 1 if encoded.endswith("=") else 0)
+    sizes={id(page):size_hint(page) for page in pages}
+    by_number={page["page_number"]:page for page in pages}
+    batches=[];batch=[];total=0
+    for page in pages:
+        size=sizes[id(page)]
+        if batch and (len(batch)>=batch_pages or total+size>MAX_VISION_BATCH_BYTES):
+            batches.append(batch);batch=[]
+        if not batch:
+            previous=by_number.get(page["page_number"]-1) if input_mode=="image" else None
+            total=sizes.get(id(previous),0)
+        batch.append(page);total+=size
+    if batch:batches.append(batch)
+    return batches
+
+
 def model_images(pages, context_pages, input_mode):
     """Return multimodal blocks and byte-verified image cache identities."""
     blocks=[]
@@ -358,7 +385,7 @@ def model_images(pages, context_pages, input_mode):
             if not data or len(data)>8_000_000 or digest!=page.get("image_reference",{}).get("sha256"):
                 raise ExtractionError("Source image does not match its bounded evidence hash.")
             total+=len(data)
-            if total>16_000_000:
+            if total>MAX_VISION_BATCH_BYTES:
                 raise ExtractionError("Vision batch exceeds 16 MB; choose a smaller --batch-pages value.")
             blocks.extend([{"type":"text","text":f"{role.upper()} PAGE {page['page_number']}"},
                            {"type":"image_url","image_url":{"url":url}}])
@@ -381,7 +408,7 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
 
     async def orchestrator(state: OverallState):
         pages = state["pages"]
-        return {"batches": [pages[i:i+batch_pages] for i in range(0, len(pages), batch_pages)]}
+        return {"batches": page_batches(pages,batch_pages,input_mode)}
 
     async def dispatch(state: OverallState):
         by_number={page["page_number"]:page for page in state["pages"]}
