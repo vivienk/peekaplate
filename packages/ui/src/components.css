@@ -139,7 +139,7 @@
 }
 .pp-button--text {
   background-color: transparent;
-  color: var(--pp-role-button-outline-text);
+  color: var(--pp-role-on-surface);
 }
 .pp-button--text:hover:not(:disabled) {
   background-color: var(--pp-role-button-text-hover-bg);
