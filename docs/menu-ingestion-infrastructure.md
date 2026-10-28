@@ -208,10 +208,13 @@ the raw suggestion archive. Identically named PR45 adapted-draft fixtures are no
 the producer's review-result envelope: validate the actual shared export at the
 consumer boundary, not filenames alone.
 
-PR45 still defaults to600s while the Python process cap is700s, before cold
-startup/transfer/storage. An explicit measured transport/lease policy and storage
-failure/retry/tenant tests remain with VIS01/Jeffin. This producer follow-up does
-not silently raise those budgets or enable the consumer.
+A later read-only check of PR45 head `b79d2f8bfc5aa43484442d6280ee043b741ff614`
+confirms the transport default is now720s and the lease default15 minutes; this
+supersedes the600s default observed at32ebc3c above. It does not prove the full
+startup/transfer/700s-processing/storage chain fits: readiness alone can take30s.
+Measured budget, storage failure/retry/tenant and hosted upload-to-ACK acceptance
+remain with VIS01/Jeffin. This producer follow-up does not silently raise those
+budgets or enable the consumer.
 
 ### Run and package
 

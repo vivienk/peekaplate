@@ -43,15 +43,16 @@ def complete_price_match(match, text):
     currency=rf"(?:{MONEY_MARKER}|\b(?-i:[A-Z]{{3}}))"
     # A source marker outside the supplied literal must not hide a sign or slash.
     before=re.sub(rf"{currency}[ \t]*\Z", "", before, flags=re.I)
-    if re.search(r"[\w.,+\-−]\Z", before) or re.match(r"\w|[.,]\d", after):
+    if re.search(r"[\w.,+\-−]\Z|[+\-−][ \t]*\Z", before) or re.match(r"\w|[.,]\d", after):
         return False
     # Include malformed/signed neighbors when checking completeness, not as new
     # supported price formats. Never salvage a suffix of an unsupported group.
-    number=r"[+\-−]?[.,]?\d+(?:[.,]\d+)*"
+    number=r"[+\-−]?[ \t]*[.,]?\d+(?:[.,]\d+)*"
     prior=re.search(rf"({number})(?:[ \t]+[A-Z]{{3}})?\s*/\s*$", before, re.I)
     if prior and not nonprice_unit(text, prior.start(1), prior.end(1)):
         return False
-    following=re.match(rf"(?:[ \t]+[A-Z]{{3}})?\s*/\s*(?:{currency}[ \t]*)?({number})", after, re.I)
+    # Signs may precede or follow a marker, including OCR-separated tokens.
+    following=re.match(rf"(?:[ \t]+[A-Z]{{3}})?\s*/\s*(?:[+\-−][ \t]*)?(?:{currency}[ \t]*)?({number})", after, re.I)
     if following:
         # Explicit money beside a directly labelled calorie/portion count is
         # separate evidence; an indirectly labelled option is still a partial list.

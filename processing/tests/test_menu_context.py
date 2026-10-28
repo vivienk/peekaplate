@@ -165,6 +165,42 @@ class MenuContextTests(unittest.TestCase):
         self.assertIsNone(cleaned.price_amount)
         self.assertIsNone(cleaned.price_text)
 
+    def signed_neighbor_cases(self):
+        for marker in ["CAD", "$"]:
+            clipped=f"{marker}8.50"
+            for sign in ["+", "-", "−"]:
+                for first,second in [(sign,marker),(marker,sign)]:
+                    for gap,number_gap in [("",""),(" ",""),(""," "),(" "," "),("\t","\t")]:
+                        neighbor=f"{first}{gap}{second}{number_gap}12.50"
+                        for printed in [f"{clipped} / {neighbor}",f"{neighbor} / {clipped}"]:
+                            yield printed,clipped
+
+    def test_signed_slash_neighbors_cannot_ground_or_recover_clipped_prices(self):
+        from test_menu_layout import layout,box
+        for printed,clipped in self.signed_neighbor_cases():
+            metadata=layout(box("Soup",20,20),box(clipped,220,20,300))
+            for overlay in [None,metadata]:
+                for supplied in [None,clipped]:
+                    with self.subTest(printed=printed,overlay=overlay is not None,supplied=supplied):
+                        cleaned,_=grounded_draft(self.dish(name="Soup",price_amount="8.50",price_text=supplied),
+                            f"Soup\n{printed}",ocr_metadata=overlay)
+                        self.assertIsNone(cleaned.price_amount)
+                        self.assertIsNone(cleaned.price_text)
+                        self.assertIsNone(cleaned.price_currency)
+
+    def test_directly_labelled_units_still_allow_a_separate_monetary_price(self):
+        from test_menu_layout import layout,box
+        for unit in ["kcal","calories","cal","cals","pc","pcs","piece","pieces",
+                     "serving","servings","gram","grams","kg","g","ml","oz"]:
+            for printed in ["CAD8.50","$8.50"]:
+                for source in [f"{printed} / 200 {unit}",f"200 {unit} / {printed}",f"{unit}: 200 / {printed}"]:
+                    with self.subTest(source=source):
+                        for overlay in [None,layout(box("Soup",20,20),box(printed,220,20))]:
+                            cleaned,_=grounded_draft(self.dish(name="Soup",price_amount="8.50",price_text=printed),
+                                f"Soup\n{source}",ocr_metadata=overlay)
+                            self.assertEqual((cleaned.price_text,cleaned.price_amount),(printed,"8.50"))
+                            self.assertIsNone(cleaned.price_currency)
+
     def test_review_prices_remain_conservative_through_pipeline_export(self):
         import tempfile,copy
         from pathlib import Path
@@ -177,12 +213,15 @@ class MenuContextTests(unittest.TestCase):
                ("CAD 8.50 / CAD 12.50",None,"8.50",None),
                ("CAD8.50 / CAD12.50","CAD8.50","8.50","CAD8.50"),
                ("CAD8.50 / CAD12.50 / CAD15.50","CAD8.50 / CAD12.50","8.50","CAD8.50 / CAD12.50")]
+        cases.extend((printed,clipped,"8.50",clipped) for printed,clipped in self.signed_neighbor_cases())
         for printed,supplied,amount,overlay in cases:
             with self.subTest(printed=printed),tempfile.TemporaryDirectory() as folder:
-                root=Path(folder);source=root/"synthetic.pdf";source.write_bytes(make_pdf([{"text":f"Menu prices\nSoup\n{printed}\nsynthetic fixture context for review only"}]))
+                root=Path(folder);source=root/"synthetic.pdf";source.write_bytes(make_pdf([{"text":f"Menu prices\nSoup\n{printed}\nsynthetic fixture context for review only".replace("−","-")}]))
                 acquired=extract_source(source)
                 if overlay is not None:
                     acquired.segments[0].method="ocr_space_engine3"
+                    # Synthetic OCR, independent of the ASCII-only PDF fixture font.
+                    acquired.segments[0].text=f"Menu prices\nSoup\n{printed}\nsynthetic fixture context for review only"
                     acquired.segments[0].metadata=layout(box("Soup",20,20),box(overlay,520,20,300))
                 before=copy.deepcopy(acquired.segments[0])
                 candidate=self.dish(page_number=1,name="Soup",price_amount=amount,price_text=supplied)
