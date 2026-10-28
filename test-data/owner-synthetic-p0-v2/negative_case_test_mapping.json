@@ -136,7 +136,7 @@
     "coverage_status": "PARTIAL_LOCAL_COVERAGE",
     "test_references": [
       "tests/test_negative_cases.py::test_neg_020_zero_denominator",
-      "tests/test_session_completion.py::test_no_eligible_completed_savers"
+      "tests/test_session_completion.py::TestSessionInactivity::test_no_eligible_savers"
     ],
     "application_execution_status": "NOT_RUN"
   },
@@ -144,7 +144,7 @@
     "case_id": "NEG-021",
     "coverage_status": "PARTIAL_LOCAL_COVERAGE",
     "test_references": [
-      "tests/test_session_completion.py::test_unfinished_session_excluded_from_retention"
+      "tests/test_session_completion.py::TestSessionInactivity::test_standalone_engagement_examples"
     ],
     "application_execution_status": "NOT_RUN"
   },

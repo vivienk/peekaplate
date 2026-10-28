@@ -46,29 +46,27 @@ def considered_dishes(events):
             event["cumulative_active_ms"],
         )
 
-    # Derive qualifying comparisons from displayed events.
+    # A displayed Start or Replace qualifies if at least one compared
+    # dish was opened earlier in the same session.
+    previously_opened = {}
+
     for event in events:
-        if event["event_type"] != "dish_compared":
-            continue
+        session = event.get("session_id", "example-session")
+        event_type = event["event_type"]
 
-        if event.get("compare_action") != "start":
-            continue
+        if event_type == "dish_detail_opened":
+            previously_opened.setdefault(session, set()).add(event["dish_id"])
 
-        if event.get("display_state") != "displayed":
-            continue
-
-        opening_id = event.get("opening_id")
-
-        if opening_id not in openings:
-            continue
-
-        linked_dish = openings[opening_id]
-
-        if linked_dish not in event.get("dish_ids", []):
-            continue
-
-        qualifying_comparisons.add(linked_dish)
-
+        elif (
+            event_type == "dish_compared"
+            and event.get("compare_action") in ("start", "replace")
+            and event.get("display_state") == "displayed"
+        ):
+            linked_dishes = (
+                set(event.get("dish_ids", []))
+                & previously_opened.get(session, set())
+            )
+            qualifying_comparisons.update(linked_dishes)
     considered = set(qualifying_comparisons)
 
     for opening_id, active_ms in completed_active_ms.items():
@@ -87,6 +85,60 @@ class TestMetricExamples(unittest.TestCase):
             path.read_text(encoding="utf-8")
         )["examples"]
 
+    def test_replace_comparison_qualifies(self):
+        events = [
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-A",
+                "dish_id": "dish-A",
+            },
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "opening_id": "different-opening",
+                "dish_ids": ["dish-A", "dish-C"],
+                "compare_action": "replace",
+                "display_state": "displayed",
+            },
+        ]
+        self.assertEqual(considered_dishes(events), {"dish-A"})
+
+    def test_cross_session_comparison_does_not_qualify(self):
+        events = [
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-A",
+                "dish_id": "dish-A",
+            },
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-B",
+                "dish_ids": ["dish-A", "dish-B"],
+                "compare_action": "start",
+                "display_state": "displayed",
+            },
+        ]
+        self.assertEqual(considered_dishes(events), set())
+
+    def test_comparison_before_opening_does_not_qualify(self):
+        events = [
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "dish_ids": ["dish-A", "dish-B"],
+                "compare_action": "start",
+                "display_state": "displayed",
+            },
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-A",
+                "dish_id": "dish-A",
+            },
+        ]
+        self.assertEqual(considered_dishes(events), set())
     def test_all_six_examples_exist(self):
         self.assertEqual(len(self.examples), 6)
 

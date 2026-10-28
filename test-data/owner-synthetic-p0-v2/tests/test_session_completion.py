@@ -1,102 +1,158 @@
 import json
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def finalized_retention(sessions, dish_id):
-    completed = [
-        session for session in sessions
-        if session["completion_status"] == "completed"
-    ]
+def split_visits_on_inactivity(events, timeout_minutes=30):
+    """A gap of 30 minutes or more starts a new visit."""
+    if not events:
+        return []
 
-    eligible_savers = [
-        session for session in completed
+    ordered = sorted(
+        events,
+        key=lambda event: datetime.fromisoformat(event["timestamp"]),
+    )
+
+    visits = [[ordered[0]]]
+    timeout = timedelta(minutes=timeout_minutes)
+
+    for event in ordered[1:]:
+        previous = visits[-1][-1]
+        gap = (
+            datetime.fromisoformat(event["timestamp"])
+            - datetime.fromisoformat(previous["timestamp"])
+        )
+
+        if gap >= timeout:
+            visits.append([event])
+        else:
+            visits[-1].append(event)
+
+    return visits
+
+
+def engagement_status(events):
+    """Classify observed engagement without implying order completion."""
+    opened = set()
+    active_ms = {}
+
+    for event in events:
+        event_type = event["event_type"]
+
+        if event_type == "dish_detail_opened":
+            opened.add(event["dish_id"])
+
+        elif event_type == "dish_activity_checkpoint":
+            dish = event["dish_id"]
+            if dish in opened and event.get("is_final") is True:
+                active_ms[dish] = max(
+                    active_ms.get(dish, 0),
+                    event["cumulative_active_ms"],
+                )
+
+        elif (
+            event_type == "dish_compared"
+            and event.get("compare_action") in ("start", "replace")
+            and event.get("display_state") == "displayed"
+            and opened.intersection(event.get("dish_ids", []))
+        ):
+            return "engaged (provisional)"
+
+    if any(value >= 10000 for value in active_ms.values()):
+        return "engaged (provisional)"
+
+    if events and all(
+        event["event_type"] == "menu_viewed" for event in events
+    ):
+        return "browse-only"
+
+    return "not engaged"
+
+
+def observed_save_retention(sessions, dish_id):
+    """Descriptive Save retention; not checkout or order retention."""
+    savers = [
+        session for session in sessions
         if dish_id in session["directly_saved_dishes"]
     ]
 
     retained = sum(
         dish_id in session["saved_dishes"]
-        for session in eligible_savers
+        for session in savers
     )
 
-    denominator = len(eligible_savers)
+    count = len(savers)
 
     return {
-        "eligible_completed_savers": denominator,
-        "retained_sessions": retained,
-        "rate": retained / denominator if denominator else None,
-        "excluded_unfinished_sessions": sum(
-            session["completion_status"] != "completed"
-            for session in sessions
-        )
+        "directly_saved_sessions": count,
+        "observed_retained_sessions": retained,
+        "observed_retention_rate": retained / count if count else None,
     }
 
 
-class TestSessionCompletion(unittest.TestCase):
+class TestSessionInactivity(unittest.TestCase):
 
-    def test_unfinished_session_excluded_from_retention(self):
-        # Read the actual JSON example included in the handoff.
-        json_path = PROJECT_ROOT / "expected_answers.json"
+    @classmethod
+    def setUpClass(cls):
+        path = PROJECT_ROOT / "expected_answers.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        cls.example = data["session_inactivity_example"]
 
-        with json_path.open("r", encoding="utf-8") as file:
-            data = json.load(file)
+    def test_standalone_engagement_examples(self):
+        for session in self.example["sessions"]:
+            with self.subTest(session=session["session_id"]):
+                self.assertEqual(
+                    engagement_status(session["events"]),
+                    session["expected_engagement"],
+                )
 
-        example = data["unfinished_session_example"]
-        sessions = example["sessions"]
-        expected = example["expected"]
-
-        result = finalized_retention(sessions, "dish-A")
+    def test_observed_save_retention(self):
+        result = observed_save_retention(
+            self.example["sessions"], "dish-A"
+        )
+        expected = self.example["expected"]
 
         self.assertEqual(
-            result["eligible_completed_savers"],
-            expected["eligible_completed_savers"]
+            result["directly_saved_sessions"],
+            expected["directly_saved_sessions"],
         )
         self.assertEqual(
-            result["retained_sessions"],
-            expected["retained_sessions"]
+            result["observed_retained_sessions"],
+            expected["observed_retained_sessions"],
         )
         self.assertEqual(
-            result["rate"],
-            expected["finalized_retention_rate"]
-        )
-        self.assertEqual(
-            result["excluded_unfinished_sessions"],
-            expected["excluded_unfinished_sessions"]
+            result["observed_retention_rate"],
+            expected["observed_retention_rate"],
         )
 
-    def test_completed_saver_who_unsaved_is_not_retained(self):
-        sessions = [
-            {
-                "session_id": "session-A",
-                "completion_status": "completed",
-                "directly_saved_dishes": ["dish-A"],
-                "saved_dishes": []
-            }
+    def test_29_minute_gap_same_visit(self):
+        events = [
+            {"event_type": "menu_viewed", "timestamp": "2026-10-20T10:00:00+05:00"},
+            {"event_type": "menu_viewed", "timestamp": "2026-10-20T10:29:00+05:00"},
         ]
+        self.assertEqual(len(split_visits_on_inactivity(events)), 1)
 
-        result = finalized_retention(sessions, "dish-A")
-
-        self.assertEqual(result["eligible_completed_savers"], 1)
-        self.assertEqual(result["retained_sessions"], 0)
-        self.assertEqual(result["rate"], 0.0)
-
-    def test_no_eligible_completed_savers(self):
-        sessions = [
-            {
-                "session_id": "session-B",
-                "completion_status": "completed",
-                "directly_saved_dishes": [],
-                "saved_dishes": []
-            }
+    def test_30_minute_gap_new_visit(self):
+        events = [
+            {"event_type": "menu_viewed", "timestamp": "2026-10-20T10:00:00+05:00"},
+            {"event_type": "menu_viewed", "timestamp": "2026-10-20T10:30:00+05:00"},
         ]
+        self.assertEqual(len(split_visits_on_inactivity(events)), 2)
 
-        result = finalized_retention(sessions, "dish-A")
+    def test_save_alone_is_not_engagement(self):
+        events = [{"event_type": "dish_saved", "dish_id": "dish-A"}]
+        self.assertEqual(engagement_status(events), "not engaged")
 
-        self.assertEqual(result["eligible_completed_savers"], 0)
-        self.assertIsNone(result["rate"])
+    def test_no_eligible_savers(self):
+        sessions = [
+            {"directly_saved_dishes": [], "saved_dishes": []}
+        ]
+        result = observed_save_retention(sessions, "dish-A")
+        self.assertEqual(result["directly_saved_sessions"], 0)
+        self.assertIsNone(result["observed_retention_rate"])
 
 
 if __name__ == "__main__":

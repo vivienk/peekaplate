@@ -9,7 +9,7 @@ Validated openings: 300
 PASS: All checkpoints link to valid earlier openings.
 Validated checkpoints: 450
 PASS: All comparisons have valid opening links and displayed pairs.
-Validated comparisons: 150
+Validated comparisons: 300
 PASS: Save, Unsave, and Undo transitions are valid.
 Direct Saves: 450
 Undo restorations: 150
@@ -30,3 +30,8 @@ Opening sessions: A=150, B=150, C=0
 Linked opening rates: A=50%, B=50%, C=0%
 Save adoption: 300/300 = 100%
 Displayed A/B comparison sessions: 150
+PASS: Start/Replace comparison attribution checks.
+Comparison Starts: 150
+Comparison Replaces: 150
+Distinct comparison flows: 150
+Displayed pair events: 300

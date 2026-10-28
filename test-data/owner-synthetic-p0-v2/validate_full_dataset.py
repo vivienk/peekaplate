@@ -26,6 +26,13 @@ parser.add_argument(
 args = parser.parse_args()
 SOURCE = Path(args.source)
 
+if args.source == str(ROOT / "events" / "full_dataset.jsonl"):
+    SOURCE = ROOT / "events" / (
+        "two_session_story.jsonl"
+        if args.dataset == "starter"
+        else "full_dataset.jsonl"
+    )
+
 manifest = json.loads(
     (ROOT / "manifest.json").read_text(encoding="utf-8")
 )
@@ -507,10 +514,7 @@ for row in events:
             direct_save_sessions.add(session)
 
     elif event_type == "dish_compared":
-        if (
-            row.get("compare_action") == "start"
-            and row.get("display_state") == "displayed"
-        ):
+        if row.get("display_state") == "displayed":
             pair = tuple(sorted(row["dish_ids"]))
             comparison_pairs[pair].add(session)
 
@@ -568,3 +572,40 @@ print(
     "Displayed A/B comparison sessions: "
     f"{len(comparison_pairs[('dish-A', 'dish-B')])}"
 )
+
+
+# Verify Start and Replace comparison metrics.
+comparison_events = [
+    row for row in events
+    if row["event_type"] == "dish_compared"
+    and row.get("display_state") == "displayed"
+]
+
+comparison_starts = [
+    row for row in comparison_events
+    if row["compare_action"] == "start"
+]
+
+comparison_replaces = [
+    row for row in comparison_events
+    if row["compare_action"] == "replace"
+]
+
+distinct_flows = {
+    (row["session_id"], row["comparison_id"])
+    for row in comparison_events
+}
+
+assert len(comparison_starts) == dataset_profile["comparison_starts"]
+assert len(comparison_replaces) == dataset_profile["comparison_replaces"]
+assert len(distinct_flows) == dataset_profile["distinct_comparison_flows"]
+assert len(comparison_events) == dataset_profile["displayed_pair_events"]
+
+assert len(comparison_pairs[("dish-A", "dish-B")]) == expected_pairs
+assert len(comparison_pairs[("dish-A", "dish-C")]) == expected_pairs
+
+print("PASS: Start/Replace comparison attribution checks.")
+print(f"Comparison Starts: {len(comparison_starts)}")
+print(f"Comparison Replaces: {len(comparison_replaces)}")
+print(f"Distinct comparison flows: {len(distinct_flows)}")
+print(f"Displayed pair events: {len(comparison_events)}")
