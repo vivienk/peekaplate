@@ -38,7 +38,9 @@ def phrase_matches(value, text):
 def complete_price_match(match, text):
     """Price evidence must not be a numeric fragment or part of a slash group."""
     before,after=text[:match.start()],text[match.end():]
-    currency=r"(?:[$€£₱]|\bPHP|\bP|\b(?-i:[A-Z]{3})[ \t]+)"
+    # Compact recognized codes use the same marker grammar as recovery. Unknown
+    # uppercase codes can block completeness, but cannot bootstrap a price.
+    currency=rf"(?:{MONEY_MARKER}|\b(?-i:[A-Z]{{3}}))"
     # A source marker outside the supplied literal must not hide a sign or slash.
     before=re.sub(rf"{currency}[ \t]*\Z", "", before, flags=re.I)
     if re.search(r"[\w.,+\-−]\Z", before) or re.match(r"\w|[.,]\d", after):

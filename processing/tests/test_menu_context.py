@@ -147,6 +147,24 @@ class MenuContextTests(unittest.TestCase):
                 self.assertEqual((cleaned.price_text,cleaned.price_amount),(printed,"95"))
                 self.assertIsNone(cleaned.price_currency)
 
+    def test_review_compact_currency_prefixes_cannot_hide_remaining_options(self):
+        from test_menu_layout import layout,box
+        for printed in ["CAD8.50 / CAD12.50", "CAD8.50 / CAD12.50 / CAD15.50"]:
+            for clipped in ["CAD8.50","CAD8.50 / CAD12.50"]:
+                if clipped==printed:continue
+                with self.subTest(printed=printed,clipped=clipped):
+                    cleaned,_=grounded_draft(self.dish(name="Soup",price_amount="8.50",price_text=clipped),
+                        f"Soup\n{printed}",ocr_metadata=layout(box("Soup",20,20),box(clipped,220,20,300)))
+                    self.assertIsNone(cleaned.price_amount)
+                    self.assertIsNone(cleaned.price_text)
+            cleaned,warnings=grounded_draft(self.dish(name="Soup",price_amount="8.50",price_text=printed),f"Soup\n{printed}")
+            self.assertEqual(cleaned.price_text,printed)
+            self.assertIsNone(cleaned.price_amount)
+            self.assertTrue(any("Multiple" in warning for warning in warnings))
+        cleaned,_=grounded_draft(self.dish(name="Soup",price_amount="8.50"),"Soup\n8.50 / XYZ12.50")
+        self.assertIsNone(cleaned.price_amount)
+        self.assertIsNone(cleaned.price_text)
+
     def test_review_prices_remain_conservative_through_pipeline_export(self):
         import tempfile,copy
         from pathlib import Path
@@ -155,15 +173,17 @@ class MenuContextTests(unittest.TestCase):
         from peekaplate_processing.run_pipeline import run_pipeline
         from peekaplate_processing.review_candidates import prepare_review_candidates
         from test_menu_layout import layout,box
-        cases=[("TEA 95",None,None),("8.50 CAD / 12.50 CAD","8.50 CAD / 12.50 CAD","8.50"),
-               ("CAD 8.50 / CAD 12.50",None,"8.50")]
-        for printed,supplied,amount in cases:
+        cases=[("TEA 95",None,None,"TEA 95"),("8.50 CAD / 12.50 CAD","8.50 CAD / 12.50 CAD","8.50",None),
+               ("CAD 8.50 / CAD 12.50",None,"8.50",None),
+               ("CAD8.50 / CAD12.50","CAD8.50","8.50","CAD8.50"),
+               ("CAD8.50 / CAD12.50 / CAD15.50","CAD8.50 / CAD12.50","8.50","CAD8.50 / CAD12.50")]
+        for printed,supplied,amount,overlay in cases:
             with self.subTest(printed=printed),tempfile.TemporaryDirectory() as folder:
                 root=Path(folder);source=root/"synthetic.pdf";source.write_bytes(make_pdf([{"text":f"Menu prices\nSoup\n{printed}\nsynthetic fixture context for review only"}]))
                 acquired=extract_source(source)
-                if printed.startswith("TEA"):
+                if overlay is not None:
                     acquired.segments[0].method="ocr_space_engine3"
-                    acquired.segments[0].metadata=layout(box("Soup",20,20),box(printed,520,20,200))
+                    acquired.segments[0].metadata=layout(box("Soup",20,20),box(overlay,520,20,300))
                 before=copy.deepcopy(acquired.segments[0])
                 candidate=self.dish(page_number=1,name="Soup",price_amount=amount,price_text=supplied)
                 from types import SimpleNamespace
@@ -177,7 +197,7 @@ class MenuContextTests(unittest.TestCase):
                 self.assertEqual(len(exported.candidates),1)
                 original=exported.candidates[0].original
                 self.assertIsNone(original.price_amount)
-                self.assertEqual(original.price_text,None if printed.startswith("TEA") else printed)
+                self.assertEqual(original.price_text,None if overlay is not None else printed)
                 self.assertEqual(original.status,"needs_review")
                 self.assertEqual(report.segments[0],before)
                 span=report.evidence[0].spans[0]
