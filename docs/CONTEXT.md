@@ -83,11 +83,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono verifies staff JWT/membership for atomic draft revisions and collaborator staging analytics; logout revocation is expiry-bounded. Observation bindings remain separate/paused; VIS04 retrieval guards SSRF, Unicode spans and aggregate limits. The staging extraction host verifies a15-minute tenant/job/hash grant and relays only the derived private source; signing keys never reach Python. Its bounded internal bundle path now retains report, final timings and unvalidated suggestions under create-only tenant/job/attempt R2 keys before returning the usual report with a private reference. No new public request/review fields, source-reading endpoint or database/publication writes are added. Container eligibility, paired host/service release, VIS01 leases/report adapter, hosted access/retention and end-to-end acceptance remain unverified activation gates.",
+      "summary": "Hono verifies staff JWT/membership for atomic draft revisions and collaborator staging analytics; logout revocation is expiry-bounded. Observation bindings remain separate/paused; VIS04 retrieval guards SSRF, Unicode spans and aggregate limits. The staging extraction host verifies a15-minute tenant/job/hash grant and relays only the derived private source; signing keys never reach Python. Its bounded internal bundle path now retains report, final timings and unvalidated suggestions under create-only tenant/job/attempt R2 keys before returning the usual report with a private reference. No new public request/review fields, source-reading endpoint or database/publication writes are added. PR60 direct-container scheduling/readiness is preserved; baseline hosted synthetic access passed per main handoff. This archive extension remains local. Paired release, VIS01 identity/lease/report acceptance, provider quality and end-to-end acceptance remain gates.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
+        "backend/tsconfig.json",
+        "pnpm-lock.yaml",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
         "backend/src/dish-command.test.ts",
@@ -132,7 +134,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8dad46589f964c35f02c91936ab44b048c4b350f3fa7e90450fff033b11ae020"
+      "sourceFingerprint": "a5ed676574143a2c5518f6d61253f497c2a7eb3e9ce14d52cfaaa595e361c6be"
     },
     {
       "id": "database",
@@ -180,7 +182,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
+      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. That preview exercise changed no application/database/staging release. Main's later PR60 host/auth/source-relay synthetic acceptance is recorded separately in the infrastructure handoff; provider-backed extraction and the feature consumer remain unaccepted. Observation reporting and production remain separate work.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -231,7 +233,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "71c56ac79dd9b7d1937c72a27362e440a2d1306a9d0e18cd77f975debcab9ef7"
+      "sourceFingerprint": "82d1468c850851e559000a076dfa718578557aec3fe414301ec98a10bd9a90d1"
     },
     {
       "id": "agents",

@@ -47,8 +47,11 @@ test('extraction host is staging-only, single-instance and contains no secret va
   );
   assert.equal(host.name, 'peekaplate-extraction-staging');
   assert.equal(host.containers.length, 1);
-  assert.equal(host.containers[0].max_instances, 1);
-  assert.equal(host.containers[0].instance_type, 'basic');
+  assert.deepEqual(host.containers[0], {
+    class_name: 'ExtractionContainer',
+    scheduling_policy: 'durable_object',
+    images: { base: { dockerfile: '../processing/Dockerfile' } },
+  });
   assert.equal(host.r2_buckets[0].bucket_name, 'peekaplate-staging-assets');
   assert.deepEqual(Object.keys(host.vars).sort(), ['APP_ENV', 'EXTRACTION_SOURCE_ORIGIN']);
   assert.equal(host.vars.APP_ENV, 'staging');
