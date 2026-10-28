@@ -108,6 +108,56 @@ describe('S3-VIS-01 / VIS-02: Comprehensive Contract & Fixture Verification', ()
       expect(singlePriceDraft?.price_amount).toBe('1595');
       expect(singlePriceDraft?.price_currency).toBe('PHP');
     });
+
+    it('accepts Mohammad PR #58 review candidates v2 extraction fixture (2fdc831)', () => {
+      const fixture = loadFixture('vis02-mohammad-extraction-v2.json');
+      const adapted = adaptPythonExtractionResult(fixture);
+      expect(adapted.success).toBe(true);
+      if (!adapted.success) return;
+
+      expect(adapted.status).toBe('incomplete');
+      expect(adapted.drafts).toHaveLength(3);
+
+      // Draft 0: Garden Soup with grouped price options and hierarchy
+      const soup = adapted.drafts[0]!;
+      expect(soup.name).toBe('Garden Soup');
+      expect(soup.category).toBe('FOOD');
+      expect(soup.subcategory).toBe('SOUPS');
+      expect(soup.category_page_number).toBe(1);
+      expect(soup.price_text).toBe('8.50 / 12.50 CAD');
+      expect(soup.price_amount).toBeNull();
+      expect(soup.price_currency).toBe('CAD');
+      expect(soup.candidate_id).toBe('draft:0bbe00087c6841623c76d7b6f9da5ebf');
+      expect(soup.status).toBe('needs_review');
+
+      // Draft 1: Coffee with missing price
+      const coffee = adapted.drafts[1]!;
+      expect(coffee.name).toBe('Coffee');
+      expect(coffee.category).toBe('HOT DRINKS');
+      expect(coffee.subcategory).toBeNull();
+      expect(coffee.price_amount).toBeNull();
+      expect(coffee.price_text).toBeNull();
+      expect(coffee.status).toBe('needs_review');
+
+      // Draft 2: Bread with explicit 0.00 price
+      const bread = adapted.drafts[2]!;
+      expect(bread.name).toBe('Bread');
+      expect(bread.category).toBe('BAKERY');
+      expect(bread.price_amount).toBe('0.00');
+      expect(bread.price_currency).toBe('CAD');
+      expect(bread.status).toBe('needs_review');
+    });
+
+    it('accepts Mohammad PR #58 service bundle report artifact (2fdc831)', () => {
+      const bundle = loadFixture<{ report: unknown }>('vis02-mohammad-bundle.json');
+      const adapted = adaptPythonExtractionResult(bundle.report);
+      expect(adapted.success).toBe(true);
+      if (!adapted.success) return;
+
+      expect(adapted.status).toBe('incomplete');
+      expect(adapted.drafts).toHaveLength(3);
+      expect(adapted.drafts[0]!.name).toBe('Garden Soup');
+    });
   });
 
   describe('Requirement 6: Multi-Span Evidence Reconstruction', () => {
