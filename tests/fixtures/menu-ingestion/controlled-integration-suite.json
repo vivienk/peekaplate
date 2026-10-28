@@ -1,0 +1,134 @@
+{
+  "suite": "S3-VIS-01 Menu Ingestion Controlled Integration Test Scenarios",
+  "version": "1.0.0",
+  "synthetic_source": {
+    "sha256": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+    "filename": "synthetic-review-options.pdf",
+    "media_type": "application/pdf",
+    "storage_key_pattern": "menu-ingestion/sources/{tenant_id}/{job_id}/source",
+    "report_key_pattern": "reports/{tenant_id}/{job_id}/extraction.json",
+    "dishes": [
+      {
+        "name": "Garden Soup",
+        "category": "FOOD",
+        "subcategory": "SOUPS",
+        "price_text": "8.50 / 12.50 CAD",
+        "category_page_number": 1
+      },
+      {
+        "name": "Coffee",
+        "category": "HOT DRINKS",
+        "subcategory": null,
+        "price_text": null,
+        "category_page_number": 1
+      },
+      {
+        "name": "Bread",
+        "category": "BAKERY",
+        "subcategory": null,
+        "price_text": "0.00 CAD",
+        "price_amount": "0.00",
+        "price_currency": "CAD",
+        "category_page_number": 1
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CASE-1-NORMAL-INGESTION",
+      "title": "Normal PDF and Photo Menu Ingestion",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "source_type": "pdf",
+        "source_hash": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+        "source_storage_key": "menu-ingestion/sources/00000000-0000-0000-0000-000000000001/11111111-1111-1111-1111-111111111111/source"
+      },
+      "expected_queue_behavior": "Queue receives message { version: 1, tenantId, jobId, queuedAt } and assigns to worker consumer with lease.",
+      "expected_extraction_behavior": "Worker calls hosted Python /extract with Bearer token, X-Job-ID, X-Tenant-ID, and minted 15-minute X-Source-Capability. Subprocess completes within 700s, HTTP returns within 720s.",
+      "expected_r2_behavior": "Complete raw extraction result written to reports/00000000-0000-0000-0000-000000000001/11111111-1111-1111-1111-111111111111/extraction.json.",
+      "expected_database_behavior": "Job status transitions queued -> running -> complete; 3 dish drafts persisted with extraction_status='needs_review' and review_status='pending'; lease claim released.",
+      "expected_ack_retry_dlq_behavior": "msg.ack() called exactly once after report written and drafts committed. Zero retries; no DLQ routing."
+    },
+    {
+      "id": "CASE-2-EXTRACTION-DRAFT-OUTPUT",
+      "title": "Expected Extraction and Draft Output Fidelity",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "fixture": "vis02-mohammad-extraction-v2.json"
+      },
+      "expected_queue_behavior": "Queue message processed and completed.",
+      "expected_extraction_behavior": "Validates schema_version 2, pipeline_version '3', producing exactly 3 drafts and 3 segments with coordinate metadata.",
+      "expected_r2_behavior": "Report JSON matches ExtractionReportSchema v2 contract with segment and evidence arrays.",
+      "expected_database_behavior": "Persists Garden Soup ($8.50 / 12.50 CAD), Coffee (unpriced), and Bread (0.00 CAD) with unique draft_index [0, 1, 2] and evidence spans linking to page 1.",
+      "expected_ack_retry_dlq_behavior": "Successful ACK after drafts and report verified."
+    },
+    {
+      "id": "CASE-3-TRANSIENT-RETRY-DLQ",
+      "title": "Transient Failure, Bounded Retry, and DLQ Routing",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "failure_mode": "transient_http_504_timeout"
+      },
+      "expected_queue_behavior": "Worker encounters 504 extraction_timeout or network failure; invokes msg.retry() on attempts 0, 1, 2.",
+      "expected_extraction_behavior": "Extraction transport aborts after timeout budget without holding database lease past 15 minutes.",
+      "expected_r2_behavior": "No report written to R2 on extraction failure.",
+      "expected_database_behavior": "failIngestionJob updates error_code='extraction_timeout', releases claim_token and locked_at; status remains 'queued' while attempt_count < 3, then marks status='failed' when attempt_count reaches max_attempts (3).",
+      "expected_ack_retry_dlq_behavior": "msg.retry() called without ACK; after 3 retries (4 total attempts), Cloudflare Queue routes poison/exhausted message to peekaplate-staging-menu-ingestion-dlq."
+    },
+    {
+      "id": "CASE-4-IDEMPOTENCY-CONFLICT",
+      "title": "Idempotency Consistency and Conflict Rejection",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "idempotency_key": "idem_conflict_test_key",
+        "initial_hash": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+        "conflicting_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "expected_queue_behavior": "No queue message emitted for rejected conflict submission.",
+      "expected_extraction_behavior": "Extractor is not invoked on conflict.",
+      "expected_r2_behavior": "R2 storage remains untouched.",
+      "expected_database_behavior": "Initial submission creates job. Second submission with conflicting hash fails with HTTP 409 Conflict (idempotency_conflict). Re-submission with identical hash returns existing job safely (HTTP 200).",
+      "expected_ack_retry_dlq_behavior": "Duplicate queue messages for already running or complete jobs are safely ACKed to avoid duplicate work."
+    },
+    {
+      "id": "CASE-5-REPORT-STORAGE-FAILURE",
+      "title": "R2 Report Storage Failure Prevents Draft Persistence and Premature ACK",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "failure_mode": "r2_bucket_unavailable"
+      },
+      "expected_queue_behavior": "Queue message processing throws IngestionError('report_storage_failed'); triggers msg.retry().",
+      "expected_extraction_behavior": "Extraction succeeded, but report cannot be persisted.",
+      "expected_r2_behavior": "R2 put operation fails/throws.",
+      "expected_database_behavior": "Database drafts are NOT persisted; persistExtractedDrafts is never called; job is failed with error_code='report_storage_failed'; lease released.",
+      "expected_ack_retry_dlq_behavior": "msg.retry() called; msg.ack() is NEVER called. Message will be retried when storage recovers."
+    },
+    {
+      "id": "CASE-6-CROSS-TENANT-ISOLATION",
+      "title": "Cross-Tenant / Cross-Venue Access Denial",
+      "input": {
+        "tenant_a": "00000000-0000-0000-0000-000000000001",
+        "tenant_b": "00000000-0000-0000-0000-000000000002",
+        "job_id_b": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+      },
+      "expected_queue_behavior": "Queue messages strictly bind tenantId from authenticated submitter.",
+      "expected_extraction_behavior": "Capability token binds tenantId; mismatched tenant cannot read another tenant's private source in R2.",
+      "expected_r2_behavior": "Sources and reports are path-scoped under tenant UUID: menu-ingestion/sources/{tenantId}/... and reports/{tenantId}/....",
+      "expected_database_behavior": "All SQL queries include AND tenant_id = $tenantId. Attempt by Tenant A to claim, fetch, or approve Tenant B's job or draft returns 404/403.",
+      "expected_ack_retry_dlq_behavior": "Foreign tenant message cannot modify state of another tenant's jobs."
+    },
+    {
+      "id": "CASE-7-ATOMIC-COMPLETION-ACK",
+      "title": "Strict Atomic Processing Sequence Before ACK",
+      "input": {
+        "tenant_id": "00000000-0000-0000-0000-000000000001",
+        "job_id": "11111111-1111-1111-1111-111111111111"
+      },
+      "expected_queue_behavior": "Batch consumer invokes handler with exactly one message.",
+      "expected_extraction_behavior": "Extractor executes and returns valid MenuExtractionResult.",
+      "expected_r2_behavior": "Report put to R2 occurs BEFORE database draft transaction.",
+      "expected_database_behavior": "persistExtractedDrafts runs within lease fence: writes dish drafts, updates job status='complete', sets result_storage_key, releases claim_token.",
+      "expected_ack_retry_dlq_behavior": "msg.ack() called strictly AFTER both R2 write and database draft transaction succeed. If any step fails, msg.retry() is called instead."
+    }
+  ]
+}

@@ -121,3 +121,21 @@ test('verifyIngestionE2E performs mock API verification and validates draft inva
   assert.equal(outcome.drafts.length, 2);
   assert.ok(outcome.checks.every((c) => c.passed));
 });
+
+test('verifyIngestionE2E fails when zero checks are performed', async () => {
+  const testJobId = '11111111-1111-1111-1111-111111111111';
+  const testVenueId = '22222222-2222-2222-2222-222222222222';
+
+  const outcome = await verifyIngestionE2E({
+    jobId: testJobId,
+    venueId: testVenueId,
+    // Neither token nor reportJson provided
+    progress: () => {},
+  });
+
+  assert.equal(outcome.passed, false);
+  assert.equal(outcome.checks.length, 1);
+  assert.equal(outcome.checks[0].name, 'Verification Execution');
+  assert.equal(outcome.checks[0].passed, false);
+  assert.match(outcome.checks[0].details, /No checks were executed/i);
+});

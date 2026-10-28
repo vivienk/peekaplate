@@ -241,6 +241,17 @@ export async function verifyIngestionE2E({
     }
   }
 
+  // Guard against zero-check success: verification must never pass if no checks ran
+  if (results.checks.length === 0) {
+    recordCheck(
+      'Verification Execution',
+      false,
+      'No checks were executed: neither API token nor report JSON was provided for verification',
+    );
+  }
+
+  results.passed = results.checks.length > 0 && results.checks.every((c) => c.passed);
+
   return results;
 }
 

@@ -72,6 +72,12 @@ function createMockDatabase() {
         if (!store.job || (store.job.status !== 'queued' && store.job.status !== 'incomplete')) {
           return { rows: [], rowCount: 0 };
         }
+        if (values && values[1] && store.job.id !== values[1]) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (values && values[2] && store.job.tenant_id !== values[2]) {
+          return { rows: [], rowCount: 0 };
+        }
         store.job.status = 'running';
         store.job.claim_token = '00000000-0000-0000-0000-000000000999';
         store.job.lease_generation = '1';
@@ -89,7 +95,14 @@ function createMockDatabase() {
 
       // 3. Select job
       if (text.includes('SELECT * FROM app_private.menu_ingestion_jobs')) {
-        return { rows: store.job ? [store.job as unknown as R] : [], rowCount: store.job ? 1 : 0 };
+        if (!store.job) return { rows: [], rowCount: 0 };
+        if (values && values[0] && store.job.tenant_id !== values[0]) {
+          return { rows: [], rowCount: 0 };
+        }
+        if (values && values[1] && store.job.id !== values[1]) {
+          return { rows: [], rowCount: 0 };
+        }
+        return { rows: [store.job as unknown as R], rowCount: 1 };
       }
 
       // 4. Row locking FOR UPDATE
@@ -126,9 +139,13 @@ function createMockDatabase() {
       // 7. Fail job
       if (text.includes('SET status = CASE WHEN attempt_count >= max_attempts')) {
         if (store.job) {
-          store.job.status = 'failed';
+          store.job.attempt_count = (store.job.attempt_count ?? 0) + 1;
+          store.job.status =
+            store.job.attempt_count >= store.job.max_attempts ? 'failed' : 'queued';
           store.job.error_code = values![0] as string;
           store.job.error_details = values![1] as string;
+          store.job.claim_token = null;
+          store.job.locked_at = null;
         }
         return { rows: [], rowCount: 1 };
       }
@@ -146,7 +163,7 @@ function createMockDatabase() {
 }
 
 describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
-  const venueId = '00000000-0000-0000-0000-000000000001';
+  const venueId = '00000000-0000-4000-8000-000000000001';
   const signingSecret = 'test-secret-at-least-48-characters-long-for-hmac-sha256-signing';
 
   function createMockReportStorage() {
@@ -772,6 +789,290 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       expect(ackCalled).toBe(true);
       expect(retryCalled).toBe(false);
       expect(extractorFn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CONTROLLED STAGING INTEGRATION SUITE: Authorized Synthetic Acceptance Cases', () => {
+    it('CASE 1 & 2: executes full synthetic PDF menu ingestion with exact 3 dishes and successful ACK', async () => {
+      const { readFileSync } = await import('node:fs');
+      const { fileURLToPath, URL: NodeURL } = await import('node:url');
+      const fixtureJson = JSON.parse(
+        readFileSync(
+          fileURLToPath(
+            new NodeURL(
+              '../../../tests/fixtures/menu-ingestion/vis02-mohammad-extraction-v2.json',
+              import.meta.url,
+            ),
+          ),
+          'utf8',
+        ) as string,
+      );
+
+      const { client, store } = createMockDatabase();
+      const { storage, reports } = createMockReportStorage();
+
+      const syntheticHash = fixtureJson.source.sha256;
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: syntheticHash,
+        idempotencyKey: 'idem_synthetic_pdf_case1',
+      });
+
+      let ackCalled = false;
+      let retryCalled = false;
+      const queueMsg: QueueMessage = {
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        attempts: 1,
+        ack: () => {
+          ackCalled = true;
+        },
+        retry: () => {
+          retryCalled = true;
+        },
+      };
+
+      const extractor = vi.fn().mockResolvedValue(fixtureJson);
+
+      const result = await processIngestionQueueBatch(client, { messages: [queueMsg] }, extractor, {
+        reportStorage: storage,
+        leaseTimeoutMinutes: 15,
+      });
+
+      expect(result.processed).toBe(1);
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(ackCalled).toBe(true);
+      expect(retryCalled).toBe(false);
+
+      // Verify report written to R2
+      const reportKey = `reports/${venueId}/${job.id}/extraction.json`;
+      expect(reports.has(reportKey)).toBe(true);
+
+      // Verify exact 3 dishes persisted with expected fields
+      expect(store.drafts.length).toBe(3);
+      const dishNames = store.drafts.map((d) => d[6]); // draft name is at index 6
+      expect(dishNames).toEqual(['Garden Soup', 'Coffee', 'Bread']);
+
+      // Check specific dish attributes
+      const soupDraft = store.drafts.find((d) => d[6] === 'Garden Soup');
+      expect(soupDraft[8]).toBe('FOOD'); // category
+      expect(soupDraft[9]).toBe('SOUPS'); // subcategory
+      expect(soupDraft[11]).toBe('8.50 / 12.50 CAD'); // price_text
+
+      const breadDraft = store.drafts.find((d) => d[6] === 'Bread');
+      expect(breadDraft[8]).toBe('BAKERY');
+      expect(breadDraft[12]).toBe('0.00'); // price_amount
+      expect(breadDraft[13]).toBe('CAD'); // price_currency
+
+      // Verify job finalized with incomplete status reflecting partial page results
+      expect(store.job?.status).toBe('incomplete');
+      expect(store.job?.draft_count).toBe(3);
+      expect(store.job?.claim_token).toBeNull();
+    });
+
+    it('CASE 3: retries message without ACK on transient extraction 504 timeout', async () => {
+      const { client, store } = createMockDatabase();
+      const { storage } = createMockReportStorage();
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: 'd'.repeat(64),
+        idempotencyKey: 'idem_transient_retry_case3',
+      });
+
+      let ackCalled = false;
+      let retryCalled = false;
+      const queueMsg: QueueMessage = {
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        attempts: 1,
+        ack: () => {
+          ackCalled = true;
+        },
+        retry: () => {
+          retryCalled = true;
+        },
+      };
+
+      const failingExtractor = vi
+        .fn()
+        .mockRejectedValue(
+          new IngestionError('extraction_timeout', 504, 'Extraction container gateway timeout'),
+        );
+
+      const result = await processIngestionQueueBatch(
+        client,
+        { messages: [queueMsg] },
+        failingExtractor,
+        {
+          reportStorage: storage,
+          leaseTimeoutMinutes: 15,
+        },
+      );
+
+      expect(result.acknowledged).toBe(0);
+      expect(result.retried).toBe(1);
+      expect(ackCalled).toBe(false);
+      expect(retryCalled).toBe(true);
+
+      // Database lease must be released and status returned to queued
+      expect(store.job?.status).toBe('queued');
+      expect(store.job?.claim_token).toBeNull();
+      expect(store.drafts.length).toBe(0);
+    });
+
+    it('CASE 5: prevents draft persistence and skips ACK when R2 report storage fails', async () => {
+      const { client, store } = createMockDatabase();
+      const failingStorage: ReportStorage = {
+        put: vi.fn().mockRejectedValue(new Error('R2 PutObject connection refused')),
+        get: vi.fn().mockResolvedValue(null),
+      };
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: 'e'.repeat(64),
+        idempotencyKey: 'idem_storage_fail_case5',
+      });
+
+      let ackCalled = false;
+      let retryCalled = false;
+      const queueMsg: QueueMessage = {
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        attempts: 1,
+        ack: () => {
+          ackCalled = true;
+        },
+        retry: () => {
+          retryCalled = true;
+        },
+      };
+
+      const extractor = vi.fn().mockResolvedValue(createStandardExtractionResult('pdf'));
+
+      const result = await processIngestionQueueBatch(client, { messages: [queueMsg] }, extractor, {
+        reportStorage: failingStorage,
+        leaseTimeoutMinutes: 15,
+      });
+
+      expect(result.acknowledged).toBe(0);
+      expect(result.retried).toBe(1);
+      expect(ackCalled).toBe(false);
+      expect(retryCalled).toBe(true);
+
+      // Drafts must NOT have been saved
+      expect(store.drafts.length).toBe(0);
+      // Job was not marked complete
+      expect(store.job?.status).not.toBe('complete');
+      expect(store.job?.claim_token).toBeNull();
+    });
+
+    it('CASE 6: enforces cross-tenant isolation and rejects foreign tenant queue message', async () => {
+      const { client, store } = createMockDatabase();
+      const foreignVenueId = '00000000-0000-4000-8000-000000000002';
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'photo',
+        sourceHash: 'f'.repeat(64),
+        idempotencyKey: 'idem_tenant_isolation_case6',
+      });
+
+      let ackCalled = false;
+      let retryCalled = false;
+      // Message claims to belong to foreignVenueId for job.id
+      const queueMsg: QueueMessage = {
+        body: {
+          version: 1,
+          tenantId: foreignVenueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        attempts: 1,
+        ack: () => {
+          ackCalled = true;
+        },
+        retry: () => {
+          retryCalled = true;
+        },
+      };
+
+      const extractor = vi.fn();
+      const result = await processIngestionQueueBatch(client, { messages: [queueMsg] }, extractor);
+
+      // Because job does not belong to foreign tenant, it is rejected and safely ACKed to clear poison
+      expect(result.errors.some((e) => e.error === 'Job not found')).toBe(true);
+      expect(ackCalled).toBe(true);
+      expect(extractor).not.toHaveBeenCalled();
+      expect(store.drafts.length).toBe(0);
+      expect(store.job?.status).toBe('queued'); // original job untouched
+    });
+
+    it('CASE 7: guarantees atomic processing order: report storage -> database drafts -> ACK', async () => {
+      const { client, store } = createMockDatabase();
+      const callSequence: string[] = [];
+
+      const storage: ReportStorage = {
+        put: vi.fn().mockImplementation(async () => {
+          callSequence.push('r2_report_put');
+        }),
+        get: vi.fn().mockResolvedValue(null),
+      };
+
+      const origQuery = client.query;
+      client.query = vi.fn().mockImplementation(async (text, values) => {
+        if (text.includes('INSERT INTO app_private.dish_drafts')) {
+          if (!callSequence.includes('dish_drafts_persisted')) {
+            callSequence.push('dish_drafts_persisted');
+          }
+        }
+        return origQuery(text, values);
+      });
+
+      const job = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'pdf',
+        sourceHash: '1'.repeat(64),
+        idempotencyKey: 'idem_atomic_order_case7',
+      });
+
+      const queueMsg: QueueMessage = {
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        attempts: 1,
+        ack: () => {
+          callSequence.push('queue_message_ack');
+        },
+        retry: vi.fn(),
+      };
+
+      const extractor = vi.fn().mockResolvedValue(createStandardExtractionResult('pdf'));
+
+      await processIngestionQueueBatch(client, { messages: [queueMsg] }, extractor, {
+        reportStorage: storage,
+      });
+
+      expect(callSequence).toEqual(['r2_report_put', 'dish_drafts_persisted', 'queue_message_ack']);
     });
   });
 });
