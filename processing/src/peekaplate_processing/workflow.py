@@ -20,7 +20,7 @@ from pydantic_core import ErrorType
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.model_cache import cache_path, read_candidates, write_candidates
-from peekaplate_processing.menu_context import apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
+from peekaplate_processing.menu_context import MONEY_MARKER, PRICE_GROUP, apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
 from peekaplate_processing.menu_layout import entry_price
 from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
@@ -150,8 +150,8 @@ def grounding_issues(dish: ExtractedDish, text: str, *, dish_names=(), price_blo
     if dish.price_amount is not None:
         try:
             amount = Decimal(dish.price_amount)
-            numbers=re.finditer(r"(?<![\w.,+-])(?:PHP|P)?[ \t]*(\d+(?:\.\d+)?)(?!\w|[.,]\d)", block, re.I)
-            amounts={Decimal(match.group(1)) for match in numbers if not nonprice_unit(block, match.start(), match.end())}
+            numbers=re.finditer(rf"(?<![\w.,+-])(?:{MONEY_MARKER})?[ \t]*(\d+(?:\.\d+)?)(?!\w|[.,]\d)", block, re.I)
+            amounts={Decimal(match.group(1)) for match in numbers if complete_price_match(match,block) and not nonprice_unit(block, match.start(), match.end())}
             if not amount.is_finite() or amount < 0 or amount not in amounts: raise ValueError
         except (InvalidOperation, ValueError):
             issues["price_amount"] = "Price is not supported by the cited page."
@@ -185,15 +185,16 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
             warnings.append("Price fields recovered from a unique OCR entry row; verify source association.")
     elif ambiguous:
         warnings.append("Price association is ambiguous; price fields remain unknown.")
-    option=r"(?:(?:[$€£₱]|PHP|P)[ \t]*)?\d+(?:\.\d+)?"
-    pair_pattern=rf"(?<![\w.,]){option}(?:[ \t]*/[ \t]*{option})+(?!\w|[.,]\d)"
-    pairs=[match for match in re.finditer(pair_pattern, block, re.I)
+    pairs=[match for match in re.finditer(PRICE_GROUP, block, re.I)
            if complete_price_match(match, block) and not nonprice_unit(block, match.start(), match.end())]
     price_text=updates.get("price_text", dish.price_text)
-    supplied_pair=re.search(pair_pattern, price_text, re.I) if price_text else None
+    supplied_pair=bool(price_text and "/" in price_text and len(re.findall(r"\d+(?:\.\d+)?",price_text))>1)
     matching_pairs=[]
-    if dish.price_amount is not None and "price_amount" not in issues:
-        amount=Decimal(dish.price_amount)
+    try:
+        amount=Decimal(dish.price_amount) if dish.price_amount is not None else None
+    except InvalidOperation:
+        amount=None
+    if amount is not None and amount.is_finite() and amount>=0:
         for pair in pairs:
             option_amounts=[Decimal(value) for value in re.findall(r"\d+(?:\.\d+)?",pair.group())]
             if amount in option_amounts:

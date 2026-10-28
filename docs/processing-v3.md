@@ -111,7 +111,14 @@ Ambiguous boundaries can produce nulls and warnings. Calorie/portion units apply
 across a slash-separated numeric list and cannot support a price; a genuine
 monetary amount beside a separate calorie count remains eligible. Recognized
 monetary prefixes are not entry names and stop unit propagation across a slash;
-a unit attached directly to a number still invalidates that number.
+a unit attached directly to a number still invalidates that number. Automatic
+recovery recognizes an explicit, bounded set of monetary codes/symbols, not every
+uppercase three-letter word: an omitted `TEA 95` heading is not a currency price.
+This recognition does not infer `price_currency` or limit which explicitly quoted
+currency fields can be reviewed. Complete options with code prefixes/suffixes
+retain their full literal text (for example `8.50 CAD / 12.50 CAD`) and no scalar.
+A scalar embedded in an incomplete or unrecognized slash group cannot establish
+a complete single-price assertion.
 
 On OCR pages, existing uploaded-image word/line boxes also support local price
 association. Valid source-supported headings, including wrapped names, bind only

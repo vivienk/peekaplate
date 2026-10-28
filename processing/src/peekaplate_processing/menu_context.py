@@ -3,6 +3,14 @@ import re
 
 
 _UNITS = r"(?:kcal|calories|cals?|pcs?|pieces?|servings?|grams?|kg|g|ml|oz)"
+# Recognition for automatic recovery, not an exhaustive ISO registry or a way to
+# infer currency. Unknown alphabetic labels must remain competing headings.
+CURRENCY_CODES=frozenset("AED AUD BRL CAD CHF CNY EUR GBP HKD IDR INR JPY KRW MXN MYR NZD PHP SAR SGD THB USD VND ZAR".split())
+CURRENCY_CODE="(?:"+"|".join(sorted(CURRENCY_CODES))+")"
+MONEY_MARKER=rf"(?:[$€£₱]|{CURRENCY_CODE}|P)"
+PRICE_NUMBER=r"\d+(?:\.\d+)?"
+PRICE_OPTION=rf"(?:{MONEY_MARKER}[ \t]*)?{PRICE_NUMBER}(?:[ \t]+{CURRENCY_CODE})?"
+PRICE_GROUP=rf"(?<![\w.,]){PRICE_OPTION}(?:[ \t]*/[ \t]*{PRICE_OPTION})+(?!\w|[.,]\d)"
 
 
 def nonprice_unit(text, start, end):
@@ -10,7 +18,7 @@ def nonprice_unit(text, start, end):
     before=text[text.rfind("\n", 0, start)+1:start]
     if re.match(rf"[ \t]*{units}\b", text[end:], re.I) or re.search(rf"\b{units}[ \t]*:?[ \t]*$", before, re.I):
         return True
-    marker=r"(?:[$€£₱]|\bPHP|\bP)"
+    marker=rf"(?:[$€£₱]|\b{CURRENCY_CODE}|\bP)"
     if re.search(rf"{marker}[ \t]*$", before, re.I) or re.match(rf"[ \t]*{marker}[ \t]*\d", text[start:end], re.I):
         return False
     after=r"[ \t]*(?:/[ \t]*\d+(?:\.\d+)?[ \t]*)*"
@@ -108,7 +116,7 @@ def dish_block(name, text, dish_names):
         label=line.strip().strip("#*▼►•- ")
         heading=re.fullmatch(r"([A-Za-z][A-Za-z '&’\-]*?)(?:[ \t]+(?:[$€£₱]|PHP[ \t]*|P)?\d.*)?", label, re.I)
         label=heading.group(1) if heading else ""
-        if label.upper() in {"PHP", "P"}:
+        if label.upper() in CURRENCY_CODES|{"P"}:
             label=""
         words=label.split()
         if label and (label.istitle() or label.isupper() or len(words) == 1):
@@ -120,7 +128,7 @@ def dish_block(name, text, dish_names):
 
 def detached_prices(block):
     """Several standalone price lines do not identify the final entry's price."""
-    price=r"(?:[$€£₱]|PHP[ \t]*|P)?[ \t]*\d+(?:\.\d+)?(?:[ \t]*/[ \t]*\d+(?:\.\d+)?)*(?:[ \t]+[A-Z]{3})?"
+    price=rf"{PRICE_OPTION}(?:[ \t]*/[ \t]*{PRICE_OPTION})*"
     groups=[]
     for line in block.splitlines():
         value=line.strip()

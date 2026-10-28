@@ -9,11 +9,10 @@ import math
 import re
 from typing import NamedTuple
 
-from .menu_context import detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches
+from .menu_context import PRICE_OPTION, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches
 
 _NUMBER = r"\d+(?:\.\d+)?"
-_AMOUNT = rf"(?:(?:[$€£₱]|PHP|P)[ \t]*)?{_NUMBER}"
-_PRICE = re.compile(rf"(?:(?-i:[A-Z]{{3}})[ \t]+)?{_AMOUNT}(?:[ \t]*/[ \t]*{_AMOUNT})*(?:[ \t]+(?-i:[A-Z]{{3}}))?", re.I)
+_PRICE = re.compile(rf"{PRICE_OPTION}(?:[ \t]*/[ \t]*{PRICE_OPTION})*", re.I)
 _MARKUP = re.compile(r"[ \t#*▼►•>-]*")
 _UNIT = re.compile(r"(?:kcal|calories|cals?|pcs?|pieces?|servings?|grams?|kg|g|ml|oz)", re.I)
 

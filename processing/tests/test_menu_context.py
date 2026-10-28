@@ -105,7 +105,7 @@ class MenuContextTests(unittest.TestCase):
             with self.subTest(amount=amount):
                 dish,warnings=grounded_draft(self.dish(name="Soup", price_amount=amount), text)
                 self.assertIsNone(dish.price_amount)
-                self.assertEqual(dish.price_text, "8.50 / 12.50 / 15.50")
+                self.assertEqual(dish.price_text, "8.50 / 12.50 / 15.50 CAD")
                 self.assertTrue(any("Multiple" in warning for warning in warnings))
         printed="8.50 / 12.50 / 15.50 CAD"
         dish,warnings=grounded_draft(self.dish(name="Soup", price_text=printed), text)
@@ -121,6 +121,67 @@ class MenuContextTests(unittest.TestCase):
                     self.assertIsNone(cleaned.price_amount)
                     self.assertIsNone(cleaned.price_currency)
                     self.assertTrue(any("Multiple" in warning for warning in warnings))
+
+    def test_review_iso_options_keep_full_literal_and_never_a_scalar(self):
+        for printed in ["8.50 CAD / 12.50 CAD", "CAD 8.50 / CAD 12.50"]:
+            for supplied in [printed,None]:
+                with self.subTest(printed=printed,supplied=supplied):
+                    candidate=self.dish(name="Soup",price_amount="8.50",price_text=supplied,price_currency="CAD")
+                    cleaned,warnings=grounded_draft(candidate,f"Soup\n{printed}")
+                    self.assertEqual(cleaned.price_text,printed)
+                    self.assertIsNone(cleaned.price_amount)
+                    self.assertEqual(cleaned.price_currency,"CAD")
+                    self.assertTrue(any("Multiple" in warning for warning in warnings))
+
+    def test_review_omitted_three_letter_heading_cannot_be_a_currency(self):
+        from test_menu_layout import layout,box
+        metadata=layout(box("Soup",20,20),box("TEA 95",520,20,200))
+        cleaned,warnings=grounded_draft(self.dish(name="Soup"),"Soup\nTEA 95",dish_names=["Soup"],ocr_metadata=metadata)
+        self.assertIsNone(cleaned.price_amount)
+        self.assertIsNone(cleaned.price_text)
+        self.assertTrue(any("ambiguous" in warning.lower() for warning in warnings))
+        for printed in ["CAD 95","PHP 95"]:
+            with self.subTest(printed=printed):
+                cleaned,_=grounded_draft(self.dish(name="Soup"),f"Soup\n{printed}",dish_names=["Soup"],
+                    ocr_metadata=layout(box("Soup",20,20),box(printed,520,20,200)))
+                self.assertEqual((cleaned.price_text,cleaned.price_amount),(printed,"95"))
+                self.assertIsNone(cleaned.price_currency)
+
+    def test_review_prices_remain_conservative_through_pipeline_export(self):
+        import tempfile,copy
+        from pathlib import Path
+        from fixture_factory import make_pdf
+        from peekaplate_processing.extract_menus import extract_source
+        from peekaplate_processing.run_pipeline import run_pipeline
+        from peekaplate_processing.review_candidates import prepare_review_candidates
+        from test_menu_layout import layout,box
+        cases=[("TEA 95",None,None),("8.50 CAD / 12.50 CAD","8.50 CAD / 12.50 CAD","8.50"),
+               ("CAD 8.50 / CAD 12.50",None,"8.50")]
+        for printed,supplied,amount in cases:
+            with self.subTest(printed=printed),tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);source=root/"synthetic.pdf";source.write_bytes(make_pdf([{"text":f"Menu prices\nSoup\n{printed}\nsynthetic fixture context for review only"}]))
+                acquired=extract_source(source)
+                if printed.startswith("TEA"):
+                    acquired.segments[0].method="ocr_space_engine3"
+                    acquired.segments[0].metadata=layout(box("Soup",20,20),box(printed,520,20,200))
+                before=copy.deepcopy(acquired.segments[0])
+                candidate=self.dish(page_number=1,name="Soup",price_amount=amount,price_text=supplied)
+                from types import SimpleNamespace
+                class CaseLLM(FakeLLM):
+                    def invoke(self,messages):
+                        return {"raw":SimpleNamespace(content=DishBatch(dishes=[candidate],sections=[]).model_dump_json(),response_metadata={"finish_reason":"stop"})}
+                llm=CaseLLM()
+                with patch("peekaplate_processing.run_pipeline.extract_source",return_value=acquired):
+                    report=run_pipeline(source,root/"run",llm=llm,input_mode="ocr",llm_cache_dir=None)
+                exported=prepare_review_candidates(report)
+                self.assertEqual(len(exported.candidates),1)
+                original=exported.candidates[0].original
+                self.assertIsNone(original.price_amount)
+                self.assertEqual(original.price_text,None if printed.startswith("TEA") else printed)
+                self.assertEqual(original.status,"needs_review")
+                self.assertEqual(report.segments[0],before)
+                span=report.evidence[0].spans[0]
+                self.assertEqual(report.segments[0].text[span.start:span.end],original.source_text)
 
     def test_calorie_options(self):
         for source in ["Soup\nCalories: 200 / 300 / 400\n8.50 CAD", "Soup\n200 / 300 / 400 kcal\n8.50 CAD"]:
