@@ -13,12 +13,12 @@
   "dependencies": {
     "@peekaplate/contracts": "workspace:*",
     "hono": "4.13.13",
-    "jose": "6.2.12",
+    "jose": "6.2.13",
     "pg": "8.23.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261026.1",
     "@types/pg": "8.23.1",
-    "wrangler": "4.149.0"
+    "wrangler": "4.152.0"
   }
 }
