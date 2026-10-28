@@ -1,6 +1,10 @@
 import type { InputHTMLAttributes } from 'react';
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({
+  className,
+  ref,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> }) {
   const classes = ['pp-input', className].filter(Boolean).join(' ');
-  return <input className={classes} {...props} />;
+  return <input ref={ref} className={classes} {...props} />;
 }

@@ -28,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "tokens",
       "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, button label, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. Chip roles (active/inactive) added from Figma; hover/pressed pending. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending. Component dims reuse --pp-space-16/20; button label uses 14px/24px tokens; no other dimension tokens.",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console: motion, typography, radius, spacing, shadows, color palette, and color roles for Button/Navigation/surface/status/input. Chip roles added; WCAG contrast test covers active pairs. Light theme via :root[data-theme=\"light\"] remaps surface/on-surface/outline/input/button/nav roles to gray palette for Console; diner keeps dark :root defaults.",
       "paths": [
         "packages/tokens/package.json",
         "packages/tokens/src/tokens.css",
@@ -39,12 +39,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "53d94c934bc753e8d3b7fb7ad28271c41799a5989bdc2c3efeabebc5d98513c8"
+      "sourceFingerprint": "a174323b508bab31db2f5e713c8cbf8afe5be028b4a530ef476d914922e6c533"
     },
     {
       "id": "ui",
       "status": "foundation",
-      "summary": "Shared framework-agnostic component CSS built only on @peekaplate/tokens (Button, Card, Input, Typography, Nav) with variants, states, responsive and reduced-motion rules. CSS-only so the diner keeps its static no-JS shell and JS budget; console wraps these classes in React. Consumed via @peekaplate/ui/components.css alongside tokens.css.",
+      "summary": "Shared framework-agnostic component CSS (Button, Card, Input, Typography, Nav) on @peekaplate/tokens. Text button uses --pp-role-on-surface for theme-safe contrast. Console wraps classes in React. Consumed via @peekaplate/ui/components.css.",
       "paths": [
         "packages/ui/package.json",
         "packages/ui/src/index.ts",
@@ -56,7 +56,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "05fd780dddb7ac48367264010d214cb17d5883be82ec650743641b91a8f663a8"
+      "sourceFingerprint": "805ed396e783a76cc3d55578b9da024846248ccbb03acbbab76b68da1fa4fa41"
     },
     {
       "id": "diner",
@@ -99,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f1b02c1d28ca55dc35cdf29d0c01439824c7c34f778fc029e6104e8e9f13ac0c"
+      "sourceFingerprint": "78a1ac131ac431ba3657c64a8f8101e0b1ddfa52c1d3efa69ae85a90cfacbf39"
     },
     {
       "id": "backend",
