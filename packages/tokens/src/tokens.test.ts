@@ -12,9 +12,14 @@ function declarations(block: string) {
 async function tokenBlocks() {
   const css = (await read('./tokens.css')).replace(/\/\*[\s\S]*?\*\//g, '');
   const reducedStart = css.indexOf('@media (prefers-reduced-motion: reduce)');
-  expect(reducedStart).toBeGreaterThan(0);
+  if (reducedStart < 0) throw new Error('reduced-motion block not found');
+  const rootBlockMatch = css.match(/:root\s*\{[\s\S]*?\}/);
+  if (!rootBlockMatch) throw new Error(':root block not found');
+  const lightBlockMatch = css.match(/\[data-theme="light"\]\s*\{[\s\S]*?\}/);
+  if (!lightBlockMatch) throw new Error('light theme block not found');
   return {
-    base: declarations(css.slice(0, reducedStart)),
+    base: declarations(rootBlockMatch[0]),
+    light: declarations(lightBlockMatch[0]),
     reduced: declarations(css.slice(reducedStart)),
   };
 }
@@ -337,9 +342,17 @@ describe('design tokens', () => {
   it('has no duplicate token names', async () => {
     const css = (await read('./tokens.css')).replace(/\/\*[\s\S]*?\*\//g, '');
     const reducedStart = css.indexOf('@media (prefers-reduced-motion: reduce)');
-    const baseCss = css.slice(0, reducedStart);
-    const names = [...baseCss.matchAll(/(--pp-[\w-]+)\s*:/g)].map(([, name]) => name);
-    expect(new Set(names).size).toBe(names.length);
+    if (reducedStart < 0) throw new Error('reduced-motion block not found');
+    const rootBlockMatch = css.match(/:root\s*\{[\s\S]*?\}/);
+    if (!rootBlockMatch) throw new Error(':root block not found');
+    const lightBlockMatch = css.match(/\[data-theme="light"\]\s*\{[\s\S]*?\}/);
+    if (!lightBlockMatch) throw new Error('light theme block not found');
+    const baseNames = [...rootBlockMatch[0].matchAll(/(--pp-[\w-]+)\s*:/g)].map(([, name]) => name);
+    const lightNames = [...lightBlockMatch[0].matchAll(/(--pp-[\w-]+)\s*:/g)].map(
+      ([, name]) => name,
+    );
+    expect(new Set(baseNames).size).toBe(baseNames.length);
+    expect(new Set(lightNames).size).toBe(lightNames.length);
   });
 
   it('maps color roles only to palette colors', async () => {
@@ -403,6 +416,131 @@ describe('design tokens', () => {
     expect(ratio([r('focus-ring'), r('surface')]), 'focus-ring on surface').toBeGreaterThanOrEqual(
       3,
     );
+  });
+
+  it('maps light color roles to existing palette colors', async () => {
+    const { light } = await tokenBlocks();
+    expect(light).toEqual({
+      '--pp-role-surface': 'var(--pp-color-gray-100)',
+      '--pp-role-surface-container': 'var(--pp-color-gray-50)',
+      '--pp-role-on-surface': 'var(--pp-color-gray-900)',
+      '--pp-role-on-surface-variant': 'var(--pp-color-gray-600)',
+      '--pp-role-outline': 'color-mix(in srgb, var(--pp-color-gray-500) 30%, transparent)',
+      '--pp-role-outline-solid': 'var(--pp-color-gray-500)',
+      '--pp-role-outline-variant': 'var(--pp-color-gray-200)',
+      '--pp-role-text-secondary': 'var(--pp-color-gray-700)',
+      '--pp-role-focus-ring': 'var(--pp-color-info-700)',
+      '--pp-role-button-outline-bg': 'var(--pp-color-gray-50)',
+      '--pp-role-button-outline-text': 'var(--pp-color-gray-900)',
+      '--pp-role-button-outline-border': 'var(--pp-color-gray-300)',
+      '--pp-role-button-outline-pressed-bg': 'var(--pp-color-gray-200)',
+      '--pp-role-button-disabled-bg': 'var(--pp-color-gray-200)',
+      '--pp-role-button-disabled-text': 'var(--pp-color-gray-500)',
+      '--pp-role-button-disabled-border': 'var(--pp-color-gray-400)',
+      '--pp-role-button-text-hover-bg':
+        'color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent)',
+      '--pp-role-button-text-pressed-bg': 'var(--pp-color-orange-900)',
+      '--pp-role-nav-bg': 'var(--pp-color-gray-100)',
+      '--pp-role-nav-icon': 'var(--pp-color-gray-900)',
+      '--pp-role-nav-hover-bg': 'var(--pp-color-orange-500)',
+      '--pp-role-nav-hover-icon': 'var(--pp-color-orange-950)',
+      '--pp-role-nav-pressed-bg': 'var(--pp-color-gray-300)',
+      '--pp-role-nav-disabled-bg': 'var(--pp-color-gray-200)',
+      '--pp-role-input-bg': 'var(--pp-color-gray-50)',
+      '--pp-role-input-text': 'var(--pp-color-gray-900)',
+      '--pp-role-input-placeholder': 'var(--pp-color-gray-500)',
+      '--pp-role-input-border': 'var(--pp-color-gray-500)',
+      '--pp-role-input-border-focus': 'var(--pp-color-info-700)',
+      '--pp-role-input-border-error': 'var(--pp-color-error-400)',
+      '--pp-role-input-text-error': 'var(--pp-color-error-700)',
+      '--pp-role-input-bg-disabled': 'var(--pp-color-gray-200)',
+      '--pp-role-input-text-disabled': 'var(--pp-color-gray-500)',
+    });
+  });
+
+  it('maps light color roles only to palette colors', async () => {
+    const { base, light } = await tokenBlocks();
+    const roles = group(light, role);
+    for (const value of Object.values(roles)) {
+      const refs = [...value.matchAll(/var\((--pp-[\w-]+)\)/g)].map(([, name]) => name);
+      expect(refs.length).toBeGreaterThan(0);
+      for (const ref of refs) {
+        let current: string | undefined = ref;
+        let finalName: string | undefined;
+        for (let i = 0; i < 5 && current; i++) {
+          finalName = current;
+          const next = base[current] ?? light[current];
+          if (!next) break;
+          const m = /^var\((--pp-[\w-]+)\)$/.exec(next.trim());
+          if (!m) break;
+          current = m[1];
+        }
+        expect(finalName).toMatch(/^--pp-color-/);
+      }
+    }
+  });
+
+  it('keeps light theme foreground/background pairs at WCAG AA contrast', async () => {
+    const { base, light } = await tokenBlocks();
+    const hexOf = (name: string): string => {
+      let value = light[name];
+      for (let i = 0; i < 5 && value; i++) {
+        const next = /^var\((--pp-[\w-]+)\)$/.exec(value.trim())?.[1];
+        if (!next) break;
+        value = light[next] ?? base[next];
+      }
+      // Fall back to dark base for any token absent from the light block.
+      if (!value) {
+        value = base[name];
+        for (let i = 0; i < 5 && value; i++) {
+          const next = /^var\((--pp-[\w-]+)\)$/.exec(value.trim())?.[1];
+          if (!next) break;
+          value = base[next];
+        }
+      }
+      if (!value || !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${name} is not a solid color`);
+      return value;
+    };
+    const luminance = (hex: string) => {
+      const channel = (i: number) => {
+        const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+    };
+    const ratio = (fg: string, bg: string) => {
+      const a = luminance(fg);
+      const b = luminance(bg);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    };
+    const r = (name: string) => `--pp-role-${name}`;
+    const pairs: Array<[string, string, number]> = [
+      [r('on-surface'), r('surface'), 4.5],
+      [r('on-surface'), r('surface-container'), 4.5],
+      [r('on-surface-variant'), r('surface'), 4.5],
+      [r('on-surface-variant'), r('surface-container'), 4.5],
+      [r('button-outline-text'), r('button-outline-bg'), 4.5],
+      [r('nav-icon'), r('nav-bg'), 4.5],
+      [r('input-text'), r('input-bg'), 4.5],
+      [r('input-text-error'), r('input-bg'), 4.5],
+    ];
+    for (const [fg, bg, min] of pairs) {
+      expect(ratio(hexOf(fg), hexOf(bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(min);
+    }
+    // Non-text UI pairs.
+    expect(
+      ratio(hexOf(r('input-border')), hexOf(r('input-bg'))),
+      'input-border on input-bg',
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      ratio(hexOf(r('focus-ring')), hexOf(r('surface'))),
+      'focus-ring on surface',
+    ).toBeGreaterThanOrEqual(3);
+    // Text button against the actual Console surface.
+    expect(
+      ratio(hexOf(r('on-surface')), '#f5f3ec'),
+      'on-surface on console surface',
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('are the shared source for both apps', async () => {
