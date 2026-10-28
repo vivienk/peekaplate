@@ -27,7 +27,7 @@ Staging observation infrastructure is provisioned: the source Queue and DLQ are 
 | Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
 | Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
 | Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
-| Processing and analysis | Python, uv, Pydantic | [Local PDF/image acquisition and LLM dish drafts](processing/README.md); needs-review output, application integration and quality acceptance pending |
+| Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [Local PDF/image extraction](processing/README.md) and tested service/container packaging; [host activation and VIS-01 integration](docs/menu-ingestion-infrastructure.md) pending |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
 Frontends and backend share contracts. Frontends do not import backend internals or hold database credentials. Authorization belongs to the backend; venue authority must derive from verified identity and membership. Database policies support this boundary; they do not authenticate callers.
@@ -45,14 +45,16 @@ Detailed boundaries, failure handling and deferred capabilities are documented i
 
 The backend can include both TypeScript and Python. The existing TypeScript/Hono API owns staff authentication, restaurant permissions and application commands. Python is an accepted option for a concrete processing or analysis job, such as checking supplied photos, validating an import or preparing an analytical result. Adding Python does not require rewriting the API or replacing Supabase.
 
-Add the first Python component with its actual task, an isolated `uv` environment, a locked dependency set and `pytest` tests. A Python process cannot directly import the TypeScript/Zod contracts: define a versioned JSON request/result format and test both implementations against the same examples. Job requests must carry backend-authorized restaurant and input references; returned results must be checked against that job before any application change. Use the established command path for business changes rather than writing around permissions, event history or approval rules.
+The existing Python component uses an isolated `uv` environment, a frozen lockfile and `unittest` regression tests. Install and test its HTTP service with `uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`; CI runs that suite and builds the package. Python and TypeScript communicate through validated JSON contracts. Job requests must carry backend-authorized restaurant and input references; returned results must be checked against that job before any application change. Use the established command path for business changes rather than writing around permissions, event history or approval rules.
+
+VIS-01 now has a bounded HTTP wrapper and a prepared Cloudflare Containers host for the native PyMuPDF pipeline. Scoped Wrangler authorization is complete; hosting waits for Vivien's planned $5/month Workers Paid upgrade. The [service handoff](docs/menu-ingestion-infrastructure.md) covers job-bound source authorization, exact private R2 sources, processing limits, required credentials and integration order. This setup does not run or replace the unfinished ingestion consumer.
 
 Choose its runtime after checking the task's packages and resource needs:
 
 - **Cloudflare Python Worker:** an option for compatible, bounded work or calls to an external model service. It is a separate deployment, connected to the API through an authenticated interface or private service binding.
 - **Container or specialist compute service:** evaluate only when required libraries or workload limits rule out Workers. Running a model ourselves may need GPU compute; calling a model API does not. Deployment and cost approval are separate from adding Python source code.
 
-[Cloudflare's Python documentation](https://developers.cloudflare.com/workers/languages/python/) and [package compatibility guide](https://developers.cloudflare.com/workers/languages/python/packages/) describe the supported runtime. These are deployment options, not infrastructure already provisioned for this repository. Before staging integration, test timeout/failure handling, safe retries and duplicate results, tenant isolation and the TypeScript/Python data contract. Long processing must not block menu browsing. Existing `pnpm` commands do not install or run Python jobs; add scoped CI checks with the first implementation.
+[Cloudflare's Python documentation](https://developers.cloudflare.com/workers/languages/python/) and [package compatibility guide](https://developers.cloudflare.com/workers/languages/python/packages/) describe the supported runtime. Python Workers remain an alternative for compatible future tasks; the current extraction host uses a container. Before staging integration, test timeout/failure handling, safe retries and duplicate results, tenant isolation and the TypeScript/Python data contract. Long processing must not block menu browsing. `pnpm` application commands do not install or run Python jobs; use the `uv` commands above.
 
 The current visual workflow remains manual and reviewed. A Python task does not authorize automatic publication, invented ingredients or generated edible surfaces. See [ADR 0004](docs/adr/0004-visual-tiers.md).
 
@@ -153,8 +155,8 @@ Each contributor installs and authenticates their own Claude or Codex client and
 
 See [PostHog setup and evidence limits](docs/posthog.md) for consent, separate staging/production build variables, taxonomy mapping, validation and manual project setup. Tracking is disabled until configured; current shells do not publish menu or owner-report events.
 
-Python processing uses `uv sync --project processing --frozen` and
-`uv run --project processing --frozen python -m unittest discover -s processing/tests`.
+Python processing uses `uv sync --project processing --extra service --frozen` and
+`uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`.
 The local package and review boundaries are described in the
 [processing guide](processing/README.md) and [delivery handoff](docs/ocr-delivery.md).
 Python tests and package builds run in CI alongside the repository checks.

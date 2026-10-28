@@ -94,3 +94,23 @@ and local-smoke checks pass afterward.
 
 Related files: `scripts/test-db.mjs`, `scripts/test-db.test.mjs`, `errors.md`.
 Pattern: db.readiness-transport; first occurrence. No policy promotion.
+
+## LRN-20261026-001 · Verify the trigger's current trusted reference
+
+**Logged**: 2026-10-26 · America/Phoenix
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+**Category**: knowledge_gap
+
+GitHub changed pull_request_target in December 2025 to source workflow code,
+GITHUB_REF and GITHUB_SHA from the default branch regardless of the PR base.
+A workflow merged only into develop cannot activate this path when main is
+the default branch. Check the provider's current event semantics and actual
+workflow registration before treating a successful merge or enable variable
+as activation evidence. Promote only the reviewed delivery slice needed on
+main; preserve unrelated application release boundaries.
+
+Related: `.github/workflows/deploy-preview.yml`, `docs/previews.md`.
+Source: https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/
+Pattern: actions.default-branch-trigger; first occurrence, no policy promotion.

@@ -476,3 +476,108 @@ connection refusal when socket readiness preceded TCP, then passed all six tests
 after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
+
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+# ERR-20261026-PREVIEW-REPAIR
+
+PR #41 merged successfully into develop, but automatic previews did not run:
+GitHub now reads pull_request_target workflow code and github.sha from the
+default branch, which still lacked the workflow and helper. Repository readback
+showed the enable variable true; a variable cannot supply missing trusted code.
+The follow-up promotes only preview orchestration to main and corrects the
+activation guide. GitHub-held token/lifecycle acceptance remains separate.
+
+`node --test scripts/preview.test.mjs` also reproduced 12 passes and one Windows
+EPERM while creating a file symlink to `/etc/passwd`; this failed before the
+sanitizer was exercised. The fixture now uses a real Windows directory junction
+or a directory symlink elsewhere. All rejection assertions remain enabled.
+
+A new exact-commit marker regression failed with ENOENT before implementation.
+Sanitization now generates the marker from a checked SHA, rejects supplied
+markers and verifies both deployed aliases against that SHA before announcing
+readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
+commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
+
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
+
+
+## October 27 VIS-01 infrastructure validation
+
+```json
+{"id":"OBS-20261027-VIS01-QUEUE-CREATE","status":"resolved","area":"operator-resource-provisioning","observation":"Initial Queue create request containing delivery_paused returned HTTP 500/code 10013; exact-name readback confirmed no resource was created.","cause":"The installed Wrangler creation path uses retention settings followed by a separate queue-name/paused PATCH; the provider did not accept the initial request shape in this run. A provider root cause was not established.","prevention":"Follow the installed CLI request contract. Read back exact names after an error before retrying; create with no producers, pause immediately, then attach the controlled consumer. Never repeat a create blindly.","regression":"The corrected sequence provisioned exactly two menu queues. Real source/R2/readback/retry-to-DLQ and cleanup passed; both empty/paused and observation settings unchanged.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS","status":"open","area":"staging-service-activation","observation":"Installed Wrangler containers list stopped before inventory because containers:write is absent from the current OAuth login. Cloudflare host dry-run, Docker build and local HTTP boundary checks are separate evidence.","prevention":"Keep the new host inactive until scoped Container deployment access is authorized. Preserve current Worker/Pages scopes; never request every default scope or infer service readiness from packaging.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"],"resolutionRequired":"Authorize the required scoped deployment access, configure provider/service secrets, deploy the reviewed host and record genuine service/source/extraction acceptance."}
+```
+
+```json
+{"id":"ERR-20261027-CONTEXT-SUMMARY","status":"resolved","area":"context-validation","cause":"Appending service details exceeded the existing context node summary bound; refresh rejected the graph before writing fingerprints.","prevention":"Keep node summaries concise and link detailed runbooks instead of accumulating prose.","regression":"Backend summary condensed without dropping authority/readiness boundaries; context refresh and check required before commit.","sources":["docs/CONTEXT.md","scripts/context.mjs"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-DRYRUN-OUTPUT","status":"resolved","area":"local-verification-artifacts","cause":"A dry-run output directory outside the existing ignored dist path was included by the lint scan.","prevention":"Write operator probe/build outputs outside the checkout or into its established ignored dist path; never format generated bundles to satisfy source lint.","regression":"Moved only the generated evidence directory to the task output folder; final pnpm check must pass on source files.","sources":["docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-COMPAT-DATE","status":"resolved","area":"local-worker-runtime","cause":"The pinned local Wrangler binary supports compatibility dates through October 13; a new October 27 test configuration could not start.","prevention":"Keep this existing project's new Worker on the already tested compatibility date until a separately verified runtime upgrade.","regression":"Actual hosting Worker source/auth routes with remote private R2 passed on the matching October 13 date, including exact cleanup.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-PARTIAL-EXIT","status":"resolved","area":"python-service-result-handling","cause":"The new service used check=True even though the existing CLI writes valid partial/failed reports and returns exit 2; reviewable partial drafts became HTTP 502.","prevention":"Distinguish expected result exit statuses from execution failure and still validate the bounded output report.","regression":"A real child writes an incomplete needs-review report and exits 2; the regression failed with 502 before the fix and passes with 200/preserved drafts afterward.","sources":["processing/src/peekaplate_processing/service.py","processing/tests/test_service.py","processing/src/peekaplate_processing/run_pipeline.py"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-SOURCE-AUTHORITY","status":"resolved","area":"private-source-authorization","cause":"The new source relay initially treated a global service bearer as authorization for caller-selected tenant/job paths, including other jobs.","prevention":"Require a short-lived signed tenant/job/hash capability minted only after backend job authorization. Keep its signing key separate from the service identity and out of Python.","regression":"Valid service identity plus job-A grant requesting job B returned 200 before the fix; focused tests and actual Worker/remote-R2 probes now deny with 403 before source access. Expired/tampered grants and digest mismatch are rejected.","sources":["backend/src/extraction-capability.ts","backend/src/extraction-host.ts","backend/src/extraction-host.test.ts","processing/src/peekaplate_processing/service.py"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS"},"status":"resolved","evidence":"Scoped Wrangler login successfully added containers:write while retaining existing Worker/Pages scopes; credentials remain in the encrypted OS-backed store. No default-scope expansion or subscription change."}
+```
+
+```json
+{"id":"OBS-20261027-CONTAINER-ELIGIBILITY","status":"open","area":"hosted-extraction-activation","observation":"Explicit staging account Container inventory returns HTTP 401 eligibility denial saying Workers Paid is required; workers-standard reports true and subscription readback is 403. Wrangler also asserts after printing the provider denial on Windows; direct API readback confirms the provider error independently.","cause":"Account entitlement/member-role eligibility is not resolved; the available evidence does not establish that the paid plan is missing.","prevention":"Have the account owner verify existing Container entitlement and member access. Do not purchase a duplicate plan or broaden permissions blindly.","resolutionRequired":"Verify eligibility on the existing account, then deploy/test the reviewed host with protected service/provider credentials.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"kind":"clarification","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"pending-external-activation","cause":"The account is on Free; Vivien will activate Workers Paid. The standard flag alone was not billing proof.","next":"Keep the prepared Cloudflare host unchanged. After the owner activates the $5 plan, verify eligibility and configure/deploy the reviewed service; no upgrade was purchased by this task."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:21:00.026Z","exitCode":1}
+```
