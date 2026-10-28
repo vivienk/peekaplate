@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(29);
+SELECT plan(33);
 
 INSERT INTO app_private.venues (id, name) VALUES
   ('00000000-0000-0000-0000-0000000000b1', 'Fact venue one'),
@@ -28,7 +28,10 @@ INSERT INTO fact_index VALUES
   ('61000000-0000-4000-8000-000000000017', 'dish_unsaved', 'accepted', '00000000-0000-0000-0000-0000000000b1'),
   ('61000000-0000-4000-8000-000000000018', 'dish_activity_checkpoint', 'accepted', '00000000-0000-0000-0000-0000000000b1'),
   ('61000000-0000-4000-8000-000000000019', 'dish_detail_opened', 'accepted', '00000000-0000-0000-0000-0000000000b1'),
-  ('61000000-0000-4000-8000-000000000020', 'menu_viewed', 'accepted', '00000000-0000-0000-0000-0000000000b2');
+  ('61000000-0000-4000-8000-000000000020', 'menu_viewed', 'accepted', '00000000-0000-0000-0000-0000000000b2'),
+  ('61000000-0000-4000-8000-000000000021', 'dish_viewed', 'accepted', '00000000-0000-0000-0000-0000000000b1'),
+  ('61000000-0000-4000-8000-000000000022', 'dish_viewed', 'accepted', '00000000-0000-0000-0000-0000000000b1'),
+  ('61000000-0000-4000-8000-000000000023', 'dish_viewed', 'accepted', '00000000-0000-0000-0000-0000000000b1');
 INSERT INTO app_private.observation_index (tenant_id, event_id, canonical_payload_checksum, schema_version,
   event_type, authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition, reason_code)
 SELECT tenant, event_id, repeat('c', 64), 'observation.v2', event_type, '71000000-0000-4000-8000-000000000001',
@@ -168,6 +171,39 @@ SELECT throws_like($$
     ('00000000-0000-0000-0000-0000000000b1', '61000000-0000-4000-8000-000000000018', '91000000-0000-4000-8000-000000000001',
      '92000000-0000-4000-8000-000000000001', '94000000-0000-4000-8000-000000000001', 300001, true)
 $$, 'new row for relation "observation_activity" violates check constraint%', 'active time is capped at five minutes per opening');
+-- Contract-sized integers: at, just above and at the top of the old int4 range; test traffic keeps the view count.
+SELECT lives_ok($$
+  INSERT INTO app_private.observation_event (tenant_id, event_id, event_type, session_id, producer_id,
+    local_sequence, publication_revision_id, traffic_class)
+  SELECT '00000000-0000-0000-0000-0000000000b1', event_id, 'dish_viewed', '81000000-0000-4000-8000-000000000001',
+    '82000000-0000-4000-8000-000000000001', n, '72000000-0000-4000-8000-000000000001', 'test'
+  FROM (VALUES ('61000000-0000-4000-8000-000000000021'::uuid, 2147483647::bigint),
+    ('61000000-0000-4000-8000-000000000022'::uuid, 2147483648::bigint),
+    ('61000000-0000-4000-8000-000000000023'::uuid, 9007199254740991::bigint)) AS v (event_id, n)
+$$, 'local_sequence accepts every contract-valid integer');
+SELECT throws_like($$
+  INSERT INTO app_private.observation_event (tenant_id, event_id, event_type, session_id, producer_id,
+    local_sequence, publication_revision_id, traffic_class)
+  VALUES ('00000000-0000-0000-0000-0000000000b1', '61000000-0000-4000-8000-000000000099', 'dish_viewed',
+    '81000000-0000-4000-8000-000000000001', '82000000-0000-4000-8000-000000000001', 9007199254740992,
+    '72000000-0000-4000-8000-000000000001', 'test')
+$$, 'new row for relation "observation_event" violates check constraint%', 'local_sequence stops at the contract maximum');
+SELECT lives_ok($$
+  INSERT INTO app_private.observation_exposure (tenant_id, event_id, dish_id, dish_revision_id, exposure_id,
+    surface, position, exposure_basis)
+  SELECT '00000000-0000-0000-0000-0000000000b1', event_id, '91000000-0000-4000-8000-000000000001',
+    '92000000-0000-4000-8000-000000000001', exposure_id, 'menu_list', n, 'viewport_50pct_1s'
+  FROM (VALUES ('61000000-0000-4000-8000-000000000021'::uuid, '93000000-0000-4000-8000-000000000021'::uuid, 2147483647::bigint),
+    ('61000000-0000-4000-8000-000000000022'::uuid, '93000000-0000-4000-8000-000000000022'::uuid, 2147483648::bigint),
+    ('61000000-0000-4000-8000-000000000023'::uuid, '93000000-0000-4000-8000-000000000023'::uuid, 9007199254740991::bigint))
+    AS v (event_id, exposure_id, n)
+$$, 'exposure position accepts every contract-valid integer');
+SELECT throws_like($$
+  INSERT INTO app_private.observation_exposure (tenant_id, event_id, dish_id, dish_revision_id, exposure_id,
+    surface, position, exposure_basis) VALUES
+    ('00000000-0000-0000-0000-0000000000b1', '61000000-0000-4000-8000-000000000014', '91000000-0000-4000-8000-000000000001',
+     '92000000-0000-4000-8000-000000000001', '93000000-0000-4000-8000-000000000024', 'menu_list', 9007199254740992, 'viewport_50pct_1s')
+$$, 'new row for relation "observation_exposure" violates check constraint%', 'exposure position stops at the contract maximum');
 SELECT throws_like($$UPDATE app_private.observation_save SET save_origin = 'direct'$$,
   'permission denied for table observation_save%', 'runtime cannot rewrite a fact');
 

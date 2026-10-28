@@ -11,6 +11,7 @@ ALTER TABLE app_private.observation_index
 
 -- Envelope fields that the index does not hold. occurred_at and receipt times stay in the index.
 -- traffic_class is server-derived from the menu token; only live traffic reaches owner views.
+-- Integer bounds match the ingestion contract's Number.MAX_SAFE_INTEGER limit.
 CREATE TABLE app_private.observation_event (
   tenant_id uuid NOT NULL,
   event_id uuid NOT NULL,
@@ -18,7 +19,7 @@ CREATE TABLE app_private.observation_event (
   disposition text NOT NULL DEFAULT 'accepted' CHECK (disposition = 'accepted'),
   session_id uuid NOT NULL,
   producer_id uuid NOT NULL,
-  local_sequence integer NOT NULL CHECK (local_sequence >= 0),
+  local_sequence bigint NOT NULL CHECK (local_sequence BETWEEN 0 AND 9007199254740991),
   publication_revision_id uuid NOT NULL,
   traffic_class text NOT NULL CHECK (traffic_class IN ('live', 'test', 'demo')),
   PRIMARY KEY (tenant_id, event_id),
@@ -46,7 +47,7 @@ CREATE TABLE app_private.observation_exposure (
   dish_revision_id uuid NOT NULL,
   exposure_id uuid NOT NULL,
   surface text NOT NULL CHECK (surface = 'menu_list'),
-  position integer NOT NULL CHECK (position >= 1),
+  position bigint NOT NULL CHECK (position BETWEEN 1 AND 9007199254740991),
   exposure_basis text NOT NULL CHECK (exposure_basis = 'viewport_50pct_1s'),
   category_filter text CHECK (length(category_filter) BETWEEN 1 AND 200),
   PRIMARY KEY (tenant_id, event_id),

@@ -141,7 +141,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d3011d25d56e4426dbe2bcf9ee997818bf40b8bfa46441bfe6a575101f214deb"
+      "sourceFingerprint": "296577d09c5153beaf65cf04530e985658c27d1094a077bcfd5a8a6245a6b769"
     },
     {
       "id": "measurement",
@@ -319,7 +319,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Added the S3-DATA-02 typed observation facts on top of the observation index: observation_event holds the session, producer, publication revision and server-derived traffic class for each accepted event, and eight detail tables hold the matrix v0.1g P0 fields (menu view, exposure, opening, activity checkpoint, close, comparison, save/unsave, Saved screen). Composite foreign keys allow facts only for an accepted index row of the same event type. All facts are append-only with forced tenant RLS and runtime select/insert only. owner_observation_v1 exposes accepted live events and owner_opening_activity_v1 takes the greatest cumulative active time per opening. Local Docker test:db passed, including 29 new assertions.",
+      "summary": "Added the S3-DATA-02 typed observation facts on top of the observation index: observation_event holds the session, producer, publication revision and server-derived traffic class for each accepted event, and eight detail tables hold the matrix v0.1g P0 fields (menu view, exposure, opening, activity checkpoint, close, comparison, save/unsave, Saved screen). Composite foreign keys allow facts only for an accepted index row of the same event type. All facts are append-only with forced tenant RLS and runtime select/insert only. owner_observation_v1 exposes accepted live events and owner_opening_activity_v1 takes the greatest cumulative active time per opening. local_sequence and exposure position are bigint up to the contract's MAX_SAFE_INTEGER. Local Docker test:db passed, including 33 new assertions.",
       "modules": [
         "database"
       ],
