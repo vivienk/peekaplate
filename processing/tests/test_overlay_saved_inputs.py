@@ -78,6 +78,29 @@ class OverlaySavedInputTests(unittest.TestCase):
         self.assertEqual(row["reason"], "repeated_or_competing_title")
         self.assertEqual(row["proposed_price_parts"], [])
 
+    def test_raw_unicode_case_insensitive_competitors_are_not_lost(self):
+        for title, inline in (("İskender", "ISKENDER"), ("ISKENDER", "İskender"),
+                              ("Isparta", "ısparta"), ("ısparta", "Isparta")):
+            report, suggestions = fixture(title=title)
+            report["segments"][0]["metadata"]["ocr_regions"].append(region(inline + " 9.50", 10, 100, 210))
+            row = prepare_overlay_review(report, suggestions)["rows"][0]
+            with self.subTest(title=title, inline=inline):
+                self.assertEqual(row["disposition"], "abstained")
+                self.assertEqual(row["reason"], "repeated_or_competing_title")
+
+    def test_raw_and_casefold_split_competitors_use_both_semantics(self):
+        for title, first, last in (("İskender Soup", "ISKENDER", "Soup"),
+                                   ("ISKENDER Soup", "İskender", "Soup"),
+                                   ("Weißwurst Soup", "WEISSWURST", "Soup")):
+            report, suggestions = fixture(title=title)
+            report["segments"][0]["metadata"]["ocr_regions"].extend([
+                region(first, 10, 100, 90), region(last + " 9.50", 110, 100, 120),
+            ])
+            row = prepare_overlay_review(report, suggestions)["rows"][0]
+            with self.subTest(title=title, first=first):
+                self.assertEqual(row["disposition"], "abstained")
+                self.assertEqual(row["reason"], "repeated_or_competing_title")
+
     def test_nonfinite_retained_suggestion_data_is_rejected(self):
         for value in (float("nan"), float("inf")):
             report, suggestions = fixture()

@@ -240,12 +240,22 @@ def _transcript(source, segment, inputs):
 
 def _competing_title(name, heading_index, boxes):
     """Negative-only bounded title runs; never produce a quote, box or span."""
-    labels=[_normalize(box.text) for box in boxes]
-    if any(i!=heading_index and phrase_matches(name,label) for i,label in enumerate(labels)):
+    labels=[" ".join(box.text.split()) for box in boxes]
+    normalized=_normalize(name)
+    raw=" ".join(name.split())
+
+    def matches(value):
+        return phrase_matches(raw,value) or phrase_matches(normalized,_normalize(value))
+
+    def is_prefix(value):
+        return (normalized.startswith(_normalize(value)+" ")
+                or re.match(re.escape(value)+r"\s+",raw,re.I))
+
+    if any(i!=heading_index and matches(label) for i,label in enumerate(labels)):
         return True
     budget=10_000
     for first,label in enumerate(labels):
-        if first==heading_index or not name.startswith(label+" "):
+        if first==heading_index or not is_prefix(label):
             continue
         pending=[(first,(first,),label)]
         while pending:
@@ -266,9 +276,9 @@ def _competing_title(name, heading_index, boxes):
                 if not (adjacent or wrapped):
                     continue
                 joined=prefix+" "+labels[i]
-                if phrase_matches(name,joined):
+                if matches(joined):
                     return True
-                if name.startswith(joined+" "):
+                if is_prefix(joined):
                     pending.append((i,(*path,i),joined))
     return False
 
@@ -280,7 +290,7 @@ def _associate(index, originals, boxes, transcript):
     if not headings:
         return "unsupported_or_unmatched_title", [], None, None
     if (len(headings)!=1 or sum(_normalize(other.name)==name for other in originals)!=1
-            or _competing_title(name,headings[0],boxes)):
+            or _competing_title(original.name,headings[0],boxes)):
         return "repeated_or_competing_title", [], None, None
     heading_index=headings[0]
     heading=boxes[heading_index]

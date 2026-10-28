@@ -214,8 +214,10 @@ to page-wide text is permitted. Inputs and standard exports remain unchanged.
 Association requires one exact case/whitespace-normalized, single-region title and
 all eligible same-row price cells. Repeated phrases, intervening labels, partly
 aligned cells and extra/conflicting readings abstain. Negative-only title checks
-also search case-folded adjacent/wrapped region runs; they never create an evidence
-quote, box or span. Search is limited to8 regions and10,000 neighbor checks per
+also search adjacent/wrapped region runs using both original case-insensitive
+phrase matching and normalized casefold matching. These Unicode relations differ;
+keeping their union prevents normalization from dropping an existing competitor.
+They never create an evidence quote, box or span. Search is limited to8 regions and10,000 neighbor checks per
 suggestion; exhausted bounds abstain rather than silently discard a possible
 competitor. Positive recovery still requires a single exact title region: wrapped,
 composed and inline titles are not recovered. Complete ordered numeric readings must match the saved
