@@ -21,5 +21,7 @@ export function NavIcon({
   ]
     .filter(Boolean)
     .join(' ');
-  return <span className={classes} aria-disabled={disabled || undefined} aria-hidden="true" {...rest} />;
+  return (
+    <span className={classes} aria-disabled={disabled || undefined} aria-hidden="true" {...rest} />
+  );
 }

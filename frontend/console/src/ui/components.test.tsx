@@ -9,13 +9,23 @@ import { Text } from './Text';
 
 describe('console UI wrappers', () => {
   it('Button renders variant classes', () => {
-    expect(renderToStaticMarkup(<Button variant="action">Save</Button>)).toContain('pp-button pp-button--action');
-    expect(renderToStaticMarkup(<Button variant="outline">Cancel</Button>)).toContain('pp-button pp-button--outline');
-    expect(renderToStaticMarkup(<Button variant="text">More</Button>)).toContain('pp-button pp-button--text');
+    expect(renderToStaticMarkup(<Button variant="action">Save</Button>)).toContain(
+      'pp-button pp-button--action',
+    );
+    expect(renderToStaticMarkup(<Button variant="outline">Cancel</Button>)).toContain(
+      'pp-button pp-button--outline',
+    );
+    expect(renderToStaticMarkup(<Button variant="text">More</Button>)).toContain(
+      'pp-button pp-button--text',
+    );
   });
 
   it('Button merges className and passes attributes', () => {
-    const html = renderToStaticMarkup(<Button className="extra" disabled aria-disabled="true">X</Button>);
+    const html = renderToStaticMarkup(
+      <Button className="extra" disabled aria-disabled="true">
+        X
+      </Button>,
+    );
     expect(html).toContain('extra');
     expect(html).toContain('disabled');
     expect(html).toContain('aria-disabled="true"');
@@ -67,6 +77,8 @@ describe('console UI wrappers', () => {
 
   it('Text renders variant classes and tag', () => {
     expect(renderToStaticMarkup(<Text variant="h1">Title</Text>)).toContain('pp-text--h1');
-    expect(renderToStaticMarkup(<Text variant="paragraph-2">Note</Text>)).toContain('pp-text--paragraph-2');
+    expect(renderToStaticMarkup(<Text variant="paragraph-2">Note</Text>)).toContain(
+      'pp-text--paragraph-2',
+    );
   });
 });
