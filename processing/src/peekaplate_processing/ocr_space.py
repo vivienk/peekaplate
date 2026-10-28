@@ -27,18 +27,19 @@ class NoRedirects(HTTPRedirectHandler):
 
 class OCRSpaceClient(OCRProvider):
 
-    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90):
+    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90, is_table:bool=True):
         if not math.isfinite(timeout) or not 0<timeout<=120:
             raise ExtractionError("OCR timeout must be greater than zero and at most 120 seconds.")
         self.api_key=api_key
         self.cache_dir=Path(cache_dir) if cache_dir is not None else None
         self.timeout=timeout
+        self.is_table=bool(is_table)
 
     def extract(self, image:bytes)->dict:
         if not image or len(image)>MAX_OCR_BYTES:
             raise ExtractionError("OCR image exceeds the configured free upload limit.")
         image_hash=hashlib.sha256(image).hexdigest()
-        settings={"OCREngine":3, "language":"auto", "isTable":True, "isOverlayRequired":True}
+        settings={"OCREngine":3, "language":"auto", "isTable":self.is_table, "isOverlayRequired":True}
         cache_key=hashlib.sha256(json.dumps({"image":image_hash, "settings":settings}, sort_keys=True).encode()).hexdigest()
         cache_path=self.cache_dir/f"{cache_key}.json" if self.cache_dir else None
         if cache_path and cache_path.is_file():

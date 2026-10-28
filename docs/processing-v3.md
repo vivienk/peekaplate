@@ -60,6 +60,17 @@ Choose new output directories. `--pages-json` may reuse verified text in `ocr` a
 `ocr_image`; image-only rejects it instead of secretly reading OCR. Vision modes
 still need original source bytes. No image-backed RES schema is introduced here.
 
+Both acquisition and pipeline CLIs accept `--no-ocr-table` (Python
+`is_table=False`) to send OCR.space Engine 3 `isTable=false`. The default remains
+true, and OCR cache identities separate the two settings without invalidating
+existing default entries. Acquisition records the requested value in
+`configuration.ocr_is_table`; each OCR segment retains the actual provider settings.
+The flag does not reacquire saved `--pages-json` text and has no effect in image-only
+mode. There is no automatic retry with a different setting or grounding change.
+The bounded column-menu trial returned identical text with no price tokens for
+both settings: this option is not a demonstrated missing-price fix. Overlay-only
+values still cannot become source-text facts.
+
 ## Output and category handling
 
 New reports use `schema_version: 2` and `pipeline_version: "3"`. The loader can

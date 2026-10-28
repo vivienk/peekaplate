@@ -295,7 +295,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/photo processing exposes ocr, ocr_image (CLI/Python default) and true no-OCR image inputs through the existing model/graph. Raw, cleared and rejected suggestions stay in private review artifacts with actual source/page-image references; grounded RES originals and exact code-point spans remain unchanged. Image-only has no grounded candidates and an explicit incomplete report. Bounded vision groups split before calls. Image/context hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported; model/batch/concurrency settings are unchanged. The optional authenticated service reuses the pipeline without database/publication access. The internal service bundle captures final timings/private suggestions before cleanup; Docker source rules explicitly exclude nested env/history. Private host persistence is locally tested, not a deployed guarantee. Hosting, PR45 integration, representative quality and human acceptance remain separate gates.",
+      "summary": "Bounded PDF/photo processing exposes ocr, default ocr_image and true no-OCR image inputs via the existing model/graph. Private raw/cleared/rejected suggestions retain source/image references; grounded RES originals and code-point spans stay strict. Image-only has no grounded candidates and an incomplete report. Vision groups split before calls; image/context hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported. Opt-in CLI/Python isTable=false has separate cache identity; true/service defaults remain unchanged. The bounded column-menu trial returned identical price-less text: recovery remains unresolved. The authenticated service has no database/publication access and bundles final timings/suggestions before cleanup. Docker excludes nested env/history. Host persistence is locally tested, not a deployed guarantee; hosting, PR45 integration, representative quality and human approval remain gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -368,7 +368,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "5ff0c1c9a859387b8cbd6682d7f2b10063ffbc7985582413a3425634c9ec40b7"
+      "sourceFingerprint": "940435f08de9f824024c38c5abf4c885f03541e5310115f9f4063a6c07ad8db4"
     }
   ],
   "handoffs": [

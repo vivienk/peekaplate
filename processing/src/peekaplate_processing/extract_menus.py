@@ -18,16 +18,16 @@ from peekaplate_processing.sources import detect_kind, read_file
 from peekaplate_processing.storage import save_json
 
 
-def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-cache", timeout=120, ocr_provider: OCRProvider | None = None) -> MenuExtractionResult:
+def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-cache", timeout=120, ocr_provider: OCRProvider | None = None, is_table: bool = True) -> MenuExtractionResult:
     result = MenuExtractionResult(started_at=datetime.now(timezone.utc))
-    result.configuration = {"stage": "text_acquisition", "pdf_engine": "pymupdf", "max_pdf_pages": 40, "min_pdf_native_text_chars": MIN_NATIVE_TEXT_CHARS}
+    result.configuration = {"stage": "text_acquisition", "pdf_engine": "pymupdf", "max_pdf_pages": 40, "min_pdf_native_text_chars": MIN_NATIVE_TEXT_CHARS, "ocr_is_table": bool(is_table)}
     try:
         data = read_file(source)
         kind = detect_kind(data)
         digest = hashlib.sha256(data).hexdigest()
         source_id = f"sha256:{digest}"
         result.source = SourceRecord(source_id=source_id, sha256=digest, kind=kind, location=Path(source).name, retrieved_at=datetime.now(timezone.utc), size_bytes=len(data), snapshot_base64=base64.b64encode(data).decode())
-        ocr = ocr_provider if ocr_provider is not None else OCRSpaceClient(ocr_api_key, cache_dir=cache_dir, timeout=timeout)
+        ocr = ocr_provider if ocr_provider is not None else OCRSpaceClient(ocr_api_key, cache_dir=cache_dir, timeout=timeout, is_table=is_table)
 
         if kind == "pdf":
             result.segments = extract_pdf(data, source_id, ocr)
@@ -61,12 +61,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Extract page text using PyMuPDF and OCR.space, without an LLM.")
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--no-ocr-table", action="store_true", help="Disable OCR.space table recognition (isTable); enabled by default.")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
 
     try:
         if args.output.exists() or args.output.is_symlink(): raise ExtractionError("Choose a new output path.")
-        result = extract_source(args.input, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"))
+        result = extract_source(args.input, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), is_table=not args.no_ocr_table)
         save_json(result.model_dump(mode="json"), args.output)
 
     except ExtractionError as error: parser.exit(1, f"Extraction failed: {error}\n")

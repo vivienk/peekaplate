@@ -8,11 +8,13 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs
 
 from PIL import Image
 from fixture_factory import make_pdf
 from peekaplate_processing.errors import ExtractionError
+from peekaplate_processing.extract_menus import main as acquisition_main
 from peekaplate_processing.review_candidates import prepare_review_candidates
 from peekaplate_processing.run_pipeline import main, run_pipeline
 from peekaplate_processing.workflow import DishBatch, ExtractedDish, PageSection, run_menu_graph
@@ -61,6 +63,50 @@ class InputModeTests(unittest.TestCase):
                     patch("peekaplate_processing.run_pipeline.load_dotenv"),patch("builtins.print"):
                 self.assertEqual(main(["--input","menu.pdf","--run-dir","work/modes",*flags]),0)
                 self.assertEqual(pipeline.call_args.kwargs["input_mode"],expected)
+
+    def test_pipeline_cli_ocr_table_default_and_opt_out(self):
+        for flags,expected in [([],True),(["--no-ocr-table"],False)]:
+            with self.subTest(is_table=expected), patch("peekaplate_processing.run_pipeline.run_pipeline",
+                    return_value=SimpleNamespace(drafts=[],status="complete",errors=[])) as pipeline, \
+                    patch("peekaplate_processing.run_pipeline.load_dotenv"),patch("builtins.print"):
+                self.assertEqual(main(["--input","menu.png","--run-dir","work/table",*flags]),0)
+                self.assertIs(pipeline.call_args.kwargs["is_table"],expected)
+
+    def test_acquisition_cli_ocr_table_default_and_opt_out(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for flags,expected in [([],True),(["--no-ocr-table"],False)]:
+                with self.subTest(is_table=expected), patch("peekaplate_processing.extract_menus.extract_source",
+                        return_value=MagicMock(segments=[],status="complete",errors=[])) as acquisition, \
+                        patch("peekaplate_processing.extract_menus.load_dotenv"), \
+                        patch("peekaplate_processing.extract_menus.save_json"),patch("builtins.print"):
+                    self.assertEqual(acquisition_main(["--input","menu.png","--output",str(Path(folder)/"pages.json"),*flags]),0)
+                    self.assertIs(acquisition.call_args.kwargs["is_table"],expected)
+
+    def test_real_pipeline_propagates_ocr_table_setting_to_transport_and_reports(self):
+        for options,expected in [({},True),({"is_table":False},False)]:
+            with self.subTest(is_table=expected),tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);source=root/"menu.png";photo(source)
+                response=MagicMock()
+                response.read.return_value=json.dumps({"OCRExitCode":1,"IsErroredOnProcessing":False,
+                    "ParsedResults":[{"FileParseExitCode":1,"ParsedText":"Soup 8.50"}]}).encode()
+                opener=MagicMock()
+                opener.open.return_value.__enter__.return_value=response
+                with patch("peekaplate_processing.ocr_space.build_opener",return_value=opener):
+                    report=run_pipeline(source,root/"run",llm=RecordingLLM(),ocr_api_key="synthetic-key",
+                                        cache_dir=None,llm_cache_dir=None,**options)
+                opener.open.assert_called_once()
+                fields=parse_qs(opener.open.call_args.args[0].data.decode())
+                self.assertEqual(fields["isTable"],[str(expected).lower()])
+                self.assertEqual(fields["OCREngine"],["3"])
+                self.assertEqual(fields["isOverlayRequired"],["true"])
+                self.assertEqual(report.status,"complete")
+                self.assertEqual(len(report.drafts),1)
+                self.assertIs(report.configuration["ocr_is_table"],expected)
+                self.assertIs(report.segments[0].metadata["ocr_settings"]["isTable"],expected)
+                for name in ["pages.json","extraction.json"]:
+                    saved=json.loads((root/"run"/name).read_text())
+                    self.assertIs(saved["configuration"]["ocr_is_table"],expected)
+                    self.assertIs(saved["segments"][0]["metadata"]["ocr_settings"]["isTable"],expected)
 
     def test_invalid_mode_and_saved_ocr_in_image_mode_fail_before_output(self):
         with tempfile.TemporaryDirectory() as folder:
