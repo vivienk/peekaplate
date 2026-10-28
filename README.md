@@ -18,7 +18,7 @@ The repository contains diner and staff-console shells and a staff-command slice
 
 ## Technology and architecture
 
-Staging observation infrastructure is provisioned: the source Queue and DLQ are connected, the existing private R2 bucket is reused, and synthetic delivery/retry/DLQ and create-only archive checks pass. Delivery remains paused until the real consumer is reviewed and integrated. The staging producer/R2 binding configuration still needs its reviewed `main` deployment. See the [infrastructure handoff](docs/observation-infrastructure.md) for exact resources, retention, test evidence and Teeyansh's next steps.
+Staging observation infrastructure is provisioned: the source Queue and DLQ are connected, the existing private R2 bucket is reused, and synthetic delivery/retry/DLQ and create-only archive checks pass. Delivery remains paused until the real consumer is reviewed and integrated. The staging producer/R2 bindings are live; this does not establish a working feature consumer. See the [infrastructure handoff](docs/observation-infrastructure.md) for exact resources, retention, test evidence and Teeyansh's next steps.
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ Staging observation infrastructure is provisioned: the source Queue and DLQ are 
 | Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
 | Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
 | Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
-| Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [Local PDF/image extraction](processing/README.md) and tested service/container packaging; [host activation and VIS-01 integration](docs/menu-ingestion-infrastructure.md) pending |
+| Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [PDF/image extraction](processing/README.md) and deployed staging Python service; hosted authorization/private R2 checks passed. [Provider extraction and VIS-01 integration](docs/menu-ingestion-infrastructure.md) remain separate |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
 Frontends and backend share contracts. Frontends do not import backend internals or hold database credentials. Authorization belongs to the backend; venue authority must derive from verified identity and membership. Database policies support this boundary; they do not authenticate callers.
@@ -47,7 +47,7 @@ The backend can include both TypeScript and Python. The existing TypeScript/Hono
 
 The existing Python component uses an isolated `uv` environment, a frozen lockfile and `unittest` regression tests. Install and test its HTTP service with `uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`; CI runs that suite and builds the package. Python and TypeScript communicate through validated JSON contracts. Job requests must carry backend-authorized restaurant and input references; returned results must be checked against that job before any application change. Use the established command path for business changes rather than writing around permissions, event history or approval rules.
 
-VIS-01 now has a bounded HTTP wrapper and a prepared Cloudflare Containers host for the native PyMuPDF pipeline. Scoped Wrangler authorization is complete; hosting waits for Vivien's planned $5/month Workers Paid upgrade. The [service handoff](docs/menu-ingestion-infrastructure.md) covers job-bound source authorization, exact private R2 sources, processing limits, required credentials and integration order. This setup does not run or replace the unfinished ingestion consumer.
+VIS-01 has a deployed Cloudflare Containers host and bounded HTTP wrapper for the native PyMuPDF pipeline. Workers Paid is active; internal credentials and the API service URL are configured. Hosted health, authorization and signed private R2 source checks passed. On October 28, the OCR.space key was stored in GitHub's protected staging environment and the extraction Worker; a fresh OCR-only provider call read three synthetic dish names and prices in 4.654 seconds. The [service handoff](docs/menu-ingestion-infrastructure.md#ocr-credential-and-provider-check--october-28-2026) distinguishes this check from full extraction: AI provider configuration, the reviewed migration/consumer and complete staging acceptance remain pending. No key belongs in frontend configuration or source control.
 
 Choose its runtime after checking the task's packages and resource needs:
 

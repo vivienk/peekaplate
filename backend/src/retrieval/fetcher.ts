@@ -97,7 +97,7 @@ async function readBoundedBody(
   }
 
   const sha256 = createHash('sha256').update(fullBuffer).digest('hex');
-  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const decoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: false });
   return { text: decoder.decode(fullBuffer), size: totalBytes, sha256 };
 }
 
