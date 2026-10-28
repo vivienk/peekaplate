@@ -551,3 +551,26 @@ both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
 alone does not establish instantaneous edge retirement. Staging deployment
 IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T13:15:19.972Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T13:20:26.669Z","exitCode":1}
+```
+
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T13:15:19.972Z"},"status":"resolved","cause":"Biome formatting in packages/tokens/src/tokens.test.ts after inserting the light-theme test-block extraction; two lines had insufficient indentation.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 14 files/202 tests + 4 skipped, context:check, docs:check)."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T13:20:26.669Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T16:45:03.171Z","exitCode":1}
+```
