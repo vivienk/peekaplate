@@ -243,8 +243,7 @@ describe('design tokens', () => {
       '--pp-role-chip-active-bg': 'var(--pp-color-neutral-50)',
       '--pp-role-chip-active-text': 'var(--pp-color-neutral-800)',
       '--pp-role-chip-inactive-text': 'var(--pp-color-neutral-50)',
-      '--pp-role-chip-inactive-border':
-        'color-mix(in srgb, var(--pp-color-neutral-500) 30%, transparent)',
+      '--pp-role-chip-inactive-border': 'var(--pp-role-outline)',
 
       '--pp-role-input-bg': 'var(--pp-color-neutral-800)',
       '--pp-role-input-text': 'var(--pp-color-neutral-50)',
@@ -358,10 +357,31 @@ describe('design tokens', () => {
   it('maps color roles only to palette colors', async () => {
     const { base } = await tokenBlocks();
     const roles = group(base, role);
-    for (const value of Object.values(roles)) {
-      const refs = [...value.matchAll(/var\((--pp-[\w-]+)\)/g)].map(([, name]) => name);
+    const parseRefs = (cssValue: string): string[] => {
+      const refs: string[] = [];
+      for (const match of cssValue.matchAll(/var\((--pp-[\w-]+)\)/g)) {
+        const ref = match[1];
+        if (!ref) throw new Error(`Could not parse a token reference from: ${cssValue}`);
+        refs.push(ref);
+      }
+      return refs;
+    };
+
+    for (const [name, value] of Object.entries(roles)) {
+      const refs = parseRefs(value);
       expect(refs.length).toBeGreaterThan(0);
-      for (const ref of refs) {
+      const resolvedRefs = refs.flatMap((ref) => {
+        if (ref.startsWith('--pp-role-')) {
+          const nested = base[ref];
+          if (nested === undefined) {
+            throw new Error(`Role ${name} references unknown role ${ref}`);
+          }
+          return parseRefs(nested);
+        }
+        return [ref];
+      });
+      expect(resolvedRefs.length).toBeGreaterThan(0);
+      for (const ref of resolvedRefs) {
         expect(ref).toMatch(/^--pp-color-/);
       }
     }
@@ -404,6 +424,7 @@ describe('design tokens', () => {
       [r('button-outline-text'), r('button-outline-bg')],
       [r('nav-icon'), r('nav-bg')],
       [r('nav-hover-icon'), r('nav-hover-bg')],
+      [r('chip-active-text'), r('chip-active-bg')],
       [r('on-surface'), r('surface')],
       [r('on-surface'), r('surface-container')],
       [r('on-surface-variant'), r('surface')],
