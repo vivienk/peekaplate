@@ -10,8 +10,10 @@ import {
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
   MenuPublicationSchema,
+  PublicMenuAllergenCodeSchema,
   PublicMenuContentBundleSchema,
   PublicMenuDeliverySchema,
+  PublicMenuDietaryCodeSchema,
   PublishMenuSchema,
   RetrievalRequestSchema,
   SourceReferenceSchema,
@@ -199,7 +201,8 @@ describe('RES-02 immutable diner bundle boundary', () => {
                 description: null,
               },
             ],
-            dietary: ['Vegan', 'Gluten-free'],
+            allergens: ['sesame'],
+            dietary: ['vegan', 'gluten-free'],
             images: {
               card: {
                 url: 'https://assets.example.test/dishes/card.webp',
@@ -229,7 +232,27 @@ describe('RES-02 immutable diner bundle boundary', () => {
     expect(PublicMenuContentBundleSchema.parse(bundle)).toEqual(bundle);
   });
 
-  it('rejects partial claims, arbitrary allergens and insecure image URLs', () => {
+  it('accepts every approved allergen and dietary code and rejects display labels as wire values', () => {
+    const allergenCodes = [
+      'milk',
+      'egg',
+      'fish',
+      'crustacean shellfish',
+      'tree nut',
+      'peanut',
+      'wheat',
+      'soy',
+      'sesame',
+    ] as const;
+    const dietaryCodes = ['vegan', 'vegetarian', 'gluten-free'] as const;
+
+    for (const code of allergenCodes) expect(PublicMenuAllergenCodeSchema.parse(code)).toBe(code);
+    for (const code of dietaryCodes) expect(PublicMenuDietaryCodeSchema.parse(code)).toBe(code);
+    expect(PublicMenuAllergenCodeSchema.safeParse('Peanuts').success).toBe(false);
+    expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
+  });
+
+  it('rejects partial claims, unknown allergens and insecure image URLs', () => {
     const incompleteDish = bundle.categories[0].dishes[1];
     expect(
       PublicMenuContentBundleSchema.safeParse({
@@ -249,7 +272,7 @@ describe('RES-02 immutable diner bundle boundary', () => {
         categories: [
           {
             ...bundle.categories[0],
-            dishes: [{ ...completeDish, allergens: ['Peanuts'] }],
+            dishes: [{ ...completeDish, allergens: ['gluten'] }],
           },
         ],
       }).success,
@@ -319,7 +342,7 @@ describe('RES-02 immutable diner bundle boundary', () => {
     ).toBe(false);
   });
 
-  it('rejects duplicate identities and invalid money or dietary values', () => {
+  it('rejects duplicate identities and invalid money, allergen or dietary values', () => {
     const completeDish = bundle.categories[0].dishes[0];
     expect(
       PublicMenuContentBundleSchema.safeParse({
@@ -348,7 +371,8 @@ describe('RES-02 immutable diner bundle boundary', () => {
               {
                 ...completeDish,
                 price: { amount: '12.500', currency: 'usd' },
-                dietary: ['Vegan', 'Vegan'],
+                allergens: ['wheat', 'wheat'],
+                dietary: ['vegan', 'vegan'],
               },
             ],
           },

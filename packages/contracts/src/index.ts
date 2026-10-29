@@ -169,6 +169,20 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
   complete: z.literal(false),
 });
 
+export const PublicMenuAllergenCodeSchema = z.enum([
+  'milk',
+  'egg',
+  'fish',
+  'crustacean shellfish',
+  'tree nut',
+  'peanut',
+  'wheat',
+  'soy',
+  'sesame',
+]);
+
+export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
+
 export const PublicMenuCompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(true),
@@ -179,8 +193,12 @@ export const PublicMenuCompleteDishSchema = z.strictObject({
     currency: z.string().regex(/^[A-Z]{3}$/),
   }),
   ingredients: z.array(PublicMenuIngredientSchema).max(100),
+  allergens: z
+    .array(PublicMenuAllergenCodeSchema)
+    .max(9)
+    .refine((values) => new Set(values).size === values.length, 'Allergen values must be unique'),
   dietary: z
-    .array(z.enum(['Vegan', 'Vegetarian', 'Gluten-free']))
+    .array(PublicMenuDietaryCodeSchema)
     .max(3)
     .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
   images: z.strictObject({
@@ -320,6 +338,8 @@ export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
 export type MenuTokenClaims = z.infer<typeof MenuTokenClaimsSchema>;
 export type PublicMenuImage = z.infer<typeof PublicMenuImageSchema>;
 export type PublicMenuIngredient = z.infer<typeof PublicMenuIngredientSchema>;
+export type PublicMenuAllergenCode = z.infer<typeof PublicMenuAllergenCodeSchema>;
+export type PublicMenuDietaryCode = z.infer<typeof PublicMenuDietaryCodeSchema>;
 export type PublicMenuDish = z.infer<typeof PublicMenuDishSchema>;
 export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
 export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;

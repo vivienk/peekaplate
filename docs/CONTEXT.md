@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "a3e8f17094c78fdb5455508bb943a51f15185d1836de99a4861ac78a03d35142"
+      "sourceFingerprint": "f94214da0a12b8d657ddf3a4aefd0fe50b293e637226fba09036126cfa1ded80"
     },
     {
       "id": "diner",
@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The shared immutable JSON bundle schema fixes exact revision-scoped snake-case identities, restaurant presentation, complete dish content, decimal-string prices, ingredient identities, HTTPS T0 variants and explicit-only dietary values while rejecting partial, allergen, spatial, draft and review fields. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
+      "summary": "Hono Worker verifies staff JWTs/membership for atomic draft revisions and owner-only RES-02 approval, publication and withdrawal commands. Anonymous public reads return only the active approved T0 bundle pointer and issue a venue/publication-bound ES256 observations token from a protected key; the matching public key is exposed through JWKS for the DATA-01 verifier. The shared immutable JSON bundle schema fixes exact revision-scoped snake-case identities, restaurant presentation, complete dish content, decimal-string prices, ingredient identities, approved closed-list allergen and dietary codes, and HTTPS T0 variants while rejecting partial, spatial, draft and review fields. Missing, draft, unbundled and withdrawn menus share a 404 response; offline failures remain distinguishable. Separate review/publication streams retain pure reducers, expected versions, idempotent receipts, tenant projections and outbox rows.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -115,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "74c1996fb54c810849154596bf95ba9c387e54d96da9090aa1c0acb6e5f007cb"
+      "sourceFingerprint": "8b253c4e90ba04eea37bf481b0708bec2e4d0e0bdd34922924dd0e2691be5381"
     },
     {
       "id": "database",
@@ -327,7 +327,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend",
         "database"
       ],
-      "next": "Keep PRs #42/#43 Draft pending human review and the privileged immutable-bundle producer. Define and implement the RES-02 original-publication token-renewal endpoint before relying on delivery after token expiry. Have an authorized deployment administrator confirm exact staging/production CORS origins; keep static PR previews disconnected. Jeffin, Ehab and Harshita can implement the shared schema, immutable outbox transition and UI states in DIN-03 without inventing keys or tokens. Confirm the allergen list or 2.5D format only through a new reviewed schema version."
+      "next": "Move PRs #42/#43 to human review after verifying the approved closed-list allergen/dietary update and documenting the DIN adapter mapping. Define and implement the RES-02 original-publication token-renewal endpoint before relying on delivery after token expiry. Have an authorized deployment administrator confirm exact staging/production CORS origins; keep static PR previews disconnected. Jeffin, Ehab and Harshita can implement the shared schema, immutable outbox transition and UI states in DIN-03 without inventing keys or tokens. A 2.5D format remains outside Bundle v1 and requires a new reviewed schema version."
     },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
