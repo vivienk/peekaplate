@@ -218,6 +218,54 @@ class TestValidatorIntegration(unittest.TestCase):
         self.assert_rejected(rows, "'surface' is a required property")
 
 
+    def test_comparison_does_not_require_specific_opening_id(self):
+        rows = copy.deepcopy(self.original)
+
+        target = next(
+            row for row in rows
+            if row["event_type"] == "dish_compared"
+        )
+
+        for row in rows:
+            if row["event_id"] == target["event_id"]:
+                row["opening_id"] = "non-matching-opening-id"
+
+        result = self.run_validator(rows)
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+
+    def test_comparison_replace_before_start_rejected(self):
+        rows = copy.deepcopy(self.original)
+
+        start = next(
+            row for row in rows
+            if row["event_type"] == "dish_compared"
+            and row["compare_action"] == "start"
+        )
+
+        replace = next(
+            row for row in rows
+            if row["event_type"] == "dish_compared"
+            and row["compare_action"] == "replace"
+            and row["session_id"] == start["session_id"]
+            and row["comparison_id"] == start["comparison_id"]
+        )
+
+        for row in rows:
+            if row["event_id"] == start["event_id"]:
+                row["compare_action"] = "replace"
+            elif row["event_id"] == replace["event_id"]:
+                row["compare_action"] = "start"
+
+        self.assert_rejected(
+            rows,
+            "Comparison flow must begin with Start",
+        )
+
     def test_comparison_missing_identity_fields(self):
         rows = copy.deepcopy(self.original)
 

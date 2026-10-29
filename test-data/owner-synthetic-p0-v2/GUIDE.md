@@ -1,4 +1,4 @@
-﻿# PeekaPlate P0 v2 Owner Synthetic Dataset Guide
+# PeekaPlate P0 v2 Owner Synthetic Dataset Guide
 
 ## Purpose
 
@@ -16,7 +16,7 @@ From this dataset folder, install the required dependency:
 
     python -B -m unittest discover -s tests -v
 
-Reviewed result: 62 tests passed, including 19 validator integration tests.
+Reviewed result: 73 tests passed, including 21 validator integration tests.
 
 ## Validate the full dataset
 

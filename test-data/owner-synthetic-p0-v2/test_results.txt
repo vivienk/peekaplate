@@ -1,4 +1,10 @@
-test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
+python : test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
+At line:1 char:1
++ python -m unittest discover -s test-data/owner-synthetic-p0-v2/tests  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_ai001_fixt..._exists) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
 test_ai001_no_private_event_data (test_ai_report_inputs.TestAIReportInputs.test_ai001_no_private_event_data) ... ok
 test_ai001_not_run (test_ai_report_inputs.TestAIReportInputs.test_ai001_not_run) ... ok
 test_ai001_suppressed_values_hidden (test_ai_report_inputs.TestAIReportInputs.test_ai001_suppressed_values_hidden) ... ok
@@ -33,6 +39,7 @@ test_comparison_reentry_uses_new_flow_id (test_metric_examples.TestMetricExample
 test_cross_session_comparison_does_not_qualify (test_metric_examples.TestMetricExamples.test_cross_session_comparison_does_not_qualify) ... ok
 test_expected_metric_results (test_metric_examples.TestMetricExamples.test_expected_metric_results) ... ok
 test_replace_comparison_qualifies (test_metric_examples.TestMetricExamples.test_replace_comparison_qualifies) ... ok
+test_ten_second_non_final_checkpoint_qualifies (test_metric_examples.TestMetricExamples.test_ten_second_non_final_checkpoint_qualifies) ... ok
 test_neg_001_identical_retry (test_negative_cases.TestNegativeCases.test_neg_001_identical_retry) ... ok
 test_neg_002_conflicting_retry (test_negative_cases.TestNegativeCases.test_neg_002_conflicting_retry) ... ok
 test_neg_003_missing_event_id (test_negative_cases.TestNegativeCases.test_neg_003_missing_event_id) ... ok
@@ -53,7 +60,10 @@ test_standalone_engagement_examples (test_session_completion.TestSessionInactivi
 test_checkpoint_active_time_exceeds_elapsed (test_validator_integration.TestValidatorIntegration.test_checkpoint_active_time_exceeds_elapsed) ... ok
 test_checkpoint_timestamp_before_opening (test_validator_integration.TestValidatorIntegration.test_checkpoint_timestamp_before_opening) ... ok
 test_checkpoint_wrong_dish (test_validator_integration.TestValidatorIntegration.test_checkpoint_wrong_dish) ... ok
+test_comparison_does_not_require_specific_opening_id
+(test_validator_integration.TestValidatorIntegration.test_comparison_does_not_require_specific_opening_id) ... ok
 test_comparison_missing_identity_fields (test_validator_integration.TestValidatorIntegration.test_comparison_missing_identity_fields) ... ok
+test_comparison_replace_before_start_rejected (test_validator_integration.TestValidatorIntegration.test_comparison_replace_before_start_rejected) ... ok
 test_duplicate_local_sequence (test_validator_integration.TestValidatorIntegration.test_duplicate_local_sequence) ... ok
 test_empty_event_id (test_validator_integration.TestValidatorIntegration.test_empty_event_id) ... ok
 test_invalid_schema_version (test_validator_integration.TestValidatorIntegration.test_invalid_schema_version) ... ok
@@ -71,6 +81,6 @@ test_valid_baseline (test_validator_integration.TestValidatorIntegration.test_va
 test_zero_sequence (test_validator_integration.TestValidatorIntegration.test_zero_sequence) ... ok
 
 ----------------------------------------------------------------------
-Ran 70 tests in 20.667s
+Ran 73 tests in 23.251s
 
 OK

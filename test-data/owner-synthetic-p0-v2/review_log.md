@@ -1,6 +1,6 @@
 # PeekaPlate P0 v2 — Review Log
 
-**Last updated:** October 25, 2026
+**Last updated:** October 29, 2026
 **Status:** Revised synthetic dataset locally validated; awaiting Sai's re-review and product decisions. Not production-approved.
 **Dataset version:** `p0-v2-synthetic-1.0`
 
@@ -10,8 +10,8 @@ This package contains fictional test data and an internal metric oracle, not rea
 
 | Dataset | Sessions | Delivery lines | Unique observations | Duplicate deliveries |
 |---|---:|---:|---:|---:|
-| Starter story (`events/two_session_story.jsonl`) | 2 | 21 | 20 | 1 |
-| Full repeated fixture (`events/full_dataset.jsonl`) | 300 | 3,150 | 3,000 | 150 |
+| Starter story (`events/two_session_story.jsonl`) | 2 | 22 | 21 | 1 |
+| Full repeated fixture (`events/full_dataset.jsonl`) | 300 | 3,300 | 3,150 | 150 |
 
 The full fixture repeats the same two-session story 150 times. Its sessions are **not independent real customers**, and the fixture cannot establish customer trends. The synthetic observation window is October 20, 2026, 10:00:00–11:00:07 (UTC+05:00), inclusive. The starter story's retry is an identical redelivery of a successful Undo restoration.
 
@@ -35,13 +35,13 @@ python validate_full_dataset.py
 
 **Validator detail:** 300 detail openings, 450 checkpoints, 150 displayed comparisons, 450 direct Saves, 150 Undo restorations, 450 successful Unsaves, 1,050 shortlist-size validations; 150 openings at 10 seconds and 150 at 5 seconds; average active time 7.5 seconds. Exposure sessions: A=300, B=300, C=150. Opening sessions: A=150, B=150, C=0. Linked opening rates: A=50%, B=50%, C=0%. Save adoption: 300/300 sessions.
 
-`test_results.txt` and `validation_results.txt` are intended evidence artifacts; **their contents must be refreshed from the latest run before handoff**. Historical 55-test results are not the current submission evidence; refresh these files using the latest 62-test run.
+`test_results.txt` and `validation_results.txt` are intended evidence artifacts; **their contents must be refreshed from the latest run before handoff**. Historical 55-test results are not the current submission evidence; refresh these files using the latest verified run before handoff.
 
 These are local synthetic-fixture checks, not production integration or privacy certification.
 
 ## 3. Validator regression coverage
 
-`tests/test_validator_integration.py` includes 19 real-validator integration tests, including a passing baseline and rejection of invalid inputs. Covered defects include invalid schema version, malformed or timezone-less timestamps, unknown event type, empty event ID, zero local sequence, duplicate sequence, incorrect checkpoint-to-dish link, invalid Undo restoration, Undo without matching Unsave, and missing expected retry delivery.
+`tests/test_validator_integration.py` includes 21 real-validator integration tests, including a passing baseline and rejection of invalid inputs. Covered defects include invalid schema version, malformed or timezone-less timestamps, unknown event type, empty event ID, zero local sequence, duplicate sequence, incorrect checkpoint-to-dish link, invalid Undo restoration, Undo without matching Unsave, and missing expected retry delivery.
 
 ### October 26, 2026 — Independent Re-review Corrections
 
@@ -127,3 +127,26 @@ The fixture uses proposed event types: `menu_viewed`, `dish_viewed`, `dish_detai
 - [ ] Obtain independent re-review and required approvals.
 
 **Handoff status:** Locally validated synthetic package; **not** a production certification, AI evaluation pass, privacy compliance certification, or release approval.
+
+## October 29, 2026 — Sai Re-review Follow-up
+
+Sai reviewed commit d70c779 and requested three corrections:
+
+1. Removed the specific-opening-ID requirement from displayed comparison validation. Displayed comparison counts remain separate from engagement qualification.
+2. Updated the engagement metric examples so a valid cumulative 10-second checkpoint can establish provisional engagement without requiring a final checkpoint.
+3. Added per-flow Start/Replace ordering validation, including rejection of Replace before Start.
+
+Current local verification:
+- Automated test suite: 73 tests passed in 23.673 seconds.
+- Validator integration tests: 21 included in the passing suite.
+- Full fixture: 3,300 deliveries, 3,150 unique observations, 300 sessions.
+- Starter fixture: 22 deliveries, 21 unique observations, 2 sessions.
+- Full and starter validators passed on October 29; fresh outputs saved in validation_results.txt.
+
+Pending:
+- Confirm product and metric decisions that remain unresolved.
+- Saved test and validator evidence refreshed on October 29 (73 tests passed; both dataset validators passed).
+- Reconcile develop into this branch, preserving both docs/CONTEXT.md handoffs and refreshing context fingerprints.
+- Obtain normal CI results and Sai's next independent review.
+- Application AI evaluation: NOT RUN.
+- Hosted privacy, production API mapping, and application behavior: NOT VERIFIED.

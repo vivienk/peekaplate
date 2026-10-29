@@ -267,42 +267,44 @@ comparisons = [
     if row["event_type"] == "dish_compared"
 ]
 
+opened_by_session = {}
+
+for opening in openings:
+    opened_by_session.setdefault(
+        opening["session_id"], []
+    ).append(opening)
+
+linked_comparisons = 0
+
 for comparison in comparisons:
-    opening_id = comparison["opening_id"]
+    event_id = comparison["event_id"]
+    session = comparison["session_id"]
+    dishes = comparison["dish_ids"]
 
-    assert opening_id in opening_lookup, (
-        f"Missing opening for comparison: {comparison['event_id']}"
+    assert len(dishes) == 2, (
+        f"Invalid pair size: {event_id}"
     )
 
-    opening = opening_lookup[opening_id]
-
-    assert comparison["session_id"] == opening["session_id"], (
-        f"Wrong session: {comparison['event_id']}"
-    )
-
-    assert comparison["local_sequence"] > opening["local_sequence"], (
-        f"Comparison before opening: {comparison['event_id']}"
-    )
-
-    assert len(comparison["dish_ids"]) == 2, (
-        f"Invalid pair size: {comparison['event_id']}"
-    )
-
-    assert len(set(comparison["dish_ids"])) == 2, (
-        f"Duplicate dish in pair: {comparison['event_id']}"
-    )
-
-    assert opening["dish_id"] in comparison["dish_ids"], (
-        f"Opening dish missing from pair: {comparison['event_id']}"
+    assert len(set(dishes)) == 2, (
+        f"Duplicate dish in pair: {event_id}"
     )
 
     assert comparison["display_state"] == "displayed", (
-        f"Pair not displayed: {comparison['event_id']}"
+        f"Pair not displayed: {event_id}"
     )
 
-print("PASS: All comparisons have valid opening links and displayed pairs.")
-print(f"Validated comparisons: {len(comparisons)}")
+    linked = any(
+        opening["dish_id"] in dishes
+        and opening["local_sequence"] < comparison["local_sequence"]
+        for opening in opened_by_session.get(session, [])
+    )
 
+    if linked:
+        linked_comparisons += 1
+
+print("PASS: Comparison pairs validated.")
+print(f"Displayed comparisons: {len(comparisons)}")
+print(f"Engagement-linked comparisons: {linked_comparisons}")
 
 # Validate Save, Unsave, and Undo state transitions.
 saved_by_session = {}
@@ -595,6 +597,44 @@ distinct_flows = {
     (row["session_id"], row["comparison_id"])
     for row in comparison_events
 }
+
+# Validate Start/Replace ordering within each comparison flow.
+flows = {}
+
+for row in comparison_events:
+    key = (row["session_id"], row["comparison_id"])
+    flows.setdefault(key, []).append(row)
+
+for flow_key, flow_events in flows.items():
+    ordered = sorted(
+        flow_events,
+        key=lambda row: row["local_sequence"],
+    )
+
+    assert ordered[0]["compare_action"] == "start", (
+        f"Comparison flow must begin with Start: {flow_key}"
+    )
+
+    assert len([
+        row for row in ordered
+        if row["compare_action"] == "start"
+    ]) == 1, (
+        f"Comparison flow must have exactly one Start: {flow_key}"
+    )
+
+    for index, row in enumerate(ordered):
+        expected_action = "start" if index == 0 else "replace"
+
+        assert row["compare_action"] == expected_action, (
+            f"Invalid Start/Replace order: {flow_key}"
+        )
+
+        assert row["pair_version"] == index + 1, (
+            f"Invalid pair_version sequence: {flow_key}"
+        )
+
+print("PASS: Comparison flow Start/Replace ordering is valid.")
+
 
 assert len(comparison_starts) == dataset_profile["comparison_starts"]
 assert len(comparison_replaces) == dataset_profile["comparison_replaces"]

@@ -10,14 +10,14 @@ def considered_dishes(events):
     Derive considered dishes from event records.
 
     A dish qualifies when:
-    - A linked opening has >= 10,000 ms of completed active time, OR
+    - A linked opening has >= 10,000 ms of checkpointed active time, OR
     - A valid linked opening has a displayed comparison.
 
     Comparison attribution is provisional:
     only the linked opening's dish qualifies.
     """
     openings = {}
-    completed_active_ms = {}
+    checkpointed_active_ms = {}
     qualifying_comparisons = set()
 
     # Identify actual dish openings.
@@ -25,7 +25,7 @@ def considered_dishes(events):
         if event["event_type"] == "dish_detail_opened":
             openings[event["opening_id"]] = event["dish_id"]
 
-    # Derive completed active time from checkpoints.
+    # Derive provisional active time from valid checkpoints.
     for event in events:
         if event["event_type"] != "dish_activity_checkpoint":
             continue
@@ -38,11 +38,9 @@ def considered_dishes(events):
         if event["dish_id"] != openings[opening_id]:
             continue
 
-        if event.get("is_final") is not True:
-            continue
 
-        completed_active_ms[opening_id] = max(
-            completed_active_ms.get(opening_id, 0),
+        checkpointed_active_ms[opening_id] = max(
+            checkpointed_active_ms.get(opening_id, 0),
             event["cumulative_active_ms"],
         )
 
@@ -69,7 +67,7 @@ def considered_dishes(events):
             qualifying_comparisons.update(linked_dishes)
     considered = set(qualifying_comparisons)
 
-    for opening_id, active_ms in completed_active_ms.items():
+    for opening_id, active_ms in checkpointed_active_ms.items():
         if active_ms >= 10000:
             considered.add(openings[opening_id])
 
@@ -84,6 +82,30 @@ class TestMetricExamples(unittest.TestCase):
         cls.examples = json.loads(
             path.read_text(encoding="utf-8")
         )["examples"]
+
+
+    def test_ten_second_non_final_checkpoint_qualifies(self):
+        events = [
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-A",
+                "dish_id": "dish-A",
+            },
+            {
+                "event_type": "dish_activity_checkpoint",
+                "session_id": "session-A",
+                "opening_id": "open-A",
+                "dish_id": "dish-A",
+                "cumulative_active_ms": 10000,
+                "is_final": False,
+            },
+        ]
+
+        self.assertEqual(
+            considered_dishes(events),
+            {"dish-A"},
+        )
 
     def test_replace_comparison_qualifies(self):
         events = [
