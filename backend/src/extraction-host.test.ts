@@ -1,6 +1,13 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@cloudflare/containers', () => ({ Container: class {} }));
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class {
+    constructor(
+      public ctx: unknown,
+      public env: unknown,
+    ) {}
+  },
+}));
 
 import { mintExtractionCapability } from './extraction-capability';
 import host, { ExtractionContainer, type ExtractionHostEnv } from './extraction-host';
@@ -41,6 +48,112 @@ function setup() {
   return { env, get, forward, request };
 }
 
+function runtime(running = false) {
+  const { env } = setup();
+  const fetch = vi.fn(async (_input: string | Request, _init?: RequestInit) =>
+    Response.json({ status: 'ok' }),
+  );
+  const container = {
+    running,
+    images: { base: 'registry.cloudflare.com/synthetic@sha256:abc' },
+    start: vi.fn(() => {
+      container.running = true;
+    }),
+    setInactivityTimeout: vi.fn(async () => {}),
+    getTcpPort: vi.fn(() => ({ fetch })),
+  };
+  const ctx = {
+    container,
+    blockConcurrencyWhile: vi.fn(async (callback: () => Promise<void>) => callback()),
+  };
+  const actor = new ExtractionContainer(ctx as unknown as DurableObjectState, env);
+  return { actor, container, fetch, ctx };
+}
+
+describe('direct Container startup', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('starts the named image with scoped environment and preserves a POST exactly once', async () => {
+    const { actor, container, fetch } = runtime();
+    const response = await actor.fetch(
+      new Request('https://host.invalid/extract', { method: 'POST', body: 'synthetic' }),
+    );
+    expect(response.status).toBe(200);
+    expect(container.start).toHaveBeenCalledWith({
+      image: container.images.base,
+      instance: 'standard-1',
+      enableInternet: true,
+      env: {
+        EXTRACTION_SERVICE_SECRET: secret,
+        EXTRACTION_SOURCE_ORIGIN: 'https://peekaplate-extraction-staging.vxkong.workers.dev',
+      },
+    });
+    expect(container.setInactivityTimeout).toHaveBeenCalledWith(60_000);
+    expect(container.getTcpPort).toHaveBeenCalledWith(8080);
+    const forwarded = fetch.mock.calls[1]?.[0] as unknown as Request;
+    expect(forwarded.url).toBe('http://container/extract');
+    expect(forwarded.method).toBe('POST');
+    expect(await forwarded.text()).toBe('synthetic');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries readiness, never the extraction POST', async () => {
+    vi.useFakeTimers();
+    const { actor, fetch } = runtime();
+    fetch
+      .mockRejectedValueOnce(new Error('port opening'))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }));
+    const pending = actor.fetch(
+      new Request('https://host.invalid/extract', { method: 'POST', body: '{}' }),
+    );
+    await vi.advanceTimersByTimeAsync(1_001);
+    expect((await pending).status).toBe(200);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(
+      fetch.mock.calls.filter(([value]) => value instanceof Request && value.method === 'POST'),
+    ).toHaveLength(1);
+  });
+
+  it('shares cold readiness between concurrent requests and restores idle timeout after restart', async () => {
+    const { actor, container, fetch } = runtime();
+    let ready!: (response: Response) => void;
+    fetch.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          ready = resolve;
+        }),
+    );
+    const requests = [
+      actor.fetch(new Request('https://host.invalid/health')),
+      actor.fetch(new Request('https://host.invalid/health')),
+    ];
+    await Promise.resolve();
+    await Promise.resolve();
+    ready(Response.json({ status: 'ok' }));
+    expect((await Promise.all(requests)).every((response) => response.ok)).toBe(true);
+    expect(container.start).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const restarted = runtime(true);
+    expect(restarted.ctx.blockConcurrencyWhile).toHaveBeenCalledTimes(1);
+    expect(restarted.container.setInactivityTimeout).toHaveBeenCalledWith(60_000);
+    expect(restarted.container.start).not.toHaveBeenCalled();
+  });
+
+  it('bounds readiness failure and permits a later request to recover', async () => {
+    vi.useFakeTimers();
+    const { actor, fetch } = runtime();
+    fetch.mockRejectedValue(new Error('not ready'));
+    const pending = expect(actor.fetch(new Request('https://host.invalid/health'))).rejects.toThrow(
+      'did not become ready',
+    );
+    await vi.advanceTimersByTimeAsync(30_001);
+    await pending;
+    expect(fetch.mock.calls.length).toBeLessThanOrEqual(61);
+    fetch.mockResolvedValue(Response.json({ status: 'ok' }));
+    expect((await actor.fetch(new Request('https://host.invalid/health'))).status).toBe(200);
+  });
+});
+
 describe('staging extraction host', () => {
   it('denies a valid service credential and job-A capability requesting another valid job', async () => {
     const { env, get, request } = setup();
@@ -65,13 +178,15 @@ describe('staging extraction host', () => {
     expect((await host.fetch(input, env)).status).toBe(403);
     expect(get).not.toHaveBeenCalled();
   });
-  it('keeps the source signing key out of the Python container environment', () => {
+  it('forwards the OCR key to Python while keeping the source signing key out', () => {
     const { env } = setup();
+    env.OCR_SPACE_API_KEY = 'synthetic-ocr-provider-key';
     const container = new ExtractionContainer(
       {} as ConstructorParameters<typeof ExtractionContainer>[0],
       env,
     );
     expect(container.envVars.EXTRACTION_SERVICE_SECRET).toBe(secret);
+    expect(container.envVars.OCR_SPACE_API_KEY).toBe('synthetic-ocr-provider-key');
     expect(container.envVars.EXTRACTION_SOURCE_SIGNING_SECRET).toBeUndefined();
   });
   it('requires distinct service and source-signing credentials', async () => {

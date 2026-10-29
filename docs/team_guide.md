@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-VIS-01 infrastructure updated October 27, 2026; team analytics evidence remains dated separately. The team research and board inventory below remains the dated October 14 snapshot.
+VIS-01 infrastructure and OCR credential status updated October 28, 2026; team analytics evidence remains dated separately. The team research and board inventory below remains the dated October 14 snapshot.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
 
@@ -42,7 +42,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
 | Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
-| Python processing | Local OCR/extraction code plus a tested HTTP service and Docker package | Activate the prepared host, connect VIS-01 and verify real menu extraction; see the service handoff |
+| Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
@@ -52,15 +52,25 @@ ClickUp's “Complete” status describes a task's recorded progress. It is not 
 **Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
 passed real synthetic delivery tests. Reports will use the existing private R2
 bucket. The new Python HTTP service wraps the existing OCR/extraction code and
-has local tests and a Docker build; its Cloudflare host awaits Vivien's planned
-$5/month Workers Paid upgrade and protected provider credentials.
-Teeyansh must connect the real consumer, report adapter and reviewed database
-changes before live menu tests. The queues stay paused until then. Follow the
+has local tests and a Docker build. Vivien's Workers Paid upgrade is active,
+and the protected API deployment succeeded: menu Queue/R2 bindings are live.
+The Python host is now deployed and its private connection is configured.
+Live tests confirmed Python health, signed source reads from private R2,
+wrong-job denial and source-hash conflict handling. The Queue-to-R2/retry/DLQ
+checks also passed against real Cloudflare resources. Teeyansh can continue
+integration using the runtime bindings; nobody needs to put internal keys in
+frontend code or receive them in chat. On October 28, the OCR.space key was added
+to GitHub's protected staging environment and the extraction Worker's secret store.
+A fresh OCR-only test read three made-up dishes and their prices in 4.654 seconds.
+This proves that the OCR provider accepted the key for that image; it does not
+prove the complete hosted menu-processing flow. The AI step still needs its
+provider configuration, and menu-to-draft acceptance remains pending. The queues stay
+paused until that passes. Follow the
 [VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
 interfaces and who does what next. Provisioned infrastructure is not a completed
 menu-processing feature.
 
-The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is now provisioned and tested with synthetic messages. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. The staging binding configuration needs its reviewed release before the API Worker can use it; actual archive-to-database processing remains separate work.
+The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is provisioned with live API bindings. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. Actual archive-to-database processing remains separate work; the menu-infrastructure acceptance does not certify that feature.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -234,7 +244,7 @@ Staff supplies a dish photo
 
 The two languages exchange structured messages, like a form with agreed field names. Developers call this a **data contract**. It includes a job reference, the approved input and the expected result. TypeScript types do not automatically work in Python, so developers test that both sides understand the same messages. A job must not gain permission simply by supplying a restaurant ID, and a repeated result must not create duplicate changes.
 
-Python needs its own environment and tests: **uv** manages its dependencies and **pytest** runs its tests. Those tools will be added with the first real task. There is no Python service deployed today, and the current `pnpm` commands only run the existing JavaScript/TypeScript toolchain.
+Python has its own environment and tests: **uv** manages the locked dependencies and Python's **unittest** runs the existing regression suite. The staging FastAPI/Uvicorn service runs in a Cloudflare Container because the pipeline uses native PyMuPDF. CI tests and builds that package alongside the TypeScript checks. The OCR key is configured privately; contributors call the authorized backend rather than retrieving a shared key from GitHub. The complete upload-to-draft connection still needs feature acceptance.
 
 For a small compatible job, a separate **Cloudflare Python Worker** may be enough. Cloudflare supports Python, but some libraries and workloads do not fit its runtime. Heavier work may need a container or specialist compute service with a separately agreed cost. Calling an AI provider is different from hosting an image model ourselves. The first Python ticket must check those requirements before choosing where it runs. See the [supported Python packages](https://developers.cloudflare.com/workers/languages/python/packages/).
 

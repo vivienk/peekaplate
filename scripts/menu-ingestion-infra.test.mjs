@@ -7,6 +7,16 @@ const config = JSON.parse(
 );
 const staging = config.env.staging;
 
+test('the extraction application uses the provider-required Durable Object scheduler', () => {
+  const host = JSON.parse(
+    readFileSync(new URL('../backend/wrangler.extraction.jsonc', import.meta.url), 'utf8'),
+  );
+  assert.equal(host.containers[0].scheduling_policy, 'durable_object');
+  assert.equal(host.containers[0].images.base.dockerfile, '../processing/Dockerfile');
+  assert.equal(host.containers[0].image, undefined);
+  assert.equal(host.containers[0].max_instances, undefined);
+});
+
 test('menu ingestion has its own staging producer without redirecting observations', () => {
   const producers = staging.queues.producers;
   assert.equal(
@@ -47,8 +57,7 @@ test('extraction host is staging-only, single-instance and contains no secret va
   );
   assert.equal(host.name, 'peekaplate-extraction-staging');
   assert.equal(host.containers.length, 1);
-  assert.equal(host.containers[0].max_instances, 1);
-  assert.equal(host.containers[0].instance_type, 'basic');
+  assert.equal(host.containers[0].scheduling_policy, 'durable_object');
   assert.equal(host.r2_buckets[0].bucket_name, 'peekaplate-staging-assets');
   assert.deepEqual(Object.keys(host.vars).sort(), ['APP_ENV', 'EXTRACTION_SOURCE_ORIGIN']);
   assert.equal(host.vars.APP_ENV, 'staging');
