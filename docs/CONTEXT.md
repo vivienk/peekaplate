@@ -217,7 +217,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "026590781ff55b814e68b33de98a8c19db7771354176c287e4dcedac8cbfe06e"
+      "sourceFingerprint": "208de851085373d9387430015b87fb88ca9813a8dc121cb4fbbd5966de882481"
     },
     {
       "id": "agents",
@@ -279,33 +279,41 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Python PDF/image acquisition validates Engine3-compatible OCR, preserves later native pages after failures and retains evidence-linked needs_review drafts. Staging FastAPI/Uvicorn runs in the protected Cloudflare Container. October28 fresh operator-side OCR read three synthetic names/prices in4.654s without cache; key stored in GitHub staging and host bindings. This was not hosted full extraction or accuracy acceptance. Expected CLI exit2 preserves partial/failed reports. Full AI provider configuration and VIS01 feature acceptance remain pending. Python gets no source-signing/database credentials or publication permission.",
+      "summary": "Python PDF/image acquisition validates Engine3-compatible OCR, preserves later native pages after failures and retains evidence-linked needs_review drafts. Staging FastAPI/Uvicorn runs in the protected Cloudflare Container; fresh operator-side OCR passed and expected CLI exit2 preserves partial/failed reports. T0 asset preparation emits create-only hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks human-prepared layered samples against the T0 detail variant with a dependency-free fallback harness; optional presentation preparation pairs dish cutouts and reference images with the frozen presentation prompt, validates square transparent PNGs and retains the T0 fallback on failure. Manifests never self-approve (needs_review, publication.eligible=false), and Python gets no signing/database credentials.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
         "processing/README.md",
         "processing/pyproject.toml",
         "processing/src/peekaplate_processing/__init__.py",
+        "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/check_llm.py",
         "processing/src/peekaplate_processing/errors.py",
         "processing/src/peekaplate_processing/extract_menus.py",
+        "processing/src/peekaplate_processing/harness.py",
         "processing/src/peekaplate_processing/images.py",
         "processing/src/peekaplate_processing/model_cache.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
         "processing/src/peekaplate_processing/pdf.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/prepare_spatial.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
         "processing/src/peekaplate_processing/schemas.py",
         "processing/src/peekaplate_processing/sources.py",
+        "processing/src/peekaplate_processing/spatial.py",
         "processing/src/peekaplate_processing/storage.py",
         "processing/src/peekaplate_processing/workflow.py",
         "processing/tests/fixture_factory.py",
+        "processing/tests/test_assets.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
         "processing/tests/test_pdf_images.py",
         "processing/tests/test_schemas.py",
+        "processing/tests/test_spatial.py",
         "processing/tests/test_workflow.py",
         "processing/uv.lock",
+        "docs/asset-delivery.md",
         "docs/ocr-delivery.md",
         "processing/tests/fixtures/source-spans.json",
         "processing/tests/test_handoff.py",
@@ -316,17 +324,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
         "processing/Dockerfile",
-        "processing/.dockerignore"
+        "processing/.dockerignore",
+        "processing/src/peekaplate_processing/prepare_presentation.py",
+        "processing/src/peekaplate_processing/presentation.py",
+        "processing/tests/test_presentation.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
+      "sourceFingerprint": "910887c40acb95f917c014eec67692350611613e6174c7b6756e17863698ffdf"
     }
   ],
   "handoffs": [
+    {
+      "summary": "Rebased S3-VIS-03 onto develop 0477653, preserving reviewed OCR/retrieval, staging container service and CI workflows. Addressed PR #25 P2/P3 viewer findings: live prefers-reduced-motion media query listener with style/metrics clearing, and Object.create(null) prototype-safe layer retries. Added optional post-cutout dish presentation prompt, provider interface, square/transparent PNG validation and automatic T0 fallback retention. All Python and repository checks pass.",
+      "modules": [
+        "processing",
+        "delivery"
+      ],
+      "next": "Complete PR #25 code review and offline validation. Keep presentation and 2.5D manifests provisional (needs_review, publication.eligible=false) until S3-ARC-01 contract freeze; align presentation and spatial fields with S3-RES-02."
+    },
     {
       "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
       "modules": [
@@ -405,14 +424,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
-    },
-    {
-      "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
-      "modules": [
-        "delivery",
-        "analytics"
-      ],
-      "next": "Review the reconciled PR 27 release after local checks. Read-only hosted audit confirmed migration 20261021130000 is absent; apply and record its forward migration through the database procedure before deployment. Operator OAuth is valid but does not verify GitHub-held tokens. Keep the activation flag off until protected credential/release checks, then deploy reviewed main and run hosted access acceptance."
     }
   ]
 }
