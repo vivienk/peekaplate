@@ -113,11 +113,11 @@ LEFT JOIN (
         AND te.occurred_at >= te.received_at - INTERVAL '24 hours'
         AND te.occurred_at <= te.received_at + INTERVAL '5 minutes'
         AND NOT EXISTS (
-            SELECT 1 
-            FROM temp_events c 
-            WHERE c.tenant_id = te.tenant_id 
+            SELECT 1
+            FROM temp_events c
+            WHERE c.tenant_id = te.tenant_id
               AND c.event_id = te.event_id
-            GROUP BY c.tenant_id, c.event_id 
+            GROUP BY c.tenant_id, c.event_id
             HAVING COUNT(DISTINCT c.payload_checksum) > 1
         )
     GROUP BY te.tenant_id, te.event_id, te.session_id
