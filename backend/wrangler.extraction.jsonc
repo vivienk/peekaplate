@@ -16,9 +16,8 @@
   "containers": [
     {
       "class_name": "ExtractionContainer",
-      "image": "../processing/Dockerfile",
-      "instance_type": "basic",
-      "max_instances": 1
+      "scheduling_policy": "durable_object",
+      "images": { "base": { "dockerfile": "../processing/Dockerfile" } }
     }
   ],
   "durable_objects": { "bindings": [{ "name": "EXTRACTOR", "class_name": "ExtractionContainer" }] },

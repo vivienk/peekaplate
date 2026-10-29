@@ -1,5 +1,5 @@
+import { DurableObject } from 'cloudflare:workers';
 import { timingSafeEqual } from 'node:crypto';
-import { Container } from '@cloudflare/containers';
 import { readExtractionCapability } from './extraction-capability';
 
 type Stub = { fetch(request: Request): Promise<Response> };
@@ -27,11 +27,11 @@ const pipelineVariables = [
   'a2agent_api_MODEL',
 ] as const;
 
-export class ExtractionContainer extends Container<ExtractionHostEnv> {
-  defaultPort = 8080;
-  sleepAfter = '60s';
+export class ExtractionContainer extends DurableObject<ExtractionHostEnv> {
+  envVars: Record<string, string>;
+  private readiness: Promise<void> | undefined;
 
-  constructor(ctx: ConstructorParameters<typeof Container>[0], env: ExtractionHostEnv) {
+  constructor(ctx: DurableObjectState, env: ExtractionHostEnv) {
     super(ctx, env);
     this.envVars = {
       EXTRACTION_SERVICE_SECRET: env.EXTRACTION_SERVICE_SECRET ?? '',
@@ -40,6 +40,52 @@ export class ExtractionContainer extends Container<ExtractionHostEnv> {
         pipelineVariables.flatMap((key) => (env[key] ? [[key, env[key]]] : [])),
       ),
     };
+    if (ctx.container?.running) {
+      void ctx.blockConcurrencyWhile(() => ctx.container!.setInactivityTimeout(60_000));
+    }
+  }
+
+  private async waitForReady(): Promise<void> {
+    const container = this.ctx.container;
+    if (!container) throw new Error('Extraction container is unavailable');
+    if (!container.running) {
+      const image = container.images.base;
+      if (!image) throw new Error('Extraction image is unavailable');
+      container.start({
+        image,
+        instance: 'standard-1',
+        env: this.envVars,
+        enableInternet: true,
+      });
+    }
+    await container.setInactivityTimeout(60_000);
+    const port = container.getTcpPort(8080);
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      try {
+        const response = await port.fetch('http://container/health', {
+          headers: { Authorization: `Bearer ${this.envVars.EXTRACTION_SERVICE_SECRET}` },
+          signal: AbortSignal.timeout(1_000),
+        });
+        await response.body?.cancel();
+        if (response.ok) return;
+      } catch {
+        // Running means the VM started; Uvicorn may still be opening its port.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    throw new Error('Extraction container did not become ready');
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    this.readiness ??= this.waitForReady().finally(() => {
+      this.readiness = undefined;
+    });
+    await this.readiness;
+    // Retry only readiness probes; an extraction POST must be forwarded once.
+    return this.ctx
+      .container!.getTcpPort(8080)
+      .fetch(new Request(`http://container${new URL(request.url).pathname}`, request));
   }
 }
 
