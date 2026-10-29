@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
+import { DishRevisionSchema } from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -248,7 +249,7 @@ describe('real PostgreSQL staff command', () => {
     const dish = crypto.randomUUID();
     const response = await request(dish);
     expect(response.status).toBe(200);
-    const result = await response.json();
+    const result = DishRevisionSchema.parse(await response.json());
     expect(result).toMatchObject({ dishId: dish, version: 1, name: 'Test dish' });
     expect(await counts(dish)).toEqual({ events: 1, projections: 1, receipts: 1, outbox: 1 });
     const persisted = await admin.query(

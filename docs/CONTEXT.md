@@ -87,7 +87,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWT/membership for atomic draft revisions and individual GitHub collaboration for bounded staging analytics. October 24 deployed observation bindings; source/DLQ remain paused. VIS-04 retrieval enforces SSRF, Unicode spans and aggregate context limits. New config adds a separate menu Queue/report bucket alias, awaiting reviewed main deployment. A separate staging-only authenticated extraction host is prepared for one sleeping Cloudflare Container and exact tenant/job R2 source relay; scoped login is authorized but the explicit staging account still denies Container eligibility, so it is not hosted. No ingestion route, feature consumer, canonical observation writes or publication are added. Hosted access-removal acceptance and production remain separate; JWT logout revocation is expiry-bounded. Source relay requires a15-minute signed tenant/job/hash capability; the distinct signing key never reaches Python.",
+      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -122,7 +122,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/extraction-host.ts",
         "backend/src/extraction-host.test.ts",
         "backend/wrangler.extraction.jsonc",
-        "backend/src/extraction-capability.ts"
+        "backend/src/extraction-capability.ts",
+        "backend/tsconfig.json"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -134,7 +135,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1a23a94066950b74261589b2bdaac33259ed9c03aa0f5bd7ff06894e65735500"
+      "sourceFingerprint": "4ec280d24260cb2416d9f83022d78fba8db724fe304a2af308ba0e9bcaa12d66"
     },
     {
       "id": "database",
@@ -182,7 +183,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main supplies protected manual staging and later production releases under ADR 0012. October 26 readback found unchanged staging Pages at 2a135fa, Worker version fcb87dc6 and healthy team analytics reads. PR #47 main merge ab6f9c4 activated isolated PR previews: credential-free head builds, trusted SHA markers, exact-alias readiness and scoped cleanup. GitHub run 40393096652 deployed synthetic PR #48; both screens/markers and one bot comment passed. Close run 40393553935 removed both deployments and edge aliases settled to 404. No application, database or staging release occurred. Observation consumer/canonical reporting and production remain separate work.",
+      "summary": "Main remains the staging/production release source under ADR0012. This sync reconciles main82f3876 release fixes with develop00856e1, preserving retrieval/contracts, preview lifecycle evidence and both error/learning histories. Direct-DO host runtime, OCR setup and current operations are shared with develop; this Git merge does not deploy or change credentials/data. Isolated previews retain trusted build/deploy separation and verified cleanup. Full hosted ingestion/reporting acceptance and production remain separate.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -222,7 +223,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/preview.mjs",
         "scripts/preview.test.mjs",
         "docs/menu-ingestion-infrastructure.md",
-        "scripts/menu-ingestion-infra.test.mjs"
+        "scripts/menu-ingestion-infra.test.mjs",
+        "pnpm-lock.yaml"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -233,7 +235,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9c1804bdbaae73df04a628a3ab6c590a2fe8753f9c264f3a9cb1d77050f087e9"
+      "sourceFingerprint": "32a52300357a3d6458da355ad35adccae7c2738c383a63239dd66ef28126d7e3"
     },
     {
       "id": "agents",
@@ -295,7 +297,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Local PDF/image acquisition uses an injectable OCRProvider restricted to validated OCR.space Engine 3-compatible results. Incompatible OCR fails its segment and preserves later native pages. LLM extraction retains needs_review drafts and evidence. Shared Unicode fixtures check spans; combined integration, separate verification and quality acceptance remain pending. Optional staging FastAPI/Uvicorn service authenticates a trusted Worker, verifies tenant/job-derived private R2 sources and hashes, and runs the existing pipeline in a bounded subprocess. It has no database access, URL fetch path or publication ability; hosting/credentials and PR45 admission/deadline/report-adapter alignment remain pending. Expected CLI exit2 retains validated partial/failed reports instead of converting them to transport errors.",
+      "summary": "Python PDF/image acquisition validates Engine3-compatible OCR, preserves later native pages after failures and retains evidence-linked needs_review drafts. Staging FastAPI/Uvicorn runs in the protected Cloudflare Container. October28 fresh operator-side OCR read three synthetic names/prices in4.654s without cache; key stored in GitHub staging and host bindings. This was not hosted full extraction or accuracy acceptance. Expected CLI exit2 preserves partial/failed reports. Full AI provider configuration and VIS01 feature acceptance remain pending. Python gets no source-signing/database credentials or publication permission.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -353,6 +355,43 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma."
     },
     {
+      "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
+      "modules": [
+        "backend",
+        "contracts",
+        "processing",
+        "delivery"
+      ],
+      "next": "Record combined local/CI verification in the sync PR and merge after review. Teeyansh then updates his own feature branch from develop and reruns its checks; PR45 final review, approved AI configuration, migration/consumer release and full hosted ingestion acceptance remain separate. Keep menu delivery paused."
+    },
+    {
+      "summary": "October28: stored OCR_SPACE_API_KEY in protected GitHub staging environment and existing extraction Worker. Host version7b505396 retains main7bbe0d3 code/image and other bindings. Fresh OCR-only provider call read all three synthetic names/prices in4.654s with no cache; local output stays outside Git. Focused host regression checks OCR forwarding and signing-key exclusion. No production, migration or consumer activation.",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "next": "Teeyansh fixes PR45 verifier zero-check success, finalizes reviewed consumer/deadline settings and prepares controlled E2E cases. Operators configure the approved AI provider and verify/apply the reviewed migration/release before replacing the temporary pull consumer. Run full upload-to-drafts/ACK and failure/tenant checks before enabling real submissions. Hosted full extraction remains NOT RUN."
+    },
+    {
+      "summary": "Completed VIS-01 host activation after Paid upgrade and PR60 directDO repair. Deployed main7bbe0d3 using existing image; set matched internal secrets privately. Hosted health/auth/job/source/hash checks and genuine remote Queue/R2/ACK/retry/DLQ probes passed with exact cleanup and queues paused. Existing team reads200/anonymous401. Corrected previous local-R2 evidence claim after independent hosted read exposed forceLocal helper behavior.",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "next": "Teeyansh can use staging runtime bindings without receiving internal secret values. Configure approved existing OCR/AI provider credentials when ready, finish/review PR45 and its migrations/report adapter, align600s transport with700s processing plus cold start, then run controlled authorized upload→Queue→service→private report→database drafts→ACK and failure/tenant tests before unpausing. No production or restaurant-data tests were performed."
+    },
+    {
+      "summary": "Paid activation resolved Container eligibility. Existing protected API run succeeded and menu aliases are live. Actual container registration then rejected default scheduling; prepared directDO runtime repair with RED/GREEN config guard and startup/readiness/concurrency/failure-recovery tests. Dev-only official Worker types are pinned to mature October26 release; latest October28 was blocked by dependency maturity policy, which remains unchanged.",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
+    },
+    {
       "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",
       "modules": [
         "backend",
@@ -393,40 +432,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
-    },
-    {
-      "summary": "Reconciled main into the PR 27 release branch, preserving October 22 staging controls, verified PostHog export history, team analytics access documentation and both error-ledger histories. Runtime, contracts, migrations and deployment workflow are unchanged from the reviewed develop release. Corrected the team-access activation checklist so migration/history, token permissions and final review/CI are explicit prerequisites to enabling the flag. Final guide cleanup distinguishes the enabled hourly export from the pending team inspection API and links its activation checklist; PR verification metadata is refreshed for the final candidate.",
-      "modules": [
-        "delivery",
-        "analytics"
-      ],
-      "next": "Review the reconciled PR 27 release after local checks. Read-only hosted audit confirmed migration 20261021130000 is absent; apply and record its forward migration through the database procedure before deployment. Operator OAuth is valid but does not verify GitHub-held tokens. Keep the activation flag off until protected credential/release checks, then deploy reviewed main and run hosted access acceptance."
-    },
-    {
-      "summary": "Recorded the October 22 staging environment settings: exact main branch restriction saved, required reviewers and prevent self-review enabled, administrator bypass allowed, and expected variable/secret names present. Updated stale environment-availability guidance. No secret values, activation flag, workflow code or deployment changed.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Review this documentation PR. Before Actions activation, verify credential permissions, intended staging bindings and the independent approval process; the settings observation is not a successful workflow or deployment test."
-    },
-    {
-      "summary": "Updated deployment selection to main for both environments per the maintainer's explicit instruction. Configured verified non-secret staging account, issuer and Hyperdrive bindings. Provider audit found existing Supabase migrations, forced RLS, restricted staging login, an ES256 public key and uncached Hyperdrive; no duplicate database branch was created. Hosted request behavior remains unverified.",
-      "modules": [
-        "delivery",
-        "backend"
-      ],
-      "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "PRs 14/15 released hosted PostHog consented shell capture at main 2a135fa, verified by live synthetic capture and provider readback. Added private export landing migration, conflict-aware deduplication view and least-privilege tests. pnpm check and test:db pass; technical/security review found no supported defect and guide review corrections are applied. Hosted migration applied with explicit access approval; tables and effective role boundaries verified. Export connection created; first run failed TLS verification and schedule is paused. User reported correction requires project Admin access. No rows transferred; no bypass attempted.",
-      "modules": [
-        "analytics",
-        "database",
-        "delivery"
-      ],
-      "next": "Vivien must correct the connection or grant project Admin access. Complete the connection with the official Supabase CA, verify a bounded export and duplicate-safe retry, then resume schedule. Do not claim transfer success from backfill wrapper completion alone."
     }
   ]
-
 }
 ```
+
