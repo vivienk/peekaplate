@@ -79,6 +79,8 @@ export function toMenu(
     menu: {
       source,
       notice: source === 'fixture' ? FIXTURE_NOTICE : null,
+      venueId: bundle.venue_id,
+      menuId: bundle.menu_id,
       publicationRevisionId,
       menuRevisionId: bundle.menu_revision_id,
       restaurant: { name: bundle.restaurant.name, logo: logo ? toImage(logo) : null },
