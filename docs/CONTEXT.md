@@ -56,7 +56,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "805ed396e783a76cc3d55578b9da024846248ccbb03acbbab76b68da1fa4fa41"
+      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
     },
     {
       "id": "diner",

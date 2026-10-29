@@ -221,4 +221,7 @@
   .pp-input {
     transition: none;
   }
+  .pp-button:active:not(:disabled) {
+    transform: none;
+  }
 }
