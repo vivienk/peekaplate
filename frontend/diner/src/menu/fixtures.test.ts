@@ -12,8 +12,20 @@ import {
   NO_ICON_ALLERGEN,
   NO_ICON_INGREDIENT,
 } from './fixtures';
-import type { CompleteDish, Menu } from './types';
+import { ALLERGENS, type CompleteDish, type Menu } from './types';
 import type { WireCompleteDish } from './wire';
+
+const wireDish = (): WireCompleteDish => ({
+  dish_id: DISH.avocadoToast,
+  dish_revision_id: DISH.avocadoToast,
+  complete: true,
+  name: 'Test',
+  description: 'Test',
+  price: { amount: '1.00', currency: 'USD' },
+  ingredients: [{ ingredient_id: DISH.harvestPowerBowl, name: 'Bread', description: null }],
+  dietary: [],
+  images: null,
+});
 
 async function loadMenu(scenario: Parameters<typeof createFixtureMenuSource>[0]): Promise<Menu> {
   const result = await createFixtureMenuSource(scenario).load();
@@ -73,16 +85,22 @@ describe('fixture menu source', () => {
     expect(dish).not.toHaveProperty('price');
   });
 
-  it('suppresses Gluten-free when the dish also contains Gluten', async () => {
+  it('suppresses Gluten-free when the dish also contains Wheat', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.berryPancakeStack);
-    expect(dish.allergens).toContain('Gluten');
+    expect(dish.allergens).toEqual(['Wheat', 'Milk', 'Eggs']);
     expect(dish.dietary).toEqual(['Vegetarian']);
   });
 
   it('keeps every validated allergen, including one without an icon, for chip wrapping', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.gardenAvocadoSalad);
-    expect(dish.allergens).toEqual(['Tree nut', 'Peanut', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
+    expect(dish.allergens).toEqual(['Tree nuts', 'Peanuts', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
     expect(dish.dietary).toEqual(['Vegan', 'Vegetarian']);
+  });
+
+  it('has a complete dish with no allergen or dietary data, so the section can be hidden', async () => {
+    const dish = complete(await loadMenu('edge-cases'), DISH.noAllergenData);
+    expect(dish.allergens).toEqual([]);
+    expect(dish.dietary).toEqual([]);
   });
 
   it('never shows draft-like fields from the data, at any level', async () => {
@@ -158,7 +176,30 @@ describe('menu adapter', () => {
     expect(chipKey('Gluten')).not.toBe(chipKey('Gluten-free'));
   });
 
-  it('also suppresses Gluten-free when Wheat is listed', () => {
+  it('shows the approved label for each P0 allergen code, and accepts the label too', () => {
+    const codes = ALLERGENS.flatMap((a) => [a.code, a.label.toUpperCase()]);
+    const result = toMenu(
+      {
+        ...edgeCaseBundle,
+        categories: [
+          {
+            category_id: CATEGORY.breakfast,
+            name: 'B',
+            dishes: [{ ...wireDish(), allergens: [...codes, 'Lupin'] }],
+          },
+        ],
+      },
+      'fixture',
+      FIXTURE_PUBLICATION_REVISION_ID,
+    );
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual([
+      ...ALLERGENS.map((a) => a.label),
+      'Lupin',
+    ]);
+  });
+
+  it('still suppresses Gluten-free when an unlisted Gluten value is given', () => {
     const wheat: WireCompleteDish = {
       dish_id: DISH.avocadoToast,
       dish_revision_id: DISH.avocadoToast,
@@ -167,7 +208,7 @@ describe('menu adapter', () => {
       description: 'Test',
       price: { amount: '1.00', currency: 'USD' },
       ingredients: [{ ingredient_id: DISH.harvestPowerBowl, name: 'Bread', description: null }],
-      allergens: ['wheat'],
+      allergens: ['Gluten'],
       dietary: ['Gluten-free', 'Vegan'],
       images: null,
     };
@@ -180,6 +221,7 @@ describe('menu adapter', () => {
       FIXTURE_PUBLICATION_REVISION_ID,
     );
     if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual(['Gluten']);
     expect(complete(result.menu, DISH.avocadoToast).dietary).toEqual(['Vegan']);
     expect(result.menu.notice).toBeNull();
     expect(FIXTURE_NOTICE).toBe('Fixture data');
