@@ -1,128 +1,122 @@
 {
-    "metric":  "considered_dishes_per_visit",
-    "rule":  "A dish is considered if it has at least 10 seconds of active visible time OR a qualifying displayed comparison. Count each dish only once per visit.",
-    "comparison_attribution":  "A displayed Start or Replace comparison qualifies when at least one compared dish was previously opened in the same session. Do not infer Save attribution or causality.",
-    "examples":  [
-                     {
-                         "id":  "metric_001",
-                         "scenario":  "Active-time-only engagement",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_detail_opened",
-                                            "opening_id":  "open-001",
-                                            "dish_id":  "dish-A"
-                                        },
-                                        {
-                                            "event_type":  "dish_activity_checkpoint",
-                                            "opening_id":  "open-001",
-                                            "dish_id":  "dish-A",
-                                            "cumulative_active_ms":  12000,
-                                            "is_final":  true
-                                        }
-                                    ],
-                         "expected_considered":  true,
-                         "expected_count":  1
-                     },
-                     {
-                         "id":  "metric_002",
-                         "scenario":  "Comparison-only engagement",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_detail_opened",
-                                            "opening_id":  "open-002",
-                                            "dish_id":  "dish-A"
-                                        },
-                                        {
-                                            "event_type":  "dish_activity_checkpoint",
-                                            "opening_id":  "open-002",
-                                            "dish_id":  "dish-A",
-                                            "cumulative_active_ms":  4000,
-                                            "is_final":  true
-                                        },
-                                        {
-                                            "event_type":  "dish_compared",
-                                            "opening_id":  "open-002",
-                                            "dish_ids":  [
-                                                             "dish-A",
-                                                             "dish-B"
-                                                         ],
-                                            "compare_action":  "start",
-                                            "display_state":  "displayed"
-                                        }
-                                    ],
-                         "expected_considered":  true,
-                         "expected_count":  1
-                     },
-                     {
-                         "id":  "metric_003",
-                         "scenario":  "Short opening without engagement",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_detail_opened",
-                                            "opening_id":  "open-003",
-                                            "dish_id":  "dish-A"
-                                        },
-                                        {
-                                            "event_type":  "dish_activity_checkpoint",
-                                            "opening_id":  "open-003",
-                                            "dish_id":  "dish-A",
-                                            "cumulative_active_ms":  5000,
-                                            "is_final":  true
-                                        }
-                                    ],
-                         "expected_considered":  false,
-                         "expected_count":  0
-                     },
-                     {
-                         "id":  "metric_004",
-                         "scenario":  "Save without opening",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_saved",
-                                            "dish_id":  "dish-A",
-                                            "save_origin":  "direct"
-                                        }
-                                    ],
-                         "expected_considered":  false,
-                         "expected_count":  0
-                     },
-                     {
-                         "id":  "metric_005",
-                         "scenario":  "Exactly 10 seconds qualifies",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_detail_opened",
-                                            "opening_id":  "open-005",
-                                            "dish_id":  "dish-A"
-                                        },
-                                        {
-                                            "event_type":  "dish_activity_checkpoint",
-                                            "opening_id":  "open-005",
-                                            "dish_id":  "dish-A",
-                                            "cumulative_active_ms":  10000,
-                                            "is_final":  true
-                                        }
-                                    ],
-                         "expected_considered":  true,
-                         "expected_count":  1
-                     },
-                     {
-                         "id":  "metric_006",
-                         "scenario":  "Comparison without linked opening",
-                         "events":  [
-                                        {
-                                            "event_type":  "dish_compared",
-                                            "opening_id":  "missing-opening",
-                                            "dish_ids":  [
-                                                             "dish-A",
-                                                             "dish-B"
-                                                         ],
-                                            "compare_action":  "start",
-                                            "display_state":  "displayed"
-                                        }
-                                    ],
-                         "expected_considered":  false,
-                         "expected_count":  0
-                     }
-                 ]
+  "metric": "considered_dishes_per_visit",
+  "rule": "A dish is considered if it has at least 10 seconds of active visible time OR a qualifying displayed comparison. Count each dish only once per visit.",
+  "comparison_attribution": "A displayed Start or Replace comparison qualifies when at least one compared dish was previously opened in the same session. Do not infer Save attribution or causality.",
+  "examples": [
+    {
+      "id": "metric_001",
+      "scenario": "Active-time-only engagement",
+      "events": [
+        {
+          "event_type": "dish_detail_opened",
+          "opening_id": "open-001",
+          "dish_id": "dish-A"
+        },
+        {
+          "event_type": "dish_activity_checkpoint",
+          "opening_id": "open-001",
+          "dish_id": "dish-A",
+          "cumulative_active_ms": 12000,
+          "is_final": true
+        }
+      ],
+      "expected_considered": true,
+      "expected_count": 1
+    },
+    {
+      "id": "metric_002",
+      "scenario": "Comparison-only engagement",
+      "events": [
+        {
+          "event_type": "dish_detail_opened",
+          "opening_id": "open-002",
+          "dish_id": "dish-A"
+        },
+        {
+          "event_type": "dish_activity_checkpoint",
+          "opening_id": "open-002",
+          "dish_id": "dish-A",
+          "cumulative_active_ms": 4000,
+          "is_final": true
+        },
+        {
+          "event_type": "dish_compared",
+          "opening_id": "open-002",
+          "dish_ids": ["dish-A", "dish-B"],
+          "compare_action": "start",
+          "display_state": "displayed"
+        }
+      ],
+      "expected_considered": true,
+      "expected_count": 1
+    },
+    {
+      "id": "metric_003",
+      "scenario": "Short opening without engagement",
+      "events": [
+        {
+          "event_type": "dish_detail_opened",
+          "opening_id": "open-003",
+          "dish_id": "dish-A"
+        },
+        {
+          "event_type": "dish_activity_checkpoint",
+          "opening_id": "open-003",
+          "dish_id": "dish-A",
+          "cumulative_active_ms": 5000,
+          "is_final": true
+        }
+      ],
+      "expected_considered": false,
+      "expected_count": 0
+    },
+    {
+      "id": "metric_004",
+      "scenario": "Save without opening",
+      "events": [
+        {
+          "event_type": "dish_saved",
+          "dish_id": "dish-A",
+          "save_origin": "direct"
+        }
+      ],
+      "expected_considered": false,
+      "expected_count": 0
+    },
+    {
+      "id": "metric_005",
+      "scenario": "Exactly 10 seconds qualifies",
+      "events": [
+        {
+          "event_type": "dish_detail_opened",
+          "opening_id": "open-005",
+          "dish_id": "dish-A"
+        },
+        {
+          "event_type": "dish_activity_checkpoint",
+          "opening_id": "open-005",
+          "dish_id": "dish-A",
+          "cumulative_active_ms": 10000,
+          "is_final": true
+        }
+      ],
+      "expected_considered": true,
+      "expected_count": 1
+    },
+    {
+      "id": "metric_006",
+      "scenario": "Comparison without linked opening",
+      "events": [
+        {
+          "event_type": "dish_compared",
+          "opening_id": "missing-opening",
+          "dish_ids": ["dish-A", "dish-B"],
+          "compare_action": "start",
+          "display_state": "displayed"
+        }
+      ],
+      "expected_considered": false,
+      "expected_count": 0
+    }
+  ]
 }

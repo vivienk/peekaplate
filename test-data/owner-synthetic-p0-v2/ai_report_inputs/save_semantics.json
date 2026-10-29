@@ -1,22 +1,22 @@
 {
-    "fixture_id":  "save_semantics",
-    "report_type":  "authorized_metric_definitions",
-    "data_scope":  "fictional_synthetic_restaurant",
-    "definitions":  {
-                        "direct_save":  "A diner adds a dish to their shortlist. This does not prove a purchase.",
-                        "unsave":  "A diner removes a previously saved dish from their shortlist.",
-                        "undo_restoration":  "Undo restores a previously unsaved dish. It is not a new direct Save.",
-                        "duplicate_delivery":  "Identical deliveries of the same event are deduplicated by event ID and counted once.",
-                        "story_end_saved_state":  "The dishes remaining Saved at the end of an observed story. This is not verified completed-session retention.",
-                        "observed_save_retention":  "Among observed visits that directly saved a particular dish, the proportion that still have it Saved at the end of the observed visit. This is descriptive, not verified order completion or causal conversion."
-                    },
-    "completion_evidence":  {
-                                "status":  "UNAVAILABLE",
-                                "verified_completed_session_retention":  null
-                            },
-    "privacy":  {
-                    "raw_events_included":  false,
-                    "individual_saved_lists_included":  false,
-                    "suppressed_counts_included":  false
-                }
+  "fixture_id": "save_semantics",
+  "report_type": "authorized_metric_definitions",
+  "data_scope": "fictional_synthetic_restaurant",
+  "definitions": {
+    "direct_save": "A diner adds a dish to their shortlist. This does not prove a purchase.",
+    "unsave": "A diner removes a previously saved dish from their shortlist.",
+    "undo_restoration": "Undo restores a previously unsaved dish. It is not a new direct Save.",
+    "duplicate_delivery": "Identical deliveries of the same event are deduplicated by event ID and counted once.",
+    "story_end_saved_state": "The dishes remaining Saved at the end of an observed story. This is not verified completed-session retention.",
+    "observed_save_retention": "Among observed visits that directly saved a particular dish, the proportion that still have it Saved at the end of the observed visit. This is descriptive, not verified order completion or causal conversion."
+  },
+  "completion_evidence": {
+    "status": "UNAVAILABLE",
+    "verified_completed_session_retention": null
+  },
+  "privacy": {
+    "raw_events_included": false,
+    "individual_saved_lists_included": false,
+    "suppressed_counts_included": false
+  }
 }

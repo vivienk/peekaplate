@@ -1,215 +1,203 @@
 {
-    "fixture_id":  "two-session-story-p0-v2",
-    "status":  "INTERNAL_ORACLE_DRAFT",
-    "privacy_notice":  "Two sessions are below the threshold of 10. All behavioral values are internal test oracle values; owner-facing cells and evidence must be suppressed.",
-    "expected":  {
-                     "delivery_lines":  22,
-                     "unique_observations":  21,
-                     "sessions":  2,
-                     "menu_sessions":  2,
-                     "card_exposed_sessions":  {
-                                                   "dish-A":  2,
-                                                   "dish-B":  2,
-                                                   "dish-C":  1
-                                               },
-                     "actual_detail_openings":  {
-                                                    "dish-A":  1,
-                                                    "dish-B":  1,
-                                                    "dish-C":  0
-                                                },
-                     "linked_detail_open_rate":  {
-                                                     "dish-A":  {
-                                                                    "numerator":  1,
-                                                                    "denominator":  2,
-                                                                    "value":  0.5
-                                                                },
-                                                     "dish-B":  {
-                                                                    "numerator":  1,
-                                                                    "denominator":  2,
-                                                                    "value":  0.5
-                                                                },
-                                                     "dish-C":  {
-                                                                    "numerator":  0,
-                                                                    "denominator":  1,
-                                                                    "value":  0.0
-                                                                }
-                                                 },
-                     "completed_active_time_seconds":  {
-                                                           "opening-X-A1":  10,
-                                                           "opening-Y-B1":  5
-                                                       },
-                     "average_completed_active_seconds":  {
-                                                              "numerator":  15,
-                                                              "denominator":  2,
-                                                              "value":  7.5
-                                                          },
-                     "comparison":  {
-                                        "starts":  1,
-                                        "pair_session_counts":  {
-                                                                    "dish-A|dish-B":  1,
-                                                                    "dish-A|dish-C":  1
-                                                                },
-                                        "replaces":  1,
-                                        "distinct_flows":  1,
-                                        "displayed_pair_events":  2
-                                    },
-                     "save":  {
-                                  "direct_saves":  {
-                                                       "dish-A":  1,
-                                                       "dish-B":  2
-                                                   },
-                                  "undo_restorations":  {
-                                                            "dish-A":  1
-                                                        },
-                                  "successful_unsaves":  {
-                                                             "dish-A":  1,
-                                                             "dish-B":  2
-                                                         },
-                                  "story_end_saved_counts":  {
-                                                                 "dish-A":  1,
-                                                                 "dish-B":  0
-                                                             },
-                                  "story_end_saved_rate_among_direct_savers":  {
-                                                                                   "dish-A":  {
-                                                                                                  "numerator":  1,
-                                                                                                  "denominator":  1,
-                                                                                                  "value":  1.0
-                                                                                              },
-                                                                                   "dish-B":  {
-                                                                                                  "numerator":  0,
-                                                                                                  "denominator":  2,
-                                                                                                  "value":  0.0
-                                                                                              }
-                                                                               }
-                              },
-                     "save_adoption":  {
-                                           "numerator":  2,
-                                           "denominator":  2,
-                                           "value":  1.0,
-                                           "note":  "Undo restoration does not count as a new adoption."
-                                       },
-                     "strict_engaged_session_dish_pairs":  {
-                                                               "status":  "PROPOSED_PENDING_PRODUCT_VALIDATION",
-                                                               "pairs":  [
-                                                                             {
-                                                                                 "session_id":  "session-X",
-                                                                                 "dish_id":  "dish-A",
-                                                                                 "qualification_basis":  "qualifying_displayed_comparison",
-                                                                                 "validation_status":  "proposed"
-                                                                             }
-                                                                         ]
-                                                           },
-                     "orders_revenue_waste":  {
-                                                  "status":  "UNKNOWN_OR_UNAVAILABLE",
-                                                  "orders":  null,
-                                                  "revenue":  null,
-                                                  "waste":  null
-                                              },
-                     "owner_visible_behavioral_values":  {
-                                                             "status":  "SUPPRESSED",
-                                                             "eligible_sessions":  2,
-                                                             "threshold":  10
-                                                         },
-                     "depth_stage_sessions":  {
-                                                  "menu_viewed":  2,
-                                                  "dish_opened":  2,
-                                                  "compared":  1,
-                                                  "saved":  2
-                                              }
-                 },
-    "full_dataset_proposed_engagement":  {
-                                             "status":  "PROPOSED_PENDING_METRIC_OWNER_APPROVAL",
-                                             "rule":  "At least 10 seconds of active visible time OR a qualifying displayed comparison; deduplicate by session and dish.",
-                                             "dish-A":  {
-                                                            "considered_sessions":  150,
-                                                            "eligible_opening_sessions":  150,
-                                                            "rate":  1.0,
-                                                            "validation_status":  "PROPOSED"
-                                                        },
-                                             "dish-B":  {
-                                                            "considered_sessions":  0,
-                                                            "eligible_opening_sessions":  150,
-                                                            "rate":  0.0,
-                                                            "validation_status":  "PROVISIONAL_DEPENDS_ON_COMPARISON_ATTRIBUTION"
-                                                        },
-                                             "scope":  "Synthetic internal test expectations only; not owner-visible production metrics.",
-                                             "comparison_attribution_status":  "LINKAGE_RULE_CONFIRMED_ENGAGEMENT_PROVISIONAL",
-                                             "comparison_attribution_question":  "Confirmed linkage rule: a displayed Start or Replace comparison qualifies when at least one compared dish was previously opened in the same session. Matching opening_id is not required. Do not infer Save causality."
-                                         },
-    "session_inactivity_example":  {
-                                       "note":  "Standalone synthetic policy example, not derived from full dataset. Inactivity ends a visit, not an order. Engagement remains provisional.",
-                                       "expected":  {
-                                                        "observed_retention_rate":  1,
-                                                        "observed_retained_sessions":  2,
-                                                        "directly_saved_sessions":  2,
-                                                        "completed_order_claims":  0
-                                                    },
-                                       "sessions":  [
-                                                        {
-                                                            "saved_dishes":  [
-                                                                                 "dish-A"
-                                                                             ],
-                                                            "events":  [
-                                                                           {
-                                                                               "dish_id":  "dish-A",
-                                                                               "timestamp":  "2026-10-20T10:00:00+05:00",
-                                                                               "event_type":  "dish_detail_opened"
-                                                                           },
-                                                                           {
-                                                                               "dish_id":  "dish-A",
-                                                                               "timestamp":  "2026-10-20T10:00:12+05:00",
-                                                                               "event_type":  "dish_activity_checkpoint",
-                                                                               "is_final":  true,
-                                                                               "cumulative_active_ms":  12000
-                                                                           },
-                                                                           {
-                                                                               "dish_id":  "dish-A",
-                                                                               "timestamp":  "2026-10-20T10:00:15+05:00",
-                                                                               "event_type":  "dish_saved"
-                                                                           }
-                                                                       ],
-                                                            "directly_saved_dishes":  [
-                                                                                          "dish-A"
-                                                                                      ],
-                                                            "session_id":  "session-A",
-                                                            "expected_engagement":  "engaged (provisional)"
-                                                        },
-                                                        {
-                                                            "saved_dishes":  [
-
-                                                                             ],
-                                                            "events":  [
-                                                                           {
-                                                                               "timestamp":  "2026-10-20T11:00:00+05:00",
-                                                                               "event_type":  "menu_viewed"
-                                                                           }
-                                                                       ],
-                                                            "directly_saved_dishes":  [
-
-                                                                                      ],
-                                                            "session_id":  "session-B",
-                                                            "expected_engagement":  "browse-only"
-                                                        },
-                                                        {
-                                                            "saved_dishes":  [
-                                                                                 "dish-A"
-                                                                             ],
-                                                            "events":  [
-                                                                           {
-                                                                               "dish_id":  "dish-A",
-                                                                               "timestamp":  "2026-10-20T12:00:00+05:00",
-                                                                               "event_type":  "dish_saved"
-                                                                           }
-                                                                       ],
-                                                            "directly_saved_dishes":  [
-                                                                                          "dish-A"
-                                                                                      ],
-                                                            "session_id":  "session-C",
-                                                            "expected_engagement":  "not engaged"
-                                                        }
-                                                    ],
-                                       "inactivity_timeout_minutes":  30,
-                                       "engagement_label":  "engaged (provisional)",
-                                       "status":  "PROPOSED_SYNTHETIC_TEST"
-                                   }
+  "fixture_id": "two-session-story-p0-v2",
+  "status": "INTERNAL_ORACLE_DRAFT",
+  "privacy_notice": "Two sessions are below the threshold of 10. All behavioral values are internal test oracle values; owner-facing cells and evidence must be suppressed.",
+  "expected": {
+    "delivery_lines": 22,
+    "unique_observations": 21,
+    "sessions": 2,
+    "menu_sessions": 2,
+    "card_exposed_sessions": {
+      "dish-A": 2,
+      "dish-B": 2,
+      "dish-C": 1
+    },
+    "actual_detail_openings": {
+      "dish-A": 1,
+      "dish-B": 1,
+      "dish-C": 0
+    },
+    "linked_detail_open_rate": {
+      "dish-A": {
+        "numerator": 1,
+        "denominator": 2,
+        "value": 0.5
+      },
+      "dish-B": {
+        "numerator": 1,
+        "denominator": 2,
+        "value": 0.5
+      },
+      "dish-C": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0
+      }
+    },
+    "completed_active_time_seconds": {
+      "opening-X-A1": 10,
+      "opening-Y-B1": 5
+    },
+    "average_completed_active_seconds": {
+      "numerator": 15,
+      "denominator": 2,
+      "value": 7.5
+    },
+    "comparison": {
+      "starts": 1,
+      "pair_session_counts": {
+        "dish-A|dish-B": 1,
+        "dish-A|dish-C": 1
+      },
+      "replaces": 1,
+      "distinct_flows": 1,
+      "displayed_pair_events": 2
+    },
+    "save": {
+      "direct_saves": {
+        "dish-A": 1,
+        "dish-B": 2
+      },
+      "undo_restorations": {
+        "dish-A": 1
+      },
+      "successful_unsaves": {
+        "dish-A": 1,
+        "dish-B": 2
+      },
+      "story_end_saved_counts": {
+        "dish-A": 1,
+        "dish-B": 0
+      },
+      "story_end_saved_rate_among_direct_savers": {
+        "dish-A": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1.0
+        },
+        "dish-B": {
+          "numerator": 0,
+          "denominator": 2,
+          "value": 0.0
+        }
+      }
+    },
+    "save_adoption": {
+      "numerator": 2,
+      "denominator": 2,
+      "value": 1.0,
+      "note": "Undo restoration does not count as a new adoption."
+    },
+    "strict_engaged_session_dish_pairs": {
+      "status": "PROPOSED_PENDING_PRODUCT_VALIDATION",
+      "pairs": [
+        {
+          "session_id": "session-X",
+          "dish_id": "dish-A",
+          "qualification_basis": "qualifying_displayed_comparison",
+          "validation_status": "proposed"
+        }
+      ]
+    },
+    "orders_revenue_waste": {
+      "status": "UNKNOWN_OR_UNAVAILABLE",
+      "orders": null,
+      "revenue": null,
+      "waste": null
+    },
+    "owner_visible_behavioral_values": {
+      "status": "SUPPRESSED",
+      "eligible_sessions": 2,
+      "threshold": 10
+    },
+    "depth_stage_sessions": {
+      "menu_viewed": 2,
+      "dish_opened": 2,
+      "compared": 1,
+      "saved": 2
+    }
+  },
+  "full_dataset_proposed_engagement": {
+    "status": "PROPOSED_PENDING_METRIC_OWNER_APPROVAL",
+    "rule": "At least 10 seconds of active visible time OR a qualifying displayed comparison; deduplicate by session and dish.",
+    "dish-A": {
+      "considered_sessions": 150,
+      "eligible_opening_sessions": 150,
+      "rate": 1.0,
+      "validation_status": "PROPOSED"
+    },
+    "dish-B": {
+      "considered_sessions": 0,
+      "eligible_opening_sessions": 150,
+      "rate": 0.0,
+      "validation_status": "PROVISIONAL_DEPENDS_ON_COMPARISON_ATTRIBUTION"
+    },
+    "scope": "Synthetic internal test expectations only; not owner-visible production metrics.",
+    "comparison_attribution_status": "LINKAGE_RULE_CONFIRMED_ENGAGEMENT_PROVISIONAL",
+    "comparison_attribution_question": "Confirmed linkage rule: a displayed Start or Replace comparison qualifies when at least one compared dish was previously opened in the same session. Matching opening_id is not required. Do not infer Save causality."
+  },
+  "session_inactivity_example": {
+    "note": "Standalone synthetic policy example, not derived from full dataset. Inactivity ends a visit, not an order. Engagement remains provisional.",
+    "expected": {
+      "observed_retention_rate": 1,
+      "observed_retained_sessions": 2,
+      "directly_saved_sessions": 2,
+      "completed_order_claims": 0
+    },
+    "sessions": [
+      {
+        "saved_dishes": ["dish-A"],
+        "events": [
+          {
+            "dish_id": "dish-A",
+            "timestamp": "2026-10-20T10:00:00+05:00",
+            "event_type": "dish_detail_opened"
+          },
+          {
+            "dish_id": "dish-A",
+            "timestamp": "2026-10-20T10:00:12+05:00",
+            "event_type": "dish_activity_checkpoint",
+            "is_final": true,
+            "cumulative_active_ms": 12000
+          },
+          {
+            "dish_id": "dish-A",
+            "timestamp": "2026-10-20T10:00:15+05:00",
+            "event_type": "dish_saved"
+          }
+        ],
+        "directly_saved_dishes": ["dish-A"],
+        "session_id": "session-A",
+        "expected_engagement": "engaged (provisional)"
+      },
+      {
+        "saved_dishes": [],
+        "events": [
+          {
+            "timestamp": "2026-10-20T11:00:00+05:00",
+            "event_type": "menu_viewed"
+          }
+        ],
+        "directly_saved_dishes": [],
+        "session_id": "session-B",
+        "expected_engagement": "browse-only"
+      },
+      {
+        "saved_dishes": ["dish-A"],
+        "events": [
+          {
+            "dish_id": "dish-A",
+            "timestamp": "2026-10-20T12:00:00+05:00",
+            "event_type": "dish_saved"
+          }
+        ],
+        "directly_saved_dishes": ["dish-A"],
+        "session_id": "session-C",
+        "expected_engagement": "not engaged"
+      }
+    ],
+    "inactivity_timeout_minutes": 30,
+    "engagement_label": "engaged (provisional)",
+    "status": "PROPOSED_SYNTHETIC_TEST"
+  }
 }
