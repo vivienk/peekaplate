@@ -5,6 +5,7 @@ import {
   processIngestionQueueBatch,
   type QueueMessage,
   submitMenuIngestion,
+  validateIngestionUrl,
 } from './orchestrator';
 import { type DatabaseClient, IngestionError, type MenuIngestionJobRow } from './repository';
 
@@ -122,92 +123,51 @@ describe('Ingestion Orchestrator', () => {
   it('submitMenuIngestion rejects unmaterialized url/text and enforces sourceHash on pdf/photo', async () => {
     const { client } = createMockClient();
 
-    // Accepts url with valid sourceUrl (content digest null when omitted prior to materialization)
-    const urlJob = await submitMenuIngestion(client, {
-      venueId,
-      sourceType: 'url',
-      sourceUrl: 'https://example.com/menu',
-      idempotencyKey: 'idem_url_accept',
+    // Rejects url at submission boundary until materialization is connected
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_url_reject',
+      }),
+    ).rejects.toMatchObject({
+      code: 'unsupported_source_type',
+      status: 400,
     });
-    expect(urlJob.status).toBe('queued');
-    expect(urlJob.source_type).toBe('url');
-    expect(urlJob.source_url).toBe('https://example.com/menu');
-    expect(urlJob.source_hash).toBeNull();
-    expect(urlJob.source_storage_key).toMatch(
+
+    // Validates url format and enforces SSRF defense via validateIngestionUrl
+    expect(() => validateIngestionUrl('ftp://not-http-url')).toThrowError();
+    expect(() => validateIngestionUrl('http://169.254.169.254/latest/meta-data')).toThrowError();
+    expect(() => validateIngestionUrl('http://localhost/menu')).toThrowError();
+    expect(() => validateIngestionUrl('https://user:pass@example.com/menu')).toThrowError();
+    expect(() => validateIngestionUrl('https://example.com:8080/menu')).toThrowError();
+    expect(validateIngestionUrl('https://example.com/menu').href).toBe('https://example.com/menu');
+
+    // Accepts pdf with valid sourceHash
+    const pdfJob = await submitMenuIngestion(client, {
+      venueId,
+      sourceType: 'pdf',
+      sourceHash: 'a'.repeat(64),
+      idempotencyKey: 'idem_pdf_accept',
+    });
+    expect(pdfJob.status).toBe('queued');
+    expect(pdfJob.source_type).toBe('pdf');
+    expect(pdfJob.source_hash).toBe('a'.repeat(64));
+    expect(pdfJob.source_storage_key).toMatch(
       new RegExp(`^menu-ingestion/sources/${venueId}/[a-f0-9-]+/source$`),
     );
 
-    // Accepts url with pre-materialized content digest
-    const urlJobWithHash = await submitMenuIngestion(client, {
+    // Accepts photo with valid sourceHash
+    const photoJob = await submitMenuIngestion(client, {
       venueId,
-      sourceType: 'url',
-      sourceUrl: 'https://example.com/menu2',
-      sourceHash: 'a'.repeat(64),
-      idempotencyKey: 'idem_url_with_hash',
+      sourceType: 'photo',
+      sourceHash: 'b'.repeat(64),
+      idempotencyKey: 'idem_photo_accept',
     });
-    expect(urlJobWithHash.source_hash).toBe('a'.repeat(64));
-
-    // Rejects url with invalid protocol (SSRF defense)
-    await expect(
-      submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'ftp://not-http-url',
-        idempotencyKey: 'idem_url_invalid',
-      }),
-    ).rejects.toMatchObject({
-      code: 'ssrf_destination_prohibited',
-      status: 400,
-    });
-
-    // Rejects url targeting loopback or cloud metadata (SSRF defense)
-    await expect(
-      submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'http://169.254.169.254/latest/meta-data',
-        idempotencyKey: 'idem_ssrf_metadata',
-      }),
-    ).rejects.toMatchObject({
-      code: 'ssrf_destination_prohibited',
-      status: 400,
-    });
-
-    await expect(
-      submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'http://localhost/menu',
-        idempotencyKey: 'idem_ssrf_localhost',
-      }),
-    ).rejects.toMatchObject({
-      code: 'ssrf_destination_prohibited',
-      status: 400,
-    });
-
-    await expect(
-      submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://user:pass@example.com/menu',
-        idempotencyKey: 'idem_ssrf_userinfo',
-      }),
-    ).rejects.toMatchObject({
-      code: 'ssrf_destination_prohibited',
-      status: 400,
-    });
-
-    await expect(
-      submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com:8080/menu',
-        idempotencyKey: 'idem_ssrf_port',
-      }),
-    ).rejects.toMatchObject({
-      code: 'ssrf_destination_prohibited',
-      status: 400,
-    });
+    expect(photoJob.status).toBe('queued');
+    expect(photoJob.source_type).toBe('photo');
+    expect(photoJob.source_hash).toBe('b'.repeat(64));
 
     // Rejects text
     await expect(

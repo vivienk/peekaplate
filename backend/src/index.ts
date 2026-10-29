@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import {
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
@@ -18,7 +19,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
-import { CommandError, createDishRevision } from './dish-command';
+import { CommandError, createDishRevision, type DishRevisionResult } from './dish-command';
 import {
   type PythonExtractor,
   processIngestionQueueBatch,
@@ -120,6 +121,7 @@ export async function authorizeStaffVenue(
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
     const membership = await client.query<{ permission: string }>(
       `SELECT permission
@@ -202,6 +204,135 @@ const dependencies: Dependencies = {
     }
   },
 };
+
+export async function approveDishDraftAtomic(
+  client: Client,
+  actorId: string,
+  venueId: string,
+  draftId: string,
+  options: { commandId?: string | undefined; expectedVersion?: number | undefined } = {},
+): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
+  let started = false;
+  try {
+    await client.query('BEGIN');
+    started = true;
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+
+    const membership = await client.query<{ permission: string }>(
+      `SELECT permission
+       FROM app_private.staff_membership
+       WHERE tenant_id = $1 AND actor_id = $2
+       FOR SHARE`,
+      [venueId, actorId],
+    );
+    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
+      throw new CommandError('forbidden', 403);
+    }
+
+    if (options.commandId) {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `command:${venueId}:${actorId}:${options.commandId}`,
+      ]);
+
+      const approvalHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 }))
+        .digest('hex');
+
+      const receipt = await client.query<{ request_hash: string; result: any }>(
+        `SELECT request_hash, result
+         FROM app_private.es_command
+         WHERE tenant_id = $1 AND actor_id = $2 AND idempotency_key = $3`,
+        [venueId, actorId, options.commandId],
+      );
+      const existing = receipt.rows[0];
+      if (existing) {
+        if (existing.request_hash !== approvalHash) {
+          throw new CommandError('command_conflict', 409);
+        }
+        await client.query('COMMIT');
+        started = false;
+        return existing.result;
+      }
+    }
+
+    const draftRes = await client.query<DishDraftRow>(
+      `SELECT * FROM app_private.dish_drafts
+       WHERE tenant_id = $1 AND id = $2
+       FOR UPDATE`,
+      [venueId, draftId],
+    );
+    const draft = draftRes.rows[0];
+    if (!draft || draft.review_status !== 'pending') {
+      throw new IngestionError('draft_not_pending_or_not_found', 404);
+    }
+
+    const newDishId = crypto.randomUUID();
+    const revisionCommandId = crypto.randomUUID();
+    const revision = await createDishRevision(
+      client,
+      actorId,
+      venueId,
+      {
+        commandId: revisionCommandId,
+        dishId: newDishId,
+        expectedVersion: options.expectedVersion ?? 0,
+        name: draft.name,
+        description: draft.description ?? draft.name,
+      },
+      { inTransaction: true },
+    );
+
+    const updatedDraft = await approveDishDraft(
+      client,
+      {
+        actorId,
+        tenantId: venueId,
+        draftId,
+        publishedDishId: revision.dishId,
+      },
+      { inTransaction: true },
+    );
+
+    const result = { draft: updatedDraft, publishedRevision: revision };
+
+    if (options.commandId) {
+      const approvalHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 }))
+        .digest('hex');
+      const payload = JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 });
+      await client.query(
+        `INSERT INTO app_private.es_command
+          (id, tenant_id, actor_id, command_type, idempotency_key, payload, request_hash, result)
+         VALUES ($1, $2, $3, 'dish.draft.approve', $4, $5::jsonb, $6, $7::jsonb)`,
+        [
+          crypto.randomUUID(),
+          venueId,
+          actorId,
+          options.commandId,
+          payload,
+          approvalHash,
+          JSON.stringify(result),
+        ],
+      );
+    }
+
+    await client.query('COMMIT');
+    started = false;
+    return result;
+  } catch (error) {
+    if (started) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {}
+    }
+    throw error;
+  }
+}
 
 export function createApp(services: Dependencies = dependencies) {
   const app = new Hono<{ Bindings: Bindings }>();
@@ -461,34 +592,7 @@ export function createApp(services: Dependencies = dependencies) {
         const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
         try {
           await client.connect();
-          await authorizeStaffVenue(client, actorId, venueId);
-
-          const draftRes = await client.query<{ name: string; description: string | null }>(
-            `SELECT name, description FROM app_private.dish_drafts
-             WHERE tenant_id = $1 AND id = $2 AND review_status = 'pending'
-             FOR UPDATE;`,
-            [venueId, draftId],
-          );
-          const draft = draftRes.rows[0];
-          if (!draft) throw new IngestionError('draft_not_pending_or_not_found', 404);
-
-          const newDishId = crypto.randomUUID();
-          const revision = await createDishRevision(client, actorId, venueId, {
-            commandId: options.commandId ?? crypto.randomUUID(),
-            dishId: newDishId,
-            expectedVersion: options.expectedVersion ?? 0,
-            name: draft.name,
-            description: draft.description ?? draft.name,
-          });
-
-          const updatedDraft = await approveDishDraft(client, {
-            actorId,
-            tenantId: venueId,
-            draftId,
-            publishedDishId: revision.dishId,
-          });
-
-          return { draft: updatedDraft, publishedRevision: revision };
+          return await approveDishDraftAtomic(client, actorId, venueId, draftId, options);
         } finally {
           await client.end();
         }

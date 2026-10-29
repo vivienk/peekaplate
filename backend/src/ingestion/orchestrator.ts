@@ -139,48 +139,23 @@ export async function submitMenuIngestion(
     throw new IngestionError('invalid_request', 400, 'venueId and idempotencyKey are required');
   }
 
-  // Reject raw text sources at submission boundary
-  if (request.sourceType === 'text') {
+  // Reject raw text and url sources at submission boundary until materialization is connected
+  if (request.sourceType === 'text' || request.sourceType === 'url') {
     throw new IngestionError(
       'unsupported_source_type',
       400,
-      'Source type "text" is not supported for direct extraction.',
+      `Source type "${request.sourceType}" is not supported for direct extraction without materialization.`,
     );
   }
 
-  let sourceHash = request.sourceHash ?? null;
-
-  if (request.sourceType === 'url') {
-    if (!request.sourceUrl || typeof request.sourceUrl !== 'string') {
-      throw new IngestionError(
-        'invalid_source_url',
-        400,
-        'A valid http or https sourceUrl is required for URL menu ingestion',
-      );
-    }
-    // Validate destination and enforce SSRF protections
-    validateIngestionUrl(request.sourceUrl);
-
-    if (sourceHash) {
-      if (!/^[0-9a-f]{64}$/.test(sourceHash)) {
-        throw new IngestionError(
-          'invalid_source_hash',
-          400,
-          'A valid 64-character SHA-256 hex sourceHash is required if provided for URL menu extraction',
-        );
-      }
-    } else {
-      sourceHash = null;
-    }
-  } else {
-    // PDF and photo sources require SHA-256 hash
-    if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
-      throw new IngestionError(
-        'missing_source_hash',
-        400,
-        'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
-      );
-    }
+  // PDF and photo sources require SHA-256 hash
+  const sourceHash = request.sourceHash ?? null;
+  if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
+    throw new IngestionError(
+      'missing_source_hash',
+      400,
+      'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
+    );
   }
 
   const jobId = crypto.randomUUID();

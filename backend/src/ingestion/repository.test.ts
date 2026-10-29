@@ -27,6 +27,20 @@ function createMockClient() {
   const client: DatabaseClient = {
     async query(text, values) {
       queries.push({ text, values });
+      if (
+        text === 'BEGIN;' ||
+        text === 'COMMIT;' ||
+        text === 'ROLLBACK;' ||
+        text.startsWith('SET LOCAL') ||
+        text.includes("set_config('app.tenant_id'") ||
+        text.includes("set_config('app.actor_id'")
+      ) {
+        try {
+          const res = queryHandler(text, values);
+          if (res && res.rows) return res;
+        } catch {}
+        return { rows: [], rowCount: 0 };
+      }
       return queryHandler(text, values);
     },
   };
@@ -365,7 +379,11 @@ describe('Ingestion Repository', () => {
       errorDetails: 'Connection to OCR timed out',
     });
 
-    expect(mock.queries.length).toBe(1);
+    expect(
+      mock.queries.some((q) => q.text.includes('UPDATE app_private.menu_ingestion_jobs')),
+    ).toBe(true);
+    expect(mock.queries.some((q) => q.text.includes('set_config'))).toBe(true);
+    expect(mock.queries.some((q) => q.text === 'COMMIT;')).toBe(true);
   });
 
   it('Finding B: preserves original producer draft_index across filtering and persistence', async () => {

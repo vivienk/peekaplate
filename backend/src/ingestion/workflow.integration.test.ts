@@ -259,21 +259,20 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       const { client, store } = createMockDatabase();
       const { storage, reports } = createMockReportStorage();
 
-      // 1. Submit URL menu with pre-materialized content digest
-      const urlHash = 'c'.repeat(64);
+      // 1. Submit PDF menu with content digest
+      const pdfHash = 'c'.repeat(64);
       const job = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://restaurant.example.com/dinner-menu',
-        sourceHash: urlHash,
-        idempotencyKey: 'idem_url_e2e_1',
+        sourceType: 'pdf',
+        sourceHash: pdfHash,
+        sourceStorageKey: `menu-ingestion/sources/${venueId}/job_1/source`,
+        idempotencyKey: 'idem_pdf_e2e_1',
       });
 
       expect(job.status).toBe('queued');
-      expect(job.source_type).toBe('url');
-      expect(job.source_url).toBe('https://restaurant.example.com/dinner-menu');
-      expect(job.source_hash).toBe(urlHash);
-      expect(job.source_storage_key).toBe(`menu-ingestion/sources/${venueId}/${job.id}/source`);
+      expect(job.source_type).toBe('pdf');
+      expect(job.source_hash).toBe(pdfHash);
+      expect(job.source_storage_key).toBe(`menu-ingestion/sources/${venueId}/job_1/source`);
 
       // 2. Execute workflow with mocked extractor
       const mockResult = createStandardExtractionResult('url');
@@ -439,8 +438,8 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       // 2. Create job and persist transformed drafts
       const job = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://steakhouse.example.com/menu',
+        sourceType: 'pdf',
+        sourceHash: '1'.repeat(64),
         idempotencyKey: 'idem_retrieval_handoff_1',
       });
 
@@ -580,43 +579,43 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
   });
 
   describe('MOCKED INTEGRATION TEST: Idempotency Key Consistency and Conflict Rejection', () => {
-    it('returns existing job on identical URL re-submission', async () => {
+    it('returns existing job on identical PDF re-submission', async () => {
       const { client } = createMockDatabase();
 
       const job1 = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
-        idempotencyKey: 'idem_url_idempotent_1',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        idempotencyKey: 'idem_pdf_idempotent_1',
       });
 
       const job2 = await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
-        idempotencyKey: 'idem_url_idempotent_1',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        idempotencyKey: 'idem_pdf_idempotent_1',
       });
 
       expect(job2.id).toBe(job1.id);
       expect(job2.source_hash).toBe(job1.source_hash);
     });
 
-    it('rejects re-submission with same idempotency key but conflicting sourceUrl with 409', async () => {
+    it('rejects re-submission with same idempotency key but conflicting sourceHash with 409', async () => {
       const { client } = createMockDatabase();
 
       await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/original-menu',
-        idempotencyKey: 'idem_conflict_url_1',
+        sourceType: 'pdf',
+        sourceHash: 'a'.repeat(64),
+        idempotencyKey: 'idem_conflict_pdf_1',
       });
 
       await expect(
         submitMenuIngestion(client, {
           venueId,
-          sourceType: 'url',
-          sourceUrl: 'https://example.com/different-menu',
-          idempotencyKey: 'idem_conflict_url_1',
+          sourceType: 'pdf',
+          sourceHash: 'b'.repeat(64),
+          idempotencyKey: 'idem_conflict_pdf_1',
         }),
       ).rejects.toMatchObject({
         code: 'idempotency_conflict',
@@ -675,19 +674,18 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
 
       await submitMenuIngestion(client, {
         venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
+        sourceType: 'pdf',
         sourceHash: '3'.repeat(64),
-        idempotencyKey: 'idem_conflict_url_omitted',
+        idempotencyKey: 'idem_conflict_type_change',
       });
 
-      // Second request switches to pdf without sourceUrl
+      // Second request switches to photo with same idempotency key
       await expect(
         submitMenuIngestion(client, {
           venueId,
-          sourceType: 'pdf',
+          sourceType: 'photo',
           sourceHash: '3'.repeat(64),
-          idempotencyKey: 'idem_conflict_url_omitted',
+          idempotencyKey: 'idem_conflict_type_change',
         }),
       ).rejects.toMatchObject({
         code: 'idempotency_conflict',
@@ -695,7 +693,7 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       });
     });
 
-    it('rejects URL submission targeting loopback and metadata endpoints with ssrf_destination_prohibited', async () => {
+    it('rejects raw URL submission before job creation or queue dispatch', async () => {
       const { client } = createMockDatabase();
 
       await expect(
@@ -703,10 +701,10 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
           venueId,
           sourceType: 'url',
           sourceUrl: 'http://169.254.169.254/latest/meta-data',
-          idempotencyKey: 'idem_ssrf_1',
+          idempotencyKey: 'idem_url_reject_1',
         }),
       ).rejects.toMatchObject({
-        code: 'ssrf_destination_prohibited',
+        code: 'unsupported_source_type',
         status: 400,
       });
 
@@ -714,23 +712,11 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
         submitMenuIngestion(client, {
           venueId,
           sourceType: 'url',
-          sourceUrl: 'http://127.0.0.1/admin',
-          idempotencyKey: 'idem_ssrf_2',
+          sourceUrl: 'https://example.com/menu',
+          idempotencyKey: 'idem_url_reject_2',
         }),
       ).rejects.toMatchObject({
-        code: 'ssrf_destination_prohibited',
-        status: 400,
-      });
-
-      await expect(
-        submitMenuIngestion(client, {
-          venueId,
-          sourceType: 'url',
-          sourceUrl: 'https://user:pass@example.com/menu',
-          idempotencyKey: 'idem_ssrf_3',
-        }),
-      ).rejects.toMatchObject({
-        code: 'ssrf_destination_prohibited',
+        code: 'unsupported_source_type',
         status: 400,
       });
     });

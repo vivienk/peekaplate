@@ -89,66 +89,87 @@ export async function createIngestionJob(
     idempotencyKey: string;
     maxAttempts?: number | undefined;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<MenuIngestionJobRow> {
-  const id = params.id ?? crypto.randomUUID();
-  const maxAttempts = params.maxAttempts ?? 3;
-
-  const result = await client.query<MenuIngestionJobRow>(
-    `INSERT INTO app_private.menu_ingestion_jobs (
-      id, tenant_id, source_type, source_url, source_hash, source_storage_key, idempotency_key, max_attempts
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    ON CONFLICT (tenant_id, idempotency_key) DO UPDATE
-      SET id = app_private.menu_ingestion_jobs.id
-    RETURNING *;`,
-    [
-      id,
-      params.tenantId,
-      params.sourceType,
-      params.sourceUrl ?? null,
-      params.sourceHash ?? null,
-      params.sourceStorageKey ?? null,
-      params.idempotencyKey,
-      maxAttempts,
-    ],
-  );
-
-  const row = result.rows[0];
-  if (!row) throw new IngestionError('job_creation_failed', 500);
-
-  // If a row was returned via ON CONFLICT DO UPDATE, verify source fields are identical
-  const sourceUrl = params.sourceUrl ?? null;
-  const sourceHash = params.sourceHash ?? null;
-  const sourceStorageKey = params.sourceStorageKey ?? null;
-
-  const rowSourceUrl = row.source_url ?? null;
-  const rowSourceHash = row.source_hash ?? null;
-  const rowSourceStorageKey = row.source_storage_key ?? null;
-
-  const isDefaultCanonicalKey = (key: string | null, tenant: string, jobId: string) =>
-    key === `menu-ingestion/sources/${tenant}/${jobId}/source`;
-
-  const keysConflict =
-    sourceStorageKey !== rowSourceStorageKey &&
-    !(
-      isDefaultCanonicalKey(sourceStorageKey, params.tenantId, id) &&
-      isDefaultCanonicalKey(rowSourceStorageKey, row.tenant_id, row.id)
-    );
-
-  if (
-    row.source_type !== params.sourceType ||
-    sourceHash !== rowSourceHash ||
-    sourceUrl !== rowSourceUrl ||
-    keysConflict
-  ) {
-    throw new IngestionError(
-      'idempotency_conflict',
-      409,
-      `Idempotency key "${params.idempotencyKey}" already exists for tenant "${params.tenantId}" with differing source parameters`,
-    );
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
   }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
 
-  return row;
+    const id = params.id ?? crypto.randomUUID();
+    const maxAttempts = params.maxAttempts ?? 3;
+
+    const result = await client.query<MenuIngestionJobRow>(
+      `INSERT INTO app_private.menu_ingestion_jobs (
+        id, tenant_id, source_type, source_url, source_hash, source_storage_key, idempotency_key, max_attempts
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (tenant_id, idempotency_key) DO UPDATE
+        SET id = app_private.menu_ingestion_jobs.id
+      RETURNING *;`,
+      [
+        id,
+        params.tenantId,
+        params.sourceType,
+        params.sourceUrl ?? null,
+        params.sourceHash ?? null,
+        params.sourceStorageKey ?? null,
+        params.idempotencyKey,
+        maxAttempts,
+      ],
+    );
+
+    const row = result.rows[0];
+    if (!row) throw new IngestionError('job_creation_failed', 500);
+
+    // If a row was returned via ON CONFLICT DO UPDATE, verify source fields are identical
+    const sourceUrl = params.sourceUrl ?? null;
+    const sourceHash = params.sourceHash ?? null;
+    const sourceStorageKey = params.sourceStorageKey ?? null;
+
+    const rowSourceUrl = row.source_url ?? null;
+    const rowSourceHash = row.source_hash ?? null;
+    const rowSourceStorageKey = row.source_storage_key ?? null;
+
+    const isDefaultCanonicalKey = (key: string | null, tenant: string, jobId: string) =>
+      key === `menu-ingestion/sources/${tenant}/${jobId}/source`;
+
+    const keysConflict =
+      sourceStorageKey !== rowSourceStorageKey &&
+      !(
+        isDefaultCanonicalKey(sourceStorageKey, params.tenantId, id) &&
+        isDefaultCanonicalKey(rowSourceStorageKey, row.tenant_id, row.id)
+      );
+
+    if (
+      row.source_type !== params.sourceType ||
+      sourceHash !== rowSourceHash ||
+      sourceUrl !== rowSourceUrl ||
+      keysConflict
+    ) {
+      throw new IngestionError(
+        'idempotency_conflict',
+        409,
+        `Idempotency key "${params.idempotencyKey}" already exists for tenant "${params.tenantId}" with differing source parameters`,
+      );
+    }
+
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    return row;
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -163,33 +184,54 @@ export async function claimIngestionJob(
     workerId: string;
     leaseTimeoutMinutes?: number | undefined;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<{ claimToken: string; leaseGeneration: string } | null> {
-  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
-  const result = await client.query<{ claim_token: string; lease_generation: string }>(
-    `UPDATE app_private.menu_ingestion_jobs
-     SET status = 'running',
-         claim_token = gen_random_uuid(),
-         lease_generation = lease_generation + 1,
-         locked_at = now(),
-         locked_by = $1,
-         attempt_count = attempt_count + 1,
-         started_at = COALESCE(started_at, now()),
-         finished_at = NULL
-     WHERE id = $2 AND tenant_id = $3
-       AND (
-         status = 'queued'
-         OR (status = 'running' AND locked_at < now() - ($4 || ' minutes')::interval)
-         OR (status = 'incomplete' AND attempt_count < max_attempts)
-       )
-     RETURNING claim_token, lease_generation;`,
-    [params.workerId, params.jobId, params.tenantId, timeout.toString()],
-  );
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
 
-  if (!result.rows[0]) return null;
-  return {
-    claimToken: result.rows[0].claim_token,
-    leaseGeneration: result.rows[0].lease_generation,
-  };
+    const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
+    const result = await client.query<{ claim_token: string; lease_generation: string }>(
+      `UPDATE app_private.menu_ingestion_jobs
+       SET status = 'running',
+           claim_token = gen_random_uuid(),
+           lease_generation = lease_generation + 1,
+           locked_at = now(),
+           locked_by = $1,
+           attempt_count = attempt_count + 1,
+           started_at = COALESCE(started_at, now()),
+           finished_at = NULL
+       WHERE id = $2 AND tenant_id = $3
+         AND (
+           status = 'queued'
+           OR (status = 'running' AND locked_at < now() - ($4 || ' minutes')::interval)
+           OR (status = 'incomplete' AND attempt_count < max_attempts)
+         )
+       RETURNING claim_token, lease_generation;`,
+      [params.workerId, params.jobId, params.tenantId, timeout.toString()],
+    );
+
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    if (!result.rows[0]) return null;
+    return {
+      claimToken: result.rows[0].claim_token,
+      leaseGeneration: result.rows[0].lease_generation,
+    };
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -203,18 +245,39 @@ export async function renewJobLease(
     claimToken: string;
     leaseTimeoutMinutes?: number | undefined;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<boolean> {
-  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
-  const result = await client.query(
-    `UPDATE app_private.menu_ingestion_jobs
-     SET locked_at = now()
-     WHERE id = $1 AND tenant_id = $2
-       AND status = 'running'
-       AND claim_token = $3
-       AND locked_at >= now() - ($4 || ' minutes')::interval;`,
-    [params.jobId, params.tenantId, params.claimToken, timeout.toString()],
-  );
-  return (result.rowCount ?? 0) > 0;
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
+
+    const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
+    const result = await client.query(
+      `UPDATE app_private.menu_ingestion_jobs
+       SET locked_at = now()
+       WHERE id = $1 AND tenant_id = $2
+         AND status = 'running'
+         AND claim_token = $3
+         AND locked_at >= now() - ($4 || ' minutes')::interval;`,
+      [params.jobId, params.tenantId, params.claimToken, timeout.toString()],
+    );
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    return (result.rowCount ?? 0) > 0;
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -391,30 +454,51 @@ export async function failIngestionJob(
     errorDetails?: string | null | undefined;
     leaseTimeoutMinutes?: number | undefined;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<void> {
-  const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
-  await client.query(
-    `UPDATE app_private.menu_ingestion_jobs
-     SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
-         error_code = $1,
-         error_details = $2,
-         finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,
-         locked_at = NULL,
-         locked_by = NULL,
-         claim_token = NULL
-     WHERE id = $3 AND tenant_id = $4
-       AND status = 'running'
-       AND claim_token = $5
-       AND locked_at >= now() - ($6 || ' minutes')::interval;`,
-    [
-      params.errorCode,
-      params.errorDetails ?? null,
-      params.jobId,
-      params.tenantId,
-      params.claimToken,
-      timeout.toString(),
-    ],
-  );
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
+
+    const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
+    await client.query(
+      `UPDATE app_private.menu_ingestion_jobs
+       SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
+           error_code = $1,
+           error_details = $2,
+           finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,
+           locked_at = NULL,
+           locked_by = NULL,
+           claim_token = NULL
+       WHERE id = $3 AND tenant_id = $4
+         AND status = 'running'
+         AND claim_token = $5
+         AND locked_at >= now() - ($6 || ' minutes')::interval;`,
+      [
+        params.errorCode,
+        params.errorDetails ?? null,
+        params.jobId,
+        params.tenantId,
+        params.claimToken,
+        timeout.toString(),
+      ],
+    );
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -424,13 +508,32 @@ export async function getIngestionJob(
   client: DatabaseClient,
   tenantId: string,
   jobId: string,
+  options?: { inTransaction?: boolean },
 ): Promise<MenuIngestionJobRow | null> {
-  const result = await client.query<MenuIngestionJobRow>(
-    `SELECT * FROM app_private.menu_ingestion_jobs
-     WHERE tenant_id = $1 AND id = $2;`,
-    [tenantId, jobId],
-  );
-  return result.rows[0] ?? null;
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [tenantId]);
+    const result = await client.query<MenuIngestionJobRow>(
+      `SELECT * FROM app_private.menu_ingestion_jobs
+       WHERE tenant_id = $1 AND id = $2;`,
+      [tenantId, jobId],
+    );
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    return result.rows[0] ?? null;
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -443,16 +546,35 @@ export async function listDishDrafts(
     reviewStatus?: 'pending' | 'accepted' | 'rejected' | 'edited' | 'superseded' | undefined;
     jobId?: string | undefined;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<DishDraftRow[]> {
-  const result = await client.query<DishDraftRow>(
-    `SELECT * FROM app_private.dish_drafts
-     WHERE tenant_id = $1
-       AND ($2::text IS NULL OR review_status = $2)
-       AND ($3::uuid IS NULL OR job_id = $3)
-     ORDER BY created_at DESC, draft_index ASC;`,
-    [params.tenantId, params.reviewStatus ?? null, params.jobId ?? null],
-  );
-  return result.rows;
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
+    const result = await client.query<DishDraftRow>(
+      `SELECT * FROM app_private.dish_drafts
+       WHERE tenant_id = $1
+         AND ($2::text IS NULL OR review_status = $2)
+         AND ($3::uuid IS NULL OR job_id = $3)
+       ORDER BY created_at DESC, draft_index ASC;`,
+      [params.tenantId, params.reviewStatus ?? null, params.jobId ?? null],
+    );
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    return result.rows;
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -466,20 +588,41 @@ export async function approveDishDraft(
     draftId: string;
     publishedDishId: string;
   },
+  options?: { inTransaction?: boolean },
 ): Promise<DishDraftRow> {
-  const result = await client.query<DishDraftRow>(
-    `UPDATE app_private.dish_drafts
-     SET review_status = 'accepted',
-         reviewed_by = $1,
-         reviewed_at = now(),
-         published_dish_id = $2,
-         updated_at = now()
-     WHERE tenant_id = $3 AND id = $4 AND review_status = 'pending'
-     RETURNING *;`,
-    [params.actorId, params.publishedDishId, params.tenantId, params.draftId],
-  );
+  const inTx = options?.inTransaction === true;
+  if (!inTx) {
+    await client.query('BEGIN;');
+  }
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SET LOCAL lock_timeout = '3s'");
+    await client.query("SELECT set_config('app.actor_id', $1, true);", [params.actorId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
+    const result = await client.query<DishDraftRow>(
+      `UPDATE app_private.dish_drafts
+       SET review_status = 'accepted',
+           reviewed_by = $1,
+           reviewed_at = now(),
+           published_dish_id = $2,
+           updated_at = now()
+       WHERE tenant_id = $3 AND id = $4 AND review_status = 'pending'
+       RETURNING *;`,
+      [params.actorId, params.publishedDishId, params.tenantId, params.draftId],
+    );
 
-  const row = result.rows[0];
-  if (!row) throw new IngestionError('draft_not_pending_or_not_found', 404);
-  return row;
+    const row = result.rows[0];
+    if (!row) throw new IngestionError('draft_not_pending_or_not_found', 404);
+    if (!inTx) {
+      await client.query('COMMIT;');
+    }
+    return row;
+  } catch (err) {
+    if (!inTx) {
+      try {
+        await client.query('ROLLBACK;');
+      } catch {}
+    }
+    throw err;
+  }
 }

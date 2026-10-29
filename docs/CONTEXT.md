@@ -69,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; report retention via result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout aligned with Python service budget; Queue consumer handler and approval routes. Source intake validates URL/PDF/photo, deriving canonical R2 keys and SHA-256 digests. Staging queues stay paused; publication is unreleased.",
+      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; report retention via result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer handler with transaction-local RLS tenant context; atomic draft approval and dish creation under concurrency with es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -127,7 +127,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "56d06d1abab74ed8bc9684dd7e70e4af60f3604ddecbc69bde4fbec4828d184c"
+      "sourceFingerprint": "31a3c44154f1f6d9cfde7861713436c71c36606cd35a88078139c421af7fa19c"
     },
     {
       "id": "database",
@@ -340,13 +340,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Completed S3-VIS-01 menu ingestion orchestration and cross-component integration (PR #45): supported VIS-02 schema 2/pipeline 3 alongside legacy schema 1/pipeline 2; preserved subcategory, category_page_number, price_text, candidate_id, draft_index, and multi-span evidence through contracts, adapter, repository, and reload; retained full extraction report via result_storage_key and connected INGESTION_REPORTS_BUCKET; aligned budgets with 720s transport timeout, 15m lease timeout, and max_batch_size: 1 queue retry; enforced 64-hex sourceHash and tenant/job R2 key derivation while rejecting unmaterialized URL/text inputs at submission boundary. All 84 ingestion, 13 index, and 6 verify-e2e tests pass with zero-check protection and controlled acceptance cases.",
+      "summary": "Resolved all outstanding inline review comments on PR #45 (hemu77): (1) Enforced transaction-local app.tenant_id across all ingestion repository operations and queue processing under the restricted peekaplate_runtime role, ensuring RLS isolation without relying on connection leaks or pre-set context. (2) Implemented atomic draft approval and dish revision creation with SELECT FOR UPDATE and es_command idempotency tracking, guaranteeing exactly one dish creation under concurrent requests and safe replay without duplicate writes. (3) Bounded menu intake by strictly rejecting raw URL/text sources with 400 unsupported_source_type before job creation or queue dispatch. Added comprehensive database regressions under peekaplate_runtime connecting with unconfigured session context. All unit, integration, and database tests pass.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Verify staging database migration application, deploy the reviewed extraction container once Workers Paid container eligibility is active, unpause the staging queue consumer, and perform live end-to-end extraction verification."
+      "next": "Reviewers verify resolved review threads and regression evidence. Staging queue consumer unpausing and live extraction deployment remain gated on operator approval and container deployment."
     },
     {
       "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
