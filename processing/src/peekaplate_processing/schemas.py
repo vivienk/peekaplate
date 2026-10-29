@@ -475,3 +475,101 @@ class SpatialManifest(BaseModel):
     publication:PublicationState
     measurements:SpatialMeasurements
     harness:Literal["harness.html"]="harness.html"
+
+
+class PresentationInputAsset(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    role:Literal["cutout", "reference"]
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(ge=1, le=12_000_000)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    format:Literal["PNG", "WEBP", "JPEG"]
+    has_alpha:bool
+
+
+class PresentationAsset(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    path:Literal["presentation.png"]="presentation.png"
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(ge=512)
+    height:int=Field(ge=512)
+    format:Literal["PNG"]="PNG"
+    has_alpha:Literal[True]=True
+    transparent_corners:Literal[True]=True
+
+    @model_validator(mode="after")
+    def require_square(self):
+        if self.width!=self.height:
+            raise ValueError("Presentation asset must be square.")
+        return self
+
+
+class PresentationPromptSpec(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    prompt_version:Literal["presentation-prompt-v1"]="presentation-prompt-v1"
+    prompt_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    model_version:NonEmptyText
+    preserved_original_viewpoint:bool=False
+    reconstructed_details_flagged:bool=False
+    fidelity_notes:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PresentationProcessingState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["ready", "fallback_retained"]
+    engine:Literal["pillow"]="pillow"
+    engine_version:NonEmptyText
+    started_at:datetime
+    completed_at:datetime
+    steps:list[NonEmptyText]=Field(min_length=1)
+    validation_errors:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PresentationMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    presentation_bytes:int=Field(ge=0)
+    fallback_bytes:int=Field(gt=0)
+    total_bundle_bytes:int=Field(gt=0)
+    budget_bytes:int|None=Field(default=None, gt=0)
+    budget_status:Literal["within_budget", "exceeded_fallback_retained", "not_configured"]
+
+
+class PresentationManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^pres_[0-9a-f]{32}$")
+    recipe_version:Literal["presentation-v1"]="presentation-v1"
+    tier:Literal["T0-presentation"]="T0-presentation"
+    source_t0:NonEmptyText
+    source_t0_manifest_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    dish:DishRef
+    draft_id:NonEmptyText|None=None
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+    cutout:PresentationInputAsset
+    reference:PresentationInputAsset
+    prompt:PresentationPromptSpec
+    presentation:PresentationAsset|None=None
+    fallback:SpatialFallback
+    fallback_retained:bool
+    active_display_path:Literal["presentation.png", "fallback.jpg"]="fallback.jpg"
+    processing:PresentationProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:PresentationMeasurements

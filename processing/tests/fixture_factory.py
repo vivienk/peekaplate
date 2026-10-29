@@ -97,3 +97,30 @@ def layered_photo(width=1280, height=960)->dict[str, bytes]:
     accent.close()
     layers["accent"]=output.getvalue()
     return layers
+
+
+def cutout_photo(width=1280, height=960)->bytes:
+    image=Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw=ImageDraw.Draw(image)
+    draw.ellipse((width//4, height//4, width*3//4, height*3//4), fill=(192, 57, 43, 255))
+    output=io.BytesIO()
+    image.save(output, format="PNG")
+    image.close()
+    return output.getvalue()
+
+
+def presentation_photo(width=2048, height=2048, transparent_corners=True, has_alpha=True)->bytes:
+    mode="RGBA" if has_alpha else "RGB"
+    bg=(0, 0, 0, 0) if (has_alpha and transparent_corners) else (232, 226, 214, 255 if has_alpha else None)
+    if not has_alpha:
+        bg=(232, 226, 214)
+    image=Image.new(mode, (width, height), bg)
+    draw=ImageDraw.Draw(image)
+    plate_color=(245, 245, 245, 255) if has_alpha else (245, 245, 245)
+    food_color=(192, 57, 43, 255) if has_alpha else (192, 57, 43)
+    draw.ellipse((width//8, height//8, width*7//8, height*7//8), fill=plate_color)
+    draw.ellipse((width//4, height//4, width*3//4, height*3//4), fill=food_color)
+    output=io.BytesIO()
+    image.save(output, format="PNG")
+    image.close()
+    return output.getvalue()
