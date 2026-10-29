@@ -1,11 +1,10 @@
 # S3-VIS-03 QA and verified fix report
 
-Date: 2026-10-25 (updated after rebase onto `develop` `5c0cb3f` and `@hemu77` PR review)
-Base commit: `5c0cb3f` (`origin/develop`, including merged PRs #23, #24 `78ebb47`, #38 and #39)
+Date: 2026-10-29 (updated after rebase onto `develop` `0477653`, PR #25 viewer findings, and ClickUp presentation addition)
+Base commit: `0477653153b7032192882452e2a5a70d628e85d8` (`origin/develop`, including PRs #63, #62, #61, #60, #57, #54, #48, #47, #41, #39, #38, #24, #23)
 Branch: `feat/s3-vis-03-asset-delivery`
 Pull request: [vivienk/peekaplate#25](https://github.com/vivienk/peekaplate/pull/25)
 ClickUp: [86bcnfw7r](https://app.clickup.com/t/86bcnfw7r)
-
 ## Environment
 
 | Item | Value |
@@ -87,6 +86,28 @@ Rebasing onto `origin/develop` (`5c0cb3f`, after PR #23 and PR #24 `78ebb47`) dr
 - **Stable integer `z-index` depth ranks (`harness.py:230-288`, P2):** Replaced `Math.round(layer.depth * 1000) + 1` with distinct `1..N` integer ranks from stable `(layer.depth, index)` sorting so closely spaced depths (`0.0`, `0.0001`, `0.0002`) receive `z-index` `1`, `2`, `3` and a delayed background never covers foreground layers.
 - **Loaded-layer harness regression (`test_spatial.py:318-513`, P3):** Exposed `globalThis.CSS = globalThis.window.CSS` (and `window.CSS.supports` in `harness.py`), asserted `layersLoaded == 3`, `spatialVisible == true`, and `subject` parallax transforms across keyboard-only and mixed pointer+keyboard saturation/reversal, and added `test_harness_preserves_depth_order_for_closely_spaced_delayed_layers`.
 
+### PR #25 viewer findings (`@vivienk`, commit `921b32d`)
+
+- **Live `prefers-reduced-motion` media-query listener (`harness.py:65-173`, P2, review 4396991434):**
+  Replaced one-time `Boolean(window.matchMedia(...).matches)` evaluation with a retained `MediaQueryList` and live `change` listener (`motionQuery.addEventListener("change", onMotionChange)` / `addListener`). Added `clearTransforms()` and `syncReducedMotion()`. When reduced motion is toggled live, existing transforms on `#layers` and child `<img>` elements are immediately cleared to `""`, rotation/pointer/keyboard offsets are zeroed, and further movement handlers exit early.
+- **Null-prototype `layerRetries` and `ranks` (`harness.py:71, 243, 285`, P3, review 4396991442):**
+  Initialized `layerRetries: Object.create(null)`, `imageDecodeMs: Object.create(null)` and `ranks = Object.create(null)`. `loadLayer` counts retries using `Object.prototype.hasOwnProperty.call(metrics.layerRetries, layer.name) ? metrics.layerRetries[layer.name] : 0`. Valid layer names such as `"constructor"` record integer `1` rather than appending string `"function Object() ... 1"`.
+
+### ClickUp task S3-VIS-03 presentation pipeline addition (`@vivienk`, comment `90140274443174`)
+
+- **Frozen presentation prompt & multimodal request builder (`presentation.py`, `presentation-prompt-v1`):**
+  Embeds Vivien Kong's verbatim prompt requesting a photorealistic square dish-and-plate PNG with genuine transparent background and clean antialiased edges. `build_multimodal_messages` packages Image 1 (dish cutout data URL) and Image 2 (reference framing data URL).
+- **Injectable `PresentationProvider` & `FilePresentationProvider` (`presentation.py`):**
+  Pluggable generation abstraction following PR #24's `OCRProvider` pattern, supporting offline candidate PNG validation.
+- **PNG, alpha, square, and transparent-corner validation (`presentation.py`):**
+  Requires square PNG (`width == height >= 512`, preferably `2048x2048`), genuine alpha channel (`min_a == 0, max_a > 0`), and fully transparent corner pixels `(0, 0)`, `(w-1, 0)`, `(0, h-1)`, `(w-1, h-1)` to eliminate opaque checkerboards, gray rectangles, or watermarks.
+- **Provenance manifest (`PresentationManifest`):**
+  `presentation-manifest.json` links source T0 `asset_id` and manifest SHA-256, source image SHA-256, cutout SHA-256, reference SHA-256, prompt SHA-256, model version, dish/revision identifiers, and optional PR #24 `draft_id`.
+- **Human review gate & fidelity notes (`schemas.py`, `presentation.py`):**
+  Manifests never self-approve (`review.status = "needs_review"`, `publication.eligible = False`). Fidelity limitation flags (`--preserved-original-viewpoint`, `--reconstructed-details-flagged`, `--fidelity-note`) persist on `manifest.prompt` and emit explicit review warnings.
+- **Automatic T0 fallback retention (`presentation.py`, `prepare_presentation.py`):**
+  When candidate generation or validation fails, or candidate byte budget is exceeded, the approved original-photo T0 detail JPEG is automatically retained as `fallback.jpg` with `fallback_retained = True`, `active_display_path = "fallback.jpg"`, `presentation = None`, and CLI exit code 2.
+
 ## Regression evidence
 
 Added to `processing/tests/test_spatial.py:156-177`:
@@ -144,7 +165,7 @@ OK
 Full Python suite on rebased branch:
 
 ```text
-Ran 110 tests in 21.842s
+Ran 140 tests in 18.481s
 OK
 ```
 
@@ -181,6 +202,13 @@ OK
 | Context/docs checks | Fresh context and valid local links | 10 modules, 10 handoffs; 43 Markdown files | `PASS` | `pnpm verify context:check docs:check` |
 | PR body check | Valid when applicable | "not applicable to this event" | `PASS` | `pnpm verify pr:check` |
 | PR mergeability | Rebased cleanly onto `origin/develop` (`5c0cb3f`) | Linear history on top of merged #23/#24/#38/#39 | `PASS` | `git log origin/develop..HEAD` |
+| Live `prefers-reduced-motion` toggle | Clears transforms, zeroes offsets, blocks movement without reload | `rotateY(0.5deg)` -> `""`, metrics `reducedMotion: true` | `PASS` | `test_harness_responds_to_live_reduced_motion_changes` + Chromium |
+| Constructor-named layer retry count | Integer count without prototype pollution | `layerRetries: {"constructor": 1}`, `typeof === "number"` | `PASS` | `test_harness_counts_numeric_retry_for_constructor_named_layer` |
+| Presentation 2048x2048 transparent PNG | Generates ready bundle, links T0/cutout/reference provenance | `pres_...` bundle, `needs_review`, `eligible=false`, `active_display_path="fallback.jpg"` | `PASS` | `test_valid_2048_transparent_presentation_bundle_links_provenance_and_stays_needs_review` |
+| Multimodal presentation payload | Exact verbatim prompt, cutout & reference data URLs | 3 content parts, prompt matched, data URLs matched | `PASS` | `test_multimodal_request_embeds_cutout_and_reference_image_bytes_with_exact_prompt` |
+| Non-square / opaque / over-budget presentation | Retains T0 fallback, records errors, CLI exits 2 | `status="fallback_retained"`, `fallback_retained=true`, `fallback.jpg` byte-identical to T0 | `PASS` | `test_opaque_non_square_or_over_budget_candidate_retains_t0_fallback` |
+| Presentation fidelity warnings | Flags persist on manifest and emit review warnings | `reconstructed_details_flagged`, `preserved_original_viewpoint`, review warnings emitted | `PASS` | `test_reconstructed_details_and_viewpoint_limitations_are_recorded_in_warnings` |
+| Rebase onto develop `0477653` | Linear history on top of latest PRs #63/#62/#61/#60/#57/#54 | Clean rebase, 140 Python tests pass | `PASS` | `git log origin/develop..HEAD` |
 
 Biome also scans untracked generated `graphify-out/` JSON. That directory was moved outside the worktree only for the lint gate and restored byte-for-byte afterward; no repository file was changed for this workaround.
 

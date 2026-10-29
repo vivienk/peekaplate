@@ -387,10 +387,13 @@ reconciling the stored keyboard offsets on both keydown and pointer updates so
 reverse arrow keys respond immediately after saturation and `Home` resets to
 zero. Paint order assigns distinct integer `z-index` ranks (`1..N`) from stable
 depth ordering, so closely spaced or delayed background layers cannot cover the
-foreground. It honours `prefers-reduced-motion`,
-and degrades to the T0 photo when 3D CSS or a layer is unavailable. It records
-`window.__peekaplateSpatialMetrics` with fetch, decode, frame-timing, viewport
-and fallback state, and offers a copy button for the same JSON.
+foreground. It honours `prefers-reduced-motion` with a live media-query listener
+that immediately clears transforms, zeroes input offsets, and prevents movement
+without page reload, counts layer retries using a prototype-safe `Object.create(null)`
+map (`metrics.layerRetries`), and degrades to the T0 photo when 3D CSS or a layer
+is unavailable. It records `window.__peekaplateSpatialMetrics` with fetch, decode,
+frame-timing, viewport, fallback and retry state, and offers a copy button for
+the same JSON.
 
 Serve the bundle over HTTP (`python -m http.server` inside the bundle directory)
 because browsers block the manifest `fetch` from `file://`, where the harness
@@ -399,3 +402,37 @@ reports "Preview unavailable" after one retry.
 The harness is a feasibility measurement, not a diner renderer and not a phone
 benchmark. Real captured-dish review, rights review and publication approval
 remain human gates.
+
+## Dish presentation prompt and validation (optional extension)
+
+`peekaplate_processing.presentation` implements the post-cutout presentation
+pipeline requested in ClickUp task S3-VIS-03. `prepare_presentation` pairs an
+approved T0 photo with a dish cutout, framing reference image and the frozen
+presentation prompt (`presentation-prompt-v1`), and validates square transparent
+PNG candidates (`width == height >= 512`, preferably `2048x2048`):
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.prepare_presentation \
+  --t0-manifest work/vis03/<revision-id>/t0/<asset_id>/manifest.json \
+  --cutout work/vis03/cutout.png \
+  --reference work/vis03/reference.jpg \
+  --candidate-png work/vis03/candidate-2048.png \
+  --output-root work/vis03/<revision-id>/presentation \
+  --capture-evidence "Permitted studio capture; see the private capture log." \
+  --draft-id "draft-dish-42" \
+  --model-version "offline-candidate-v1" \
+  --budget-bytes 5000000
+```
+
+Inputs and outputs:
+- Cutout input must be PNG or WEBP with transparent background (`min_a == 0, max_a > 0`).
+- Reference image can be PNG, WEBP, or JPEG.
+- Candidate presentation image must be a square PNG with an alpha channel and transparent corners
+  `(0, 0)`, `(w-1, 0)`, `(0, h-1)`, `(w-1, h-1)` to reject opaque backgrounds or watermarks.
+- `presentation-manifest.json` links the source T0 `asset_id` and SHA-256, source JPEG SHA-256,
+  cutout and reference SHA-256, prompt SHA-256, model version, dish/revision identifiers, and optional `draft_id`.
+- Manifests never self-approve: `review.status` is `needs_review` and `publication.eligible` is `false`.
+  Flags (`--reconstructed-details-flagged`, `--preserved-original-viewpoint`, `--fidelity-note`)
+  persist on `manifest.prompt` and add explicit review warnings.
+- On generation/validation failure, the approved T0 detail photo is automatically retained as
+  `fallback.jpg` with `fallback_retained = True`, `active_display_path = "fallback.jpg"`, and CLI exit code 2.

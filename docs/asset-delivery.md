@@ -47,16 +47,68 @@ keydown and pointer updates so reverse input responds immediately after
 saturation and `Home` resets both axes. Paint order assigns distinct integer
 `z-index` ranks (`1..N`) from stable depth ordering, so closely spaced or
 delayed background layers cannot cover the foreground. It honours
-`prefers-reduced-motion`, and falls back to the T0 photo
-when 3D CSS is unsupported or a layer fails to load. It exposes
+`prefers-reduced-motion` with a live `change` media-query listener that immediately
+clears existing transforms, zeroes input offsets, and blocks movement without
+page reload, and counts layer retries using a prototype-safe `Object.create(null)`
+map (`metrics.layerRetries`). It falls back to the T0 photo when 3D CSS is
+unsupported or a layer fails to load. It exposes
 `window.__peekaplateSpatialMetrics` with fetch, decode, frame-timing, viewport
 and fallback state, and a copy button for the same JSON.
-
 The suite covers deterministic hash addressing, create-only refusal,
 orientation and alpha normalization, failure without output, manifest
 non-approval, layer and fallback hashing, revision mismatch, layer dimension,
 alpha and background rules, motion limits, budget enforcement and repeated
 spatial bundle refusal.
+
+## Optional post-cutout dish presentation pipeline
+
+`peekaplate_processing.presentation` implements the post-cutout dish presentation
+prompt and offline candidate validator requested in ClickUp task S3-VIS-03
+(comment `90140274443174`). It pairs a source dish cutout with a framing/lighting
+reference image and the frozen presentation prompt (`presentation-prompt-v1`),
+requesting a standalone square dish-and-plate asset:
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.prepare_presentation \
+  --t0-manifest work/vis03/<revision-id>/t0/<asset_id>/manifest.json \
+  --cutout work/vis03/cutout.png \
+  --reference work/vis03/reference.jpg \
+  --candidate-png work/vis03/candidate-2048.png \
+  --output-root work/vis03/<revision-id>/presentation \
+  --capture-evidence "Permitted studio capture; see the private capture log." \
+  --draft-id "draft-dish-42" \
+  --model-version "offline-candidate-v1" \
+  --budget-bytes 5000000
+```
+
+Key architecture and safety invariants:
+- **Prompt & Multimodal Request:** Uses Vivien Kong's verbatim presentation prompt
+  (`presentation-prompt-v1`, SHA-256 tracked in the manifest). `build_multimodal_messages`
+  assembles Image 1 (source dish cutout data URL) and Image 2 (reference framing data URL)
+  into the standard multimodal format.
+- **Provider Abstraction:** `PresentationProvider` defines the pluggable generation
+  interface following PR #24's `OCRProvider` pattern. `FilePresentationProvider`
+  enables reproducible offline candidate validation and test runs.
+- **Strict Image Validation:** Cutouts require PNG or WEBP with transparent background
+  (`min_a == 0, max_a > 0`). Reference inputs require PNG, WEBP, or JPEG. Generated
+  presentation PNGs must be square (`width == height >= 512`, preferably `2048x2048`),
+  carry genuine alpha transparency, and have all four corner pixels `(0, 0)`, `(w-1, 0)`,
+  `(0, h-1)`, `(w-1, h-1)` fully transparent (`alpha == 0`), rejecting opaque
+  checkerboards, gray rectangles, or baked-in edges.
+- **Provenance Manifest (`PresentationManifest`):** The output `presentation-manifest.json`
+  links the source T0 `asset_id` and manifest SHA-256, source JPEG SHA-256, cutout
+  SHA-256, reference SHA-256, prompt SHA-256, model version, dish and revision UUIDs,
+  and optional PR #24 `draft_id`.
+- **Human Review Gate:** Manifests never self-approve (`review.status = "needs_review"`,
+  `publication.eligible = False`). Fidelity requirements (`preserved_original_viewpoint`,
+  `reconstructed_details_flagged`, `fidelity_notes`) persist on `manifest.prompt` and
+  emit explicit review warnings flagging reconstructed unseen food or cropped details.
+- **Automatic Fallback Retention:** If generation fails, the provider returns an error,
+  candidate dimensions/alpha/corners are invalid, or byte budget is exceeded, the pipeline
+  preserves the approved original-photo T0 `fallback.jpg`, sets `fallback_retained = True`,
+  `active_display_path = "fallback.jpg"`, `presentation = None`, and records error
+  reasons in `processing.validation_errors`. The CLI exits 2 on fallback retention so
+  operators are alerted while the valid fallback bundle is preserved.
 
 ## Integration review requested
 

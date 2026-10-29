@@ -532,7 +532,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "df0e711fd489095320713a4c9fb88472b7d6ea896378eba13c4fa0a505ed1477"
+      "sourceFingerprint": "b1547476eb1eb39c335d42280d8d471c4d72b23ace36d042ff109af292f07488"
     },
     {
       "id": "assets",
@@ -547,7 +547,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_assets.py",
         "processing/tests/test_spatial.py",
         "processing/tests/fixture_factory.py",
-        "docs/asset-delivery.md"
+        "docs/asset-delivery.md",
+        "processing/src/peekaplate_processing/prepare_presentation.py",
+        "processing/src/peekaplate_processing/presentation.py",
+        "processing/tests/test_presentation.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",
@@ -556,7 +559,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "30fee398a75791ca2e2b8526b799bbc88bb507156f88198e805121fa806e885e"
+      "sourceFingerprint": "45cb0a29a32512cdbf6a4513de809ca1c32215926d212802571fc5cd1c1e5447"
     }
   ],
   "handoffs": [
