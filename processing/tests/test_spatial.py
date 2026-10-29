@@ -511,5 +511,195 @@ globalThis.fetch = () => Promise.resolve({{ ok: true, json: () => Promise.resolv
         self.assertLess(result["zIndices"]["background"], result["zIndices"]["subject"])
         self.assertLess(result["zIndices"]["subject"], result["zIndices"]["accent"])
 
+    def test_harness_responds_to_live_reduced_motion_changes(self):
+        prepared=self.prepare()
+        harness_html=(prepared.directory/"harness.html").read_text(encoding="utf-8")
+        script=harness_html.split("<script>", 1)[1].split("</script>", 1)[0]
+        manifest_text=(prepared.directory/"spatial-manifest.json").read_text(encoding="utf-8")
+        driver=f"""
+const manifestData = {manifest_text};
+const listeners = {{}};
+const layerImgs = [];
+function makeNode(id) {{
+  return {{
+    id,
+    style: {{}},
+    dataset: {{}},
+    className: "",
+    textContent: "",
+    classList: {{ add() {{}} }},
+    addEventListener(type, fn) {{ (listeners[type] = listeners[type] || []).push(fn); }},
+    appendChild(child) {{ layerImgs.push(child); }},
+    querySelector(sel) {{
+      const m = sel.match(/data-layer="([^"]+)"/);
+      return m ? layerImgs.find(img => img.dataset.layer === m[1]) || null : null;
+    }},
+    querySelectorAll() {{ return layerImgs; }},
+    getBoundingClientRect() {{ return {{ left: 0, top: 0, width: 390, height: 292.5 }}; }}
+  }};
+}}
+const nodes = {{
+  stage: makeNode("stage"),
+  fallback: makeNode("fallback"),
+  layers: makeNode("layers"),
+  status: makeNode("status"),
+  metrics: makeNode("metrics"),
+  "copy-metrics": makeNode("copy-metrics"),
+  "copy-state": makeNode("copy-state"),
+}};
+let motionMatches = false;
+const changeListeners = [];
+const motionQuery = {{
+  get matches() {{ return motionMatches; }},
+  addEventListener: (type, fn) => {{ if (type === "change") changeListeners.push(fn); }},
+  removeEventListener: () => {{}},
+}};
+globalThis.window = {{
+  innerWidth: 390,
+  innerHeight: 844,
+  devicePixelRatio: 3,
+  matchMedia: (q) => q.includes("prefers-reduced-motion") ? motionQuery : ({{ matches: false }}),
+  CSS: {{ supports: () => true }},
+}};
+globalThis.CSS = globalThis.window.CSS;
+globalThis.document = {{ getElementById: (id) => nodes[id] }};
+globalThis.performance = {{ now: () => 10 }};
+globalThis.requestAnimationFrame = () => {{}};
+globalThis.navigator = {{}};
+globalThis.Image = class {{
+  constructor() {{ this.style = {{}}; this.dataset = {{}}; this.classList = {{ add() {{}} }}; }}
+  set src(v) {{
+    setTimeout(() => this.onload && this.onload(), 5);
+  }}
+}};
+globalThis.fetch = () => Promise.resolve({{ ok: true, json: () => Promise.resolve(manifestData) }});
+{script}
+(async () => {{
+  await new Promise(r => setTimeout(r, 40));
+  const initialReducedMotion = window.__peekaplateSpatialMetrics.reducedMotion;
+  // Step 1: Send ArrowRight with reduced-motion false
+  (listeners["keydown"] || []).forEach(fn => fn({{ key: "ArrowRight", preventDefault() {{}} }}));
+  const initialLayersTransform = nodes.layers.style.transform;
+  const subjectImg = layerImgs.find(img => img.dataset.layer === "subject");
+  const initialSubjectTransform = subjectImg ? subjectImg.style.transform : "";
+  // Step 2: Toggle reduced-motion to true live
+  motionMatches = true;
+  changeListeners.forEach(fn => fn({{ matches: true }}));
+  const toggledReducedMotion = window.__peekaplateSpatialMetrics.reducedMotion;
+  const clearedLayersTransform = nodes.layers.style.transform;
+  const clearedSubjectTransform = subjectImg ? subjectImg.style.transform : "";
+  // Step 3: Send ArrowRight and pointermove while reduced-motion is true
+  (listeners["keydown"] || []).forEach(fn => fn({{ key: "ArrowRight", preventDefault() {{}} }}));
+  (listeners["pointermove"] || []).forEach(fn => fn({{ clientX: 390, clientY: 146 }}));
+  const subsequentLayersTransform = nodes.layers.style.transform;
+  const subsequentSubjectTransform = subjectImg ? subjectImg.style.transform : "";
+  console.log(JSON.stringify({{
+    initialReducedMotion,
+    initialLayersTransform,
+    initialSubjectTransform,
+    toggledReducedMotion,
+    clearedLayersTransform,
+    clearedSubjectTransform,
+    subsequentLayersTransform,
+    subsequentSubjectTransform,
+  }}));
+}})();
+"""
+        completed=subprocess.run(["node", "-e", driver], capture_output=True, text=True, check=True)
+        result=json.loads(completed.stdout.strip())
+        self.assertIs(result["initialReducedMotion"], False)
+        self.assertEqual(result["initialLayersTransform"], "perspective(900px) rotateX(0deg) rotateY(0.5deg)")
+        self.assertEqual(result["initialSubjectTransform"], "translate(0.5333333333333333px,0px)")
+        self.assertIs(result["toggledReducedMotion"], True)
+        self.assertEqual(result["clearedLayersTransform"], "")
+        self.assertEqual(result["clearedSubjectTransform"], "")
+        self.assertEqual(result["subsequentLayersTransform"], "")
+        self.assertEqual(result["subsequentSubjectTransform"], "")
+
+    def test_harness_counts_numeric_retry_for_constructor_named_layer(self):
+        (self.layer_directory/"constructor.png").write_bytes(
+            (self.layer_directory/"subject.png").read_bytes()
+        )
+        self.write_layers(layer_document(
+            files={"background":"background.png", "constructor":"constructor.png", "accent":"accent.png"},
+            depths={"background":0.0, "constructor":0.4, "accent":0.7},
+        ))
+        prepared=self.prepare()
+        harness_html=(prepared.directory/"harness.html").read_text(encoding="utf-8")
+        script=harness_html.split("<script>", 1)[1].split("</script>", 1)[0]
+        manifest_text=(prepared.directory/"spatial-manifest.json").read_text(encoding="utf-8")
+        driver=f"""
+const manifestData = {manifest_text};
+const listeners = {{}};
+const layerImgs = [];
+function makeNode(id) {{
+  return {{
+    id,
+    style: {{}},
+    dataset: {{}},
+    className: "",
+    textContent: "",
+    classList: {{ add() {{}} }},
+    addEventListener(type, fn) {{ (listeners[type] = listeners[type] || []).push(fn); }},
+    appendChild(child) {{ layerImgs.push(child); }},
+    querySelector(sel) {{
+      const m = sel.match(/data-layer="([^"]+)"/);
+      return m ? layerImgs.find(img => img.dataset.layer === m[1]) || null : null;
+    }},
+    querySelectorAll() {{ return layerImgs; }},
+    getBoundingClientRect() {{ return {{ left: 0, top: 0, width: 390, height: 292.5 }}; }}
+  }};
+}}
+const nodes = {{
+  stage: makeNode("stage"),
+  fallback: makeNode("fallback"),
+  layers: makeNode("layers"),
+  status: makeNode("status"),
+  metrics: makeNode("metrics"),
+  "copy-metrics": makeNode("copy-metrics"),
+  "copy-state": makeNode("copy-state"),
+}};
+globalThis.window = {{
+  innerWidth: 390,
+  innerHeight: 844,
+  devicePixelRatio: 3,
+  matchMedia: () => ({{ matches: false }}),
+  CSS: {{ supports: () => true }},
+}};
+globalThis.CSS = globalThis.window.CSS;
+globalThis.document = {{ getElementById: (id) => nodes[id] }};
+globalThis.performance = {{ now: () => 10 }};
+globalThis.requestAnimationFrame = () => {{}};
+globalThis.navigator = {{}};
+globalThis.Image = class {{
+  constructor() {{ this.style = {{}}; this.dataset = {{}}; this.classList = {{ add() {{}} }}; }}
+  set src(v) {{
+    const url = String(v);
+    if (url.includes("constructor") && !url.includes("retry=1")) {{
+      setTimeout(() => this.onerror && this.onerror(new Error("simulated first attempt failure")), 5);
+      return;
+    }}
+    setTimeout(() => this.onload && this.onload(), 5);
+  }}
+}};
+globalThis.fetch = () => Promise.resolve({{ ok: true, json: () => Promise.resolve(manifestData) }});
+{script}
+(async () => {{
+  await new Promise(r => setTimeout(r, 350));
+  const metrics = window.__peekaplateSpatialMetrics;
+  console.log(JSON.stringify({{
+    layersLoaded: metrics.layersLoaded,
+    spatialVisible: metrics.spatialVisible,
+    layerRetries: metrics.layerRetries,
+    constructorRetryType: typeof metrics.layerRetries.constructor,
+  }}));
+}})();
+"""
+        completed=subprocess.run(["node", "-e", driver], capture_output=True, text=True, check=True)
+        result=json.loads(completed.stdout.strip())
+        self.assertEqual(result["layersLoaded"], 3)
+        self.assertIs(result["spatialVisible"], True)
+        self.assertEqual(result["layerRetries"], {"constructor": 1})
+        self.assertEqual(result["constructorRetryType"], "number")
 if __name__=="__main__":
     unittest.main()

@@ -62,13 +62,14 @@ HARNESS_HTML="""<!doctype html>
   var copyButton=document.getElementById("copy-metrics");
   var copyState=document.getElementById("copy-state");
 
-  var reducedMotion=Boolean(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var motionQuery=window.matchMedia?window.matchMedia("(prefers-reduced-motion: reduce)"):null;
+  var reducedMotion=Boolean(motionQuery&&motionQuery.matches);
   var metrics={
     schemaVersion:1,
     manifestFetchMs:0,
     manifestRetries:0,
-    imageDecodeMs:{},
-    layerRetries:{},
+    imageDecodeMs:Object.create(null),
+    layerRetries:Object.create(null),
     firstRenderMs:0,
     averageFrameMs:0,
     p95FrameMs:0,
@@ -82,7 +83,6 @@ HARNESS_HTML="""<!doctype html>
     totalAssetBytes:0,
     budgetBytes:0
   };
-
   var manifest=null;
   var yaw=0;
   var pitch=0;
@@ -115,12 +115,46 @@ HARNESS_HTML="""<!doctype html>
     metrics.firstRenderMs=performance.now();
     publish();
   }
+  function clearTransforms(){
+    layerHost.style.transform="";
+    layerHost.querySelectorAll("img").forEach(function(image){image.style.transform="";});
+  }
+
+  function syncReducedMotion(nextValue){
+    var active=typeof nextValue==="boolean"?nextValue:Boolean(motionQuery&&motionQuery.matches);
+    if(active===reducedMotion&&metrics.reducedMotion===active){return active;}
+    reducedMotion=active;
+    metrics.reducedMotion=active;
+    if(reducedMotion){
+      yaw=0;
+      pitch=0;
+      pointer.x=0;
+      pointer.y=0;
+      keyboard.yaw=0;
+      keyboard.pitch=0;
+      clearTransforms();
+    }else if(manifest){
+      render();
+    }
+    publish();
+    return reducedMotion;
+  }
+
+  function onMotionChange(event){
+    syncReducedMotion(event&&typeof event.matches==="boolean"?event.matches:Boolean(motionQuery&&motionQuery.matches));
+  }
+
+  if(motionQuery){
+    if(typeof motionQuery.addEventListener==="function"){
+      motionQuery.addEventListener("change",onMotionChange);
+    }else if(typeof motionQuery.addListener==="function"){
+      motionQuery.addListener(onMotionChange);
+    }
+  }
 
   function render(){
-    if(!manifest){return;}
-    if(reducedMotion){
-      layerHost.style.transform="";
-      layerHost.querySelectorAll("img").forEach(function(image){image.style.transform="";});
+    if(syncReducedMotion()||!manifest){
+      clearTransforms();
       return;
     }
     var maxYaw=manifest.motion.max_yaw_degrees;
@@ -141,7 +175,7 @@ HARNESS_HTML="""<!doctype html>
   }
 
   function onPointerMove(event){
-    if(reducedMotion||!manifest){return;}
+    if(syncReducedMotion()||!manifest){return;}
     var rect=stage.getBoundingClientRect();
     if(!rect.width||!rect.height){return;}
     var maxYaw=manifest.motion.max_yaw_degrees;
@@ -154,7 +188,7 @@ HARNESS_HTML="""<!doctype html>
   }
 
   function onKeyDown(event){
-    if(reducedMotion||!manifest){return;}
+    if(syncReducedMotion()||!manifest){return;}
     var step=0.5;
     var maxYaw=manifest.motion.max_yaw_degrees;
     var maxPitch=manifest.motion.max_pitch_degrees;
@@ -240,7 +274,8 @@ HARNESS_HTML="""<!doctype html>
       return image;
     }).catch(function(error){
       if(attempt>=1){throw error;}
-      metrics.layerRetries[layer.name]=(metrics.layerRetries[layer.name]||0)+1;
+      var previousRetries=Object.prototype.hasOwnProperty.call(metrics.layerRetries,layer.name)?metrics.layerRetries[layer.name]:0;
+      metrics.layerRetries[layer.name]=previousRetries+1;
       publish();
       return delay(RETRY_DELAY_MS).then(function(){return loadLayer(layer,rank,attempt+1);});
     });
@@ -282,7 +317,7 @@ HARNESS_HTML="""<!doctype html>
       }
       var ordered=value.layers.map(function(layer,index){return {name:layer.name,depth:layer.depth,index:index};});
       ordered.sort(function(a,b){return a.depth!==b.depth?a.depth-b.depth:a.index-b.index;});
-      var ranks={};
+      var ranks=Object.create(null);
       ordered.forEach(function(entry,rank){ranks[entry.name]=rank+1;});
       var jobs=[];
       value.layers.forEach(function(layer){jobs.push(loadLayer(layer,ranks[layer.name],0));});
