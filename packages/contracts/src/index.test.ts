@@ -252,6 +252,22 @@ describe('RES-02 immutable diner bundle boundary', () => {
     expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
   });
 
+  it('keeps an unknown allergen review state distinct from a reviewed empty declaration', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    const withAllergenState = (allergens: null | []) => ({
+      ...bundle,
+      categories: [
+        {
+          ...bundle.categories[0],
+          dishes: [{ ...completeDish, allergens }],
+        },
+      ],
+    });
+
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState(null)).success).toBe(true);
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState([])).success).toBe(true);
+  });
+
   it('rejects partial claims, unknown allergens and insecure image URLs', () => {
     const incompleteDish = bundle.categories[0].dishes[1];
     expect(
@@ -342,7 +358,7 @@ describe('RES-02 immutable diner bundle boundary', () => {
     ).toBe(false);
   });
 
-  it('rejects duplicate identities and invalid money, allergen or dietary values', () => {
+  it('rejects duplicate identities and invalid money, allergen or dietary values independently', () => {
     const completeDish = bundle.categories[0].dishes[0];
     expect(
       PublicMenuContentBundleSchema.safeParse({
@@ -371,10 +387,30 @@ describe('RES-02 immutable diner bundle boundary', () => {
               {
                 ...completeDish,
                 price: { amount: '12.500', currency: 'usd' },
-                allergens: ['wheat', 'wheat'],
-                dietary: ['vegan', 'vegan'],
               },
             ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['wheat', 'wheat'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, dietary: ['vegan', 'vegan'] }],
           },
         ],
       }).success,

@@ -25,7 +25,7 @@ The immutable bundle is UTF-8 JSON served with `Content-Type: application/json`.
 | Root | `schema_version: 1`; UUID strings `venue_id`, `menu_id`, `menu_revision_id`; `restaurant`; ordered `categories` |
 | `restaurant` | trimmed `name`; `logo`, which is either an image object or `null` |
 | Category | UUID `category_id`; trimmed `name`; ordered `dishes` |
-| Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; unique approved `allergens` and `dietary` codes; required T0 `images.card` and `images.detail` |
+| Complete dish | UUID `dish_id` and `dish_revision_id`; `complete: true`; trimmed `name`; `description`; decimal-string `price.amount`; three-letter uppercase `price.currency`; ordered `ingredients`; reviewed `allergens` state and unique approved `dietary` codes; required T0 `images.card` and `images.detail` |
 | Incomplete dish | only UUID `dish_id`, UUID `dish_revision_id` and `complete: false` |
 | Ingredient | UUID `ingredient_id`; trimmed `name`; `description` string or `null` |
 | Image | immutable HTTPS `url`; positive integer `width` and `height`; non-empty `alt` text |
@@ -41,7 +41,11 @@ Allergen and dietary values are explicit restaurant assertions, never inferred. 
 | Allergen | `milk`, `egg`, `fish`, `crustacean shellfish`, `tree nut`, `peanut`, `wheat`, `soy`, `sesame` |
 | Dietary | `vegan`, `vegetarian`, `gluten-free` |
 
-Codes are stable contract identifiers rather than display labels or icon names. The diner maps them to the approved presentation; renaming a label does not change the wire value. Unknown or duplicate codes fail validation. Version 1 still contains no 2.5D field, and an unapproved spatial format is rejected as an unknown field. T0 card and detail images remain mandatory.
+Codes are stable contract identifiers rather than display labels or icon names. The diner maps them to the approved presentation; renaming a label does not change the wire value. Unknown or duplicate codes fail validation.
+
+`allergens` is required on a complete dish but has an explicit review state: `null` means the declaration is unavailable or has not been reviewed, `[]` means the reviewed declaration contains no values from this closed list, and a non-empty array contains the reviewed declared codes. Neither `null` nor `[]` is a guarantee that a dish is allergen-free, and the diner must not present either state as such. Dietary codes remain explicit restaurant assertions rather than inferred medical or safety claims.
+
+Version 1 still contains no 2.5D field, and an unapproved spatial format is rejected as an unknown field. T0 card and detail images remain mandatory.
 
 Only the revision referenced by the current approved publication may be displayed. A content-incomplete dish carries no partial name, price, ingredient, dietary, allergen or asset claims. A withdrawn dish is omitted from the next publication bundle. Draft, rejected, reviewer and source-evidence fields never enter the public bundle. Bundle and image URLs are public, immutable HTTPS objects; changing any content requires a new revision and hashes rather than overwriting an existing URL.
 

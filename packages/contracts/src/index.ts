@@ -196,7 +196,8 @@ export const PublicMenuCompleteDishSchema = z.strictObject({
   allergens: z
     .array(PublicMenuAllergenCodeSchema)
     .max(9)
-    .refine((values) => new Set(values).size === values.length, 'Allergen values must be unique'),
+    .refine((values) => new Set(values).size === values.length, 'Allergen values must be unique')
+    .nullable(),
   dietary: z
     .array(PublicMenuDietaryCodeSchema)
     .max(3)
