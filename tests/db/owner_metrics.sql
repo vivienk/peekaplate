@@ -50,6 +50,10 @@ INSERT INTO temp_events (tenant_id, event_id, session_id, event_type, payload_ch
     ('resto_10', 'evt_208', 'sess_H', 'dish_detail_opened', 'sha_8', 'live', NOW(), NOW()),
     ('resto_10', 'evt_209', 'sess_I', 'dish_detail_opened', 'sha_9', 'live', NOW(), NOW()),
     ('resto_10', 'evt_210', 'sess_J', 'dish_detail_opened', 'sha_10', 'live', NOW(), NOW()),
+    -- Sai regression case: malformed rows with NULL event_id
+    -- Must not mask or suppress the 10 valid sessions above
+    ('resto_10', NULL, 'sess_K', 'dish_detail_opened', 'sha_malformed_1', 'live', NOW(), NOW()),
+    ('resto_10', NULL, 'sess_L', 'dish_detail_opened', 'sha_malformed_2', 'live', NOW(), NOW()),
 
     -- CASE 11: Frontier 11 (Must show metrics normally = 11)
     ('resto_11', 'evt_301', 'sess_x1', 'dish_detail_opened', 'sha_x', 'live', NOW(), NOW()),
@@ -100,20 +104,26 @@ SELECT
     END AS status
 FROM (SELECT DISTINCT tenant_id FROM temp_events) v
 LEFT JOIN (
-    SELECT MIN(id) as id, tenant_id, event_id, session_id
-    FROM temp_events
+    SELECT MIN(te.id) as id, te.tenant_id, te.event_id, te.session_id
+    FROM temp_events te
     WHERE 
-        traffic_class = 'live'
-        AND event_type = 'dish_detail_opened'
-        AND event_id IS NOT NULL
-        AND occurred_at >= received_at - INTERVAL '24 hours'
-        AND occurred_at <= received_at + INTERVAL '5 minutes'
-        AND (tenant_id, event_id) NOT IN (
-            SELECT tenant_id, event_id FROM temp_events GROUP BY tenant_id, event_id HAVING COUNT(DISTINCT payload_checksum) > 1
+        te.traffic_class = 'live'
+        AND te.event_type = 'dish_detail_opened'
+        AND te.event_id IS NOT NULL
+        AND te.occurred_at >= te.received_at - INTERVAL '24 hours'
+        AND te.occurred_at <= te.received_at + INTERVAL '5 minutes'
+        AND NOT EXISTS (
+            SELECT 1 
+            FROM temp_events c 
+            WHERE c.tenant_id = te.tenant_id 
+              AND c.event_id = te.event_id
+            GROUP BY c.tenant_id, c.event_id 
+            HAVING COUNT(DISTINCT c.payload_checksum) > 1
         )
-    GROUP BY tenant_id, event_id, session_id
+    GROUP BY te.tenant_id, te.event_id, te.session_id
 ) AS ce ON v.tenant_id = ce.tenant_id
 GROUP BY v.tenant_id;
+
 
 -- =====================================================================
 -- PGTAP ASSERTS
