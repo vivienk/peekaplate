@@ -382,7 +382,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "940c02a23b6b08a141350ba97eb97e42de9ef72fe10b90be2e29c05169bc0200"
+      "sourceFingerprint": "c3fd1a086016d401810b975c76eceec5547b28ce207f2013c80e6e3ced4c2cff"
     },
     {
       "id": "agents",
@@ -469,7 +469,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/sources.py",
         "processing/src/peekaplate_processing/storage.py",
         "processing/src/peekaplate_processing/workflow.py",
-        "processing/tests/fixture_factory.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
         "processing/tests/test_pdf_images.py",
@@ -533,10 +532,43 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "e1f5dd6026943495b4f53235515dad797a4727285dc1c5267ede6d1c329deb2e"
+      "sourceFingerprint": "df0e711fd489095320713a4c9fb88472b7d6ea896378eba13c4fa0a505ed1477"
+    },
+    {
+      "id": "assets",
+      "status": "foundation",
+      "summary": "T0 asset preparation emits create-only hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks human-prepared layered samples against the T0 detail variant with a dependency-free fallback harness; optional presentation preparation pairs dish cutouts and reference images with the frozen presentation prompt, validates square transparent PNGs and retains the T0 fallback on failure. Manifests never self-approve (needs_review, publication.eligible=false), and Python gets no signing/database credentials.",
+      "paths": [
+        "processing/src/peekaplate_processing/assets.py",
+        "processing/src/peekaplate_processing/harness.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/prepare_spatial.py",
+        "processing/src/peekaplate_processing/spatial.py",
+        "processing/tests/test_assets.py",
+        "processing/tests/test_spatial.py",
+        "processing/tests/fixture_factory.py",
+        "docs/asset-delivery.md"
+      ],
+      "adrs": [
+        "docs/adr/0004-visual-tiers.md",
+        "docs/adr/0005-tenancy-and-privacy.md"
+      ],
+      "dependsOn": [
+        "processing"
+      ],
+      "sourceFingerprint": "30fee398a75791ca2e2b8526b799bbc88bb507156f88198e805121fa806e885e"
     }
   ],
   "handoffs": [
+    {
+      "summary": "Rebased S3-VIS-03 onto develop 0477653, preserving reviewed OCR/retrieval, staging container service and CI workflows. Addressed PR #25 P2/P3 viewer findings: live prefers-reduced-motion media query listener with style/metrics clearing, and Object.create(null) prototype-safe layer retries. Added optional post-cutout dish presentation prompt, provider interface, square/transparent PNG validation and automatic T0 fallback retention. All Python and repository checks pass.",
+      "modules": [
+        "processing",
+        "assets",
+        "delivery"
+      ],
+      "next": "Complete PR #25 code review and offline validation. Keep presentation and 2.5D manifests provisional (needs_review, publication.eligible=false) until S3-ARC-01 contract freeze; align presentation and spatial fields with S3-RES-02."
+    },
     {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
       "modules": [
@@ -606,16 +638,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
-    },
-    {
-      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
     }
   ]
 }

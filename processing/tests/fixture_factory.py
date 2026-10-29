@@ -52,3 +52,48 @@ def make_pdf(pages:list[dict])->bytes:
     for offset in offsets[1:]:output.extend(f"{offset:010} 00000 n \n".encode())
     output.extend(f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n".encode())
     return bytes(output)
+
+
+def food_photo(width=2000, height=1500, orientation=None)->bytes:
+    image=Image.new("RGB", (width, height), "#e8e2d6")
+    draw=ImageDraw.Draw(image)
+    draw.rectangle((width//12, height//12, width-width//12, height-height//12), fill="#8b5a2b")
+    draw.ellipse((width//3, height//3, width*2//3, height*2//3), fill="#c0392b")
+    draw.text((width//20, height//20), "SYNTHETIC FIXTURE", fill="white", font_size=max(12, width//24))
+    output=io.BytesIO()
+    if orientation is None:
+        image.save(output, format="JPEG", quality=92)
+    else:
+        exif=Image.Exif()
+        exif[0x0112]=orientation
+        image.save(output, format="JPEG", quality=92, exif=exif)
+    image.close()
+    return output.getvalue()
+
+
+def layered_photo(width=1280, height=960)->dict[str, bytes]:
+    layers={}
+    background=Image.new("RGB", (width, height), "#e8e2d6")
+    draw=ImageDraw.Draw(background)
+    draw.rectangle((width//12, height//12, width-width//12, height-height//12), fill="#8b5a2b")
+    draw.text((width//20, height//20), "SYNTHETIC FIXTURE", fill="black", font_size=max(12, width//40))
+    output=io.BytesIO()
+    background.save(output, format="PNG")
+    background.close()
+    layers["background"]=output.getvalue()
+    subject=Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw=ImageDraw.Draw(subject)
+    draw.ellipse((width//4, height//4, width*3//4, height*3//4), fill=(192, 57, 43, 255))
+    draw.text((width//20, height//2), "SYNTHETIC FIXTURE", fill=(255, 255, 255, 255), font_size=max(12, width//40))
+    output=io.BytesIO()
+    subject.save(output, format="PNG")
+    subject.close()
+    layers["subject"]=output.getvalue()
+    accent=Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw=ImageDraw.Draw(accent)
+    draw.rectangle((width//3, height//8, width//3+ width//8, height//8+height//8), fill=(241, 196, 15, 255))
+    output=io.BytesIO()
+    accent.save(output, format="PNG")
+    accent.close()
+    layers["accent"]=output.getvalue()
+    return layers

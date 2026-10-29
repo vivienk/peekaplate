@@ -3,6 +3,8 @@ import unicodedata
 from decimal import Decimal
 from datetime import datetime
 from typing import Annotated, Literal
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -288,3 +290,188 @@ def validate_box_evidence(report:MenuExtractionResult):
         (by_index[i].draft_id, draft, by_index[i].spans, by_index[i].box_evidence)
         for i, draft in enumerate(report.drafts)
     ])
+
+
+class DishRef(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    dish_id:UUID
+    revision_id:UUID
+
+
+class AssetVariant(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:Literal["card-480", "detail-1280"]
+    format:Literal["webp", "jpeg"]
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    quality:int=Field(ge=1, le=100)
+
+
+class AssetSource(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(ge=1, le=12_000_000)
+    format:Literal["JPEG", "PNG", "WEBP", "TIFF", "BMP", "GIF"]
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    path:NonEmptyText
+    captured_at:datetime|None=None
+    capture_evidence:NonEmptyText
+
+
+class ProcessingState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["ready"]
+    engine:Literal["pillow"]
+    engine_version:NonEmptyText
+    started_at:datetime
+    completed_at:datetime
+    steps:list[NonEmptyText]=Field(min_length=1)
+
+
+class ReviewState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["needs_review"]="needs_review"
+    warnings:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PublicationState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    eligible:Literal[False]=False
+    reason:NonEmptyText="Human approval and backend publication are required."
+
+
+class AssetMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    total_variant_bytes:int=Field(gt=0)
+    budget_bytes:int|None=Field(default=None, gt=0)
+    budget_status:Literal["within_budget", "not_configured"]
+
+
+class AssetManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^t0_[0-9a-f]{32}$")
+    recipe_version:Literal["t0-v1"]="t0-v1"
+    tier:Literal["T0"]="T0"
+    source:AssetSource
+    dish:DishRef
+    variants:list[AssetVariant]=Field(min_length=4, max_length=4)
+    processing:ProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:AssetMeasurements
+
+
+class MotionLimits(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    max_yaw_degrees:float=Field(ge=0, le=3)
+    max_pitch_degrees:float=Field(ge=0, le=3)
+
+    @model_validator(mode="after")
+    def require_motion(self):
+        if max(self.max_yaw_degrees, self.max_pitch_degrees)<=0:
+            raise ValueError("At least one motion limit must be greater than zero.")
+        return self
+
+
+class LayerInput(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:str=Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")
+    file:NonEmptyText
+    depth:float=Field(ge=0, le=1)
+
+
+class LayersInput(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    tier:Literal["T1"]="T1"
+    dish:DishRef
+    motion:MotionLimits
+    layers:list[LayerInput]=Field(min_length=2, max_length=6)
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+
+
+class SpatialLayer(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:NonEmptyText
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    format:Literal["PNG", "WEBP", "JPEG"]
+    depth:float=Field(ge=0, le=1)
+
+
+class SpatialFallback(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    tier:Literal["T0"]="T0"
+    path:Literal["fallback.jpg"]="fallback.jpg"
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+
+
+class SpatialMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    total_asset_bytes:int=Field(gt=0)
+    budget_bytes:int=Field(gt=0)
+    budget_status:Literal["within_budget"]
+
+
+class SpatialManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^t1_[0-9a-f]{32}$")
+    recipe_version:Literal["t1-v1"]="t1-v1"
+    tier:Literal["T1"]="T1"
+    source_t0:NonEmptyText
+    source_t0_manifest_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    dish:DishRef
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+    motion:MotionLimits
+    layers:list[SpatialLayer]
+    fallback:SpatialFallback
+    processing:ProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:SpatialMeasurements
+    harness:Literal["harness.html"]="harness.html"
