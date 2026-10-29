@@ -8,8 +8,9 @@ PASS: All detail openings link to valid earlier exposures.
 Validated openings: 2
 PASS: All checkpoints link to valid earlier openings.
 Validated checkpoints: 3
-PASS: All comparisons have valid opening links and displayed pairs.
-Validated comparisons: 2
+PASS: Comparison pairs validated.
+Displayed comparisons: 2
+Engagement-linked comparisons: 2
 PASS: Save, Unsave, and Undo transitions are valid.
 Direct Saves: 3
 Undo restorations: 1
@@ -30,6 +31,7 @@ Opening sessions: A=1, B=1, C=0
 Linked opening rates: A=50%, B=50%, C=0%
 Save adoption: 2/2 = 100%
 Displayed A/B comparison sessions: 1
+PASS: Comparison flow Start/Replace ordering is valid.
 PASS: Start/Replace comparison attribution checks.
 Comparison Starts: 1
 Comparison Replaces: 1

@@ -1,4 +1,4 @@
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { FetchError, MAX_HTML_BYTES, MAX_REDIRECTS, safeFetch } from './fetcher';

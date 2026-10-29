@@ -1,4 +1,4 @@
-python : test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
+﻿python : test_ai001_fixture_exists (test_ai_report_inputs.TestAIReportInputs.test_ai001_fixture_exists) ... ok
 At line:1 char:1
 + python -m unittest discover -s test-data/owner-synthetic-p0-v2/tests  ...
 + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -57,13 +57,15 @@ test_no_eligible_savers (test_session_completion.TestSessionInactivity.test_no_e
 test_observed_save_retention (test_session_completion.TestSessionInactivity.test_observed_save_retention) ... ok
 test_save_alone_is_not_engagement (test_session_completion.TestSessionInactivity.test_save_alone_is_not_engagement) ... ok
 test_standalone_engagement_examples (test_session_completion.TestSessionInactivity.test_standalone_engagement_examples) ... ok
-test_checkpoint_active_time_exceeds_elapsed (test_validator_integration.TestValidatorIntegration.test_checkpoint_active_time_exceeds_elapsed) ... ok
+test_checkpoint_active_time_exceeds_elapsed (test_validator_integration.TestValidatorIntegration.test_checkpoint_active_time_exceeds_elapsed) ...
+ok
 test_checkpoint_timestamp_before_opening (test_validator_integration.TestValidatorIntegration.test_checkpoint_timestamp_before_opening) ... ok
 test_checkpoint_wrong_dish (test_validator_integration.TestValidatorIntegration.test_checkpoint_wrong_dish) ... ok
 test_comparison_does_not_require_specific_opening_id
 (test_validator_integration.TestValidatorIntegration.test_comparison_does_not_require_specific_opening_id) ... ok
 test_comparison_missing_identity_fields (test_validator_integration.TestValidatorIntegration.test_comparison_missing_identity_fields) ... ok
-test_comparison_replace_before_start_rejected (test_validator_integration.TestValidatorIntegration.test_comparison_replace_before_start_rejected) ... ok
+test_comparison_replace_before_start_rejected (test_validator_integration.TestValidatorIntegration.test_comparison_replace_before_start_rejected)
+... ok
 test_duplicate_local_sequence (test_validator_integration.TestValidatorIntegration.test_duplicate_local_sequence) ... ok
 test_empty_event_id (test_validator_integration.TestValidatorIntegration.test_empty_event_id) ... ok
 test_invalid_schema_version (test_validator_integration.TestValidatorIntegration.test_invalid_schema_version) ... ok
@@ -81,6 +83,6 @@ test_valid_baseline (test_validator_integration.TestValidatorIntegration.test_va
 test_zero_sequence (test_validator_integration.TestValidatorIntegration.test_zero_sequence) ... ok
 
 ----------------------------------------------------------------------
-Ran 73 tests in 23.251s
+Ran 73 tests in 23.302s
 
 OK
