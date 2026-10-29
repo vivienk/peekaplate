@@ -30,6 +30,10 @@
         {
           "binding": "OBSERVATION_ARCHIVE_BUCKET",
           "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "INGESTION_REPORTS_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
         }
       ],
       "ratelimits": [
@@ -49,6 +53,10 @@
           {
             "binding": "OBSERVATION_QUEUE",
             "queue": "peekaplate-staging-observations"
+          },
+          {
+            "binding": "INGESTION_QUEUE",
+            "queue": "peekaplate-staging-menu-ingestion"
           }
         ]
       }
