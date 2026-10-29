@@ -1,4 +1,4 @@
-﻿# ADR 0016: Unified Menu Ingestion Orchestration
+# ADR 0016: Unified Menu Ingestion Orchestration
 
 - Status: Proposed
 - Date: 2026-10-23
@@ -51,9 +51,7 @@ command boundary rather than introducing a parallel persistence mechanism.
    must use the existing authorized dish command and its version and
    idempotency checks.
 
-7. Select the execution service, queue, storage bindings, and job-state
-   persistence only after confirming the supported deployment architecture.
-   A queue alone does not execute the Python processing package.
+7. Use the supported hosted Python extraction service for deployed processing. The staging infrastructure uses the `peekaplate-staging-menu-ingestion` Queue, its `peekaplate-staging-menu-ingestion-dlq` dead-letter queue, and private R2 storage in `peekaplate-staging-assets`. Extraction reports are written under `reports/<tenant>/<job>/extraction.json`. Keep source artifacts private, enforce tenant/job-scoped source access and source-hash validation, and ensure report persistence succeeds before acknowledging queue work. Do not allow the Python service to fetch arbitrary caller-supplied URLs. URL, PDF, and photo inputs must be validated and safely materialized through the authorized ingestion boundary before processing. These staging resource choices do not, by themselves, establish full end-to-end product acceptance.
 
 8. Test contract compatibility, source validation, tenant isolation, job
    transitions, retries, duplicate submissions, partial failures, evidence
@@ -61,36 +59,32 @@ command boundary rather than introducing a parallel persistence mechanism.
 
 ## Consequences
 
-- The existing processing and handoff implementations remain the preferred
-  reusable boundaries.
-- The implementation requires an explicit job lifecycle and a defined
-  Python execution mechanism.
-- Queue and object-storage reuse cannot be assumed from the existing
-  observation-specific bindings.
-- Draft extraction remains separate from dish revision persistence and
-  publication.
-- Python processing tests and a pinned Python CI job must be integrated into
-  the repository verification workflow.
+- Existing VIS-02 processing and VIS-04 retrieval/handoff implementations remain the preferred reusable boundaries.
+- Deployed Python processing uses the supported hosted extraction runtime rather than assuming a Queue can execute Python directly.
+- Staging infrastructure has dedicated menu-ingestion Queue/DLQ configuration and private R2 report storage; resource names and bindings must remain aligned with deployment configuration.
+- Source access, tenant/job scoping, source-hash consistency, and report persistence are required processing boundaries.
+- Queue delivery must remain controlled until approved OCR/AI provider configuration, processing/transport/lease/retry budgets, and full feature-level acceptance are verified.
+- Extracted dishes remain separate from authorized dish-revision persistence and publication; human review remains mandatory.
+- Python processing tests and a pinned Python CI job must remain part of the repository verification workflow.
 
 ## Open Questions
 
-- Which supported service will execute Python processing in deployed
-  environments?
-- Should menu ingestion use dedicated queue and storage resources, or can
-  existing resources be safely shared?
-- Where will job state, retry metadata, and validated results be persisted?
-- What are the agreed limits, retention policy, timeout, and retry budget?
-- How should duplicate submissions be identified and handled?
-- Which owner approves the deployment, resource, and operational-cost
-  decisions?
+- Which approved OCR and AI provider credentials and configuration will be used for controlled feature acceptance?
+- What are the agreed processing, transport, lease, timeout, and retry budgets across the Worker, Queue, and hosted extraction service?
+- Are upload limits, retention, and operational-cost ownership explicitly approved?
+- Where and how is ingestion job state persisted, including retry metadata, idempotency, and validated results?
+- Who owns final approval of the deployment and operational configuration?
+- Has the complete controlled menu-ingestion workflow been accepted, including submission, extraction, report persistence, validated draft creation, queue acknowledgement, retries, dead-letter handling, and cross-venue isolation?
 
 ## Verification
 
-- Existing VIS-04 adapter tests continue to pass.
-- Python processing tests run in the documented environment.
-- Contract tests cover supported and unsupported versions, evidence spans,
-  Unicode offsets, and partial failures.
-- Integration tests verify authorization, tenant isolation, job lifecycle,
-  duplicate protection, and persistence boundaries.
-- An end-to-end test demonstrates submission, processing, validated draft
-  output, and human-review gating without automatic publication.
+- Existing VIS-04 adapter tests must continue to pass.
+- Python processing tests must run in the documented environment, with the pinned Python CI job passing.
+- Contract tests must cover supported and unsupported versions, evidence spans, Unicode offsets, and partial failures.
+- Integration tests must verify authorization, tenant isolation, job lifecycle, duplicate protection, and persistence boundaries.
+- Staging infrastructure acceptance is documented in `docs/menu-ingestion-infrastructure.md`. It covers hosted service authentication, signed private-source access, source-hash validation, and remote Queue/R2 delivery, retry, acknowledgement, and dead-letter recovery using synthetic test data.
+- Infrastructure-level checks do not establish successful real OCR/AI extraction, extraction quality, report-to-draft persistence, or complete feature acceptance.
+- Before enabling menu submissions, verify the approved AI provider configuration, hosted extraction, reviewed job/draft migrations, report-storage injection, and aligned processing, transport, lease, timeout, and retry budgets.
+- Complete a controlled, authorized synthetic menu test covering submission, extraction, private report persistence, validated database drafts, and acknowledgement. Also test duplicate delivery, conflicting source hashes, report-storage failure, timeout/retry/DLQ handling, and cross-venue isolation.
+- Confirm that extracted dishes remain `needs_review` and that no ingestion path bypasses human approval or automatically publishes dishes.
+- Keep real submissions disabled until the complete controlled workflow and required operational configuration have been reviewed and accepted.
