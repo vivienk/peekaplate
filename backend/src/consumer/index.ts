@@ -77,6 +77,8 @@ export function createQueueHandler(services: QueueHandlerServices = {}) {
         log: (level, msg, meta) => {
           if (level === 'error') {
             console.error(JSON.stringify({ event: 'queue_consumer_log', level, msg, ...meta }));
+          } else if (level === 'warn') {
+            console.warn(JSON.stringify({ event: 'queue_consumer_log', level, msg, ...meta }));
           }
         },
       });

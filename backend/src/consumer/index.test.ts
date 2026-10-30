@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FakeObservationRepository } from './database';
 import { createQueueHandler } from './index';
 import { type MessageBatch, QueueConsumer, type QueueMessage } from './queue-consumer';
@@ -115,5 +115,37 @@ describe('createQueueHandler', () => {
     expect(cleanupCalled).toBe(true);
     expect(repository.index.size).toBe(1);
     expect(r2Storage.has(`raw/observations/${testTenant}/${testEvent}.json`)).toBe(true);
+  });
+
+  it('formats warning events via console.warn for operational visibility in staging', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const r2Storage = new FakeR2ArchiveStorage();
+    const repository = new FakeObservationRepository();
+    const consumer = new QueueConsumer({
+      r2Storage,
+      repository,
+      log: (level, msg, meta) => {
+        if (level === 'error') {
+          console.error(JSON.stringify({ event: 'queue_consumer_log', level, msg, ...meta }));
+        } else if (level === 'warn') {
+          console.warn(JSON.stringify({ event: 'queue_consumer_log', level, msg, ...meta }));
+        }
+      },
+    });
+
+    (consumer as any).log(
+      'warn',
+      'Event identity conflict detected in DB - recording in conflict table',
+      {
+        tenantId: testTenant,
+        eventId: testEvent,
+      },
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('"level":"warn"'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Event identity conflict detected'),
+    );
+    warnSpy.mockRestore();
   });
 });

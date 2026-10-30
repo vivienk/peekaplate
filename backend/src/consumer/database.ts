@@ -138,10 +138,13 @@ export class PostgresObservationRepository implements ObservationRepository {
         ],
       );
 
-      // Typed fact persistence hook: when Jeffin's typed fact migrations land,
-      // facts will be inserted within this same transaction using record.sessionId.
+      // Typed fact persistence boundary: PR #31 writes the canonical index row (app_private.observation_index)
+      // and conflict records (app_private.observation_conflict) matching PR #32.
+      // Typed fact table persistence (app_private.observation_event and typed fact tables)
+      // belongs to follow-up work once PR #50's migration merges into develop and the producer
+      // contract provides server-derived traffic_class. The raw payload is fully preserved in R2.
       if (record.factData) {
-        // Reserved for future typed facts migration
+        // Reserved for future PR #50 typed facts integration
       }
 
       await this.client.query('COMMIT');
