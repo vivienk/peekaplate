@@ -8,13 +8,13 @@ const MetricStatusSchema = z.enum([
 	"suppressed",
 	"missing",
 	"stale",
-	"evidence_check_failed",
+	"evidence_check_failed"
 ]);
 
 // Wrapper interface linking data values to their collection states
 const MetricValueSchema = z.object({
 	value: z.number().nullable(),
-	status: MetricStatusSchema,
+	status: MetricStatusSchema
 });
 
 export const OwnerDishReportSchema = z.object({
@@ -26,17 +26,17 @@ export const OwnerDishReportSchema = z.object({
 		date_window: z.object({
 			start_time: z.string().datetime(),
 			end_time: z.string().datetime(),
-			duration_hours: z.number(),
+			duration_hours: z.number()
 		}),
 		coverage: z.object({
 			total_dishes_monitored: z.number(),
-			measurable_dishes_count: z.number(),
+			measurable_dishes_count: z.number()
 		}),
 		freshness: z.object({
 			last_event_ingested_at: z.string().datetime(),
-			is_stale: z.boolean(),
+			is_stale: z.boolean()
 		}),
-		report_status: z.enum(["NORMAL", "EMPTY", "STALE", "ERROR"]),
+		report_status: z.enum(["NORMAL", "EMPTY", "STALE", "ERROR"])
 	}),
 	dishes: z.array(
 		z.object({
@@ -48,10 +48,10 @@ export const OwnerDishReportSchema = z.object({
 				avg_interaction_time_seconds: MetricValueSchema,
 				open_rate: MetricValueSchema,
 				engagement_rate: MetricValueSchema,
-				save_rate: MetricValueSchema,
-			}),
-		}),
-	),
+				save_rate: MetricValueSchema
+			})
+		})
+	)
 });
 
 export type OwnerDishReport = z.infer<typeof OwnerDishReportSchema>;
