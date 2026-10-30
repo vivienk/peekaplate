@@ -523,6 +523,11 @@ The sandbox blocked the authentication test HTTP listener; rerunning with local 
 
 PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T19:27:42.930Z","exitCode":1}
+```
+
 # ERR-20261026-PREVIEW-REPAIR
 
 PR #41 merged successfully into develop, but automatic previews did not run:
@@ -706,3 +711,18 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T19:38:40.134Z","exitCode":1}
+```
+
+## 2026-10-30 — AI-01 develop-sync verification environment limit
+
+`pnpm verify context:check docs:check` could not start the checks in the fresh
+Windows agent worktree: pnpm's automatic dependency installation failed with
+EPERM while registering the project through a store symlink. No application
+test failed in this attempt. Direct `node scripts/context.mjs check` and
+`node scripts/check-docs.mjs` passed after context refresh; they do not replace
+the complete CI run. Run frozen installation and `pnpm check` in a capable
+environment, then verify the exact pushed merge revision in GitHub CI.
