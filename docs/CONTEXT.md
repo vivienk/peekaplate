@@ -13,17 +13,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3, preserving IDs, printed prices, hierarchy and code-point evidence with synthetic fixtures. Existing segment metadata preserves Python-validated candidate box links via a shared synthetic fixture; TypeScript does not independently verify OCR joins. This is an offline contract, not an accepted deployed review API. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/review-candidates.ts",
+        "packages/contracts/src/review-candidates.test.ts",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/source-spans.json",
+        "processing/tests/fixtures/review-candidates/README.md",
+        "processing/tests/fixtures/review-candidates/field-limits.json",
+        "processing/tests/fixtures/review-candidates/invalid-extraction.json",
+        "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
+        "processing/tests/fixtures/review-candidates/priced-candidate.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "0d75190a014cddd9f695d3f512afa2a52abb143dbc025be6f31e9525c6b205d4"
     },
     {
       "id": "tokens",
@@ -104,11 +119,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono verifies staff JWT/membership for atomic draft revisions and collaborator staging analytics; logout revocation is expiry-bounded. Observation bindings remain separate/paused; VIS04 retrieval guards SSRF, Unicode spans and aggregate limits. The staging extraction host verifies a15-minute tenant/job/hash grant and relays only the derived private source; signing keys never reach Python. Its bounded internal bundle path now retains report, final timings and unvalidated suggestions under create-only tenant/job/attempt R2 keys before returning the usual report with a private reference. No new public request/review fields, source-reading endpoint or database/publication writes are added. PR60 direct-container scheduling/readiness is preserved; baseline hosted synthetic access passed per main handoff. This archive extension remains local. Paired release, VIS01 identity/lease/report acceptance, provider quality and end-to-end acceptance remain gates.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
+        "backend/tsconfig.json",
+        "pnpm-lock.yaml",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
         "backend/src/dish-command.test.ts",
@@ -138,6 +155,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/menu-ingestion-infra.test.mjs",
         "backend/src/extraction-host.ts",
         "backend/src/extraction-host.test.ts",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
         "backend/wrangler.extraction.jsonc",
         "backend/src/extraction-capability.ts",
         "backend/tsconfig.json"
@@ -152,7 +171,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4ec280d24260cb2416d9f83022d78fba8db724fe304a2af308ba0e9bcaa12d66"
+      "sourceFingerprint": "7300436047e53531a33c1c6cd8895f1f55fb61def6741cb63b349fa7416b5e0d"
     },
     {
       "id": "database",
@@ -252,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "0e24f1c1c7ac2ea398bb929da107b3d9080f9048b277e683d6e446bf894840d3"
+      "sourceFingerprint": "dbdb9b3b2a2ec29d91ac0e563992dd0bdd763fe4982ebfab25c230a2ba73f2c0"
     },
     {
       "id": "agents",
@@ -314,7 +333,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Python PDF/image acquisition validates Engine3-compatible OCR, preserves later native pages after failures and retains evidence-linked needs_review drafts. Staging FastAPI/Uvicorn runs in the protected Cloudflare Container. October28 fresh operator-side OCR read three synthetic names/prices in4.654s without cache; key stored in GitHub staging and host bindings. This was not hosted full extraction or accuracy acceptance. Expected CLI exit2 preserves partial/failed reports. Full AI provider configuration and VIS01 feature acceptance remain pending. Python gets no source-signing/database credentials or publication permission.",
+      "summary": "PDF/photo modes keep ocr, default ocr_image and ungrounded image-only; pipeline3/schema2 and legacy1/2 remain compatible. Bounded wrapped titles/columns and corroborated text/geometry sections permit only complete price groups; conflicts, crossing/unclaimed cells and unresolved repeats abstain. Whole-entry guards and narrow name/footer views never rewrite source. Atomic assembly preserves exact fractional page/index/literal joins in existing candidate-ID segment metadata; SourceSpan/TS schemas and legacy empty-field omission stay unchanged. Originals stay unvalidated. Opt-in OCR recovery validates failed Engine3 pages and caps1–4 single attempts, stopping on failure. Selected-page model recovery preflights1–4 requests, retains history/incomplete coverage and never merges old candidates. Defaults/queues stay unchanged. Measured gains are modest; broad layout recall, fresh-provider, consumer and human acceptance remain unverified.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -328,6 +347,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/model_cache.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
+        "processing/src/peekaplate_processing/overlay_review.py",
+        "processing/src/peekaplate_processing/recover_pages.py",
         "processing/src/peekaplate_processing/pdf.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
         "processing/src/peekaplate_processing/schemas.py",
@@ -337,7 +358,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixture_factory.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
+        "processing/tests/test_overlay_review.py",
+        "processing/tests/test_overlay_saved_inputs.py",
         "processing/tests/test_pdf_images.py",
+        "processing/tests/test_box_evidence.py",
+        "processing/tests/test_box_grounding_safety.py",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
         "processing/tests/test_schemas.py",
         "processing/tests/test_workflow.py",
         "processing/uv.lock",
@@ -350,15 +376,48 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "test-data/README.md",
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
+        "processing/tests/test_service_artifacts.py",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
         "processing/Dockerfile",
-        "processing/.dockerignore"
+        "processing/.dockerignore",
+        "processing/src/peekaplate_processing/menu_context.py",
+        "processing/src/peekaplate_processing/menu_layout.py",
+        "processing/src/peekaplate_processing/vision.py",
+        "processing/src/peekaplate_processing/review_suggestions.py",
+        "processing/src/peekaplate_processing/review_candidates.py",
+        "processing/src/peekaplate_processing/timing.py",
+        "processing/tests/test_menu_context.py",
+        "processing/tests/test_menu_layout.py",
+        "processing/tests/test_layout_reconstruction.py",
+        "processing/tests/test_source_entry_recovery.py",
+        "processing/tests/test_recover_pages.py",
+        "processing/tests/test_targeted_model_recovery.py",
+        "processing/tests/test_menu_duplicates.py",
+        "processing/tests/test_input_modes.py",
+        "processing/tests/test_pipeline_timing.py",
+        "processing/tests/test_review_candidates.py",
+        "docs/processing-v3.md",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/review-candidates/README.md",
+        "processing/tests/fixtures/review-candidates/field-limits.json",
+        "processing/tests/fixtures/review-candidates/invalid-extraction.json",
+        "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
+        "processing/tests/fixtures/review-candidates/priced-candidate.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
-      "dependsOn": [],
-      "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
+      "dependsOn": [
+        "contracts"
+      ],
+      "sourceFingerprint": "4c1fa001b6761d0b35e27e52363459f031556407a5212becbff60fac043976c1"
     }
   ],
   "handoffs": [
@@ -419,6 +478,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
     },
     {
+      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service/host retention is tested with a shared synthetic bundle and create-only tenant/job/attempt storage, without new public request or RES fields. Real-menu runs, images, credentials and private reports remain excluded. Bounded box corroboration now carries exact validated provenance through atomic Python assembly and existing public segment metadata; SourceSpan and TS schemas stay unchanged, with legacy empty-field omission. Bounded layout/source-entry recovery and explicit capped OCR/model page recovery preserve failures and incomplete coverage; no automatic retry, live-provider or whole-menu-quality acceptance is implied.",
+      "modules": [
+        "processing",
+        "contracts"
+      ],
+      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Private suggestion retention follows Sai's bounded clarification. Obtain consumer rendering/save-reload acceptance of candidate-linked OCR metadata. Image-only public evidence, variant models and human quality acceptance remain deferred."
+    },
+    {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
       "modules": [
         "delivery"
@@ -442,14 +509,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
-    },
-    {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     }
   ]
 }

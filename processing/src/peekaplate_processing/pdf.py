@@ -1,18 +1,30 @@
 """Extract native PDF text; OCR pages with fewer than 20 visible characters."""
 import math
+import time
 import pymupdf
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.images import prepare_ocr_image
 from peekaplate_processing.ocr import OCRProvider, validate_ocr_settings
 from peekaplate_processing.schemas import SourceSegment
+from peekaplate_processing.timing import measure
 
 MAX_PDF_PAGES = 40
 MAX_RENDER_PIXELS = 6_000_000
 MIN_NATIVE_TEXT_CHARS = 20
 
 
-def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSegment]:
+def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider, *, page_numbers=None) -> list[SourceSegment]:
+    """Acquire all pages by default, or only explicit 1-based page numbers.
+
+    Selection never loads unselected pages. Returned identities stay source-wide;
+    callers retaining complete coverage must merge these segments themselves.
+    """
+    if page_numbers is not None:
+        if (not isinstance(page_numbers, (list, tuple)) or not page_numbers
+                or any(type(n) is not int or not 1 <= n <= MAX_PDF_PAGES for n in page_numbers)
+                or len(set(page_numbers)) != len(page_numbers)):
+            raise ExtractionError("Select distinct PDF page numbers between 1 and 40.")
     try:
         document = pymupdf.open(stream=data, filetype="pdf")
     except (RuntimeError, ValueError):
@@ -22,12 +34,19 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
             raise ExtractionError("Password-protected PDFs need an unlocked export.")
         if not 1 <= len(document) <= MAX_PDF_PAGES:
             raise ExtractionError("PDF must contain between 1 and 40 pages.")
+        if page_numbers is not None and any(n > len(document) for n in page_numbers):
+            raise ExtractionError("Selected page is outside the source PDF.")
         pages = []
         for index in range(len(document)):
+            if page_numbers is not None and index + 1 not in page_numbers:
+                continue
+            started=time.perf_counter()
+            timings={}
             segment = SourceSegment(segment_id=f"{source_id}#page-{index+1}", page_number=index+1, method="pdf_native")
             try:
-                page = document.load_page(index)
-                text = page.get_text("text", sort=True).strip()
+                with measure(timings, "native_text"):
+                    page = document.load_page(index)
+                    text = page.get_text("text", sort=True).strip()
                 if len(text) > 100_000:
                     raise ExtractionError("PDF page text exceeds the extraction limit.")
                 has_images = bool(page.get_image_info())
@@ -47,9 +66,12 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
                     if not all(math.isfinite(v) and 0 < v <= 14_400 for v in (width, height)):
                         raise ExtractionError("PDF page dimensions exceed the rendering limit.")
                     scale = min(2, math.sqrt(MAX_RENDER_PIXELS / (width * height)))
-                    pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csRGB, alpha=False)
-                    prepared, metadata = prepare_ocr_image(pixmap.tobytes("png"))
-                    response = ocr.extract(prepared)
+                    with measure(timings, "render"):
+                        pixmap = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csRGB, alpha=False)
+                    with measure(timings, "image_prepare"):
+                        prepared, metadata = prepare_ocr_image(pixmap.tobytes("png"))
+                    with measure(timings, "ocr"):
+                        response = ocr.extract(prepared)
                     validate_ocr_settings(response)
                     segment.text = response["text"]
                     segment.metadata.update({**metadata, "ocr_settings": response["settings"], "cache_hit": response["cache_hit"], "ocr_image_sha256": response.get("image_sha256"), "ocr_regions": response.get("regions", []), "ocr_region_status": response.get("region_status", "unavailable"), "ocr_coordinate_space": "uploaded_image_pixels"})
@@ -58,5 +80,8 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
             except (ExtractionError, RuntimeError, ValueError, OSError) as error:
                 segment.status = "failed"
                 segment.error = str(error) if isinstance(error, ExtractionError) else "PDF page extraction failed."
+            finally:
+                timings["total"]=round(time.perf_counter()-started, 6)
+                segment.metadata["timings_seconds"]=timings
             pages.append(segment)
         return pages

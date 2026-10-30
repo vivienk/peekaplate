@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export {
+  type ReviewCandidate,
+  type ReviewCandidateResult,
+  ReviewCandidateResultSchema,
+  ReviewCandidateSchema,
+} from './review-candidates';
+
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 
 export const HealthResponseSchema = z.strictObject({

@@ -30,17 +30,84 @@ under `work/` remain outside Git.
    LangGraph `Send` dispatches batches. The CLI defaults to one request at a time;
    `--llm-concurrency 2` allows two overlapping calls, with dispatches spaced
    at least 3.1 seconds apart.
-5. **Synthesizer:** combine worker results in page order using Python. No LLM call.
+5. **Synthesizer:** combine worker results in page order using Python. Carry an
+   explicit category into a supported continuation page and retain the heading's
+   source page. Missing/failed pages, unclear continuation and mixed main sections
+   clear this context. No additional LLM call.
 
-The LLM sees only `{"pages": [{"page_number": 1, "text": "..."}]}` plus its schema
-and extraction instructions. The prompt includes the exact generated JSON schema
+The default `--input-mode ocr_image` sends target page images together with
+acquired source text. `--input-mode ocr` preserves the earlier text-only path.
+Both receive up to 3,000 characters of previous-page `context_pages` when available.
+`--input-mode image` sends target images and a labelled previous-page image,
+without OCR or native-text extraction. It produces private unvalidated suggestions,
+not fabricated text-grounded candidates. See [input modes](../docs/processing-v3.md#input-modes-and-private-review-artifacts).
+
+The model receives the existing dish schema and extraction instructions. Context
+pages cannot produce dishes. The prompt includes the exact generated JSON schema
 and a complete synthetic input/output example, showing separate `price_amount`
 and `price_currency` keys and required unknown fields set to null. This reinforces
-provider-side schema requests; local strict validation remains mandatory. It does not receive OCR overlays or source images.
-Names/prices/attributes are checked literally against their cited page. Original
+provider-side schema requests; local strict validation remains mandatory. OCR overlay coordinates stay local; only the selected vision modes receive source images.
+Names/attributes are matched against their cited page while tolerating wrapped
+OCR headings. Price evidence is limited to the associated entry; ambiguous entry
+boundaries and explicit calorie/portion units cannot support a numeric price. Original
 page text is attached by code as evidence, avoiding model-generated source quotes.
 This is page-level evidence, not proof of correct dish/price associations.
 Unknown facts stay null and every dish remains `needs_review`.
+
+New results use **schema 2 / pipeline 3**, with `subcategory`, `price_text` for
+printed price options and `category_page_number` for heading provenance. Never
+pick a single price or invent option labels for `345 / 545`. The final run timing
+breakdown is in `timings.json`; see [pipeline changes and timing](../docs/processing-v3.md).
+
+The RES-01.1 exporter supports both earlier **schema 1 / pipeline 2** and current
+**schema 2 / pipeline 3** reports. Preparing saved results for the review API/UI
+needs no provider calls:
+
+```sh
+uv run --frozen python -m peekaplate_processing.review_candidates \
+  --input work/my-run/extraction.json --output work/my-run/review-candidates.json
+```
+
+This keeps original dishes, stable IDs, source/page evidence, processing failures
+and warnings. It checks the handoff data; human review still decides correctness.
+See [the review handoff guide](../docs/review-candidates.md) for the flow, schema,
+synthetic examples and manual tests.
+
+The matching shared review schema preserves hierarchy, heading provenance and
+printed price options. Vision groups split before calls to honor the16 MB budget including context;
+`--batch-pages` remains a maximum of10 by default, with no silent image resampling.
+Private raw/cleared/rejected values are kept separately in
+`review-suggestions.json`; they are not silently substituted into grounded originals. VIS-01 and review API consumers still need explicit
+version-2 integration; mixed version pairs are rejected rather than relabeled.
+
+The [bounded missing-ParsedText-price fallback](../docs/processing-v3.md#missing-parsedtext-prices-and-exact-box-links)
+can corroborate a model reading only when its canonical entry is unique and has no
+numeric evidence, and complete exact OCR row cells agree. Conflicts, signed/unit
+values and competing numeric titles abstain. Exact page/index/literal/fractional
+box records accompany the draft; the exporter validates them and adds candidate-ID
+links to existing segment metadata without changing `SourceSpan[]` or shared TS
+schemas. Private decisions identify box support explicitly; all outputs still need
+human review. Empty box evidence is omitted for legacy wire compatibility.
+Adjacent/wrapped title runs and known column boundaries can recover additional
+rows. Explicit source/geometry section context can distinguish repeated names;
+unknown context stays ambiguous. Narrow model-only trailing trademark replacement
+and structured terminal-contact boundaries never rewrite the saved source.
+
+[Targeted recovery](../docs/processing-v3.md#explicit-targeted-recovery) is explicit
+and capped, never automatic. `peekaplate_processing.recover_pages` reacquires only
+selected failed OCR pages, one HTTP attempt each, with a preserved attempt manifest.
+`run_pipeline --target-pages ... --max-model-requests ...` processes only selected
+saved ready pages and keeps incomplete coverage explicit; it never merges old
+candidates. Both require fresh output paths and can incur provider charges only
+when deliberately invoked. Tests/replays use no live providers. Cropped-model
+acquisition and hosted acceptance remain deferred.
+
+A separate [private OCR-box prototype](../docs/processing-v3.md#private-ocr-box-prototype)
+compares saved single-image overlays with saved image-model readings offline. It
+writes its own unvalidated transcript/proposals; it never populates standard draft
+prices, changes RES evidence or joins suggestion IDs to final candidates. The
+service does not retain it automatically. No new provider call or verification
+model is involved; keep inputs and output private.
 
 **LLM verification is yours to add.** No verification/review agent is included.
 Add your verification node after `synthesizer` in `workflow.py` when ready.
@@ -55,7 +122,8 @@ currently OCR.space Engine 3-compatible only: returned `settings` must contain
 the integer `OCREngine=3`. Both input paths reject incompatible settings before
 accepting text, so another engine cannot silently produce Engine 3 evidence.
 Supporting a different provider requires an explicit evidence-contract update.
-The default provider, CLI flags and environment names are unchanged.
+The provider and credential environment names are unchanged. The new input-mode
+flag deliberately defaults to OCR plus image; existing text-only callers can select `ocr`.
 
 From `processing`, configure your private `.env` using `.env.example`:
 
@@ -156,9 +224,10 @@ uv run --frozen python -m peekaplate_processing.run_pipeline \
   --llm-timeout 90
 ```
 
-For the approved smaller-batch trial, add `--batch-pages 2` and choose a fresh
-run directory. A 35-page document produces up to 18 sequential requests
+For an explicitly selected smaller-batch trial, add `--batch-pages 2` and choose
+a fresh run directory. A 35-page document then produces up to 18 requests
 (17 pairs and one final page), compared with four at the default size of ten.
+Add `--llm-concurrency 2` only when two overlapping calls are intended.
 This reduces work per request but may increase total calls and pacing overhead;
 live performance must be measured. Deadlines, strict validation and page-level
 evidence are unchanged. Invalid batch sizes are rejected before acquisition.
