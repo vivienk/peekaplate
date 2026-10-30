@@ -26,6 +26,39 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
     },
     {
+      "id": "tokens",
+      "status": "foundation",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console: motion, typography, radius, spacing, shadows, color palette, and color roles for Button/Navigation/surface/status/input. Chip roles added; WCAG contrast test covers active pairs. Light theme via :root[data-theme=\"light\"] remaps surface/on-surface/outline/input/button/nav roles to gray palette for Console; diner keeps dark :root defaults.",
+      "paths": [
+        "packages/tokens/package.json",
+        "packages/tokens/src/tokens.css",
+        "packages/tokens/src/tokens.test.ts"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0004-visual-tiers.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "657afec34a4f9c2da845e614be17fc732469c7d06154242955706c31d8c372b1"
+    },
+    {
+      "id": "ui",
+      "status": "foundation",
+      "summary": "Shared framework-agnostic component CSS (Button, Card, Input, Typography, Nav) on @peekaplate/tokens. Text button uses --pp-role-on-surface for theme-safe contrast. Console wraps classes in React. Consumed via @peekaplate/ui/components.css.",
+      "paths": [
+        "packages/ui/package.json",
+        "packages/ui/src/index.ts",
+        "packages/ui/src/components.css"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md"
+      ],
+      "dependsOn": [
+        "tokens"
+      ],
+      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
+    },
+    {
       "id": "diner",
       "status": "foundation",
       "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. See docs/posthog.md for activation and evidence limits.",
@@ -43,9 +76,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [
-        "contracts"
+        "contracts",
+        "tokens"
       ],
-      "sourceFingerprint": "277a8be5e4b45ef41eba68d87907024a6aa89c030677e64af388f97f6d5f5221"
+      "sourceFingerprint": "d08f53d1c49393f7eac8dc4e6060b73e005fb8503094ed776c6ddb0ee9e6978f"
     },
     {
       "id": "console",
@@ -62,9 +96,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
       "dependsOn": [
-        "contracts"
+        "contracts",
+        "tokens"
       ],
-      "sourceFingerprint": "76fee1388a2aa45d7ffaf13527a727816305f7038d4f48e0d17cb00181145893"
+      "sourceFingerprint": "78a1ac131ac431ba3657c64a8f8101e0b1ddfa52c1d3efa69ae85a90cfacbf39"
     },
     {
       "id": "backend",
@@ -220,7 +255,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "026590781ff55b814e68b33de98a8c19db7771354176c287e4dcedac8cbfe06e"
+      "sourceFingerprint": "0e24f1c1c7ac2ea398bb929da107b3d9080f9048b277e683d6e446bf894840d3"
     },
     {
       "id": "agents",
@@ -338,6 +373,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Teeyansh's PR #31 consumer writes these exact tables, so merge this migration before deploying the consumer. Then add the typed fact tables and the owner report view that Louis's PR #22 will read. Sai and Vivien apply migrations to staging."
     },
     {
+      "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
+      "modules": [
+        "tokens",
+        "ui",
+        "diner",
+        "console"
+      ],
+      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
+    },
+    {
       "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
       "modules": [
         "backend",
@@ -407,14 +452,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
-    },
-    {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     }
   ]
 }
