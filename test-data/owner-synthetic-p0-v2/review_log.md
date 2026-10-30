@@ -2,7 +2,7 @@
 
 **Last updated:** October 30, 2026  
 
-**Status:** 75 local Python tests passed; full and starter standalone validators passed on October 30, 2026. Saved evidence files still require refreshing. Awaiting independent re-review and product decisions. Not production-approved.  
+**Status:** 75 local Python tests passed; full and starter standalone validators passed on October 30, 2026. Saved evidence files have been refreshed and verified: test_results.txt records 75 passing tests, and validation_results.txt and starter_validation_results.txt record successful full and starter dataset validation, including comparison Start/Replace ordering and attribution checks. Awaiting independent re-review and product decisions. Not production-approved.  
 
 **Dataset version:** `p0-v2-synthetic-1.0`
 
@@ -46,7 +46,7 @@ python validate_full_dataset.py
 
 **Historical validator detail:** 300 detail openings, 450 checkpoints, 150 displayed comparison flows (300 displayed pair events reported in later revision), 450 direct Saves, 150 Undo restorations, 450 successful Unsaves, 1,050 shortlist-size validations; 150 openings at 10 seconds and 150 at 5 seconds; average active time 7.5 seconds. Exposure sessions: A=300, B=300, C=150. Opening sessions: A=150, B=150, C=0. Linked opening rates: A=50%, B=50%, C=0%. Save adoption: 300/300 sessions.
 
-`test_results.txt` and `validation_results.txt` are intended evidence artifacts; **their contents must be refreshed from the latest run before handoff**. Historical 55- and 62-test results are not current submission evidence; refresh these files using the latest verified commands before handoff.
+`test_results.txt` and `validation_results.txt` are intended evidence artifacts; **their contents have been refreshed and verified against the latest local runs**. Historical 55- and 62-test results are not current submission evidence; refresh these files using the latest verified commands before handoff.
 
 **Latest local verification — October 30, 2026:** Running `python -m unittest discover -s test-data/owner-synthetic-p0-v2/tests -v` from the repository root returned **Ran 75 tests in 31.913s — OK**, including **22 real-validator integration tests**. The tests cover comparison events without `opening_id` and agreement between engagement helpers for a 10-second nonfinal checkpoint. Both standalone validators were subsequently rerun successfully using `--dataset full` (default) and `--dataset starter`. Saved evidence files still require refreshing.
 
