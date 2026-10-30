@@ -77,7 +77,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
         "vitest.config.ts",
-        "frontend/diner/src/track.ts",
+        "frontend/diner/src/tracking/index.ts",
+        "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
         "frontend/diner/src/menu/events.test.ts"
       ],
@@ -88,7 +89,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c224915fcbf9f30f0c263f76cf07b898df4af5850208752f3843435494465b92"
+      "sourceFingerprint": "dd6e06fec6fd580843acce7bfda03ceb0886dcbe9d5d418c5f96631b85c196a9"
     },
     {
       "id": "console",
@@ -372,7 +373,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/track.ts is the shared console-only placeholder for S3-TRK-01 (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
+      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
       "modules": [
         "diner"
       ],

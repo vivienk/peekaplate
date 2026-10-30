@@ -1,6 +1,6 @@
 // DIN-01 UI triggers for menu_viewed and dish_detail_opened (Taxonomy v0.2, matrix v0.1g). Screens
 // call these at the moment the content is readable; the shared tracking layer adds the envelope.
-import { track } from '../track';
+import { track } from '../tracking';
 import type { Dish, Menu } from './types';
 
 export const ENTRY_SOURCES = ['qr', 'direct_link', 'unknown'] as const;
