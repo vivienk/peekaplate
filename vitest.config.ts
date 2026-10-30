@@ -7,6 +7,7 @@ export default defineConfig({
       'backend/*.test.mjs',
       'packages/*/src/**/*.test.ts',
       'frontend/diner/src/**/*.test.ts',
+      'frontend/console/src/**/*.test.tsx',
     ],
   },
 });
