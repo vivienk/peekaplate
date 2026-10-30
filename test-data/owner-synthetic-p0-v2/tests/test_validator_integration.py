@@ -238,6 +238,20 @@ class TestValidatorIntegration(unittest.TestCase):
             result.stdout + result.stderr,
         )
 
+    def test_comparison_without_opening_id_accepted(self):
+        rows = copy.deepcopy(self.original)
+
+        for row in rows:
+            if row["event_type"] == "dish_compared":
+                row.pop("opening_id", None)
+
+        result = self.run_validator(rows)
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr,
+        )
+
     def test_comparison_replace_before_start_rejected(self):
         rows = copy.deepcopy(self.original)
 

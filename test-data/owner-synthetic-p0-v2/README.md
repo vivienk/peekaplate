@@ -1,8 +1,8 @@
 # PeekaPlate Owner Synthetic Dataset — P0 v2
 
-**Status:** Draft for re-review
+**Status:** Draft for independent re-review
 **Dataset Version:** `p0-v2-synthetic-1.0`
-**Last Updated:** October 25, 2026
+**Last Updated:** October 30, 2026
 
 ## 1. Project Overview
 
@@ -11,6 +11,7 @@ This package contains fictional synthetic event data for testing PeekaPlate's ow
 The dataset is intended for local evaluation and independent review.
 
 **Important limitations:**
+
 - This is not production customer data.
 - It is not approved for production database import.
 - Passing local tests does not prove production integration correctness.
@@ -62,7 +63,7 @@ The repeated story is not suitable for establishing real customer trends or grow
 - `tests/test_fixture.py` — Dataset structure and expected values.
 - `tests/test_negative_cases.py` — Negative-case checks.
 - `tests/test_metric_examples.py` — Event-derived engagement calculations.
-- `tests/test_session_completion.py` — Standalone finalized-retention examples.
+- `tests/test_session_completion.py` — Standalone observed-visit engagement, inactivity splitting, and Save-retention examples (not order completion).
 - `tests/test_validator_integration.py` — Real-validator regression tests.
 - `tests/test_ai_report_inputs.py` — AI fixture references, suppression, execution status, and prohibited private fields.
 
@@ -70,8 +71,9 @@ The repeated story is not suitable for establishing real customer trends or grow
 
 - `metric_examples.json` — Six event-derived engagement examples.
 - `review_log.md` — Validation evidence, review findings, and outstanding decisions.
-- `test_results.txt` — Saved test output; refresh when preparing the final handoff.
-- `validation_results.txt` — Saved validator output; refresh when preparing the final handoff.
+- `test_results.txt` — Saved output from the latest local Python test run.
+- `validation_results.txt` — Saved full-dataset validator output.
+- `starter_validation_results.txt` — Saved starter-dataset validator output.
 - `failure_ledger.csv` — Failure tracking and evaluation evidence.
 
 ## 4. Local Setup
@@ -112,16 +114,24 @@ python -m unittest discover -s tests -p "test_*.py" -v
 python validate_full_dataset.py
 ```
 
-These commands provide the local dataset generation, automated testing, and validation workflow.
+### Validate the starter dataset
+
+```powershell
+python validate_full_dataset.py --dataset starter
+```
+
+These commands are intended to run from the `test-data/owner-synthetic-p0-v2` directory.
 
 ## 5. Latest Local Validation Results
 
-**Verification date:** October 25, 2026
+**Verification date:** October 30, 2026 — 75 Python tests passed; full and starter dataset validators passed after the latest changes.
 
 | Check | Result |
 |---|---|
-| Automated unit and integration tests | PASS - 73 tests |
+| Automated unit and integration tests | PASS — 75 tests |
+| Real-validator integration tests | PASS — 22 tests included in the total |
 | Full dataset validation | PASS |
+| Starter dataset validation | PASS |
 | JSON Schema validation | PASS |
 | Timezone-aware timestamp validation | PASS |
 | Duplicate delivery handling | PASS |
@@ -132,11 +142,11 @@ These commands provide the local dataset generation, automated testing, and vali
 | Application AI evaluation | NOT RUN |
 | Production integration testing | NOT ESTABLISHED |
 
-The full dataset validator confirmed:
+The full-dataset validator was rerun successfully on October 30, 2026, after the latest schema and test changes. The following results were confirmed:
 
 - 300 valid detail openings
 - 450 valid activity checkpoints
-- 150 displayed comparisons
+- 300 displayed pair events across 150 comparison flows
 - 450 direct Saves
 - 150 Undo restorations
 - 450 successful Unsaves
@@ -145,7 +155,18 @@ The full dataset validator confirmed:
 - 150 five-second openings
 - Average active opening time of 7.5 seconds
 
-These results apply to the synthetic dataset and its local validator.
+The starter validator also passed, confirming:
+
+- 2 valid detail openings
+- 3 valid activity checkpoints
+- 2 displayed pair events in 1 comparison flow
+- 3 direct Saves
+- 1 Undo restoration
+- 3 successful Unsaves
+- 7 validated shortlist sizes
+- Average active opening time of 7.5 seconds
+
+These results apply to the synthetic datasets and their local validators.
 
 ## 6. Proposed Event Schema
 
@@ -163,9 +184,11 @@ Each observation must satisfy the applicable rules in `schema.json`.
 
 The validator checks required fields, valid event types, event IDs, positive sequence numbers, timestamp formatting and timezone awareness, and relevant event relationships.
 
+A `dish_compared` event does not require `opening_id` when its other schema and relationship requirements are satisfied. An activity checkpoint must still reference a valid earlier opening.
+
 **The synthetic schema is not an approved production event or ingestion contract.**
 
-Production event/API mapping requires separate review.
+Production event/API mapping requires separate review. A local passing validator does not establish compatibility with the live ingestion contract.
 
 ## 7. Validator Regression Testing
 
@@ -185,8 +208,10 @@ Examples include:
 10. Timestamp without timezone information — rejected.
 11. Checkpoint with an incorrect dish reference — rejected.
 12. Invalid Undo restoration of an already-saved dish — rejected.
+13. Comparison without `opening_id` — accepted when other schema and relationship rules are met.
+14. Replace comparison before a Start event in the same flow — rejected.
 
-The integration test suite includes 21 tests covering valid and invalid validator behavior.
+The integration test suite includes 22 tests covering valid and invalid validator behavior, including comparison events with no `opening_id` and rejection of Replace-before-Start ordering.
 
 Invalid records are expected to fail with useful error information rather than silently passing.
 
@@ -203,12 +228,12 @@ They cover:
 5. Exactly 10 seconds of active visible time.
 6. Displayed comparison without a linked opening.
 
-The proposed considered-dish rule requires either:
+The locally implemented provisional considered-dish rule requires either:
 
 - At least 10 seconds of active visible time; or
-- A qualifying displayed comparison associated with the appropriate opening.
+- A displayed Start or Replace comparison involving a dish opened earlier in the same session (provisional attribution).
 
-Activity checkpoints represent cumulative active time and must not be added together as independent durations.
+Activity checkpoints represent cumulative active time and must not be added together as independent durations. A valid linked 10-second checkpoint qualifies even when `is_final` is `false`; the maximum valid checkpoint for an opening is used.
 
 A Save event alone does not establish considered-dish engagement.
 
@@ -221,9 +246,9 @@ Under the current provisional interpretation, the full synthetic dataset produce
 
 Dish B's result must remain provisional until comparison attribution is approved.
 
-## 9. Saved State and Finalized Retention
+## 9. Story-end Saved State and Observed Save Retention
 
-Story-end Saved state and finalized retention are different measurements.
+Story-end Saved state and descriptive observed Save retention are distinct from checkout, order completion, or completed-session retention.
 
 ### Story-end Saved state
 
@@ -232,28 +257,19 @@ The original two-session story ends with:
 - Session X: Dish A saved.
 - Session Y: No dishes saved.
 
-These are fixture-end Saved-state assertions, not verified completed-session retention.
+These are fixture-end Saved-state assertions; they do not establish a completed order or confirmed application-session completion.
 
-### Finalized retention
+### Observed Save retention (descriptive)
 
-The proposed retention policy uses:
+The standalone helper `observed_save_retention(sessions, dish_id)` computes:
 
-**Numerator:** Completed sessions that directly saved the dish and still have it Saved at completion.
+- **Denominator:** Observed sessions/visits in which the dish was directly saved (`directly_saved_dishes`).
+- **Numerator:** Those directly-saving sessions/visits in which the dish remains in `saved_dishes` at the observation boundary.
+- **Rate:** Numerator divided by denominator, or `null` when the denominator is zero.
 
-**Denominator:** Completed sessions that directly saved that dish.
+The calculation excludes observed visits that never directly saved the dish. It does **not** require proof of checkout, order completion, or a final application-session event. A Save by itself does not establish considered-dish engagement.
 
-The calculation excludes:
-
-- Unfinished sessions.
-- Completed sessions that never directly saved the dish.
-
-When the denominator is zero, the retention rate is `null`.
-
-Standalone automated examples cover retained savers, completed savers who no longer retain the dish, and cases with no eligible completed savers.
-
-The main synthetic dataset does not independently establish session completion.
-
-An explicit completion event or approved inactivity-timeout rule is required before finalized retention can be calculated from application data.
+Standalone examples also exercise a proposed 30-minute inactivity split for observed visits; the session/visit boundary and completion policy still require product-owner confirmation. The synthetic dataset does not prove order completion, completed-session retention, or production behavior.
 
 ## 10. AI Evaluation Cases
 
@@ -329,16 +345,16 @@ The package must not imply that all cataloged negative cases have passed merely 
 
 ## 13. Review Status
 
-Sai completed an initial independent review and identified issues involving validator enforcement, engagement examples, retention definitions, AI input fixtures, and handoff documentation.
+Sai (hemu77) completed an independent review and identified issues involving validator enforcement, engagement examples, retention definitions, AI input fixtures, and handoff documentation.
 
 The revised local package includes updates addressing these areas.
 
-**The revised package still requires independent re-review.**
+**The revised package still requires independent re-review.** The 75 Python tests and both dataset validators passed locally on October 30, 2026, but these results do not establish independent acceptance, production integration, or application-level correctness.
 
 Outstanding decisions and checks include:
 
 - Approval of metric definitions and comparison attribution.
-- Approval of session completion and inactivity-timeout policy.
+- Confirmation of observed-visit inactivity boundary and separate session/order-completion policy.
 - Production event/API contract mapping.
 - Production privacy suppression and tenant-isolation testing.
 - Application-level AI evaluation.
@@ -351,10 +367,10 @@ Do not mark pending decisions as approved without explicit evidence.
 
 Before submitting the revised package:
 
-1. Generate the full dataset.
+1. Generate or verify the full dataset.
 2. Run the complete automated test suite.
-3. Run the full dataset validator.
-4. Refresh `test_results.txt` and `validation_results.txt` with current results.
+3. Run the full and starter dataset validators.
+4. Refresh `test_results.txt`, `validation_results.txt`, and `starter_validation_results.txt` with current results.
 5. Verify that all 20 AI cases remain marked NOT RUN against application AI.
 6. Review `manifest.json`, `negative_cases.json`, and `review_log.md` for consistency.
 7. Provide the updated dataset package and evidence to Sai for independent re-review.
@@ -362,7 +378,7 @@ Before submitting the revised package:
 
 **Related ClickUp ticket:** https://app.clickup.com/t/90141746115/86bcng0d7
 
-The dataset is fictional and intended for evaluation. This handoff does not certify production behavior, privacy compliance, finalized retention, or application-AI performance.
+The dataset is fictional and intended for evaluation. This handoff does not certify production behavior, privacy compliance, order completion, completed-session retention, or application-AI performance.
 
 ## AI Evaluation Input Boundary
 

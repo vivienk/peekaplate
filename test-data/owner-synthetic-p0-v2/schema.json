@@ -139,7 +139,6 @@
           "compare_action",
           "pair_version",
           "dish_ids",
-          "opening_id",
           "display_state"
         ]
       }

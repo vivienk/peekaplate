@@ -67,7 +67,7 @@
     "file": "negative_cases.json",
     "defined": 25,
     "helper_tests_implemented": 10,
-    "validator_integration_tests": 19,
+    "validator_integration_tests": 22,
     "execution_scope": "LOCAL_HELPER_AND_VALIDATOR_TESTS_ONLY",
     "catalog_mapping_file": "negative_case_test_mapping.json",
     "catalog_mapping_status": "PARTIAL_LOCAL_COVERAGE_DOCUMENTED",
@@ -84,7 +84,7 @@
   "evidence": {
     "unit_test_results": "test_results.txt",
     "dataset_validation_results": "validation_results.txt",
-    "unit_tests_passed": 70,
+    "unit_tests_passed": 75,
     "validation_status": "LOCAL_SYNTHETIC_CHECKS_PASSED",
     "starter_validation_results": "starter_validation_results.txt"
   },

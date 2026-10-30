@@ -47,7 +47,7 @@ def engagement_status(events):
 
         elif event_type == "dish_activity_checkpoint":
             dish = event["dish_id"]
-            if dish in opened and event.get("is_final") is True:
+            if dish in opened:
                 active_ms[dish] = max(
                     active_ms.get(dish, 0),
                     event["cumulative_active_ms"],
@@ -100,6 +100,27 @@ class TestSessionInactivity(unittest.TestCase):
         path = PROJECT_ROOT / "expected_answers.json"
         data = json.loads(path.read_text(encoding="utf-8"))
         cls.example = data["session_inactivity_example"]
+
+    def test_nonfinal_ten_second_checkpoint_agrees_with_considered_dishes(self):
+        from test_metric_examples import considered_dishes
+
+        events = [
+            {
+                "event_type": "dish_detail_opened",
+                "dish_id": "dish-A",
+                "opening_id": "opening-A",
+            },
+            {
+                "event_type": "dish_activity_checkpoint",
+                "dish_id": "dish-A",
+                "opening_id": "opening-A",
+                "cumulative_active_ms": 10000,
+                "is_final": False,
+            },
+        ]
+
+        self.assertEqual(considered_dishes(events), {"dish-A"})
+        self.assertEqual(engagement_status(events), "engaged (provisional)")
 
     def test_standalone_engagement_examples(self):
         for session in self.example["sessions"]:
