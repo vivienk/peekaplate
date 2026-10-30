@@ -110,6 +110,23 @@ describe('session-only fallback', () => {
   });
 });
 
+describe('re-reading the latest saves', () => {
+  it('returns what another tab wrote', () => {
+    const storage = new FakeStorage();
+    const persistence = createSavedPersistence({ venueId: VENUE_A, storage });
+    createSavedPersistence({ venueId: VENUE_A, storage }).persist(['y', 'x']);
+    expect(persistence.reread()).toEqual(['y', 'x']);
+  });
+
+  it('reports a failed read as null, not as an empty list', () => {
+    const storage = new FakeStorage();
+    const persistence = createSavedPersistence({ venueId: VENUE_A, storage });
+    persistence.persist(['x']);
+    storage.failReads = true;
+    expect(persistence.reread()).toBeNull();
+  });
+});
+
 describe('damaged stored data', () => {
   const loadRaw = (raw: string) => {
     const storage = new FakeStorage();

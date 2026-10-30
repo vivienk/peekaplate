@@ -328,3 +328,93 @@ describe('Undo at the state level', () => {
     expect(state.save(DISH.harvestPowerBowl).changed).toBe(true);
   });
 });
+
+// Adam, 30 Oct: no live sync in P0, but each save or unsave re-reads storage, applies only its
+// own change and writes it back, so a stale tab can never wipe saves made in another tab.
+describe('two tabs of the same restaurant', () => {
+  async function twoTabs() {
+    const storage = new FakeStorage();
+    const menu = await loadMenu();
+    const tabA = createSaveState({ venueId: menu.venueId, storage });
+    const tabB = createSaveState({ venueId: menu.venueId, storage });
+    tabA.reconcile(menu);
+    tabB.reconcile(menu);
+    return { storage, menu, tabA, tabB };
+  }
+
+  it("a stale tab's save keeps the other tab's saves", async () => {
+    const { storage, menu, tabA, tabB } = await twoTabs();
+    tabB.save(DISH.avocadoToast);
+    expect(tabA.save(DISH.harvestPowerBowl)).toEqual({
+      changed: true,
+      persisted: true,
+      savedCount: 2,
+    });
+    expect(stored(storage, menu.venueId).dishIds).toEqual([
+      DISH.harvestPowerBowl,
+      DISH.avocadoToast,
+    ]);
+    expect(tabA.savedDishIds()).toEqual([DISH.harvestPowerBowl, DISH.avocadoToast]);
+  });
+
+  it("a stale tab's unsave removes only its own dish", async () => {
+    const { storage, menu, tabA, tabB } = await twoTabs();
+    tabA.save(DISH.avocadoToast);
+    tabB.save(DISH.harvestPowerBowl);
+    tabA.unsave(DISH.avocadoToast);
+    expect(stored(storage, menu.venueId).dishIds).toEqual([DISH.harvestPowerBowl]);
+  });
+
+  it("reports no change for another tab's work, but refreshes the screens", async () => {
+    const { tabA, tabB } = await twoTabs();
+    tabB.save(DISH.avocadoToast);
+    const listener = vi.fn();
+    tabA.subscribe(listener);
+    expect(tabA.save(DISH.avocadoToast)).toEqual({
+      changed: false,
+      persisted: false,
+      savedCount: 1,
+    });
+    expect(tabA.isSaved(DISH.avocadoToast)).toBe(true);
+    expect(listener).toHaveBeenCalledOnce();
+
+    tabB.unsave(DISH.avocadoToast);
+    expect(tabA.unsave(DISH.avocadoToast).changed).toBe(false);
+    expect(tabA.isSaved(DISH.avocadoToast)).toBe(false);
+  });
+
+  it('re-checks against the latest saves on reload', async () => {
+    const [first, second] = await loadMenus('withdrawal', 2);
+    if (!first || !second) throw new Error('missing menus');
+    const storage = new FakeStorage();
+    const tabA = createSaveState({ venueId: first.venueId, storage });
+    const tabB = createSaveState({ venueId: first.venueId, storage });
+    tabA.reconcile(first);
+    tabB.reconcile(first);
+    tabB.save(DISH.salmonPokeBowl);
+    tabB.save(DISH.harvestPowerBowl);
+    expect(tabA.reconcile(second)).toEqual({ removed: [DISH.salmonPokeBowl] });
+    expect(stored(storage, first.venueId).dishIds).toEqual([DISH.harvestPowerBowl]);
+  });
+
+  it('keeps its own list when storage cannot be read for a moment', async () => {
+    const { storage, tabA } = await twoTabs();
+    tabA.save(DISH.avocadoToast);
+    storage.failReads = true;
+    tabA.save(DISH.harvestPowerBowl);
+    expect(tabA.savedDishIds()).toEqual([DISH.harvestPowerBowl, DISH.avocadoToast]);
+  });
+
+  it('stays memory-only in session-only mode', async () => {
+    const { storage, menu } = await readyState();
+    storage.failWrites = true;
+    const tab = createSaveState({ venueId: menu.venueId, storage });
+    tab.reconcile(menu);
+    storage.values.set(
+      savedKey(menu.venueId),
+      JSON.stringify({ version: 1, dishIds: [DISH.eggsBenedict] }),
+    );
+    tab.save(DISH.avocadoToast);
+    expect(tab.savedDishIds()).toEqual([DISH.avocadoToast]);
+  });
+});

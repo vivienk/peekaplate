@@ -26,6 +26,10 @@ export type SaveState = {
   subscribe(listener: () => void): () => void;
 };
 
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
 function menuDishIds(menu: Menu): Set<string> {
   return new Set(menu.categories.flatMap((category) => category.dishes.map((d) => d.dishId)));
 }
@@ -54,9 +58,28 @@ export function createSaveState({
     }
   }
 
-  // Write, then update the state, then notify, then report the result to the caller.
-  function apply(next: readonly string[]): SaveChange {
-    if (next === dishIds) return { changed: false, persisted: false, savedCount: dishIds.length };
+  // Another tab may have changed storage since this one last read it (Adam, 30 Oct: no live sync
+  // in P0). In persistent mode every change starts from the latest stored list, so a stale tab
+  // never writes back an old one. Session-only mode cannot write, so it stays memory-only, and a
+  // failed read keeps this tab's list. Returns true when the list was refreshed.
+  function refresh(): boolean {
+    if (persistence.mode() !== 'persistent') return false;
+    const latest = persistence.reread();
+    if (latest === null || sameIds(latest, dishIds)) return false;
+    dishIds = latest;
+    return true;
+  }
+
+  // Applies this tab's own change to the latest list: write, then update the state, then notify,
+  // then report the result. Another tab's work is never reported as this tab's change, so it can
+  // never fire an event; a refresh alone only updates the screens.
+  function change(update: (ids: readonly string[]) => readonly string[]): SaveChange {
+    const refreshed = refresh();
+    const next = update(dishIds);
+    if (next === dishIds) {
+      if (refreshed) notify();
+      return { changed: false, persisted: false, savedCount: dishIds.length };
+    }
     const persisted = persistence.persist(next);
     dishIds = next;
     notify();
@@ -75,19 +98,22 @@ export function createSaveState({
       if (!inMenu?.has(dishId)) {
         return { changed: false, persisted: false, savedCount: dishIds.length };
       }
-      return apply(addNewest(dishIds, dishId));
+      return change((ids) => addNewest(ids, dishId));
     },
 
-    unsave: (dishId) => apply(withoutDish(dishIds, dishId)),
+    unsave: (dishId) => change((ids) => withoutDish(ids, dishId)),
 
     // Call only after a successful menu load: a failed load must never wipe saves. Withdrawn
     // dishes are removed (not a diner action, so no event); incomplete ones stay as placeholders.
     reconcile(menu) {
       if (menu.venueId !== venueId) return { removed: [] };
-      inMenu = menuDishIds(menu);
-      const current = inMenu;
-      const removed = dishIds.filter((id) => !current.has(id));
-      if (removed.length > 0) apply(dishIds.filter((id) => current.has(id)));
+      const current = menuDishIds(menu);
+      inMenu = current;
+      let removed: string[] = [];
+      change((ids) => {
+        removed = ids.filter((id) => !current.has(id));
+        return removed.length > 0 ? ids.filter((id) => current.has(id)) : ids;
+      });
       return { removed };
     },
 

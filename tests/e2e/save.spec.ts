@@ -57,6 +57,7 @@ async function openSaveState(page: Page, scenario: Scenario, incompleteDish?: st
 type PageGlobals = {
   saveState: {
     save(id: string): unknown;
+    unsave(id: string): unknown;
     savedDishIds(): string[];
     mode(): string;
     isSaveAvailable(): boolean;
@@ -67,6 +68,8 @@ type PageGlobals = {
 const saveState = (page: Page) => ({
   save: (id: string) =>
     page.evaluate((dishId) => (window as unknown as PageGlobals).saveState.save(dishId), id),
+  unsave: (id: string) =>
+    page.evaluate((dishId) => (window as unknown as PageGlobals).saveState.unsave(dishId), id),
   read: () =>
     page.evaluate(() => {
       const state = (window as unknown as PageGlobals).saveState;
@@ -176,4 +179,35 @@ test('two restaurants in the same browser keep separate saves', async ({ page })
   const otherKey = `peekaplate:saved:v1:${venueId.replace(/1$/, '2')}`;
   expect(await page.evaluate((key) => window.localStorage.getItem(key), otherKey)).toBeNull();
   expect(await storedValue(page, venueId)).not.toBeNull();
+});
+
+// Adam, 30 Oct: no live sync in P0, but a stale tab must never wipe saves made in another tab.
+test('a stale tab never wipes saves made in another tab of the same restaurant', async ({
+  context,
+}) => {
+  const tabA = await context.newPage();
+  const tabB = await context.newPage();
+  const { venueId, dish } = await openSaveState(tabA, 'edge-cases');
+  await openSaveState(tabB, 'edge-cases');
+
+  // Tab B saves first; tab A has not reloaded, so its list is stale.
+  await saveState(tabB).save(dish.avocadoToast ?? '');
+  expect(await saveState(tabA).save(dish.harvestPowerBowl ?? '')).toEqual({
+    changed: true,
+    persisted: true,
+    savedCount: 2,
+  });
+  expect(JSON.parse((await storedValue(tabA, venueId)) ?? 'null').dishIds).toEqual([
+    dish.harvestPowerBowl,
+    dish.avocadoToast,
+  ]);
+
+  // Tab A saving the dish tab B already saved is not reported as tab A's change.
+  expect(await saveState(tabA).save(dish.avocadoToast ?? '')).toMatchObject({ changed: false });
+
+  // A stale unsave in tab B removes only its own dish.
+  await saveState(tabB).unsave(dish.avocadoToast ?? '');
+  expect(JSON.parse((await storedValue(tabB, venueId)) ?? 'null').dishIds).toEqual([
+    dish.harvestPowerBowl,
+  ]);
 });

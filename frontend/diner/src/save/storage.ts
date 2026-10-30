@@ -72,6 +72,17 @@ export function createSavedPersistence({
       }
     },
 
+    // The latest list another tab may have written, or null when storage can't be read right now,
+    // so a failed read is never mistaken for "nothing saved".
+    reread(): string[] | null {
+      if (!storage) return null;
+      try {
+        return parseSaved(storage.getItem(key));
+      } catch {
+        return null;
+      }
+    },
+
     // True only when the write committed. A failed write switches to session-only for the rest
     // of the visit, and later writes are skipped so nothing is backfilled.
     persist(dishIds: readonly string[]): boolean {
