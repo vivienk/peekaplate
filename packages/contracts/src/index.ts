@@ -1,5 +1,38 @@
 import { z } from 'zod';
 
+export {
+  type ReviewCandidate,
+  type ReviewCandidateResult,
+  ReviewCandidateResultSchema,
+  ReviewCandidateSchema,
+} from './review-candidates';
+export {
+  type CandidateCorrectedFields,
+  CandidateCorrectedFieldsSchema,
+  type CandidateReviewRecord,
+  CandidateReviewRecordSchema,
+  type CandidateReviewScope,
+  CandidateReviewScopeSchema,
+  type ExtractionReviewScope,
+  ExtractionReviewScopeSchema,
+  type ExtractionReviewSessionResponse,
+  ExtractionReviewSessionResponseSchema,
+  type PrivateArtifactRef,
+  PrivateArtifactRefSchema,
+  type ResolvedCandidateFields,
+  ResolvedCandidateFieldsSchema,
+  type ReviewCandidateCommand,
+  ReviewCandidateCommandSchema,
+  type ReviewCandidateItemResponse,
+  ReviewCandidateItemResponseSchema,
+  type ReviewCandidateStatus,
+  ReviewCandidateStatusSchema,
+  type ReviewEditableField,
+  ReviewEditableFieldSchema,
+  type UpsertExtractionReviewSessionRequest,
+  UpsertExtractionReviewSessionRequestSchema,
+} from './review-persistence';
+
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 
 export const HealthResponseSchema = z.strictObject({

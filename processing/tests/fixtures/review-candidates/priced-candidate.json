@@ -1,0 +1,24 @@
+{
+  "candidate_id": "draft:27d0c94f31358afb46af7b114ab8703f",
+  "original": {
+    "name": "Garden Soup",
+    "description": null,
+    "category": null,
+    "price_amount": "8.50",
+    "price_currency": "CAD",
+    "ingredients": null,
+    "source_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7",
+    "source_text": "SYNTHETIC MENU\nGarden Soup - vegetables - 8.50 CAD\nCoffee\nBread - 0.00 CAD",
+    "image_id": null,
+    "review_warnings": ["Page-level evidence; dish/price association needs human verification."],
+    "status": "needs_review"
+  },
+  "evidence": [
+    {
+      "segment_id": "sha256:505d9833a260c0101babb8e3ef2195eb123b7ee5bc3a5797e01b164aaa5e53d7#page-1",
+      "start": 0,
+      "end": 74
+    }
+  ],
+  "missing_fields": ["description", "category", "ingredients"]
+}

@@ -1,10 +1,18 @@
 import {
   type BoundedRetrievalResult,
+  CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
   DishRevisionScopeSchema,
+  ExtractionReviewScopeSchema,
+  type ExtractionReviewSessionResponse,
   type HealthResponse,
+  type ReviewCandidateCommand,
+  ReviewCandidateCommandSchema,
+  type ReviewCandidateItemResponse,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
+  type UpsertExtractionReviewSessionRequest,
+  UpsertExtractionReviewSessionRequestSchema,
   VenueScopeSchema,
 } from '@peekaplate/contracts';
 import { Hono } from 'hono';
@@ -13,6 +21,12 @@ import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
 import { CommandError, createDishRevision } from './dish-command';
 import { retrieveMenuEvidence } from './retrieval';
+import {
+  getExtractionReviewSession,
+  ReviewCommandError,
+  saveCandidateReviewCommand,
+  upsertExtractionReviewSession,
+} from './review-command';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
@@ -43,6 +57,26 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
+  upsertReviewSession?: (
+    actorId: string,
+    venueId: string,
+    input: UpsertExtractionReviewSessionRequest,
+    env: Bindings,
+  ) => Promise<ExtractionReviewSessionResponse>;
+  getReviewSession?: (
+    actorId: string,
+    venueId: string,
+    extractionId: string,
+    env: Bindings,
+  ) => Promise<ExtractionReviewSessionResponse>;
+  saveCandidateReview?: (
+    actorId: string,
+    venueId: string,
+    extractionId: string,
+    candidateId: string,
+    input: ReviewCandidateCommand,
+    env: Bindings,
+  ) => Promise<ReviewCandidateItemResponse>;
 };
 
 export async function authorizeStaffVenue(
@@ -138,6 +172,49 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async upsertReviewSession(actorId, venueId, input, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await upsertExtractionReviewSession(client, actorId, venueId, input);
+    } finally {
+      await client.end();
+    }
+  },
+  async getReviewSession(actorId, venueId, extractionId, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await getExtractionReviewSession(client, actorId, venueId, extractionId);
+    } finally {
+      await client.end();
+    }
+  },
+  async saveCandidateReview(actorId, venueId, extractionId, candidateId, input, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await saveCandidateReviewCommand(
+        client,
+        actorId,
+        venueId,
+        extractionId,
+        candidateId,
+        input,
+      );
+    } finally {
+      await client.end();
+    }
+  },
 };
 
 export function createApp(services: Dependencies = dependencies) {
@@ -154,10 +231,23 @@ export function createApp(services: Dependencies = dependencies) {
       stage: 'foundation',
     } satisfies HealthResponse),
   );
-  app.use(
-    '/venues/*',
-    bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
-  );
+  const reviewSessionLimit = bodyLimit({
+    maxSize: 524_288,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
+  const defaultVenueLimit = bodyLimit({
+    maxSize: 16_384,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
+  app.use('/venues/*', async (c, next) => {
+    if (
+      c.req.method === 'PUT' &&
+      /^\/venues\/[^/]+\/extractions\/[^/]+\/review-session$/.test(c.req.path)
+    ) {
+      return reviewSessionLimit(c, next);
+    }
+    return defaultVenueLimit(c, next);
+  });
   app.get('/team/analytics/:kind', async (c) => {
     const env = c.env ?? {};
     if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
@@ -252,10 +342,129 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await retrieverFn(retrievalRequest);
     return c.json(result);
   });
+  app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = ExtractionReviewScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = UpsertExtractionReviewSessionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (parsed.data.extractionResult.extraction_id !== scope.data.extractionId) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    const handler =
+      services.upsertReviewSession ??
+      (async (aid, vid, inp, env) => {
+        const connStr =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connStr) throw new AuthUnavailableError();
+        const client = new Client({ connectionString: connStr, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await upsertExtractionReviewSession(client, aid, vid, inp);
+        } finally {
+          await client.end();
+        }
+      });
+
+    const result = await handler(actorId, scope.data.venueId, parsed.data, c.env ?? {});
+    return c.json(result);
+  });
+  app.get('/venues/:venueId/extractions/:extractionId/candidates', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = ExtractionReviewScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const handler =
+      services.getReviewSession ??
+      (async (aid, vid, eid, env) => {
+        const connStr =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connStr) throw new AuthUnavailableError();
+        const client = new Client({ connectionString: connStr, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await getExtractionReviewSession(client, aid, vid, eid);
+        } finally {
+          await client.end();
+        }
+      });
+
+    const result = await handler(actorId, scope.data.venueId, scope.data.extractionId, c.env ?? {});
+    return c.json(result);
+  });
+  app.post(
+    '/venues/:venueId/extractions/:extractionId/candidates/:candidateId/review',
+    async (c) => {
+      const authorization = c.req.header('Authorization');
+      if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+        return c.json({ error: 'unauthorized' }, 401);
+      }
+      const actorId = await services.verify(authorization, c.env ?? {});
+      const scope = CandidateReviewScopeSchema.safeParse(c.req.param());
+      if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+      if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+        return c.json({ error: 'unsupported_media_type' }, 415);
+      }
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ error: 'invalid_json' }, 400);
+      }
+      const parsed = ReviewCandidateCommandSchema.safeParse(body);
+      if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+      const handler =
+        services.saveCandidateReview ??
+        (async (aid, vid, eid, cid, inp, env) => {
+          const connStr =
+            env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+          if (!connStr) throw new AuthUnavailableError();
+          const client = new Client({ connectionString: connStr, connectionTimeoutMillis: 5000 });
+          try {
+            await client.connect();
+            return await saveCandidateReviewCommand(client, aid, vid, eid, cid, inp);
+          } finally {
+            await client.end();
+          }
+        });
+
+      const result = await handler(
+        actorId,
+        scope.data.venueId,
+        scope.data.extractionId,
+        scope.data.candidateId,
+        parsed.data,
+        c.env ?? {},
+      );
+      return c.json(result);
+    },
+  );
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
+    if (error instanceof ReviewCommandError) return c.json({ error: error.code }, error.status);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
       JSON.stringify({ event: 'command_failed', requestId: c.res.headers.get('X-Request-ID') }),
