@@ -470,3 +470,11 @@ commit; provider writes are not part of these local tests.
 ```json
 {"id":"OBS-20261027-REMOTE-R2-PROOF","status":"resolved","observation":"A local test writer reported201 but the independently deployed source reader returned404.","cause":"The helper used unstable_dev local:true with experimental.forceLocal:true; its remote R2 flag did not establish a provider write.","resolution":"Changed helper to actual remote mode and repeated service/source and Queue/R2 tests. Hosted source read200, Python relay checks, real conditional-create race and cleanup/absence verification passed. Corrected the earlier R2 evidence claims and retained the failed run separately outside the repo.","sources":["docs/menu-ingestion-infrastructure.md","docs/operations.md"]}
 ```
+
+```json
+{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION","status":"pending-verification","area":"main-ci","cause":"An unused owner-report schema was committed outside packages/contracts/src on main; Biome rejects its formatting while exports and TypeScript exclude it.","resolution":"Remove only the misplaced root-level draft. Keep the reviewed owner-report implementation on its separate develop-based branch.","regression":"Before deletion, pnpm exec biome check packages/contracts/owner-report.ts reproduced the formatting failure. Full local and PR checks follow the deletion.","sources":["packages/contracts/package.json","packages/contracts/tsconfig.json","https://github.com/vivienk/peekaplate/actions/runs/41111328548"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION"},"status":"resolved","evidence":"After deleting the unused draft, pnpm verify lint typecheck test build context:check docs:check passed in 20.143s: 69 Vitest tests and 57 script tests. Public exports, TypeScript source, runtime, migrations and deployment configuration are unchanged. Applicable GitHub PR checks remain a separate merge gate.","prevention":"Add reviewed shared contracts under packages/contracts/src and export them from src/index.ts through a PR into develop; verify formatting and contracts before promotion."}
+```
