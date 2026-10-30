@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result and initial dish-intent schemas. HTTP command authority fields are rejected; ingest and broader diner events remain planned. Team analytics query/response schemas enforce bounded dates/results and allowlisted diagnostic fields.",
+      "summary": "Strict health, staff dish-revision command/result and initial dish-intent schemas. HTTP command authority fields are rejected; ingest and broader diner events remain planned. Team analytics query/response schemas enforce bounded dates/results and allowlisted diagnostic fields. Package exports remain in src/index.ts; the unused root-level owner-report.ts draft was removed from main, leaving the separate develop-based owner-report work unchanged.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -315,6 +315,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October30 main cleanup: removed packages/contracts/owner-report.ts, an unexported draft outside the TypeScript source tree that broke Biome on main682ab7f. Local lint, typecheck, 69 Vitest and 57 script tests, builds and context/docs checks passed in 20.143s. No caller, runtime, migration or deployment changes; separate develop schema work is untouched.",
+      "modules": [
+        "contracts"
+      ],
+      "next": "Merge only this cleanup into main after applicable PR CI passes. Louis continues the owner-report contract separately through a develop-based PR; no main-to-develop sync or feature-branch changes belong in this cleanup."
+    },
+    {
       "summary": "October28: stored OCR_SPACE_API_KEY in protected GitHub staging environment and existing extraction Worker. Host version7b505396 retains main7bbe0d3 code/image and other bindings. Fresh OCR-only provider call read all three synthetic names/prices in4.654s with no cache; local output stays outside Git. Focused host regression checks OCR forwarding and signing-key exclusion. No production, migration or consumer activation.",
       "modules": [
         "backend",
@@ -388,13 +395,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
-    },
-    {
-      "summary": "Aligned staging to application history through PR #5 and corrected manual deployment selection from develop to staging, including CI push coverage and release documentation. Provider inspection confirmed no Hyperdrive, Pages project or staging Worker; D1 resources do not replace PostgreSQL.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Configure the isolated staging Supabase/auth/Hyperdrive and frontend/API connections, supply scoped GitHub deployment credentials, then verify the deployed staging flow before activation or production promotion."
     }
   ]
 }
