@@ -26,6 +26,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
     },
     {
+      "id": "tokens",
+      "status": "foundation",
+      "summary": "Shared CSS custom-property design tokens imported first by diner/console. Holds Animation motion values with reduced-motion overrides; Design System text styles (H1-H5, paragraph, small, footer, rem, four weights, Inter no font file); corner-radius (0-24px plus full); spacing (0-80px incl. 48px); shadow levels plus Figma elevation styles; color palette. Color roles map palette to Button/Navigation/surface/status/input controls using --pp-role-button-<variant>-<state>-<property>, incl. nav hover icon and color-mix roles. Chip roles (active/inactive) added from Figma; hover/pressed pending. Surface-container is neutral-700 needing outline border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs. Ease-out curve interim; Figma shadows pending.",
+      "paths": [
+        "packages/tokens/package.json",
+        "packages/tokens/src/tokens.css",
+        "packages/tokens/src/tokens.test.ts"
+      ],
+      "adrs": [
+        "docs/adr/0001-scope-and-repository.md",
+        "docs/adr/0004-visual-tiers.md"
+      ],
+      "dependsOn": [],
+      "sourceFingerprint": "2616b8b9c232ac4e9e1590ed3f30a54cec39d5b75e9dfc51c1ffe6739a45eaa3"
+    },
+    {
       "id": "diner",
       "status": "foundation",
       "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. See docs/posthog.md for activation and evidence limits.",
@@ -46,7 +62,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4107ee97eaf9096f1bcfc032000d09ddd8542fa7b389c4b93ae88e72b8173fe8"
+      "sourceFingerprint": "5bd2fc5c56032c8f68ea3179d768da5dd2c18f3cfc31ba20edbecf4ee929aa9e"
     },
     {
       "id": "console",
@@ -326,33 +342,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "dependsOn": [],
       "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
-    },
-    {
-      "id": "tokens",
-      "status": "foundation",
-      "summary": "Shared CSS custom-property design tokens imported first by the diner and console styles. Holds the Animation specification motion values with reduced-motion overrides, Design System text styles (H1-H5, paragraph, small, footer sizes/line heights in rem from the Figma text styles, plus a separate H5 Bold line height; four weights; Inter family without a loaded font file) and the corner-radius scale (0-24px plus full, mapped to Figma names in docs/frontend-design.md). H3 size/line height, the Footer Semi Bold weight and the ease-out curve are interim pending design confirmation. Color, spacing, elevation, interaction states and Button/Card/Input/Typography/Navigation foundations remain pending approved Figma values.",
-      "paths": [
-        "packages/tokens/package.json",
-        "packages/tokens/src/tokens.css",
-        "packages/tokens/src/tokens.test.ts"
-      ],
-      "adrs": [
-        "docs/adr/0001-scope-and-repository.md",
-        "docs/adr/0004-visual-tiers.md"
-      ],
-      "dependsOn": [],
-      "sourceFingerprint": "8486697ad76f0d9307e5f2d095eca2068218b735b82c60d809ce7ba9478d1428"
     }
   ],
   "handoffs": [
     {
-      "summary": "Started S3-TOK-01 with a shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides, the Design System text-style scale and weights, and the corner-radius scale, with tests for values, token groups and both imports. No color or component token was invented; shells are not restyled.",
+      "summary": "S3-TOK-01 now ships the shared @peekaplate/tokens CSS package imported by both apps. It encodes the Animation specification motion values with reduced-motion overrides; Design System text styles, corner-radius, spacing (0-80px including 48px), shadows and color palette; and semantic color roles using --pp-role-button-<variant>-<state>-<property>, including a nav hover icon role and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a --pp-role-outline border; on-error and on-information use neutral-950 for WCAG AA contrast. A WCAG contrast test covers active foreground/background pairs; shells remain locally styled.",
       "modules": [
         "tokens",
         "diner",
         "console"
       ],
-      "next": "Confirm the custom ease-out curve, licensed brand font, H2/footer weight typos and semantic token names with Rania. Spacing and elevation are proposed for Harshita; then add approved color and interaction-state tokens and the Button/Card/Input/Typography/Navigation foundations."
+      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma."
     },
     {
       "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
@@ -436,3 +436,4 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ]
 }
 ```
+
