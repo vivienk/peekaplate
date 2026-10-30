@@ -134,13 +134,7 @@
         "required": ["event_type"]
       },
       "then": {
-        "required": [
-          "comparison_id",
-          "compare_action",
-          "pair_version",
-          "dish_ids",
-          "display_state"
-        ]
+        "required": ["comparison_id", "compare_action", "pair_version", "dish_ids", "display_state"]
       }
     },
     {
