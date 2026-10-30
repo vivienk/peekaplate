@@ -493,7 +493,7 @@ export const SubmitMenuIngestionRequestSchema = z.strictObject({
 export type SubmitMenuIngestionRequest = z.infer<typeof SubmitMenuIngestionRequestSchema>;
 
 export const ApproveDishDraftRequestSchema = z.strictObject({
-  commandId: z.uuid().optional(),
+  commandId: uuid,
   expectedVersion: z.number().int().nonnegative().default(0),
 });
 export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;

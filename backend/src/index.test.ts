@@ -218,10 +218,12 @@ describe('menu ingestion HTTP boundary', () => {
       approveDraft,
     });
 
+    const commandId = '00000000-0000-4000-8000-000000000007';
     const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
       method: 'POST',
       headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        commandId,
         expectedVersion: 0,
       }),
     });
@@ -232,9 +234,57 @@ describe('menu ingestion HTTP boundary', () => {
       actorId,
       venueId,
       draftId,
-      { expectedVersion: 0 },
+      { commandId, expectedVersion: 0 },
       {},
     );
+  });
+
+  it('rejects malformed nonempty JSON on approval with 400 invalid_json without executing command', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const draftId = '00000000-0000-4000-8000-000000000002';
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const approveDraft = vi.fn();
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: '{"commandId":',
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_json' });
+    expect(approveDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejects approval request without required commandId with 400 invalid_request', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const draftId = '00000000-0000-4000-8000-000000000002';
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const approveDraft = vi.fn();
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_request' });
+    expect(approveDraft).not.toHaveBeenCalled();
   });
 
   describe('Cloudflare Queue Worker Handler', () => {

@@ -73,11 +73,19 @@ Use separate keys in the existing bucket:
 
 ```text
 menu-ingestion/sources/<server-set tenant UUID>/<server-set job UUID>/source
-reports/<server-set tenant UUID>/<server-set job UUID>/extraction.json
+reports/<server-set tenant UUID>/<server-set job UUID>/attempts/<server-set claim UUID>/extraction.json
 ```
 
 The first is the service's required input location; the second matches PR #45's
-proposed report location. The Worker must authorize the venue, materialize the
+attempt-scoped immutable report key that prevents stale worker races across lease
+expiration. Attempt-scoped keys ensure write isolation across worker interruptions.
+If an interrupted or slow worker writes a report after its lease has expired, its
+artifact is isolated under its own claim key and cannot overwrite the winning attempt's
+report. Downstream consumers resolve the authoritative report via the
+`result_storage_key` persisted in PostgreSQL under transaction fencing. Unreferenced
+attempt reports from abandoned runs do not impact correctness; lifecycle policies may
+reclaim stale attempts out-of-band without destructive runtime cleanups. The Worker must
+authorize the venue, materialize the
 source, compute its SHA-256, then enqueue the job. A prefix is an organization
 rule, not an access-control boundary. Bucket credentials can read across its
 prefixes; keep them server-side and limit them to the staging bucket.

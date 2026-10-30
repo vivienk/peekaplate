@@ -251,7 +251,18 @@ export async function executeIngestionWorkflow(
   if (!claim) {
     const existing = await getIngestionJob(client, params.tenantId, params.jobId);
     if (!existing) throw new IngestionError('job_not_found', 404);
-    throw new IngestionError('job_already_locked_or_complete', 409);
+    if (existing.status === 'running') {
+      throw new IngestionError(
+        'job_lease_active',
+        409,
+        `Job ${params.jobId} is currently running under an active lease held by ${existing.locked_by ?? 'another worker'}`,
+      );
+    }
+    throw new IngestionError(
+      'job_already_complete',
+      409,
+      `Job ${params.jobId} has reached terminal status ${existing.status}`,
+    );
   }
 
   const job = (await getIngestionJob(client, params.tenantId, params.jobId))!;
@@ -290,7 +301,7 @@ export async function executeIngestionWorkflow(
     // 4. Durably retain complete private report and timing artifact if storage is configured
     let resultStorageKey: string | null = null;
     if (params.reportStorage) {
-      resultStorageKey = `reports/${params.tenantId}/${params.jobId}/extraction.json`;
+      resultStorageKey = `reports/${params.tenantId}/${params.jobId}/attempts/${claim.claimToken}/extraction.json`;
       try {
         await params.reportStorage.put(resultStorageKey, JSON.stringify(rawResult));
       } catch (storageErr) {
@@ -410,8 +421,16 @@ export async function processIngestionQueueBatch(
       }
     } catch (err: unknown) {
       if (err instanceof IngestionError) {
-        if (err.code === 'job_already_locked_or_complete') {
-          // Duplicate queue delivery while active lease or completed: ACK safely
+        if (err.code === 'job_lease_active') {
+          // Job is currently running under an active lease.
+          // Retry message delivery so an abandoned/interrupted worker can be recovered after lease expiry.
+          msg.retry();
+          retried += 1;
+          errors.push({ jobId, error: 'Job is currently running under an active lease' });
+          continue;
+        }
+        if (err.code === 'job_already_complete' || err.code === 'job_already_locked_or_complete') {
+          // Duplicate queue delivery for completed or terminal job: ACK safely
           msg.ack();
           acknowledged += 1;
           continue;

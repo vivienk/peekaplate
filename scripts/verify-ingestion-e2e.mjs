@@ -128,12 +128,15 @@ export async function verifyIngestionE2E({
       );
 
       // 4. Result storage key check
-      const expectedStorageKey = `reports/${venueId}/${jobId}/extraction.json`;
-      const hasReportKey = results.job.result_storage_key === expectedStorageKey;
+      const expectedPrefix = `reports/${venueId}/${jobId}/`;
+      const hasReportKey =
+        typeof results.job.result_storage_key === 'string' &&
+        results.job.result_storage_key.startsWith(expectedPrefix) &&
+        results.job.result_storage_key.endsWith('/extraction.json');
       recordCheck(
         'Result Storage Key Scope',
         hasReportKey,
-        `Expected "${expectedStorageKey}", got "${results.job.result_storage_key}"`,
+        `Expected key scoped under "${expectedPrefix}", got "${results.job.result_storage_key}"`,
       );
     }
 

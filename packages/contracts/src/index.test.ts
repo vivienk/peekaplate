@@ -697,6 +697,14 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
         expectedVersion: 0,
       };
       expect(ApproveDishDraftRequestSchema.parse(validApproval)).toEqual(validApproval);
+      expect(ApproveDishDraftRequestSchema.safeParse({}).success).toBe(false);
+      expect(ApproveDishDraftRequestSchema.safeParse({ expectedVersion: 0 }).success).toBe(false);
+      expect(
+        ApproveDishDraftRequestSchema.safeParse({
+          commandId: 'not-a-uuid',
+          expectedVersion: 0,
+        }).success,
+      ).toBe(false);
 
       const validQueueMessage = {
         version: 1 as const,

@@ -1,7 +1,7 @@
 import type { StructuredDishDraft } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { approveDishDraftAtomic } from '../index';
+import { approveDishDraftAtomic, createApp } from '../index';
 import { processIngestionQueueBatch, type QueueMessage, submitMenuIngestion } from './orchestrator';
 import {
   approveDishDraft,
@@ -737,7 +737,9 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       // Unauthorized actor attempting approval
       const nonStaffActor = crypto.randomUUID();
       await expect(
-        approveDishDraftAtomic(runtimeClient, nonStaffActor, venueId, targetDraft.id),
+        approveDishDraftAtomic(runtimeClient, nonStaffActor, venueId, targetDraft.id, {
+          commandId: crypto.randomUUID(),
+        }),
       ).rejects.toMatchObject({
         code: 'forbidden',
         status: 403,
@@ -747,6 +749,493 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       const reloadedDrafts = await listDishDrafts(runtimeClient, { tenantId: venueId, jobId });
       expect(reloadedDrafts[0]?.review_status).toBe('pending');
       expect(reloadedDrafts[0]?.published_dish_id).toBeNull();
+    });
+
+    it('recovers abandoned worker job after early redelivery and lease expiry', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'e'.repeat(64),
+        idempotencyKey: `idem_abandon_${jobId}`,
+      });
+
+      // 1. Worker 1 claims job
+      const claim1 = await claimIngestionJob(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        workerId: 'worker_abandoned',
+        leaseTimeoutMinutes: 15,
+      });
+      expect(claim1).not.toBeNull();
+
+      // 2. Queue early redelivery while lease is still active
+      let acked1 = false;
+      let retried1 = false;
+      const earlyMsg: QueueMessage<unknown> = {
+        id: 'msg_early_redelivery',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: () => {
+          acked1 = true;
+        },
+        retry: () => {
+          retried1 = true;
+        },
+      };
+
+      const mockExtractor = vi.fn();
+      const earlyBatchResult = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [earlyMsg] },
+        mockExtractor,
+        { workerId: 'worker_2', leaseTimeoutMinutes: 15 },
+      );
+
+      // Must be retried, NOT acked
+      expect(earlyBatchResult.acknowledged).toBe(0);
+      expect(earlyBatchResult.retried).toBe(1);
+      expect(acked1).toBe(false);
+      expect(retried1).toBe(true);
+      expect(mockExtractor).not.toHaveBeenCalled();
+
+      // Job remains running held by worker_abandoned
+      const jobStillRunning = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(jobStillRunning?.status).toBe('running');
+      expect(jobStillRunning?.locked_by).toBe('worker_abandoned');
+
+      // 3. Worker 1 abandoned execution; lease expires
+      await adminClient.query(
+        `UPDATE app_private.menu_ingestion_jobs
+         SET locked_at = now() - interval '20 minutes'
+         WHERE id = $1 AND tenant_id = $2`,
+        [jobId, venueId],
+      );
+
+      // 4. Retried queue message arrives for Worker 2 after lease expiry
+      let acked2 = false;
+      let retried2 = false;
+      const recoveryMsg: QueueMessage<unknown> = {
+        id: 'msg_recovery',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: () => {
+          acked2 = true;
+        },
+        retry: () => {
+          retried2 = true;
+        },
+      };
+
+      const recoveryExtractor = vi.fn().mockResolvedValue({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'complete',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [
+          {
+            segment_id: 'seg_rec',
+            page_number: 1,
+            method: 'text',
+            status: 'ready',
+            text: 'Recovered Soup $10.00',
+            warnings: [],
+          },
+        ],
+        drafts: [
+          {
+            draft_id: `draft_rec_${jobId}`,
+            draft_index: 0,
+            name: 'Recovered Soup',
+            price_amount: '10.00',
+            price_currency: 'USD',
+            source_id: 'src_rec',
+            source_text: 'Recovered Soup $10.00',
+            review_warnings: [],
+            status: 'needs_review',
+          },
+        ],
+        evidence: [
+          {
+            draft_id: `draft_rec_${jobId}`,
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_rec', start: 0, end: 21 }],
+          },
+        ],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      });
+
+      const recoveryBatchResult = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [recoveryMsg] },
+        recoveryExtractor,
+        { workerId: 'worker_2', leaseTimeoutMinutes: 15 },
+      );
+
+      expect(recoveryBatchResult.acknowledged).toBe(1);
+      expect(recoveryBatchResult.retried).toBe(0);
+      expect(acked2).toBe(true);
+      expect(retried2).toBe(false);
+
+      const completedJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(completedJob?.status).toBe('complete');
+      expect(completedJob?.draft_count).toBe(1);
+    });
+
+    it('protects report storage write boundary across lease expiration and re-claim ordering', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'f'.repeat(64),
+        idempotencyKey: `idem_two_worker_${jobId}`,
+      });
+
+      const storedReports = new Map<string, string>();
+      const reportStorage = {
+        async put(key: string, data: string): Promise<void> {
+          storedReports.set(key, data);
+        },
+      };
+
+      // Worker A claims the job
+      const claimA = (await claimIngestionJob(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        workerId: 'worker_A',
+      }))!;
+      expect(claimA).not.toBeNull();
+
+      // Worker A starts extraction (prepare report A)
+      const rawResultA = { worker: 'A', text: 'Stale Report from Worker A' };
+
+      // Worker A's lease expires
+      await adminClient.query(
+        `UPDATE app_private.menu_ingestion_jobs
+         SET locked_at = now() - interval '20 minutes'
+         WHERE id = $1 AND tenant_id = $2`,
+        [jobId, venueId],
+      );
+
+      // Worker B reclaims the job
+      const runtimeClientB = new Client({ connectionString: runtimeUrl });
+      await runtimeClientB.connect();
+      try {
+        const claimB = (await claimIngestionJob(runtimeClientB, {
+          tenantId: venueId,
+          jobId,
+          workerId: 'worker_B',
+        }))!;
+        expect(claimB).not.toBeNull();
+        expect(claimB.claimToken).not.toBe(claimA.claimToken);
+
+        // Worker B extracts, writes report, and completes
+        const rawResultB = { worker: 'B', text: 'Valid Report from Worker B' };
+        const keyB = `reports/${venueId}/${jobId}/attempts/${claimB.claimToken}/extraction.json`;
+        await reportStorage.put(keyB, JSON.stringify(rawResultB));
+
+        const draftB: StructuredDishDraft = {
+          draft_id: `draft_b_${jobId}`,
+          draft_index: 0,
+          name: 'Worker B Salad',
+          description: null,
+          category: null,
+          price_amount: '15.00',
+          price_currency: 'USD',
+          ingredients: null,
+          source_id: 'src_b',
+          source_text: 'Worker B Salad $15.00',
+          image_id: null,
+          code_point_spans: [{ segment_id: 'seg_b', start: 0, end: 14 }],
+          utf16_spans: [{ segment_id: 'seg_b', start: 0, end: 14 }],
+          review_warnings: [],
+          status: 'needs_review',
+        };
+
+        await persistExtractedDrafts(runtimeClientB, {
+          tenantId: venueId,
+          jobId,
+          claimToken: claimB.claimToken,
+          drafts: [draftB],
+          status: 'complete',
+          resultStorageKey: keyB,
+        });
+
+        const jobAfterB = (await getIngestionJob(runtimeClientB, venueId, jobId))!;
+        expect(jobAfterB.status).toBe('complete');
+        expect(jobAfterB.result_storage_key).toBe(keyB);
+
+        // Worker A now resumes and writes report to its attempt-specific key
+        const keyA = `reports/${venueId}/${jobId}/attempts/${claimA.claimToken}/extraction.json`;
+        await reportStorage.put(keyA, JSON.stringify(rawResultA));
+
+        // Key B was NOT overwritten by Worker A
+        expect(storedReports.get(keyB)).toBe(JSON.stringify(rawResultB));
+
+        // Worker A attempts persistExtractedDrafts with stale claimToken
+        const draftA: StructuredDishDraft = {
+          draft_id: `draft_a_${jobId}`,
+          draft_index: 0,
+          name: 'Stale Worker A Dish',
+          description: null,
+          category: null,
+          price_amount: '99.00',
+          price_currency: 'USD',
+          ingredients: null,
+          source_id: 'src_a',
+          source_text: 'Stale Worker A Dish $99.00',
+          image_id: null,
+          code_point_spans: [{ segment_id: 'seg_a', start: 0, end: 19 }],
+          utf16_spans: [{ segment_id: 'seg_a', start: 0, end: 19 }],
+          review_warnings: [],
+          status: 'needs_review',
+        };
+
+        await expect(
+          persistExtractedDrafts(runtimeClient, {
+            tenantId: venueId,
+            jobId,
+            claimToken: claimA.claimToken,
+            drafts: [draftA],
+            status: 'complete',
+            resultStorageKey: keyA,
+          }),
+        ).rejects.toMatchObject({
+          code: 'lease_expired_or_reclaimed',
+          status: 409,
+        });
+
+        // The job remains complete, pointing to Worker B's key and intact report
+        const finalJob = (await getIngestionJob(runtimeClient, venueId, jobId))!;
+        expect(finalJob.status).toBe('complete');
+        expect(finalJob.result_storage_key).toBe(keyB);
+        expect(JSON.parse(storedReports.get(finalJob.result_storage_key!)!).worker).toBe('B');
+      } finally {
+        await runtimeClientB.end().catch(() => {});
+      }
+    });
+
+    it('rejects malformed nonempty JSON on default handler asserting draft stays pending and no command/event writes occur', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: '1'.repeat(64),
+        idempotencyKey: `idem_malformed_${jobId}`,
+      });
+
+      const claim = (await claimIngestionJob(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        workerId: 'worker_malformed',
+      }))!;
+
+      const draftData: StructuredDishDraft = {
+        draft_id: `draft_malformed_${jobId}`,
+        draft_index: 0,
+        name: 'Draft Pending Dish',
+        description: null,
+        category: null,
+        price_amount: '22.00',
+        price_currency: 'USD',
+        ingredients: null,
+        source_id: 'src_m',
+        source_text: 'Draft Pending Dish $22.00',
+        image_id: null,
+        code_point_spans: [{ segment_id: 'seg_1', start: 0, end: 18 }],
+        utf16_spans: [{ segment_id: 'seg_1', start: 0, end: 18 }],
+        review_warnings: [],
+        status: 'needs_review',
+      };
+
+      await persistExtractedDrafts(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        claimToken: claim.claimToken,
+        drafts: [draftData],
+        status: 'complete',
+      });
+
+      const drafts = await listDishDrafts(runtimeClient, { tenantId: venueId, jobId });
+      const targetDraft = drafts[0]!;
+
+      const app = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+
+      // Send malformed nonempty JSON
+      const res = await app.request(
+        `/venues/${venueId}/drafts/${targetDraft.id}/approve`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer staff_token',
+            'Content-Type': 'application/json',
+          },
+          body: '{"commandId":',
+        },
+        {
+          APP_ENV: 'local',
+          LOCAL_DATABASE_URL: runtimeUrl,
+        },
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'invalid_json' });
+
+      // Assert draft is still pending
+      const reloadedDrafts = await listDishDrafts(runtimeClient, { tenantId: venueId, jobId });
+      expect(reloadedDrafts[0]?.review_status).toBe('pending');
+      expect(reloadedDrafts[0]?.published_dish_id).toBeNull();
+
+      // Assert no dish created for this draft name
+      const eventCount = await adminClient.query(
+        `SELECT count(*) FROM app_private.es_event WHERE tenant_id = $1 AND payload->>'name' = $2`,
+        [venueId, targetDraft.name],
+      );
+      expect(Number(eventCount.rows[0].count)).toBe(0);
+    });
+
+    it('enforces command idempotency, conflicting reuse rejection, and membership revocation', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: '2'.repeat(64),
+        idempotencyKey: `idem_idem_${jobId}`,
+      });
+
+      const claim = (await claimIngestionJob(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        workerId: 'worker_idem',
+      }))!;
+
+      const draftData: StructuredDishDraft = {
+        draft_id: `draft_idem_${jobId}`,
+        draft_index: 0,
+        name: 'Idempotent Truffle Pasta',
+        description: 'Truffles and handmade tagliolini',
+        category: 'Pasta',
+        price_amount: '34.00',
+        price_currency: 'USD',
+        ingredients: null,
+        source_id: 'src_i',
+        source_text: 'Idempotent Truffle Pasta $34.00',
+        image_id: null,
+        code_point_spans: [{ segment_id: 'seg_1', start: 0, end: 24 }],
+        utf16_spans: [{ segment_id: 'seg_1', start: 0, end: 24 }],
+        review_warnings: [],
+        status: 'needs_review',
+      };
+
+      await persistExtractedDrafts(runtimeClient, {
+        tenantId: venueId,
+        jobId,
+        claimToken: claim.claimToken,
+        drafts: [draftData],
+        status: 'complete',
+      });
+
+      const drafts = await listDishDrafts(runtimeClient, { tenantId: venueId, jobId });
+      const targetDraft = drafts[0]!;
+
+      const stableCommandId = crypto.randomUUID();
+
+      // 1. First approval succeeds
+      const firstResult = await approveDishDraftAtomic(
+        runtimeClient,
+        actorId,
+        venueId,
+        targetDraft.id,
+        { commandId: stableCommandId, expectedVersion: 0 },
+      );
+      expect(firstResult.draft.review_status).toBe('accepted');
+      expect(firstResult.publishedRevision.dishId).toBeDefined();
+
+      // 2. Identical retry returns cached receipt (not 404!)
+      const replayResult = await approveDishDraftAtomic(
+        runtimeClient,
+        actorId,
+        venueId,
+        targetDraft.id,
+        { commandId: stableCommandId, expectedVersion: 0 },
+      );
+      expect(replayResult.draft.id).toBe(firstResult.draft.id);
+      expect(replayResult.publishedRevision.revisionId).toBe(
+        firstResult.publishedRevision.revisionId,
+      );
+      expect(replayResult.publishedRevision.dishId).toBe(firstResult.publishedRevision.dishId);
+
+      // 3. Conflicting reuse (same commandId, different expectedVersion) -> 409 command_conflict
+      await expect(
+        approveDishDraftAtomic(runtimeClient, actorId, venueId, targetDraft.id, {
+          commandId: stableCommandId,
+          expectedVersion: 5,
+        }),
+      ).rejects.toMatchObject({
+        code: 'command_conflict',
+        status: 409,
+      });
+
+      // 4. Membership revocation: actor with viewer-only permission rejected with 403
+      const revokedActor = crypto.randomUUID();
+      await adminClient.query(
+        `INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission)
+         VALUES ($1, $2, 'viewer')
+         ON CONFLICT (tenant_id, actor_id) DO UPDATE SET permission = 'viewer'`,
+        [venueId, revokedActor],
+      );
+
+      await expect(
+        approveDishDraftAtomic(runtimeClient, revokedActor, venueId, targetDraft.id, {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+        }),
+      ).rejects.toMatchObject({
+        code: 'forbidden',
+        status: 403,
+      });
+
+      // 5. Membership revocation prevents replay of existing command receipt
+      await adminClient.query(
+        `UPDATE app_private.staff_membership SET permission = 'viewer' WHERE tenant_id = $1 AND actor_id = $2`,
+        [venueId, actorId],
+      );
+
+      await expect(
+        approveDishDraftAtomic(runtimeClient, actorId, venueId, targetDraft.id, {
+          commandId: stableCommandId,
+          expectedVersion: 0,
+        }),
+      ).rejects.toMatchObject({
+        code: 'forbidden',
+        status: 403,
+      });
+
+      // Restore owner permission for subsequent tests
+      await adminClient.query(
+        `UPDATE app_private.staff_membership SET permission = 'owner' WHERE tenant_id = $1 AND actor_id = $2`,
+        [venueId, actorId],
+      );
     });
 
     it('rejects raw URL submission before job creation or queue dispatch', async () => {

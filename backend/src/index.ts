@@ -210,7 +210,7 @@ export async function approveDishDraftAtomic(
   actorId: string,
   venueId: string,
   draftId: string,
-  options: { commandId?: string | undefined; expectedVersion?: number | undefined } = {},
+  options: { commandId: string; expectedVersion?: number | undefined },
 ): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
   let started = false;
   try {
@@ -232,31 +232,30 @@ export async function approveDishDraftAtomic(
       throw new CommandError('forbidden', 403);
     }
 
-    if (options.commandId) {
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        `command:${venueId}:${actorId}:${options.commandId}`,
-      ]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `command:${venueId}:${actorId}:${options.commandId}`,
+    ]);
 
-      const approvalHash = crypto
-        .createHash('sha256')
-        .update(JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 }))
-        .digest('hex');
+    const expectedVersion = options.expectedVersion ?? 0;
+    const approvalHash = crypto
+      .createHash('sha256')
+      .update(JSON.stringify({ draftId, expectedVersion }))
+      .digest('hex');
 
-      const receipt = await client.query<{ request_hash: string; result: any }>(
-        `SELECT request_hash, result
-         FROM app_private.es_command
-         WHERE tenant_id = $1 AND actor_id = $2 AND idempotency_key = $3`,
-        [venueId, actorId, options.commandId],
-      );
-      const existing = receipt.rows[0];
-      if (existing) {
-        if (existing.request_hash !== approvalHash) {
-          throw new CommandError('command_conflict', 409);
-        }
-        await client.query('COMMIT');
-        started = false;
-        return existing.result;
+    const receipt = await client.query<{ request_hash: string; result: any }>(
+      `SELECT request_hash, result
+       FROM app_private.es_command
+       WHERE tenant_id = $1 AND actor_id = $2 AND idempotency_key = $3`,
+      [venueId, actorId, options.commandId],
+    );
+    const existing = receipt.rows[0];
+    if (existing) {
+      if (existing.request_hash !== approvalHash) {
+        throw new CommandError('command_conflict', 409);
       }
+      await client.query('COMMIT');
+      started = false;
+      return existing.result;
     }
 
     const draftRes = await client.query<DishDraftRow>(
@@ -279,7 +278,7 @@ export async function approveDishDraftAtomic(
       {
         commandId: revisionCommandId,
         dishId: newDishId,
-        expectedVersion: options.expectedVersion ?? 0,
+        expectedVersion,
         name: draft.name,
         description: draft.description ?? draft.name,
       },
@@ -299,27 +298,21 @@ export async function approveDishDraftAtomic(
 
     const result = { draft: updatedDraft, publishedRevision: revision };
 
-    if (options.commandId) {
-      const approvalHash = crypto
-        .createHash('sha256')
-        .update(JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 }))
-        .digest('hex');
-      const payload = JSON.stringify({ draftId, expectedVersion: options.expectedVersion ?? 0 });
-      await client.query(
-        `INSERT INTO app_private.es_command
-          (id, tenant_id, actor_id, command_type, idempotency_key, payload, request_hash, result)
-         VALUES ($1, $2, $3, 'dish.draft.approve', $4, $5::jsonb, $6, $7::jsonb)`,
-        [
-          crypto.randomUUID(),
-          venueId,
-          actorId,
-          options.commandId,
-          payload,
-          approvalHash,
-          JSON.stringify(result),
-        ],
-      );
-    }
+    const payload = JSON.stringify({ draftId, expectedVersion });
+    await client.query(
+      `INSERT INTO app_private.es_command
+        (id, tenant_id, actor_id, command_type, idempotency_key, payload, request_hash, result)
+       VALUES ($1, $2, $3, 'dish.draft.approve', $4, $5::jsonb, $6, $7::jsonb)`,
+      [
+        crypto.randomUUID(),
+        venueId,
+        actorId,
+        options.commandId,
+        payload,
+        approvalHash,
+        JSON.stringify(result),
+      ],
+    );
 
     await client.query('COMMIT');
     started = false;
@@ -574,11 +567,11 @@ export function createApp(services: Dependencies = dependencies) {
     if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
       return c.json({ error: 'unsupported_media_type' }, 415);
     }
-    let body: unknown = {};
+    let body: unknown;
     try {
       body = await c.req.json();
     } catch {
-      // empty body is acceptable for defaults
+      return c.json({ error: 'invalid_json' }, 400);
     }
     const parsed = ApproveDishDraftRequestSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);

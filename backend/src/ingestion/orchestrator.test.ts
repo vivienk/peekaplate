@@ -497,6 +497,48 @@ describe('Ingestion Orchestrator', () => {
       expect(duplicateMsg.retry).not.toHaveBeenCalled();
     });
 
+    it('retries queue delivery when job is currently running under an active lease', async () => {
+      const { client, store } = createMockClient();
+      const job = await submitMenuIngestion(client, {
+        venueId: queueVenueId,
+        sourceType: 'pdf',
+        sourceHash: 'b'.repeat(64),
+        sourceStorageKey: 'sources/sample2.pdf',
+        idempotencyKey: 'idem_active_lease_1',
+      });
+
+      // Manually set status to running with active lease
+      store.job!.status = 'running';
+      store.job!.claim_token = '00000000-0000-0000-0000-000000000111';
+      store.job!.locked_at = new Date().toISOString();
+      store.job!.locked_by = 'worker_busy';
+
+      const mockExtractor = vi.fn();
+      const activeMsg: QueueMessage<unknown> = {
+        id: 'msg_active_1',
+        body: {
+          version: 1,
+          tenantId: queueVenueId,
+          jobId: job.id,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result = await processIngestionQueueBatch(
+        client,
+        { messages: [activeMsg] },
+        mockExtractor,
+      );
+
+      expect(result.acknowledged).toBe(0);
+      expect(result.retried).toBe(1);
+      expect(activeMsg.retry).toHaveBeenCalledTimes(1);
+      expect(activeMsg.ack).not.toHaveBeenCalled();
+      expect(mockExtractor).not.toHaveBeenCalled();
+    });
+
     it('processes valid queue message, persists drafts, and acks message', async () => {
       const { client } = createMockClient();
       const job = await submitMenuIngestion(client, {
@@ -781,7 +823,7 @@ describe('Ingestion Orchestrator', () => {
       });
 
       expect(outcome.job.status).toBe('complete');
-      const expectedStorageKey = `reports/${venueId}/${job.id}/extraction.json`;
+      const expectedStorageKey = `reports/${venueId}/${job.id}/attempts/00000000-0000-0000-0000-000000000999/extraction.json`;
       expect(outcome.job.result_storage_key).toBe(expectedStorageKey);
 
       // Verify artifact was durably written to storage

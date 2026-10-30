@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "0917d5edaf9a600fca7c8182a60dae228ee62a3fe8aa2171b78acf973dc65177"
+      "sourceFingerprint": "efbe9b0d3369288dbe18a49b5beaa8fa40e900c29e74fde8c4c289ccb4a1bf6b"
     },
     {
       "id": "tokens",
@@ -104,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; report retention via result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer handler with transaction-local RLS tenant context; atomic draft approval and dish creation under concurrency with es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
+      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer handler retrying active leases and acknowledging terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -162,7 +162,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "31a3c44154f1f6d9cfde7861713436c71c36606cd35a88078139c421af7fa19c"
+      "sourceFingerprint": "3e4efb0c29ffb908c65f8c46b37ac931e2e098897cd8a0037df3621e5746085b"
     },
     {
       "id": "database",
@@ -264,7 +264,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "0e24f1c1c7ac2ea398bb929da107b3d9080f9048b277e683d6e446bf894840d3"
+      "sourceFingerprint": "1e1483e21bcf5c03a155a035dfc31712d519424dc1a483b6e5308ad0f0a86b78"
     },
     {
       "id": "agents",
@@ -375,13 +375,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Resolved all outstanding inline review comments on PR #45 (Sai): (1) Enforced transaction-local app.tenant_id across all ingestion repository operations and queue processing under the restricted peekaplate_runtime role, ensuring RLS isolation without relying on connection leaks or pre-set context. (2) Implemented atomic draft approval and dish revision creation with SELECT FOR UPDATE and es_command idempotency tracking, guaranteeing exactly one dish creation under concurrent requests and safe replay without duplicate writes. (3) Bounded menu intake by strictly rejecting raw URL/text sources with 400 unsupported_source_type before job creation or queue dispatch. Added comprehensive database regressions under peekaplate_runtime connecting with unconfigured session context. All unit, integration, and database tests pass.",
+      "summary": "Resolved outstanding review findings on PR #45 (Hemu): (1) Separated active leases from terminal jobs in Queue batch processing, invoking msg.retry() on running leases to enable recovery of abandoned workers after lease expiration while acknowledging terminal completions. (2) Bound report storage write ownership to the claimed generation using an attempt-specific immutable key (reports/<tenant>/<job>/attempts/<claim>/extraction.json), preventing stale resume overwrites across two-worker lease expiration races. (3) Enforced 400 invalid_json on malformed nonempty JSON approval requests before command execution, keeping drafts pending with zero writes. (4) Required client-stable commandId in ApproveDishDraftRequestSchema, enforcing identical retry replay, conflicting reuse rejection (409), and staff membership revocation (403) within atomic transactions. Added comprehensive PostgreSQL/HTTP integration tests.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Reviewers verify resolved review threads and regression evidence. Staging queue consumer unpausing and live extraction deployment remain gated on operator approval and container deployment."
+      "next": "Reviewers verify resolved review threads and regression evidence across the four recovery/approval findings. Staging queue consumer unpausing and live extraction deployment remain gated on operator approval and container deployment."
     },
     {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",

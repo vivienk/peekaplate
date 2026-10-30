@@ -304,7 +304,10 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       expect(draft.status).toBe('needs_review');
 
       // 4. Verify report artifact persisted in storage
-      const reportKey = `reports/${venueId}/${job.id}/extraction.json`;
+      const reportKey = workflowResult.job.result_storage_key!;
+      expect(reportKey).toBe(
+        `reports/${venueId}/${job.id}/attempts/00000000-0000-0000-0000-000000000999/extraction.json`,
+      );
       expect(reports.has(reportKey)).toBe(true);
       const parsedReport = JSON.parse(reports.get(reportKey)!);
       expect(parsedReport.schema_version).toBe(2);
@@ -348,7 +351,7 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       expect(workflowResult.job.status).toBe('complete');
       expect(workflowResult.persistedCount).toBe(1);
       expect(store.drafts.length).toBe(1);
-      expect(reports.has(`reports/${venueId}/${job.id}/extraction.json`)).toBe(true);
+      expect(reports.has(workflowResult.job.result_storage_key!)).toBe(true);
     });
 
     it('executes complete Photo menu ingestion workflow to draft persistence', async () => {
@@ -379,7 +382,7 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       expect(workflowResult.job.status).toBe('complete');
       expect(workflowResult.persistedCount).toBe(1);
       expect(store.drafts.length).toBe(1);
-      expect(reports.has(`reports/${venueId}/${job.id}/extraction.json`)).toBe(true);
+      expect(reports.has(workflowResult.job.result_storage_key!)).toBe(true);
     });
   });
 
@@ -837,7 +840,10 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       expect(retryCalled).toBe(false);
 
       // Verify report written to R2
-      const reportKey = `reports/${venueId}/${job.id}/extraction.json`;
+      const reportKey = store.job?.result_storage_key!;
+      expect(reportKey).toBe(
+        `reports/${venueId}/${job.id}/attempts/00000000-0000-0000-0000-000000000999/extraction.json`,
+      );
       expect(reports.has(reportKey)).toBe(true);
 
       // Verify exact 3 dishes persisted with expected fields
