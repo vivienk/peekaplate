@@ -14,7 +14,17 @@ MAX_RENDER_PIXELS = 6_000_000
 MIN_NATIVE_TEXT_CHARS = 20
 
 
-def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSegment]:
+def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider, *, page_numbers=None) -> list[SourceSegment]:
+    """Acquire all pages by default, or only explicit 1-based page numbers.
+
+    Selection never loads unselected pages. Returned identities stay source-wide;
+    callers retaining complete coverage must merge these segments themselves.
+    """
+    if page_numbers is not None:
+        if (not isinstance(page_numbers, (list, tuple)) or not page_numbers
+                or any(type(n) is not int or not 1 <= n <= MAX_PDF_PAGES for n in page_numbers)
+                or len(set(page_numbers)) != len(page_numbers)):
+            raise ExtractionError("Select distinct PDF page numbers between 1 and 40.")
     try:
         document = pymupdf.open(stream=data, filetype="pdf")
     except (RuntimeError, ValueError):
@@ -24,8 +34,12 @@ def extract_pdf(data: bytes, source_id: str, ocr: OCRProvider) -> list[SourceSeg
             raise ExtractionError("Password-protected PDFs need an unlocked export.")
         if not 1 <= len(document) <= MAX_PDF_PAGES:
             raise ExtractionError("PDF must contain between 1 and 40 pages.")
+        if page_numbers is not None and any(n > len(document) for n in page_numbers):
+            raise ExtractionError("Selected page is outside the source PDF.")
         pages = []
         for index in range(len(document)):
+            if page_numbers is not None and index + 1 not in page_numbers:
+                continue
             started=time.perf_counter()
             timings={}
             segment = SourceSegment(segment_id=f"{source_id}#page-{index+1}", page_number=index+1, method="pdf_native")

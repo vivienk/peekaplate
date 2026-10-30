@@ -26,10 +26,19 @@ class NoRedirects(HTTPRedirectHandler):
 
 
 class OCRSpaceClient(OCRProvider):
+    """Engine 3 adapter; default retries are unchanged.
 
-    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90, is_table:bool=True):
+    Explicit recovery uses max_attempts=1 and cache_dir=None. The cumulative
+    transport_attempts counter excludes cache hits and local input/key failures.
+    """
+
+    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90, is_table:bool=True, max_attempts:int=2):
         if not math.isfinite(timeout) or not 0<timeout<=120:
             raise ExtractionError("OCR timeout must be greater than zero and at most 120 seconds.")
+        if type(max_attempts) is not int or max_attempts not in (1, 2):
+            raise ExtractionError("OCR max_attempts must be 1 or 2.")
+        self.transport_attempts=0
+        self.max_attempts=max_attempts
         self.api_key=api_key
         self.cache_dir=Path(cache_dir) if cache_dir is not None else None
         self.timeout=timeout
@@ -61,13 +70,14 @@ class OCRSpaceClient(OCRProvider):
         payload={**settings, "base64Image":"data:image/jpeg;base64,"+base64.b64encode(image).decode()}
         data=urlencode({key:str(value).lower() if isinstance(value, bool) else value for key,value in payload.items()}).encode()
         request=Request(OCR_ENDPOINT, data=data, headers={"apikey":self.api_key, "Content-Type":"application/x-www-form-urlencoded"}, method="POST")
-        for attempt in range(2):
+        for attempt in range(self.max_attempts):
             try:
+                self.transport_attempts += 1
                 with build_opener(NoRedirects()).open(request, timeout=self.timeout) as response:
                     body=response.read(MAX_OCR_RESPONSE+1)
                 break
             except HTTPError as error:
-                if error.code in {429, 500, 502, 503, 504} and attempt==0:
+                if error.code in {429, 500, 502, 503, 504} and attempt + 1 < self.max_attempts:
                     delay=error.headers.get("Retry-After", "1") if error.headers else "1"
                     if delay.isdigit() and int(delay)<=3:
                         time.sleep(max(1, int(delay)))
@@ -76,11 +86,11 @@ class OCRSpaceClient(OCRProvider):
                     raise ExtractionError("OCR.space returned HTTP 429 (rate/quota limit); wait for the provider reset before retrying.") from None
                 raise ExtractionError(f"OCR.space returned HTTP {error.code}; the request failed, and quota exhaustion is not established.") from None
             except (URLError, OSError, HTTPException):
-                if attempt==0:
+                if attempt + 1 < self.max_attempts:
                     # A timeout may already have consumed quota. Retry only once.
                     time.sleep(1)
                     continue
-                raise ExtractionError("OCR.space request failed or timed out after two attempts.") from None
+                raise ExtractionError("OCR.space request failed or timed out after two attempts." if self.max_attempts == 2 else "OCR.space request failed or timed out after one attempt; no retry was made.") from None
             except ValueError:
                 raise ExtractionError("OCR.space request configuration is invalid.") from None
         if len(body)>MAX_OCR_RESPONSE:

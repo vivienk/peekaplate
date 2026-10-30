@@ -10,20 +10,58 @@ CURRENCY_CODE="(?:"+"|".join(sorted(CURRENCY_CODES))+")"
 MONEY_MARKER=rf"(?:[$€£₱]|{CURRENCY_CODE}|P)"
 PRICE_NUMBER=r"\d+(?:\.\d+)?"
 PRICE_OPTION=rf"(?:{MONEY_MARKER}[ \t]*)?{PRICE_NUMBER}(?:[ \t]+{CURRENCY_CODE})?"
-PRICE_GROUP=rf"(?<![\w.,]){PRICE_OPTION}(?:[ \t]*/[ \t]*{PRICE_OPTION})+(?!\w|[.,]\d)"
+PRICE_SEPARATOR=r"(?:[ \t]*/[ \t]*|[ \t]+or[ \t]+)"
+PRICE_GROUP=rf"(?<![\w.,]){PRICE_OPTION}(?:{PRICE_SEPARATOR}{PRICE_OPTION})+(?!\w|[.,]\d)"
 
 
 def nonprice_unit(text, start, end):
-    units=_UNITS
+    units=rf"(?:{_UNITS}\b|[%％])"
+    preceding=rf"(?:\b{_UNITS}|[%％])"
     before=text[text.rfind("\n", 0, start)+1:start]
-    if re.match(rf"[ \t]*{units}\b", text[end:], re.I) or re.search(rf"\b{units}[ \t]*:?[ \t]*$", before, re.I):
+    if re.match(rf"[ \t]*{units}", text[end:], re.I) or re.search(rf"{preceding}[ \t]*:?[ \t]*$", before, re.I):
         return True
     marker=rf"(?:[$€£₱]|\b{CURRENCY_CODE}|\bP)"
     if re.search(rf"{marker}[ \t]*$", before, re.I) or re.match(rf"[ \t]*{marker}[ \t]*\d", text[start:end], re.I):
         return False
     after=r"[ \t]*(?:/[ \t]*\d+(?:\.\d+)?[ \t]*)*"
     prior=r"(?:\d+(?:\.\d+)?[ \t]*/[ \t]*)*"
-    return bool(re.match(rf"{after}{units}\b", text[end:], re.I) or re.search(rf"\b{units}[ \t]*:?[ \t]*{prior}$", before, re.I))
+    return bool(re.match(rf"{after}{units}", text[end:], re.I) or re.search(rf"{preceding}[ \t]*:?[ \t]*{prior}$", before, re.I))
+
+
+TRAILING_TRADEMARK_WARNING="Trailing model trademark marker removed after literal source-name verification."
+
+
+def verified_source_name(name, text):
+    """Only remove a model-only trailing trademark from a literal source entry."""
+    if phrase_matches(name, text):
+        return name
+    trimmed=name.rstrip()
+    candidate=re.sub(r"(?:[ \t]*[®™])+$", "", trimmed)
+    if candidate != trimmed and candidate:
+        entries=entry_matches(candidate,text)
+        if entries and not any(text[match.end():].lstrip().startswith(("®","™")) for match in entries):
+            return candidate
+    return name
+
+
+def without_terminal_contact_footer(text):
+    """Local boundary view only; never rewrite saved source text or offsets."""
+    lines=[match for match in re.finditer(r"(?m)^[^\n]*(?:\n|$)", text) if match.group().strip()]
+    if not lines:
+        return text
+    last=lines[-1]
+    value=last.group().strip()
+    heading=re.match(r"#{1,6}[ \t]+", value)
+    if heading:
+        value=value[heading.end():]
+    label=re.match(r"(?:tel(?:ephone)?|phone|call|contact)(?:[ \t]*:)?[ \t]+", value, re.I)
+    if label:
+        value=value[label.end():]
+    phone=r"(?:\+?1[ \t.-]+)?(?:\([0-9]{3}\)|[0-9]{3})[ \t.-]+[0-9]{3}[ \t.-]+[0-9]{4}"
+    separated=bool(re.search(r"\n[ \t]*\n[ \t]*$", text[:last.start()]))
+    if re.fullmatch(phone, value) and (label or heading and separated):
+        return text[:last.start()]
+    return text
 
 
 def phrase_matches(value, text):
@@ -48,16 +86,17 @@ def complete_price_match(match, text):
     # Include malformed/signed neighbors when checking completeness, not as new
     # supported price formats. Never salvage a suffix of an unsupported group.
     number=r"[+\-−]?[ \t]*[.,]?\d+(?:[.,]\d+)*"
-    prior=re.search(rf"({number})(?:[ \t]+[A-Z]{{3}})?\s*/\s*$", before, re.I)
+    sep=r"(?:\s*/\s*|\s+or\s+)"
+    prior=re.search(rf"({number})(?:[ \t]+[A-Z]{{3}})?{sep}$", before, re.I)
     if prior and not nonprice_unit(text, prior.start(1), prior.end(1)):
         return False
     # Signs may precede or follow a marker, including OCR-separated tokens.
-    following=re.match(rf"(?:[ \t]+[A-Z]{{3}})?\s*/\s*(?:[+\-−][ \t]*)?(?:{currency}[ \t]*)?({number})", after, re.I)
+    following=re.match(rf"(?:[ \t]+[A-Z]{{3}})?{sep}(?:[+\-−][ \t]*)?(?:{currency}[ \t]*)?({number})", after, re.I)
     if following:
         # Explicit money beside a directly labelled calorie/portion count is
         # separate evidence; an indirectly labelled option is still a partial list.
         end=match.end()+following.end(1)
-        if not re.match(rf"[ \t]*{_UNITS}\b", text[end:], re.I):
+        if not re.match(rf"[ \t]*(?:{_UNITS}\b|[%％])", text[end:], re.I):
             return False
     return True
 
@@ -71,9 +110,39 @@ def price_matches(value, text):
     return [match for match in re.finditer(pattern, text, re.I) if complete_price_match(match, text)]
 
 
+def is_unpriced_callout(match, text):
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    line_end = text.find("\n", match.end())
+    if line_end == -1:
+        line_end = len(text)
+    if "![" in text[line_start:line_end]:
+        return False
+    rem = text[match.end():line_end].strip(" #*▼►•-")
+    minor = {"with", "w/", "and", "or", "in", "of", "the", "a", "an", "is", "to", "for", "on", "at", "by", "from"}
+    if rem:
+        if any(c.isdigit() for c in rem) or "," in rem or any(w.islower() for w in rem.split() if w.lower() not in minor):
+            return False
+    lines = [line.strip() for line in text[line_end:].splitlines() if line.strip()]
+    if not lines:
+        return True
+    first = lines[0]
+    if first.startswith("#"):
+        return True
+    if "," in first or any(c.isdigit() for c in first):
+        return False
+    words = [w.strip(".,;:'\"") for w in first.split() if w.strip(".,;:'\"")]
+    has_desc = any(w.islower() for w in words if w.lower() not in minor)
+    if has_desc:
+        return False
+    return True
+
+
 def entry_matches(name, text):
+    captions = [m.span() for m in re.finditer(r"!\[[^\]\n]+\]\([^\n)]*\)", text)]
     entries=[]
     for match in phrase_matches(name, text):
+        if any(start <= match.start() and match.end() <= end for start, end in captions):
+            continue
         line_start=text.rfind("\n", 0, match.start())+1
         prefix=text[line_start:match.start()]
         # Repeated titles can share one flattened column line. Mentions on a
@@ -81,6 +150,10 @@ def entry_matches(name, text):
         same_line=bool(entries and entries[-1].start() >= line_start)
         if (re.fullmatch(r"[ \t#*▼►•-]*", prefix) or same_line) and not text[match.end():].lstrip(" \t").startswith(","):
             entries.append(match)
+    if len(entries) > 1:
+        non_callouts = [m for m in entries if not is_unpriced_callout(m, text)]
+        if len(non_callouts) == 1:
+            return non_callouts
     return entries
 
 
@@ -91,42 +164,55 @@ def single_source_entry(name, text):
         return False
     normalize=lambda value:" ".join(re.sub(r"^[ \t#*▼►•>-]*", "", value).split())
     entry=normalize(entries[0].group())
-    captions=[match for match in re.finditer(r"!\[([^\]\n]+)\]\([^\n)]*\)", text)
+    captions=[match for match in re.finditer(r"!\[([^\]\n]+)\]\(([^\n)]*)\)", text)
               if normalize(match.group(1)) != entry]
+    def in_caption(match, caption):
+        if (caption.start(1) <= match.start() and match.end() <= caption.end(1)
+                and normalize(match.group()) == normalize(caption.group(1))):
+            return True
+        return (caption.start(2) <= match.start() and match.end() <= caption.end(2)
+                and normalize(caption.group(2)).casefold() == normalize(caption.group(1)).casefold()
+                and normalize(match.group()) == normalize(caption.group(2)))
     occurrences=[match for match in phrase_matches(name, text)
-                 if not any(caption.start(1) <= match.start() and match.end() <= caption.end(1)
-                            and normalize(match.group()) == normalize(caption.group(1))
-                            for caption in captions)]
+                 if not any(in_caption(match, caption) for caption in captions)]
+    if len(occurrences) > 1:
+        non_callouts = [m for m in occurrences if not is_unpriced_callout(m, text)]
+        if len(non_callouts) == 1:
+            return True
     return len(occurrences) == 1
-
 
 def dish_block(name, text, dish_names):
     entries=entry_matches(name, text)
     if not entries:
         return ""
-    # Numbers in the dish name are not price evidence.
-    start=entries[-1].end()
-    end=len(text)
+    all_other_starts = []
     for other in dish_names:
         if other.casefold() == name.casefold():
             continue
         for match in entry_matches(other, text):
-            if match.start() > start:
-                end=min(end, match.start())
-    # Stop at a possible entry omitted by the model; ambiguous blocks stay unknown.
-    offset=entries[-1].end()
-    for line in text[offset:end].splitlines(keepends=True):
-        label=line.strip().strip("#*▼►•- ")
-        heading=re.fullmatch(r"([A-Za-z][A-Za-z '&’\-]*?)(?:[ \t]+(?:[$€£₱]|PHP[ \t]*|P)?\d.*)?", label, re.I)
-        label=heading.group(1) if heading else ""
-        if re.sub(r"[\s\-−]+$", "", label).upper() in CURRENCY_CODES|{"P"}:
-            label=""
-        words=label.split()
-        if label and (label.istitle() or label.isupper() or len(words) == 1):
-            end=offset
-            break
-        offset+=len(line)
-    return text[start:end]
+            all_other_starts.append(match.start())
+    blocks = []
+    for i, m in enumerate(entries):
+        start = m.end()
+        end = entries[i+1].start() if i + 1 < len(entries) else len(text)
+        for ost in all_other_starts:
+            if ost > start and ost < end:
+                end = ost
+        offset = start
+        for line in text[start:end].splitlines(keepends=True):
+            label = line.strip().strip("#*▼►•- ")
+            heading = re.fullmatch(r"([A-Za-z][A-Za-z '&’\-]*?)(?:[ \t]+(?:[$€£₱]|PHP[ \t]*|P)?\d.*)?", label, re.I)
+            lbl = heading.group(1) if heading else ""
+            if re.sub(r"[\s\-−]+$", "", lbl).upper() in CURRENCY_CODES|{"P"}:
+                lbl = ""
+            words = lbl.split()
+            if lbl and (lbl.istitle() or lbl.isupper() or (len(words) == 1 and lbl[0].isupper())):
+                if not (lbl.lower().startswith("with ") or lbl in {"Grilled Chicken Breast", "Shrimp"} or lbl.lower().startswith("best paired with")):
+                    end = offset
+                    break
+            offset += len(line)
+        blocks.append(text[start:end])
+    return "\n".join(b for b in blocks if b)
 
 
 def detached_prices(block):

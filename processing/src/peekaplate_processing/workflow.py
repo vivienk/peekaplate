@@ -20,8 +20,8 @@ from pydantic_core import ErrorType
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.model_cache import cache_path, read_candidates, write_candidates
-from peekaplate_processing.menu_context import MONEY_MARKER, PRICE_GROUP, apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry
-from peekaplate_processing.menu_layout import corroborate_box_price, entry_price
+from peekaplate_processing.menu_context import MONEY_MARKER, PRICE_GROUP, TRAILING_TRADEMARK_WARNING, apply_sections, complete_price_match, detached_prices, dish_block, entry_matches, nonprice_unit, phrase_matches, price_matches, single_source_entry, verified_source_name, without_terminal_contact_footer
+from peekaplate_processing.menu_layout import box_price_text_is_missing, corroborate_box_price, entry_price, section_price_context
 from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
 
@@ -119,13 +119,18 @@ REQUIRED JSON SCHEMA:
 """ + json.dumps(DishBatch.model_json_schema(), ensure_ascii=False)
 
 
-def grounding_issues(dish: ExtractedDish, text: str, *, dish_names=(), price_block=None):
+def grounding_issues(dish: ExtractedDish, text: str, *, dish_names=(), price_block=None, entry_scope=None):
     """Return unsupported fields without retaining their generated values."""
     issues = {}
-    fields = [("name", dish.name), ("description", dish.description), ("category", dish.category), ("subcategory", dish.subcategory)]
-    fields.extend(("ingredients", value) for value in dish.ingredients or [])
-    for field, value in fields:
-        if value is not None and not phrase_matches(value, text):
+    local_scope = dish_block(dish.name, text, dish_names) if entry_scope is None else entry_scope
+    for field, value, scope in [
+        ("name", dish.name, text),
+        ("description", dish.description, local_scope),
+        ("category", dish.category, text),
+        ("subcategory", dish.subcategory, text),
+        *(("ingredients", value, local_scope) for value in dish.ingredients or []),
+    ]:
+        if value is not None and not phrase_matches(value, scope):
             issues[field] = f"Dish {field} is absent from its cited page."
     if dish.subcategory is not None:
         subcategory=" ".join(dish.subcategory.casefold().split())
@@ -146,16 +151,40 @@ def grounding_issues(dish: ExtractedDish, text: str, *, dish_names=(), price_blo
     if dish.price_currency is not None:
         if not re.fullmatch(r"[A-Z]{3}", dish.price_currency):
             issues["price_currency"] = "Currency requires an explicit three-letter uppercase code."
-        elif not re.search(rf"(?<![A-Za-z]){re.escape(dish.price_currency)}(?![A-Za-z])", text, re.I):
-            issues["price_currency"] = "Currency is not explicitly present on the page."
+        else:
+            pat = rf"(?<![A-Za-z]){re.escape(dish.price_currency)}(?![A-Za-z])"
+            literal_codes = {m.group().upper() for m in re.finditer(r"(?<![A-Za-z])[A-Z]{3}(?![A-Za-z])", dish.price_text or "")}
+            first_entry = min((m.start() for n in {*dish_names, dish.name} for m in entry_matches(n, text)), default=len(text))
+            header_scope = text[:first_entry]
+            if not re.search(pat, text, re.I):
+                issues["price_currency"] = "Currency is not explicitly present on the page."
+            elif literal_codes and dish.price_currency.upper() not in literal_codes:
+                issues["price_currency"] = "Currency conflicts with the explicit currency in this dish's price text."
+            elif not (re.search(pat, local_scope, re.I) or re.search(pat, block, re.I) or re.search(pat, header_scope, re.I)):
+                issues["price_currency"] = "Currency is not supported in this dish's entry or shared header."
     if dish.price_amount is not None:
         try:
             amount = Decimal(dish.price_amount)
             numbers=re.finditer(rf"(?<![\w.,+-])(?:{MONEY_MARKER})?[ \t]*(\d+(?:\.\d+)?)(?!\w|[.,]\d)", block, re.I)
-            amounts={Decimal(match.group(1)) for match in numbers if complete_price_match(match,block) and not nonprice_unit(block, match.start(), match.end())}
-            if not amount.is_finite() or amount < 0 or amount not in amounts: raise ValueError
+            amounts=[Decimal(match.group(1)) for match in numbers if complete_price_match(match,block) and not nonprice_unit(block, match.start(), match.end())]
+            unique_amounts = set(amounts)
+            if not amount.is_finite() or amount < 0 or amount not in unique_amounts:
+                raise ValueError
+            if len(unique_amounts) > 1:
+                raise ValueError("Ambiguous multiple prices in entry.")
+            if dish.price_text is not None and "price_text" not in issues:
+                text_amounts = {Decimal(v) for v in re.findall(r"\d+(?:\.\d+)?", dish.price_text)}
+                if len(text_amounts) != 1 or amount not in text_amounts:
+                    raise ValueError("Price amount contradicts price_text.")
         except (InvalidOperation, ValueError):
             issues["price_amount"] = "Price is not supported by the cited page."
+    if dish.price_text is not None and "price_text" not in issues:
+        text_nums = re.findall(r"\d+(?:\.\d+)?", dish.price_text)
+        if len(text_nums) == 1:
+            numbers=re.finditer(rf"(?<![\w.,+-])(?:{MONEY_MARKER})?[ \t]*(\d+(?:\.\d+)?)(?!\w|[.,]\d)", block, re.I)
+            unique_block_amounts={Decimal(match.group(1)) for match in numbers if complete_price_match(match,block) and not nonprice_unit(block, match.start(), match.end())}
+            if len(unique_block_amounts) > 1:
+                issues["price_text"] = "Single price text is ambiguous among multiple numeric prices in this dish's entry."
     return issues
 
 
@@ -165,26 +194,42 @@ def check_grounding(dish: ExtractedDish, text: str):
     if issues: raise ExtractionError(next(iter(issues.values())))
 
 
-def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadata=None, return_box_evidence=False):
-    layout=entry_price(dish.name, text, ocr_metadata, dish_names=dish_names)
-    block=dish_block(dish.name, text, dish_names) if layout is None else layout["price_text"] or ""
+def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), section_names=(), ocr_metadata=None, return_box_evidence=False):
+    source_name=verified_source_name(dish.name, text)
+    name_replaced=source_name != dish.name
+    if name_replaced:
+        dish=dish.model_copy(update={"name":source_name})
+    dish_names=tuple(verified_source_name(name, text) for name in dish_names)
+    base_layout=entry_price(dish.name,text,ocr_metadata,dish_names=dish_names)
+    context=None if base_layout and base_layout["price_text"] else section_price_context(
+        dish.name,dish.category,text,ocr_metadata,section_names=section_names,dish_names=dish_names)
+    entry_text=context["text"] if context else text
+    entry_metadata=context["metadata"] if context else ocr_metadata
+    # Telephone eligibility is checked against the whole page, never a clipped
+    # view that could turn an interior contact line into a terminal footer.
+    canonical_text=without_terminal_contact_footer(text)
+    canonical_entry=canonical_text[context["canonical_entry_start"]:context["canonical_entry_stop"]] if context else canonical_text
+    layout=entry_price(dish.name,entry_text,entry_metadata,dish_names=dish_names) if context else base_layout
+    if context and layout and layout["price_text"]:
+        numeric_body=canonical_text[context["canonical_name_end"]:context["canonical_entry_stop"]]
+        if re.findall(r"\d+(?:\.\d+)?",numeric_body)!=re.findall(r"\d+(?:\.\d+)?",layout["price_text"]):
+            layout={"price_text":None,"anchor":None,"label":None}
+    local_entry_block=dish_block(dish.name, entry_text, dish_names)
+    block=local_entry_block if layout is None else layout["price_text"] or ""
     ambiguous=(layout is not None and not block) or (
-        layout is None and (len(entry_matches(dish.name,text)) > 1 or detached_prices(block)))
+        layout is None and (len(entry_matches(dish.name,entry_text)) > 1 or detached_prices(block)))
     if ambiguous:
         block=""
-    issues = grounding_issues(dish, text, dish_names=dish_names, price_block=block)
+    issues = grounding_issues(dish, text, dish_names=dish_names, price_block=block, entry_scope=local_entry_block)
     if "name" in issues: raise ExtractionError(issues["name"])
     recovered=layout is not None and bool(block)
-    # If the dish block contains price options / slashes, text-based options govern.
-    raw_block = dish_block(dish.name, text, dish_names)
-    text_has_options = "/" in raw_block and any(c.isdigit() for c in raw_block)
     box_evidence = []
-    if not recovered and not text_has_options and ocr_metadata:
+    if not recovered and entry_metadata and box_price_text_is_missing(dish.name,canonical_entry,dish_names):
         c_text, c_amount, c_boxes = corroborate_box_price(
-            dish.name, dish.price_text, dish.price_amount, ocr_metadata, dish_names=tuple(dish_names)
+            dish.name, dish.price_text, dish.price_amount, entry_metadata, dish_names=tuple(dish_names)
         )
         if c_text is not None:
-            box_evidence = c_boxes
+            box_evidence = [{**record,"saved_region_index":context["region_indices"][record["saved_region_index"]]} for record in c_boxes] if context else c_boxes
             block = c_text
             recovered = True
             issues.pop("price_text", None)
@@ -197,6 +242,8 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
 
     warnings = [f"{field} cleared to null: {message}" for field, message in issues.items()
                 if not recovered or field not in {"price_text", "price_amount"}]
+    if name_replaced:
+        warnings.insert(0,TRAILING_TRADEMARK_WARNING)
     updates = {field: None for field in issues}
     if recovered:
         if box_corroborated:
@@ -213,7 +260,7 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
     pairs=[match for match in re.finditer(PRICE_GROUP, block, re.I)
            if complete_price_match(match, block) and not nonprice_unit(block, match.start(), match.end())]
     price_text=updates.get("price_text", dish.price_text)
-    supplied_pair=bool(price_text and "/" in price_text and len(re.findall(r"\d+(?:\.\d+)?",price_text))>1)
+    supplied_pair=bool(price_text and re.search(r"/|\bor\b", price_text, re.I) and len(re.findall(r"\d+(?:\.\d+)?",price_text))>1)
     matching_pairs=[]
     try:
         amount=Decimal(dish.price_amount) if dish.price_amount is not None else None
@@ -231,6 +278,11 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), ocr_metadat
             updates["price_text"]=pairs[0].group()
         warnings.append("Multiple printed prices; option meanings require human review.")
     if dish.ingredients == []: updates["ingredients"] = None
+    if updates.get("price_text", dish.price_text) is None and updates.get("price_amount", dish.price_amount) is None:
+        if any(w in text.lower() for w in ("bistro to share", "all-day trio", "choose 1", "starter +", "combo", "bundle")):
+            warnings.append("Included in set menu / bundle; no standalone price")
+    if context and (updates.get("price_text",dish.price_text) is not None or updates.get("price_amount",dish.price_amount) is not None):
+        warnings.append("Price association scoped to an explicit source section; verify section membership.")
     cleaned = dish.model_copy(update=updates)
     if return_box_evidence:
         return cleaned, warnings, box_evidence
@@ -536,15 +588,17 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                         continue
                     with measure(timings, "grounding"):
                         names=[other.name for other in parsed.dishes if other.page_number == dish.page_number]
+                        section_names=[other.category for other in parsed.dishes if other.page_number==dish.page_number and other.category is not None]
                         cleaned, warnings, box_ev = grounded_draft(
-                            dish, pages[dish.page_number], dish_names=names,
+                            dish, pages[dish.page_number], dish_names=names,section_names=section_names,
                             ocr_metadata=metadata[dish.page_number], return_box_evidence=True
                         )
                 except ExtractionError as error:
                     finding["errors"].append(f"Batch {state['worker_id']}, dish {index}, page {dish.page_number}: {error}")
                     finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages.get(dish.page_number),rejection=str(error))
                     continue
-                finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages[dish.page_number],cleaned=cleaned,warnings=warnings)
+                box_ev=[{**value,"page_number":source_pages[dish.page_number]["page_number"]} for value in box_ev]
+                finding["suggestions"][index-1]=suggestion_record(dish,state["worker_id"],index,source_pages[dish.page_number],cleaned=cleaned,warnings=warnings,box_evidence=box_ev)
                 item = cleaned.model_dump()
                 if box_ev:
                     item["box_evidence"] = box_ev

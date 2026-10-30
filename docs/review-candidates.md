@@ -135,6 +135,25 @@ Page-level evidence remains page-level. Available `ocr_regions`, upload dimensio
 in segment metadata. This does not assign a precise rectangle to each dish or
 field. The UI must support showing the page/text when boxes are absent or ambiguous.
 
+For the bounded missing-ParsedText-price fallback, the producer additionally exports
+`segments[].metadata.candidate_box_evidence`: a map keyed by existing candidate ID.
+Each value is a nonempty list of `{page_number, saved_region_index, text, box}`
+records, with `box` containing exact finite `left`, `top`, `width`, `height` values
+in uploaded-image pixels. Fractional coordinates are preserved. Each record joins
+that segment's saved `ocr_regions` by index, literal and typed coordinates, on a
+cited ready Engine3 page with available, in-bounds geometry. Duplicates, invented
+facts and orphan/conflicting pre-existing maps are rejected by Python on save/export
+and review-result reload. The exporter deep-copies segments; saved reports, original
+fields, IDs and `SourceSpan[]` are not rewritten. No private transcript, suggestion
+ID, decision record or source-image path is added to this public map.
+
+The shared synthetic `box-evidence-candidates.json` fixture is generated/checked by
+Python and round-tripped through the unchanged TypeScript schema. TypeScript
+preserves this existing metadata envelope; it does **not** independently validate
+the box joins or prove price correctness. It must not be treated as an approval or
+as a precise dish rectangle. UI rendering and consumer save/reload acceptance are
+separate integration gates. Legacy exports without boxes remain unchanged.
+
 ## Test it locally
 
 From `processing`, run the synthetic input without credentials or provider calls:

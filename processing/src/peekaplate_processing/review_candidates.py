@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from peekaplate_processing.errors import ExtractionError
-from peekaplate_processing.schemas import DishDraft, MenuExtractionResult, SourceSegment, SourceSpan
+from peekaplate_processing.schemas import DishDraft, MenuExtractionResult, SourceSegment, SourceSpan, _box_evidence_links, validate_box_evidence
 from peekaplate_processing.storage import save_json
 
 
@@ -110,10 +110,27 @@ class ReviewCandidateResult(BaseModel):
                 passages.append(segment.text[span.start:span.end])
             if "\n".join(passages) != candidate.original.source_text:
                 raise ValueError("Candidate evidence must reconstruct the original source text.")
+        # Validate public OCR links on JSON reload as well as preparation.
+        boxes_by_candidate = {candidate.candidate_id: [] for candidate in self.candidates}
+        for segment in self.segments:
+            if "candidate_box_evidence" not in segment.metadata:
+                continue
+            mapping = segment.metadata["candidate_box_evidence"]
+            if not isinstance(mapping, dict) or not mapping:
+                raise ValueError("Public candidate box links must be a nonempty map.")
+            for key, boxes in mapping.items():
+                if key not in boxes_by_candidate or not isinstance(boxes, list) or not boxes:
+                    raise ValueError("Public box links require existing candidates and nonempty records.")
+                boxes_by_candidate[key].extend(boxes)
+        _box_evidence_links(self.source, self.segments, [
+            (candidate.candidate_id, candidate.original, candidate.evidence, boxes_by_candidate[candidate.candidate_id])
+            for candidate in self.candidates
+        ])
         return self
 
 
 def prepare_review_candidates(report:MenuExtractionResult)->ReviewCandidateResult:
+    public_links=validate_box_evidence(report)
     if report.source is None:
         raise ValueError("An extraction source is required.")
     source=report.source
@@ -135,6 +152,10 @@ def prepare_review_candidates(report:MenuExtractionResult)->ReviewCandidateResul
         ))
     identity=f"{source.source_id}:{report.started_at.isoformat()}:{report.pipeline_version}"
     extraction_id="extraction:"+hashlib.sha256(identity.encode()).hexdigest()[:32]
+    segments=[segment.model_copy(deep=True) for segment in report.segments]
+    for segment in segments:
+        if segment.segment_id in public_links:
+            segment.metadata["candidate_box_evidence"]=public_links[segment.segment_id]
     return ReviewCandidateResult(
         schema_version=report.schema_version,
         extraction_id=extraction_id,
@@ -144,7 +165,7 @@ def prepare_review_candidates(report:MenuExtractionResult)->ReviewCandidateResul
         finished_at=report.finished_at,
         extraction_model=report.extraction_model,
         source=ReviewSource.model_validate(source.model_dump(exclude={"snapshot_base64"})),
-        segments=[segment.model_copy(deep=True) for segment in report.segments],
+        segments=segments,
         candidates=candidates,
         warnings=list(report.warnings),
         errors=list(report.errors),

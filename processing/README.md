@@ -80,6 +80,28 @@ Private raw/cleared/rejected values are kept separately in
 `review-suggestions.json`; they are not silently substituted into grounded originals. VIS-01 and review API consumers still need explicit
 version-2 integration; mixed version pairs are rejected rather than relabeled.
 
+The [bounded missing-ParsedText-price fallback](../docs/processing-v3.md#missing-parsedtext-prices-and-exact-box-links)
+can corroborate a model reading only when its canonical entry is unique and has no
+numeric evidence, and complete exact OCR row cells agree. Conflicts, signed/unit
+values and competing numeric titles abstain. Exact page/index/literal/fractional
+box records accompany the draft; the exporter validates them and adds candidate-ID
+links to existing segment metadata without changing `SourceSpan[]` or shared TS
+schemas. Private decisions identify box support explicitly; all outputs still need
+human review. Empty box evidence is omitted for legacy wire compatibility.
+Adjacent/wrapped title runs and known column boundaries can recover additional
+rows. Explicit source/geometry section context can distinguish repeated names;
+unknown context stays ambiguous. Narrow model-only trailing trademark replacement
+and structured terminal-contact boundaries never rewrite the saved source.
+
+[Targeted recovery](../docs/processing-v3.md#explicit-targeted-recovery) is explicit
+and capped, never automatic. `peekaplate_processing.recover_pages` reacquires only
+selected failed OCR pages, one HTTP attempt each, with a preserved attempt manifest.
+`run_pipeline --target-pages ... --max-model-requests ...` processes only selected
+saved ready pages and keeps incomplete coverage explicit; it never merges old
+candidates. Both require fresh output paths and can incur provider charges only
+when deliberately invoked. Tests/replays use no live providers. Cropped-model
+acquisition and hosted acceptance remain deferred.
+
 A separate [private OCR-box prototype](../docs/processing-v3.md#private-ocr-box-prototype)
 compares saved single-image overlays with saved image-model readings offline. It
 writes its own unvalidated transcript/proposals; it never populates standard draft

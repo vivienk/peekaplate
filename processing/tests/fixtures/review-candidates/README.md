@@ -14,6 +14,7 @@ No OCR or model request was made to create these fixtures.
 | `representative-candidates.json` | Expected version 1 review export; consumed by Python and TypeScript tests. |
 | `representative-extraction-v2.json` | Schema 2 / pipeline 3 synthetic input: grouped price options, unknown price and zero price, plus failed/skipped pages. |
 | `representative-candidates-v2.json` | Expected version 2 export; both languages preserve subcategory, heading page and printed prices without treating a known price pair as missing. |
+| `box-evidence-candidates.json` | Synthetic producer-validated export derived in `test_box_evidence.data()` from the version 1 input, with injected OCR regions and fractional candidate-linked box metadata; both languages preserve it. Not real OCR or image-accuracy evidence. |
 | `field-limits.json` | Shared Unicode boundary cases for name, description and printed price text; both languages count code points. |
 | `invalid-extraction.json` | A source span extends beyond its page text; export must fail without creating output. |
 

@@ -119,7 +119,9 @@ A printed-price suggestion or OCR box must corroborate a complete numeric group,
 not a decimal/thousands fragment or a subset of a slash-separated option list.
 Clipped boxes and truncated suggestions are withheld rather than promoted to a
 scalar price. Explicit money beside a separately labelled calorie/portion count
-remains distinct; these checks do not turn units into prices.
+remains distinct; these checks do not turn units into prices. ASCII/fullwidth
+percentage symbols also mark nonprice values, without invalidating separate
+explicit monetary evidence.
 
 Numbers are checked against the matched dish entry, bounded by other known or
 possible entry headings, including omitted entries with inline prices, rather than
@@ -147,10 +149,11 @@ are not inferred. Every known entry's heading parts and name spans are excluded
 from other entries' price candidates, including wrapped numeric names and inline
 price headings. These are approximate geometry checks, not factual approval.
 
-An extra unpriced occurrence of the same name remains a competing entry. Missing
-prices do not prove that it is a photo caption. Only distinguishable, explicit
+Within an unresolved source section, an extra unpriced occurrence of the same name
+remains a competing entry. Missing prices do not prove that it is a photo caption. Only distinguishable, explicit
 image-alt text can exclude a caption occurrence; an unmarked or indistinguishable
-repeat stays ambiguous, even when another occurrence has a valid price. Every
+repeat stays ambiguous without the explicit section context described below, even
+when another occurrence has a valid price. Every
 source entry occurrence must be reconciled: an entry whose boxes join its title
 and description cannot disappear from the competing count merely because that
 combined run is not a price-eligible heading. Repeated source phrases inside one
@@ -167,7 +170,75 @@ appears in that cluster. Overlay labels omitted from the OCR text can be image
 logos or captions: they cannot supply facts and do not invalidate unrelated
 entry associations. Original text, geometry and Unicode offsets are not rewritten.
 The separately identified [private OCR-box prototype](#private-ocr-box-prototype)
-may compare these readings offline; it does not relax this grounded-output rule.
+remains an offline diagnostic. The bounded production fallback below uses saved
+OCR facts directly; it never imports that prototype's transcript or proposals.
+
+### Missing ParsedText prices and exact box links
+
+When Engine3 omits prices from ParsedText but retains them in TextOverlay, the
+graph may corroborate an existing model reading against complete, literal,
+same-row OCR price cells. The dish name must have one unambiguous canonical entry
+and one uniquely reconstructed overlay title. Adjacent/wrapped title runs are
+bounded to eight original regions and 10,000 candidate checks; they establish
+membership only, never synthetic evidence rectangles or text spans. Known exact
+headings bound neighboring columns; unknown labels remain blockers. Prices aligned
+to different title lines cannot be combined into a convenient option sequence.
+Numeric evidence in the canonical entry takes precedence: scan through the next
+known entry, not just a heading-clipped dish block. Conflicting amounts, signs, units, fractions,
+incomplete options and repeated entries therefore cannot be erased by boxes.
+Any digit in that full entry withholds this fallback. A strictly terminal telephone
+line is excluded from the local decision view only when explicitly contact-labelled,
+or when a separately spaced Markdown heading contains a complete recognized
+telephone format. Bare digit/hyphen strings, generic PRICE headings, interior
+options/conflicts and telephone lines followed by more menu text are not discarded.
+The saved source and offsets never change. This is conservative, not full recall.
+
+Repeated names may be resolved only with explicit section evidence: the model's
+category and the other known page categories must match unique source Markdown
+headings and unique original overlay heading runs. Both the canonical section
+entry and its geometric membership must be unambiguous. Generic PRICE, currency,
+unit or numeric headings cannot establish a section boundary; unknown headings
+remain inside the text check rather than hide numbers. A temporary region view
+maps selected evidence back to original saved indices. Missing/ambiguous section
+context still abstains, and same-name entries in distinct sections are not merged.
+A region straddling any proposed boundary invalidates the view. Excluded cells on
+the selected title's row require an independent exact neighboring title to claim
+them; a boundary alone cannot erase a price option/unit. Existing valid full-entry
+text/geometry grounding takes precedence over this recovery view, so a lateral
+section label cannot discard an already supported row.
+
+A trailing `®`/`™` in the model name but absent from saved canonical OCR text may
+be removed only when the entire remaining name matches a literal entry under
+existing case/whitespace semantics. This does not assert that the marker is absent
+from the source image. Markers in canonical text after spaces, tabs or newlines
+prevent replacement; internal markers,
+spelling changes and semantic aliases are not repaired. Raw suggestions remain
+unchanged and private name decisions record `replaced_by_source_text` plus the
+grounded name. This is a narrow source verification, not general name correction.
+
+All components of known adjacent/wrapped competing titles are excluded from price
+cells, including numeric components. Unresolved or exhausted title searches abstain.
+The complete ordered box readings must agree with the model; selecting a convenient
+subset is prohibited. Multiple cells are displayed with ` / ` separators, but each
+evidence record retains its verbatim saved literal. A multi-option scalar stays
+null; currencies, option meanings and qualifier relationships are not inferred.
+The warning is `Price grounded via OCR box evidence; verify row alignment.`
+
+Internal `DraftEvidence.box_evidence` records contain the authoritative source
+`page_number`, zero-based `saved_region_index`, exact `text`, and exact uploaded-pixel
+`box` (`left`, `top`, `width`, `height`). Finite fractional coordinates are preserved.
+Both draft and evidence are validated before either is appended. Before saving or
+exporting, records must resolve to one cited ready Engine3 segment, available
+geometry, actual upload dimensions and the exact saved region. Invalid/duplicate
+records, invented literals or coordinates, and injected/orphan public links fail
+validation. Empty lists are omitted to preserve legacy service serialization.
+
+Private suggestions remain `unvalidated`; box-supported price decisions are labelled
+`supported_by_ocr_boxes` / `replaced_by_ocr_boxes`, not `supported_by_source_text`, and
+keep the selected records. Public export links only validated facts through existing
+segment metadata; see [the evidence contract](review-candidates.md#evidence-and-invalid-input).
+No source text, text offsets, candidate fields or shared TypeScript schema are changed.
+Exact provenance and two agreeing readings still do not prove factual accuracy.
 
 Compatible same-name candidates collapse only when they resolve to one source
 entry and one unchanged candidate contains the other's supported facts. Names
@@ -243,9 +314,11 @@ uv run --frozen --offline --no-env-file python -m peekaplate_processing.overlay_
 Output is create-only with private file permissions. Exit0 means an artifact was
 written, even when all rows abstain; invalid input/existing output exits1. Keep the
 artifact beside its immutable inputs and restrict access. Do not stash it in segment
-metadata: that metadata is exported and is not a private extension point. Public
-box-backed candidates still require coordinated Python/TypeScript evidence schemas,
-consumer acceptance and service/host retention changes; this prototype authorizes none.
+metadata: that metadata is exported and is not a private extension point. The
+separate production fallback exports only validated OCR facts via the existing
+metadata envelope, never this artifact or private suggestion associations. Consumer
+rendering, save/reload acceptance and human approval remain separate gates; this
+prototype authorizes none.
 
 The frozen single-image replay retained all14 suggestions/44 regions:10 rows had
 numeric agreement covering18 visually checked price cells;4 abstained. The extra
@@ -253,6 +326,91 @@ veggie reading and imported-drink disagreement were withheld, as were header and
 repeated-phrase ambiguities. A shared OCR/model spelling error was not corrected.
 These selected numeric checks are not whole-menu/name/role accuracy. All14 standard
 candidates, IDs and null prices remained unchanged. No additional paid call occurred.
+
+## Explicit targeted recovery
+
+Recovery is operator-invoked, not a service/queue policy. The following commands
+can make paid provider requests; use only with an approved budget. `uv --offline`
+controls dependency resolution, not OCR/model network access. No such paid calls
+are needed by the synthetic tests or saved-response quality replays.
+
+For saved **failed Engine3 OCR pages**, choose at most four pages and an explicit
+1–4 request cap:
+
+```sh
+uv run --frozen --offline --no-env-file python -m peekaplate_processing.recover_pages \
+  --input menu.pdf --pages-json work/prior/pages.json \
+  --output-dir work/recovered-ocr --target-pages 2 --max-requests 1
+```
+
+Preflight checks exact source snapshot/hash/size, complete source-page coverage,
+failed-page identities, native-text eligibility, selection, budget and output
+collision before constructing the client. Only selected pages are acquired using
+the existing rendering/upload path. Recovery bypasses OCR cache and explicitly
+uses one HTTP attempt per page; the ordinary client's legacy default is unchanged.
+The first failed attempt, including HTTP429, stops the operation. Remaining pages
+stay explicitly `not_attempted`; nothing silently retries or advances through a
+known provider limit. `pages.json` preserves full coverage and unchanged acquisition
+segments except stale derived candidate-box maps; old drafts/evidence/capture
+requests are not copied. `manifest.json` retains original report/source hashes,
+previous failures, outcomes, request count and settings. Repaired errors clear only
+on usable fresh OCR success. Outputs are new private create-only files/directories.
+
+For a failed model batch or unresolved ready-text page, normal `run_pipeline` also
+accepts a small explicit selection and model-request budget:
+
+```sh
+uv run --frozen --offline --no-env-file python -m peekaplate_processing.run_pipeline \
+  --input menu.pdf --pages-json work/prior/extraction.json \
+  --run-dir work/recovered-model --target-pages 2 --max-model-requests 1
+```
+
+This requires saved ready text for every selected page, so failed OCR must be
+recovered first. At most four selected pages and four planned batch requests are
+allowed. The existing exact mode/image-aware batch planner checks the budget
+before any model invocation. Only selected images are rendered and only selected
+pages are sent; no old drafts or candidate IDs are merged. Complete source segments,
+input-report hash, previous failures/batches, selection and cap remain in the new
+report. Unprocessed pages make the extraction explicitly incomplete even when the
+selected request succeeds. Failure remains a failure; no automatic retry is added.
+Previous-page hierarchy may remain unknown in this scoped attempt. Existing cache
+identity still distinguishes actual request/context inputs; `--no-llm-cache` is an
+explicit fresh-request choice, not an automatic fallback.
+
+Both recovery paths have unchanged shared request/review contracts and no database,
+publication or queue activation access. Cropped-region model calls and coordinate
+transforms remain deferred rather than pretending a whole-page box is a dish crop.
+Fresh-provider success, runtime budgets and human/consumer acceptance require
+separate validation.
+
+## Offline recovery evaluation boundary
+
+Seven actual saved-response pipeline/export replays validate serialization and
+provenance without acquiring new provider evidence. Two image-only exports remain
+intentionally empty, not successful food extraction. Compared with the corrected
+producer snapshot, the single-page 14-row fixture gains one supported price row
+(9→10), and the multi-page fixture moves from 41/164 priced candidates to 44/169.
+All previously asserted prices survive unchanged. These are priced rows, not
+independent-dish totals or complete scalar prices: printed option groups retain
+null scalars. The single-page reference includes three qualifier rows.
+
+Case/whitespace-only scoring without aliases improves correct complete name/price
+groups from 8→9 on the original 14-row reference and 4→7 on the frozen 31-group
+multi-page reference; selected wrong assertions remain zero, not a whole-menu
+precision guarantee. Eight additional source-image checks expand the latter to
+39 selected groups without editing the original reference: correct complete groups
+5→8, unknown-price groups 12→14 and missing names 22→17. These supplemental checks
+were selected during development, not blind held-out evaluation. Punctuation is
+not silently repaired in strict scoring; the historical alias/punctuation metric
+is retained separately for comparability and does not change exported names.
+
+Observed real-fixture gains come from the validated contact boundary and canonical
+source-name verification. The saved multi-page run gains no additional box fallback;
+wrapped-title/column/section recovery is proven by synthetic controls, not a claim
+of measured whole-menu layout recall. Failed OCR/model acquisitions remain failed
+in these saved replays. Most prices remain unknown; representative fresh-provider,
+consumer and human acceptance remain separate gates. Private sources, references,
+raw responses and diagnostic reports are excluded from Git.
 
 ## Timings on each started run
 

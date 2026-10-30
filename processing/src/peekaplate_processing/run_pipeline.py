@@ -1,3 +1,4 @@
+import copy
 """PDF/photo -> selected model input -> grounded drafts and private suggestions."""
 import argparse
 import base64
@@ -14,16 +15,15 @@ from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
-from pydantic import ValidationError
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
-from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult
+from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult, validate_box_evidence
 from peekaplate_processing.storage import save_json
-from peekaplate_processing.workflow import INPUT_MODES, run_menu_graph
+from peekaplate_processing.workflow import INPUT_MODES, page_batches, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
-from peekaplate_processing.vision import image_source, page_images
+from peekaplate_processing.vision import image_source, normalize_page_selection, page_images
 from peekaplate_processing.review_suggestions import private_result
 
 
@@ -47,7 +47,7 @@ def configured_llm():
     return ChatOpenAI(**reasoning, model=model, api_key=key, base_url=base_url, timeout=120, max_retries=0, max_tokens=16384, extra_body=extra)
 
 
-def saved_page_text(source, pages_json):
+def saved_page_text(source, pages_json, *, recovery=False):
     try:
         with Path(pages_json).open("rb") as handle:
             data = handle.read(32_000_001)
@@ -80,15 +80,44 @@ def saved_page_text(source, pages_json):
         raise ExtractionError("Saved pages must include every source page, including failed/skipped pages.")
     if not 1 <= len(numbers) <= 40 or any(n is None or n > 40 for n in numbers) or len(set(numbers)) != len(numbers) or len({s.segment_id for s in saved.segments}) != len(numbers) or sum(len(s.text) for s in saved.segments) > 100_000:
         raise ExtractionError("Saved pages exceed page/text limits or have invalid page identities.")
+    configuration={"reused_page_text": True}
+    if "failed_ocr_recovery" in saved.configuration:
+        configuration["failed_ocr_recovery"]=copy.deepcopy(saved.configuration["failed_ocr_recovery"])
+    if recovery:
+        configuration["targeted_model_recovery"]={
+            "input_report_sha256":hashlib.sha256(data).hexdigest(),
+            "previous_status":saved.status, "previous_errors":list(saved.errors),
+            "previous_model_batches":saved.configuration.get("llm_batches",[]),
+        }
+    elif saved.errors or saved.configuration.get("llm_batches"):
+        configuration["superseded_model_history"]={
+            "input_report_sha256":hashlib.sha256(data).hexdigest(),
+            "previous_status":saved.status, "previous_errors":list(saved.errors),
+            "previous_model_batches":saved.configuration.get("llm_batches",[]),
+        }
+    errors=[]
+    for s in saved.segments:
+        if s.status == "failed":
+            errors.append(f"Page {s.page_number}: {s.error or 'Saved page acquisition failed.'}")
+        elif s.status == "skipped":
+            errors.append(f"Page {s.page_number}: {s.error or 'Saved page acquisition was skipped.'}")
+        elif s.error is not None:
+            errors.append(f"Page {s.page_number}: {s.error}")
     return MenuExtractionResult(
         source=saved.source, segments=saved.segments, started_at=datetime.now(timezone.utc),
-        library_versions=saved.library_versions, configuration={"reused_page_text": True},
+        library_versions=saved.library_versions, configuration=configuration,
         warnings=["Reused saved page text; missing pages were not retried."],
-        errors=[f"Page {s.page_number}: {s.error or 'Saved page acquisition failed.'}" for s in saved.segments if s.status == "failed"],
+        errors=errors,
     )
 
 
-def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True):
+def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None):
+    if target_pages is not None:
+        target_pages=normalize_page_selection(target_pages,limit=4)
+        if pages_json is None or input_mode=="image" or type(max_model_requests) is not int or not 1 <= max_model_requests <= 4:
+            raise ExtractionError("Targeted recovery requires saved pages, OCR input mode and an explicit model-request budget between 1 and 4.")
+    elif max_model_requests is not None:
+        raise ExtractionError("A model-request budget requires an explicit target-page selection.")
     if input_mode not in INPUT_MODES:
         raise ExtractionError("Input mode must be ocr, ocr_image or image.")
     if input_mode=="image" and pages_json is not None:
@@ -110,7 +139,16 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     try:
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
-            report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
+            report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
+        if target_pages is not None:
+            by_number={segment.page_number:segment for segment in report.segments}
+            if any(number not in by_number or by_number[number].status!="ready" or by_number[number].error is not None or not by_number[number].text.strip() for number in target_pages):
+                raise ExtractionError("Targeted model recovery requires ready saved source text for every selected page; recover failed OCR first.")
+            omitted=sorted(set(by_number)-set(target_pages))
+            report.configuration["targeted_model_recovery"].update(
+                selected_pages=list(target_pages),max_model_requests=max_model_requests,unprocessed_pages=omitted)
+            if omitted:
+                report.errors.append("Targeted extraction: unselected pages were not processed or merged from previous attempts.")
         report.configuration.update(input_mode=input_mode,ocr_enabled=input_mode!="image")
         report.configuration["timings_seconds"]=timings
         report.configuration.update(llm_deadline_seconds=llm_timeout, llm_batch_pages=batch_pages, llm_concurrency=llm_concurrency)
@@ -123,17 +161,22 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         images=[]
         if input_mode!="ocr" and report.source:
             with measure(timings,"source_images"):
-                images,image_errors=page_images(report.source,directory)
+                images,image_errors=page_images(report.source,directory) if target_pages is None else page_images(report.source,directory,page_numbers=target_pages)
             report.errors.extend(image_errors)
         pages=[{"page_number":segment.page_number,"segment_id":segment.segment_id,
                 "text":segment.text if segment.status=="ready" and segment.error is None else "",
                 "ocr_metadata":segment.metadata if segment.method=="ocr_space_engine3" and segment.status=="ready" and segment.error is None else None}
-               for segment in report.segments]
+               for segment in report.segments if target_pages is None or segment.page_number in target_pages]
         if input_mode=="image":
             pages=images
         elif input_mode=="ocr_image":
             by_number={page["page_number"]:page for page in images}
             pages=[{**page,**by_number[page["page_number"]]} for page in pages if page["page_number"] in by_number]
+        if target_pages is not None:
+            planned=len(page_batches(pages,batch_pages,input_mode))
+            if planned > max_model_requests:
+                raise ExtractionError("Selected recovery batches exceed the explicit model-request budget; no model call was made.")
+            report.configuration["targeted_model_recovery"]["planned_batches"]=planned
         output={"suggestions":[],"batches":[],"raw_sections":[]}
         if report.source and (any(page.get("text", "").strip() for page in pages) or input_mode!="ocr" and pages) and sum(len(segment.text) for segment in report.segments) <= 100_000:
             with measure(timings, "llm_wall"):
@@ -150,20 +193,23 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     try:
                         draft_fields = {key:value for key,value in item.items() if key not in {"page_number", "review_warnings", "box_evidence"}}
                         draft=DishDraft(**draft_fields, source_id=report.source.source_id, source_text=segment.text.strip(), review_warnings=["Page-level evidence; dish/price association needs human verification.", *item.get("review_warnings", [])])
-                    except ValidationError:
-                        report.errors.append(f"Page {segment.page_number}: dish failed schema validation.")
+                        index=len(report.drafts)
+                        draft_id="draft:"+hashlib.sha256(f"{report.source.sha256}:{index}:{draft.model_dump_json()}".encode()).hexdigest()[:32]
+                        start=segment.text.find(draft.source_text)
+                        evidence=DraftEvidence(
+                            draft_id=draft_id, draft_index=index,
+                            spans=[SourceSpan(segment_id=segment.segment_id, start=start, end=start+len(draft.source_text))],
+                            box_evidence=item.get("box_evidence", []),
+                        )
+                        validate_box_evidence(report.model_copy(update={
+                            "drafts":[*report.drafts,draft], "evidence":[*report.evidence,evidence],
+                        }))
+                    except ValueError:
+                        report.errors.append(f"Page {segment.page_number}: dish or evidence failed schema validation.")
                         continue
-                    index=len(report.drafts)
-                    draft_id="draft:"+hashlib.sha256(f"{report.source.sha256}:{index}:{draft.model_dump_json()}".encode()).hexdigest()[:32]
-                    start=segment.text.find(draft.source_text)
                     report.drafts.append(draft)
-                    box_evidence_items = item.get("box_evidence", [])
-                    report.evidence.append(DraftEvidence(
-                        draft_id=draft_id,
-                        draft_index=index,
-                        spans=[SourceSpan(segment_id=segment.segment_id, start=start, end=start+len(draft.source_text))],
-                        box_evidence=box_evidence_items,
-                    ))
+                    report.evidence.append(evidence)
+        validate_box_evidence(report)
         if input_mode=="image":
             report.warnings.append("Image-only suggestions are private and unvalidated; no OCR-grounded candidates or text spans were created.")
             report.status="incomplete"
@@ -204,6 +250,8 @@ def main(argv=None):
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), or image (no OCR; private suggestions only).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
+    parser.add_argument("--target-pages",type=int,nargs="+",help="Explicitly recover only 1 to 4 saved ready pages; no merging with old drafts or automatic retry.")
+    parser.add_argument("--max-model-requests",type=int,help="Required with --target-pages: explicit maximum batch requests, 1 to 4; preflighted before calls.")
     parser.add_argument("--llm-timeout", type=float, default=90, help="Cancellable deadline per LLM batch in seconds (default: 90; maximum: 300).")
     parser.add_argument("--batch-pages", type=int, default=10, help="Maximum pages per LLM request, 1 to 10 (default: 10); vision groups split before the 16 MB limit. Smaller groups make more calls.")
     parser.add_argument("--llm-concurrency", type=int, default=1, help="Simultaneous LLM calls, 1 or 2 (default: 1); starts remain spaced apart.")
@@ -212,8 +260,10 @@ def main(argv=None):
     parser.add_argument("--no-ocr-table", action="store_true", help="Disable OCR.space table recognition (isTable); enabled by default.")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
+    recovery={} if args.target_pages is None and args.max_model_requests is None else {
+        "target_pages":args.target_pages,"max_model_requests":args.max_model_requests}
     try:
-        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table)
+        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table,**recovery)
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")

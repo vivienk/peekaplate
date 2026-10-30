@@ -328,6 +328,81 @@ class MenuContextTests(unittest.TestCase):
             dish_names=["Soup","Cake"],ocr_metadata=metadata)
         self.assertIsNone(dish.price_text)
 
+
+    def test_duplicate_alt_target_caption_does_not_block_entry_price(self):
+        from peekaplate_processing.menu_context import single_source_entry
+        text = "![Mex It Up Nachos](Mex It Up Nachos)\n## MEX IT UP NACHOS\nTortilla chips\n375 / 695"
+        def box(label, x, y, width=None):
+            return dict(text=label, left=x, top=y, width=width or len(label) * 6, height=12)
+        metadata = dict(ocr_region_status="available", ocr_coordinate_space="uploaded_image_pixels",
+                        upload_width=600, upload_height=400,
+                        ocr_regions=[box("Mex It Up Nachos", 20, 20),
+                                     box("## MEX IT UP NACHOS", 20, 180),
+                                     box("Tortilla chips", 20, 205),
+                                     box("375 / 695", 320, 180)])
+        self.assertTrue(single_source_entry("MEX IT UP NACHOS", text))
+        dish, warnings = grounded_draft(
+            self.dish(page_number=14, name="MEX IT UP NACHOS", price_text="375 / 695"),
+            text, dish_names=["MEX IT UP NACHOS"], ocr_metadata=metadata,
+        )
+        self.assertEqual(dish.price_text, "375 / 695")
+        self.assertIsNone(dish.price_amount)
+        self.assertTrue(any("Multiple" in w for w in warnings))
+        non_matching = "![Soup](Soup seasonal vegetables)\nSOUP\n5"
+        self.assertFalse(single_source_entry("SOUP", non_matching))
+        competing_meta = dict(ocr_region_status="available", ocr_coordinate_space="uploaded_image_pixels",
+                              upload_width=600, upload_height=400,
+                              ocr_regions=[box("Soup", 20, 20),
+                                           box("SOUP", 20, 180),
+                                           box("5", 320, 180)])
+        dish_competing, _ = grounded_draft(
+            self.dish(page_number=1, name="SOUP", price_amount="5", price_text="5"),
+            non_matching, dish_names=["SOUP"], ocr_metadata=competing_meta,
+        )
+        self.assertIsNone(dish_competing.price_amount)
+        self.assertIsNone(dish_competing.price_text)
+
+    def test_centered_card_price_and_lowercase_wrapped_description(self):
+        text = (
+            "### BISCOFF ICE CREAM CRÈME BRÛLÉE\n"
+            "Biscoff ice cream, cotton\n"
+            "candy\n"
+            "295\n"
+            "### CARROT CAKE\n"
+            "Cream cheese frosting\n"
+            "225"
+        )
+        def box(label, x, y, w, h=12):
+            return dict(text=label, left=x, top=y, width=w, height=h)
+        metadata = dict(
+            ocr_region_status="available",
+            ocr_coordinate_space="uploaded_image_pixels",
+            upload_width=600,
+            upload_height=400,
+            ocr_regions=[
+                box("BISCOFF ICE CREAM CRÈME BRÛLÉE", 100, 20, 240),
+                box("Biscoff ice cream, cotton", 110, 40, 200),
+                box("candy", 190, 56, 50),
+                box("295", 195, 76, 40),
+                box("CARROT CAKE", 140, 140, 160),
+                box("Cream cheese frosting", 130, 160, 180),
+                box("225", 195, 180, 40),
+            ],
+        )
+        names = ["BISCOFF ICE CREAM CRÈME BRÛLÉE", "CARROT CAKE"]
+        dish, warnings = grounded_draft(
+            self.dish(page_number=31, name="BISCOFF ICE CREAM CRÈME BRÛLÉE", price_amount="295", price_text="295"),
+            text, dish_names=names, ocr_metadata=metadata,
+        )
+        self.assertEqual((dish.price_text, dish.price_amount), ("295", "295"))
+        self.assertEqual(warnings, [])
+        metadata["ocr_regions"].append(box("225", 200, 96, 40))
+        dish_ambiguous, _ = grounded_draft(
+            self.dish(page_number=31, name="BISCOFF ICE CREAM CRÈME BRÛLÉE", price_amount="295", price_text="295"),
+            text, dish_names=names, ocr_metadata=metadata,
+        )
+        self.assertIsNone(dish_ambiguous.price_text)
+        self.assertIsNone(dish_ambiguous.price_amount)
     def test_detached_prices(self):
         for amount,printed in [("460","460"),(None,"375 / 695")]:
             with self.subTest(printed=printed):

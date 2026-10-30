@@ -1,8 +1,11 @@
 """Private, unvalidated suggestions; deliberately separate from review candidates."""
+import copy
 import hashlib
 
+from .menu_context import TRAILING_TRADEMARK_WARNING
 
-def suggestion_record(dish, worker_id, index, page, *, cleaned=None, warnings=(), rejection=None):
+
+def suggestion_record(dish, worker_id, index, page, *, cleaned=None, warnings=(), rejection=None, box_evidence=()):
     original=dish.model_dump(mode="json")
     decisions=[]
     for field,value in original.items():
@@ -14,18 +17,30 @@ def suggestion_record(dish, worker_id, index, page, *, cleaned=None, warnings=()
         elif cleaned is None:
             disposition="unvalidated"
             reason="Image-only or unaccepted suggestion; no OCR grounding is claimed."
+        elif field=="name" and value!=cleaned.name and TRAILING_TRADEMARK_WARNING in warnings:
+            disposition="replaced_by_source_text"
+            reason="Only a model-only trailing trademark was removed; the remaining name matches a literal source entry."
+        elif box_evidence and field in {"price_text","price_amount"}:
+            disposition="supported_by_ocr_boxes" if getattr(cleaned,field)==value else "replaced_by_ocr_boxes"
+            reason="Selected from exact OCR regions; provenance and row alignment still require review."
         elif getattr(cleaned,field)==value:
             disposition="supported_by_source_text"
             reason="Survived literal source-text grounding; still requires human verification."
         else:
             disposition="cleared" if getattr(cleaned,field) is None else "replaced"
             reason="Value changed during OCR grounding; inspect grounding_warnings."
-        decisions.append({"field":field,"suggested_value":value,"disposition":disposition,"reason":reason})
-    return {"worker_id":worker_id,"suggestion_index":index,"cited_page_number":dish.page_number,
+        decision={"field":field,"suggested_value":value,"disposition":disposition,"reason":reason}
+        if disposition=="replaced_by_source_text":
+            decision["grounded_value"]=cleaned.name
+        decisions.append(decision)
+    record={"worker_id":worker_id,"suggestion_index":index,"cited_page_number":dish.page_number,
             "status":"unvalidated","original":original,"decisions":decisions,
             "grounding_warnings":list(warnings),"source_reference":None if page is None else {
                 "page_number":page["page_number"],"segment_id":page.get("segment_id"),
                 "image":page.get("image_reference")}}
+    if box_evidence:
+        record["box_evidence"]=copy.deepcopy(list(box_evidence))
+    return record
 
 
 def private_result(source, input_mode, pages, output):

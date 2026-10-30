@@ -65,6 +65,34 @@ describe('RES-01.1 review candidate contract', () => {
     expect(bread?.original.price_amount).toBe('0.00');
   });
 
+  it('preserves Python-validated candidate box links in existing segment metadata', () => {
+    const input = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../processing/tests/fixtures/review-candidates/box-evidence-candidates.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    const result = ReviewCandidateResultSchema.parse(input);
+    expect(result).toEqual(input);
+    expect(result.candidates[0]?.evidence).toEqual(fixture.candidates[0].evidence);
+    expect(result.candidates[0]?.original.status).toBe('needs_review');
+    expect(result.segments[0]?.metadata.candidate_box_evidence).toEqual({
+      [input.candidates[0].candidate_id]: [
+        {
+          page_number: 1,
+          saved_region_index: 0,
+          text: '8.50',
+          box: { left: 10.25, top: 20, width: 30.5, height: 12 },
+        },
+      ],
+    });
+    // The TypeScript metadata envelope preserves producer-validated facts; it
+    // does not independently prove the OCR join or field/row correctness.
+  });
+
   it('rejects missing or unusable category heading pages', () => {
     for (const page of [999, 2, 3]) {
       const input = structuredClone(fixtureV2);

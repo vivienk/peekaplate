@@ -30,7 +30,16 @@ def image_source(source):
         retrieved_at=now,size_bytes=len(data),snapshot_base64=base64.b64encode(data).decode()))
 
 
-def page_images(source, directory):
+def normalize_page_selection(values, *, limit=MAX_PDF_PAGES):
+    if (not isinstance(values, (list, tuple)) or not 1 <= len(values) <= limit
+            or any(type(n) is not int or not 1 <= n <= MAX_PDF_PAGES for n in values)
+            or len(set(values)) != len(values)):
+        raise ExtractionError("Select distinct source page numbers within the recovery limit.")
+    return tuple(sorted(values))
+
+
+def page_images(source, directory, *, page_numbers=None):
+    selected=None if page_numbers is None else normalize_page_selection(page_numbers)
     data=base64.b64decode(source.snapshot_base64,validate=True)
     if len(data)!=source.size_bytes or hashlib.sha256(data).hexdigest()!=source.sha256:
         raise ExtractionError("Image source snapshot does not match its hash and size.")
@@ -58,7 +67,11 @@ def page_images(source, directory):
             with pymupdf.open(stream=data,filetype="pdf") as document:
                 if document.needs_pass or not 1<=len(document)<=MAX_PDF_PAGES:
                     raise ExtractionError("PDF must be unlocked and contain between 1 and 40 pages.")
+                if selected is not None and any(number > len(document) for number in selected):
+                    raise ExtractionError("Selected page is outside the source PDF.")
                 for index in range(len(document)):
+                    if selected is not None and index+1 not in selected:
+                        continue
                     try:
                         page=document.load_page(index)
                         width,height=page.rect.width,page.rect.height
@@ -72,6 +85,8 @@ def page_images(source, directory):
         except (RuntimeError,ValueError):
             raise ExtractionError("Unable to render the source PDF.") from None
     elif source.kind=="image":
+        if selected is not None and selected != (1,):
+            raise ExtractionError("A source photo has only page 1.")
         with open_image(data) as image:
             with Image.open(io.BytesIO(data)) as original:
                 original_format=original.format

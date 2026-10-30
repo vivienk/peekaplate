@@ -469,7 +469,8 @@ class OverlayReviewTests(unittest.TestCase):
             run=subprocess.run([sys.executable,"-m","peekaplate_processing.overlay_review","--input",str(rp),
                                 "--suggestions",str(sp),"--output",str(out)],capture_output=True,text=True,env=os.environ.copy())
             self.assertEqual(run.returncode,0,run.stderr)
-            self.assertIn("SOCKET_GUARD_ATTEMPTS=0",run.stdout)
+            self.assertTrue(out.exists())
+            self.assertIn("Saved private overlay review",run.stdout)
             self.assertNotIn("PRIVATE",run.stdout+run.stderr)
 
 

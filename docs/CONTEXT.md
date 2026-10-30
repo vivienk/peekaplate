@@ -13,12 +13,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3, preserving IDs, printed prices, hierarchy and code-point evidence with synthetic fixtures. This is an offline contract, not an accepted deployed review API. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3, preserving IDs, printed prices, hierarchy and code-point evidence with synthetic fixtures. Existing segment metadata preserves Python-validated candidate box links via a shared synthetic fixture; TypeScript does not independently verify OCR joins. This is an offline contract, not an accepted deployed review API. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/src/review-candidates.ts",
         "packages/contracts/src/review-candidates.test.ts",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
         "docs/review-candidates.md",
         "processing/tests/fixtures/source-spans.json",
         "processing/tests/fixtures/review-candidates/README.md",
@@ -37,7 +38,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "97f0ac3968fa537b22ad30000266f4652cd6f2cabdf51fac66ec48606655725b"
+      "sourceFingerprint": "0d75190a014cddd9f695d3f512afa2a52abb143dbc025be6f31e9525c6b205d4"
     },
     {
       "id": "diner",
@@ -295,7 +296,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Bounded PDF/photo processing exposes ocr, default ocr_image and true no-OCR image inputs via the existing graph. Private suggestions retain source/image references; public RES originals and code-point spans stay strict. Image-only has no grounded candidates and an incomplete report. Vision groups split before calls; hashes isolate caches; prices/dedup abstain. Pipeline3/schema2 and legacy1/2 remain supported. Opt-in isTable=false has separate cache identity but its bounded trial did not restore prices. The offline overlay_review prototype retains exact box transcripts and unvalidated complete-sequence numeric proposals; ambiguity/conflicts abstain. It never changes standard drafts/IDs, metadata, RES schemas or service bundles. Source consistency is not same-run proof. The service has no database/publication access; Docker excludes env/history. Hosted integration, representative quality and human approval remain gates.",
+      "summary": "PDF/photo modes keep ocr, default ocr_image and ungrounded image-only; pipeline3/schema2 and legacy1/2 remain compatible. Bounded wrapped titles/columns and corroborated text/geometry sections permit only complete price groups; conflicts, crossing/unclaimed cells and unresolved repeats abstain. Whole-entry guards and narrow name/footer views never rewrite source. Atomic assembly preserves exact fractional page/index/literal joins in existing candidate-ID segment metadata; SourceSpan/TS schemas and legacy empty-field omission stay unchanged. Originals stay unvalidated. Opt-in OCR recovery validates failed Engine3 pages and caps1–4 single attempts, stopping on failure. Selected-page model recovery preflights1–4 requests, retains history/incomplete coverage and never merges old candidates. Defaults/queues stay unchanged. Measured gains are modest; broad layout recall, fresh-provider, consumer and human acceptance remain unverified.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -310,6 +311,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
         "processing/src/peekaplate_processing/overlay_review.py",
+        "processing/src/peekaplate_processing/recover_pages.py",
         "processing/src/peekaplate_processing/pdf.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
         "processing/src/peekaplate_processing/schemas.py",
@@ -322,6 +324,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_overlay_review.py",
         "processing/tests/test_overlay_saved_inputs.py",
         "processing/tests/test_pdf_images.py",
+        "processing/tests/test_box_evidence.py",
+        "processing/tests/test_box_grounding_safety.py",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
         "processing/tests/test_schemas.py",
         "processing/tests/test_workflow.py",
         "processing/uv.lock",
@@ -347,6 +352,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/timing.py",
         "processing/tests/test_menu_context.py",
         "processing/tests/test_menu_layout.py",
+        "processing/tests/test_layout_reconstruction.py",
+        "processing/tests/test_source_entry_recovery.py",
+        "processing/tests/test_recover_pages.py",
+        "processing/tests/test_targeted_model_recovery.py",
         "processing/tests/test_menu_duplicates.py",
         "processing/tests/test_input_modes.py",
         "processing/tests/test_pipeline_timing.py",
@@ -371,7 +380,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "2e22361e7d3cc6f1da2a385a4b608ca36599bda54a098222851330dfc5a234bd"
+      "sourceFingerprint": "4c1fa001b6761d0b35e27e52363459f031556407a5212becbff60fac043976c1"
     }
   ],
   "handoffs": [
@@ -385,12 +394,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
     },
     {
-      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service/host retention is tested with a shared synthetic bundle and create-only tenant/job/attempt storage, without new public request or RES fields. Real-menu runs, images, credentials and private reports remain excluded.",
+      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service/host retention is tested with a shared synthetic bundle and create-only tenant/job/attempt storage, without new public request or RES fields. Real-menu runs, images, credentials and private reports remain excluded. Bounded box corroboration now carries exact validated provenance through atomic Python assembly and existing public segment metadata; SourceSpan and TS schemas stay unchanged, with legacy empty-field omission. Bounded layout/source-entry recovery and explicit capped OCR/model page recovery preserve failures and incomplete coverage; no automatic retry, live-provider or whole-menu-quality acceptance is implied.",
       "modules": [
         "processing",
         "contracts"
       ],
-      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Private suggestion retention follows Sai's bounded clarification; a public image-backed RES contract, variant model and human quality acceptance remain deferred."
+      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Private suggestion retention follows Sai's bounded clarification. Obtain consumer rendering/save-reload acceptance of candidate-linked OCR metadata. Image-only public evidence, variant models and human quality acceptance remain deferred."
     },
     {
       "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
