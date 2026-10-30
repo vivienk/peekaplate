@@ -69,6 +69,8 @@
   --pp-line-height-small: 1rem; /* 16px */
   --pp-font-size-footer: 0.625rem; /* 10px */
   --pp-line-height-footer: 0.875rem; /* 14px */
+  --pp-font-size-button-label: 0.875rem; /* 14px; M button label (SemiBold) */
+  --pp-line-height-button-label: 1.5rem; /* 24px; Figma button text style */
 
   /* Corner radius. Names follow pixel size; the Figma sizing/radius variable is noted beside each.
      6, 10 and 20px come from the alpha Corner Radius page only and await design confirmation. */
@@ -203,6 +205,7 @@
   /* Color roles for interactive controls and general semantic uses (dark-theme values). They
      only reference the palette. */
   --pp-role-button-action-bg: var(--pp-color-orange-500);
+  --pp-role-button-action-hover-bg: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
   --pp-role-button-action-text: var(--pp-color-orange-950);
   --pp-role-button-action-pressed-bg: var(--pp-color-orange-600);
   --pp-role-button-outline-bg: var(--pp-color-neutral-800);
@@ -258,9 +261,10 @@
   --pp-role-information-container: var(--pp-color-info-800);
   --pp-role-on-information-container: var(--pp-color-info-100);
   --pp-role-button-text-hover-bg: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
+  --pp-role-button-text-pressed-bg: var(--pp-color-orange-900);
   --pp-role-button-disabled-border: var(--pp-color-neutral-600);
   --pp-role-button-outline-pressed-bg: var(--pp-color-neutral-600);
-  --pp-role-nav-icon-disabled: var(--pp-color-neutral-400);
+  --pp-role-nav-icon-disabled: var(--pp-color-neutral-500);
   /* Input roles. Interim: reuse palette colors until the Input design exists in Figma. */
   --pp-role-input-bg: var(--pp-color-neutral-800);
   --pp-role-input-text: var(--pp-color-neutral-50);
@@ -271,6 +275,52 @@
   --pp-role-input-text-error: var(--pp-color-error-400);
   --pp-role-input-bg-disabled: var(--pp-color-neutral-600);
   --pp-role-input-text-disabled: var(--pp-color-neutral-400);
+}
+/* PROVISIONAL: placeholder values chosen only to pass WCAG AA. Replace with the
+   Owner/console mapping from design (Rania/Figma). Do not treat as design-approved. */
+/* Light theme: Restaurant Console uses the same semantic roles on a light canvas.
+   Opt in via <html data-theme="light">; :root keeps the dark (diner) defaults. */
+:root[data-theme="light"] {
+  /* Surface roles */
+  --pp-role-surface: var(--pp-color-gray-100);
+  --pp-role-surface-container: var(--pp-color-gray-50);
+  --pp-role-on-surface: var(--pp-color-gray-900);
+  --pp-role-on-surface-variant: var(--pp-color-gray-600);
+  --pp-role-outline: color-mix(in srgb, var(--pp-color-gray-500) 30%, transparent);
+  --pp-role-outline-solid: var(--pp-color-gray-500);
+  --pp-role-outline-variant: var(--pp-color-gray-200);
+  --pp-role-text-secondary: var(--pp-color-gray-700);
+  --pp-role-focus-ring: var(--pp-color-info-700);
+
+  /* Button roles */
+  --pp-role-button-outline-bg: var(--pp-color-gray-50);
+  --pp-role-button-outline-text: var(--pp-color-gray-900);
+  --pp-role-button-outline-border: var(--pp-color-gray-300);
+  --pp-role-button-outline-pressed-bg: var(--pp-color-gray-200);
+  --pp-role-button-disabled-bg: var(--pp-color-gray-200);
+  --pp-role-button-disabled-text: var(--pp-color-gray-500);
+  --pp-role-button-disabled-border: var(--pp-color-gray-400);
+  --pp-role-button-text-hover-bg: color-mix(in srgb, var(--pp-color-orange-800) 50%, transparent);
+  --pp-role-button-text-pressed-bg: var(--pp-color-orange-900);
+
+  /* Navigation roles */
+  --pp-role-nav-bg: var(--pp-color-gray-100);
+  --pp-role-nav-icon: var(--pp-color-gray-900);
+  --pp-role-nav-hover-bg: var(--pp-color-orange-500);
+  --pp-role-nav-hover-icon: var(--pp-color-orange-950);
+  --pp-role-nav-pressed-bg: var(--pp-color-gray-300);
+  --pp-role-nav-disabled-bg: var(--pp-color-gray-200);
+
+  /* Input roles */
+  --pp-role-input-bg: var(--pp-color-gray-50);
+  --pp-role-input-text: var(--pp-color-gray-900);
+  --pp-role-input-placeholder: var(--pp-color-gray-500);
+  --pp-role-input-border: var(--pp-color-gray-500);
+  --pp-role-input-border-focus: var(--pp-color-info-700);
+  --pp-role-input-border-error: var(--pp-color-error-400);
+  --pp-role-input-text-error: var(--pp-color-error-700);
+  --pp-role-input-bg-disabled: var(--pp-color-gray-200);
+  --pp-role-input-text-disabled: var(--pp-color-gray-500);
 }
 
 /* Reduced motion: transitions shrink to 1ms, delays and staggers are removed, and screens
