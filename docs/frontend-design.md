@@ -31,7 +31,7 @@ CSS tokens are named by value; the Figma names they correspond to are:
 | --- | --- |
 | `sizing/radius/none`, `xxs`, `xs 2`, `sm`, `md`, `lg`, `xl`, `full` | `--pp-radius-0`, `-2`, `-4`, `-8`, `-12`, `-16`, `-24`, `-full` (999px) |
 | Radius 6, 10 and 20px (Corner Radius page only) | `--pp-radius-6`, `-10`, `-20`, pending design confirmation |
-| Text style `H1`–`H5`, `Paragraph 1`/`2`, `Small`, `Footer` | `--pp-font-size-*` and `--pp-line-height-*` with the same names; `H5/Bold` adds `--pp-line-height-h5-bold` |
+| Text style `H1`–`H5`, `Paragraph 1`/`2`, `Small`, `Footer`, `Button label` | `--pp-font-size-*` and `--pp-line-height-*` with the same names; `H5/Bold` adds `--pp-line-height-h5-bold`; `Button label` is `--pp-font-size-button-label` / `--pp-line-height-button-label` |
 | `font/weight/regular`, `medium`, `semibold`, `bold` | `--pp-font-weight-regular`, `-medium`, `-semibold`, `-bold` |
 | `font/family/sans` | `--pp-font-family-base` |
 

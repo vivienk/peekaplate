@@ -63,6 +63,9 @@ importers:
       '@peekaplate/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
+      '@peekaplate/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -91,6 +94,9 @@ importers:
       '@peekaplate/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
+      '@peekaplate/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
     devDependencies:
       vite:
         specifier: 8.3.4
@@ -109,6 +115,12 @@ importers:
         version: 4.6.7
 
   packages/tokens: {}
+
+  packages/ui:
+    dependencies:
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../tokens
 
 packages:
 

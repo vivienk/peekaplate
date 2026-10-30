@@ -1,9 +1,11 @@
 @import "@peekaplate/tokens/tokens.css";
+@import "@peekaplate/ui/components.css";
 
 :root {
   font-family: system-ui, sans-serif;
   color: #22251e;
   background: #f5f3ec;
+  color-scheme: light;
 }
 body {
   margin: 0;
