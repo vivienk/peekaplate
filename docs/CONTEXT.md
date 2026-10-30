@@ -16,14 +16,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. observation.v2 now matches the October 24 P0 field table, including exposure_id/viewport_50pct_1s, opening-linked 5-minute activity, comparison fields, Save/Unsave and shortlist events; every P0 type has valid/invalid fixture coverage. Queue envelopes remain a strict observation.v2 or privacy-safe observation_conflict.v1 union.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/fixtures/observation.v2/fixtures.json",
+        "packages/contracts/fixtures/observation.v2/README.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "cf0023525fca5665dbfb181f6d4e021018d22bec33a3b22459625b40706731d6"
+      "sourceFingerprint": "32a52c3019a41d431f15945ea83b2625e0f45c05accf1c01c1dec7bdcafab6a6"
     },
     {
       "id": "diner",
@@ -84,6 +86,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/menu-token.ts",
         "backend/src/menu-token.test.ts",
         "backend/src/observation-ingest.ts",
+        "backend/src/observation-fixtures.test.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -120,7 +123,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ac1c48adfadf6539a5ac7b6fb4cfab1574b77dfa921492775514e51b138c1dcc"
+      "sourceFingerprint": "d4b617072676c0d46e8b5bcafd467a46db0ed16bf6e4c62747bccbe419e5668b"
     },
     {
       "id": "database",
