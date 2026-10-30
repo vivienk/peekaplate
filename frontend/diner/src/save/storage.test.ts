@@ -1,32 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { FakeStorage } from './fake-storage';
 import { addNewest, withoutDish } from './saved-list';
-import { createSavedPersistence, type SaveStorage, savedKey } from './storage';
+import { createSavedPersistence, savedKey } from './storage';
 
 const VENUE_A = 'a6000000-0000-4000-8000-000000000001';
 const VENUE_B = 'a6000000-0000-4000-8000-000000000002';
-
-// In-memory stand-in for localStorage that can be told to fail like a blocked or full browser.
-class FakeStorage implements SaveStorage {
-  readonly values = new Map<string, string>();
-  failReads = false;
-  failWrites = false;
-  writes = 0;
-
-  getItem(key: string): string | null {
-    if (this.failReads) throw new DOMException('blocked', 'SecurityError');
-    return this.values.get(key) ?? null;
-  }
-
-  setItem(key: string, value: string): void {
-    if (this.failWrites) throw new DOMException('full', 'QuotaExceededError');
-    this.writes += 1;
-    this.values.set(key, value);
-  }
-
-  removeItem(key: string): void {
-    this.values.delete(key);
-  }
-}
 
 const stored = (storage: FakeStorage, venueId: string) =>
   JSON.parse(storage.values.get(savedKey(venueId)) ?? 'null');
