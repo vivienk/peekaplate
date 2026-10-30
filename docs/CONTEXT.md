@@ -104,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Direct-DO extraction host, named image and native idle timeout with signed tenant/job/hash source grants are configured; Python never gets signing or database credentials. Protected OCR key passed standalone verification. Staging configuration adds OBSERVATION_QUEUE, OBSERVATION_ARCHIVE_BUCKET, and queue consumer binding with DLQ. Queue consumer handler is wired into Worker entry point for observation.v2 and multi-copy observation_conflict.v1 envelopes with canonical checksum validation and tenant-isolated Postgres persistence. Provides S3-VIS-04 bounded menu evidence retrieval. Ingestion route, direct live publication or canonical observation writes remain planned; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and collaborator staging reads. Direct-DO extraction host, named image and idle timeout with signed tenant/job/hash source grants are configured; Python never gets signing or database credentials. Protected OCR key passed standalone verification. Staging configuration adds OBSERVATION_QUEUE, OBSERVATION_ARCHIVE_BUCKET, and queue consumer binding with DLQ. Queue consumer handler processes observation.v2 and multi-copy observation_conflict.v1 envelopes with canonical checksum validation, safe quarantine path for invalid conflict copies, microsecond-accurate time classification matching Postgres CHECK constraints, and tenant-isolated Postgres persistence. S3-VIS-04 menu evidence retrieval configured. Ingestion route and live publication remain planned.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "92330a4e6e27719d294bbe0875491619f2c25e23d782abf4588ba2e03ed16ca7"
+      "sourceFingerprint": "49abee1ab395be9db0612e12f65e3515d8c9a39cde462de6365adf488d99ad97"
     },
     {
       "id": "database",
@@ -374,12 +374,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-DATA-02 hardened the observation queue consumer and aligned canonical contracts with PR #40. Standardized ObservationV2 canonical serialization and sha256 checksum computation over full observations across contracts and consumer. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
+      "summary": "S3-DATA-02 hardened the observation queue consumer and resolved two reproducible P2 findings: invalid conflict copies now have a durable quarantine path in R2 and PostgreSQL observation_conflict without raw unvalidated field leakage or accepted-fact promotion, and timestamp classification now preserves microsecond precision to match PostgreSQL's timestamptz future_time CHECK constraint. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
       "modules": [
         "contracts",
         "backend"
       ],
-      "next": "Zhiliang Wang re-review on feat/s3-data-02-queue-consumer. Complete full archive-to-DB/ACK/recovery acceptance with migrated database before enabling collection on staging queue."
+      "next": "Re-review on feat/s3-data-02-queue-consumer. Await integration dependency order (#32 -> #50 -> #40 -> #31) and complete full archive-to-DB/ACK/recovery acceptance with migrated database before enabling collection on staging queue."
     },
     {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",

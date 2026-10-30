@@ -1,4 +1,5 @@
 import {
+  ConflictMetadataSchema,
   canonicalJson,
   ObservationConflictQueueMessageSchema,
   ObservationQueueEnvelopeSchema,
@@ -82,8 +83,7 @@ function formatValidationError(
     return 'Invalid incomingChecksum: must be a 64-character hex string';
   if (path === 'kind') return 'Unsupported envelope kind';
   if (path === 'payload') return 'Invalid observation payload';
-  if (path === 'copies')
-    return 'Invalid conflict copies: must contain between 2 and 25 valid copies';
+  if (path === 'copies') return 'Invalid conflict copies: must contain between 2 and 25 copies';
   return path ? `Invalid or missing field: ${path}` : 'Validation check failed';
 }
 
@@ -414,14 +414,21 @@ export class QueueConsumer {
    * Processes an incoming observation_conflict.v1 message from the Queue.
    * Conforms to ADR 0015 / PR #40:
    * 1. Validates every supplied copy before any R2 archival, PostgreSQL persistence, or acknowledgement.
-   * 2. Validates each copy against the shared canonical observation schema (ObservationV2Schema).
-   * 3. Verifies each copy's event_id matches the top-level envelope's event identity.
-   * 4. Verifies each copy's publication_revision_id matches top-level authorizedPublicationId.
-   * 5. Recomputes canonical checksum using canonicalJson and sha256.
-   * 6. Rejects any copy whose supplied canonicalChecksum does not match recomputed checksum.
-   * 7. Ensures invalid conflict copies cause NO R2 writes and NO PostgreSQL persistence.
-   * 8. Routes invalid messages to retry/DLQ (status: 'dead_letter').
-   * 9. Archives valid conflict copies under deterministic conflict keys and records in PostgreSQL.
+   * 2. For valid copies (validation: 'valid'):
+   *    - Validates against canonical observation schema (ObservationV2Schema).
+   *    - Verifies event_id matches envelope eventId and publication matches authorizedPublicationId.
+   *    - Recomputes canonical checksum using canonicalJson and sha256.
+   *    - Validates supplied canonicalChecksum matches recomputed checksum.
+   *    - Archives valid canonical representation under deterministic conflict key.
+   * 3. For invalid copies (validation: 'invalid'):
+   *    - Validates bounded metadata against ConflictMetadataSchema.
+   *    - Strictly excludes all raw, unvalidated fields from the browser payload.
+   *    - Archives safe, schema-approved evidence under deterministic conflict key.
+   *    - Never treats invalid copies as accepted observations (no observation_index writes).
+   * 4. Preserves create-only semantics on R2 archival.
+   * 5. Persists every supported copy into PostgreSQL (app_private.observation_conflict).
+   * 6. Strictly follows durability sequence: archive evidence -> persist database -> acknowledge message.
+   * 7. Remains idempotent on redelivery.
    */
   private async processConflictMessage(
     envelope: ConflictObservationEnvelope,
@@ -431,97 +438,166 @@ export class QueueConsumer {
 
     // Phase 1: Validate EVERY copy upfront before any R2 archival or DB persistence
     interface ValidatedConflictCopy {
-      readonly canonicalEvent: Record<string, unknown>;
+      readonly canonicalEvent?: Record<string, unknown>;
       readonly bytes: Uint8Array;
       readonly checksum: string;
       readonly archiveKey: string;
+      readonly isInvalidCopy?: boolean;
     }
     const validatedCopies: ValidatedConflictCopy[] = [];
 
     for (const copy of envelope.copies) {
-      if (copy.validation !== 'valid' || !copy.event) {
-        this.log('error', 'Conflict copy failed canonical schema validation', {
-          category: 'conflict_integrity_failure',
-          reason: 'copy_not_valid_canonical_observation',
+      if (copy.validation === 'valid') {
+        if (!copy.event) {
+          this.log('error', 'Valid conflict copy missing event object', {
+            category: 'conflict_integrity_failure',
+            reason: 'missing_event',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Valid conflict copy missing event object',
+          };
+        }
+
+        const parseResult = ObservationV2Schema.safeParse(copy.event);
+        if (!parseResult.success) {
+          this.log('error', 'Conflict copy failed canonical observation schema check', {
+            category: 'conflict_integrity_failure',
+            reason: 'schema_validation_failed',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Conflict copy failed canonical observation schema check',
+          };
+        }
+
+        const canonicalEvent = parseResult.data;
+
+        if (canonicalEvent.event_id !== envelope.eventId) {
+          this.log('error', 'Conflict copy event_id does not match envelope eventId', {
+            category: 'conflict_integrity_failure',
+            reason: 'event_id_mismatch',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Conflict copy event_id does not match top-level envelope eventId',
+          };
+        }
+
+        if (canonicalEvent.publication_revision_id !== envelope.authorizedPublicationId) {
+          this.log('error', 'Conflict copy publication_revision_id does not match envelope', {
+            category: 'conflict_integrity_failure',
+            reason: 'publication_id_mismatch',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Conflict copy publication_revision_id does not match top-level envelope',
+          };
+        }
+
+        const computedChecksum = await sha256(canonicalJson(canonicalEvent));
+        if (copy.canonicalChecksum !== computedChecksum) {
+          this.log('error', 'Conflict copy canonicalChecksum does not match recomputed checksum', {
+            category: 'conflict_integrity_failure',
+            reason: 'checksum_mismatch',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Conflict copy canonicalChecksum does not match recomputed checksum',
+          };
+        }
+
+        let copyArchiveKey: string;
+        try {
+          copyArchiveKey = buildConflictArchiveKey(
+            tenantId,
+            eventId,
+            canonicalEvent.occurred_at,
+            computedChecksum,
+          );
+        } catch (err: unknown) {
+          const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
+          this.log('error', 'Malformed conflict archive key, routing to dead letter', {
+            category: 'conflict_integrity_failure',
+            reason: 'invalid_key',
+          });
+          return { status: 'dead_letter', reason };
+        }
+
+        validatedCopies.push({
+          canonicalEvent: canonicalEvent as unknown as Record<string, unknown>,
+          bytes: new TextEncoder().encode(JSON.stringify(canonicalEvent)),
+          checksum: computedChecksum,
+          archiveKey: copyArchiveKey,
         });
-        return {
-          status: 'dead_letter',
-          reason:
-            'Conflict copy must be a valid canonical observation matching ObservationV2Schema',
-        };
-      }
+      } else if (copy.validation === 'invalid') {
+        const metadataResult = ConflictMetadataSchema.safeParse(copy.metadata);
+        if (!metadataResult.success) {
+          this.log('error', 'Invalid conflict copy metadata failed schema validation', {
+            category: 'conflict_integrity_failure',
+            reason: 'metadata_validation_failed',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Invalid conflict copy metadata failed schema validation',
+          };
+        }
 
-      const parseResult = ObservationV2Schema.safeParse(copy.event);
-      if (!parseResult.success) {
-        this.log('error', 'Conflict copy failed canonical observation schema check', {
-          category: 'conflict_integrity_failure',
-          reason: 'schema_validation_failed',
-        });
-        return {
-          status: 'dead_letter',
-          reason: 'Conflict copy failed canonical observation schema check',
-        };
-      }
+        const validChecksum =
+          typeof copy.canonicalChecksum === 'string' &&
+          /^[0-9a-f]{64}$/i.test(copy.canonicalChecksum);
+        if (!validChecksum) {
+          this.log('error', 'Invalid conflict copy canonicalChecksum malformed', {
+            category: 'conflict_integrity_failure',
+            reason: 'malformed_checksum',
+          });
+          return {
+            status: 'dead_letter',
+            reason: 'Invalid conflict copy canonicalChecksum must be a 64-character hex string',
+          };
+        }
 
-      const canonicalEvent = parseResult.data;
+        const checksum = copy.canonicalChecksum.toLowerCase();
 
-      if (canonicalEvent.event_id !== envelope.eventId) {
-        this.log('error', 'Conflict copy event_id does not match envelope eventId', {
-          category: 'conflict_integrity_failure',
-          reason: 'event_id_mismatch',
-        });
-        return {
-          status: 'dead_letter',
-          reason: 'Conflict copy event_id does not match top-level envelope eventId',
-        };
-      }
+        let copyArchiveKey: string;
+        try {
+          copyArchiveKey = buildConflictArchiveKey(tenantId, eventId, checksum);
+        } catch (err: unknown) {
+          const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
+          this.log('error', 'Malformed conflict archive key, routing to dead letter', {
+            category: 'conflict_integrity_failure',
+            reason: 'invalid_key',
+          });
+          return { status: 'dead_letter', reason };
+        }
 
-      if (canonicalEvent.publication_revision_id !== envelope.authorizedPublicationId) {
-        this.log('error', 'Conflict copy publication_revision_id does not match envelope', {
-          category: 'conflict_integrity_failure',
-          reason: 'publication_id_mismatch',
-        });
-        return {
-          status: 'dead_letter',
-          reason: 'Conflict copy publication_revision_id does not match top-level envelope',
-        };
-      }
-
-      const computedChecksum = await sha256(canonicalJson(canonicalEvent));
-      if (copy.canonicalChecksum !== computedChecksum) {
-        this.log('error', 'Conflict copy canonicalChecksum does not match recomputed checksum', {
-          category: 'conflict_integrity_failure',
-          reason: 'checksum_mismatch',
-        });
-        return {
-          status: 'dead_letter',
-          reason: 'Conflict copy canonicalChecksum does not match recomputed checksum',
-        };
-      }
-
-      let copyArchiveKey: string;
-      try {
-        copyArchiveKey = buildConflictArchiveKey(
+        // Quarantine evidence contains strictly bounded, schema-approved metadata
+        // and provenance identity. Excludes all raw, unvalidated fields from the durable payload.
+        const safeQuarantinePayload = {
+          validation: 'invalid' as const,
           tenantId,
           eventId,
-          canonicalEvent.occurred_at,
-          computedChecksum,
-        );
-      } catch (err: unknown) {
-        const reason = err instanceof Error ? err.message : 'Invalid conflict archive key';
-        this.log('error', 'Malformed conflict archive key, routing to dead letter', {
-          category: 'conflict_integrity_failure',
-          reason: 'invalid_key',
-        });
-        return { status: 'dead_letter', reason };
-      }
+          authorizedPublicationId: envelope.authorizedPublicationId,
+          canonicalChecksum: checksum,
+          metadata: metadataResult.data,
+        };
 
-      validatedCopies.push({
-        canonicalEvent: canonicalEvent as unknown as Record<string, unknown>,
-        bytes: new TextEncoder().encode(JSON.stringify(canonicalEvent)),
-        checksum: computedChecksum,
-        archiveKey: copyArchiveKey,
-      });
+        validatedCopies.push({
+          bytes: new TextEncoder().encode(JSON.stringify(safeQuarantinePayload)),
+          checksum,
+          archiveKey: copyArchiveKey,
+          isInvalidCopy: true,
+        });
+      } else {
+        this.log('error', 'Unsupported conflict copy validation variant', {
+          category: 'conflict_integrity_failure',
+          reason: 'unsupported_validation_variant',
+        });
+        return {
+          status: 'dead_letter',
+          reason: 'Conflict copy must have validation of valid or invalid',
+        };
+      }
     }
 
     // Phase 2: Now that ALL copies are validated, archive to R2 and persist to DB
@@ -530,7 +606,26 @@ export class QueueConsumer {
       // 1. Archive copy to R2 first (Create-only)
       try {
         this.trace('r2.put', { copyArchiveKey: copy.archiveKey, checksum: copy.checksum });
-        await this.deps.r2Storage.putRawPayload(copy.archiveKey, copy.bytes, copy.checksum);
+        const r2Result = await this.deps.r2Storage.putRawPayload(
+          copy.archiveKey,
+          copy.bytes,
+          copy.checksum,
+        );
+        if (r2Result.status === 'already_exists') {
+          if (r2Result.existingChecksum && r2Result.existingChecksum !== copy.checksum) {
+            this.log('error', 'R2 conflict archive key exists with conflicting checksum', {
+              copyArchiveKey: copy.archiveKey,
+              existingChecksum: r2Result.existingChecksum,
+              incomingChecksum: copy.checksum,
+            });
+            return {
+              status: 'retry',
+              error: new Error(
+                `R2 conflict archive key ${copy.archiveKey} already exists with conflicting checksum`,
+              ),
+            };
+          }
+        }
       } catch (err: unknown) {
         const error = err instanceof Error ? err : new Error(String(err));
         this.log('error', 'R2 conflict copy archive write failed, triggering retry', {

@@ -651,6 +651,96 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       );
       expect(futureRow.rows[0].disposition).toBe('rejected');
       expect(futureRow.rows[0].reason_code).toBe('future_time');
+
+      // 4. Finding 2 regression: Exactly on 5-minute future boundary is accepted
+      const exactFiveMinEventId = crypto.randomUUID();
+      const exactReceivedAt = '2026-10-30T10:00:00.000Z';
+      const exactFiveMinOccurred = '2026-10-30T10:05:00.000Z';
+      const exactFiveMinOutcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: exactFiveMinEventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: exactFiveMinOccurred,
+        firstReceivedAt: exactReceivedAt,
+        checksum: '1111111111111111111111111111111111111111111111111111111111111111',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/30/${exactFiveMinEventId}.json`,
+        payload: {},
+      });
+      expect(exactFiveMinOutcome.disposition).toBe('accepted');
+
+      // 5. Finding 2 regression: 5 minutes plus one microsecond is classified as future_time
+      // and successfully persisted in PostgreSQL observation_index without triggering SQLSTATE 23514
+      const microFutureEventId = crypto.randomUUID();
+      const microFutureOccurred = '2026-10-30T10:05:00.000001Z';
+      const microFutureOutcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: microFutureEventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: microFutureOccurred,
+        firstReceivedAt: exactReceivedAt,
+        checksum: '2222222222222222222222222222222222222222222222222222222222222222',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/30/${microFutureEventId}.json`,
+        payload: {},
+      });
+      expect(microFutureOutcome.disposition).toBe('rejected');
+      if (microFutureOutcome.disposition === 'rejected') {
+        expect(microFutureOutcome.reasonCode).toBe('future_time');
+      }
+
+      const microFutureRow = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [microFutureEventId],
+      );
+      expect(microFutureRow.rows[0].disposition).toBe('rejected');
+      expect(microFutureRow.rows[0].reason_code).toBe('future_time');
+
+      // 6. Finding 2 regression: Exactly on 24-hour lower bound is accepted
+      const exactPastEventId = crypto.randomUUID();
+      const exactPastOccurred = '2026-10-29T10:00:00.000Z';
+      const exactPastOutcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: exactPastEventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: exactPastOccurred,
+        firstReceivedAt: exactReceivedAt,
+        checksum: '3333333333333333333333333333333333333333333333333333333333333333',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/29/${exactPastEventId}.json`,
+        payload: {},
+      });
+      expect(exactPastOutcome.disposition).toBe('accepted');
+
+      // 7. Finding 2 regression: 24 hours plus one microsecond is classified as too_old
+      const microOldEventId = crypto.randomUUID();
+      const microOldOccurred = '2026-10-29T09:59:59.999999Z';
+      const microOldOutcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: microOldEventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: microOldOccurred,
+        firstReceivedAt: exactReceivedAt,
+        checksum: '4444444444444444444444444444444444444444444444444444444444444444',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/29/${microOldEventId}.json`,
+        payload: {},
+      });
+      expect(microOldOutcome.disposition).toBe('rejected');
+      if (microOldOutcome.disposition === 'rejected') {
+        expect(microOldOutcome.reasonCode).toBe('too_old');
+      }
+
+      const microOldRow = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [microOldEventId],
+      );
+      expect(microOldRow.rows[0].disposition).toBe('rejected');
+      expect(microOldRow.rows[0].reason_code).toBe('too_old');
     } finally {
       await client.end();
     }
@@ -794,7 +884,178 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
     }
   });
 
-  it('K. Schema conformance verification: validates exact columns, primary keys, RLS flags, and append-only triggers against the canonical observation contract', async () => {
+  it('K. Mixed conflict envelope [valid, invalid] archives safe evidence to R2 and persists to observation_conflict in PostgreSQL', async () => {
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+
+    try {
+      const repo = new PostgresObservationRepository(client);
+      const r2 = new FakeR2ArchiveStorage();
+      const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
+
+      const eventId = crypto.randomUUID();
+      const sessionId = crypto.randomUUID();
+      const producerId = crypto.randomUUID();
+      const dishId = crypto.randomUUID();
+      const dishRevId = crypto.randomUUID();
+      const exposureId = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      const validEvent = {
+        schema_version: 'observation.v2' as const,
+        event_id: eventId,
+        session_id: sessionId,
+        producer_id: producerId,
+        local_sequence: 1,
+        occurred_at: now,
+        publication_revision_id: pubId1,
+        type: 'dish_viewed' as const,
+        payload: {
+          dish_id: dishId,
+          dish_revision_id: dishRevId,
+          exposure_id: exposureId,
+          surface: 'menu_list' as const,
+          position: 1,
+          exposure_basis: 'viewport_50pct_1s' as const,
+        },
+      };
+
+      const checksumA = await sha256(canonicalJson(validEvent));
+      const checksumB = 'b'.repeat(64);
+
+      const mixedEnvelope = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: tenant1,
+        eventId,
+        authorizedPublicationId: pubId1,
+        firstReceivedAt: now,
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: checksumA,
+            event: validEvent,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'dish_viewed' as const,
+              occurredAt: now,
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(mixedEnvelope);
+      expect(disposition.status).toBe('acknowledged');
+      expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
+
+      // 1. Both conflict copies are persisted to app_private.observation_conflict
+      const conflictRows = await admin.query<{ incoming_checksum: string }>(
+        'SELECT incoming_checksum FROM app_private.observation_conflict WHERE tenant_id = $1 AND event_id = $2 ORDER BY incoming_checksum',
+        [tenant1, eventId],
+      );
+      expect(conflictRows.rows.length).toBe(2);
+      expect(conflictRows.rows.map((r) => r.incoming_checksum)).toEqual(
+        [checksumA, checksumB].sort(),
+      );
+
+      // 2. Canonical index must NOT contain any rows for quarantined conflict
+      const indexRows = await admin.query(
+        'SELECT count(*)::int AS count FROM app_private.observation_index WHERE tenant_id = $1 AND event_id = $2',
+        [tenant1, eventId],
+      );
+      expect(indexRows.rows[0].count).toBe(0);
+
+      // 3. R2 contains both archives
+      const keyA = buildConflictArchiveKey(tenant1, eventId, now, checksumA);
+      const keyB = buildConflictArchiveKey(tenant1, eventId, checksumB);
+      expect(r2.has(keyA)).toBe(true);
+      expect(r2.has(keyB)).toBe(true);
+
+      // 4. Redelivery is idempotent
+      const redelivery = await consumer.processMessage(mixedEnvelope);
+      expect(redelivery.status).toBe('acknowledged');
+      expect((redelivery as { reason: string }).reason).toBe('duplicate_same_payload');
+    } finally {
+      await client.end();
+    }
+  });
+
+  it('L. All-invalid conflict envelope [invalid, invalid] preserves quarantine evidence in PostgreSQL without index rows', async () => {
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+
+    try {
+      const repo = new PostgresObservationRepository(client);
+      const r2 = new FakeR2ArchiveStorage();
+      const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
+
+      const eventId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const checksumA = 'e'.repeat(64);
+      const checksumB = 'f'.repeat(64);
+
+      const allInvalidEnvelope = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: tenant1,
+        eventId,
+        authorizedPublicationId: pubId1,
+        firstReceivedAt: now,
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumA,
+            metadata: {
+              schemaVersionStatus: 'other' as const,
+              eventType: 'unknown' as const,
+              occurredAt: null,
+              publicationStatus: 'invalid' as const,
+              payloadObject: false,
+            },
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'missing' as const,
+              eventType: 'missing' as const,
+              occurredAt: null,
+              publicationStatus: 'missing' as const,
+              payloadObject: false,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(allInvalidEnvelope);
+      expect(disposition.status).toBe('acknowledged');
+      expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
+
+      // Both copies persisted in app_private.observation_conflict
+      const conflictRows = await admin.query<{ incoming_checksum: string }>(
+        'SELECT incoming_checksum FROM app_private.observation_conflict WHERE tenant_id = $1 AND event_id = $2',
+        [tenant1, eventId],
+      );
+      expect(conflictRows.rows.length).toBe(2);
+
+      // No rows in observation_index
+      const indexRows = await admin.query(
+        'SELECT count(*)::int AS count FROM app_private.observation_index WHERE tenant_id = $1 AND event_id = $2',
+        [tenant1, eventId],
+      );
+      expect(indexRows.rows[0].count).toBe(0);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it('M. Schema conformance verification: validates exact columns, primary keys, RLS flags, and append-only triggers against the canonical observation contract', async () => {
     // 1. Column definitions and types for observation_index
     const colsRes = await admin.query<{
       column_name: string;

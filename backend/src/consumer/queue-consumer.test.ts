@@ -1,7 +1,16 @@
 import crypto from 'node:crypto';
-import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  ObservationQueueEnvelopeSchema,
+  sha256,
+  toCanonicalObservation,
+} from '@peekaplate/contracts';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { FakeObservationRepository } from './database';
+import {
+  classifyObservationTimeWindow,
+  FakeObservationRepository,
+  parseIsoToMicroseconds,
+} from './database';
 import {
   MalformedMessageError,
   type MessageBatch,
@@ -1358,7 +1367,189 @@ describe('QueueConsumer', () => {
       expect(repository.index.size).toBe(0);
     });
 
-    it('rejects message with multiple copies when one copy is valid and another copy is invalid, ensuring valid copy is not archived or persisted', async () => {
+    it('processes mixed conflict envelope [valid, invalid]: safely archives both copies and persists to conflict table without accepting invalid facts', async () => {
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+      const checksumA = computeSyncChecksum(eventA);
+      const checksumB = 'b'.repeat(64);
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: checksumA,
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      // 1. Envelope passes shared schema
+      expect(ObservationQueueEnvelopeSchema.safeParse(msg).success).toBe(true);
+
+      // 2. Process message
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('acknowledged');
+      expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
+
+      // 3. Valid copy followed intended path and invalid copy reached quarantine storage
+      expect(r2Storage.putCalls.length).toBe(2);
+      expect(repository.conflicts.size).toBe(2);
+
+      // 4. Invalid copies NEVER become accepted facts in canonical observation_index
+      expect(repository.index.size).toBe(0);
+
+      // 5. Verify R2 safe quarantine payload content for invalid copy
+      const keyB = buildConflictArchiveKey(T1, E1, checksumB);
+      const r2ObjB = await r2Storage.getRawPayload(keyB);
+      expect(r2ObjB).not.toBeNull();
+      const parsedQuarantine = JSON.parse(new TextDecoder().decode(r2ObjB!.rawBytes));
+      expect(parsedQuarantine.validation).toBe('invalid');
+      expect(parsedQuarantine.tenantId).toBe(T1);
+      expect(parsedQuarantine.eventId).toBe(E1);
+      expect(parsedQuarantine.canonicalChecksum).toBe(checksumB);
+      expect(parsedQuarantine.metadata.publicationStatus).toBe('matches_authority');
+    });
+
+    it('processes all-invalid conflict envelope [invalid, invalid]: preserves quarantine evidence for both invalid copies without accepting either as a fact', async () => {
+      const checksumA = 'a'.repeat(64);
+      const checksumB = 'b'.repeat(64);
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumA,
+            metadata: {
+              schemaVersionStatus: 'other' as const,
+              eventType: 'unknown' as const,
+              occurredAt: null,
+              publicationStatus: 'invalid' as const,
+              payloadObject: false,
+            },
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'dish_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      expect(ObservationQueueEnvelopeSchema.safeParse(msg).success).toBe(true);
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('acknowledged');
+      expect((disposition as { reason: string }).reason).toBe('conflict_recorded');
+
+      // Both copies recorded in observation_conflict
+      expect(repository.conflicts.size).toBe(2);
+      expect(r2Storage.putCalls.length).toBe(2);
+
+      // Neither copy entered observation_index
+      expect(repository.index.size).toBe(0);
+    });
+
+    it('invalid copy containing private or unapproved raw fields excludes unapproved data from R2 payload and DB records', async () => {
+      const checksum = 'c'.repeat(64);
+
+      // Raw unvalidated browser object with private and sensitive fields
+      const rawBrowserItem = {
+        event_id: E1,
+        schema_version: 'observation.v2',
+        credit_card: '4111-2222-3333-4444',
+        user_email: 'diner@example.invalid',
+        internal_auth_token: 'secret-credential-value',
+        nested_secret: { ssn: '000-00-0000' },
+      };
+
+      // Producer sanitizes and sends only schema-approved metadata
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksum,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'unknown' as const,
+              occurredAt: null,
+              publicationStatus: 'missing' as const,
+              payloadObject: false,
+            },
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: 'd'.repeat(64),
+            metadata: {
+              schemaVersionStatus: 'other' as const,
+              eventType: 'unknown' as const,
+              occurredAt: null,
+              publicationStatus: 'invalid' as const,
+              payloadObject: false,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('acknowledged');
+
+      // Assert R2 quarantine object contains NO private or unapproved raw fields
+      const key = buildConflictArchiveKey(T1, E1, checksum);
+      const r2Obj = await r2Storage.getRawPayload(key);
+      const payloadText = new TextDecoder().decode(r2Obj!.rawBytes);
+
+      expect(payloadText).not.toContain('4111-2222-3333-4444');
+      expect(payloadText).not.toContain('diner@example.invalid');
+      expect(payloadText).not.toContain('secret-credential-value');
+      expect(payloadText).not.toContain('000-00-0000');
+    });
+
+    it('retries on transient R2 failure during mixed conflict processing and does not acknowledge or persist', async () => {
+      r2Storage.failNextPut = true;
       const eventA = {
         schema_version: 'observation.v2' as const,
         event_id: E1,
@@ -1371,7 +1562,6 @@ describe('QueueConsumer', () => {
         payload: { shortlist_size: 1 },
       };
 
-      // Copy B has validation: 'invalid'
       const msg = {
         kind: 'observation_conflict.v1' as const,
         tenantId: T1,
@@ -1400,12 +1590,228 @@ describe('QueueConsumer', () => {
       };
 
       const disposition = await consumer.processMessage(msg);
-      expect(disposition.status).toBe('dead_letter');
-
-      // Crucial: Copy A must NOT have been partially archived or persisted!
-      expect(r2Storage.putCalls.length).toBe(0);
+      expect(disposition.status).toBe('retry');
       expect(repository.conflicts.size).toBe(0);
       expect(repository.index.size).toBe(0);
+    });
+
+    it('retries on database persistence failure after successful R2 archival and completes safely on redelivery', async () => {
+      repository.failNextRecordConflict = true;
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: 'b'.repeat(64),
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      // 1. First attempt fails on DB write
+      const d1 = await consumer.processMessage(msg);
+      expect(d1.status).toBe('retry');
+      expect(repository.conflicts.size).toBe(0);
+
+      // 2. Redelivery succeeds: R2 sees existing, DB succeeds
+      const d2 = await consumer.processMessage(msg);
+      expect(d2.status).toBe('acknowledged');
+      expect((d2 as { reason: string }).reason).toBe('conflict_recorded');
+      expect(repository.conflicts.size).toBe(2);
+    });
+
+    it('handles duplicate delivery of the same mixed conflict envelope idempotently', async () => {
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: 'b'.repeat(64),
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      // First delivery
+      const d1 = await consumer.processMessage(msg);
+      expect(d1.status).toBe('acknowledged');
+      expect((d1 as { reason: string }).reason).toBe('conflict_recorded');
+
+      // Second delivery (identical redelivery)
+      const d2 = await consumer.processMessage(msg);
+      expect(d2.status).toBe('acknowledged');
+      expect((d2 as { reason: string }).reason).toBe('duplicate_same_payload');
+
+      expect(repository.conflicts.size).toBe(2);
+    });
+
+    it('retries on conflicting content for an existing create-only R2 object and does not overwrite', async () => {
+      const checksumB = 'b'.repeat(64);
+      const conflictingChecksum = 'f'.repeat(64);
+      const keyB = buildConflictArchiveKey(T1, E1, checksumB);
+
+      // Pre-seed an existing object under keyB with a DIFFERENT checksum
+      r2Storage.setExisting(
+        keyB,
+        new TextEncoder().encode('{"original":"content"}'),
+        conflictingChecksum,
+      );
+
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: checksumB,
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      const disposition = await consumer.processMessage(msg);
+      expect(disposition.status).toBe('retry');
+      expect((disposition as { error: Error }).error.message).toContain('conflicting checksum');
+
+      // Verify original R2 object was NOT overwritten
+      const existingObj = await r2Storage.getRawPayload(keyB);
+      expect(existingObj!.checksum).toBe(conflictingChecksum);
+    });
+
+    it('acknowledges queue message in batch only after required durable R2 and DB writes complete', async () => {
+      const eventA = {
+        schema_version: 'observation.v2' as const,
+        event_id: E1,
+        session_id: S1,
+        producer_id: PROD1,
+        local_sequence: 1,
+        occurred_at: '2026-10-24T12:00:00.000Z',
+        publication_revision_id: P1,
+        type: 'shortlist_viewed' as const,
+        payload: { shortlist_size: 1 },
+      };
+
+      const msg = {
+        kind: 'observation_conflict.v1' as const,
+        tenantId: T1,
+        eventId: E1,
+        authorizedPublicationId: P1,
+        firstReceivedAt: '2026-10-24T12:00:00.000Z',
+        reasonCode: 'event_id_conflict' as const,
+        copies: [
+          {
+            validation: 'valid' as const,
+            canonicalChecksum: computeSyncChecksum(eventA),
+            event: eventA,
+          },
+          {
+            validation: 'invalid' as const,
+            canonicalChecksum: 'b'.repeat(64),
+            metadata: {
+              schemaVersionStatus: 'observation.v2' as const,
+              eventType: 'shortlist_viewed' as const,
+              occurredAt: '2026-10-24T12:00:00.000Z',
+              publicationStatus: 'matches_authority' as const,
+              payloadObject: true,
+            },
+          },
+        ],
+      };
+
+      const queueMsg = new FakeQueueMessage('msg-conflict-mixed', msg);
+      const batch = new FakeMessageBatch('obs-queue', [queueMsg]);
+
+      const result = await consumer.processBatch(batch);
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(queueMsg.acked).toBe(true);
+
+      // Verify writes were committed
+      expect(r2Storage.putCalls.length).toBe(2);
+      expect(repository.conflicts.size).toBe(2);
     });
   });
 
@@ -1717,6 +2123,118 @@ describe('QueueConsumer', () => {
           ]).toContain(log.meta.category);
         }
       }
+    });
+  });
+
+  describe('Finding 2: Microsecond Precision Timestamp Classification', () => {
+    const baseReceived = '2026-10-30T10:00:00.000Z';
+
+    it('1. accepts timestamp exactly five minutes in the future', () => {
+      const occurred = '2026-10-30T10:05:00.000Z';
+      const result = classifyObservationTimeWindow(occurred, baseReceived);
+      expect(result.disposition).toBe('accepted');
+      expect(result.reasonCode).toBeUndefined();
+    });
+
+    it('2. permanently rejects timestamp five minutes plus one microsecond as future_time', () => {
+      const occurred = '2026-10-30T10:05:00.000001Z';
+      const result = classifyObservationTimeWindow(occurred, baseReceived);
+      expect(result.disposition).toBe('rejected');
+      expect(result.reasonCode).toBe('future_time');
+    });
+
+    it('3. permanently rejects timestamp five minutes plus one millisecond as future_time', () => {
+      const occurred = '2026-10-30T10:05:00.001Z';
+      const result = classifyObservationTimeWindow(occurred, baseReceived);
+      expect(result.disposition).toBe('rejected');
+      expect(result.reasonCode).toBe('future_time');
+    });
+
+    it('4. accepts timestamp exactly 24 hours in the past (inclusive lower bound)', () => {
+      const occurred = '2026-10-29T10:00:00.000Z';
+      const result = classifyObservationTimeWindow(occurred, baseReceived);
+      expect(result.disposition).toBe('accepted');
+      expect(result.reasonCode).toBeUndefined();
+    });
+
+    it('5. rejects timestamp more than 24 hours in the past as too_old', () => {
+      // 24 hours + 1 microsecond in past
+      const occurredMicros = '2026-10-29T09:59:59.999999Z';
+      const resultMicros = classifyObservationTimeWindow(occurredMicros, baseReceived);
+      expect(resultMicros.disposition).toBe('rejected');
+      expect(resultMicros.reasonCode).toBe('too_old');
+
+      // 25 hours in past
+      const occurredHours = '2026-10-29T09:00:00.000Z';
+      const resultHours = classifyObservationTimeWindow(occurredHours, baseReceived);
+      expect(resultHours.disposition).toBe('rejected');
+      expect(resultHours.reasonCode).toBe('too_old');
+    });
+
+    it('6. handles equivalent timestamps expressed using different timezone offsets', () => {
+      // UTC 10:05:00.000000 -> exactly 5 minutes in future
+      const utcPlusTwoExact = '2026-10-30T12:05:00.000000+02:00';
+      expect(classifyObservationTimeWindow(utcPlusTwoExact, baseReceived).disposition).toBe(
+        'accepted',
+      );
+
+      // UTC 10:05:00.000001 -> 1 microsecond beyond future boundary
+      const utcPlusTwoExceeded = '2026-10-30T12:05:00.000001+02:00';
+      const resultPlus = classifyObservationTimeWindow(utcPlusTwoExceeded, baseReceived);
+      expect(resultPlus.disposition).toBe('rejected');
+      expect(resultPlus.reasonCode).toBe('future_time');
+
+      // UTC 10:05:00.000001 with negative offset (-04:00)
+      const utcMinusFourExceeded = '2026-10-30T06:05:00.000001-04:00';
+      const resultMinus = classifyObservationTimeWindow(utcMinusFourExceeded, baseReceived);
+      expect(resultMinus.disposition).toBe('rejected');
+      expect(resultMinus.reasonCode).toBe('future_time');
+    });
+
+    it('7. parses and classifies fractional-second timestamps with varied precision', () => {
+      // 1 decimal place (.1 -> 100ms)
+      expect(
+        classifyObservationTimeWindow('2026-10-30T10:04:59.9Z', baseReceived).disposition,
+      ).toBe('accepted');
+
+      // 3 decimal places (.500 -> 500ms)
+      expect(
+        classifyObservationTimeWindow('2026-10-30T10:04:59.500Z', baseReceived).disposition,
+      ).toBe('accepted');
+
+      // 6 decimal places (.999999 -> microsecond)
+      expect(
+        classifyObservationTimeWindow('2026-10-30T10:04:59.999999Z', baseReceived).disposition,
+      ).toBe('accepted');
+
+      // Exactly on 5-minute boundary with 6 digits (.000000)
+      expect(
+        classifyObservationTimeWindow('2026-10-30T10:05:00.000000Z', baseReceived).disposition,
+      ).toBe('accepted');
+    });
+
+    it('8. proves one-microsecond future event is durably persisted as rejected rather than repeatedly retried', async () => {
+      const futureMicroEvent = createValidObservationMsg({
+        firstReceivedAt: baseReceived,
+        occurredAt: '2026-10-30T10:05:00.000001Z', // 1 microsecond beyond boundary
+      });
+
+      const msg = new FakeQueueMessage('msg-future-micro', futureMicroEvent);
+      const batch = new FakeMessageBatch('obs-queue', [msg]);
+
+      const result = await consumer.processBatch(batch);
+      // Must be acknowledged (durably recorded as rejected), NOT retried or DLQ'd!
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(result.deadLettered).toBe(0);
+      expect(msg.acked).toBe(true);
+      expect(msg.retried).toBe(false);
+
+      // Verify canonical index row was stored with rejected disposition and future_time reason
+      const stored = repository.index.get(`${T1}:${E1}`);
+      expect(stored).toBeDefined();
+      expect(stored!.disposition).toBe('rejected');
+      expect(stored!.reasonCode).toBe('future_time');
     });
   });
 });

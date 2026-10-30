@@ -706,3 +706,26 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
+```
+
+## ERR-20261031-CONSUMER-SANDBOX-PNPM
+
+Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded exit code 1 due to sandbox filesystem isolation restricting reading the user-level pnpm preference directory (`/Users/teeyanshshukla/Library/Preferences/pnpm/config.yaml`). Direct invocation via `node scripts/check-docs.mjs` confirmed all 44 documentation files checked with 0 broken links.
+
+```json
+{"kind":"resolution","references":{"id":"ERR-20261031-CONSUMER-SANDBOX-PNPM"},"status":"resolved","evidence":"Direct verification via node scripts/check-docs.mjs confirmed passing on 44 markdown files."}
+```

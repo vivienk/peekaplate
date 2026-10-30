@@ -2,6 +2,106 @@ import type { Client } from 'pg';
 import type { ObservationRepository, PersistenceOutcome } from './types';
 
 /**
+ * Microsecond constants for observation ingest time window.
+ */
+export const TWENTY_FOUR_HOURS_MICROS = 24n * 60n * 60n * 1000n * 1000n; // 86_400_000_000n µs
+export const FIVE_MINUTES_MICROS = 5n * 60n * 1000n * 1000n; // 300_000_000n µs
+
+/**
+ * Parses an ISO-8601 timestamp with optional timezone offset and fractional seconds
+ * into exact integer microseconds (BigInt) since the Unix epoch (1970-01-01T00:00:00.000000Z).
+ * Correctly preserves fractional seconds up to microsecond precision, matching
+ * PostgreSQL's timestamptz microsecond representation.
+ */
+export function parseIsoToMicroseconds(isoString: string): bigint {
+  const trimmed = isoString.trim();
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):?(\d{2}))?$/i.exec(
+      trimmed,
+    );
+  if (
+    !match ||
+    match[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined ||
+    match[4] === undefined ||
+    match[5] === undefined ||
+    match[6] === undefined
+  ) {
+    const fallbackMs = Date.parse(trimmed);
+    if (Number.isNaN(fallbackMs)) {
+      throw new Error(`Invalid ISO timestamp: ${isoString}`);
+    }
+    return BigInt(fallbackMs) * 1000n;
+  }
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  const hour = parseInt(match[4], 10);
+  const min = parseInt(match[5], 10);
+  const sec = parseInt(match[6], 10);
+  const fractionStr = match[7] ?? '';
+  const tzSign = match[9];
+  const tzHourStr = match[10];
+  const tzMinStr = match[11];
+
+  let utcMs = Date.UTC(year, month, day, hour, min, sec);
+
+  if (tzSign && tzHourStr && tzMinStr) {
+    const offsetMinutes = parseInt(tzHourStr, 10) * 60 + parseInt(tzMinStr, 10);
+    if (tzSign === '+') {
+      utcMs -= offsetMinutes * 60 * 1000;
+    } else {
+      utcMs += offsetMinutes * 60 * 1000;
+    }
+  }
+
+  let totalMicros = BigInt(utcMs) * 1000n;
+
+  if (fractionStr.length > 0) {
+    if (fractionStr.length <= 6) {
+      totalMicros += BigInt(fractionStr.padEnd(6, '0'));
+    } else {
+      // PostgreSQL timestamptz rounds to nearest microsecond for >6 digits
+      let micros = BigInt(fractionStr.slice(0, 6));
+      const nextChar = fractionStr[6];
+      if (nextChar !== undefined && nextChar >= '5') {
+        micros += 1n;
+      }
+      totalMicros += micros;
+    }
+  }
+
+  return totalMicros;
+}
+
+/**
+ * Classifies an observation's time window per ADR 0015 & PR #32:
+ * Lower bound: first_received_at - 24 hours (inclusive)
+ * Upper bound: first_received_at + 5 minutes (inclusive)
+ *
+ * Distinguishes boundary cases with microsecond precision to remain
+ * 100% consistent with PostgreSQL's timestamptz CHECK constraint.
+ */
+export function classifyObservationTimeWindow(
+  occurredAtIso: string,
+  firstReceivedAtIso: string,
+): { disposition: 'accepted' | 'rejected'; reasonCode?: 'too_old' | 'future_time' } {
+  const occurredMicros = parseIsoToMicroseconds(occurredAtIso);
+  const receivedMicros = parseIsoToMicroseconds(firstReceivedAtIso);
+  const diffMicros = occurredMicros - receivedMicros;
+
+  if (diffMicros < -TWENTY_FOUR_HOURS_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'too_old' };
+  }
+  if (diffMicros > FIVE_MINUTES_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'future_time' };
+  }
+  return { disposition: 'accepted' };
+}
+
+/**
  * PostgreSQL implementation of ObservationRepository.
  * Uses atomic transactions, statement timeouts, pg_advisory_xact_lock concurrency serialization,
  * and forced tenant RLS (app.tenant_id) to enforce tenant isolation and canonical uniqueness.
@@ -99,22 +199,13 @@ export class PostgresObservationRepository implements ObservationRepository {
 
       // Time window check as defined in ADR 0015 and PR #32:
       // first_received_at - 24 hours <= occurred_at <= first_received_at + 5 minutes
-      const occurredTime = new Date(record.occurredAt).getTime();
-      const receivedTime = new Date(record.firstReceivedAt).getTime();
-      const diffMs = occurredTime - receivedTime;
-      const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-      const fiveMinutesMs = 5 * 60 * 1000;
-
-      let disposition: 'accepted' | 'rejected' = 'accepted';
-      let reasonCode: string | null = null;
-
-      if (diffMs < -twentyFourHoursMs) {
-        disposition = 'rejected';
-        reasonCode = 'too_old';
-      } else if (diffMs > fiveMinutesMs) {
-        disposition = 'rejected';
-        reasonCode = 'future_time';
-      }
+      // Preserves microsecond precision consistent with PostgreSQL timestamptz and CHECK constraint
+      const timeClassification = classifyObservationTimeWindow(
+        record.occurredAt,
+        record.firstReceivedAt,
+      );
+      const disposition = timeClassification.disposition;
+      const reasonCode = timeClassification.reasonCode ?? null;
 
       // Insert canonical index row (append-only: no UPDATE or DELETE)
       await this.client.query(
@@ -329,22 +420,12 @@ export class FakeObservationRepository implements ObservationRepository {
       };
     }
 
-    const occurredTime = new Date(record.occurredAt).getTime();
-    const receivedTime = new Date(record.firstReceivedAt).getTime();
-    const diffMs = occurredTime - receivedTime;
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-    const fiveMinutesMs = 5 * 60 * 1000;
-
-    let disposition: 'accepted' | 'rejected' = 'accepted';
-    let reasonCode: string | undefined;
-
-    if (diffMs < -twentyFourHoursMs) {
-      disposition = 'rejected';
-      reasonCode = 'too_old';
-    } else if (diffMs > fiveMinutesMs) {
-      disposition = 'rejected';
-      reasonCode = 'future_time';
-    }
+    const timeClassification = classifyObservationTimeWindow(
+      record.occurredAt,
+      record.firstReceivedAt,
+    );
+    const disposition = timeClassification.disposition;
+    const reasonCode = timeClassification.reasonCode;
 
     this.index.set(k, {
       ...record,
