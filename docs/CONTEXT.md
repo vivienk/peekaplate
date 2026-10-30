@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -70,7 +70,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/check-bundle.mjs",
         "scripts/check-bundle.test.mjs",
         "docs/frontend-design.md",
-        "frontend/diner/package.json"
+        "frontend/diner/package.json",
+        "frontend/diner/src/menu/types.ts",
+        "frontend/diner/src/menu/wire.ts",
+        "frontend/diner/src/menu/adapter.ts",
+        "frontend/diner/src/menu/fixtures.ts",
+        "frontend/diner/src/menu/fixtures.test.ts",
+        "vitest.config.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -79,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d08f53d1c49393f7eac8dc4e6060b73e005fb8503094ed776c6ddb0ee9e6978f"
+      "sourceFingerprint": "e2904bfe798827778b45f216c6f180c21fe63317fecaf2b56f14cb44b2a2707b"
     },
     {
       "id": "console",
@@ -363,6 +369,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
+    },
+    {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
       "modules": [
         "tokens",
@@ -442,14 +455,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
-    },
-    {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     }
   ]
 }
