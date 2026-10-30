@@ -1,6 +1,10 @@
+import { ObservationReceiptBatchSchema } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import app, { consumeJtiRateLimit, createApp } from './index';
 import { ingestObservations } from './observation-ingest';
+
+const parseObservationReceiptBatch = async (response: Response) =>
+  ObservationReceiptBatchSchema.parse(await response.json());
 
 describe('foundation API', () => {
   it('returns a minimal liveness response without database or secret configuration', async () => {
@@ -162,9 +166,7 @@ describe('observation.v2 HTTP boundary', () => {
     );
     expect(response.status).toBe(200);
     expect(
-      (await response.json()).receipts.map(
-        (receipt: { reason_code: string }) => receipt.reason_code,
-      ),
+      (await parseObservationReceiptBatch(response)).receipts.map((receipt) => receipt.reason_code),
     ).toEqual([
       'schema_invalid',
       'unknown_type',
@@ -188,7 +190,7 @@ describe('observation.v2 HTTP boundary', () => {
       ]),
     );
     expect(response.status).toBe(200);
-    expect((await response.json()).receipts).toMatchObject([
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
       { status: 'accepted', reason_code: null },
       { status: 'accepted', reason_code: 'duplicate_in_batch' },
       { status: 'rejected', reason_code: 'event_id_conflict' },
@@ -212,7 +214,7 @@ describe('observation.v2 HTTP boundary', () => {
       request([first, second]),
     );
     expect(partialResponse.status).toBe(200);
-    expect((await partialResponse.json()).receipts).toMatchObject([
+    expect((await parseObservationReceiptBatch(partialResponse)).receipts).toMatchObject([
       { status: 'accepted', retryable: false },
       { status: 'retry', retryable: true },
     ]);
@@ -358,7 +360,7 @@ describe('observation.v2 HTTP boundary', () => {
       ]),
     );
     expect(response.status).toBe(200);
-    expect((await response.json()).receipts).toMatchObject([
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
       { status: 'rejected', reason_code: 'event_id_conflict' },
       { status: 'rejected', reason_code: 'event_id_conflict' },
     ]);
@@ -411,7 +413,7 @@ describe('observation.v2 HTTP boundary', () => {
       request([first, second]),
     );
     expect(response.status).toBe(200);
-    expect((await response.json()).receipts).toMatchObject([
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
       { status: 'rejected', reason_code: 'event_id_conflict' },
       { status: 'rejected', reason_code: 'event_id_conflict' },
     ]);

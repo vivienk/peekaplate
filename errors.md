@@ -653,3 +653,29 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-30T00:33:10.052Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-30T00:34:34.171Z","exitCode":1}
+```
+
+## ERR-20261029-DATA01-RESPONSE-TYPES
+
+The first full typecheck after merging current `develop` into PR #40 failed
+because TypeScript 6 treats `Response.json()` as `unknown`; five DATA-01 tests
+accessed `receipts` directly. This was a test typing regression, not a runtime
+receipt or Queue behavior failure.
+
+The tests now parse successful receipt bodies with the shared
+`ObservationReceiptBatchSchema` before asserting their fields. Backend
+typecheck and the focused 18-case HTTP-boundary suite pass after the change.
+The later full test attempt reached 213 passing tests and then failed only
+because the Codex sandbox denied loopback JWKS connections with `EACCES`.
+Re-run `pnpm check` in the contributor's ordinary PowerShell before push; do
+not weaken response types or authentication behavior to accommodate the
+sandbox restriction.
