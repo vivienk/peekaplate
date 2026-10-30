@@ -1,6 +1,6 @@
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
-import { createFixtureMenuSource } from './fixtures';
+import { createFixtureMenuSource, demoBundle } from './fixtures';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
@@ -43,6 +43,7 @@ function escapeHtml(value: string): string {
 
 function renderLoading(container: HTMLElement): void {
   container.innerHTML = `
+    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
     <div class="pp-menu pp-menu--loading" role="status" aria-live="polite">
       <div class="pp-spinner" aria-hidden="true"></div>
       <p class="pp-loading-text">Loading menu…</p>
@@ -58,6 +59,7 @@ function renderFailure(container: HTMLElement, status: MenuLoadResult['status'])
     offline: 'You appear to be offline. Please check your connection.',
   };
   container.innerHTML = `
+    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
     </div>
@@ -106,6 +108,7 @@ function renderMenu(
 
   container.innerHTML = `
     <div class="pp-menu">
+      <h1 class="pp-sr-only">${escapeHtml(menu.restaurant.name)}</h1>
       <header class="pp-header">
         <button class="pp-saved" type="button" aria-label="Saved dishes">
           <span class="pp-saved__icon" aria-hidden="true">♥</span>

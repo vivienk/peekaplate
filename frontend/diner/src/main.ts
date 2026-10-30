@@ -5,5 +5,8 @@ import { mountMenuScreen } from './menu/menuScreen';
 const app = document.querySelector<HTMLElement>('#app');
 if (app) {
   mountMenuScreen(app);
-  mountAnalyticsConsent(app, import.meta.env, 'diner');
+  const consentHost = document.createElement('div');
+  consentHost.id = 'consent';
+  document.body.append(consentHost);
+  mountAnalyticsConsent(consentHost, import.meta.env, 'diner');
 }

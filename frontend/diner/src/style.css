@@ -1,6 +1,18 @@
 @import "@peekaplate/tokens/tokens.css";
 @import "@peekaplate/ui/components.css";
 
+.pp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :root {
   font-family: system-ui, sans-serif;
   color: #f7f1e7;
@@ -174,16 +186,33 @@ p {
 }
 
 .pp-card--dim {
-  opacity: 0.5;
-  transition: opacity 150ms ease;
+  position: relative;
+  transition: none;
 }
 
-.pp-card--dim.pp-card--inview {
+.pp-card--dim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: inherit;
+  pointer-events: none;
   opacity: 1;
+  transition: opacity 150ms ease;
+  z-index: 0;
+}
+
+.pp-card--dim > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pp-card--dim.pp-card--inview::before {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pp-card--dim {
+  .pp-card--dim::before {
     transition: none;
   }
 }
