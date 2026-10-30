@@ -1,4 +1,5 @@
 import {
+  ALLERGENS,
   type CompleteDish,
   DIETARY_VALUES,
   type Dish,
@@ -18,6 +19,18 @@ export function chipKey(value: string): string {
 // Listing either value means the dish cannot also be shown as Gluten-free.
 const EXCLUDES_GLUTEN_FREE = new Set([chipKey('Gluten'), chipKey('Wheat')]);
 
+const ALLERGEN_LABELS = new Map<string, string>(
+  ALLERGENS.flatMap((a) => [
+    [chipKey(a.code), a.label],
+    [chipKey(a.label), a.label],
+  ]),
+);
+
+// An allergen outside the P0 list keeps its own text (a text-only chip); allergens are never dropped.
+function allergenLabel(value: string): string {
+  return ALLERGEN_LABELS.get(chipKey(value)) ?? value;
+}
+
 // Every field is copied by name, so unknown or draft fields in the data never reach screens.
 function toImage(image: WireImage): MenuImage {
   return { url: image.url, width: image.width, height: image.height, alt: image.alt };
@@ -33,7 +46,8 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       categoryId,
     };
   }
-  const allergens = [...new Map((dish.allergens ?? []).map((a) => [chipKey(a), a])).values()];
+  const labels = (dish.allergens ?? []).map(allergenLabel);
+  const allergens = [...new Map(labels.map((a) => [chipKey(a), a])).values()];
   const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));
   const dietary = DIETARY_VALUES.filter(
     (value) =>

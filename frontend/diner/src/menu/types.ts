@@ -3,6 +3,20 @@
 export const DIETARY_VALUES = ['Vegan', 'Vegetarian', 'Gluten-free'] as const;
 export type DietaryValue = (typeof DIETARY_VALUES)[number];
 
+// P0 allergens approved by Vivien (Oct 29): the code value in the data and the label screens show.
+// Codes are still to be confirmed, so the adapter accepts either. Every one has a Figma icon.
+export const ALLERGENS = [
+  { code: 'milk', label: 'Milk' },
+  { code: 'egg', label: 'Eggs' },
+  { code: 'fish', label: 'Fish' },
+  { code: 'crustacean shellfish', label: 'Crustacean shellfish' },
+  { code: 'tree nut', label: 'Tree nuts' },
+  { code: 'peanut', label: 'Peanuts' },
+  { code: 'wheat', label: 'Wheat' },
+  { code: 'soy', label: 'Soy' },
+  { code: 'sesame', label: 'Sesame' },
+] as const;
+
 export type MenuImage = { url: string; width: number; height: number; alt: string };
 
 export type Ingredient = { ingredientId: string; name: string; description: string | null };
