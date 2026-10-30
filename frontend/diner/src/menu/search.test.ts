@@ -55,9 +55,23 @@ describe('searchMenu', () => {
     expect(searchMenu(menu, 'flaky').dishIds).toEqual([]);
   });
 
-  it('matches "gluten" to the Gluten allergen only', async () => {
-    const result = searchMenu(await loadMenu('edge-cases'), 'gluten');
-    expect(result.dishIds).toEqual([DISH.berryPancakeStack]);
+  it('never matches "gluten" to the Gluten-free dietary value, but shows the allergy line', async () => {
+    // The approved P0 list has Wheat, not Gluten, so "gluten" matches no chip.
+    expect(searchMenu(await loadMenu('edge-cases'), 'gluten')).toEqual({
+      dishIds: [],
+      allergyNotice: true,
+    });
+  });
+
+  it('matches the Wheat allergen, including the dish that also lists Gluten-free', async () => {
+    const result = searchMenu(await loadMenu('edge-cases'), 'wheat');
+    expect(result.dishIds).toEqual([
+      DISH.avocadoToast,
+      DISH.eggsBenedict,
+      DISH.berryPancakeStack,
+      DISH.briocheFrenchToast,
+      DISH.longName,
+    ]);
     expect(result.allergyNotice).toBe(true);
   });
 
@@ -79,16 +93,42 @@ describe('searchMenu', () => {
     expect(searchMenu(menu, 'sesa')).toEqual({ dishIds: [], allergyNotice: false });
   });
 
-  it('finds an allergen value that has no icon', async () => {
-    const result = searchMenu(await loadMenu('edge-cases'), NO_ICON_ALLERGEN);
-    expect(result.dishIds).toEqual([
+  it('matches an approved allergen by its code or its label', async () => {
+    const menu = await loadMenu('edge-cases');
+    for (const query of ['peanut', 'Peanuts']) {
+      expect(searchMenu(menu, query)).toEqual({
+        dishIds: [DISH.gardenAvocadoSalad],
+        allergyNotice: true,
+      });
+    }
+    for (const query of ['tree nut', 'Tree nuts']) {
+      expect(searchMenu(menu, query).dishIds).toEqual([DISH.gardenAvocadoSalad]);
+    }
+    const eggDishes = [
       DISH.avocadoToast,
       DISH.eggsBenedict,
+      DISH.berryPancakeStack,
       DISH.briocheFrenchToast,
-      DISH.gardenAvocadoSalad,
-      DISH.longName,
-    ]);
+    ];
+    expect(searchMenu(menu, 'egg').dishIds).toEqual(eggDishes);
+    expect(searchMenu(menu, 'eggs').dishIds).toEqual(eggDishes);
+  });
+
+  it('finds an allergen value that has no icon', async () => {
+    const result = searchMenu(await loadMenu('edge-cases'), NO_ICON_ALLERGEN);
+    expect(result.dishIds).toEqual([DISH.gardenAvocadoSalad]);
     expect(result.allergyNotice).toBe(true);
+  });
+
+  it('shows the allergy line for an allergen no dish on this menu lists', async () => {
+    const menu = await loadMenu('edge-cases');
+    for (const query of ['Shellfish', 'crustacean shellfish', 'celery', 'dairy']) {
+      expect(searchMenu(menu, query)).toEqual({ dishIds: [], allergyNotice: true });
+    }
+    expect(searchMenu(await loadMenu('layout-20'), 'mustard')).toEqual({
+      dishIds: [],
+      allergyNotice: true,
+    });
   });
 
   it('returns no results and no allergy line for an unknown word', async () => {
