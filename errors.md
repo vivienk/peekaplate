@@ -153,6 +153,7 @@ These records describe local validation limits, not application failures.
 
 ```json
 {"id":"ERR-20261019-POSTHOG-003","status":"resolved","area":"sandbox-local-servers","references":{"check":"test","timestamp":"2026-10-20T04:46:52.443Z"},"cause":"The restricted execution context rejected loopback server binding with EPERM, preventing existing auth/local-harness test setup.","prevention":"Run local-server checks in an approved context that permits loopback listeners; do not weaken auth tests.","regression":"The permitted pnpm check rerun passed 50 application and 21 script tests; pnpm verify build and pnpm verify test:e2e passed, including four foundation and four intercepted analytics browser cases."}
+```
 
 ```json
 {"id":"ERR-20261018-CLOUD-001","status":"resolved","area":"operator-authentication","cause":"Wrangler keyring login required its Windows helper; a non-interactive attempt could not install it. A later localhost OAuth retry expired and then rejected a mismatched callback state.","prevention":"Use Wrangler's interactive keyring setup and an isolated device-login flow when localhost callbacks are stale. Never disable OAuth state validation or print credentials.","regression":"wrangler login --device --scopes account:read user:read workers:write --use-keyring --browser=false succeeded. wrangler whoami confirmed encrypted credential storage and the approved scopes; an account-scoped wrangler hyperdrive list returned the expected staging connection.","limit":"Authentication and resource listing do not prove deployment or hosted database behavior."}
@@ -334,6 +335,24 @@ These records describe local validation limits, not application failures.
 
 ```json
 {"id":"OBS-20261022-ADR15-PUSH-001","status":"resolved","area":"review-coordination","observation":"A normal PR-branch push was rejected because the author concurrently merged the same develop update.","cause":"The remote review head advanced after the local review was pinned.","regression":"Fetched and compared the new head, then merged it without force-pushing; the only retained local difference was the final technical-review context handoff. Context freshness, documentation links and diff checks passed after reconciliation.","prevention":"Re-pin and re-review a changed remote head; preserve concurrent commits and use an expected head when merging the PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-22T00:13:01.752Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-22T00:13:01.752Z"},"status":"resolved","cause":"The new shared-token CSS imports used single quotes; the repository Biome formatter requires double quotes in CSS.","prevention":"Run pnpm format or biome check --write on new CSS before verification.","regression":"Formatted both app imports and updated the token test's import assertion; pnpm check passed afterward."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T00:13:19.319Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T00:13:19.319Z"},"status":"resolved","cause":"The token test was edited after the context fingerprints were refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
 ```
 
 ## October 22 staging activation verification
@@ -535,6 +554,15 @@ alone does not establish instantaneous edge retirement. Staging deployment
 IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:54:53.626Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-27T19:54:53.626Z"},"status":"resolved","cause":"Color-role palette test edits introduced a Biome formatting violation (misaligned array element).","prevention":"Run pnpm format (biome check --write) on changed files before verification.","regression":"Biome formatting check passes; pnpm lint exits 0."}
+```
+
 ## October 27 VIS-01 infrastructure validation
 
 ```json
@@ -575,6 +603,60 @@ IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
 ```json
 {"kind":"clarification","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"pending-external-activation","cause":"The account is on Free; Vivien will activate Workers Paid. The standard flag alone was not billing proof.","next":"Keep the prepared Cloudflare host unchanged. After the owner activates the $5 plan, verify eligibility and configure/deploy the reviewed service; no upgrade was purchased by this task."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z"},"status":"resolved","cause":"The color-role palette test used unsafe regex match destructuring (`[, ref]`) whose captured groups could be undefined under noUncheckedIndexedAccess.","prevention":"Parse regex matches through a typed helper that validates each capture before use.","regression":"pnpm typecheck passes; tokens suite passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-27T20:04:00.236Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-27T20:04:00.236Z"},"status":"resolved","cause":"Token test edits landed after the module fingerprint was refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T13:15:19.972Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T13:20:26.669Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T13:15:19.972Z"},"status":"resolved","cause":"Biome formatting in packages/tokens/src/tokens.test.ts after inserting the light-theme test-block extraction; two lines had insufficient indentation.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 14 files/202 tests + 4 skipped, context:check, docs:check)."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T13:20:26.669Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T16:45:03.171Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T16:45:03.171Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T17:18:55.326Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T17:18:55.326Z"},"status":"resolved","cause":"Biome formatting in frontend/console/src/ui/Nav.tsx and components.test.tsx after adding aria-hidden and test file.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 15 files/216 tests + 4 skipped, context:check, docs:check)."}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -709,4 +791,45 @@ the PR records verification of the reconciled canonical tree separately.
 
 ```json
 {"id":"OBS-VIS02-TARGETED-RECOVERY-BUDGET-001","status":"resolved","area":"explicit-provider-request-budget","observation":"A selected-page count does not bound paid transport attempts when the legacy OCR client internally retries. Failed-page recovery also must not silently reacquire the whole PDF, erase earlier failures or reuse old candidate links.","correction":"Add opt-in selective PDF acquisition and an explicit single-attempt OCR setting without changing ordinary defaults. Recovery validates source snapshot/hash/coverage and selected failed Engine3 pages before client construction, bypasses cache, enforces a small explicit cap, stops on first failure including429 and preserves unattempted pages/history in private create-only output. Model-only recovery separately preflights the exact selected-page batch plan and keeps unprocessed coverage incomplete without merging drafts.","regression":"Socket-blocked synthetic tests cover caps, exact source/coverage preflight, selection-only rendering/acquisition, cache bypass, one-attempt transport,429 stop, failed/unattempted manifest records, old-error preservation and model-budget rejection before invocation. Full381-test discovery passes with no socket attempts. Six independent write-mocked retry/budget controls pass. No recovery was invoked against a live provider; fresh reliability and hosted budgets remain unverified.","sources":["processing/src/peekaplate_processing/recover_pages.py","processing/src/peekaplate_processing/pdf.py","processing/src/peekaplate_processing/ocr_space.py","processing/src/peekaplate_processing/run_pipeline.py","processing/src/peekaplate_processing/vision.py","processing/tests/test_recover_pages.py","processing/tests/test_targeted_model_recovery.py","docs/processing-v3.md"]}
+```json
+{"kind":"deployment-followup","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"timestamp":"2026-10-27T20:25:05.885Z","status":"pending-external-activation","observation":"Actual deploy of main58838e1 uploaded a partial extraction Worker, then failed at /containers/me with HTTP401 requiring Workers Paid. workers.dev remains disabled and health/extract return404; settings readback returned provider500. Protected API run40577213391 awaits independent approval; existing API health200 at prior version.","next":"Owner activates planned Paid subscription, then retry the same Worker name and verify service configuration. Independently approve existing API run and verify its new aliases. Local integration can continue; do not enable real submissions before full acceptance.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"OBS-20261027-DOCKER-START","status":"resolved","area":"local-deployment","observation":"Wrangler could not launch the Docker engine; the desktop-linux named pipe was absent.","cause":"Docker Desktop daemon was stopped.","resolution":"Started the existing Docker Desktop installation; docker info returned29.8.2 and the image build/upload completed. No daemon reset or data/cache deletion.","sources":["processing/Dockerfile"]}
+```
+
+```json
+{"id":"OBS-20261027-CONTAINER-SCHEDULER","status":"fixed-locally","area":"hosted-extraction-activation","observation":"After Paid entitlement succeeded, application creation failed VALIDATE_INPUT because this account cannot use default scheduling_policy.","cause":"Default was implicit, and the older Container helper does not support the provider-required durable_object policy.","resolution":"Use direct DurableObject startup, images.base, supported standard-1 size and native inactivity timeout. Keep service/source-grant checks unchanged. New configuration guard failed before the repair and passes afterward; lifecycle regressions cover readiness, concurrency and recovery. Hosted verification follows reviewed main release.","sources":["backend/wrangler.extraction.jsonc","backend/src/extraction-host.ts","backend/src/extraction-host.test.ts","scripts/menu-ingestion-infra.test.mjs"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"resolved","evidence":"Paid entitlement succeeds and the existing extraction host is deployed. No subscription was purchased by the operator."}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-CONTAINER-SCHEDULER"},"status":"resolved","evidence":"PR60 main7bbe0d3 deployed successfully under durable_object scheduling. Authenticated hosted Python health200, job/source denials and signed private source/hash checks passed."}
+```
+
+```json
+{"id":"OBS-20261027-REMOTE-R2-PROOF","status":"resolved","observation":"A local test writer reported201 but the independently deployed source reader returned404.","cause":"The helper used unstable_dev local:true with experimental.forceLocal:true; its remote R2 flag did not establish a provider write.","resolution":"Changed helper to actual remote mode and repeated service/source and Queue/R2 tests. Hosted source read200, Python relay checks, real conditional-create race and cleanup/absence verification passed. Corrected the earlier R2 evidence claims and retained the failed run separately outside the repo.","sources":["docs/menu-ingestion-infrastructure.md","docs/operations.md"]}
+```
+
+## ERR-20261028-MAIN-DEVELOP-TYPES
+
+The first combined `pnpm verify typecheck` failed after importing main's Worker
+runtime declarations into develop: `TextDecoderConstructorOptions` required an
+explicit `ignoreBOM`, and Node's `fileURLToPath` rejected a Worker-global URL in
+the retrieval runtime test. This was a branch-integration type mismatch, not a
+failed hosted request or database change.
+
+Preserved the existing decoder behavior with `ignoreBOM: false` and imported
+Node's URL explicitly in the Node test, matching the existing dish integration
+fix. The same typecheck then passed. Full retrieval/workerd and repository
+regression results belong to the sync PR. Do not suppress strict types or drop
+develop's retrieval implementation to make a release merge compile.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```

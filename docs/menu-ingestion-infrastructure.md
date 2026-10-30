@@ -1,6 +1,6 @@
 # VIS-01: staging infrastructure and Python service
 
-Updated October 27, 2026. For Teeyansh's [VIS-01 integration, PR #45](https://github.com/vivienk/peekaplate/pull/45).
+Updated October 28, 2026. For Teeyansh's [VIS-01 integration, PR #45](https://github.com/vivienk/peekaplate/pull/45).
 
 ## What is ready
 
@@ -276,8 +276,9 @@ is deployed from main `7bbe0d3729503f69a05c0f360ed09a41b9ecaf08`. The existing h
 are reused, with one Container application. The existing uploaded image was
 reused by immutable digest; no second large upload was necessary.
 Service authentication, source-signing credentials and the API service URL are
-configured in protected Cloudflare secret bindings. Actual provider-backed
-menu extraction remains untested because no OCR/AI provider keys are configured.
+configured in protected Cloudflare secret bindings. OCR.space is now configured
+and its standalone provider check passed, as recorded below. The full extraction
+endpoint still needs the approved AI configuration and its own hosted test.
 Subscription readback is denied, so no total monthly bill is certified here.
 Container usage is included up to the existing Workers Paid plan allowances,
 with overage charges possible. See [current pricing](https://developers.cloudflare.com/containers/platform/pricing/).
@@ -304,18 +305,19 @@ before connecting the menu consumer. A successful dry run does not prove hosting
 1. **Completed infrastructure:** protected API deployment, menu aliases, the
    hosted Python container and matched service/signing credentials are verified.
    Keep the actual queues paused until feature acceptance.
-2. **Mohammad + Sai/Vivien:** configure the approved existing OCR/AI provider
-   credentials privately, then test genuine menu extraction and quality. The
+2. **Mohammad + Sai/Vivien:** OCR credential setup and a fresh OCR-only provider
+   check are complete. Configure the approved existing AI provider privately,
+   then test genuine full menu extraction and quality. The
    generic MENU_AI_* names refer to a configured provider, not a required new
    subscription. Standalone OCR-only checks can use OCR.space; the current full
    extraction endpoint also requires the AI step. Do not buy another service
    or silently change the extraction model for infrastructure acceptance.
 3. **Teeyansh:** verify PR #45 before enabling jobs. Require the input key/hash
    above before enqueue; either reject URL/text clearly or materialize approved
-   retrieval output first. The observed `e26f3c1` transport uses a 600-second
-   timeout; that is shorter than the service's 700-second processing cap plus
-   cold startup and transfer. Configure a measured overall budget with matching
-   proxy/queue/lease limits), batch size one and concurrency one for the pilot.
+   retrieval output first. PR #45 at `79b2e99` now proposes a 720-second transport
+   timeout. Verify that the service's 700-second processing cap, cold startup,
+   transfer and response fit the actual overall deadline, with matching
+   proxy/queue/lease limits, batch size one and concurrency one for the pilot.
    Verify limits against the selected runtime rather than silently raising them.
    Mint and send the job-bound source capability after the durable claim, using
    the trusted job row's IDs/hash. Do not expose a browser-facing grant-mint route.
@@ -335,6 +337,44 @@ before connecting the menu consumer. A successful dry run does not prove hosting
 
 Steps 2–4 can proceed in parallel after agreeing the interface; step 6 needs all
 of them. No unfinished feature PR was merged to achieve this setup.
+
+## OCR credential and provider check — October 28, 2026
+
+The existing `OCR_SPACE_API_KEY` is now stored in two protected locations:
+
+- GitHub repository `vivienk/peekaplate`, environment **staging**, Actions secret
+  `OCR_SPACE_API_KEY`; metadata confirms the October 28 update.
+- Cloudflare Worker **peekaplate-extraction-staging**, secret-text binding of the
+  same name. Readback confirmed the binding and preserved every other host binding.
+
+No value appears in source, frontend variables, test fixtures, logs or operator
+files. The existing host allowlist forwards this variable into Python; it does
+not forward the source-signing secret. The focused host regression checks both.
+GitHub secrets are encrypted deployment inputs, not credentials collaborators can
+retrieve. The current **Deploy staging Worker** workflow deploys the API, not this
+separate extraction host. The authorized operator applied the host secret directly;
+storing the GitHub secret did not trigger a deployment or enable collection.
+
+**Provider check — PASS:** the existing Python `extract_source` / `OCRSpaceClient`
+path made a fresh OCR.space Engine 3 request for a generated three-item menu image.
+It completed in **4.654 seconds**, returned `complete`, reported no cache hit, and
+contained Tomato Soup / 7.50, Garden Salad / 9.00 and Grilled Chicken / 14.00.
+Only fictional test content was uploaded. This proves the supplied credential's
+OCR use on that image, not real-menu accuracy or successful hosted job processing.
+
+The secret update created Worker version `7b505396-501e-4d46-870f-d6dbd87655ee`
+without changing its main `7bbe0d3` application code, Container image or internal
+authentication credentials. Both menu queues remain paused and the temporary
+HTTP pull consumers remain in place. No database migration was applied here.
+
+**Still pending:** AI provider URL/key/model configuration for the current full
+`/extract` pipeline; review and hosted verification of the job/draft migration;
+the real Worker consumer release and complete source-to-report-to-drafts/ACK tests.
+Teeyansh can prepare those cases in parallel. Before trusting the new read-only
+verification utility, fix its `79b2e99` zero-check path: with no token or report,
+it returns `passed: true` and no checks. Mark that run failed or incomplete and
+add a regression. Keep production and real restaurant collection off until their
+separate release acceptance.
 
 ## Hosted acceptance — October 27, 2026 (Phoenix)
 
@@ -372,7 +412,6 @@ application Workers.
 operator's own GitHub identity, and 401 without authentication. API health is
 200; existing Auth, Hyperdrive, observation bindings and TEAM_GITHUB_TOKEN were
 preserved. No Supabase schema/data or production deployment changed.
-
 The host has EXTRACTION_SERVICE_SECRET and EXTRACTION_SOURCE_SIGNING_SECRET;
 the API has the matching two plus EXTRACTION_SERVICE_URL. Values were generated
 in memory and written only to protected Cloudflare secret bindings, not files,

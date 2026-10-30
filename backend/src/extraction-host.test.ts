@@ -110,6 +110,7 @@ function runtime(running = false) {
 
 describe('direct Container startup', () => {
   afterEach(() => vi.useRealTimers());
+
   it('starts the named image with scoped environment and preserves a POST exactly once', async () => {
     const { actor, container, fetch } = runtime();
     const response = await actor.fetch(
@@ -133,6 +134,7 @@ describe('direct Container startup', () => {
     expect(await forwarded.text()).toBe('synthetic');
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
   it('retries readiness, never the extraction POST', async () => {
     vi.useFakeTimers();
     const { actor, fetch } = runtime();
@@ -149,6 +151,7 @@ describe('direct Container startup', () => {
       fetch.mock.calls.filter(([value]) => value instanceof Request && value.method === 'POST'),
     ).toHaveLength(1);
   });
+
   it('shares cold readiness between concurrent requests and restores idle timeout after restart', async () => {
     const { actor, container, fetch } = runtime();
     let ready!: (response: Response) => void;
@@ -173,6 +176,7 @@ describe('direct Container startup', () => {
     expect(restarted.container.setInactivityTimeout).toHaveBeenCalledWith(60_000);
     expect(restarted.container.start).not.toHaveBeenCalled();
   });
+
   it('bounds readiness failure and permits a later request to recover', async () => {
     vi.useFakeTimers();
     const { actor, fetch } = runtime();
@@ -212,13 +216,15 @@ describe('staging extraction host', () => {
     expect((await host.fetch(input, env)).status).toBe(403);
     expect(get).not.toHaveBeenCalled();
   });
-  it('keeps the source signing key out of the Python container environment', () => {
+  it('forwards the OCR key to Python while keeping the source signing key out', () => {
     const { env } = setup();
+    env.OCR_SPACE_API_KEY = 'synthetic-ocr-provider-key';
     const container = new ExtractionContainer(
       {} as ConstructorParameters<typeof ExtractionContainer>[0],
       env,
     );
     expect(container.envVars.EXTRACTION_SERVICE_SECRET).toBe(secret);
+    expect(container.envVars.OCR_SPACE_API_KEY).toBe('synthetic-ocr-provider-key');
     expect(container.envVars.EXTRACTION_SOURCE_SIGNING_SECRET).toBeUndefined();
   });
   it('requires distinct service and source-signing credentials', async () => {
