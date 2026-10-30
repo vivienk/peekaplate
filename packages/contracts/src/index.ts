@@ -285,3 +285,263 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 });
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
+
+const observationUuid = z.uuid().transform((value) => value.toLowerCase());
+const saveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
+const unsaveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
+const dishReference = {
+  dish_id: observationUuid,
+  dish_revision_id: observationUuid,
+};
+const observationBase = z.strictObject({
+  schema_version: z.literal('observation.v2'),
+  event_id: observationUuid,
+  session_id: observationUuid,
+  producer_id: observationUuid,
+  local_sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  occurred_at: z.iso.datetime({ offset: true }),
+  publication_revision_id: observationUuid,
+});
+
+const menuViewed = observationBase.extend({
+  type: z.literal('menu_viewed'),
+  payload: z.strictObject({
+    entry_source: z.enum(['qr', 'direct_link', 'unknown']),
+  }),
+});
+const dishViewed = observationBase.extend({
+  type: z.literal('dish_viewed'),
+  payload: z.strictObject({
+    ...dishReference,
+    exposure_id: observationUuid,
+    surface: z.literal('menu_list'),
+    position: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    exposure_basis: z.literal('viewport_50pct_1s'),
+    category_filter: z.string().trim().min(1).max(160).optional(),
+  }),
+});
+const dishDetailOpened = observationBase.extend({
+  type: z.literal('dish_detail_opened'),
+  payload: z.strictObject({
+    opening_id: observationUuid,
+    ...dishReference,
+    source: z.enum(['menu_card', 'compare_view', 'direct', 'saved_screen']),
+    from_exposure_id: observationUuid.optional(),
+    nav_relation: z.enum(['none', 'from_compare', 'back_navigation']).optional(),
+    save_available: z.boolean(),
+  }),
+});
+const dishActivityCheckpoint = observationBase.extend({
+  type: z.literal('dish_activity_checkpoint'),
+  payload: z.strictObject({
+    ...dishReference,
+    opening_id: observationUuid,
+    active_ms: z.number().int().nonnegative().max(300_000),
+    final: z.boolean(),
+  }),
+});
+const dishDetailClosed = observationBase.extend({
+  type: z.literal('dish_detail_closed'),
+  payload: z.strictObject({
+    ...dishReference,
+    opening_id: observationUuid,
+  }),
+});
+const dishCompared = observationBase.extend({
+  type: z.literal('dish_compared'),
+  payload: z
+    .strictObject({
+      ...dishReference,
+      other_dish_id: observationUuid,
+      other_dish_revision_id: observationUuid,
+      comparison_id: observationUuid,
+      compare_action: z.enum(['start', 'replace']),
+      save_available: z.boolean(),
+    })
+    .refine((payload) => payload.dish_id !== payload.other_dish_id, {
+      path: ['other_dish_id'],
+      message: 'Compared dishes must be different',
+    }),
+});
+const dishSaved = observationBase.extend({
+  type: z.literal('dish_saved'),
+  payload: z.strictObject({
+    ...dishReference,
+    save_origin: z.enum(['direct', 'undo']),
+    save_surface: saveSurface,
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+const dishUnsaved = observationBase.extend({
+  type: z.literal('dish_unsaved'),
+  payload: z.strictObject({
+    ...dishReference,
+    unsave_surface: unsaveSurface,
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+const shortlistViewed = observationBase.extend({
+  type: z.literal('shortlist_viewed'),
+  payload: z.strictObject({
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+
+export const ObservationV2Schema = z.discriminatedUnion('type', [
+  menuViewed,
+  dishViewed,
+  dishDetailOpened,
+  dishActivityCheckpoint,
+  dishDetailClosed,
+  dishCompared,
+  dishSaved,
+  dishUnsaved,
+  shortlistViewed,
+]);
+
+const observationEventType = z.enum([
+  'menu_viewed',
+  'dish_viewed',
+  'dish_detail_opened',
+  'dish_detail_closed',
+  'dish_activity_checkpoint',
+  'dish_compared',
+  'dish_saved',
+  'dish_unsaved',
+  'shortlist_viewed',
+]);
+
+export const ObservationQueueMessageSchema = z
+  .strictObject({
+    kind: z.literal('observation.v2'),
+    tenantId: observationUuid,
+    eventId: observationUuid,
+    sessionId: observationUuid,
+    schemaVersion: z.literal('observation.v2'),
+    occurredAt: z.iso.datetime({ offset: true }),
+    type: observationEventType,
+    authorizedPublicationId: observationUuid,
+    producerId: observationUuid,
+    localSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    payload: z.record(z.string(), z.unknown()),
+    firstReceivedAt: z.iso.datetime({ offset: true }),
+  })
+  .superRefine((message, ctx) => {
+    const observation = ObservationV2Schema.safeParse({
+      schema_version: message.schemaVersion,
+      event_id: message.eventId,
+      session_id: message.sessionId,
+      producer_id: message.producerId,
+      local_sequence: message.localSequence,
+      occurred_at: message.occurredAt,
+      publication_revision_id: message.authorizedPublicationId,
+      type: message.type,
+      payload: message.payload,
+    });
+    if (!observation.success) {
+      ctx.addIssue({ code: 'custom', path: ['payload'], message: 'Invalid observation payload' });
+    }
+  });
+
+const conflictMetadataSchema = z.strictObject({
+  schemaVersionStatus: z.enum(['observation.v2', 'other', 'missing']),
+  eventType: observationEventType.or(z.enum(['unknown', 'missing'])),
+  occurredAt: z.iso.datetime({ offset: true }).nullable(),
+  publicationStatus: z.enum(['matches_authority', 'mismatch', 'invalid', 'missing']),
+  payloadObject: z.boolean(),
+});
+const conflictCopySchema = z.discriminatedUnion('validation', [
+  z.strictObject({
+    validation: z.literal('valid'),
+    canonicalChecksum: hash,
+    event: ObservationV2Schema,
+  }),
+  z.strictObject({
+    validation: z.literal('invalid'),
+    canonicalChecksum: hash,
+    metadata: conflictMetadataSchema,
+  }),
+]);
+export const ObservationConflictQueueMessageSchema = z.strictObject({
+  kind: z.literal('observation_conflict.v1'),
+  tenantId: observationUuid,
+  eventId: observationUuid,
+  authorizedPublicationId: observationUuid,
+  firstReceivedAt: z.iso.datetime({ offset: true }),
+  reasonCode: z.literal('event_id_conflict'),
+  copies: z.array(conflictCopySchema).min(2).max(25),
+});
+export const ObservationQueueEnvelopeSchema = z.union([
+  ObservationQueueMessageSchema,
+  ObservationConflictQueueMessageSchema,
+]);
+
+export const ObservationBatchV2Schema = z.strictObject({
+  contract: z.literal('observation.v2'),
+  events: z.array(z.unknown()).min(1).max(25),
+});
+
+export const ObservationReceiptReasonSchema = z.enum([
+  'duplicate_same_payload',
+  'duplicate_in_batch',
+  'schema_invalid',
+  'unknown_type',
+  'too_old',
+  'future_time',
+  'publication_not_allowed',
+  'event_id_conflict',
+]);
+const acceptedObservationReceipt = z.strictObject({
+  event_id: observationUuid,
+  status: z.literal('accepted'),
+  reason_code: z.enum(['duplicate_same_payload', 'duplicate_in_batch']).nullable(),
+  retryable: z.literal(false),
+});
+const retryObservationReceipt = z.strictObject({
+  event_id: observationUuid,
+  status: z.literal('retry'),
+  reason_code: z.literal('duplicate_in_batch').nullable(),
+  retryable: z.literal(true),
+});
+const rejectedObservationReceipt = z
+  .strictObject({
+    event_id: observationUuid.nullable(),
+    status: z.literal('rejected'),
+    reason_code: z.enum([
+      'schema_invalid',
+      'unknown_type',
+      'too_old',
+      'future_time',
+      'publication_not_allowed',
+      'event_id_conflict',
+    ]),
+    retryable: z.literal(false),
+  })
+  .superRefine((receipt, ctx) => {
+    if (
+      receipt.event_id === null &&
+      !['schema_invalid', 'unknown_type'].includes(receipt.reason_code)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['event_id'],
+        message: 'Identified rejection requires event_id',
+      });
+    }
+  });
+export const ObservationReceiptSchema = z.union([
+  acceptedObservationReceipt,
+  retryObservationReceipt,
+  rejectedObservationReceipt,
+]);
+export const ObservationReceiptBatchSchema = z.strictObject({
+  contract: z.literal('observation-receipt.v1'),
+  request_id: observationUuid,
+  receipts: z.array(ObservationReceiptSchema).min(1).max(25),
+});
+
+export type ObservationV2 = z.infer<typeof ObservationV2Schema>;
+export type ObservationQueueEnvelope = z.infer<typeof ObservationQueueEnvelopeSchema>;
+export type ObservationBatchV2 = z.infer<typeof ObservationBatchV2Schema>;
+export type ObservationReceipt = z.infer<typeof ObservationReceiptSchema>;
+export type ObservationReceiptBatch = z.infer<typeof ObservationReceiptBatchSchema>;

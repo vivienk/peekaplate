@@ -1,0 +1,528 @@
+{
+  "fixture_version": 1,
+  "description": "Synthetic schema and delivery inputs. Freeze server time at 2026-10-24T16:00:00.000Z; supply test-only matching publication authority. Never send to production.",
+  "valid_events": [
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000001",
+      "type": "menu_viewed",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 1,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "entry_source": "qr"
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000002",
+      "type": "dish_viewed",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 2,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "exposure_id": "70000000-0000-4000-8000-000000000001",
+        "surface": "menu_list",
+        "position": 1,
+        "exposure_basis": "viewport_50pct_1s"
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000003",
+      "type": "dish_detail_opened",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 3,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "opening_id": "80000000-0000-4000-8000-000000000001",
+        "source": "menu_card",
+        "from_exposure_id": "70000000-0000-4000-8000-000000000001",
+        "nav_relation": "none",
+        "save_available": true
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000004",
+      "type": "dish_activity_checkpoint",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 4,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "opening_id": "80000000-0000-4000-8000-000000000001",
+        "active_ms": 300000,
+        "final": true
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000005",
+      "type": "dish_detail_closed",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 5,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "opening_id": "80000000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000006",
+      "type": "dish_compared",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 6,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "other_dish_id": "50000000-0000-4000-8000-000000000002",
+        "other_dish_revision_id": "60000000-0000-4000-8000-000000000002",
+        "comparison_id": "90000000-0000-4000-8000-000000000001",
+        "compare_action": "start",
+        "save_available": true
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000007",
+      "type": "dish_saved",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 7,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "save_origin": "direct",
+        "save_surface": "dish_detail",
+        "shortlist_size": 1
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000008",
+      "type": "dish_unsaved",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 8,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "dish_id": "50000000-0000-4000-8000-000000000001",
+        "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+        "unsave_surface": "compare_view",
+        "shortlist_size": 0
+      }
+    },
+    {
+      "schema_version": "observation.v2",
+      "event_id": "10000000-0000-4000-8000-000000000009",
+      "type": "shortlist_viewed",
+      "session_id": "20000000-0000-4000-8000-000000000001",
+      "producer_id": "30000000-0000-4000-8000-000000000001",
+      "local_sequence": 9,
+      "occurred_at": "2026-10-24T16:00:00.000Z",
+      "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+      "payload": {
+        "shortlist_size": 1
+      }
+    }
+  ],
+  "invalid_events": [
+    {
+      "name": "invalid_menu_viewed",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "menu_viewed",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "entry_source": "table_qr"
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_viewed",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_viewed",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "exposure_id": "70000000-0000-4000-8000-000000000001",
+          "surface": "menu_list",
+          "position": 0,
+          "exposure_basis": "viewport_50pct_1s"
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_detail_opened",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_detail_opened",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "opening_id": "80000000-0000-4000-8000-000000000001",
+          "source": "direct_link",
+          "save_available": true
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_activity_checkpoint",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_activity_checkpoint",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "opening_id": "80000000-0000-4000-8000-000000000001",
+          "active_ms": 300001,
+          "final": true
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_detail_closed",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_detail_closed",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "opening_id": "80000000-0000-4000-8000-000000000001",
+          "active_ms": 1
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_compared",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_compared",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "other_dish_id": "50000000-0000-4000-8000-000000000001",
+          "other_dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "comparison_id": "90000000-0000-4000-8000-000000000001",
+          "compare_action": "start",
+          "save_available": true
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_saved",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_saved",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "save_origin": "toast",
+          "save_surface": "dish_detail",
+          "shortlist_size": 1
+        }
+      }
+    },
+    {
+      "name": "invalid_dish_unsaved",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "dish_unsaved",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "dish_id": "50000000-0000-4000-8000-000000000001",
+          "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+          "unsave_surface": "toast",
+          "shortlist_size": 0
+        }
+      }
+    },
+    {
+      "name": "invalid_shortlist_viewed",
+      "event": {
+        "schema_version": "observation.v2",
+        "event_id": "10000000-0000-4000-8000-000000000001",
+        "type": "shortlist_viewed",
+        "session_id": "20000000-0000-4000-8000-000000000001",
+        "producer_id": "30000000-0000-4000-8000-000000000001",
+        "local_sequence": 1,
+        "occurred_at": "2026-10-24T16:00:00.000Z",
+        "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+        "payload": {
+          "shortlist_size": 1,
+          "dish_id": "50000000-0000-4000-8000-000000000001"
+        }
+      }
+    }
+  ],
+  "delivery_cases": [
+    {
+      "name": "first_delivery",
+      "requests": [
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        }
+      ],
+      "expected_statuses": [["accepted"]]
+    },
+    {
+      "name": "identical_retry",
+      "requests": [
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        },
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        }
+      ],
+      "expected_statuses": [["accepted"], ["accepted"]]
+    },
+    {
+      "name": "cross_request_conflict_deferred_to_consumer",
+      "requests": [
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        },
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 2
+              }
+            }
+          ]
+        }
+      ],
+      "expected_statuses": [["accepted"], ["accepted"]]
+    },
+    {
+      "name": "mixed_batch",
+      "requests": [
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": "observation.v2",
+              "event_id": "10000000-0000-4000-8000-000000000001",
+              "type": "menu_viewed",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 1,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "entry_source": "qr"
+              }
+            },
+            {
+              "schema_version": 2,
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        }
+      ],
+      "expected_statuses": [["accepted", "rejected"]]
+    },
+    {
+      "name": "integer_schema_version",
+      "requests": [
+        {
+          "contract": "observation.v2",
+          "events": [
+            {
+              "schema_version": 2,
+              "event_id": "10000000-0000-4000-8000-000000000007",
+              "type": "dish_saved",
+              "session_id": "20000000-0000-4000-8000-000000000001",
+              "producer_id": "30000000-0000-4000-8000-000000000001",
+              "local_sequence": 7,
+              "occurred_at": "2026-10-24T16:00:00.000Z",
+              "publication_revision_id": "40000000-0000-4000-8000-000000000001",
+              "payload": {
+                "dish_id": "50000000-0000-4000-8000-000000000001",
+                "dish_revision_id": "60000000-0000-4000-8000-000000000001",
+                "save_origin": "direct",
+                "save_surface": "dish_detail",
+                "shortlist_size": 1
+              }
+            }
+          ]
+        }
+      ],
+      "expected_statuses": [["rejected"]]
+    }
+  ]
+}

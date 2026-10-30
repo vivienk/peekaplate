@@ -8,6 +8,11 @@ import {
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
+  ObservationBatchV2Schema,
+  ObservationConflictQueueMessageSchema,
+  ObservationQueueMessageSchema,
+  ObservationReceiptSchema,
+  ObservationV2Schema,
   RetrievalRequestSchema,
   SourceReferenceSchema,
 } from './index';
@@ -408,5 +413,365 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       retrieved_at: '2026-10-22T20:00:00.000Z',
     };
     expect(SourceReferenceSchema.safeParse(refWithProvenance).success).toBe(true);
+  });
+});
+
+describe('observation.v2 contract', () => {
+  const base = {
+    schema_version: 'observation.v2',
+    event_id: '10000000-0000-4000-8000-000000000001',
+    type: 'dish_saved',
+    session_id: '20000000-0000-4000-8000-000000000001',
+    producer_id: '30000000-0000-4000-8000-000000000001',
+    local_sequence: 1,
+    occurred_at: '2026-10-24T16:00:00.000Z',
+    publication_revision_id: '40000000-0000-4000-8000-000000000001',
+    payload: {
+      dish_id: '50000000-0000-4000-8000-000000000001',
+      dish_revision_id: '60000000-0000-4000-8000-000000000001',
+      save_origin: 'direct',
+      save_surface: 'dish_detail',
+      shortlist_size: 1,
+    },
+  };
+
+  it('accepts the string schema version and approved Save fields', () => {
+    expect(ObservationV2Schema.parse(base)).toEqual(base);
+    expect(
+      ObservationBatchV2Schema.parse({ contract: 'observation.v2', events: [base] }).events,
+    ).toHaveLength(1);
+  });
+
+  it('accepts and rejects a fixture for every P0 event payload', () => {
+    const dishId = base.payload.dish_id;
+    const dishRevisionId = base.payload.dish_revision_id;
+    const otherDishId = '50000000-0000-4000-8000-000000000002';
+    const otherDishRevisionId = '60000000-0000-4000-8000-000000000002';
+    const exposureId = '70000000-0000-4000-8000-000000000001';
+    const openingId = '80000000-0000-4000-8000-000000000001';
+    const fixtures = [
+      {
+        valid: { ...base, type: 'menu_viewed', payload: { entry_source: 'qr' } },
+        invalid: { ...base, type: 'menu_viewed', payload: { entry_source: 'table_qr' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 1,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 0,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'menu_card',
+            from_exposure_id: exposureId,
+            nav_relation: 'none',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'direct_link',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_000,
+            final: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_001,
+            final: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: { dish_id: dishId, dish_revision_id: dishRevisionId, opening_id: openingId },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 1,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: otherDishId,
+            other_dish_revision_id: otherDishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: dishId,
+            other_dish_revision_id: dishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: base,
+        invalid: { ...base, payload: { ...base.payload, save_origin: 'toast' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'compare_view',
+            shortlist_size: 0,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'toast',
+            shortlist_size: 0,
+          },
+        },
+      },
+      {
+        valid: { ...base, type: 'shortlist_viewed', payload: { shortlist_size: 1 } },
+        invalid: {
+          ...base,
+          type: 'shortlist_viewed',
+          payload: { shortlist_size: 1, dish_id: dishId },
+        },
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      expect(ObservationV2Schema.safeParse(fixture.valid).success).toBe(true);
+      expect(ObservationV2Schema.safeParse(fixture.invalid).success).toBe(false);
+    }
+  });
+
+  it('rejects numeric versions, client authority, unknown fields and removed event types', () => {
+    for (const candidate of [
+      { ...base, schema_version: 2 },
+      { ...base, venue_id: base.event_id },
+      { ...base, received_at: base.occurred_at },
+      { ...base, type: 'ingredient_viewed' },
+      { ...base, payload: { ...base.payload, search_text: 'soup' } },
+    ]) {
+      expect(ObservationV2Schema.safeParse(candidate).success).toBe(false);
+    }
+  });
+
+  it('keeps Save, Unsave and Undo in the approved event vocabulary', () => {
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        payload: { ...base.payload, save_origin: 'undo', save_surface: 'saved_screen' },
+      }).success,
+    ).toBe(true);
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        type: 'dish_unsaved',
+        payload: {
+          dish_id: base.payload.dish_id,
+          dish_revision_id: base.payload.dish_revision_id,
+          unsave_surface: 'saved_screen',
+          shortlist_size: 0,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        type: 'dish_unsaved',
+        payload: {
+          dish_id: base.payload.dish_id,
+          dish_revision_id: base.payload.dish_revision_id,
+          unsave_surface: 'compare_view',
+          shortlist_size: 0,
+        },
+      }).success,
+    ).toBe(true);
+    expect(ObservationV2Schema.safeParse({ ...base, type: 'undo' }).success).toBe(false);
+  });
+});
+
+describe('observation receipt contract', () => {
+  const eventId = '10000000-0000-4000-8000-000000000001';
+
+  it('accepts only coherent accepted, retry and rejected dispositions', () => {
+    for (const receipt of [
+      { event_id: eventId, status: 'accepted', reason_code: null, retryable: false },
+      {
+        event_id: eventId,
+        status: 'accepted',
+        reason_code: 'duplicate_in_batch',
+        retryable: false,
+      },
+      { event_id: eventId, status: 'retry', reason_code: null, retryable: true },
+      {
+        event_id: eventId,
+        status: 'rejected',
+        reason_code: 'schema_invalid',
+        retryable: false,
+      },
+      { event_id: null, status: 'rejected', reason_code: 'schema_invalid', retryable: false },
+    ]) {
+      expect(ObservationReceiptSchema.safeParse(receipt).success).toBe(true);
+    }
+  });
+
+  it('rejects contradictory status, reason and retryability combinations', () => {
+    for (const receipt of [
+      { event_id: eventId, status: 'accepted', reason_code: 'schema_invalid', retryable: false },
+      { event_id: eventId, status: 'accepted', reason_code: null, retryable: true },
+      { event_id: null, status: 'accepted', reason_code: null, retryable: false },
+      { event_id: eventId, status: 'retry', reason_code: 'too_old', retryable: true },
+      { event_id: eventId, status: 'retry', reason_code: null, retryable: false },
+      { event_id: null, status: 'retry', reason_code: null, retryable: true },
+      { event_id: eventId, status: 'rejected', reason_code: null, retryable: false },
+      { event_id: eventId, status: 'rejected', reason_code: 'too_old', retryable: true },
+      { event_id: null, status: 'rejected', reason_code: 'too_old', retryable: false },
+    ]) {
+      expect(ObservationReceiptSchema.safeParse(receipt).success).toBe(false);
+    }
+  });
+});
+
+describe('observation Queue contracts', () => {
+  const event = {
+    schema_version: 'observation.v2' as const,
+    event_id: '10000000-0000-4000-8000-000000000001',
+    type: 'shortlist_viewed' as const,
+    session_id: '20000000-0000-4000-8000-000000000001',
+    producer_id: '30000000-0000-4000-8000-000000000001',
+    local_sequence: 2,
+    occurred_at: '2026-10-24T16:00:00.000Z',
+    publication_revision_id: '40000000-0000-4000-8000-000000000001',
+    payload: { shortlist_size: 2 },
+  };
+
+  it('validates the flattened observation payload against its event type', () => {
+    const message = {
+      kind: 'observation.v2',
+      tenantId: '50000000-0000-4000-8000-000000000001',
+      eventId: event.event_id,
+      sessionId: event.session_id,
+      schemaVersion: event.schema_version,
+      occurredAt: event.occurred_at,
+      type: event.type,
+      authorizedPublicationId: event.publication_revision_id,
+      producerId: event.producer_id,
+      localSequence: event.local_sequence,
+      payload: event.payload,
+      firstReceivedAt: '2026-10-24T16:00:01.000Z',
+    };
+    expect(ObservationQueueMessageSchema.safeParse(message).success).toBe(true);
+    expect(
+      ObservationQueueMessageSchema.safeParse({
+        ...message,
+        payload: { shortlist_size: 2, search_text: 'private' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('bounds conflict evidence to validated events or fixed safe metadata', () => {
+    const message = {
+      kind: 'observation_conflict.v1',
+      tenantId: '50000000-0000-4000-8000-000000000001',
+      eventId: event.event_id,
+      authorizedPublicationId: event.publication_revision_id,
+      firstReceivedAt: '2026-10-24T16:00:01.000Z',
+      reasonCode: 'event_id_conflict',
+      copies: [
+        { validation: 'valid', canonicalChecksum: 'a'.repeat(64), event },
+        {
+          validation: 'invalid',
+          canonicalChecksum: 'b'.repeat(64),
+          metadata: {
+            schemaVersionStatus: 'other',
+            eventType: 'shortlist_viewed',
+            occurredAt: event.occurred_at,
+            publicationStatus: 'matches_authority',
+            payloadObject: true,
+          },
+        },
+      ],
+    };
+    expect(ObservationConflictQueueMessageSchema.safeParse(message).success).toBe(true);
+    expect(
+      ObservationConflictQueueMessageSchema.safeParse({
+        ...message,
+        copies: [message.copies[0], { ...message.copies[1], search_text: 'private' }],
+      }).success,
+    ).toBe(false);
   });
 });

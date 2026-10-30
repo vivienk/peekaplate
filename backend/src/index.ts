@@ -3,6 +3,9 @@ import {
   CreateDishRevisionSchema,
   DishRevisionScopeSchema,
   type HealthResponse,
+  ObservationBatchV2Schema,
+  type ObservationQueueEnvelope,
+  ObservationQueueEnvelopeSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   VenueScopeSchema,
@@ -12,6 +15,14 @@ import { bodyLimit } from 'hono/body-limit';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
 import { CommandError, createDishRevision } from './dish-command';
+import {
+  createMenuTokenVerifier,
+  type MenuAuthority,
+  MenuTokenAuthenticationError,
+  MenuTokenAuthorizationError,
+  MenuTokenUnavailableError,
+} from './menu-token';
+import { ingestObservations } from './observation-ingest';
 import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
@@ -24,6 +35,14 @@ export type Bindings = {
   POSTHOG_PROJECT_ID?: string;
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
+  MENU_TOKEN_ISSUER?: string;
+  OBSERVATION_QUEUE?: { send(message: ObservationQueueEnvelope): Promise<void> };
+  OBSERVATION_RATE_LIMITER_MINUTE?: {
+    limit(input: { key: string }): Promise<{ success: boolean }>;
+  };
+  OBSERVATION_RATE_LIMITER_BURST?: {
+    limit(input: { key: string }): Promise<{ success: boolean }>;
+  };
 };
 
 type Dependencies = {
@@ -43,6 +62,12 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
+  verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
+  consumeObservationRateLimit?: (
+    jti: string,
+    env: Bindings,
+  ) => Promise<{ allowed: boolean; retryAfterSeconds: number }>;
+  enqueueObservation?: (message: ObservationQueueEnvelope, env: Bindings) => Promise<void>;
 };
 
 export async function authorizeStaffVenue(
@@ -85,6 +110,25 @@ export async function authorizeStaffVenue(
 }
 
 let verifier: { issuer: string; local: boolean; verify: ReturnType<typeof createStaffVerifier> };
+let menuVerifier: {
+  issuer: string;
+  local: boolean;
+  verify: ReturnType<typeof createMenuTokenVerifier>;
+};
+export async function consumeJtiRateLimit(
+  jti: string,
+  env: Bindings,
+): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  if (!env.OBSERVATION_RATE_LIMITER_MINUTE || !env.OBSERVATION_RATE_LIMITER_BURST) {
+    throw new MenuTokenUnavailableError();
+  }
+  const minute = await env.OBSERVATION_RATE_LIMITER_MINUTE.limit({ key: jti });
+  const burst = await env.OBSERVATION_RATE_LIMITER_BURST.limit({ key: jti });
+  if (!minute.success) return { allowed: false, retryAfterSeconds: 60 };
+  if (!burst.success) return { allowed: false, retryAfterSeconds: 10 };
+  return { allowed: true, retryAfterSeconds: 1 };
+}
+
 const dependencies: Dependencies = {
   async verify(authorization, env) {
     if (!env.AUTH_ISSUER) throw new AuthUnavailableError();
@@ -97,6 +141,30 @@ const dependencies: Dependencies = {
       };
     }
     return verifier.verify(authorization);
+  },
+  async verifyMenu(authorization, env) {
+    if (!env.MENU_TOKEN_ISSUER) throw new MenuTokenUnavailableError();
+    const local = env.APP_ENV === 'local';
+    if (
+      !menuVerifier ||
+      menuVerifier.issuer !== env.MENU_TOKEN_ISSUER ||
+      menuVerifier.local !== local
+    ) {
+      menuVerifier = {
+        issuer: env.MENU_TOKEN_ISSUER,
+        local,
+        verify: createMenuTokenVerifier({
+          issuer: env.MENU_TOKEN_ISSUER,
+          allowLocalIssuer: local,
+        }),
+      };
+    }
+    return menuVerifier.verify(authorization);
+  },
+  consumeObservationRateLimit: consumeJtiRateLimit,
+  async enqueueObservation(message, env) {
+    if (!env.OBSERVATION_QUEUE) throw new MenuTokenUnavailableError();
+    await env.OBSERVATION_QUEUE.send(ObservationQueueEnvelopeSchema.parse(message));
   },
   async execute(actorId, venueId, input, env) {
     const connectionString =
@@ -158,6 +226,10 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
   );
+  app.use(
+    '/observations',
+    bodyLimit({ maxSize: 32_768, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
+  );
   app.get('/team/analytics/:kind', async (c) => {
     const env = c.env ?? {};
     if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
@@ -185,6 +257,47 @@ export function createApp(services: Dependencies = dependencies) {
     }
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
+  });
+  app.post('/observations', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!services.verifyMenu || !services.consumeObservationRateLimit) {
+      throw new MenuTokenUnavailableError();
+    }
+    const authority = await services.verifyMenu(authorization, c.env ?? {});
+    const rate = await services.consumeObservationRateLimit(authority.jti, c.env ?? {});
+    if (!rate.allowed) {
+      c.header('Retry-After', String(Math.max(1, Math.ceil(rate.retryAfterSeconds))));
+      return c.json({ error: 'rate_limited' }, 429);
+    }
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'invalid_envelope' }, 400);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_envelope' }, 400);
+    }
+    if (
+      body &&
+      typeof body === 'object' &&
+      Array.isArray((body as Record<string, unknown>).events) &&
+      ((body as Record<string, unknown>).events as unknown[]).length > 25
+    ) {
+      return c.json({ error: 'body_too_large' }, 413);
+    }
+    const parsed = ObservationBatchV2Schema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_envelope' }, 400);
+    if (!services.enqueueObservation) throw new MenuTokenUnavailableError();
+    const enqueueObservation = services.enqueueObservation;
+    const result = await ingestObservations(parsed.data.events, authority, {
+      enqueue: (message) => enqueueObservation(message, c.env ?? {}),
+    });
+    if (result.queueUnavailable) return c.json({ error: 'queue_unavailable' }, 503);
+    return c.json(result.response);
   });
   app.post('/venues/:venueId/dishes/:dishId/revisions', async (c) => {
     const authorization = c.req.header('Authorization');
@@ -254,6 +367,11 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
+    if (error instanceof MenuTokenAuthenticationError)
+      return c.json({ error: 'unauthorized' }, 401);
+    if (error instanceof MenuTokenAuthorizationError) return c.json({ error: 'forbidden' }, 403);
+    if (error instanceof MenuTokenUnavailableError)
+      return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
     // Never log bearer tokens, request bodies or database errors containing row data.

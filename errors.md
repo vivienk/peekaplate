@@ -496,6 +496,31 @@ after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 rea
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
 
+## October 24 DATA-01 endpoint local verification
+
+```json
+{"id":"OBS-20261024-DATA01-LOOPBACK-001","status":"environment_blocked","area":"local-test-runtime","observation":"The broader backend/contracts Vitest run passed 43 tests but 12 existing auth tests could not reach their ephemeral 127.0.0.1 JWKS fixture; every failure was EACCES and surfaced as AuthUnavailableError.","cause":"This sandbox blocks the test process from connecting to its loopback JWKS server; the failures are outside the DATA-01 diff and do not establish an auth regression.","prevention":"Run the full suite in CI or a local environment that permits bounded loopback test servers; keep focused contract/endpoint/menu-token tests independent of network fixtures.","regression":"Focused DATA-01 tests passed 29/29, contracts and backend typechecks passed, and the scoped Biome check passed. The full auth suite remains environment-blocked here."}
+```
+```json
+{"kind":"resolution","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"status":"resolved_for_scoped_change","regression":"After privacy-safe conflict evidence and shared Queue contract fixes, focused DATA-01 tests pass 31/31; contracts/backend typechecks and scoped Biome checks pass. The unrelated loopback JWKS restriction remains an environment limit for the broader auth suite."}
+```
+```json
+{"kind":"verification-update","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"result":"Focused DATA-01 tests now pass 32/32 after adding raw-in-memory checksum conflict detection for two invalid same-metadata copies; no raw rejected field is placed in the Queue contract. Contracts/backend typechecks remain green."}
+```
+```json
+{"kind":"verification-update","references":{"id":"OBS-20261024-DATA01-LOOPBACK-001"},"result":"Focused DATA-01 tests pass 33/33 after replacing recursive canonical JSON with an explicit-stack implementation and adding a 12,000-level invalid JSON regression. Contracts/backend typechecks and scoped Biome checks pass."}
+```
+
+## October 25 DATA-01 verification tooling and rate-limit boundary
+
+```json
+{"id":"OBS-20261025-DATA01-TOOLS-001","sources":["backend/src/index.test.ts","packages/contracts/src/index.test.ts"],"observation":"The sandboxed pnpm workspace registration and default linker could not create Windows symlinks, and the first Vitest run could not rename its transform cache under the sandbox temp directory.","prevention":"Use a repository-local pnpm store with the hoisted linker, provide the backend package a generated local copy of the workspace contract package when workspace symlinks are unavailable, and point TEMP/TMP at a repository-local ignored directory.","status":"resolved","regression":"Direct repository binaries ran the focused contracts, endpoint and menu-token suites: 50/50 passed. Both TypeScript projects and scoped Biome passed.","area":"local-test-runtime"}
+```
+
+```json
+{"id":"OBS-20261025-DATA01-RATELIMIT-001","followup":"Review whether approximate per-location protection is acceptable for the staging pilot. If strict cross-location enforcement is required, approve and design a per-jti Durable Object limiter before activation.","observation":"Cloudflare Workers Rate Limiting bindings support only 10- or 60-second approximate per-location windows. They are permissive and eventually consistent, so 60/60 plus 10/10 bindings keyed by verified token jti do not prove a strict global token bucket with burst capacity 10.","sources":["backend/src/index.ts","backend/src/index.test.ts","backend/wrangler.jsonc"],"status":"open","regression":"Local dependency tests verify both bindings receive only the verified jti and return bounded Retry-After values. Hosted behavior is not yet tested.","area":"observation-rate-limit"}
+```
+
 ## ERR-20261025-PREVIEW-001 · Local verification prerequisites
 
 Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
@@ -523,6 +548,12 @@ The sandbox blocked the authentication test HTTP listener; rerunning with local 
 
 PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T19:14:22.047Z","exitCode":1}
+```
+
+Resolution: all 212 Vitest assertions passed with four optional skips, and 46 of 47 repository script tests passed. The sole failure is the known Windows sandbox denial when the regression itself attempts to create a symlink; rerunning `node --test --test-skip-pattern="rejects artifact symlinks" scripts/preview.test.mjs` passed the remaining 12 preview tests. Linux CI remains the required evidence for the symlink case.
 # ERR-20261026-PREVIEW-REPAIR
 
 PR #41 merged successfully into develop, but automatic previews did not run:
@@ -706,3 +737,29 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-30T00:33:10.052Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-30T00:34:34.171Z","exitCode":1}
+```
+
+## ERR-20261029-DATA01-RESPONSE-TYPES
+
+The first full typecheck after merging current `develop` into PR #40 failed
+because TypeScript 6 treats `Response.json()` as `unknown`; five DATA-01 tests
+accessed `receipts` directly. This was a test typing regression, not a runtime
+receipt or Queue behavior failure.
+
+The tests now parse successful receipt bodies with the shared
+`ObservationReceiptBatchSchema` before asserting their fields. Backend
+typecheck and the focused 18-case HTTP-boundary suite pass after the change.
+The later full test attempt reached 213 passing tests and then failed only
+because the Codex sandbox denied loopback JWKS connections with `EACCES`.
+Re-run `pnpm check` in the contributor's ordinary PowerShell before push; do
+not weaken response types or authentication behavior to accommodate the
+sandbox restriction.

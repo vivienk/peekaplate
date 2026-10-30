@@ -13,17 +13,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, dish-intent, team analytics and bounded menu-retrieval schemas remain strict. observation.v2 now matches the October 24 P0 field table, including exposure_id/viewport_50pct_1s, opening-linked 5-minute activity, comparison fields, Save/Unsave and shortlist events; every P0 type has valid/invalid fixture coverage. Queue envelopes remain a strict observation.v2 or privacy-safe observation_conflict.v1 union.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/fixtures/observation.v2/fixtures.json",
+        "packages/contracts/fixtures/observation.v2/README.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "32a52c3019a41d431f15945ea83b2625e0f45c05accf1c01c1dec7bdcafab6a6"
     },
     {
       "id": "tokens",
@@ -104,7 +106,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded.",
+      "summary": "Hono Worker retains staff JWT/membership-checked commands, bounded collaborator staging reads and VIS-04 retrieval protections. It adds the local POST /observations boundary with 30-minute token authority, jti-keyed approximate Cloudflare limits, exact 32 KiB and 24 h/5 min bounds, coherent receipts, privacy-safe conflict quarantine and Queue-confirmed acceptance. Main also supplies the deployed direct-DO extraction host with signed tenant/job/hash grants and isolated Python credentials. Live observation activation, consumer/database writes, full ingestion/report acceptance and hosted verification remain pending; observation/menu queues stay paused. Publication is not implemented on this branch and JWT logout revocation remains expiry-bounded.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -116,6 +118,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/menu-token.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/observation-ingest.ts",
+        "backend/src/observation-fixtures.test.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -152,7 +158,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4ec280d24260cb2416d9f83022d78fba8db724fe304a2af308ba0e9bcaa12d66"
+      "sourceFingerprint": "d4b617072676c0d46e8b5bcafd467a46db0ed16bf6e4c62747bccbe419e5668b"
     },
     {
       "id": "database",
@@ -444,12 +450,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
     },
     {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
+      "summary": "DATA-01 shared observation.v2 fixtures cover nine event schemas and delivery/retry/mixed/version cases. Six fixture tests verify receipt reasons, retry flags and Queue identity. Cross-request duplicate/conflict handling remains consumer-owned. Reconciled latest develop documentation and retained both error histories.",
       "modules": [
         "contracts",
         "backend"
       ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
+      "next": "Require Linux CI for this merged head; Windows full check was limited by preview symlink permission. TRK-01 consumes pinned fixtures; hosted Queue/R2/database acceptance remains separate."
     }
   ]
 }
