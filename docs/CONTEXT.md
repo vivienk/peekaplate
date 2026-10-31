@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, diner observation canonical schemas (ObservationV2 with 9 P0 events, canonicalJson, sha256), Queue message contracts (ObservationQueueMessageSchema, ObservationConflictQueueMessageSchema with multi-copy conflict schema), and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced; HTTP command authority fields are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "0d46192dca37bd0fd8229ffe31927d653c77353a928614975eea058dbc829197"
     },
     {
       "id": "tokens",
@@ -109,16 +109,30 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded. Bounded retrieval supports linked PDF discovery, native page-aware text evidence and IPv4-mapped IPv6 SSRF checks within source/context limits; extraction and publication remain separate.",
+      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance, context limits, and bounded PDF text evidence. Direct-DO extraction host, named image and idle timeout with signed tenant/job/hash source grants are configured; Python never gets signing/database credentials. Protected OCR key passed standalone verification. Staging config adds OBSERVATION_QUEUE, OBSERVATION_ARCHIVE_BUCKET, and queue consumer binding with DLQ. Queue consumer processes observation.v2 and multi-copy observation_conflict.v1 envelopes with canonical checksum validation, safe quarantine path for invalid conflict copies, microsecond-accurate time classification matching Postgres CHECK constraints, and tenant-isolated Postgres persistence. Ingestion route and live publication remain planned.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
+        "backend/src/consumer/canonical-json.test.ts",
+        "backend/src/consumer/canonical-json.ts",
+        "backend/src/consumer/consumer.integration.ts",
+        "backend/src/consumer/database.ts",
+        "backend/src/consumer/index.test.ts",
+        "backend/src/consumer/index.ts",
+        "backend/src/consumer/queue-consumer.test.ts",
+        "backend/src/consumer/queue-consumer.ts",
+        "backend/src/consumer/r2-storage.test.ts",
+        "backend/src/consumer/r2-storage.ts",
+        "backend/src/consumer/types.ts",
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/extraction-capability.ts",
+        "backend/src/extraction-host.test.ts",
+        "backend/src/extraction-host.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
         "backend/src/retrieval/api.test.ts",
@@ -138,14 +152,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
+        "backend/tsconfig.json",
+        "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
         "docs/menu-ingestion-infrastructure.md",
-        "scripts/menu-ingestion-infra.test.mjs",
-        "backend/src/extraction-host.ts",
-        "backend/src/extraction-host.test.ts",
-        "backend/wrangler.extraction.jsonc",
-        "backend/src/extraction-capability.ts",
-        "backend/tsconfig.json"
+        "scripts/menu-ingestion-infra.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -157,7 +168,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7ae9ff0f5719ed8a8b7a75cc937403d83584f7600ec791a9fa69e9e42a2e088c"
+      "sourceFingerprint": "72bd0ae3cb7ea2cf08962c35106048753fe33d7014d22826562867b6cc3bbab8"
     },
     {
       "id": "database",
@@ -374,6 +385,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-DATA-02 hardened the observation queue consumer and resolved two reproducible P2 findings: invalid conflict copies now have a durable quarantine path in R2 and PostgreSQL observation_conflict without raw unvalidated field leakage or accepted-fact promotion, and timestamp classification now preserves microsecond precision to match PostgreSQL's timestamptz future_time CHECK constraint. Consumer strictly validates ObservationQueueMessage and multi-copy ObservationConflictQueueMessage envelopes, archives copies to deterministic R2 keys, enforces tenant-isolated Postgres transactions with app.tenant_id, and wires createQueueHandler into Worker index.ts with DLQ retry policy.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "Re-review on feat/s3-data-02-queue-consumer. Await integration dependency order (#32 -> #50 -> #40 -> #31) and complete full archive-to-DB/ACK/recovery acceptance with migrated database before enabling collection on staging queue."
+    },
+    {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
       "modules": [
         "database",
@@ -449,15 +468,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Teeyansh can use staging runtime bindings without receiving internal secret values. Configure approved existing OCR/AI provider credentials when ready, finish/review PR45 and its migrations/report adapter, align600s transport with700s processing plus cold start, then run controlled authorized upload→Queue→service→private report→database drafts→ACK and failure/tenant tests before unpausing. No production or restaurant-data tests were performed."
-    },
-    {
-      "summary": "Paid activation resolved Container eligibility. Existing protected API run succeeded and menu aliases are live. Actual container registration then rejected default scheduling; prepared directDO runtime repair with RED/GREEN config guard and startup/readiness/concurrency/failure-recovery tests. Dev-only official Worker types are pinned to mature October26 release; latest October28 was blocked by dependency maturity policy, which remains unchanged.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
     }
   ]
 }
