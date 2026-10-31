@@ -1,5 +1,45 @@
 # Local and staging operations
 
+## OCR credential activation — October 28, 2026 (Phoenix)
+
+`OCR_SPACE_API_KEY` is configured in GitHub's existing protected `staging`
+environment and as a secret binding on `peekaplate-extraction-staging`. No key
+value was committed, saved in operator files or printed. Existing host bindings,
+service/signing credentials, image, database and production resources were unchanged.
+The secret update created extraction Worker version
+`7b505396-501e-4d46-870f-d6dbd87655ee`; its application code remains main `7bbe0d3`.
+
+One fresh call through the existing Python OCR adapter to OCR.space Engine 3
+completed in **4.654 seconds** with no cache hit. It read all three expected
+synthetic dish names and prices. This was an OCR-only provider check from the
+operator's machine, not a hosted `/extract` or Queue/database acceptance test.
+The [service handoff](menu-ingestion-infrastructure.md#ocr-credential-and-provider-check--october-28-2026)
+records the configuration boundary and remaining AI/migration/consumer work.
+Both menu queues remain paused; no workflow or production deployment was triggered.
+
+## VIS-01 hosted activation — October 27, 2026 (Phoenix)
+
+Workers Paid entitlement, the existing menu Queue/DLQ and private R2 bucket are
+verified. The protected API release at main 58838e1 succeeded and menu aliases
+are live. The scheduler repair in [PR #60](https://github.com/vivienk/peekaplate/pull/60)
+deployed the extraction host from main `7bbe0d3729503f69a05c0f360ed09a41b9ecaf08`, reusing the
+already-uploaded image and existing host/application namespace. It uses direct
+Durable Object scheduling, standard-1 capacity and a native 60-second idle
+timeout. Fixed-name routing selects one instance; it is not a billing cap.
+
+Service/signing secrets and the API URL are configured privately. Hosted Python
+health, authorization denials, signed private source reads, unsupported-input
+rejection, hash conflict and exact cleanup passed. The separate genuine remote
+Queue→R2→ACK/retry→DLQ test passed and left both queues empty and paused.
+Team APIs still return 200 with the operator's own identity and 401 anonymously.
+No provider keys, Supabase changes or production release were added.
+
+Earlier local-Worker R2 claims are corrected: forceLocal meant those R2 steps
+were local even though Queue delivery was real. The corrected remote tests and
+exact component versions are in the [hosted acceptance record](menu-ingestion-infrastructure.md#hosted-acceptance--october-27-2026-phoenix).
+Real OCR/AI extraction and PR #45's full upload/report/database/ACK acceptance
+remain separate. Keep real submissions off until those pass.
+
 ## Observation infrastructure — October 24, 2026
 
 Created only the missing staging source Queue and DLQ in the existing account, reused private `peekaplate-staging-assets`, and verified source retry-to-DLQ routing with HTTP pull consumers. The complete synthetic repeat at `2026-10-24T17:30:36.147Z` passed archive/readback before ACK, initial delivery plus three retries, DLQ arrival and exact probe cleanup. A separate real R2 concurrency check allowed exactly one create-only writer and preserved its bytes on conflicting attempts. Provider readback confirms both Queues empty and paused, 24-hour retention, `r2.dev` disabled, no custom domain and no CORS rule. No production resource, application consumer, database fact or unfinished PR changed.

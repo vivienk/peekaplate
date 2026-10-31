@@ -14,6 +14,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.5.15
         version: 2.5.15
+      '@cloudflare/containers':
+        specifier: 0.3.7
+        version: 0.3.7
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
@@ -41,19 +44,31 @@ importers:
       pg:
         specifier: 8.23.1
         version: 8.23.1
+      unpdf:
+        specifier: 1.8.1
+        version: 1.8.1
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 5.20261026.1
+        version: 5.20261026.1
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
       wrangler:
         specifier: 4.149.0
-        version: 4.149.0(@types/node@24.19.2)
+        version: 4.149.0(@cloudflare/workers-types@5.20261026.1)(@types/node@24.19.2)
 
   frontend/console:
     dependencies:
       '@peekaplate/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
+      '@peekaplate/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -79,6 +94,12 @@ importers:
       '@peekaplate/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
+      '@peekaplate/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
     devDependencies:
       vite:
         specifier: 8.3.4
@@ -95,6 +116,14 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+
+  packages/tokens: {}
+
+  packages/ui:
+    dependencies:
+      '@peekaplate/tokens':
+        specifier: workspace:*
+        version: link:../tokens
 
 packages:
 
@@ -160,6 +189,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@cloudflare/containers@0.3.7':
+    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
+
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
@@ -202,6 +234,9 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-types@5.20261026.1':
+    resolution: {integrity: sha512-E+KMLXOMip7uzfkFYoSjAF0n0+VFkK2KFU0Md/PM3JkPpC9Km0/YAoDttkmxAoZLGbK1wQRAFg2IJtyZkTBCHg==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -1056,6 +1091,15 @@ packages:
   unenv@2.0.0-rc.24:
     resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
 
+  unpdf@1.8.1:
+    resolution: {integrity: sha512-xkURhy2SoGpOIH0a1gLHNkASPIQYonadDJs2AQwPEfUakafeD9EA1WTWWsaR++gfTCXJpV27W7tU1nXuk82UKQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
+
   vite@8.3.4:
     resolution: {integrity: sha512-IftLE8phJhdNRIGNEV4JCCvfNScoZQVfcXaN8TQropWGJtOHcu+iAB9pHcuGvmEb/kddw0LBe/jS8ztdC6xdiQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1227,6 +1271,8 @@ snapshots:
   '@biomejs/cli-win32-x64@2.5.15':
     optional: true
 
+  '@cloudflare/containers@0.3.7': {}
+
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
   '@cloudflare/unenv-preset@2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261006.1)':
@@ -1249,6 +1295,8 @@ snapshots:
 
   '@cloudflare/workerd-windows-64@1.20261006.1':
     optional: true
+
+  '@cloudflare/workers-types@5.20261026.1': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -1900,6 +1948,8 @@ snapshots:
     dependencies:
       pathe: 2.0.3
 
+  unpdf@1.8.1: {}
+
   vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.2):
     dependencies:
       lightningcss: 1.33.0
@@ -1952,7 +2002,7 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20261006.1
       '@cloudflare/workerd-windows-64': 1.20261006.1
 
-  wrangler@4.149.0(@types/node@24.19.2):
+  wrangler@4.149.0(@cloudflare/workers-types@5.20261026.1)(@types/node@24.19.2):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20261006.1)
@@ -1963,6 +2013,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       workerd: 1.20261006.1
     optionalDependencies:
+      '@cloudflare/workers-types': 5.20261026.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - '@types/node'

@@ -1,5 +1,10 @@
 import { createServer, type Server } from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
+import {
+  DishRevisionSchema,
+  MenuApprovalSchema,
+  MenuPublicationSchema,
+} from '@peekaplate/contracts';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -352,7 +357,7 @@ describe('real PostgreSQL staff command', () => {
     const dish = crypto.randomUUID();
     const response = await request(dish);
     expect(response.status).toBe(200);
-    const result = await response.json();
+    const result = DishRevisionSchema.parse(await response.json());
     expect(result).toMatchObject({ dishId: dish, version: 1, name: 'Test dish' });
     expect(await counts(dish)).toEqual({ events: 1, projections: 1, receipts: 1, outbox: 1 });
     const persisted = await admin.query(
@@ -682,7 +687,7 @@ describe('real PostgreSQL menu publication commands', () => {
     await registerReviewSubject(menuId, approvalInput);
     const approvalResponse = await requestPublication(menuId, 'approvals', approvalInput);
     expect(approvalResponse.status).toBe(200);
-    const approval = await approvalResponse.json();
+    const approval = MenuApprovalSchema.parse(await approvalResponse.json());
 
     const publishCommand = {
       commandId: crypto.randomUUID(),
@@ -691,7 +696,7 @@ describe('real PostgreSQL menu publication commands', () => {
     };
     const publishedResponse = await requestPublication(menuId, 'publications', publishCommand);
     expect(publishedResponse.status).toBe(200);
-    const published = await publishedResponse.json();
+    const published = MenuPublicationSchema.parse(await publishedResponse.json());
     expect(published).toMatchObject({
       menuId,
       approvalId: approval.approvalId,
@@ -749,7 +754,9 @@ describe('real PostgreSQL menu publication commands', () => {
     const menuId = crypto.randomUUID();
     const approvalInput = approvalCommand();
     await registerReviewSubject(menuId, approvalInput);
-    const approval = await (await requestPublication(menuId, 'approvals', approvalInput)).json();
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', approvalInput)).json(),
+    );
     const publishCommand = {
       commandId: crypto.randomUUID(),
       expectedVersion: 0,
@@ -776,10 +783,12 @@ describe('real PostgreSQL menu publication commands', () => {
     const secondInput = approvalCommand(1);
     await registerReviewSubject(menuId, firstInput);
     await registerReviewSubject(menuId, secondInput);
-    const firstApproval = await (await requestPublication(menuId, 'approvals', firstInput)).json();
-    const secondApproval = await (
-      await requestPublication(menuId, 'approvals', secondInput)
-    ).json();
+    const firstApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', firstInput)).json(),
+    );
+    const secondApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', secondInput)).json(),
+    );
     const responses = await Promise.all([
       requestPublication(menuId, 'publications', {
         commandId: crypto.randomUUID(),
