@@ -1,3 +1,5 @@
+export * from './owner-ai';
+
 import { z } from 'zod';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);

@@ -523,6 +523,11 @@ The sandbox blocked the authentication test HTTP listener; rerunning with local 
 
 PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T19:27:42.930Z","exitCode":1}
+```
+
 # ERR-20261026-PREVIEW-REPAIR
 
 PR #41 merged successfully into develop, but automatic previews did not run:
@@ -709,5 +714,26 @@ develop's retrieval implementation to make a release merge compile.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T19:38:40.134Z","exitCode":1}
+```
+
+## 2026-10-30 — AI-01 develop-sync verification environment limit
+
+`pnpm verify context:check docs:check` could not start the checks in the fresh
+Windows agent worktree: pnpm's automatic dependency installation failed with
+EPERM while registering the project through a store symlink. No application
+test failed in this attempt. Direct `node scripts/context.mjs check` and
+`node scripts/check-docs.mjs` passed after context refresh; they do not replace
+the complete CI run. Run frozen installation and `pnpm check` in a capable
+environment, then verify the exact pushed merge revision in GitHub CI.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-29T14:41:51.693Z","exitCode":1}
 ```
+
+## 2026-10-31 — AI-01 reconciliation verification limits
+
+The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
+
+Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
