@@ -84,7 +84,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic demo built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for staging or production; final visual integration remains separately reviewed.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -94,7 +94,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/foundations/Input.tsx",
         "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
-        "tests/e2e/input.spec.ts"
+        "tests/e2e/input.spec.ts",
+        "frontend/console/vite.config.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -104,7 +105,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "edd7eb2813fac4cbfc7fbcfbce673d741cd830b924dbbfb324d365f114abdc38"
+      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
     },
     {
       "id": "backend",
@@ -252,7 +253,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/preview.test.mjs",
         "docs/menu-ingestion-infrastructure.md",
         "scripts/menu-ingestion-infra.test.mjs",
-        "pnpm-lock.yaml"
+        "pnpm-lock.yaml",
+        "scripts/console-preview-demos.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -263,7 +265,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "757c24f97bb673257ea746b43f30f8c329f758c16fe8a4d960a2de48f1678670"
     },
     {
       "id": "agents",
@@ -374,6 +376,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR previews now include the synthetic console component demo (foundations.html) so design can review real components from the preview link. The console Vite config adds the page only when PEEKAPLATE_PREVIEW_DEMOS=true, which only deploy-preview.yml's build step sets; staging and production builds stay index-only. The demo is labelled synthetic, noindex, loads no analytics, and the preview headers already block API calls. Approved by Sai. scripts/console-preview-demos.test.mjs builds the console both ways and checks the workflow sets the flag nowhere else.",
+      "modules": [
+        "console",
+        "delivery"
+      ],
+      "next": "After merge, re-run a console PR's preview (for example #74) and confirm /foundations.html loads, then share it with Rania. Future demo pages need the same flag and labelling."
+    },
+    {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
       "modules": [
         "database",
@@ -411,16 +421,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
-    },
-    {
-      "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
-      "modules": [
-        "tokens",
-        "ui",
-        "diner",
-        "console"
-      ],
-      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
     },
     {
       "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
