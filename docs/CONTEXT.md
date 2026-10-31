@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-02.1 adds the shared Save state (frontend/diner/src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that removes withdrawn dishes and keeps incomplete ones, and stale-tab-safe writes; no screen uses it yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite shell, readable without JavaScript; optional consent-gated PostHog shell views; the dish intent adapter is tested but awaits real controls. S3-DIN-01.1: a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback without backfill, a reload re-check that drops withdrawn and keeps incomplete dishes, and stale-tab-safe writes. S3-DIN-02.2: mountSaveHeart/mountSaveBadge/mountToastArea with latest-removal-only Undo, 5s/3s toasts and dish_saved/dish_unsaved payloads only for committed writes of complete dishes (injected sender until track() lands). No screen uses the menu or Save modules yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -83,7 +83,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save-state.ts",
         "frontend/diner/src/save/save-state.test.ts",
         "frontend/diner/src/save/fake-storage.ts",
-        "tests/e2e/save.spec.ts"
+        "tests/e2e/save.spec.ts",
+        "frontend/diner/src/save/events.ts",
+        "frontend/diner/src/save/feedback.ts",
+        "frontend/diner/src/save/feedback.test.ts",
+        "frontend/diner/src/save/mount.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -92,7 +96,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "21fab36baa27ccff1cbf885741671ee422955043021bdf035a6003678e6ec89c"
+      "sourceFingerprint": "2791dcbb761de146b85b1ac50b74cb35727c894bf1ef37d66e6d22be57bd66f1"
     },
     {
       "id": "console",
@@ -380,7 +384,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "diner"
       ],
-      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
+      "next": "S3-DIN-02.2 (PR #75, stacked on #68) adds the heart, badge, Undo, toasts and Save event payloads; switch its injected sender to track() once #65 is on the branch, apply the Figma toast frames, and have screens mount the heart, badge and .pp-toast-area. Then the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
     },
     {
       "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
