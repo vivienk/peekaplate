@@ -294,20 +294,20 @@ export function mountMenuScreen(container: HTMLElement): void {
         { send: track },
       );
 
-    if (detailActivityHandler) {
-      container.removeEventListener('click', detailActivityHandler);
-      container.removeEventListener('scroll', detailActivityHandler);
-      container.removeEventListener('keydown', detailActivityHandler);
-      container.removeEventListener('pointerdown', detailActivityHandler);
-      detailActivityHandler = null;
-    }
+      if (detailActivityHandler) {
+        container.removeEventListener('click', detailActivityHandler);
+        container.removeEventListener('scroll', detailActivityHandler);
+        container.removeEventListener('keydown', detailActivityHandler);
+        container.removeEventListener('pointerdown', detailActivityHandler);
+        detailActivityHandler = null;
+      }
 
-    const reportActivity = () => openingClock?.activity();
-    detailActivityHandler = reportActivity;
-    container.addEventListener('click', reportActivity);
-    container.addEventListener('scroll', reportActivity);
-    container.addEventListener('keydown', reportActivity);
-    container.addEventListener('pointerdown', reportActivity);
+      const reportActivity = () => openingClock?.activity();
+      detailActivityHandler = reportActivity;
+      container.addEventListener('click', reportActivity);
+      container.addEventListener('scroll', reportActivity);
+      container.addEventListener('keydown', reportActivity);
+      container.addEventListener('pointerdown', reportActivity);
     }
   };
 
