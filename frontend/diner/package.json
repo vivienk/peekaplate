@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "vite": "8.3.4"
+    "vite": "8.3.5"
   },
   "dependencies": {
     "@peekaplate/analytics": "workspace:*"

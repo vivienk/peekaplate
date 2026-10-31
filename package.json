@@ -27,12 +27,12 @@
     "check": "node scripts/verify.mjs lint typecheck test context:check docs:check"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
-    "@biomejs/biome": "2.5.15",
+    "@axe-core/playwright": "4.14.0",
+    "@biomejs/biome": "2.6.3",
     "@cloudflare/containers": "0.3.7",
-    "@playwright/test": "1.64.0",
+    "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",
     "typescript": "6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
