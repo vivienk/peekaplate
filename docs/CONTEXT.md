@@ -104,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer delays active-lease redelivery through the remaining 15-minute fence (+1s) and ACKs terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
+      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF (including IPv4-mapped IPv6), native page-aware PDF text evidence, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer delays active-lease redelivery through the remaining 15-minute fence (+1s) and ACKs terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -162,7 +162,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8bfaf924850ac592891c7e9d653a7a6bff96285a32d9ee39c4506dd30176c544"
+      "sourceFingerprint": "be7c484ef2d783f209861f522a5a1de295912efe69103ab1998855cc236378f0"
     },
     {
       "id": "database",
@@ -265,7 +265,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "096d7707f2ab210d0502e8dc6641eed7eb3dbcd9a9a3863295dba7e2be6b51fb"
+      "sourceFingerprint": "a928f9320aba6314afe38a22a8a625efd738b646c41b22542e4fd7983e9a0091"
     },
     {
       "id": "agents",
@@ -376,21 +376,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "PR #45 recovery retry now uses the Queue per-message delay derived from the remaining trusted PostgreSQL lease plus one second, rather than immediate redelivery. Focused unit and real-PostgreSQL integration assertions cover the delayed early delivery and the later post-expiry extraction/drafts/ACK recovery; the delay preserves the consumer retry budget. Temporary pull consumer settings remain infrastructure-only and are not the future Worker policy.",
-      "modules": [
-        "backend",
-        "database"
-      ],
-      "next": "Keep the menu queues paused. Review the Worker consumer binding, single-message/concurrency limits and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
-    },
-    {
-      "summary": "Resolved outstanding review findings on PR #45 (Hemu): (1) Separated active leases from terminal jobs in Queue batch processing, invoking msg.retry() on running leases to enable recovery of abandoned workers after lease expiration while acknowledging terminal completions. (2) Bound report storage write ownership to the claimed generation using an attempt-specific immutable key (reports/<tenant>/<job>/attempts/<claim>/extraction.json), preventing stale resume overwrites across two-worker lease expiration races. (3) Enforced 400 invalid_json on malformed nonempty JSON approval requests before command execution, keeping drafts pending with zero writes. (4) Required client-stable commandId in ApproveDishDraftRequestSchema, enforcing identical retry replay, conflicting reuse rejection (409), and staff membership revocation (403) within atomic transactions. Added comprehensive PostgreSQL/HTTP integration tests.",
+      "summary": "Resolved outstanding review findings on PR #45 (Hemu): (1) Lease-aware redelivery delay derived from remaining PostgreSQL lease plus safety second, preventing Queue retry budget exhaustion before lease expiry. (2) Generation-scoped report storage via immutable result_storage_key protecting from stale worker overwrites. (3) 400 invalid_json on malformed nonempty JSON approval requests. (4) Required client-stable commandId in ApproveDishDraftRequestSchema for idempotent approval replay, conflict rejection, and atomic dish creation. Comprehensive unit and real PostgreSQL regression assertions pass.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Reviewers verify resolved review threads and regression evidence across the four recovery/approval findings. Staging queue consumer unpausing and live extraction deployment remain gated on operator approval and container deployment."
+      "next": "Keep menu queues paused. Review Worker consumer binding, batch/concurrency limits, and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
+    },
+    {
+      "summary": "October31 PR29 reconciliation: retained bounded PDF retrieval and current develop tokens/UI, deployment foundations and PR22 owner-metric tests. The only merge conflict was the context graph; target responsibilities and the PDF source paths are both preserved.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Run actual Worker retrieval tests, builds, database checks and applicable CI on this reconciled head, then merge PR29. Representative menu relevance and hosted extraction/publication acceptance remain separate."
     },
     {
       "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
