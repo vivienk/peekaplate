@@ -172,7 +172,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, candidate_id, subcategory, category_page_number, price_text, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS, retry constraint behavior, and composite FK behavior, connection reuse, and the standalone owner-metric SQL oracle testing NULL-ID rejection, retry/conflict handling and the ten-session fixture boundary.",
+      "summary": "Private Postgres venue/event/command/outbox, actor memberships, tenant projections, and ingestion jobs/drafts use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP-ready startup; hosted checks are separate. Private PostHog export is append-only: 8 raw copies/4 deduplicated events. Oct 22 audit verifies migration 20261021130000, staging scope 675372, restricted execution, denied runtime raw access. Owner-metric oracle covers NULL-ID rejection, retries/conflicts, ten-session floor; canonical report integration is separate. Canonical index/conflicts plus typed facts and tenant-restricted owner views are defined. Forward migration 20261026220000 adds menu_ingestion_jobs and dish_drafts with lease fencing, exact numeric prices, subcategory, page, price_text, and ON DELETE SET NULL on dish_current. pgTAP tests cover ingestion RLS, retry constraints, composite FKs. Report suppression and consumer integration are separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -186,6 +186,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261021130000_team_analytics.sql",
         "tests/db/team-analytics.sql",
         "tests/db/owner_metrics.sql",
+        "migrations/20261023120000_observation_index.sql",
+        "tests/db/observations.sql",
+        "migrations/20261026120000_observation_facts.sql",
+        "tests/db/observation-facts.sql",
         "migrations/20261026220000_menu_ingestion_drafts.sql",
         "tests/db/menu_ingestion.sql"
       ],
@@ -193,10 +197,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0013-posthog-export-boundary.md",
-        "docs/adr/0014-team-analytics-access.md"
+        "docs/adr/0014-team-analytics-access.md",
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "30efb834fa5dfef4a009b8faebe3453b2d65efbffeb726a98ef021736af0e564"
+      "sourceFingerprint": "dac9648807a377882f7e1cad95f7ed1cb23a14264294e854fad8f90bb860bb04"
     },
     {
       "id": "measurement",
@@ -390,6 +395,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Keep menu queues paused. Review Worker consumer binding, batch/concurrency limits, and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
     },
     {
+      "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
+      "modules": [
+        "database",
+        "delivery"
+      ],
+      "next": "Require green exact-head CI before merging PR50. Reconcile the canonical producer and consumer against these tables/views; wire owner-report queries separately. Hosted migration and live reporting acceptance remain separate operator work."
+    },
+    {
+      "summary": "October 31 PR32 reconciliation: preserved current develop owner-metric tests, PDF retrieval, Input and design-token work while adding canonical observation index/conflict schema and its 29 SQL assertions. Only the shared context conflicted; migration/test bytes remain unchanged from the previously reviewed c2a1331. Local verification passed 237 unit tests, 57 script tests, 113 SQL assertions and 20 database integration tests.",
+      "modules": [
+        "database",
+        "delivery"
+      ],
+      "next": "Require green exact-head CI before merging PR32, then retarget/reconcile PR50. Hosted migrations and Queue consumer activation remain separate operator work."
+    },
+    {
       "summary": "October31 PR30 reconciliation: preserved current develop tokens, shared component CSS, PDF retrieval and owner-metric tests while retaining the accessible Input foundation and dev-only synthetic demo. Context and frontend-design conflicts retain both intents; no input behavior or owner-report schema changed.",
       "modules": [
         "console",
@@ -449,24 +470,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Teeyansh can use staging runtime bindings without receiving internal secret values. Configure approved existing OCR/AI provider credentials when ready, finish/review PR45 and its migrations/report adapter, align600s transport with700s processing plus cold start, then run controlled authorized upload→Queue→service→private report→database drafts→ACK and failure/tenant tests before unpausing. No production or restaurant-data tests were performed."
-    },
-    {
-      "summary": "Paid activation resolved Container eligibility. Existing protected API run succeeded and menu aliases are live. Actual container registration then rejected default scheduling; prepared directDO runtime repair with RED/GREEN config guard and startup/readiness/concurrency/failure-recovery tests. Dev-only official Worker types are pinned to mature October26 release; latest October28 was blocked by dependency maturity policy, which remains unchanged.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
-    },
-    {
-      "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
     }
   ]
 }
