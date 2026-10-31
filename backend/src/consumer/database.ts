@@ -63,11 +63,28 @@ export function parseIsoToMicroseconds(isoString: string): bigint {
     if (fractionStr.length <= 6) {
       totalMicros += BigInt(fractionStr.padEnd(6, '0'));
     } else {
-      // PostgreSQL timestamptz rounds to nearest microsecond for >6 digits
+      // PostgreSQL timestamptz parses fractional seconds to microsecond precision
+      // using round-to-nearest, ties-to-even (banker's rounding).
       let micros = BigInt(fractionStr.slice(0, 6));
-      const nextChar = fractionStr[6];
-      if (nextChar !== undefined && nextChar >= '5') {
-        micros += 1n;
+      const seventhChar = fractionStr[6];
+      if (seventhChar !== undefined) {
+        if (seventhChar > '5') {
+          micros += 1n;
+        } else if (seventhChar === '5') {
+          // Check if there are any non-zero digits after the 7th character (e.g. .00000051)
+          const hasNonZeroAfter = fractionStr
+            .slice(7)
+            .split('')
+            .some((c) => c !== '0');
+          if (hasNonZeroAfter) {
+            micros += 1n;
+          } else {
+            // Exact tie (.5 µs): round to nearest EVEN microsecond
+            if (micros % 2n !== 0n) {
+              micros += 1n;
+            }
+          }
+        }
       }
       totalMicros += micros;
     }
@@ -199,13 +216,19 @@ export class PostgresObservationRepository implements ObservationRepository {
 
       // Time window check as defined in ADR 0015 and PR #32:
       // first_received_at - 24 hours <= occurred_at <= first_received_at + 5 minutes
-      // Preserves microsecond precision consistent with PostgreSQL timestamptz and CHECK constraint
-      const timeClassification = classifyObservationTimeWindow(
-        record.occurredAt,
-        record.firstReceivedAt,
+      // Evaluated using PostgreSQL's authoritative timestamptz comparison, guaranteeing
+      // 100% agreement with the table's CHECK constraint.
+      const timeCheck = await this.client.query<{ reason_code: 'too_old' | 'future_time' | null }>(
+        `SELECT
+           CASE
+             WHEN $1::timestamptz < $2::timestamptz - interval '24 hours' THEN 'too_old'
+             WHEN $1::timestamptz > $2::timestamptz + interval '5 minutes' THEN 'future_time'
+             ELSE NULL
+           END AS reason_code`,
+        [record.occurredAt, record.firstReceivedAt],
       );
-      const disposition = timeClassification.disposition;
-      const reasonCode = timeClassification.reasonCode ?? null;
+      const reasonCode = timeCheck.rows[0]?.reason_code ?? null;
+      const disposition = reasonCode !== null ? 'rejected' : 'accepted';
 
       // Insert canonical index row (append-only: no UPDATE or DELETE)
       await this.client.query(

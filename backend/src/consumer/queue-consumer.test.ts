@@ -2136,6 +2136,33 @@ describe('QueueConsumer', () => {
       expect(result.reasonCode).toBeUndefined();
     });
 
+    it('1b. accepts sub-microsecond timestamps at the 5-minute boundary: .0000004Z and .0000005Z (banker round-to-even)', () => {
+      // .0000004 rounds down to .000000 -> accepted
+      const res04 = classifyObservationTimeWindow('2026-10-30T10:05:00.0000004Z', baseReceived);
+      expect(res04.disposition).toBe('accepted');
+      expect(res04.reasonCode).toBeUndefined();
+
+      // .0000005: 7th digit 5 with even 6th digit 0 rounds to nearest even (.000000) -> accepted
+      const res05 = classifyObservationTimeWindow('2026-10-30T10:05:00.0000005Z', baseReceived);
+      expect(res05.disposition).toBe('accepted');
+      expect(res05.reasonCode).toBeUndefined();
+
+      // .00000050: trailing zero still exact tie -> accepted
+      const res050 = classifyObservationTimeWindow('2026-10-30T10:05:00.00000050Z', baseReceived);
+      expect(res050.disposition).toBe('accepted');
+      expect(res050.reasonCode).toBeUndefined();
+
+      // .0000006: 7th digit 6 > 5 rounds up to .000001 -> rejected as future_time
+      const res06 = classifyObservationTimeWindow('2026-10-30T10:05:00.0000006Z', baseReceived);
+      expect(res06.disposition).toBe('rejected');
+      expect(res06.reasonCode).toBe('future_time');
+
+      // .00000051: non-zero digit after 5 rounds up to .000001 -> rejected as future_time
+      const res051 = classifyObservationTimeWindow('2026-10-30T10:05:00.00000051Z', baseReceived);
+      expect(res051.disposition).toBe('rejected');
+      expect(res051.reasonCode).toBe('future_time');
+    });
+
     it('2. permanently rejects timestamp five minutes plus one microsecond as future_time', () => {
       const occurred = '2026-10-30T10:05:00.000001Z';
       const result = classifyObservationTimeWindow(occurred, baseReceived);
@@ -2235,6 +2262,29 @@ describe('QueueConsumer', () => {
       expect(stored).toBeDefined();
       expect(stored!.disposition).toBe('rejected');
       expect(stored!.reasonCode).toBe('future_time');
+    });
+
+    it('9. proves halfway fractional timestamp (.0000005Z) is accepted and durably persisted as accepted, not permanently rejected', async () => {
+      const halfwayEvent = createValidObservationMsg({
+        firstReceivedAt: baseReceived,
+        occurredAt: '2026-10-30T10:05:00.0000005Z', // 7th digit 5 rounds to even 0 -> exactly 5 minutes
+      });
+
+      const msg = new FakeQueueMessage('msg-halfway-micro', halfwayEvent);
+      const batch = new FakeMessageBatch('obs-queue', [msg]);
+
+      const result = await consumer.processBatch(batch);
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(result.deadLettered).toBe(0);
+      expect(msg.acked).toBe(true);
+      expect(msg.retried).toBe(false);
+
+      // Verify canonical index row was stored with accepted disposition and NO reason code
+      const stored = repository.index.get(`${T1}:${E1}`);
+      expect(stored).toBeDefined();
+      expect(stored!.disposition).toBe('accepted');
+      expect(stored!.reasonCode).toBeUndefined();
     });
   });
 });

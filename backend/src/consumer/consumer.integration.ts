@@ -670,6 +670,79 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       });
       expect(exactFiveMinOutcome.disposition).toBe('accepted');
 
+      // 4b. Sub-microsecond boundary: .0000004Z is accepted at the inclusive boundary in real PostgreSQL
+      const micro04EventId = crypto.randomUUID();
+      const micro04Outcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: micro04EventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: '2026-10-30T10:05:00.0000004Z',
+        firstReceivedAt: exactReceivedAt,
+        checksum: '1111111111111111111111111111111111111111111111111111111111111114',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/30/${micro04EventId}.json`,
+        payload: {},
+      });
+      expect(micro04Outcome.disposition).toBe('accepted');
+
+      const micro04Row = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [micro04EventId],
+      );
+      expect(micro04Row.rows[0].disposition).toBe('accepted');
+      expect(micro04Row.rows[0].reason_code).toBeNull();
+
+      // 4c. Sub-microsecond boundary: .0000005Z is accepted at the inclusive boundary
+      // after PostgreSQL's round-to-even microsecond semantics (reported halfway regression)
+      const micro05EventId = crypto.randomUUID();
+      const micro05Outcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: micro05EventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: '2026-10-30T10:05:00.0000005Z',
+        firstReceivedAt: exactReceivedAt,
+        checksum: '1111111111111111111111111111111111111111111111111111111111111115',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/30/${micro05EventId}.json`,
+        payload: {},
+      });
+      expect(micro05Outcome.disposition).toBe('accepted');
+
+      const micro05Row = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [micro05EventId],
+      );
+      expect(micro05Row.rows[0].disposition).toBe('accepted');
+      expect(micro05Row.rows[0].reason_code).toBeNull();
+
+      // 4d. Sub-microsecond boundary: .0000006Z is classified as future_time and persisted
+      const micro06EventId = crypto.randomUUID();
+      const micro06Outcome = await repo.persistCanonical({
+        tenantId: tenant1,
+        eventId: micro06EventId,
+        schemaVersion: 'observation.v2',
+        eventType: 'dish_viewed',
+        authorizedPublicationId: pubId1,
+        occurredAt: '2026-10-30T10:05:00.0000006Z',
+        firstReceivedAt: exactReceivedAt,
+        checksum: '1111111111111111111111111111111111111111111111111111111111111116',
+        r2ArchiveKey: `raw/observations/${tenant1}/2026/10/30/${micro06EventId}.json`,
+        payload: {},
+      });
+      expect(micro06Outcome.disposition).toBe('rejected');
+      if (micro06Outcome.disposition === 'rejected') {
+        expect(micro06Outcome.reasonCode).toBe('future_time');
+      }
+
+      const micro06Row = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [micro06EventId],
+      );
+      expect(micro06Row.rows[0].disposition).toBe('rejected');
+      expect(micro06Row.rows[0].reason_code).toBe('future_time');
+
       // 5. Finding 2 regression: 5 minutes plus one microsecond is classified as future_time
       // and successfully persisted in PostgreSQL observation_index without triggering SQLSTATE 23514
       const microFutureEventId = crypto.randomUUID();
@@ -741,6 +814,59 @@ describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () 
       );
       expect(microOldRow.rows[0].disposition).toBe('rejected');
       expect(microOldRow.rows[0].reason_code).toBe('too_old');
+
+      // 8. End-to-end QueueConsumer with real PostgreSQL: .0000005Z is accepted and durably persisted
+      // as an accepted observation, proving no valid event is rejected by rounding disagreement
+      const r2 = new FakeR2ArchiveStorage();
+      const consumer = new QueueConsumer({ r2Storage: r2, repository: repo });
+      const e2eEventId = crypto.randomUUID();
+      const e2eDishId = crypto.randomUUID();
+      const e2ePayload = {
+        dish_id: e2eDishId,
+        dish_revision_id: crypto.randomUUID(),
+        exposure_id: crypto.randomUUID(),
+        surface: 'menu_list' as const,
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s' as const,
+      };
+      const envelope = {
+        kind: 'observation.v2' as const,
+        tenantId: tenant1,
+        eventId: e2eEventId,
+        sessionId: crypto.randomUUID(),
+        producerId: crypto.randomUUID(),
+        localSequence: 1,
+        schemaVersion: 'observation.v2' as const,
+        type: 'dish_viewed' as const,
+        authorizedPublicationId: pubId1,
+        occurredAt: '2026-10-30T10:05:00.0000005Z',
+        firstReceivedAt: exactReceivedAt,
+        payload: e2ePayload,
+      };
+
+      const msg = new TestQueueMessage(`msg-e2e-${e2eEventId}`, envelope);
+      const batch = {
+        queue: 'observation-queue',
+        messages: [msg],
+        ackAll: () => {},
+        retryAll: () => {},
+      };
+
+      const result = await consumer.processBatch(batch);
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(result.deadLettered).toBe(0);
+      expect(msg.ackCount).toBe(1);
+      expect(msg.retryCount).toBe(0);
+
+      // Verify row in real PostgreSQL
+      const e2eRow = await admin.query(
+        'SELECT disposition, reason_code FROM app_private.observation_index WHERE event_id = $1',
+        [e2eEventId],
+      );
+      expect(e2eRow.rows.length).toBe(1);
+      expect(e2eRow.rows[0].disposition).toBe('accepted');
+      expect(e2eRow.rows[0].reason_code).toBeNull();
     } finally {
       await client.end();
     }
