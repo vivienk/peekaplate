@@ -44,7 +44,7 @@ def page_images(source, directory, *, page_numbers=None):
     if len(data)!=source.size_bytes or hashlib.sha256(data).hexdigest()!=source.sha256:
         raise ExtractionError("Image source snapshot does not match its hash and size.")
     folder=Path(directory)/"pages"
-    folder.mkdir(mode=0o700)
+    folder.mkdir(mode=0o700, exist_ok=True)
     images=[]
     errors=[]
 

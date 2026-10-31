@@ -26,25 +26,13 @@ from peekaplate_processing.timing import measure
 from peekaplate_processing.vision import image_source, normalize_page_selection, page_images
 from peekaplate_processing.review_suggestions import private_result
 
+from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result
 
-def configured_llm():
-    a2_names = ("a2agent_api_key", "a2agent_url", "a2agent_api_MODEL")
-    nara_names = ("NARA_ROUTER_KEY", "NARA_ROUTER_URL", "NARA_ROUTER_MODEL")
-    names = nara_names if any(os.environ.get(n) for n in nara_names) else ("MENU_AI_API_KEY", "MENU_AI_API_URL", "MENU_AI_MODEL")
-    if any(os.environ.get(n) for n in a2_names):
-        names = a2_names
-    key, endpoint, model = (os.environ.get(n, "").strip() for n in names)
-    if not all((key, endpoint, model)):
-        raise ExtractionError(f"Set {', '.join(names)} in .env.")
-    base_url = endpoint.removesuffix("/").removesuffix("/chat/completions")
-    try:
-        url = urlsplit(base_url)
-        if url.scheme != "https" or not url.hostname or url.username or url.password or url.query or url.fragment: raise ValueError
-    except ValueError:
-        raise ExtractionError("Use an HTTPS model endpoint without embedded credentials.") from None
-    extra = {"reasoning": {"enabled": False}, "provider": {"require_parameters": True}} if url.hostname == "openrouter.ai" else {}
-    reasoning = {"reasoning_effort": "none"} if url.hostname == "router.bynara.id" else {}
-    return ChatOpenAI(**reasoning, model=model, api_key=key, base_url=base_url, timeout=120, max_retries=0, max_tokens=16384, extra_body=extra)
+from peekaplate_processing.model_providers import create_model_client, create_cascading_clients, PROVIDER_REGISTRY
+
+
+def configured_llm(timeout=120, provider=None):
+    return create_model_client(provider_name=provider, timeout=timeout)
 
 
 def saved_page_text(source, pages_json, *, recovery=False):
@@ -111,7 +99,7 @@ def saved_page_text(source, pages_json, *, recovery=False):
     )
 
 
-def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None):
+def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None):
     if target_pages is not None:
         target_pages=normalize_page_selection(target_pages,limit=4)
         if pages_json is None or input_mode=="image" or type(max_model_requests) is not int or not 1 <= max_model_requests <= 4:
@@ -130,16 +118,56 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         raise ExtractionError("LLM deadline must be greater than zero and at most 300 seconds.")
     directory = Path(run_dir)
     if directory.exists() or directory.is_symlink(): raise ExtractionError("Choose a new run directory.")
-    if llm is None: llm = configured_llm()
+    if llm is None: llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     started=time.perf_counter()
     timings={}
     report=None
     completed=False
     try:
+        fallback_warnings = []
+        prepared_images = []
+        if input_mode == "vision_v4":
+            print("Running V4 direct multimodal extraction with native bounding boxes...", file=sys.stderr, flush=True)
+            with measure(timings, "acquisition"):
+                report = image_source(source)
+            with measure(timings, "source_images"):
+                images, image_errors = page_images(report.source, directory)
+                prepared_images = images
+            report.errors.extend(image_errors)
+
+            # Provider cascade: explicit provider or cascade: google_studio -> openrouter -> a2agent
+            client_candidates = [(provider, llm)] if provider else create_cascading_clients(timeout=llm_timeout)
+            if not client_candidates:
+                client_candidates = [("default", llm)]
+
+            v4_success = False
+            for p_name, p_client in client_candidates:
+                try:
+                    print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
+                    with measure(timings, "llm_wall"):
+                        v4_dishes = extract_vision_v4(p_client, images, timeout=llm_timeout)
+                    if not v4_dishes:
+                        raise ExtractionError("Vision extraction produced 0 dishes.")
+                    v4_report = build_v4_result(report.source, images, v4_dishes, datetime.fromtimestamp(started, tz=timezone.utc))
+                    v4_report.extraction_model = getattr(p_client, "model_name", None)
+                    with measure(timings, "extraction_write"):
+                        save_json(v4_report.model_dump(mode="json"), directory / "extraction.json")
+                    report = v4_report
+                    completed = True
+                    v4_success = True
+                    return report
+                except Exception as prov_err:
+                    print(f"Provider '{p_name}' failed ({prov_err}); trying next provider in cascade...", file=sys.stderr, flush=True)
+                    fallback_warnings.append(f"Provider '{p_name}' failed: {prov_err}")
+
+            if not v4_success:
+                print("All vision providers failed; cleanly falling back to OCR mode...", file=sys.stderr, flush=True)
+                input_mode = "ocr_image"
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
             report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
+        report.warnings.extend(fallback_warnings)
         if target_pages is not None:
             by_number={segment.page_number:segment for segment in report.segments}
             if any(number not in by_number or by_number[number].status!="ready" or by_number[number].error is not None or not by_number[number].text.strip() for number in target_pages):
@@ -158,10 +186,10 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
             save_json(report.model_dump(mode="json"), directory / "pages.json")
         report.extraction_mode="ai"
         report.extraction_model=getattr(llm, "model_name", None)
-        images=[]
-        if input_mode!="ocr" and report.source:
-            with measure(timings,"source_images"):
-                images,image_errors=page_images(report.source,directory) if target_pages is None else page_images(report.source,directory,page_numbers=target_pages)
+        images = prepared_images
+        if input_mode != "ocr" and report.source and not images:
+            with measure(timings, "source_images"):
+                images, image_errors = page_images(report.source, directory) if target_pages is None else page_images(report.source, directory, page_numbers=target_pages)
             report.errors.extend(image_errors)
         pages=[{"page_number":segment.page_number,"segment_id":segment.segment_id,
                 "text":segment.text if segment.status=="ready" and segment.error is None else "",
@@ -258,12 +286,13 @@ def main(argv=None):
     parser.add_argument("--no-llm-cache", action="store_true", help="Make fresh model requests instead of reusing complete cached candidates.")
     parser.add_argument("--no-ocr-cache", action="store_true", help="Skip OCR cache reads and writes for fresh OCR requests.")
     parser.add_argument("--no-ocr-table", action="store_true", help="Disable OCR.space table recognition (isTable); enabled by default.")
+    parser.add_argument("--provider", choices=list(sorted(PROVIDER_REGISTRY.keys())), default=None, help="Explicit model provider (e.g. google_studio, openrouter, a2agent, openai, nara).")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
     recovery={} if args.target_pages is None and args.max_model_requests is None else {
         "target_pages":args.target_pages,"max_model_requests":args.max_model_requests}
     try:
-        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table,**recovery)
+        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table,provider=args.provider,**recovery)
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")

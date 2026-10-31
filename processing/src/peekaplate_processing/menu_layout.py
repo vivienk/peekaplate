@@ -598,8 +598,8 @@ def _matches_remaining(text, remaining):
     bt = " ".join(text.casefold().split())
     if bt == remaining or remaining.startswith(bt + " "):
         return True
-    return bt.startswith(remaining + " ") and bool(_PRICE.fullmatch(bt[len(remaining):].strip()))
-
+    tail = re.sub(r"^[.\s…·•–—]+", "", bt[len(remaining):]).strip()
+    return bt.startswith(remaining + " ") and bool(_PRICE.fullmatch(tail))
 
 def _headings(name, runs):
     normalized = " ".join(name.casefold().split())
@@ -611,9 +611,12 @@ def _headings(name, runs):
             match = matches[0] if matches else None
             if match and _MARKUP.fullmatch(joined[:match.start()]):
                 tail = joined[match.end():].strip()
+                clean_tail = re.sub(r"^[.\s…·•–—]+", "", tail).strip()
                 # No trailing commas, descriptions, or digits from inside the name.
-                if not tail or _PRICE.fullmatch(tail):
-                    yield parts, _union(parts, joined[:match.end()].strip()), tail
+                if not clean_tail:
+                    yield parts, _union(parts, joined[:match.end()].strip()), ""
+                elif _PRICE.fullmatch(clean_tail):
+                    yield parts, _union(parts, joined[:match.end()].strip()), clean_tail
                 break
             prefix = " ".join(_MARKUP.sub("", joined, count=1).casefold().split())
             if not prefix or not normalized.startswith(prefix + " "):

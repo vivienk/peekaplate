@@ -25,7 +25,7 @@ from peekaplate_processing.menu_layout import box_price_text_is_missing, corrobo
 from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
 
-INPUT_MODES=("ocr", "ocr_image", "image")
+INPUT_MODES=("ocr", "ocr_image", "image", "vision_v4")
 MAX_VISION_BATCH_BYTES=16_000_000
 
 
@@ -574,8 +574,17 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                 except (ExtractionError, OSError):
                     finding["warnings"].append("Model candidates could not be cached; future runs may repeat this request.")
             section_numbers=[section.page_number for section in parsed.sections]
-            if len(set(section_numbers)) != len(section_numbers) or any(number not in pages for number in section_numbers):
-                raise ExtractionError("Section metadata has duplicate or out-of-batch pages.")
+            if any(number not in pages for number in section_numbers):
+                raise ExtractionError("Section metadata cites a page outside its batch.")
+            # Keep at most one section entry per page
+            seen_sec_pages = set()
+            deduped_sections = []
+            for sec in parsed.sections:
+                if sec.page_number not in seen_sec_pages:
+                    seen_sec_pages.add(sec.page_number)
+                    deduped_sections.append(sec)
+            parsed.sections = deduped_sections
+            section_numbers = [sec.page_number for sec in parsed.sections]
             finding["sections"]=[section.model_dump() for section in parsed.sections]
             for number,text in pages.items():
                 if text.strip() and number not in section_numbers:
