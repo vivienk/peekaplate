@@ -167,7 +167,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, candidate_id, subcategory, category_page_number, price_text, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS, retry constraint behavior, and composite FK behavior, and connection reuse.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships, tenant-scoped projections, and menu ingestion jobs and unreviewed dish drafts remain protected by forced RLS. Forward migration 20261026220000 establishes menu_ingestion_jobs and dish_drafts with worker lease fencing, exact decimal numeric prices, candidate_id, subcategory, category_page_number, price_text, and column-specific ON DELETE SET NULL referencing dish_current. Tests cover schema upgrade, atomic commands, pgTAP suite for ingestion RLS, retry constraint behavior, and composite FK behavior, connection reuse, and the standalone owner-metric SQL oracle testing NULL-ID rejection, retry/conflict handling and the ten-session fixture boundary.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -180,6 +180,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
         "tests/db/team-analytics.sql",
+        "tests/db/owner_metrics.sql",
         "migrations/20261026220000_menu_ingestion_drafts.sql",
         "tests/db/menu_ingestion.sql"
       ],
@@ -190,7 +191,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "8473e0447aaf5ab34f1b8b5eb2b201b3e05140104bf3094b218cb1ead2a1c5fd"
+      "sourceFingerprint": "30efb834fa5dfef4a009b8faebe3453b2d65efbffeb726a98ef021736af0e564"
     },
     {
       "id": "measurement",
@@ -392,6 +393,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Reviewers verify resolved review threads and regression evidence across the four recovery/approval findings. Staging queue consumer unpausing and live extraction deployment remain gated on operator approval and container deployment."
     },
     {
+      "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
+      "modules": [
+        "database"
+      ],
+      "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
+    },
+    {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
       "modules": [
         "tokens",
@@ -453,16 +461,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
-    },
-    {
-      "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
-      "modules": [
-        "processing",
-        "backend",
-        "contracts",
-        "delivery"
-      ],
-      "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
     }
   ]
 }
