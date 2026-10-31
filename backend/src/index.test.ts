@@ -552,9 +552,7 @@ describe('observation.v2 HTTP boundary', () => {
     };
 
     const appInstance = createApp({ ...baseServices, enqueueObservation });
-    const response = await appInstance.fetch(
-      request([validCopy, feb31Copy, overflowFractionCopy]),
-    );
+    const response = await appInstance.fetch(request([validCopy, feb31Copy, overflowFractionCopy]));
     expect(response.status).toBe(200);
 
     expect(enqueueObservation).toHaveBeenCalledTimes(1);
