@@ -45,14 +45,16 @@ export function startOpeningClock(
   let cumulative = 0;
   let sequence = 0;
   let ended = false;
-  let interval: number | undefined;
+  let interval: ReturnType<typeof globalThis.setInterval> | undefined;
 
   const onVisibilityChange = () => {
     if (document.hidden) {
       lastActivity = Date.now() - 30_000;
     }
   };
-  document.addEventListener('visibilitychange', onVisibilityChange);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+  }
 
   const checkpoint = () => {
     if (ended) return;
@@ -78,7 +80,7 @@ export function startOpeningClock(
     }
   };
 
-  interval = window.setInterval(checkpoint, 5_000);
+  interval = globalThis.setInterval(checkpoint, 5_000);
 
   const activity = () => {
     if (!ended) lastActivity = Date.now();
@@ -87,8 +89,10 @@ export function startOpeningClock(
   const end = () => {
     if (ended) return;
     ended = true;
-    if (interval !== undefined) window.clearInterval(interval);
-    document.removeEventListener('visibilitychange', onVisibilityChange);
+    if (interval !== undefined) globalThis.clearInterval(interval);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
     try {
       send('dish_activity_checkpoint', {
         publication_revision_id: payload.publication_revision_id,
