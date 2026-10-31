@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { completeDishes } from '../menu/adapter';
-import { createFixtureMenuSource, DISH } from '../menu/fixtures';
+import { createFixtureMenuSource, DISH, FIXTURE_PUBLICATION_REVISION_ID } from '../menu/fixtures';
 import type { Menu } from '../menu/types';
 import { dishComparedPayload, replaceExclusions, replaceSide, startComparison } from './comparison';
 import { pickerOptions } from './picker';
@@ -91,6 +91,7 @@ describe('dishComparedPayload', () => {
     const start = startComparison(menu, DISH.avocadoToast, DISH.harvestPowerBowl, idSequence());
     if (!start) throw new Error('expected a comparison');
     expect(dishComparedPayload(menu, start, 'start', false)).toEqual({
+      publication_revision_id: FIXTURE_PUBLICATION_REVISION_ID,
       comparison_id: 'comparison-1',
       compare_action: 'start',
       dish_id: DISH.avocadoToast,
@@ -101,6 +102,7 @@ describe('dishComparedPayload', () => {
     });
     const replaced = replaceSide(menu, start, 'other', DISH.salmonPokeBowl);
     expect(dishComparedPayload(menu, replaced, 'replace', true)).toMatchObject({
+      publication_revision_id: FIXTURE_PUBLICATION_REVISION_ID,
       comparison_id: 'comparison-1',
       compare_action: 'replace',
       other_dish_id: DISH.salmonPokeBowl,

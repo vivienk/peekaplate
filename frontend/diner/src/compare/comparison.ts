@@ -16,8 +16,10 @@ export type Comparison = {
 
 export type CompareAction = 'start' | 'replace';
 
-// Field names follow matrix v0.1g §3.1 for dish_compared.
+// Field names follow matrix v0.1h §3.1 for dish_compared. publication_revision_id is the menu's
+// publication; per the TRK-01 rules the tracking layer lifts it into the event envelope.
 export type DishComparedPayload = {
+  publication_revision_id: string;
   comparison_id: string;
   compare_action: CompareAction;
   dish_id: string;
@@ -78,6 +80,7 @@ export function dishComparedPayload(
   const other = findComplete(menu, comparison.otherDishId);
   if (!first || !other || first.dishId === other.dishId) return null;
   return {
+    publication_revision_id: menu.publicationRevisionId,
     comparison_id: comparison.comparisonId,
     compare_action: action,
     dish_id: first.dishId,

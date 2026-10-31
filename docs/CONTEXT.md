@@ -91,7 +91,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "699bf50e384dfd803f62f97e714a56edd657bd1507cd426704ee5e47bc6fc4b4"
+      "sourceFingerprint": "0c652b4c622b86dd454d5b7a7ef54068f02dbae36473c41f724412634c2aeb20"
     },
     {
       "id": "console",
@@ -375,11 +375,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1g fields (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
+      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
       "modules": [
         "diner"
       ],
-      "next": "Zhiliang to confirm Replace keeps comparison_id. Build the result screen (two dishes, divider, View details with source compare_view, Replace, Back to Menu, aligned allergen rows) on the shared dish card, call track() from PR #65 and the TRK-01 ID helper, and read save_available from DIN-02.1 (false until it exists)."
+      "next": "Replace keeping comparison_id is confirmed (v0.1h). Build the result screen (two dishes, divider, View details with source compare_view, Replace, Back to Menu, aligned allergen rows) on the shared dish card, call track() from PR #65 and the TRK-01 ID helper, and read save_available from DIN-02.1 (false until it exists)."
     },
     {
       "summary": "S3-DIN-02.3 picker logic: frontend/diner/src/compare/picker.ts. pickerOptions(menu, exclude, query) returns the complete dishes the diner can pick, in menu order, without the kept dish (or both shown dishes when replacing); a query runs searchMenu so the rules and allergy line match the menu search. selectOption keeps one selection, ignores excluded, incomplete or unknown dishes and so blocks comparing a dish with itself. No API call, events or logging. 12 Vitest cases cover start, replace, search, one-dish and all-incomplete menus.",
