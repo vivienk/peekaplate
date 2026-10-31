@@ -114,6 +114,26 @@ describe('searchMenu', () => {
     expect(searchMenu(menu, 'eggs').dishIds).toEqual(eggDishes);
   });
 
+  it('matches other names for an approved allergen, like "soya" and "sesame seeds"', async () => {
+    const menu = await loadMenu('edge-cases');
+    for (const query of ['soya', 'Soybean', 'soy']) {
+      expect(searchMenu(menu, query)).toEqual({
+        dishIds: [DISH.salmonPokeBowl, DISH.gardenAvocadoSalad],
+        allergyNotice: true,
+      });
+    }
+    expect(searchMenu(menu, 'sesame seeds').dishIds).toEqual([
+      DISH.salmonPokeBowl,
+      DISH.gardenAvocadoSalad,
+    ]);
+    for (const query of ['soya', 'sesame seeds']) {
+      expect(searchMenu(await loadMenu('layout-20'), query)).toEqual({
+        dishIds: [],
+        allergyNotice: true,
+      });
+    }
+  });
+
   it('finds an allergen value that has no icon', async () => {
     const result = searchMenu(await loadMenu('edge-cases'), NO_ICON_ALLERGEN);
     expect(result.dishIds).toEqual([DISH.gardenAvocadoSalad]);
