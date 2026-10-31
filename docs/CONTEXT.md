@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.3 adds the Compare picker logic (options without the kept or shown dishes and incomplete dishes, single selection, search through searchMenu); its screen is not built yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -78,6 +78,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/fixtures.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "frontend/diner/src/compare/picker.ts",
+        "frontend/diner/src/compare/picker.test.ts",
         "vitest.config.ts"
       ],
       "adrs": [
@@ -87,7 +89,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c317ea3ac250648ce94c1053135a30d153ddc0789dcb737bfe1ddb4739f89160"
+      "sourceFingerprint": "5be97b72dffd38aab92c0756d54b8911b6cdff073c0e48ed9a82ee4c921028d7"
     },
     {
       "id": "console",
@@ -371,6 +373,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-DIN-02.3 picker logic: frontend/diner/src/compare/picker.ts. pickerOptions(menu, exclude, query) returns the complete dishes the diner can pick, in menu order, without the kept dish (or both shown dishes when replacing); a query runs searchMenu so the rules and allergy line match the menu search. selectOption keeps one selection, ignores excluded, incomplete or unknown dishes and so blocks comparing a dish with itself. No API call, events or logging. 12 Vitest cases cover start, replace, search, one-dish and all-incomplete menus.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Build the picker screen (title, Keeping card, orange border and check, search bar, no-results, clear, back/close) on the DIN-01.2 dish card and the DIN-01.3 Compare entry once Harshita shares them; add the DIN-02.2 heart. Design for the one-dish and empty cases is open with Rania/Amr. DIN-02.4 builds the result and Replace on these exclusions."
+    },
+    {
       "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip via the adapter's chipKey, and an approved P0 allergen matches its code, label or alias (egg/Eggs, soya/Soy, sesame seeds/Sesame), so \"gluten\" never finds Gluten-free. allergyNotice is true for any P0 allergen, dietary value, menu allergen or common allergy term (shellfish, gluten, mustard...), even with no results, so no results never reads as free from. Description never searched; incomplete dishes excluded; no API call, events or logging. 19 Vitest cases pass.",
       "modules": [
         "diner"
@@ -446,14 +455,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
-    },
-    {
-      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
     }
   ]
 }
