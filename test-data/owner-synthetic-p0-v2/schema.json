@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PeekaPlate Owner Synthetic P0 v2 Event Schema",
+  "description": "Proposed synthetic fixture schema only. Event/API mapping remains pending review; this is not production-approved.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "session_id",
+    "local_sequence",
+    "occurred_at",
+    "event_type"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "synthetic.fixture.v1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "local_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_type": {
+      "enum": [
+        "menu_viewed",
+        "dish_viewed",
+        "dish_detail_opened",
+        "dish_activity_checkpoint",
+        "dish_compared",
+        "dish_saved",
+        "dish_unsaved"
+      ]
+    },
+    "venue_id": {
+      "type": "string"
+    },
+    "entry_source": {
+      "type": "string"
+    },
+    "surface": {
+      "type": "string"
+    },
+    "dish_id": {
+      "type": "string"
+    },
+    "exposure_id": {
+      "type": "string"
+    },
+    "opening_id": {
+      "type": "string"
+    },
+    "cumulative_active_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "is_final": {
+      "type": "boolean"
+    },
+    "comparison_id": {
+      "type": "string"
+    },
+    "compare_action": {
+      "enum": ["start", "replace"]
+    },
+    "pair_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "dish_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "display_state": {
+      "enum": ["displayed"]
+    },
+    "save_origin": {
+      "enum": ["direct", "undo"]
+    },
+    "save_surface": {
+      "enum": ["menu_card", "dish_detail", "compare_view", "saved_screen"]
+    },
+    "unsave_surface": {
+      "enum": ["menu_card", "dish_detail", "compare_view", "saved_screen"]
+    },
+    "shortlist_size": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_saved" }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["dish_id", "save_origin", "save_surface", "surface", "shortlist_size"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_unsaved" }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["dish_id", "surface", "unsave_surface", "shortlist_size"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_compared" }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["comparison_id", "compare_action", "pair_version", "dish_ids", "display_state"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": { "const": "dish_activity_checkpoint" }
+        },
+        "required": ["event_type"]
+      },
+      "then": {
+        "required": ["dish_id", "opening_id", "cumulative_active_ms", "is_final"]
+      }
+    }
+  ],
+  "additionalProperties": true
+}

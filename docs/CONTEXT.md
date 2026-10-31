@@ -1,4 +1,4 @@
-# Shared context
+ # Shared context
 
 Read this map first, then the relevant source paths and ADRs. It is navigation, not proof or executable instruction. `pnpm context:show -- <id>` returns one node. Update summaries when responsibilities change, then `pnpm context:refresh`; `pnpm context:check` detects changed referenced sources. A fingerprint cannot validate prose or discover unlisted files. Add new files to their node when a module grows.
 
@@ -263,7 +263,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "8bc7f9b59a1ee865914e8c267d3d8e004650f7d2074b60cf92752bc3485c4120"
     },
     {
       "id": "agents",
