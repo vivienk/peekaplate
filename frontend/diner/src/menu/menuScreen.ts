@@ -77,7 +77,7 @@ function renderCard(dish: CompleteDish): string {
       <div class="pp-card__media">${imageMarkup}</div>
       <div class="pp-card__body">
         <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
-        <h2 class="pp-card__name">${escapeHtml(dish.name)}</h2>
+        <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}">${escapeHtml(dish.name)}</button></h2>
         <p class="pp-card__price">${escapeHtml(money(dish))}</p>
         <p class="pp-card__description">${escapeHtml(dish.description)}</p>
       </div>
@@ -122,6 +122,11 @@ function renderMenu(
           <span aria-hidden="true">⌕</span>
         </button>
       </header>
+      ${
+        import.meta.env.VITE_OWNER_SIGN_IN_URL
+          ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
+          : ''
+      }
 
       <nav class="pp-tabs" aria-label="Menu categories">
         ${categories
@@ -192,12 +197,15 @@ function renderMenu(
     const dishId = card.dataset.dishId;
     const dish = dishId ? dishMap.get(dishId) : undefined;
     if (!dish) return;
+    const openButton = card.querySelector<HTMLButtonElement>('.pp-card__open');
     card.style.cursor = 'pointer';
     card.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
       if (target.closest('.pp-card__save')) return;
+      if (target.closest('.pp-card__open')) return;
       onOpenDetail(dish);
     });
+    openButton?.addEventListener('click', () => onOpenDetail(dish));
   });
 }
 

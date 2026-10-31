@@ -1,6 +1,8 @@
 @import "@peekaplate/tokens/tokens.css";
 @import "@peekaplate/ui/components.css";
 
+/* Interim styling: many color values below are hardcoded pending S3-TOK-01 token mapping. */
+
 .pp-sr-only {
   position: absolute;
   width: 1px;
@@ -14,7 +16,7 @@
 }
 
 :root {
-  font-family: system-ui, sans-serif;
+  font-family: var(--pp-font-family-base, system-ui, sans-serif);
   color: #f7f1e7;
   background: #171712;
   color-scheme: dark;
@@ -609,5 +611,16 @@ p {
     background: #2a2d36;
     border: 1px solid rgba(113, 115, 122, 0.3);
     color: #fafafa;
+  }
+
+  .pp-owner-link-wrap {
+    margin: 8px 0 0;
+    text-align: center;
+  }
+
+  .pp-owner-link {
+    color: #a8a59e;
+    font-size: 12px;
+    text-decoration: underline;
   }
 }

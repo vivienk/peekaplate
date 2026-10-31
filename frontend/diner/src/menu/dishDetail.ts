@@ -44,7 +44,6 @@ function ingredientTiles(dish: CompleteDish): string {
     .map(
       (ingredient) => `
         <div class="pp-ingredient" role="group" aria-label="${escapeHtml(ingredient.name)}">
-          <div class="pp-ingredient__icon" aria-hidden="true"></div>
           <p class="pp-ingredient__name">${escapeHtml(ingredient.name)}</p>
         </div>
       `,
@@ -126,7 +125,6 @@ export function renderDishDetail(
         </div>
 
         <div class="pp-detail__actions">
-          <button class="pp-btn pp-btn--primary" type="button">View in 2.5D</button>
           <button class="pp-btn pp-btn--outlined" type="button">Compare</button>
         </div>
       </section>
