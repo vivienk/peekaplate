@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ApproveMenuRevisionSchema,
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
   DishIntentEventSchema,
@@ -8,8 +9,11 @@ import {
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
+  MenuPublicationSchema,
+  PublishMenuSchema,
   RetrievalRequestSchema,
   SourceReferenceSchema,
+  WithdrawMenuSchema,
 } from './index';
 
 const event = {
@@ -106,6 +110,61 @@ describe('dish command boundary', () => {
       { commandId: 'not-a-uuid' },
     ])
       expect(CreateDishRevisionSchema.safeParse({ ...command, ...patch }).success).toBe(false);
+  });
+});
+
+describe('RES-02 review and publication boundary', () => {
+  const commandId = '00000000-0000-4000-8000-000000000001';
+  const approvalId = '00000000-0000-4000-8000-000000000002';
+  const approval = {
+    commandId,
+    expectedVersion: 0,
+    menuRevisionId: '00000000-0000-4000-8000-000000000003',
+    contentApprovalId: '00000000-0000-4000-8000-000000000006',
+    assetApprovalId: '00000000-0000-4000-8000-000000000007',
+  };
+
+  it('pins the exact immutable menu and asset revisions under review', () => {
+    expect(ApproveMenuRevisionSchema.parse(approval)).toEqual(approval);
+  });
+
+  it('keeps approval, publication and withdrawal as separate commands', () => {
+    expect(PublishMenuSchema.parse({ commandId, expectedVersion: 0, approvalId })).toEqual({
+      commandId,
+      expectedVersion: 0,
+      approvalId,
+    });
+    expect(WithdrawMenuSchema.parse({ commandId, expectedVersion: 1 })).toEqual({
+      commandId,
+      expectedVersion: 1,
+    });
+  });
+
+  it('rejects claimed authority, unknown fields and malformed immutable references', () => {
+    for (const patch of [
+      { venueId: approvalId },
+      { actorId: approvalId },
+      { permission: 'owner' },
+      { expectedVersion: -1 },
+      { menuRevisionId: 'not-a-uuid' },
+      { contentApprovalId: 'not-a-uuid' },
+      { assetApprovalId: 'not-a-uuid' },
+    ]) {
+      expect(ApproveMenuRevisionSchema.safeParse({ ...approval, ...patch }).success).toBe(false);
+    }
+  });
+
+  it('represents withdrawn content explicitly without changing its publication identity', () => {
+    const publication = {
+      menuId: '00000000-0000-4000-8000-000000000004',
+      publicationId: '00000000-0000-4000-8000-000000000005',
+      version: 2,
+      approvalId,
+      publicationHash: 'c'.repeat(64),
+      availabilityVersion: 2,
+      status: 'withdrawn' as const,
+    };
+    expect(MenuPublicationSchema.parse(publication)).toEqual(publication);
   });
 });
 

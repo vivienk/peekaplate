@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision, RES-02 menu approval/publication/withdrawal, dish-intent, team analytics and bounded menu evidence schemas. Approval commands carry immutable menu revision plus separate content/asset approval identities; hashes are server-derived from the canonical review subject. Client authority and client-supplied hashes are rejected. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "55fd479c7dfc4c15cfb8d782ac33699f8542d957d66ef056f4a56a39c71fefbf"
     },
     {
       "id": "tokens",
@@ -109,7 +109,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded. Bounded retrieval supports linked PDF discovery, native page-aware text evidence and IPv4-mapped IPv6 SSRF checks within source/context limits; extraction and publication remain separate.",
+      "summary": "Hono Worker retains staff JWT/membership-checked draft commands, bounded collaborator staging reads, VIS-04 retrieval protections and the deployed direct-DO extraction host with signed tenant/job/hash source grants. RES-02 adds owner-only approval, publication and withdrawal commands backed by pure replay, expected versions, idempotent receipts, tenant projections and same-transaction outbox rows. Approval requires a trusted same-tenant/menu review subject with separate content and asset identities; browser authority and client hashes are rejected. Public menu reads/token issuance, full AI ingestion/report acceptance and logout revocation beyond token expiry remain separate work; observation/menu queues stay paused. Bounded retrieval also preserves linked PDF discovery, native page-aware text evidence and IPv4-mapped IPv6 SSRF checks within source/context limits.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -145,7 +145,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/extraction-host.test.ts",
         "backend/wrangler.extraction.jsonc",
         "backend/src/extraction-capability.ts",
-        "backend/tsconfig.json"
+        "backend/tsconfig.json",
+        "backend/src/publication-command.test.ts",
+        "backend/src/publication-command.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -157,12 +159,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7ae9ff0f5719ed8a8b7a75cc937403d83584f7600ec791a9fa69e9e42a2e088c"
+      "sourceFingerprint": "1062d8502c3d4e7f3be7b73a44b66ff33e1bf51fc2b8d6273303330fa6abce4a"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor memberships and tenant projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP-ready startup; hosted staff checks are separate. Private PostHog export is append-only: eight raw copies/four deduplicated synthetic events. The October 22 audit verifies migration 20261021130000/history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope; exporter has no application-schema access. Hosted pool reuse/restore remain unverified. The standalone owner-metric oracle covers NULL-ID rejection, retries/conflicts and the ten-session fixture floor; canonical report integration remains separate. Canonical index/conflicts plus typed facts and tenant-restricted live-only owner views are defined; activity uses the greatest checkpoint. Report suppression/authorization and consumer integration remain separate.",
+      "summary": "Private Postgres venue/event/command/outbox, memberships and tenant projections use forced RLS. Canonical observation index/conflicts, typed facts and tenant-restricted live-only owner views are defined; activity uses the greatest checkpoint. Consumer writes, owner-report authorization/suppression and hosted acceptance remain separate. RES-02 adds immutable review subjects, append-only exact approvals and review/publication projections; composite foreign keys reject cross-menu and forged-hash references. Runtime may read but cannot create subjects. Private PostHog export remains isolated and append-only; hosted pool reuse/restore remain unverified. Historical test counts do not establish verification of this reconciled head.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -179,7 +181,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261023120000_observation_index.sql",
         "tests/db/observations.sql",
         "migrations/20261026120000_observation_facts.sql",
-        "tests/db/observation-facts.sql"
+        "tests/db/observation-facts.sql",
+        "migrations/20261025120000_menu_publication.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -189,7 +192,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "107f87f6fa9137cdcd252696934b3c999aa54dd4c9040aed6f6f4286a9267a34"
+      "sourceFingerprint": "0c5aa0411f5fb8deb4e35e821c2ef91522f42ec56dc596f19b3bd8806d0f15a0"
     },
     {
       "id": "measurement",
@@ -374,6 +377,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October 31 RES-02 PR42 reconciliation preserves current develop retrieval, UI foundations and canonical observation index/fact migrations alongside owner-only atomic approval/publication/withdrawal. Both error histories are retained; no application or migration behavior is changed by conflict resolution.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Verify this reconciled head, obtain human review, and merge PR42 before retargeting PR43 to develop. Hosted producer admission and staging acceptance remain separate."
+    },
+    {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
       "modules": [
         "database",
@@ -449,15 +461,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Teeyansh can use staging runtime bindings without receiving internal secret values. Configure approved existing OCR/AI provider credentials when ready, finish/review PR45 and its migrations/report adapter, align600s transport with700s processing plus cold start, then run controlled authorized upload→Queue→service→private report→database drafts→ACK and failure/tenant tests before unpausing. No production or restaurant-data tests were performed."
-    },
-    {
-      "summary": "Paid activation resolved Container eligibility. Existing protected API run succeeded and menu aliases are live. Actual container registration then rejected default scheduling; prepared directDO runtime repair with RED/GREEN config guard and startup/readiness/concurrency/failure-recovery tests. Dev-only official Worker types are pinned to mature October26 release; latest October28 was blocked by dependency maturity policy, which remains unchanged.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
     }
   ]
 }
