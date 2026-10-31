@@ -157,7 +157,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified. The standalone owner-metric SQL oracle tests NULL-ID rejection, retry/conflict handling and the ten-session fixture boundary; canonical report integration remains separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -169,7 +169,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "tests/db/owner_metrics.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -178,7 +179,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5c576f557201a6d1af09e9c2c860bb1e5cd0430a3af8fdc6b3e8f1ee4528c0e6"
+      "sourceFingerprint": "3e8e8df5f7a5cbfa03b2b9fec4b97d238b830b1071b9bf2121507682560cf8d6"
     },
     {
       "id": "measurement",
@@ -363,6 +364,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
+      "modules": [
+        "database"
+      ],
+      "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
+    },
+    {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
       "modules": [
         "tokens",
@@ -442,14 +450,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
-    },
-    {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     }
   ]
 }
