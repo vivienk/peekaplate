@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline). The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders, 50% off-viewport dimming) and the dish detail screen (allergen/dietary chips, name-only ingredient tiles). Save, Compare, search and a published menu are not wired. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist; screens do not call them yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline). The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders, 50% off-viewport dimming) and the dish detail screen (allergen/dietary chips, name-only ingredient tiles). Save, Compare, search and a published menu are not wired. The console-only track(eventName, payload) placeholder (never throws) now has menu_viewed, dish_viewed and dish_detail_opened UI triggers wired on the fixture menu; dish_activity_checkpoint reporting is interim and owned by TRK-01. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -91,7 +91,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e44c95362a6ed1b4bff7c5ffcc7074f7ecdac74baa527c9d5a4e5811edfa54e2"
+      "sourceFingerprint": "e310a8fd85b2ab623d0863d2c10d4924ea3b24b4f1c9bf96fa6f3ea1c1adad70"
     },
     {
       "id": "console",
