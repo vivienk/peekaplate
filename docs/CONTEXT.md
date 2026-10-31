@@ -104,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer handler retrying active leases and acknowledging terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
+      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer delays active-lease redelivery through the remaining 15-minute fence (+1s) and ACKs terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -162,7 +162,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3e4efb0c29ffb908c65f8c46b37ac931e2e098897cd8a0037df3621e5746085b"
+      "sourceFingerprint": "8bfaf924850ac592891c7e9d653a7a6bff96285a32d9ee39c4506dd30176c544"
     },
     {
       "id": "database",
@@ -264,7 +264,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "1e1483e21bcf5c03a155a035dfc31712d519424dc1a483b6e5308ad0f0a86b78"
+      "sourceFingerprint": "096d7707f2ab210d0502e8dc6641eed7eb3dbcd9a9a3863295dba7e2be6b51fb"
     },
     {
       "id": "agents",
@@ -375,6 +375,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR #45 recovery retry now uses the Queue per-message delay derived from the remaining trusted PostgreSQL lease plus one second, rather than immediate redelivery. Focused unit and real-PostgreSQL integration assertions cover the delayed early delivery and the later post-expiry extraction/drafts/ACK recovery; the delay preserves the consumer retry budget. Temporary pull consumer settings remain infrastructure-only and are not the future Worker policy.",
+      "modules": [
+        "backend",
+        "database"
+      ],
+      "next": "Keep the menu queues paused. Review the Worker consumer binding, single-message/concurrency limits and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
+    },
+    {
       "summary": "Resolved outstanding review findings on PR #45 (Hemu): (1) Separated active leases from terminal jobs in Queue batch processing, invoking msg.retry() on running leases to enable recovery of abandoned workers after lease expiration while acknowledging terminal completions. (2) Bound report storage write ownership to the claimed generation using an attempt-specific immutable key (reports/<tenant>/<job>/attempts/<claim>/extraction.json), preventing stale resume overwrites across two-worker lease expiration races. (3) Enforced 400 invalid_json on malformed nonempty JSON approval requests before command execution, keeping drafts pending with zero writes. (4) Required client-stable commandId in ApproveDishDraftRequestSchema, enforcing identical retry replay, conflicting reuse rejection (409), and staff membership revocation (403) within atomic transactions. Added comprehensive PostgreSQL/HTTP integration tests.",
       "modules": [
         "contracts",
@@ -455,14 +463,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
-    },
-    {
-      "summary": "Resolved review findings in S3-VIS-04 (PR #23): established transaction-local app.actor_id before staff membership query under restricted database role; preserved contradictory evidence during approximate deduplication including explicit zero values ($0.00 vs $18.00); excluded failed/skipped segments from indexing; enforced Unicode code-point offset translation across VIS-01 and VIS-02 handoffs; corrected astral numeric HTML entity decoding without truncation; validated code-point bounds before offset conversion; added explicit VIS-02 segment mapping; added regression and live workerd-level external fetch security tests.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Submit PR #23 for re-review with permanent regression test coverage across all review findings."
     }
   ]
 }

@@ -535,6 +535,11 @@ describe('Ingestion Orchestrator', () => {
       expect(result.acknowledged).toBe(0);
       expect(result.retried).toBe(1);
       expect(activeMsg.retry).toHaveBeenCalledTimes(1);
+      expect(activeMsg.retry).toHaveBeenCalledWith({ delaySeconds: expect.any(Number) });
+      const retryDelay = (activeMsg.retry as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
+        ?.delaySeconds;
+      expect(retryDelay).toBeGreaterThanOrEqual(900);
+      expect(retryDelay).toBeLessThanOrEqual(901);
       expect(activeMsg.ack).not.toHaveBeenCalled();
       expect(mockExtractor).not.toHaveBeenCalled();
     });

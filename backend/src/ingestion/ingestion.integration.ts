@@ -751,7 +751,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(reloadedDrafts[0]?.published_dish_id).toBeNull();
     });
 
-    it('recovers abandoned worker job after early redelivery and lease expiry', async () => {
+    it('delays lease-active redelivery until a real lease expiry, then recovers before retry exhaustion', async () => {
       const jobId = crypto.randomUUID();
       await createIngestionJob(runtimeClient, {
         id: jobId,
@@ -761,18 +761,26 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         idempotencyKey: `idem_abandon_${jobId}`,
       });
 
+      // Keep this short enough to test real PostgreSQL expiry without a
+      // fifteen-minute sleep. The focused orchestrator test asserts the
+      // production 15-minute policy requests approximately 901 seconds.
+      const testLeaseTimeoutMinutes = 0.001;
+      const consumerMaxRetries = 3;
+
       // 1. Worker 1 claims job
       const claim1 = await claimIngestionJob(runtimeClient, {
         tenantId: venueId,
         jobId,
         workerId: 'worker_abandoned',
-        leaseTimeoutMinutes: 15,
+        leaseTimeoutMinutes: testLeaseTimeoutMinutes,
       });
       expect(claim1).not.toBeNull();
 
       // 2. Queue early redelivery while lease is still active
       let acked1 = false;
       let retried1 = false;
+      let retryCount = 0;
+      let retryDelaySeconds: number | undefined;
       const earlyMsg: QueueMessage<unknown> = {
         id: 'msg_early_redelivery',
         body: {
@@ -784,8 +792,10 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         ack: () => {
           acked1 = true;
         },
-        retry: () => {
+        retry: (options) => {
           retried1 = true;
+          retryCount += 1;
+          retryDelaySeconds = options?.delaySeconds;
         },
       };
 
@@ -794,7 +804,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         runtimeClient,
         { messages: [earlyMsg] },
         mockExtractor,
-        { workerId: 'worker_2', leaseTimeoutMinutes: 15 },
+        { workerId: 'worker_2', leaseTimeoutMinutes: testLeaseTimeoutMinutes },
       );
 
       // Must be retried, NOT acked
@@ -802,6 +812,11 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(earlyBatchResult.retried).toBe(1);
       expect(acked1).toBe(false);
       expect(retried1).toBe(true);
+      // The actual retry request, rather than a manually injected message,
+      // creates one delayed redelivery after the DB lease has expired.
+      expect(retryDelaySeconds).toBeGreaterThanOrEqual(1);
+      expect(retryDelaySeconds).toBeLessThanOrEqual(2);
+      expect(retryCount).toBeLessThan(consumerMaxRetries);
       expect(mockExtractor).not.toHaveBeenCalled();
 
       // Job remains running held by worker_abandoned
@@ -809,15 +824,11 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(jobStillRunning?.status).toBe('running');
       expect(jobStillRunning?.locked_by).toBe('worker_abandoned');
 
-      // 3. Worker 1 abandoned execution; lease expires
-      await adminClient.query(
-        `UPDATE app_private.menu_ingestion_jobs
-         SET locked_at = now() - interval '20 minutes'
-         WHERE id = $1 AND tenant_id = $2`,
-        [jobId, venueId],
-      );
+      // 3. The Queue honors the retry request before redelivery. This crosses
+      // the real PostgreSQL lease boundary without mutating locked_at.
+      await new Promise((resolve) => setTimeout(resolve, retryDelaySeconds! * 1_000 + 100));
 
-      // 4. Retried queue message arrives for Worker 2 after lease expiry
+      // 4. The delayed Queue redelivery arrives for Worker 2 after lease expiry.
       let acked2 = false;
       let retried2 = false;
       const recoveryMsg: QueueMessage<unknown> = {
@@ -883,7 +894,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         runtimeClient,
         { messages: [recoveryMsg] },
         recoveryExtractor,
-        { workerId: 'worker_2', leaseTimeoutMinutes: 15 },
+        { workerId: 'worker_2', leaseTimeoutMinutes: testLeaseTimeoutMinutes },
       );
 
       expect(recoveryBatchResult.acknowledged).toBe(1);

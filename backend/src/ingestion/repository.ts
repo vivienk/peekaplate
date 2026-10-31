@@ -12,6 +12,7 @@ export class IngestionError extends Error {
     public readonly code: string,
     public readonly status = 400,
     message?: string | undefined,
+    public readonly retryDelaySeconds?: number | undefined,
   ) {
     super(message ?? code);
     this.name = 'IngestionError';

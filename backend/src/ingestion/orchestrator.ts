@@ -11,6 +11,7 @@ import {
   claimIngestionJob,
   createIngestionJob,
   type DatabaseClient,
+  DEFAULT_LEASE_TIMEOUT_MINUTES,
   failIngestionJob,
   getIngestionJob,
   IngestionError,
@@ -117,13 +118,30 @@ export type QueueMessage<T = unknown> = {
   body: T;
   attempts?: number;
   ack(): void;
-  retry(): void;
+  retry(options?: { delaySeconds?: number }): void;
 };
 
 export type QueueBatch<T = unknown> = {
   queue?: string;
   messages: readonly QueueMessage<T>[];
 };
+
+/**
+ * Delay an early Queue redelivery until the active database lease is no longer
+ * claimable. The extra second preserves the database's strict expiry boundary
+ * (`locked_at < now() - lease`) despite clock and scheduling granularity.
+ */
+function activeLeaseRetryDelaySeconds(
+  lockedAt: string | null,
+  leaseTimeoutMinutes: number,
+  now = Date.now(),
+): number {
+  const lockedAtMs = lockedAt ? Date.parse(lockedAt) : Number.NaN;
+  const leaseExpiryMs = Number.isFinite(lockedAtMs)
+    ? lockedAtMs + leaseTimeoutMinutes * 60_000
+    : now + leaseTimeoutMinutes * 60_000;
+  return Math.max(1, Math.ceil((leaseExpiryMs - now) / 1_000) + 1);
+}
 
 /**
  * Validates and initiates a menu ingestion job.
@@ -252,10 +270,12 @@ export async function executeIngestionWorkflow(
     const existing = await getIngestionJob(client, params.tenantId, params.jobId);
     if (!existing) throw new IngestionError('job_not_found', 404);
     if (existing.status === 'running') {
+      const leaseTimeoutMinutes = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
       throw new IngestionError(
         'job_lease_active',
         409,
         `Job ${params.jobId} is currently running under an active lease held by ${existing.locked_by ?? 'another worker'}`,
+        activeLeaseRetryDelaySeconds(existing.locked_at, leaseTimeoutMinutes),
       );
     }
     throw new IngestionError(
@@ -423,8 +443,16 @@ export async function processIngestionQueueBatch(
       if (err instanceof IngestionError) {
         if (err.code === 'job_lease_active') {
           // Job is currently running under an active lease.
-          // Retry message delivery so an abandoned/interrupted worker can be recovered after lease expiry.
-          msg.retry();
+          // Delay redelivery through the trusted lease expiry. Retrying immediately
+          // can consume the consumer retry budget before an abandoned lease expires.
+          if (err.retryDelaySeconds === undefined) {
+            // Defensive fallback for a malformed/incomplete job row: preserve
+            // recovery rather than ACKing, though normal active leases always
+            // provide the delay calculated above.
+            msg.retry();
+          } else {
+            msg.retry({ delaySeconds: err.retryDelaySeconds });
+          }
           retried += 1;
           errors.push({ jobId, error: 'Job is currently running under an active lease' });
           continue;
