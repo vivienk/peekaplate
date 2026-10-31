@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   type BoundedRetrievalResult,
   SourceInputSchema,
@@ -927,6 +929,155 @@ describe('S3-VIS-04 × VIS-02 Compatibility Adapter & Handoff Integration', () =
         );
         expect(mappedSourceInput.segments![3]).not.toHaveProperty('error');
         expect(mappedSourceInput.segments![3]?.status).toBe('failed');
+      });
+    });
+
+    describe('VIS-02 × VIS-04 Schema & Pipeline Version Alignment', () => {
+      const baseSource = {
+        source_id: 'src_version_alignment_test',
+        sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        kind: 'pdf' as const,
+        location: 'https://restaurant.example.com/menu.pdf',
+        retrieved_at: '2026-10-28T12:00:00.000Z',
+        size_bytes: 4096,
+      };
+
+      const baseSegments: Vis02SourceSegment[] = [
+        {
+          segment_id: 'seg_page_1',
+          page_number: 1,
+          method: 'pdf_native',
+          status: 'ready',
+          text: 'Appetizers: Soup 🍜 $8.50, Salad 🥗 $12.00',
+          warnings: [],
+        },
+      ];
+
+      it('accepts schema 1 / pipeline 2 handoff and preserves SourceInput and provenance', () => {
+        const v1Handoff: Vis02ExtractionHandoff = {
+          schema_version: 1,
+          pipeline_version: '2',
+          status: 'complete',
+          source: baseSource,
+          segments: baseSegments,
+          drafts: [
+            {
+              name: 'Soup',
+              category: 'Appetizers',
+              price_amount: '8.50',
+              price_currency: 'USD',
+              source_id: baseSource.source_id,
+              source_text: 'Soup 🍜 $8.50',
+              review_warnings: [],
+              status: 'needs_review',
+            },
+          ],
+          evidence: [],
+          warnings: [],
+          errors: [],
+        };
+
+        const sourceInput = mapVis02HandoffToSourceInput(v1Handoff);
+        expect(SourceInputSchema.safeParse(sourceInput).success).toBe(true);
+        expect(sourceInput.source_id).toBe(baseSource.source_id);
+        expect(sourceInput.sha256).toBe(baseSource.sha256);
+        expect(sourceInput.segments).toHaveLength(1);
+        expect(sourceInput.segments![0]?.text).toBe(baseSegments[0]!.text);
+      });
+
+      it('accepts schema 2 / pipeline 3 handoff with new optional dish metadata without altering SourceInput', () => {
+        const v2Handoff: Vis02ExtractionHandoff = {
+          schema_version: 2,
+          pipeline_version: '3',
+          status: 'complete',
+          source: baseSource,
+          segments: baseSegments,
+          drafts: [
+            {
+              candidate_id: 'cand_garden_soup_001',
+              draft_id: 'draft_soup_001',
+              draft_index: 0,
+              name: 'Soup',
+              category: 'FOOD',
+              subcategory: 'HOT_SOUPS',
+              category_page_number: 1,
+              price_text: '8.50 / 12.50 USD',
+              price_amount: null,
+              price_currency: 'USD',
+              source_id: baseSource.source_id,
+              source_text: 'Soup 🍜 $8.50',
+              review_warnings: ['Ambiguous grouped pricing'],
+              status: 'needs_review',
+            },
+          ],
+          evidence: [],
+          warnings: [],
+          errors: [],
+        };
+
+        const sourceInput = mapVis02HandoffToSourceInput(v2Handoff);
+        expect(SourceInputSchema.safeParse(sourceInput).success).toBe(true);
+        expect(sourceInput.source_id).toBe(baseSource.source_id);
+        expect(sourceInput.sha256).toBe(baseSource.sha256);
+        expect(sourceInput.segments).toHaveLength(1);
+        expect(sourceInput.segments![0]?.text).toBe(baseSegments[0]!.text);
+        expect(sourceInput.segments![0]?.page_number).toBe(1);
+      });
+
+      it('rejects unsupported schema_version using standard Error convention', () => {
+        const invalidSchemaHandoff = {
+          schema_version: 3,
+          pipeline_version: '3',
+          status: 'complete',
+          source: baseSource,
+          segments: baseSegments,
+          drafts: [],
+          evidence: [],
+          warnings: [],
+          errors: [],
+        } as unknown as Vis02ExtractionHandoff;
+
+        expect(() => mapVis02HandoffToSourceInput(invalidSchemaHandoff)).toThrow(
+          'Unsupported schema_version: 3. Expected 1 or 2.',
+        );
+      });
+
+      it('rejects unsupported pipeline_version using standard Error convention', () => {
+        const invalidPipelineHandoff = {
+          schema_version: 2,
+          pipeline_version: '4',
+          status: 'complete',
+          source: baseSource,
+          segments: baseSegments,
+          drafts: [],
+          evidence: [],
+          warnings: [],
+          errors: [],
+        } as unknown as Vis02ExtractionHandoff;
+
+        expect(() => mapVis02HandoffToSourceInput(invalidPipelineHandoff)).toThrow(
+          "Unsupported pipeline_version: 4. Expected '2' or '3'.",
+        );
+      });
+
+      it('accepts genuine Mohammad PR #58 schema-v2/pipeline-v3 extraction fixture and maps SourceInput', () => {
+        const fixturePath = resolve(
+          process.cwd(),
+          'tests/fixtures/menu-ingestion/vis02-mohammad-extraction-v2.json',
+        );
+        const fixture = JSON.parse(readFileSync(fixturePath, 'utf-8')) as Vis02ExtractionHandoff;
+
+        const sourceInput = mapVis02HandoffToSourceInput(fixture);
+        const parsed = SourceInputSchema.safeParse(sourceInput);
+        expect(parsed.success).toBe(true);
+
+        expect(sourceInput.source_id).toBe(fixture.source?.source_id);
+        expect(sourceInput.sha256).toBe(fixture.source?.sha256);
+        expect(sourceInput.kind).toBe('pdf');
+        expect(sourceInput.segments).toHaveLength(3);
+        expect(sourceInput.segments![0]?.page_number).toBe(1);
+        expect(sourceInput.segments![0]?.method).toBe('pdf_native');
+        expect(sourceInput.segments![0]?.status).toBe('ready');
       });
     });
   });

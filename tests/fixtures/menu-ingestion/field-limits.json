@@ -1,0 +1,5 @@
+{
+  "name_limit": 160,
+  "description_limit": 4000,
+  "price_text_limit": 160
+}

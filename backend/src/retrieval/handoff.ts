@@ -200,9 +200,15 @@ export type Vis02DraftEvidence = {
 };
 
 export type Vis02DishDraft = {
+  draft_id?: string | null;
+  candidate_id?: string | null;
+  draft_index?: number | null;
   name: string;
   description?: string | null;
   category?: string | null;
+  subcategory?: string | null;
+  category_page_number?: number | null;
+  price_text?: string | null;
   price_amount?: string | null; // Decimal string e.g. "16.50", never heuristic
   price_currency?: string | null; // ISO 3-letter code e.g. "USD", or null
   ingredients?: string[] | null;
@@ -236,10 +242,10 @@ export type Vis02SourceSegment = {
 };
 
 export type Vis02ExtractionHandoff = {
-  schema_version: 1;
-  pipeline_version: '2';
+  schema_version: 1 | 2;
+  pipeline_version: '2' | '3';
   status: 'complete' | 'incomplete' | 'failed';
-  source?: Vis02SourceRecord | undefined;
+  source?: Vis02SourceRecord | null | undefined;
   segments: Vis02SourceSegment[];
   drafts: Vis02DishDraft[];
   evidence: Vis02DraftEvidence[];
@@ -620,6 +626,17 @@ export function mapVis02SegmentToSourceSegment(seg: Vis02SourceSegment): SourceI
 }
 
 export function mapVis02HandoffToSourceInput(handoff: Vis02ExtractionHandoff): SourceInput {
+  if (handoff.schema_version !== 1 && handoff.schema_version !== 2) {
+    throw new Error(
+      `Unsupported schema_version: ${(handoff as { schema_version: unknown }).schema_version}. Expected 1 or 2.`,
+    );
+  }
+  if (handoff.pipeline_version !== '2' && handoff.pipeline_version !== '3') {
+    throw new Error(
+      `Unsupported pipeline_version: ${(handoff as { pipeline_version: unknown }).pipeline_version}. Expected '2' or '3'.`,
+    );
+  }
+
   const source = handoff.source;
   const sourceId = source?.source_id ?? 'vis02_source';
 

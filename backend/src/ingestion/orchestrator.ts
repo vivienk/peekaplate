@@ -1,0 +1,485 @@
+import { isIP } from 'node:net';
+import {
+  type MenuExtractionResult,
+  MenuExtractionResultSchema,
+  MenuIngestionQueueMessageSchema,
+  type StructuredDishDraft,
+} from '@peekaplate/contracts';
+import { isProhibitedIP } from '../retrieval/security';
+import { adaptPythonExtractionResult } from './adapter';
+import {
+  claimIngestionJob,
+  createIngestionJob,
+  type DatabaseClient,
+  DEFAULT_LEASE_TIMEOUT_MINUTES,
+  failIngestionJob,
+  getIngestionJob,
+  IngestionError,
+  type MenuIngestionJobRow,
+  persistExtractedDrafts,
+} from './repository';
+
+export type IngestionRequest = {
+  venueId: string;
+  sourceType: 'url' | 'pdf' | 'photo' | 'text';
+  sourceUrl?: string | null | undefined;
+  sourceHash?: string | null | undefined;
+  sourceStorageKey?: string | null | undefined;
+  idempotencyKey: string;
+};
+
+/**
+ * Validates destination URL format and enforces SSRF restrictions
+ * (protocol, userinfo, port, localhost, internal domains, and private/reserved IP literals).
+ */
+export function validateIngestionUrl(rawUrl: string): URL {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new IngestionError('invalid_source_url', 400, 'Invalid destination URL format');
+  }
+
+  // Restrict protocols
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Unsupported protocol '${url.protocol}'; only http: and https: are permitted`,
+    );
+  }
+
+  // Reject credentials in URL
+  if (url.username || url.password) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      'URLs containing user credentials are not permitted',
+    );
+  }
+
+  // Restrict ports (must be 80 for http, 443 for https)
+  const explicitPort = url.port ? Number.parseInt(url.port, 10) : null;
+  const standardPort = url.protocol === 'https:' ? 443 : 80;
+  if (explicitPort !== null && explicitPort !== standardPort) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Non-standard port ${explicitPort} is prohibited for ${url.protocol}`,
+    );
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname) {
+    throw new IngestionError('invalid_source_url', 400, 'Missing hostname in URL');
+  }
+
+  // Localhost & internal domain checks
+  const isLoopbackHost = hostname === 'localhost' || hostname.endsWith('.localhost');
+  const isInternalDomain =
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan') ||
+    hostname.endsWith('.home.arpa');
+
+  if (isInternalDomain || isLoopbackHost) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Destination hostname '${hostname}' is an internal domain`,
+    );
+  }
+
+  // Check if hostname is a private/reserved IP literal
+  if (isIP(hostname) !== 0 && isProhibitedIP(hostname)) {
+    throw new IngestionError(
+      'ssrf_destination_prohibited',
+      400,
+      `Direct connection to private/reserved IP '${hostname}' is prohibited`,
+    );
+  }
+
+  return url;
+}
+
+export type PythonExtractor = (job: MenuIngestionJobRow) => Promise<MenuExtractionResult | unknown>;
+
+export type ReportStorage = {
+  put(key: string, data: string): Promise<void>;
+  get?(key: string): Promise<string | null>;
+};
+
+export type QueueProducer = {
+  send(message: unknown): Promise<void>;
+};
+
+export type QueueMessage<T = unknown> = {
+  id?: string;
+  body: T;
+  attempts?: number;
+  ack(): void;
+  retry(options?: { delaySeconds?: number }): void;
+};
+
+export type QueueBatch<T = unknown> = {
+  queue?: string;
+  messages: readonly QueueMessage<T>[];
+};
+
+/**
+ * Delay an early Queue redelivery until the active database lease is no longer
+ * claimable. The extra second preserves the database's strict expiry boundary
+ * (`locked_at < now() - lease`) despite clock and scheduling granularity.
+ */
+function activeLeaseRetryDelaySeconds(
+  lockedAt: string | null,
+  leaseTimeoutMinutes: number,
+  now = Date.now(),
+): number {
+  const lockedAtMs = lockedAt ? Date.parse(lockedAt) : Number.NaN;
+  const leaseExpiryMs = Number.isFinite(lockedAtMs)
+    ? lockedAtMs + leaseTimeoutMinutes * 60_000
+    : now + leaseTimeoutMinutes * 60_000;
+  return Math.max(1, Math.ceil((leaseExpiryMs - now) / 1_000) + 1);
+}
+
+/**
+ * Validates and initiates a menu ingestion job.
+ * If queueProducer is supplied, dispatches a versioned MenuIngestionQueueMessage.
+ */
+export async function submitMenuIngestion(
+  client: DatabaseClient,
+  request: IngestionRequest,
+  queueProducer?: QueueProducer | undefined,
+): Promise<MenuIngestionJobRow> {
+  // Input validation
+  if (!request.venueId || !request.idempotencyKey) {
+    throw new IngestionError('invalid_request', 400, 'venueId and idempotencyKey are required');
+  }
+
+  // Reject raw text and url sources at submission boundary until materialization is connected
+  if (request.sourceType === 'text' || request.sourceType === 'url') {
+    throw new IngestionError(
+      'unsupported_source_type',
+      400,
+      `Source type "${request.sourceType}" is not supported for direct extraction without materialization.`,
+    );
+  }
+
+  // PDF and photo sources require SHA-256 hash
+  const sourceHash = request.sourceHash ?? null;
+  if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
+    throw new IngestionError(
+      'missing_source_hash',
+      400,
+      'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
+    );
+  }
+
+  const jobId = crypto.randomUUID();
+  const canonicalSourceKey = `menu-ingestion/sources/${request.venueId}/${jobId}/source`;
+  let sourceStorageKey = canonicalSourceKey;
+
+  if (request.sourceStorageKey) {
+    if (
+      request.sourceStorageKey.includes('..') ||
+      request.sourceStorageKey.startsWith('/') ||
+      request.sourceStorageKey.includes('\\')
+    ) {
+      throw new IngestionError(
+        'invalid_source_storage_key',
+        400,
+        'Invalid source storage key format',
+      );
+    }
+    // Prevent cross-tenant arbitrary object access
+    const tenantScopeMatch = request.sourceStorageKey.match(
+      /(?:menu-ingestion\/)?sources\/([0-9a-f-]{36})\//i,
+    );
+    if (tenantScopeMatch && tenantScopeMatch[1] && tenantScopeMatch[1] !== request.venueId) {
+      throw new IngestionError(
+        'unauthorized_source_storage_key',
+        400,
+        'Source storage key must match the authorized venue scope',
+      );
+    }
+    sourceStorageKey = request.sourceStorageKey;
+  }
+
+  const job = await createIngestionJob(client, {
+    id: jobId,
+    tenantId: request.venueId,
+    sourceType: request.sourceType,
+    sourceUrl: request.sourceUrl ?? null,
+    sourceHash,
+    sourceStorageKey,
+    idempotencyKey: request.idempotencyKey,
+  });
+
+  if (queueProducer) {
+    try {
+      await queueProducer.send({
+        version: 1,
+        tenantId: request.venueId,
+        jobId: job.id,
+        queuedAt: new Date().toISOString(),
+      });
+    } catch (err: unknown) {
+      throw new IngestionError(
+        'queue_dispatch_failed',
+        500,
+        `Failed to enqueue ingestion job: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  return job;
+}
+
+/**
+ * Executes the end-to-end ingestion processing lifecycle for a claimed job:
+ * Claim → Extract → Adapt & Validate → Persist Drafts & Complete.
+ */
+export async function executeIngestionWorkflow(
+  client: DatabaseClient,
+  params: {
+    tenantId: string;
+    jobId: string;
+    workerId: string;
+    extractor: PythonExtractor;
+    reportStorage?: ReportStorage | undefined;
+    leaseTimeoutMinutes?: number | undefined;
+  },
+): Promise<{
+  job: MenuIngestionJobRow;
+  drafts: StructuredDishDraft[];
+  persistedCount: number;
+  supersededCount: number;
+}> {
+  // 1. Claim job lease
+  const claim = await claimIngestionJob(client, {
+    tenantId: params.tenantId,
+    jobId: params.jobId,
+    workerId: params.workerId,
+    ...(params.leaseTimeoutMinutes !== undefined
+      ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+      : {}),
+  });
+
+  if (!claim) {
+    const existing = await getIngestionJob(client, params.tenantId, params.jobId);
+    if (!existing) throw new IngestionError('job_not_found', 404);
+    if (existing.status === 'running') {
+      const leaseTimeoutMinutes = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
+      throw new IngestionError(
+        'job_lease_active',
+        409,
+        `Job ${params.jobId} is currently running under an active lease held by ${existing.locked_by ?? 'another worker'}`,
+        activeLeaseRetryDelaySeconds(existing.locked_at, leaseTimeoutMinutes),
+      );
+    }
+    throw new IngestionError(
+      'job_already_complete',
+      409,
+      `Job ${params.jobId} has reached terminal status ${existing.status}`,
+    );
+  }
+
+  const job = (await getIngestionJob(client, params.tenantId, params.jobId))!;
+
+  try {
+    // 2. Call Python extraction boundary
+    const rawResult = await params.extractor(job);
+
+    // 3. Adapt and validate output against contract
+    const adapted = adaptPythonExtractionResult(rawResult);
+
+    if (!adapted.success || adapted.status === 'failed') {
+      const errorMsg = !adapted.success
+        ? adapted.errors.join('; ')
+        : adapted.warnings.join('; ') || 'Extraction marked as failed by producer';
+      await failIngestionJob(client, {
+        tenantId: params.tenantId,
+        jobId: params.jobId,
+        claimToken: claim.claimToken,
+        errorCode: !adapted.success ? 'schema_validation_failed' : 'extraction_failed',
+        errorDetails: errorMsg,
+        ...(params.leaseTimeoutMinutes !== undefined
+          ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+          : {}),
+      });
+
+      const failedJob = (await getIngestionJob(client, params.tenantId, params.jobId))!;
+      return {
+        job: failedJob,
+        drafts: [],
+        persistedCount: 0,
+        supersededCount: 0,
+      };
+    }
+
+    // 4. Durably retain complete private report and timing artifact if storage is configured
+    let resultStorageKey: string | null = null;
+    if (params.reportStorage) {
+      resultStorageKey = `reports/${params.tenantId}/${params.jobId}/attempts/${claim.claimToken}/extraction.json`;
+      try {
+        await params.reportStorage.put(resultStorageKey, JSON.stringify(rawResult));
+      } catch (storageErr) {
+        throw new IngestionError(
+          'report_storage_failed',
+          500,
+          `Failed to persist extraction report artifact: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`,
+        );
+      }
+    }
+
+    // 5. Persist drafts under transaction fencing
+    const targetStatus = adapted.status === 'incomplete' ? 'incomplete' : 'complete';
+    const persistenceResult = await persistExtractedDrafts(client, {
+      tenantId: params.tenantId,
+      jobId: params.jobId,
+      claimToken: claim.claimToken,
+      drafts: adapted.drafts,
+      status: targetStatus,
+      resultStorageKey,
+      ...(params.leaseTimeoutMinutes !== undefined
+        ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+        : {}),
+    });
+
+    const completedJob = (await getIngestionJob(client, params.tenantId, params.jobId))!;
+    return {
+      job: completedJob,
+      drafts: adapted.drafts,
+      persistedCount: persistenceResult.persistedCount,
+      supersededCount: persistenceResult.supersededCount,
+    };
+  } catch (error) {
+    const errorCode = error instanceof IngestionError ? error.code : 'extraction_exception';
+    const errorDetails = error instanceof Error ? error.message : String(error);
+
+    await failIngestionJob(client, {
+      tenantId: params.tenantId,
+      jobId: params.jobId,
+      claimToken: claim.claimToken,
+      errorCode,
+      errorDetails,
+      ...(params.leaseTimeoutMinutes !== undefined
+        ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+        : {}),
+    });
+
+    throw error;
+  }
+}
+
+/**
+ * Processes a Cloudflare Queue batch of menu ingestion messages.
+ *
+ * Guarantees:
+ * 1. Poison/malformed messages are acknowledged with logged errors to prevent poison loops.
+ * 2. Duplicate deliveries for running or completed jobs are acknowledged safely.
+ * 3. Successful extraction and draft persistence acknowledge the message.
+ * 4. Transient/retryable exceptions trigger message retry.
+ */
+export async function processIngestionQueueBatch(
+  client: DatabaseClient,
+  batch: { messages: readonly QueueMessage<unknown>[] },
+  extractor: PythonExtractor,
+  options?: {
+    workerId?: string;
+    leaseTimeoutMinutes?: number;
+    reportStorage?: ReportStorage;
+  },
+): Promise<{
+  processed: number;
+  acknowledged: number;
+  retried: number;
+  errors: Array<{ jobId?: string; error: string }>;
+}> {
+  let processed = 0;
+  let acknowledged = 0;
+  let retried = 0;
+  const errors: Array<{ jobId?: string; error: string }> = [];
+
+  for (const msg of batch.messages) {
+    const parseResult = MenuIngestionQueueMessageSchema.safeParse(msg.body);
+    if (!parseResult.success) {
+      msg.ack();
+      acknowledged += 1;
+      errors.push({
+        error: `Invalid queue message: ${parseResult.error.message}`,
+      });
+      continue;
+    }
+
+    const { tenantId, jobId } = parseResult.data;
+
+    try {
+      const workflowOutcome = await executeIngestionWorkflow(client, {
+        tenantId,
+        jobId,
+        workerId: options?.workerId ?? 'cf-queue-worker',
+        extractor,
+        ...(options?.reportStorage !== undefined ? { reportStorage: options.reportStorage } : {}),
+        ...(options?.leaseTimeoutMinutes !== undefined
+          ? { leaseTimeoutMinutes: options.leaseTimeoutMinutes }
+          : {}),
+      });
+
+      if (workflowOutcome.job.status === 'queued') {
+        msg.retry();
+        retried += 1;
+        errors.push({
+          jobId,
+          error: `Job requeued for retry: ${workflowOutcome.job.error_code ?? 'unknown_error'}`,
+        });
+      } else {
+        msg.ack();
+        acknowledged += 1;
+        processed += 1;
+      }
+    } catch (err: unknown) {
+      if (err instanceof IngestionError) {
+        if (err.code === 'job_lease_active') {
+          // Job is currently running under an active lease.
+          // Delay redelivery through the trusted lease expiry. Retrying immediately
+          // can consume the consumer retry budget before an abandoned lease expires.
+          if (err.retryDelaySeconds === undefined) {
+            // Defensive fallback for a malformed/incomplete job row: preserve
+            // recovery rather than ACKing, though normal active leases always
+            // provide the delay calculated above.
+            msg.retry();
+          } else {
+            msg.retry({ delaySeconds: err.retryDelaySeconds });
+          }
+          retried += 1;
+          errors.push({ jobId, error: 'Job is currently running under an active lease' });
+          continue;
+        }
+        if (err.code === 'job_already_complete' || err.code === 'job_already_locked_or_complete') {
+          // Duplicate queue delivery for completed or terminal job: ACK safely
+          msg.ack();
+          acknowledged += 1;
+          continue;
+        }
+        if (err.code === 'job_not_found') {
+          msg.ack();
+          acknowledged += 1;
+          errors.push({ jobId, error: 'Job not found' });
+          continue;
+        }
+      }
+
+      // Transient or unexpected error: retry delivery
+      msg.retry();
+      retried += 1;
+      errors.push({
+        jobId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { processed, acknowledged, retried, errors };
+}

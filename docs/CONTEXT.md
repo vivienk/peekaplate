@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, and S3-VIS-01 / VIS-02 menu extraction and structured dish draft contracts (MenuExtractionResultSchema supporting schema 1/pipeline 2 and schema 2/pipeline 3 with subcategory, category_page_number, price_text, candidate_id, draft_index; ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, ExtractionSourceRecordSchema, ExtractionSourceSegmentSchema, ExtractionCaptureRequestSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Offsets, rank sequences, decimal price precision, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "be7c1679d22d25bb0b159c882153e08c02505a4734ba06baed230c2c2250d1bc"
+      "sourceFingerprint": "efbe9b0d3369288dbe18a49b5beaa8fa40e900c29e74fde8c4c289ccb4a1bf6b"
     },
     {
       "id": "tokens",
@@ -109,7 +109,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded. Bounded retrieval supports linked PDF discovery, native page-aware text evidence and IPv4-mapped IPv6 SSRF checks within source/context limits; extraction and publication remain separate.",
+      "summary": "Hono Worker verifies staff JWTs/membership for draft commands and bounded analytics. Direct-DO extraction host deployed with signed source grants; OCR key protected and standalone OCR passed. VIS-04 retrieval enforces SSRF (including IPv4-mapped IPv6), native page-aware PDF text evidence, Unicode spans and context limits. VIS-01 menu ingestion provides schema 1/2 and pipeline 2/3 extraction adapter preserving subcategory, page, price, and evidence spans; draft persistence preserving draft_index; attempt-scoped report retention via immutable result_storage_key and INGESTION_REPORTS_BUCKET; typed extraction transport with 720s timeout; Queue consumer delays active-lease redelivery through the remaining 15-minute fence (+1s) and ACKs terminal states; atomic draft approval and dish creation under concurrency with required commandId and es_command idempotency; strict URL intake rejection pending materialization service. Staging queues stay paused; publication is unreleased.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -119,8 +119,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/extraction-capability.ts",
+        "backend/src/extraction-host.test.ts",
+        "backend/src/extraction-host.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/ingestion/adapter.test.ts",
+        "backend/src/ingestion/adapter.ts",
+        "backend/src/ingestion/contract.test.ts",
+        "backend/src/ingestion/ingestion.integration.ts",
+        "backend/src/ingestion/orchestrator.test.ts",
+        "backend/src/ingestion/orchestrator.ts",
+        "backend/src/ingestion/repository.test.ts",
+        "backend/src/ingestion/repository.ts",
+        "backend/src/ingestion/transport.ts",
+        "backend/src/ingestion/workflow.integration.test.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -138,14 +151,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
+        "backend/tsconfig.json",
+        "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
         "docs/menu-ingestion-infrastructure.md",
-        "scripts/menu-ingestion-infra.test.mjs",
-        "backend/src/extraction-host.ts",
-        "backend/src/extraction-host.test.ts",
-        "backend/wrangler.extraction.jsonc",
-        "backend/src/extraction-capability.ts",
-        "backend/tsconfig.json"
+        "scripts/menu-ingestion-infra.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -157,12 +167,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7ae9ff0f5719ed8a8b7a75cc937403d83584f7600ec791a9fa69e9e42a2e088c"
+      "sourceFingerprint": "be7c484ef2d783f209861f522a5a1de295912efe69103ab1998855cc236378f0"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor memberships and tenant projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP-ready startup; hosted staff checks are separate. Private PostHog export is append-only: eight raw copies/four deduplicated synthetic events. The October 22 audit verifies migration 20261021130000/history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope; exporter has no application-schema access. Hosted pool reuse/restore remain unverified. The standalone owner-metric oracle covers NULL-ID rejection, retries/conflicts and the ten-session fixture floor; canonical report integration remains separate. Canonical index/conflicts plus typed facts and tenant-restricted live-only owner views are defined; activity uses the greatest checkpoint. Report suppression/authorization and consumer integration remain separate.",
+      "summary": "Private Postgres venue/event/command/outbox, actor memberships, tenant projections, and ingestion jobs/drafts use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP-ready startup; hosted checks are separate. Private PostHog export is append-only: 8 raw copies/4 deduplicated events. Oct 22 audit verifies migration 20261021130000, staging scope 675372, restricted execution, denied runtime raw access. Owner-metric oracle covers NULL-ID rejection, retries/conflicts, ten-session floor; canonical report integration is separate. Canonical index/conflicts plus typed facts and tenant-restricted owner views are defined. Forward migration 20261026220000 adds menu_ingestion_jobs and dish_drafts with lease fencing, exact numeric prices, subcategory, page, price_text, and ON DELETE SET NULL on dish_current. pgTAP tests cover ingestion RLS, retry constraints, composite FKs. Report suppression and consumer integration are separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -179,7 +189,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261023120000_observation_index.sql",
         "tests/db/observations.sql",
         "migrations/20261026120000_observation_facts.sql",
-        "tests/db/observation-facts.sql"
+        "tests/db/observation-facts.sql",
+        "migrations/20261026220000_menu_ingestion_drafts.sql",
+        "tests/db/menu_ingestion.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -189,7 +201,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "107f87f6fa9137cdcd252696934b3c999aa54dd4c9040aed6f6f4286a9267a34"
+      "sourceFingerprint": "dac9648807a377882f7e1cad95f7ed1cb23a14264294e854fad8f90bb860bb04"
     },
     {
       "id": "measurement",
@@ -263,7 +275,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "a928f9320aba6314afe38a22a8a625efd738b646c41b22542e4fd7983e9a0091"
     },
     {
       "id": "agents",
@@ -374,6 +386,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Resolved outstanding review findings on PR #45 (Hemu): (1) Lease-aware redelivery delay derived from remaining PostgreSQL lease plus safety second, preventing Queue retry budget exhaustion before lease expiry. (2) Generation-scoped report storage via immutable result_storage_key protecting from stale worker overwrites. (3) 400 invalid_json on malformed nonempty JSON approval requests. (4) Required client-stable commandId in ApproveDishDraftRequestSchema for idempotent approval replay, conflict rejection, and atomic dish creation. Comprehensive unit and real PostgreSQL regression assertions pass.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Keep menu queues paused. Review Worker consumer binding, batch/concurrency limits, and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
+    },
+    {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
       "modules": [
         "database",
@@ -449,15 +470,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Teeyansh can use staging runtime bindings without receiving internal secret values. Configure approved existing OCR/AI provider credentials when ready, finish/review PR45 and its migrations/report adapter, align600s transport with700s processing plus cold start, then run controlled authorized upload→Queue→service→private report→database drafts→ACK and failure/tenant tests before unpausing. No production or restaurant-data tests were performed."
-    },
-    {
-      "summary": "Paid activation resolved Container eligibility. Existing protected API run succeeded and menu aliases are live. Actual container registration then rejected default scheduling; prepared directDO runtime repair with RED/GREEN config guard and startup/readiness/concurrency/failure-recovery tests. Dev-only official Worker types are pinned to mature October26 release; latest October28 was blocked by dependency maturity policy, which remains unchanged.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
     }
   ]
 }

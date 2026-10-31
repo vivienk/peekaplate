@@ -17,7 +17,8 @@
       "vars": {
         "APP_ENV": "staging",
         "POSTHOG_PROJECT_ID": "675372",
-        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1"
+        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
+        "EXTRACTION_TIMEOUT_MS": "720000"
       },
       "hyperdrive": [
         {

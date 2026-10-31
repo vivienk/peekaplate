@@ -1,0 +1,60 @@
+{
+  "schema_version": 2,
+  "pipeline_version": "3",
+  "status": "complete",
+  "source": {
+    "source_id": "src_invalid",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "kind": "pdf",
+    "location": "https://example.com/invalid.pdf",
+    "retrieved_at": "2026-10-27T12:00:00.000Z",
+    "size_bytes": 1024,
+    "snapshot_base64": "c29tZSBwZGY="
+  },
+  "started_at": "2026-10-27T12:00:00.000Z",
+  "finished_at": "2026-10-27T12:00:02.000Z",
+  "extraction_mode": "ai",
+  "ocr_engine": 3,
+  "library_versions": {},
+  "configuration": {},
+  "segments": [
+    {
+      "segment_id": "seg_inv_1",
+      "page_number": 1,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "Short page text 15",
+      "warnings": [],
+      "metadata": {}
+    }
+  ],
+  "drafts": [
+    {
+      "candidate_id": "cand_inv_1",
+      "draft_id": "draft_inv_1",
+      "name": "Invalid Dish",
+      "price_amount": "10.00",
+      "price_currency": "USD",
+      "source_id": "src_invalid",
+      "source_text": "Short page text 15",
+      "status": "needs_review",
+      "review_warnings": []
+    }
+  ],
+  "evidence": [
+    {
+      "draft_id": "draft_inv_1",
+      "draft_index": 0,
+      "spans": [
+        {
+          "segment_id": "seg_inv_1",
+          "start": 0,
+          "end": 999
+        }
+      ]
+    }
+  ],
+  "capture_requests": [],
+  "warnings": [],
+  "errors": []
+}

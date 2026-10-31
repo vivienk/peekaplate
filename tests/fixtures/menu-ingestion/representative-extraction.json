@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "pipeline_version": "2",
+  "status": "complete",
+  "source": {
+    "source_id": "src_doc_v1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "kind": "pdf",
+    "location": "https://example.com/menu.pdf",
+    "retrieved_at": "2026-10-24T12:00:00.000Z",
+    "size_bytes": 2048,
+    "snapshot_base64": "c29tZSBwZGYgZGF0YQ=="
+  },
+  "started_at": "2026-10-24T12:00:00.000Z",
+  "finished_at": "2026-10-24T12:00:05.000Z",
+  "extraction_mode": "ai",
+  "extraction_model": "gpt-4o",
+  "ocr_engine": 3,
+  "library_versions": {
+    "pymupdf": "1.24.0"
+  },
+  "configuration": {
+    "batch_pages": 10
+  },
+  "segments": [
+    {
+      "segment_id": "seg_1",
+      "page_number": 1,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "Steak 24.95 USD\nMineral Water 0.00 USD",
+      "native_text": null,
+      "error": null,
+      "warnings": [],
+      "metadata": {}
+    }
+  ],
+  "drafts": [
+    {
+      "name": "Steak",
+      "description": "Grilled sirloin steak with herb butter",
+      "category": "Mains",
+      "price_amount": "24.95",
+      "price_currency": "USD",
+      "ingredients": ["beef", "butter", "herbs"],
+      "source_id": "src_doc_v1",
+      "source_text": "Steak 24.95 USD",
+      "image_id": null,
+      "review_warnings": ["Verify cook temperature."],
+      "status": "needs_review"
+    },
+    {
+      "name": "Mineral Water",
+      "description": null,
+      "category": "Beverages",
+      "price_amount": "0.00",
+      "price_currency": "USD",
+      "ingredients": null,
+      "source_id": "src_doc_v1",
+      "source_text": "Mineral Water 0.00 USD",
+      "image_id": null,
+      "review_warnings": [],
+      "status": "needs_review"
+    }
+  ],
+  "evidence": [
+    {
+      "draft_id": "draft:steak_01",
+      "draft_index": 0,
+      "spans": [
+        {
+          "segment_id": "seg_1",
+          "start": 0,
+          "end": 15
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:water_01",
+      "draft_index": 1,
+      "spans": [
+        {
+          "segment_id": "seg_1",
+          "start": 16,
+          "end": 38
+        }
+      ]
+    }
+  ],
+  "capture_requests": [],
+  "warnings": [],
+  "errors": []
+}

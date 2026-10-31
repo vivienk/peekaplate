@@ -69,15 +69,33 @@ consumer. **Paused messages still expire after 24 hours.** Leave real submission
 off until the processing flow is accepted. Do not attach a placeholder handler
 that acknowledges work without processing it.
 
+The reviewed Worker recovery policy is separate from those temporary pull
+settings: an early delivery that finds an active 15-minute PostgreSQL lease calls
+`retry({ delaySeconds })` with the remaining lease interval plus one second. This
+preserves a later recovery delivery before a default three-retry consumer can
+exhaust its budget; the Queue API permits retry delays up to 24 hours. Keep the
+source consumer paused until its Worker binding, one-message batch/concurrency
+limits, DLQ, and this lease-aware recovery test are reviewed together. The
+release test must exercise an early delivery, the deferred post-expiry delivery,
+and its ACK—not infer this policy from the temporary pull consumer.
+
 Use separate keys in the existing bucket:
 
 ```text
 menu-ingestion/sources/<server-set tenant UUID>/<server-set job UUID>/source
-reports/<server-set tenant UUID>/<server-set job UUID>/extraction.json
+reports/<server-set tenant UUID>/<server-set job UUID>/attempts/<server-set claim UUID>/extraction.json
 ```
 
 The first is the service's required input location; the second matches PR #45's
-proposed report location. The Worker must authorize the venue, materialize the
+attempt-scoped immutable report key that prevents stale worker races across lease
+expiration. Attempt-scoped keys ensure write isolation across worker interruptions.
+If an interrupted or slow worker writes a report after its lease has expired, its
+artifact is isolated under its own claim key and cannot overwrite the winning attempt's
+report. Downstream consumers resolve the authoritative report via the
+`result_storage_key` persisted in PostgreSQL under transaction fencing. Unreferenced
+attempt reports from abandoned runs do not impact correctness; lifecycle policies may
+reclaim stale attempts out-of-band without destructive runtime cleanups. The Worker must
+authorize the venue, materialize the
 source, compute its SHA-256, then enqueue the job. A prefix is an organization
 rule, not an access-control boundary. Bucket credentials can read across its
 prefixes; keep them server-side and limit them to the staging bucket.
