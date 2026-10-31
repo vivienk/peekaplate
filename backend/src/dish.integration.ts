@@ -4,6 +4,7 @@ import {
   DishRevisionSchema,
   MenuApprovalSchema,
   MenuPublicationSchema,
+  PublicMenuResponseSchema,
 } from '@peekaplate/contracts';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
@@ -629,19 +630,23 @@ describe('real PostgreSQL menu publication commands', () => {
     await registerPublicBundle(menuId, approvalInput.menuRevisionId);
 
     expect((await requestPublicMenu(menuId)).status).toBe(404);
-    const approval = await (await requestPublication(menuId, 'approvals', approvalInput)).json();
-    const publication = await (
-      await requestPublication(menuId, 'publications', {
-        commandId: crypto.randomUUID(),
-        expectedVersion: 0,
-        approvalId: approval.approvalId,
-      })
-    ).json();
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', approvalInput)).json(),
+    );
+    const publication = MenuPublicationSchema.parse(
+      await (
+        await requestPublication(menuId, 'publications', {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          approvalId: approval.approvalId,
+        })
+      ).json(),
+    );
 
     const response = await requestPublicMenu(menuId);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const body = await response.json();
+    const body = PublicMenuResponseSchema.parse(await response.json());
     expect(body).toMatchObject({
       schemaVersion: 1,
       venueId: venue,
