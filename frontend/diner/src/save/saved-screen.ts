@@ -7,6 +7,7 @@ import type { SendEvent } from './events';
 import { mountSaveHeart, mountToastArea } from './mount';
 import type { SaveState } from './save-state';
 import { type SavedItem, savedItems, shortlistViewedPayload } from './saved-screen-model';
+import './saved-screen.css';
 
 export const SESSION_ONLY_NOTICE = 'Saved for this session only';
 const PLACEHOLDER_TEXT = 'More information needed — pending restaurant input';

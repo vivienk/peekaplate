@@ -1,0 +1,33 @@
+/*
+ * Saved screen structure (S3-DIN-02.5). Only what accessibility needs until the Figma Saved frames
+ * are applied: every control is at least 44px square, comfortably above WCAG 2.2's 24px minimum, so
+ * the size never depends on the platform's font.
+ */
+.pp-saved__back,
+.pp-saved__save,
+.pp-saved__browse,
+.pp-saved__open {
+  box-sizing: border-box;
+  min-inline-size: 2.75rem;
+  min-block-size: 2.75rem;
+}
+
+.pp-saved__item {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+
+.pp-saved__open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  text-align: start;
+}
+
+.pp-saved__image {
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  object-fit: cover;
+}

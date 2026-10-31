@@ -90,7 +90,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/mount.ts",
         "frontend/diner/src/save/saved-screen.ts",
         "frontend/diner/src/save/saved-screen-model.ts",
-        "frontend/diner/src/save/saved-screen-model.test.ts"
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -99,7 +100,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0a726e457ceb7f33f72f1cdd975146735b93f5d1d3f08c1244310758c2f65f4c"
+      "sourceFingerprint": "24ce51920c6378835fe004c651b2ec95eeace66e0359ffcac4134cac8c95c49b"
     },
     {
       "id": "console",

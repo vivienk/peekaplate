@@ -494,6 +494,13 @@ test('Saved screen works by keyboard and passes an accessibility scan', async ({
   await page.keyboard.press('Enter');
   expect((await savedInfo(page)).opened).toHaveLength(1);
 
+  // Every control is at least 44px square, whatever the platform's font.
+  for (const button of await page.locator('.pp-saved button').all()) {
+    const box = await button.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
