@@ -13,13 +13,24 @@ export type MenuSearchResult = {
 
 const NO_MATCH: MenuSearchResult = { dishIds: [], allergyNotice: false };
 
-// A P0 allergen chip matches its code or its label, so "egg" and "eggs" both find "Eggs".
+// Other names diners use for a P0 allergen, e.g. "Soya" from the Figma icon set.
+const ALLERGEN_ALIASES: Partial<Record<(typeof ALLERGENS)[number]['code'], string[]>> = {
+  soy: ['soya', 'soybean', 'soybeans'],
+  sesame: ['sesame seed', 'sesame seeds'],
+};
+
+// A P0 allergen chip matches its code, its label or an alias, so "egg" and "eggs" both find "Eggs"
+// and "soya" finds "Soy". Keyed by label because the adapter turns P0 codes into labels.
 const ALLERGEN_KEYS = new Map<string, string[]>(
-  ALLERGENS.map((a) => [chipKey(a.label), [chipKey(a.code), chipKey(a.label)]]),
+  ALLERGENS.map((a) => [
+    chipKey(a.label),
+    [a.code, a.label, ...(ALLERGEN_ALIASES[a.code] ?? [])].map(chipKey),
+  ]),
 );
 
-// Allergy words that only show the staff line and never match a dish: common terms outside the
-// P0 list, so searching them never reads as "this menu is free from it".
+// Common allergy terms outside the P0 list. They show the staff line even when no dish lists them,
+// so searching them never reads as "this menu is free from it"; a term a dish does list as an
+// allergen (e.g. Mustard) also matches that dish.
 const NOTICE_ONLY_TERMS = [
   'gluten',
   'shellfish',
@@ -48,7 +59,8 @@ function allergenKeys(value: string): string[] {
   return ALLERGEN_KEYS.get(chipKey(value)) ?? [chipKey(value)];
 }
 
-// Name, category and ingredients match partially, ignoring case and repeated spaces.
+// Name, category and ingredients match partially, ignoring case and repeated spaces. Hyphens are
+// kept here on purpose; chip matching uses chipKey, which drops them ("gluten-free" = "glutenfree").
 function textKey(value: string): string {
   return value.toLowerCase().replace(/\s+/g, ' ').trim();
 }
@@ -80,6 +92,8 @@ export function searchMenu(menu: Menu, query: string): MenuSearchResult {
     .map((dish) => dish.dishId);
 
   // Shown even with no results: "no dishes found" for an allergen must not read as "free from".
+  // NOTICE_KEYS covers P0 allergens, dietary values and common terms with or without matches; the
+  // second check covers an allergen outside the P0 list that a dish on this menu lists.
   const allergyNotice =
     NOTICE_KEYS.has(key) ||
     dishes.some((dish) => dish.allergens.some((value) => allergenKeys(value).includes(key)));

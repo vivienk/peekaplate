@@ -89,7 +89,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "cfd7f9ad9a86b86cbd26ac7818ac5f1e992ff3417e76577f2ac66de5107c08ba"
+      "sourceFingerprint": "5be97b72dffd38aab92c0756d54b8911b6cdff073c0e48ed9a82ee4c921028d7"
     },
     {
       "id": "console",
@@ -380,7 +380,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Build the picker screen (title, Keeping card, orange border and check, search bar, no-results, clear, back/close) on the DIN-01.2 dish card and the DIN-01.3 Compare entry once Harshita shares them; add the DIN-02.2 heart. Design for the one-dish and empty cases is open with Rania/Amr. DIN-02.4 builds the result and Replace on these exclusions."
     },
     {
-      "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip via the adapter's chipKey, and an approved P0 allergen matches its code or label (egg/Eggs), so \"gluten\" never finds Gluten-free. allergyNotice is true for any P0 allergen, dietary value, menu allergen or common allergy term (shellfish, gluten, mustard...), even with no results, so no results never reads as free from. Description never searched; incomplete dishes excluded; no API call, events or logging. 18 Vitest cases pass.",
+      "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip via the adapter's chipKey, and an approved P0 allergen matches its code, label or alias (egg/Eggs, soya/Soy, sesame seeds/Sesame), so \"gluten\" never finds Gluten-free. allergyNotice is true for any P0 allergen, dietary value, menu allergen or common allergy term (shellfish, gluten, mustard...), even with no results, so no results never reads as free from. Description never searched; incomplete dishes excluded; no API call, events or logging. 19 Vitest cases pass.",
       "modules": [
         "diner"
       ],
