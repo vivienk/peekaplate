@@ -2,9 +2,9 @@
 
 The foundation is PR 0. It establishes a place to build and verify PeekaPlate; it does not claim the pilot is complete. The product line stays: **3D is the hook. The loop is the product.**
 
-## Next step: Cloudflare Workers and Supabase
+## Current foundation and next tickets
 
-The repository foundation and local staff-command slice already exist. The immediate engineering step is the [cloud-integration checkpoint](operations.md#cloud-integration-checkpoint): connect an isolated Supabase staging project to the existing Worker through Hyperdrive, verify real staff identities and restricted database access, then demonstrate the existing draft-save flow safely. No credentials or hosted resources are configured by this documentation change.
+Cloudflare staging pages, the Worker, Supabase and restricted staff-command access have been verified as recorded in [operations](operations.md). Consented shell events from both hosted pages also reached PostHog. The [private analytics export](posthog-export.md) is verified in staging: successful transfer, matching test records, duplicate-safe repeat and restricted access checks passed. Hourly exports are enabled. Teams can start design finalization, T0 menu UI, reviewed content/publication and event-contract tickets against this foundation. Owner reports must use the planned validated Supabase projections without waiting for hourly exports; agree and test freshness in the event/dashboard tickets. This is not a completed diner or owner product.
 
 Diner fixtures/design, event definitions and manual preparation of three sample dishes can proceed in parallel. Publication follows the existing command boundary; real observations require approved publication; dashboard aggregates require validated observations. The restored [implementation plan](implementation_plan.md) supplies the controls, exact calculation proposals and dependencies. Provider verification does not imply these product flows are complete.
 

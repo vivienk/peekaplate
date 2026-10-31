@@ -1,6 +1,117 @@
 # Local and staging operations
 
-Repository transition: [migration and release checklist](repository-migration.md) records repository and deployment gates. Under [ADR 0012](adr/0012-main-environment-promotion.md), `main` supplies both environments: test an exact commit in staging, then promote that same commit to production after human approval. The staging workflow requires `STAGING_DEPLOYMENT_APPROVED=true`; keep it disabled until its controls are verified. Production deployment remains unconfigured.
+## OCR credential activation — October 28, 2026 (Phoenix)
+
+`OCR_SPACE_API_KEY` is configured in GitHub's existing protected `staging`
+environment and as a secret binding on `peekaplate-extraction-staging`. No key
+value was committed, saved in operator files or printed. Existing host bindings,
+service/signing credentials, image, database and production resources were unchanged.
+The secret update created extraction Worker version
+`7b505396-501e-4d46-870f-d6dbd87655ee`; its application code remains main `7bbe0d3`.
+
+One fresh call through the existing Python OCR adapter to OCR.space Engine 3
+completed in **4.654 seconds** with no cache hit. It read all three expected
+synthetic dish names and prices. This was an OCR-only provider check from the
+operator's machine, not a hosted `/extract` or Queue/database acceptance test.
+The [service handoff](menu-ingestion-infrastructure.md#ocr-credential-and-provider-check--october-28-2026)
+records the configuration boundary and remaining AI/migration/consumer work.
+Both menu queues remain paused; no workflow or production deployment was triggered.
+
+## VIS-01 hosted activation — October 27, 2026 (Phoenix)
+
+Workers Paid entitlement, the existing menu Queue/DLQ and private R2 bucket are
+verified. The protected API release at main 58838e1 succeeded and menu aliases
+are live. The scheduler repair in [PR #60](https://github.com/vivienk/peekaplate/pull/60)
+deployed the extraction host from main `7bbe0d3729503f69a05c0f360ed09a41b9ecaf08`, reusing the
+already-uploaded image and existing host/application namespace. It uses direct
+Durable Object scheduling, standard-1 capacity and a native 60-second idle
+timeout. Fixed-name routing selects one instance; it is not a billing cap.
+
+Service/signing secrets and the API URL are configured privately. Hosted Python
+health, authorization denials, signed private source reads, unsupported-input
+rejection, hash conflict and exact cleanup passed. The separate genuine remote
+Queue→R2→ACK/retry→DLQ test passed and left both queues empty and paused.
+Team APIs still return 200 with the operator's own identity and 401 anonymously.
+No provider keys, Supabase changes or production release were added.
+
+Earlier local-Worker R2 claims are corrected: forceLocal meant those R2 steps
+were local even though Queue delivery was real. The corrected remote tests and
+exact component versions are in the [hosted acceptance record](menu-ingestion-infrastructure.md#hosted-acceptance--october-27-2026-phoenix).
+Real OCR/AI extraction and PR #45's full upload/report/database/ACK acceptance
+remain separate. Keep real submissions off until those pass.
+
+## Observation infrastructure — October 24, 2026
+
+Created only the missing staging source Queue and DLQ in the existing account, reused private `peekaplate-staging-assets`, and verified source retry-to-DLQ routing with HTTP pull consumers. The complete synthetic repeat at `2026-10-24T17:30:36.147Z` passed archive/readback before ACK, initial delivery plus three retries, DLQ arrival and exact probe cleanup. A separate real R2 concurrency check allowed exactly one create-only writer and preserved its bytes on conflicting attempts. Provider readback confirms both Queues empty and paused, 24-hour retention, `r2.dev` disabled, no custom domain and no CORS rule. No production resource, application consumer, database fact or unfinished PR changed.
+
+The [observation infrastructure handoff](observation-infrastructure.md) records names/IDs, configuration, test limits and consumer replacement steps. Staging producer/R2 bindings are prepared in `backend/wrangler.jsonc`; their live activation requires the reviewed `main` deployment. No ingestion route or successful placeholder Queue handler is added. This new setup record advances the earlier provisioning checkpoint below without claiming the full observation pipeline is implemented.
+
+## Team analytics hosted verification — October 22, 2026
+
+The staging Worker is deployed and its collaborator read path works. This record supersedes the earlier same-day prerequisite audit below. The two hosted 403 cases were initially deferred; the [October 23 follow-up](#non-collaborator-confirmation--october-23-2026) now records successful non-collaborator denial. Controlled collaborator removal remains pending. This is staging development access, not pilot or production sign-off.
+
+| Release item | Verified result |
+| --- | --- |
+| Main release | `afe45dbe99967a9010f73bce7fb5f82a3597313d` (`afe45db`) |
+| Protected deployment | [Run 39907285014](https://github.com/vivienk/peekaplate/actions/runs/39907285014), successful; requested by `vivienk`, approved under the maintainer's authorization by eligible reviewer `hemu77`; no administrator bypass used |
+| Activation flag | `STAGING_DEPLOYMENT_APPROVED=true`; manual dispatch remains required |
+| Worker version | `5922a293-6893-47fd-8bc5-a20f0afd8d0b` at `https://peekaplate-api-staging.vxkong.workers.dev` |
+| Migration | Read-only audit confirmed history version `20261021130000`, its function and the sole project-scope row `675372` |
+| Hyperdrive | Existing binding, restricted `peekaplate_staging_login`, query caching disabled, connection limit 20 |
+
+The deployment's frozen install, `pnpm check`, `pnpm build` and Wrangler deploy passed. GitHub's approval history confirms a different eligible account approved Vivien's request. Administrator bypass is still allowed by the environment settings, but was not used. Vivien confirmed the checker token is limited to this repository with Metadata read, the Cloudflare token's IP restriction was removed, and both expire January 20, 2027. Scope/expiry details are operator confirmations: GitHub secret values cannot be read back. The successful release verifies their effective deployment/API use, not every permission or expiry claim. Rotate through protected secret storage before expiry.
+
+### Hosted checks
+
+Fourteen direct HTTP checks passed against this release. The caller's existing GitHub credential was held in memory, verified as `hemu77`, sent only to GitHub and the fixed staging Worker, and never printed or saved. Analytics requests used `from=2026-10-20T06:00:00Z&until=2026-10-20T07:00:00Z`.
+
+| Check | Result |
+| --- | --- |
+| `GET /health` | 200 |
+| `GET /team/analytics/events` with the collaborator's credential | 200; four synthetic records |
+| `GET /team/analytics/summary` with the same credential | 200; two event/surface groups |
+| Missing and invalid credential on both endpoints | 401 in all four cases |
+| Client project override, duplicate parameter, excessive date window and result limit | 400 in all four cases |
+| Existing staff revision endpoint without staff authentication | 401; no write performed |
+| Diner and console staging roots | 200 HTML for both |
+
+All applicable API responses had `Cache-Control: no-store`, a request ID and no permissive CORS grant. Both successful analytics responses passed `TeamAnalyticsResponseSchema`: fixed staging project/source, bounded arrays and allowlisted properties, without visitor/person/IP fields. Freshness remains `hourly_export_delay`; these are internal diagnostics, not owner metrics.
+
+A read-only SQL transaction passed eleven assertions: migration history; staging-only scope; fixed-search-path security-definer ownership by a non-login/non-bypass role; runtime function execution; runtime denial of scope-table reads; denied raw/view reads and analytics-schema access for browser/runtime roles; denied browser function execution; no reader schema-create privilege; safe runtime role flags; forced RLS on all six application tables; and an append-only exporter without application-schema access. Readback remained eight raw copies and four deduplicated events. No migration, grant or restaurant record changed during this audit.
+
+The PostHog export remains enabled/hourly, including only `app_shell_viewed` with `environment = staging`. Subsequent scheduled runs completed, including `01a1672c-5761-0000-4453-2b83d1fc11dd`. Their zero-row results establish successful execution, not new collection or completeness. See [the export record](posthog-export.md).
+
+### Remaining boundary
+
+- **Non-collaborator denial: PASS**, as recorded in the October 23 follow-up below. **Controlled collaborator removal: NOT RUN**; a disposable collaborator must return 200 before removal and 403 afterward. Random credentials test 401, not membership denial. Do not remove a real teammate. Local denial/revocation tests are separate evidence.
+- Existing successful staff-write, concurrency and revocation evidence remains below. This release rechecked unauthenticated staff denial and database permissions without repeating that full hosted write sequence.
+- Production has no configured application deployment or separate database/bindings. There is no hosted production endpoint to accept here. Production-mode route denial is covered locally; it is not a production deployment test. Pilot load, restore, monitoring/retention/billing ownership and production approval remain separate delivery work.
+
+Contributors can continue tickets with local fixtures and the bounded staging read API. Share [team data access](team-data-access.md), not provider passwords or the checker token. Complete the controlled removal test before closing full hosted acceptance. This documentation update does not deploy a newer application revision.
+
+### Non-collaborator confirmation — October 23, 2026
+
+Harshita helped complete the remaining outsider check. The maintainer supplied two successful terminal reports from a valid non-collaborator account, using the [repository checker introduced in PR #33](https://github.com/vivienk/peekaplate/pull/33). The second run followed a fresh `develop` clone. These are user-run hosted results, not a new test executed by the documentation editor.
+
+| Evidence | First run | Fresh-clone repeat |
+| --- | --- | --- |
+| Verification time (UTC) | `2026-10-24T05:52:32.802Z` | `2026-10-24T06:07:16.871Z` |
+| GitHub `/user` | 200; expected account matched | 200; expected account matched |
+| Staging events | 403; `error=forbidden` | 403; `error=forbidden` |
+| Events request ID | `e5c56d75-4c30-4bfa-8cc1-48736a0d6494` | `caff985f-24b6-4a4a-8deb-93741b07425d` |
+| Staging summary | 403; `error=forbidden` | 403; `error=forbidden` |
+| Summary request ID | `3c8c3962-48d1-4e69-b3b7-41af1274761f` | `260bf8ee-c591-4b88-bba9-4d340f747fb0` |
+| Checker outcome | PASS | PASS |
+
+Both UTC timestamps fall on October 23 in America/Phoenix. Target: `https://peekaplate-api-staging.vxkong.workers.dev`, with the checker's fixed historical query window. This verifies denial for the tested valid outsider identity on both routes; it does not measure data freshness. No token, password, raw analytics body or private conversation is retained here. The reports do not identify a new Worker release; the latest recorded deployment remains `afe45db` above.
+
+The collaborator 200 and invalid-token 401 evidence remains in the October 22 record. The outsider 403 check is now complete, and the staging inspection API is available to accepted repository collaborators. Controlled collaborator-removal acceptance and production verification remain NOT RUN. No access grants, migration, provider setting or deployment changed for this confirmation.
+
+## PostHog export handoff — October 21, 2026
+
+The private analytics export is verified in staging. Two successful runs of the same synthetic interval produced eight raw copies and four deduplicated events; the known diner and console records each matched once. All 14 read-only row/permission checks passed. The hourly schedule is enabled, with the official Supabase CA and hostname verification retained. See [the export runbook](posthog-export.md) for run IDs, recovery history and evidence limits. No grants were broadened. Subsequent scheduled execution was verified on October 22 above; sustained monitoring remains separate work. Menu and event-contract tickets can proceed; the hourly internal copy is separate from the planned promptly updated owner-report pipeline.
+
+Repository transition: [migration and release checklist](repository-migration.md) records repository and deployment gates. Under [ADR 0012](adr/0012-main-environment-promotion.md), `main` supplies both environments: test an exact commit in staging, then promote that same commit to production after human approval. The staging workflow requires `STAGING_DEPLOYMENT_APPROVED=true`; it is enabled for manual staging dispatch as recorded above. Production deployment remains unconfigured.
 
 ## What is configured
 
@@ -11,6 +122,32 @@ The October 18 provider inspection verified the existing Supabase project `icwhk
 A read-only database audit found both migration versions (`202610130001`, `20261014210000`), all six `app_private` tables with RLS enabled and forced, and a non-superuser staging login with only the `peekaplate_runtime` role membership, no RLS bypass and no role-creation privilege. Effective table/column grants and actor/tenant policy expressions matched the staff migration. The login has schema usage but no schema-create privilege; `anon` and `authenticated` have no SELECT grant on these six tables. This verifies catalog settings, not migration-file checksums. The hosted acceptance evidence below covers the existing staff command, not future publication or ingestion behavior.
 
 R2 inventory confirms existing buckets `peekaplate-staging-assets` and `peekaplate-production-assets`. The staging bucket has no custom domain or CORS policy and its public development URL is disabled. It is not yet bound to an asset-serving workflow; leave original-photo access private. Production bucket policies were not audited. Existing D1 databases are not part of this backend: PostgreSQL remains the single application database. Do not wire D1 as a second source of truth, create duplicate resources or delete the unused databases as part of this setup. No additional paid database branch was created.
+
+## GitHub staging environment settings — verified October 22, 2026
+
+The live [staging environment settings](https://github.com/vivienk/peekaplate/settings/environments/25058679013/edit) were inspected and the branch restriction saved on October 22, 2026 (America/Los_Angeles).
+
+| Setting | Verified configuration |
+| --- | --- |
+| Deployment branches and tags | Selected branches and tags; exact branch pattern `main`; 1 branch and 0 tags allowed |
+| Required reviewers | Enabled; `hemu77`, `jeff13in`, `TeeyanshShukla` listed |
+| Prevent self-review | Enabled |
+| Administrator bypass of protection rules | Allowed |
+| Wait timer | Disabled |
+| Environment variable | `CLOUDFLARE_ACCOUNT_ID` exists and is populated |
+| Environment secrets | `CLOUDFLARE_API_TOKEN` and `TEAM_GITHUB_TOKEN` exist; only names were inspected |
+
+These settings are saved in GitHub, outside the Git tree. This dated record documents their observed state; merging it does not apply settings or detect future drift. The [staging workflow](../.github/workflows/deploy-staging.yml) requires `refs/heads/main`, targets the `staging` environment and runs only by manual dispatch with repository variable `STAGING_DEPLOYMENT_APPROVED=true`. At the settings audit, main's workflow used only the Cloudflare variable and secret. This release also passes `TEAM_GITHUB_TOKEN` to Wrangler through a private temporary secrets file; merely storing that secret in GitHub does not configure the deployed Worker.
+
+No secret values were read or committed. Token validity, scopes and expiration were not verified. This settings audit did not enable or change `STAGING_DEPLOYMENT_APPROVED`, run a deployment, or test approval enforcement through a workflow run. Administrator bypass remains allowed, so the configured reviewer gate is not an absolute barrier to administrators. Before activation, verify credential permissions, intended staging bindings and the independent approval process. This environment observation does not establish repository branch protection, a billing-plan change or production readiness.
+
+### October 22 release prerequisite audit (before activation)
+
+A read-only SQL transaction against staging project `icwhkrlsecpzcomfjsso` initially found migration-history versions `202610130001`, `20261014210000` and `20261020070000`. At that earlier audit, migration `20261021130000`, its history entry, scope table and read function were absent. Vivien subsequently applied it; the new verification above confirms its history and effective permissions. No migration or grant was applied during either verification audit.
+
+Project-local Wrangler authenticated successfully with the operator's existing OAuth credential and could list the intended account's Worker secrets; the staging Worker returned an empty secret list. This verifies the operator connection, **not** the separate `CLOUDFLARE_API_TOKEN` or `TEAM_GITHUB_TOKEN` stored in GitHub. Both GitHub environment secret names exist, but their values, expiry and effective permissions remain unverified. GitHub secrets cannot be read back for local testing. Test them only through an approved protected runner without printing them; do not substitute the operator's OAuth result as evidence for those tokens.
+
+At this earlier audit the activation variable was unset and deployment remained disabled. Vivien subsequently enabled it after completing the prerequisites; the protected release and hosted positive checks are recorded above. The October 23 follow-up closes outsider denial; controlled collaborator removal remains deferred. The earlier audit itself changed no credentials, provider resources or deployment settings.
 
 ## Staging deployment record
 
@@ -93,17 +230,23 @@ The staff migration creates the `peekaplate_runtime` group role and narrow table
 
 Account access and scoped Wrangler authentication are available; reuse the deployed resources above. Effective runtime grants and the bounded hosted staff-command checks have passed. The staff login UI and remaining pilot checks are still separate deliverables. Keep secrets in the operator's credential store or protected provider configuration, not chat, fixtures or Git. An API key is not a staff session JWT.
 
-Under the recorded private GitHub Free policy, do not assume protected environments or approval enforcement exist. Keep the Actions deployment disabled unless those controls are verified. An authorized operator may deploy a clean, reviewed exact `main` commit using provider-held credentials after independent human approval. This is a manual process, not GitHub-enforced protection.
+The October 22 environment settings record supersedes the earlier assumption that staging controls were unavailable. Required reviewers, prevent self-review and the main-only restriction are configured; administrator bypass remains allowed. Protected Actions deployment and the positive access path now pass as recorded above. A direct operator deployment remains a separate route requiring a clean, reviewed exact `main` commit and independent human approval; that direct route does not itself enforce a GitHub environment gate.
 
 The staff-command cloud checks above are complete within their recorded scope: existing migration versions and effective runtime grants, genuine login, restricted uncached Hyperdrive, isolation, retries, concurrency, membership revocation, rollback and transaction-context reset. Do not recreate accounts or resources merely to repeat initial setup. Remaining pilot work includes the session-lifetime policy, representative latency/load, physical pooled-connection reuse evidence and backup restoration. A fresh hosted migration rehearsal remains unrun. Local connection reuse is evidence for application logic, not proof of a hosted pool. Supabase remains the accepted provider under ADR 0005; a Neon switch needs an explicit decision and equivalent auth integration evidence.
 
+## PR previews
+
+Static diner and console previews for PRs use separate `*-preview` Pages projects and a Pages-only token in the `preview` GitHub environment. The reviewed workflow/helper are now on default `main` at `ab6f9c4`, with `PREVIEW_DEPLOYMENT_ENABLED=true`. Automatic upload, exact-SHA readiness, browser rendering, one bot comment and close cleanup passed on synthetic PR #48. Setup, isolation, retention and the dated acceptance evidence are in [PR previews](previews.md#hosted-lifecycle-acceptance--october-26).
+
 ## Later Actions-based staging activation
 
-This checklist is conditional on an account/control model that supports the required environment restrictions and independent approval. It is **not available under the current private GitHub Free choice**. Use the owner-controlled checkpoint above now; keep this workflow disabled. If capabilities change, verify them rather than assuming a paid upgrade alone supplies private required reviewers.
+Team analytics API release and collaborator access are documented in [team data access](team-data-access.md). The forward migration grants only checked function execution to the existing runtime. Merging the release does not establish hosted activation.
+
+The required reviewer and main-only environment settings were observed on October 22 as recorded above. The later successful protected run exercised approval and both stored credentials; use that dated release record for current status. The following procedure remains applicable to future releases; no billing-plan change was verified.
 
 The repository owner supplies real account values and enables controls before automated deployment:
 
-1. Before enabling Actions deployment, verify that the GitHub plan supports the required controls. Configure the `staging` environment to accept `main` and require appropriate human approval. Keep `CLOUDFLARE_API_TOKEN` in protected configuration and `CLOUDFLARE_ACCOUNT_ID` scoped to the intended account. If the controls are unavailable, use the manual operator route above; leave the workflow disabled.
+1. Before enabling Actions deployment, recheck the recorded `staging` settings: only the `main` branch, required reviewers and prevent self-review. Account for the allowed administrator bypass when obtaining independent human approval. Verify `CLOUDFLARE_API_TOKEN` permissions and the intended account and staging bindings without printing credentials. The presence of a secret name is not authentication evidence. If the required controls or credentials cannot be verified, leave the workflow disabled and use the authorized operator route above.
 2. Reuse `peekaplate-diner-staging` and `peekaplate-console-staging`. Use `pnpm install --frozen-lockfile` followed by `pnpm --filter @peekaplate/diner build` or `pnpm --filter @peekaplate/console build`; outputs are `frontend/diner/dist` and `frontend/console/dist`. Set `CLOUDFLARE_ACCOUNT_ID` to the verified account and upload each output with an explicit project name, `--branch main` and `--commit-hash <reviewed-sha>`. Use `wrangler pages deploy`; do not recreate projects. Disable automatic production promotion until review controls exist. The console shell contains no real staff data.
 3. Deploy the Worker from a reviewed exact `main` commit using the authorized operator route or the gated workflow when available. Record its SHA and provider deployment ID. Confirm `/health`, a rejected unknown route and the authenticated staff-command flow. Ingest is not implemented. Never promote a newer untested `main` commit as though it were the same release.
 4. Reuse the existing staging Postgres and Hyperdrive; verify the reported R2 buckets before use. Provision Queue/DLQ resources with their implementation. Commit only verified non-secret binding IDs and test actual connections. Keep migration credentials, runtime credentials and signing secrets separate. A future production environment needs its own database and bindings; do not share the staging database. Follow [Cloudflare's Supabase/Hyperdrive guide](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/supabase/).
@@ -113,17 +256,17 @@ Production is a separate decision with separate credentials/resources. There is 
 
 ## Optional PostHog staging release
 
-The existing US PostHog project `675372` is used only for synthetic staging data. Local staging builds sent verified diner and console shell views; this does not mean the hosted Pages deployments contain the integration yet. The [setup record](posthog.md) identifies current access, privacy settings, the internal dashboard and remaining approval gates.
+The existing US PostHog project `675372` is used only for synthetic staging data. Both hosted staging pages now send verified consented synthetic shell views. The [setup record](posthog.md) identifies current access, privacy settings, the internal dashboard and remaining approval gates.
 
-After the final PR receives independent human approval and the release reaches `main`, build that exact commit with `--mode staging`. Supply the five `VITE_POSTHOG_*` values from each frontend's `.env.example`; use its exact Pages origin and the staging project's public ingestion token. Build-time configuration is required: runtime variables cannot change uploaded static JavaScript. Never add personal API keys or database secrets to these values.
+For future releases, obtain the required review and build the exact approved `main` commit with `--mode staging`. Supply the five `VITE_POSTHOG_*` values from each frontend's `.env.example`; use its exact Pages origin and the staging project's public ingestion token. Build-time configuration is required: runtime variables cannot change uploaded static JavaScript. Never add personal API keys or database secrets to these values.
 
-Upload only `frontend/diner/dist` and `frontend/console/dist` to their existing, explicitly named Pages projects, using `--branch main` and the reviewed commit hash. No Worker, database or migration deployment is required for PostHog. Verify zero capture before consent, one correct event after opt-in, withdrawal/reload, browser privacy blocking and real PostHog readback on both hosted URLs. Record deployment IDs and the exact SHA. To roll back analytics, rebuild with `VITE_POSTHOG_ENABLED=false` and redeploy, or restore the previous reviewed Pages release.
+Upload only `frontend/diner/dist` and `frontend/console/dist` to their existing, explicitly named Pages projects, using `--branch main` and the reviewed commit hash. Browser capture requires no Worker or database deployment. The separate [Supabase export](posthog-export.md) requires its reviewed migration and restricted connection. Verify zero capture before consent, one correct event after opt-in, withdrawal/reload, browser privacy blocking and real PostHog readback on both hosted URLs. Record deployment IDs and the exact SHA. To roll back analytics, rebuild with `VITE_POSTHOG_ENABLED=false` and redeploy, or restore the previous reviewed Pages release.
 
 Member access is sufficient for these synthetic checks and internal charts. An administrator still needs to confirm project naming, staging-only use, the actual billing limits and deletion responsibility. No paid upgrade was purchased. Production requires its own project and release approval; real diner collection also needs an approved privacy/retention policy.
 
 ## GitHub merge controls
 
-The current owner chooses GitHub Free and private repositories. GitHub does not enable branch protection/rulesets for these private repos on this plan, so `main` and `develop` remain unenforced. The ruleset files below are retained for a future plan change, not presented as active policy. For now, keep write access limited; require reviewed PRs, passing `ci`, and an independent human approval comment before merges; preserve migration/release history with merge commits. These are team process controls, not GitHub enforcement, and admins can bypass them. Protect production credentials in provider settings and keep production promotion behind explicit human release sign-off. Configuration files and CODEOWNERS do not establish enforcement.
+On October 19, the canonical repository was public and GitHub reported both `main` and `develop` as unprotected. Earlier private-plan limitations are historical. The stored ruleset proposals are not active policy; an administrator should now evaluate enabling them for the public repository. For now, keep write access limited; require reviewed PRs, passing `ci`, and an independent human approval comment before merges; preserve migration/release history with merge commits. These are team process controls, not GitHub enforcement, and admins can bypass them. Protect production credentials in provider settings and keep production promotion behind explicit human release sign-off. Configuration files and CODEOWNERS do not establish enforcement.
 
 CI runs with read-only tokens and pinned action SHAs. PR bodies are read as data, never interpolated into shell commands. The final gate requires path selection and quality to succeed and every applicable integration lane to pass. Fork PRs receive no deployment credentials. Require a human approval with a review comment on the current commit for every PR, including AI-written and dependency changes. Reviewers and mergers currently enforce both approval and comment content manually. Native approval rules could enforce approval only after they become available and are activated. No additional comment-check workflow or automatic approval is configured.
 
@@ -136,3 +279,41 @@ Dependabot checks routine versions on the first day of each month, with one open
 Document and demonstrate: Queue retry and poison-message DLQ handling; create-only archive conflict quarantine; replay with network side effects disabled; independent backup of Postgres, approved assets/manifests and R2 evidence; restore reconciliation by ID and checksum; deletion requests reapplied after restoration. Measure the plan's content RPO ≤24 hours and restore RTO ≤4 hours. Until the drill exists, those are targets only.
 
 For a failing release, stop promotion and preserve logs without secrets or raw diner data. Prefer restoring the prior application deployment and forward-fixing schema. Do not delete an event stream or silently acknowledge unarchived observations to clear an alert.
+
+## PostHog hosted release — October 19, 2026
+
+Released exact main commit `2a135faa4386fc3e1002aef3d1a150930e5ff9bf` after [PR 14](https://github.com/vivienk/peekaplate/pull/14) and [PR 15](https://github.com/vivienk/peekaplate/pull/15). The user explicitly delegated setup approval; the review disclosed agent assistance. Ordinary PR review requirements remain unchanged.
+
+- Diner Pages deployment: `013f89a7`, [staging diner](https://peekaplate-diner-staging.pages.dev/).
+- Console Pages deployment: `9ebf0f78`, [staging console](https://peekaplate-console-staging.pages.dev/).
+- Worker and database were unchanged by this frontend release.
+- Live isolated-browser checks passed on both stable URLs: no capture before consent, HTTP 200 after consent, expected minimal properties, and no new capture after withdrawal/reload. Both matching generated IDs were visible in PostHog. Synthetic data only.
+- Private Supabase export is a separate change; see [its current status](posthog-export.md). These results do not prove diner-event ingestion, menu functionality or owner reports.
+
+## PR preview hardening — October 25, 2026
+
+Continued [PR #41](https://github.com/vivienk/peekaplate/pull/41) for [PR preview deployments](https://app.clickup.com/t/86bcqxkwf). The workflow is now `deploy-preview.yml`, with trusted-base orchestration, credential-free PR builds, static-artifact validation and project isolation preflight. Cleanup remains active when new previews are disabled.
+
+GitHub readback confirmed `CLOUDFLARE_PREVIEW_API_TOKEN` by name and the nonempty `CLOUDFLARE_ACCOUNT_ID` environment variable. The preview environment was restricted to exactly `develop` and `main` branches; no required reviewers are configured and administrator bypass remains enabled. `PREVIEW_DEPLOYMENT_ENABLED` is absent. No secret value was read or copied.
+
+PASS: `pnpm check` (189 Vitest tests, 47 script tests including 13 preview regressions), actionlint 1.7.7, both frontend builds, context and documentation checks. Exact PR #37 head `23cfe85f7d0a823a1e8aa09092c54e6ed203266f` builds both apps with analytics disabled; their artifact payloads pass the static sanitizer. Existing PR #37 CI was green. These are local/CI checks, not hosted preview acceptance.
+
+NOT VERIFIED: Cloudflare project existence/configuration, GitHub-held token scope/validity, real upload, rendered PR content, bot comment and live cleanup. Read-only local Cloudflare inspection failed at the network/TLS transport. Keep new deployments disabled until provider prerequisites are verified and PR #41 is human-reviewed and merged into the trusted base. No staging or production workflow or cloud resource was changed.
+
+## PR preview repair — October 26, 2026
+
+PR #41 merged into `develop` at `aa7c717`; [merged CI](https://github.com/vivienk/peekaplate/actions/runs/40254354113) passed. The preview enable variable is now true. GitHub resolves `pull_request_target` workflow code and `github.sha` from default branch `main`; the workflow/helper are absent there, explaining the lack of automatic preview runs. The delivery-only follow-up adds those files to main without promoting the unreleased processing/retrieval application changes or changing the manual staging workflow.
+
+Local reproduction found the preview symlink test relied on `/etc/passwd` and Windows file-symlink privileges. A real directory junction on Windows and directory symlink elsewhere now exercise rejection without skipping it. Trusted generated commit markers and bounded alias checks prevent an existing HTTP 200 preview from being labelled as a newer SHA. Staging/backend resources are not changed by these repairs. Automatic upload/comment/close cleanup still requires the reviewed main merge and an actual GitHub run.
+
+Read-only provider checks at `2026-10-26T19:55:24Z` confirmed both preview projects are isolated Direct Upload projects with production branch `unused-production`, no canonical production deployment and no resource/secret bindings accepted by the preflight. The manually uploaded PR #37 aliases returned HTTP 200 with API connections blocked by CSP. These observations do not validate GitHub-held credentials or automatic cleanup.
+
+Staging diner and console, Worker health and both authenticated team analytics read routes returned HTTP 200. Pages deployment IDs remain `013f89a7-d20a-42ef-b3f9-0a3612301e60` and `9ebf0f78-b3f4-47b1-857d-d04abf76ab55`, serving frontend commit `2a135fa`. The active Worker version remains `fcb87dc6-f1c6-4f1c-84c9-542a8014520f`, deployed October 24. This pass made no hosted writes, deployment, migration or credential changes; no separate production application was tested.
+
+### Automatic preview activation and cleanup
+
+The subsequent maintainer-authorized main merge (`ab6f9c4`) activated the registered workflow. [Run 40393096652](https://github.com/vivienk/peekaplate/actions/runs/40393096652) uploaded synthetic PR #48 head `1339089` through the GitHub-held token. Both trusted markers matched that exact head, both screens rendered successfully and the bot posted one comment. Provider deployment IDs were `e816ec3d-4e59-4194-a372-9273f1319940` (diner) and `46b649bb-c367-4cb6-bc07-40d5a8ca0740` (console).
+
+[Close cleanup run 40393553935](https://github.com/vivienk/peekaplate/actions/runs/40393553935) removed both PR deployments and updated the existing comment. Provider readback found zero matching deployments; after edge propagation, both aliases and markers returned 404 at `2026-10-26T20:13:56Z`. Build/deploy job durations were 19/41 seconds and cleanup 16 seconds. See [full acceptance](previews.md#hosted-lifecycle-acceptance--october-26).
+
+These hosted writes were limited to disposable preview deployments and PR comments. Staging Pages/Worker versions, application databases, Queue/R2 infrastructure, PostHog and production were unchanged. The preview token is verified for this lifecycle, not certified for unrelated permissions or future configuration.

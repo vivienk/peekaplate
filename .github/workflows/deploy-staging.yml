@@ -34,7 +34,13 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TEAM_GITHUB_TOKEN: ${{ secrets.TEAM_GITHUB_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Set staging CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Set staging CLOUDFLARE_API_TOKEN"; exit 1; }
-          pnpm exec wrangler deploy --env staging
+          test -n "$TEAM_GITHUB_TOKEN" || { echo "Set staging TEAM_GITHUB_TOKEN (repo Metadata read only)"; exit 1; }
+          secrets_file="$(mktemp)"
+          trap 'rm -f "$secrets_file"' EXIT
+          chmod 600 "$secrets_file"
+          node -e 'process.stdout.write(JSON.stringify({TEAM_GITHUB_TOKEN: process.env.TEAM_GITHUB_TOKEN}))' > "$secrets_file"
+          pnpm exec wrangler deploy --env staging --secrets-file "$secrets_file"

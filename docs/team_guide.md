@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Infrastructure updated October 18, 2026; Python and PostHog setup guidance updated October 19 (verification recorded October 20 UTC). The team research and board inventory below remains the dated October 14 snapshot.
+VIS-01 infrastructure and OCR credential status updated October 28, 2026; team analytics evidence remains dated separately. The team research and board inventory below remains the dated October 14 snapshot.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
 
@@ -41,13 +41,36 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
 | Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
-| PostHog analytics | Opt-in tracking code; real test events verified in the staging PostHog project from local builds | Reviewed hosted release, then connect actual menu controls as they are built |
-| Python processing | Accepted extension in the architecture | Implement, test and choose a runtime for the first specific job |
+| PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
+| Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
 
 ### Where to open staging
+
+**Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
+passed real synthetic delivery tests. Reports will use the existing private R2
+bucket. The new Python HTTP service wraps the existing OCR/extraction code and
+has local tests and a Docker build. Vivien's Workers Paid upgrade is active,
+and the protected API deployment succeeded: menu Queue/R2 bindings are live.
+The Python host is now deployed and its private connection is configured.
+Live tests confirmed Python health, signed source reads from private R2,
+wrong-job denial and source-hash conflict handling. The Queue-to-R2/retry/DLQ
+checks also passed against real Cloudflare resources. Teeyansh can continue
+integration using the runtime bindings; nobody needs to put internal keys in
+frontend code or receive them in chat. On October 28, the OCR.space key was added
+to GitHub's protected staging environment and the extraction Worker's secret store.
+A fresh OCR-only test read three made-up dishes and their prices in 4.654 seconds.
+This proves that the OCR provider accepted the key for that image; it does not
+prove the complete hosted menu-processing flow. The AI step still needs its
+provider configuration, and menu-to-draft acceptance remains pending. The queues stay
+paused until that passes. Follow the
+[VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
+interfaces and who does what next. Provisioned infrastructure is not a completed
+menu-processing feature.
+
+The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is provisioned with live API bindings. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. Actual archive-to-database processing remains separate work; the menu-infrastructure acceptance does not certify that feature.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -70,7 +93,7 @@ ClickUp's “Complete” status describes a task's recorded progress. It is not 
 | Supabase PostgreSQL | Keeps lasting application records | Stores restaurants, staff permissions, dish drafts, history, retry results and pending work. |
 | Cloudflare Hyperdrive | Manages Worker connections to PostgreSQL | Uses a restricted staging login. It is not another database. Query caching is disabled for this command path. |
 | Cloudflare R2 | Stores files such as photos and prepared visual assets | Existing staging and production buckets are reserved. Staging is private; uploads and approved asset delivery are not connected yet. |
-| Cloudflare Queues | Holds accepted observations until processing finishes | Planned with event ingestion; not running in the current flow. A failed-message queue will hold work needing recovery. |
+| Cloudflare Queues | Holds work until processing finishes | Separate staging observation and menu-extraction queues/DLQs are provisioned. They remain paused until their real consumers pass acceptance. |
 | Docker | Gives developers a disposable test database | Used locally and in CI. The shared database is hosted by Supabase. |
 
 The **current tested save path** is:
@@ -98,9 +121,9 @@ Photo files belong in file storage; the database will hold their references, own
 3. Test that deployed version and record its commit, deployment IDs and results.
 4. Once production exists and release approval is given, deploy that same tested commit with separate production resources.
 
-Today, Pages receives manually uploaded builds and the Worker was deployed with Wrangler, Cloudflare's deployment tool. Automatic GitHub deployment remains disabled behind its activation gate. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
+Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The running apps were built from `bb56cef94f09f4937a89532cf1f28d47d323a171`. Subsequent documentation commits do not change those running apps. [Operations](operations.md#staging-deployment-record) records deployment IDs and test evidence.
+The Worker now runs main release `afe45db`. The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. [Operations](operations.md#team-analytics-hosted-verification--october-22-2026) records the current Worker version and test evidence; the older deployment record preserves the earlier staff-command checks.
 
 ### Verified behavior, access and costs
 
@@ -221,7 +244,7 @@ Staff supplies a dish photo
 
 The two languages exchange structured messages, like a form with agreed field names. Developers call this a **data contract**. It includes a job reference, the approved input and the expected result. TypeScript types do not automatically work in Python, so developers test that both sides understand the same messages. A job must not gain permission simply by supplying a restaurant ID, and a repeated result must not create duplicate changes.
 
-Python needs its own environment and tests: **uv** manages its dependencies and **pytest** runs its tests. Those tools will be added with the first real task. There is no Python service deployed today, and the current `pnpm` commands only run the existing JavaScript/TypeScript toolchain.
+Python has its own environment and tests: **uv** manages the locked dependencies and Python's **unittest** runs the existing regression suite. The staging FastAPI/Uvicorn service runs in a Cloudflare Container because the pipeline uses native PyMuPDF. CI tests and builds that package alongside the TypeScript checks. The OCR key is configured privately; contributors call the authorized backend rather than retrieving a shared key from GitHub. The complete upload-to-draft connection still needs feature acceptance.
 
 For a small compatible job, a separate **Cloudflare Python Worker** may be enough. Cloudflare supports Python, but some libraries and workloads do not fit its runtime. Heavier work may need a container or specialist compute service with a separately agreed cost. Calling an AI provider is different from hosting an image model ourselves. The first Python ticket must check those requirements before choosing where it runs. See the [supported Python packages](https://developers.cloudflare.com/workers/languages/python/packages/).
 
@@ -229,9 +252,11 @@ Before connecting a job to staging, test a successful result, bad input, a timeo
 
 ### What PostHog adds, and what it does not
 
-**The PostHog connection is implemented and has received real test events from local builds. It is awaiting a reviewed release to the hosted staging pages.** For now, the two screens are starter pages. Clicking **Allow optional analytics** sends one `app_shell_viewed` event: a small record saying which screen was viewed and that this is staging. PostHog turns those records into an internal chart. It does not mean a diner opened a published menu or ordered food.
+For team inspection, the deployed read API lets any current repository collaborator use their own GitHub token to ask the Worker for safe staging events or technical counts. Nobody needs our export password or database administrator key. The Worker verifies their GitHub identity and current collaborator status before asking Supabase; data still arrives through PostHog's hourly export. Both endpoints returned 200 using Sai's GitHub account, and missing or invalid tokens returned 401. On October 23, Harshita helped verify that a valid non-collaborator received 403 from both endpoints, twice. The separate controlled collaborator-removal check remains pending. This is a development tool, not the restaurant-owner dashboard. See [team data access](team-data-access.md) for the URL, authentication, examples and dated evidence.
 
-The flow is **page → consent check → PostHog → internal chart**. It does not pass through Supabase, and it does not change the trusted database records. Tracking starts off, stops when withdrawn, and resets when the page reloads. Browser privacy signals can block it. The menu must work even if PostHog is unavailable.
+**Both hosted staging pages now send consented test events to PostHog, and those records were checked in PostHog.** For now, the two screens are starter pages. Clicking **Allow optional analytics** sends one `app_shell_viewed` event: a small record saying which screen was viewed and that this is staging. PostHog turns those records into an internal chart. It does not mean a diner opened a published menu or ordered food.
+
+The flow is **page → consent check → PostHog → internal chart**. An hourly connection now copies those observations into a separate private area of the same Supabase database. We verified four test events arrived. Sending the same batch again produced eight stored copies, but the clean view still counted four events. The diner and console test records each appeared once, and access checks passed. The hourly schedule is enabled. A raw table keeps received copies; a view counts identical repeats once and excludes conflicting copies. It does not change trusted restaurant records. See [export setup and status](posthog-export.md). Tracking starts off, stops when withdrawn, and resets when the page reloads. Browser privacy signals can block it. The menu must work even if PostHog is unavailable.
 
 When the real menu is built, its actions must follow [Adam's taxonomy and measurement plan](https://app.clickup.com/90141746115/docs/2kydvry3-1494?view=open) and the [implementation plan](implementation_plan.md), including ingredient interactions and comparisons. Agree the names, exact triggers and content versions before wiring each control. The current v1 adapter is tested for `dish_open` and `portion_compare`; it has no real dish-control caller yet. A general dish comparison must not be labelled as physical portion measurement.
 
@@ -244,7 +269,11 @@ These responsibilities remain separate:
 | PostHog | Optional internal charts; current test events describe starter-page views |
 | Owner dashboard | A future product screen with agreed calculations and access restricted to the owner's restaurant |
 
-PostHog can supply analytics through an API, but using it for owner reports is still a decision to review. A filter saying "Restaurant A" is not a security boundary. Our backend must establish which restaurant the signed-in owner can access. The current durable-event plan remains in place until a new architecture decision explicitly changes it. Decide the collection route before implementation so one action is not accidentally recorded twice.
+**The owner dashboard should not wait for the hourly PostHog export.** The planned route is: **diner action → backend validation → queue → archive and Supabase → updated totals → owner's dashboard**. A projection is simply a prepared total or summary, such as how many eligible views a dish received. The backend checks which restaurant the owner can access before returning those totals. A chart filter alone cannot protect another restaurant's data.
+
+For example, when someone opens a dish, the event pipeline will record that action once and update its eligible view count. The dashboard can then refresh from Supabase. Retries must not count the same action twice. The target is prompt updates, but the pipeline and dashboard are not built yet, so we have no measured freshness guarantee. Their tickets must agree and test the target, show when data was last updated, and show a delay if processing falls behind. The [export runbook](posthog-export.md#why-the-owner-dashboard-must-not-wait-for-this-export) diagrams this planned path beside the separate hourly analytics copy.
+
+PostHog remains useful for the team's optional usage charts and later checks against those records. Using PostHog as the owner-report source would change the accepted design and needs a reviewed architecture decision. Agree one PostHog sending route per action so it is not accidentally mirrored twice.
 
 **Capacity example:** 300 menu visits per day, with 40 events per visit over 30 days, would produce 360,000 events. PostHog lists a one-million-event monthly free allowance as checked on October 19, 2026. That should leave room for a small pilot under these assumptions; it is not a forecast or an unlimited service. Include test and automatically collected events in usage, and monitor the allowance because extra events can be dropped when a free or configured billing limit is reached. See [current pricing](https://posthog.com/pricing).
 
@@ -252,7 +281,7 @@ PostHog can supply analytics through an API, but using it for owner reports is s
 
 **Files behind this:** [analytics/index.ts](../packages/analytics/src/index.ts) checks configuration and consent, builds the allowed event fields and limits network requests. [analytics/consent.ts](../packages/analytics/src/consent.ts) provides the opt-in button. [diner/main.ts](../frontend/diner/src/main.ts) and [console/main.tsx](../frontend/console/src/main.tsx) connect it to each screen. [Unit tests](../packages/analytics/src/index.test.ts) and [browser tests](../tests/e2e/posthog.spec.ts) check allowed, blocked and failed capture. [posthog.md](posthog.md) is the operator's setup and verification record.
 
-**What comes next:** finish review and release the staging builds; then finalize the diner design states, build approved menu controls and connect their agreed events. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
+**What comes next:** finalize the diner design states, build approved menu controls and connect their agreed events. The private Supabase export and separate team inspection API are deployed; use [the access guide](team-data-access.md) with your own GitHub token. Collaborator access and genuine outsider denial have passed; the controlled collaborator-removal check remains before full access acceptance. Local work with synthetic fixtures can continue. The durable evidence pipeline and owner calculations remain separate implementation work. Vivien can rename the project **PeekaPlate Staging** later and confirm billing and retention ownership; Member access was enough to test the connection and prepare the internal chart. Before real diner use, approve the privacy notice and deletion policy. Python work can proceed separately once its first job is defined.
 
 ### What T0, T1 and T2 mean
 
@@ -421,6 +450,7 @@ The six current tables have simple jobs: `venues` identifies restaurants; `staff
 | [.github/dependabot.yml](../.github/dependabot.yml) | Monthly grouped routine updates and separate security-update grouping |
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | The five purposeful CI jobs described above |
 | [.github/workflows/deploy-staging.yml](../.github/workflows/deploy-staging.yml) | Manual main-branch Worker deployment using a staging environment and protected credentials |
+| [.github/workflows/deploy-preview.yml](../.github/workflows/deploy-preview.yml) | Static diner/console preview links for same-repository PRs, deleted when the PR closes; see [PR previews](previews.md) |
 
 ### Agent files: who does which job
 
@@ -445,6 +475,7 @@ The profiles and selected prompt behaviors were evaluated. The builder initially
 | [docs/architecture.md](architecture.md) | System boundaries, data flows and what remains unimplemented |
 | [docs/delivery.md](delivery.md) | Ordered feature slices, dependencies, responsibilities and acceptance gates |
 | [docs/operations.md](operations.md) | Local commands, API use, cloud setup, release controls and recovery work |
+| [docs/previews.md](previews.md) | How reviewers open PR preview links, their isolation, retention and one-time setup |
 | [docs/verification.md](verification.md) | Connects product/architecture requirements to existing and future test evidence |
 | [docs/frontend-design.md](frontend-design.md) | Records the evolving design reference and what the real UI must eventually demonstrate |
 | [docs/CONTEXT.md](CONTEXT.md) | Small JSON knowledge map: modules, source paths, dependencies, status, fingerprints and recent handoffs |

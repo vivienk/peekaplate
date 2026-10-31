@@ -2,7 +2,7 @@
 
 This integration is a best-effort internal product-analytics channel, **not** the durable observation receipt or owner reporting source under [ADR 0003](adr/0003-intent-evidence.md). It never changes staff commands, database events, outbox processing or replay. Do not run both a browser mirror and future server mirror for the same action.
 
-**Setup status, October 19, 2026 (October 20 UTC):** the existing US project `675372`, currently named **Default project**, received synthetic events from both local staging builds. The [internal integration dashboard](https://us.posthog.com/project/675372/dashboard/2233365) is for staging only. The hosted Pages sites have not yet received this integration; final human PR approval and the normal release process still apply. Repository defaults keep analytics disabled.
+**Setup status, updated October 21, 2026:** the existing US project `675372`, currently named **Default project**, received synthetic events from both hosted staging sites after the approved setup release. The [internal integration dashboard](https://us.posthog.com/project/675372/dashboard/2233365) is for staging only. Repository defaults keep analytics disabled; these deployments use explicit staging configuration. The separate [Supabase export](posthog-export.md) passed a bounded transfer and repeated-interval check: eight raw copies, four unique events, one matching diner and console test record each. Restricted permissions passed; hourly staging exports are enabled.
 
 ## What exists and what does not
 
@@ -62,7 +62,7 @@ The frontend allowed origins for release are those two Pages origins respectivel
 
 Observed provider and runtime checks:
 
-- Sai has Member access: event inspection and dashboard creation work; project settings and billing are restricted. No permission workaround is necessary for integration testing.
+- Sai initially had Member access. The October 20 follow-up confirmed Admin access and successfully updated the existing export connection. No permission workaround was used.
 - **Discard client IP data** was already on in project privacy settings. It was inspected, not changed. Payloads also disable GeoIP and person-profile processing.
 - Isolated Chromium opened real local builds on ports 4177 and 4178. Before consent there were no capture requests. Opt-in produced HTTP 200 for one diner and one console `app_shell_viewed`; opt-out and reload produced no further requests.
 - PostHog's event list showed both matching generated page IDs. Stored properties included `environment=staging`, the correct surface, `evidence_status=unverified_client_observation` and no URL/account fields. The inspected raw record used `person_mode=propertyless`; GeoIP was disabled.
@@ -75,14 +75,16 @@ Repository verification after reconciling the branches: **PASS** `pnpm check` (5
 
 ## Remaining owner and release actions
 
-1. **Human review:** obtain the required independent human approval comment on the final PR commit, merge through the documented release flow, and rebuild the frontends with their exact hosted origins. Repeat the consent/readback checks on the hosted URLs. A local preview is not a deployed release.
-2. **Administration:** Vivien can rename the project and confirm it remains staging-only. Confirm the actual billing plan, usage cap/alerts and who handles deletion requests. Billing was inaccessible to Member access; no account-specific spending limit was verified.
+1. **Staging release completed:** PRs #14 and #15 were merged under the user’s explicit delegated setup approval, disclosed as agent assistance rather than independent human inspection. Main commit `2a135faa4386fc3e1002aef3d1a150930e5ff9bf` was built and deployed to both staging sites. Live consent checks passed and both generated IDs were read back in PostHog. This one-time instruction does not change the normal human-review policy.
+2. **Administration:** an administrator can rename the project and confirm it remains staging-only. Confirm the actual billing plan, usage cap/alerts and who handles deletion requests. The earlier Member access blocked billing inspection; the access correction does not itself verify an account-specific spending limit.
 3. **Privacy before real diners:** approve the public notice, region and retention/deletion policy. PostHog documents one-year event retention for Free and seven years for paid plans; it does not offer a shorter automatic retention setting. A 30-day proposal is therefore not implemented by this setup. A different policy needs an explicit, tested deletion process or a different collection decision. See [retention](https://posthog.com/docs/data/events-retention) and [data storage controls](https://posthog.com/docs/privacy/data-storage).
 4. **Real controls:** when menu controls ship, test each agreed trigger against pinned approved content and check one observation per actual action. Do not rename historical v1 portion events into general comparison events. Build the durable PostgreSQL evidence path separately; PostHog HTTP success is not its receipt.
 
-Team members need PostHog membership only if they will inspect its data or manage charts. Developers can use synthetic fixtures and intercepted tests without account access. Supabase access is separate: application users obtain permitted data through the backend, not through a browser service-role credential. This integration requires no personal PostHog API key or Supabase schema change.
+Team members need PostHog membership only if they will inspect its data or manage charts. Developers can use synthetic fixtures and intercepted tests without account access. Supabase access is separate: application users obtain permitted data through the backend, not through a browser service-role credential. Browser capture requires no personal PostHog API key. The separately requested [Supabase export](posthog-export.md) uses a private schema migration and its own restricted database login. Admin/TLS and credential corrections are complete; live synthetic transfer, matching rows and duplicate-safe retry are verified. See the export runbook for run IDs, limits and recovery steps. Its hourly copy does not supply the planned live owner dashboard, which reads validated Supabase projections through an authorized backend.
 
 ## Internal analysis versus owner analytics
+
+For teammate access to the Supabase copy, use the [staging inspection API](team-data-access.md) with individual login and explicit reader grants. It returns bounded, allowlisted diagnostics; it does not proxy PostHog administration, expose raw visitor identities or implement owner reports.
 
 The internal [Integration health - staging dashboard](https://us.posthog.com/project/675372/dashboard/2233365) counts `app_shell_viewed`, broken down by `surface` and filtered to `environment=staging`. It labels these **opted-in placeholder page views**, not unique diners/owners. The generated distinct ID measures a page lifetime, not a visit or person. Repeat capture after toggling consent can add another technical view. Do not use the provider's generic starter dashboard as proof of menu usage; its automatic events are not collected here.
 

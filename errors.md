@@ -153,6 +153,7 @@ These records describe local validation limits, not application failures.
 
 ```json
 {"id":"ERR-20261019-POSTHOG-003","status":"resolved","area":"sandbox-local-servers","references":{"check":"test","timestamp":"2026-10-20T04:46:52.443Z"},"cause":"The restricted execution context rejected loopback server binding with EPERM, preventing existing auth/local-harness test setup.","prevention":"Run local-server checks in an approved context that permits loopback listeners; do not weaken auth tests.","regression":"The permitted pnpm check rerun passed 50 application and 21 script tests; pnpm verify build and pnpm verify test:e2e passed, including four foundation and four intercepted analytics browser cases."}
+```
 
 ```json
 {"id":"ERR-20261018-CLOUD-001","status":"resolved","area":"operator-authentication","cause":"Wrangler keyring login required its Windows helper; a non-interactive attempt could not install it. A later localhost OAuth retry expired and then rejected a mismatched callback state.","prevention":"Use Wrangler's interactive keyring setup and an isolated device-login flow when localhost callbacks are stale. Never disable OAuth state validation or print credentials.","regression":"wrangler login --device --scopes account:read user:read workers:write --use-keyring --browser=false succeeded. wrangler whoami confirmed encrypted credential storage and the approved scopes; an account-scoped wrangler hyperdrive list returned the expected staging connection.","limit":"Authentication and resource listing do not prove deployment or hosted database behavior."}
@@ -193,4 +194,515 @@ These records describe local validation limits, not application failures.
 
 ```json
 {"id":"ERR-20261019-RELEASE-001","status":"resolved","area":"release-context","cause":"The release merge included a newer main README edit, so the delivery fingerprint calculated on the feature head no longer matched the proposed merged tree.","prevention":"Check the release merge tree against the reviewed head, preserve target-branch edits, and refresh affected context before promotion.","regression":"Merged the current main README change into the release candidate and refreshed the delivery fingerprint; context validation must pass on the resulting release tree.","evidence":"https://github.com/vivienk/peekaplate/actions/runs/39381320009","sources":["README.md","docs/CONTEXT.md"]}
+```
+
+```json
+{"id":"OBS-20261019-EXPORT-RED-001","status":"resolved","area":"posthog-export-tests","cause":"The intentional red test found the requested private analytics table absent before implementation.","regression":"Added a forward migration. pnpm verify test:db passed 15 new export assertions, existing 43 pgTAP assertions, 13 database integration cases and the local demo lifecycle.","sources":["migrations/20261020070000_posthog_exports.sql","tests/db/posthog.sql"]}
+```
+
+```json
+{"id":"OBS-20261019-SETUP-TOOLS-001","status":"resolved","area":"operator-tooling","observation":"A quoted shell comment command failed to parse, and claiming an existing Supabase browser tab timed out twice. Neither action completed a write.","prevention":"Use a UTF-8 body file for GitHub prose. Recover a stale browser tab through a new tab in the already-selected browser, without accessing profile files.","regression":"Body-file submission succeeded. A fresh Supabase tab displayed the existing app_private schema."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-20T06:48:43.863Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261020-EXPORT-TLS-001","status":"open","area":"hosted-posthog-export","observation":"The first bounded Events export failed certificate verification with system certificate authorities. Supabase readback returned zero rows. The backfill wrapper said Completed even though its individual run failed.","followup":"Schedule paused. Use the official Supabase root certificate while retaining certificate and hostname verification; repeat the bounded export and deduplication check before claiming transfer success.","prevention":"Check individual run status plus database rows. Connection creation and backfill completion alone do not establish successful delivery.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261020-EXPORT-ADMIN-001","status":"open","area":"hosted-posthog-export","observation":"Operator reported that correcting the existing integration requires project Admin access. Browser file upload also required manual operator completion.","followup":"Vivien updates the connection or grants project Admin access. Retain TLS verification, then verify actual rows and retry deduplication before resuming the paused schedule.","sources":["docs/posthog-export.md","docs/operations.md"]}
+```
+
+```json
+{"id":"OBS-20261020-EXPORT-ADMIN-002","status":"resolved","area":"hosted-posthog-export","references":["OBS-20261020-EXPORT-ADMIN-001"],"observation":"Provider membership readback confirmed Admin access. Existing integration update succeeded without a permission workaround.","limit":"Access correction does not establish successful export or billing-limit verification.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261020-EXPORT-TLS-002","status":"resolved","area":"hosted-posthog-export","references":["OBS-20261020-EXPORT-TLS-001"],"observation":"Attached the official Supabase CA and retained certificate/hostname verification. Bounded retry reached PostgreSQL authentication instead of failing TLS.","regression":"Run 01a15d01-7dc1-0000-2e18-a56c0872e0f5 no longer reported certificate verification failure; it failed separately with EAUTHQUERY.","limit":"Transfer and duplicate-safe replay remain unverified.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261020-EXPORT-AUTH-001","status":"open","area":"hosted-posthog-export","observation":"Bounded export retry failed with EAUTHQUERY: unsupported or invalid secret format. A read-only role check returned LOGIN enabled, no expiry and a missing password; no verifier was displayed.","cause":"The dedicated database role had no password set. Entering a password in the destination form does not set the PostgreSQL role password.","prevention":"Verify password presence and expiry without printing the stored verifier, then require actual connection and matching-row evidence. Never broaden grants or weaken TLS for credential errors.","followup":"Operator sets the same password privately on the restricted role and clears the editor. Repeat bounded export and deduplication verification before resuming schedule.","sources":["docs/posthog-export.md","docs/operations.md"]}
+```
+
+```json
+{"id":"OBS-20261021-EXPORT-AUTH-002","status":"resolved","area":"hosted-posthog-export","references":["OBS-20261020-EXPORT-AUTH-001"],"observation":"After the operator's password correction, a read-only role check returned SCRAM password format, LOGIN enabled and no expiry. The editor was replaced with non-secret verification SQL.","limit":"Resolves missing password only. Subsequent export authentication still fails; successful transfer is not established.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261021-EXPORT-AUTH-003","status":"open","area":"hosted-posthog-export","observation":"Runs 01a15d25-6f43-0000-b5f1-ce8d7e959bca and 01a15d2e-9c4d-0000-1eeb-641c9338cae1 failed password authentication after the database password correction. The second bounded retry followed a delay. No credential mismatch or pooler-cache cause has been proven.","followup":"Re-enter the exact database password privately in the existing integration with verified TLS. If failure persists, privately test direct authentication to distinguish credentials from pooler failure; avoid repeated resets and retry loops. Prove matching rows and duplicate-safe repetition before enabling the paused schedule.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261021-EXPORT-UI-001","status":"observation","area":"operator-tooling","observation":"Browser extension routing was unavailable. Native Windows control allowed tab and form work, but accessibility indexes and geometry sometimes lagged visible scrolling; the file picker did not accept automation reliably.","prevention":"Refresh after layout changes, confirm actual field contents, and hand an unresolved native file picker to the operator. Do not infer success from an input call or bypass browser safety checks.","followup":"Use the prepared connection form and official certificate file; operator completes private credential input. No broader browser access or security setting change is required."}
+```
+
+```json
+{"id":"OBS-20261021-CERT-TOOLS-001","status":"resolved","area":"operator-tooling","references":["ERR-20261018-DOCS-001"],"observation":"A nested PowerShell certificate-inspection command expanded variables in the outer shell and failed parsing before reading the certificate.","prevention":"Use a script file for multi-statement probes rather than nested shell interpolation.","regression":"A local Node crypto inspection read the CA expiry successfully. A separate credential-free TLS probe passed CA and hostname validation against the configured pooler; no database login or SQL was attempted.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261021-EXPORT-PROBE-001","status":"open","area":"hosted-posthog-export","references":["OBS-20261021-EXPORT-AUTH-003"],"observation":"An independent PostgreSQL client using the operator-supplied credential and verified TLS returned 28P01 for the restricted pooler login. The direct-host diagnostic failed DNS resolution with ENOENT before authentication. No database SQL executed; no credential was saved in project files.","followup":"Verify a working restricted credential before updating the destination and repeating export checks. Direct authentication remains untested, so do not claim a pooler-cache root cause or exclude it solely from this probe.","sources":["docs/posthog-export.md"]}
+```
+
+```json
+{"id":"OBS-20261021-PROBE-TOOLS-001","status":"observation","area":"operator-tooling","observation":"Direct ESM import of the installed CommonJS PostgreSQL client failed with require is not defined. Loading it with createRequire succeeded and allowed the bounded authentication probe. A fresh browser-control inventory still timed out; native file-picker interaction remained unreliable.","prevention":"Use createRequire for the installed CommonJS client in this runtime. Report provider results separately from automation failures; never infer a successful file attachment from an input call."}
+```
+
+```json
+{"id":"OBS-20261021-PRIVATE-SETUP-001","status":"resolved","area":"operator-tooling","observation":"PowerShell could not load its Security module for Set-Acl. Execution stopped before generating or writing a credential.","prevention":"Establish and verify private filesystem permissions before writing sensitive setup material. Preserve existing nonempty setup directories rather than regenerating credentials.","regression":"The .NET filesystem ACL API succeeded. Verification confirmed inheritance disabled and one explicit access rule for the current user before the private setup file was used. No credential was written to the repository."}
+```
+
+```json
+{"id":"OBS-20261021-EXPORT-AUTH-004","status":"resolved","area":"hosted-posthog-export","references":["OBS-20261021-EXPORT-AUTH-003","OBS-20261021-EXPORT-PROBE-001"],"observation":"A private credential correction restored verified-TLS restricted pooler authentication. Two hosted exports completed the same bounded synthetic interval. Supabase readback found eight raw copies, four deduplicated events and each known diner/console test record once. All 14 row/permission checks passed; hourly schedule enabled.","regression":"Runs 01a15d4f-261f-0000-b88a-3f67d622bc39 and 01a15d53-eb5b-0000-0e3e-3ccb4c589db6. No missing/conflicting identities or out-of-scope rows. No broader grants.","limit":"Original cache or credential-mismatch cause is unproven. Direct-host IPv6 was unreachable. Next automatic hourly run not observed.","sources":["docs/posthog-export.md","docs/operations.md"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:35:09.347Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:36:48.316Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:37:36.494Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261021-TEAM-API-001","status":"resolved","area":"team-analytics-tests","observation":"The initial new HTTP tests returned 404 instead of required authentication/query errors because the team endpoint did not exist. The first database runs stopped because Docker was not running; native startup did not start the engine. The Docker desktop start command recovered it. A later SQL test assumed a Supabase anon role existed in plain local PostgreSQL.","prevention":"Use the installed Docker CLI startup command and explicit untrusted fixture roles in provider-independent database tests. Keep authentication and database authorization as separate tested boundaries.","regression":"Focused HTTP tests now pass; all 12 new SQL assertions and 14 real Worker/Postgres integration cases passed. Complete database harness cleanup/local smoke confirmation is recorded separately in PR evidence.","sources":["backend/src/team-analytics.test.ts","backend/src/dish.integration.ts","tests/db/team-analytics.sql"]}
+```
+
+```json
+{"id":"OBS-20261021-GITHUB-ENV-001","status":"open","area":"team-access-activation","observation":"Staging environment secret/variable reads returned 404. Repository metadata confirms write but no admin access; environment listing was empty and repository Actions secret listing was empty.","followup":"Repository administrator creates the staging environment and configures a scoped deployment token without sharing it with contributors. No permission bypass or shared privileged API key is introduced.","sources":["docs/team-data-access.md"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:43:03.732Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:44:04.172Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:44:46.070Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:45:30.517Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:46:06.911Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-21T19:47:30.134Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261021-TEAM-API-002","status":"resolved","area":"worker-provider-fetch","observation":"Node-mocked GitHub authorization tests passed, but real workerd returned a sanitized 503 before reaching the local provider fixture. Workerd rejected redirect:error; its error explicitly required manual or follow.","cause":"Browser-style RequestRedirect error is unsupported by the configured Workers runtime.","regression":"Changed provider fetch to redirect:manual; user responses must be OK and membership exactly204, so redirects remain denied without forwarding credentials. Real Worker/PostgreSQL integration and all15 new SQL assertions passed after the correction. Added safe-property malformed/value fixtures.","prevention":"Exercise network-bound code in the actual Worker runtime; mocked fetch cannot establish support for native request options.","sources":["backend/src/team-auth.ts","backend/src/team-auth.test.ts","backend/src/dish.integration.ts","tests/db/team-analytics.sql"]}
+```
+
+## October 22 staging settings documentation validation
+
+- Environment observation: `rtk` is unavailable in this local session; plain Git/Node commands were used. The initial sandboxed clone could not resolve GitHub; the authorized network retry succeeded.
+- `pnpm context:refresh` attempted dependency preparation in the fresh checkout and could not reach the package registry under the sandbox. It was interrupted before the requested checks ran. No application failure is established.
+- Fallback validation passed with `node scripts/context.mjs refresh`, `node scripts/context.mjs check`, `node scripts/check-docs.mjs` and `git diff --check`. These dependency-free checks cover this documentation change; the full build/test suite was not run. Use the repository-supported runtime and available dependencies for full CI validation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T02:25:25.896Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T02:25:25.896Z"},"status":"resolved","cause":"Editing ADR 0015, which the contracts, measurement and analytics nodes reference, changed their fingerprinted inputs before refresh.","prevention":"Run pnpm context:refresh after editing a referenced ADR, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+```json
+{"id":"OBS-20261022-ADR15-PUSH-001","status":"resolved","area":"review-coordination","observation":"A normal PR-branch push was rejected because the author concurrently merged the same develop update.","cause":"The remote review head advanced after the local review was pinned.","regression":"Fetched and compared the new head, then merged it without force-pushing; the only retained local difference was the final technical-review context handoff. Context freshness, documentation links and diff checks passed after reconciliation.","prevention":"Re-pin and re-review a changed remote head; preserve concurrent commits and use an expected head when merging the PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-22T00:13:01.752Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-22T00:13:01.752Z"},"status":"resolved","cause":"The new shared-token CSS imports used single quotes; the repository Biome formatter requires double quotes in CSS.","prevention":"Run pnpm format or biome check --write on new CSS before verification.","regression":"Formatted both app imports and updated the token test's import assertion; pnpm check passed afterward."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T00:13:19.319Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T00:13:19.319Z"},"status":"resolved","cause":"The token test was edited after the context fingerprints were refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+## October 22 staging activation verification
+
+```json
+{"id": "OBS-20261022-STAGING-AUDIT-001", "status": "resolved", "area": "hosted-verification-tooling", "observation": "Attaching an old Supabase SQL tab timed out during browser focus setup. A first local migration read also used a nonexistent singular filename; one documentation patch failed its ledger context check before applying.", "cause": "The existing SQL browser tab could not be attached; its underlying browser cause was not established. Local reads/patch context did not match the actual repository paths/text.", "prevention": "Open a fresh tab in the same authorized browser for a stale tab, inspect actual migration paths, and verify file context before applying a patch. Do not infer a provider outage or alter database permissions from a browser attachment failure.", "regression": "A fresh SQL tab completed a read-only transaction: all eleven catalog/permission assertions passed and eight raw/four deduplicated events remained. Corrected paths/patch context were used; pnpm check passed; a trailing blank line introduced in this ledger was removed before the final diff check."}
+```
+
+```json
+{"kind": "resolution", "references": {"id": "OBS-20261021-GITHUB-ENV-001"}, "status": "resolved", "cause": "Vivien configured the protected staging environment and credentials after the earlier administrator-access block.", "regression": "Run 39907285014 completed after an eligible separate reviewer approved it. Both hosted analytics GET endpoints returned 200 for hemu77; no secret value was published.", "remaining": "Valid non-collaborator and controlled collaborator-removal hosted 403 checks remain deferred; this resolution does not mark full hosted acceptance complete."}
+```
+
+## October 23 hosted denial verification tooling
+
+```json
+{"id":"OBS-20261023-TEAM-CHECK-001","status":"resolved","area":"acceptance-tooling","observation":"An ad hoc local credential-input script supplied no completed identity or HTTP evidence. Its source is not in this repository, so its waiting state and underlying cause were not diagnosed.","prevention":"Use the repository-owned Node command with an expected GitHub login, private GitHub CLI credential lookup, visible steps and bounded requests. Never treat a hidden input prompt, invalid-token 401 or successful collaborator access as proof of outsider denial.","regression":"Ten focused tests pass, including timeout, wrong identity, 401/503/redirect, unexpected access and secret-redaction cases. A live collaborator control returned GitHub 200 and Worker 200/200 and correctly exited nonzero without reading analytics bodies.","remaining":"Valid non-collaborator 403/403 and controlled collaborator-removal hosted acceptance remain pending.","sources":["scripts/verify-team-access.mjs","scripts/verify-team-access.test.mjs","docs/team-data-access.md"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-24T05:35:02.469Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-24T05:35:02.469Z"},"status":"resolved","cause":"The first analytics context update exceeded the existing 1000-character summary limit.","prevention":"Keep module summaries bounded and put detailed verification in the handoff and linked runbook.","regression":"Shortened the summary, refreshed fingerprints, and reran pnpm check; context now validates nine modules and ten handoffs."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-24T17:29:37.191Z","exitCode":1}
+```
+
+## October 24 staging observation infrastructure
+
+```json
+{"id":"OBS-20261024-QUEUE-PROBE-001","status":"resolved","area":"hosted-infrastructure-verification","observation":"The first synthetic HTTP-pull probe received 409 after the resume request completed: the delivery plane still reported that the Queue was paused. Cleanup re-paused both Queues and retained the unacknowledged synthetic retry message.","cause":"Queue resume control-plane completion did not immediately establish delivery-plane readiness.","prevention":"Use bounded retries only for the explicit paused-delivery propagation response after an authorized resume; do not suppress other HTTP failures or infer readiness from settings alone. Always re-pause in cleanup and never purge unrelated work.","regression":"Recovered the exact synthetic retry through the configured DLQ, then a fresh complete hosted run passed archive/readback before ACK and attempts 0,1,2,3 followed by DLQ arrival. Both Queues read back empty and paused. See docs/observation-infrastructure.md for UTC evidence.","sources":["docs/observation-infrastructure.md","backend/wrangler.jsonc"]}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-24T17:29:37.191Z"},"status":"resolved","cause":"The staging binding configuration changed fingerprinted backend inputs before the context update was finished.","prevention":"Update affected node summaries and paths, then refresh fingerprints before the final check.","regression":"Updated backend/delivery summaries, added the infrastructure handoff and ran pnpm context:refresh; final verification is recorded in the PR."}
+```
+
+```json
+{"id":"OBS-20261024-INFRA-TOOLING-001","status":"resolved","area":"operator-tooling","observation":"Initial account-wide R2 inventory could not choose between two authorized accounts; a CORS read returned the documented no-configuration 404. A local probe syntax check, one atomic documentation patch and an intermediate scan-draft schema submission also rejected invalid local input before completion.","cause":"Account selection must be explicit for these commands; no CORS configuration is represented by provider error 10059. Local tooling input did not match its file/API schema.","prevention":"Pin the intended non-secret account, distinguish the exact no-CORS response from other errors, syntax-check probes before execution, inspect patch context and use documented scan fields. Never print credential-bearing subprocess output.","regression":"Corrected account-specific inventory, private-bucket readback, real R2/Queue probes and scan checkpoint succeeded. No token, raw analytics payload or private conversation was retained."}
+```
+
+## OBS-20261022-VIS02-DRAFT-PREPARATION
+
+- Observation: the imported processing source has whitespace-only blank lines that
+  fail the default `git diff --check`; the user source style is retained for this
+  draft. This is a known review-preparation limitation, not a runtime test result.
+- Observation: the first offline package build could not create a temporary lock
+  in the read-only user uv cache. Repeating with a task-local writable cache
+  built both wheel and source distribution successfully.
+- Evidence: `uv --cache-dir /tmp/peeka-uv-cache build --offline --project
+  /tmp/peeka-vis02-review/processing --out-dir /tmp/peeka-vis02-dist` passed.
+  The isolated current processing suite passed all 82 tests with mocked providers.
+- Scope: no provider calls, application behavior change or performance refinement.
+
+## OBS-20261023-VIS02-REVIEW-CORRECTIONS
+
+- Cause: document iteration loaded each page before the per-page try block.
+  A failing synthetic middle-page load aborted extraction before the later page.
+- Correction: iterate bounded page indices and load inside the existing guard;
+  the regression now preserves ready/failed/ready segments and exact identities.
+- Test portability: cache hit/retry checks remain unconditional; mode 0600 is
+  asserted only on POSIX, without claiming verified Windows ACL privacy.
+- Test scheduling: SDK cancellation waits for mocked HTTP start; existing
+  wall-clock deadline tests cover timeout rejection and sibling-batch retention.
+- Cleanup: removed only the 18 imported whitespace-only lines flagged in review.
+  Reconciled current develop documentation and refreshed affected fingerprints.
+- No live provider calls or latency refinements were made for these corrections.
+
+- Packaging check: an existing ignored source-directory .env was included by the build backend. Added explicit source exclusions (also applied to wheels), retained the local env, and rebuilt the distributions for archive inspection. No artifacts were uploaded.
+
+## OBS-20261023-VIS02-LIVE-PDF
+
+Fresh OCR acquired all35pages in268.779s without old cache reuse. Allfour default LLM batches hit90s deadlines; a one-page/concurrency2 follow-up reused the fresh OCR and retained161 needs_review drafts in549.035s. Four pages timed out and six unsupported names were rejected; result remains incomplete. Source spans verified, field accuracy and acceptance pending. Defaults were not changed. See docs/ocr-delivery.md and test-data/README.md.
+
+## OBS-20261023-VIS02-CI-FORMAT
+
+Hosted run39931137291 failed biome formatting in scripts/processing-handoff.test.mjs; browser/database and docs/context/PR checks passed. Applied only the requested call/destructuring wraps. The same run showed account cache egress quota exhaustion and a roughly10minute setup delay; removed optional pnpm cache restore while preserving frozen installs and all checks. Node24.16.0/pnpm11.25.0 are available in temporary local tooling for native verification.
+
+Native verification: biome/typecheck/context/docs passed using pinned Node24.16.0/pnpm11.25.0. All56 Vitest cases and23 repository-script tests passed with bounded workers. One initial script-test invocation lacked the pnpm executable on PATH; rerunning in the installed pnpm environment passed without a source change.
+
+## OBS-20261024-VIS02-OCR-PROVENANCE
+
+An injected provider returning Engine 2 settings was accepted as complete while
+segment/report labels claimed Engine 3, for both image and PDF input. The new
+regressions reproduced this before the fix. Both callers now validate the
+current Engine-3-compatible response contract before accepting text; incompatible
+or missing settings fail the segment while native sibling pages survive.
+The 89-test Python suite passes with mocked providers; no live calls were made.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-24T06:28:20.278Z","exitCode":1}
+```
+
+Local verification initially lacked the cached pnpm launcher on PATH; native
+commands were rerun with that directory included. A main-checkout package-manager
+autostart was avoided by running its dependency-free context/link scripts directly.
+The first archive inspection also attempted to read uv's non-archive metadata;
+restricting inspection to wheel/sdist files passed. These were local command
+setup issues; no dependency, runtime or environment configuration was changed.
+
+The current develop branch advanced to 5da1642 before publication. GitHub blocked
+pull-request CI on shared context/error-ledger conflicts. Reconciled those files
+by preserving develop nodes/records and retaining this processing node/handoff;
+processing sources were unchanged. Repeated 89 Python tests and native quality,
+context and documentation checks passed on the reconciled tree.
+
+## OBS-20261024-VIS02-SHARED-DOC-MERGE
+
+Current develop 245b780 conflicted with the VIS-02 branch in shared context and
+error records. Retained develop module descriptions and recent infrastructure/
+team-access handoffs, the processing node and both appended error histories.
+Only the older design-link-only handoff was retired within the ten-entry cap.
+Processing files are unchanged from reviewed 0e3f204. The 89 Python tests, four
+context/Unicode script tests, context freshness and local documentation links
+passed. PR #23 remains separate; reconcile its merged result and rerun CI before
+the final integrated approval in the agreed #23 -> #24 -> #25 order.
+
+## OBS-20261024-DB-TCP-READINESS
+
+Develop run [40146434333](https://github.com/vivienk/peekaplate/actions/runs/40146434333)
+passed 73 SQL assertions and 20 Worker/Postgres cases, then failed the separate
+local-development smoke test while installing its fresh database schema:
+`connect: connection refused`. The aggregate `ci` failure followed that database
+failure; quality and browser checks passed.
+
+The hostless readiness command could accept PostgreSQL's temporary Unix-socket
+bootstrap server before the TCP listener used by dbmate existed. The installed
+official image entrypoint starts that temporary server with `listen_addresses=''`.
+The shared probe now explicitly checks `127.0.0.1:5432`; its existing bounded wait
+and immediate migration-error handling remain intact.
+
+Regression: `node --test scripts/test-db.test.mjs` reproduced the same migration
+connection refusal when socket readiness preceded TCP, then passed all six tests
+after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
+integration cases and the fresh local startup/demo/cleanup path. This changes
+disposable local/CI startup only, without a hosted database or application change.
+
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+# ERR-20261026-PREVIEW-REPAIR
+
+PR #41 merged successfully into develop, but automatic previews did not run:
+GitHub now reads pull_request_target workflow code and github.sha from the
+default branch, which still lacked the workflow and helper. Repository readback
+showed the enable variable true; a variable cannot supply missing trusted code.
+The follow-up promotes only preview orchestration to main and corrects the
+activation guide. GitHub-held token/lifecycle acceptance remains separate.
+
+`node --test scripts/preview.test.mjs` also reproduced 12 passes and one Windows
+EPERM while creating a file symlink to `/etc/passwd`; this failed before the
+sanitizer was exercised. The fixture now uses a real Windows directory junction
+or a directory symlink elsewhere. All rejection assertions remain enabled.
+
+A new exact-commit marker regression failed with ENOENT before implementation.
+Sanitization now generates the marker from a checked SHA, rejects supplied
+markers and verifies both deployed aliases against that SHA before announcing
+readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
+commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
+
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:54:53.626Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-27T19:54:53.626Z"},"status":"resolved","cause":"Color-role palette test edits introduced a Biome formatting violation (misaligned array element).","prevention":"Run pnpm format (biome check --write) on changed files before verification.","regression":"Biome formatting check passes; pnpm lint exits 0."}
+```
+
+## October 27 VIS-01 infrastructure validation
+
+```json
+{"id":"OBS-20261027-VIS01-QUEUE-CREATE","status":"resolved","area":"operator-resource-provisioning","observation":"Initial Queue create request containing delivery_paused returned HTTP 500/code 10013; exact-name readback confirmed no resource was created.","cause":"The installed Wrangler creation path uses retention settings followed by a separate queue-name/paused PATCH; the provider did not accept the initial request shape in this run. A provider root cause was not established.","prevention":"Follow the installed CLI request contract. Read back exact names after an error before retrying; create with no producers, pause immediately, then attach the controlled consumer. Never repeat a create blindly.","regression":"The corrected sequence provisioned exactly two menu queues. Real source/R2/readback/retry-to-DLQ and cleanup passed; both empty/paused and observation settings unchanged.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS","status":"open","area":"staging-service-activation","observation":"Installed Wrangler containers list stopped before inventory because containers:write is absent from the current OAuth login. Cloudflare host dry-run, Docker build and local HTTP boundary checks are separate evidence.","prevention":"Keep the new host inactive until scoped Container deployment access is authorized. Preserve current Worker/Pages scopes; never request every default scope or infer service readiness from packaging.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"],"resolutionRequired":"Authorize the required scoped deployment access, configure provider/service secrets, deploy the reviewed host and record genuine service/source/extraction acceptance."}
+```
+
+```json
+{"id":"ERR-20261027-CONTEXT-SUMMARY","status":"resolved","area":"context-validation","cause":"Appending service details exceeded the existing context node summary bound; refresh rejected the graph before writing fingerprints.","prevention":"Keep node summaries concise and link detailed runbooks instead of accumulating prose.","regression":"Backend summary condensed without dropping authority/readiness boundaries; context refresh and check required before commit.","sources":["docs/CONTEXT.md","scripts/context.mjs"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-DRYRUN-OUTPUT","status":"resolved","area":"local-verification-artifacts","cause":"A dry-run output directory outside the existing ignored dist path was included by the lint scan.","prevention":"Write operator probe/build outputs outside the checkout or into its established ignored dist path; never format generated bundles to satisfy source lint.","regression":"Moved only the generated evidence directory to the task output folder; final pnpm check must pass on source files.","sources":["docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-COMPAT-DATE","status":"resolved","area":"local-worker-runtime","cause":"The pinned local Wrangler binary supports compatibility dates through October 13; a new October 27 test configuration could not start.","prevention":"Keep this existing project's new Worker on the already tested compatibility date until a separately verified runtime upgrade.","regression":"Actual hosting Worker source/auth routes with remote private R2 passed on the matching October 13 date, including exact cleanup.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-PARTIAL-EXIT","status":"resolved","area":"python-service-result-handling","cause":"The new service used check=True even though the existing CLI writes valid partial/failed reports and returns exit 2; reviewable partial drafts became HTTP 502.","prevention":"Distinguish expected result exit statuses from execution failure and still validate the bounded output report.","regression":"A real child writes an incomplete needs-review report and exits 2; the regression failed with 502 before the fix and passes with 200/preserved drafts afterward.","sources":["processing/src/peekaplate_processing/service.py","processing/tests/test_service.py","processing/src/peekaplate_processing/run_pipeline.py"]}
+```
+
+```json
+{"id":"ERR-20261027-EXTRACTION-SOURCE-AUTHORITY","status":"resolved","area":"private-source-authorization","cause":"The new source relay initially treated a global service bearer as authorization for caller-selected tenant/job paths, including other jobs.","prevention":"Require a short-lived signed tenant/job/hash capability minted only after backend job authorization. Keep its signing key separate from the service identity and out of Python.","regression":"Valid service identity plus job-A grant requesting job B returned 200 before the fix; focused tests and actual Worker/remote-R2 probes now deny with 403 before source access. Expired/tampered grants and digest mismatch are rejected.","sources":["backend/src/extraction-capability.ts","backend/src/extraction-host.ts","backend/src/extraction-host.test.ts","processing/src/peekaplate_processing/service.py"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-EXTRACTION-HOST-ACCESS"},"status":"resolved","evidence":"Scoped Wrangler login successfully added containers:write while retaining existing Worker/Pages scopes; credentials remain in the encrypted OS-backed store. No default-scope expansion or subscription change."}
+```
+
+```json
+{"id":"OBS-20261027-CONTAINER-ELIGIBILITY","status":"open","area":"hosted-extraction-activation","observation":"Explicit staging account Container inventory returns HTTP 401 eligibility denial saying Workers Paid is required; workers-standard reports true and subscription readback is 403. Wrangler also asserts after printing the provider denial on Windows; direct API readback confirms the provider error independently.","cause":"Account entitlement/member-role eligibility is not resolved; the available evidence does not establish that the paid plan is missing.","prevention":"Have the account owner verify existing Container entitlement and member access. Do not purchase a duplicate plan or broaden permissions blindly.","resolutionRequired":"Verify eligibility on the existing account, then deploy/test the reviewed host with protected service/provider credentials.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"kind":"clarification","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"pending-external-activation","cause":"The account is on Free; Vivien will activate Workers Paid. The standard flag alone was not billing proof.","next":"Keep the prepared Cloudflare host unchanged. After the owner activates the $5 plan, verify eligibility and configure/deploy the reviewed service; no upgrade was purchased by this task."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z"},"status":"resolved","cause":"The color-role palette test used unsafe regex match destructuring (`[, ref]`) whose captured groups could be undefined under noUncheckedIndexedAccess.","prevention":"Parse regex matches through a typed helper that validates each capture before use.","regression":"pnpm typecheck passes; tokens suite passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-27T20:04:00.236Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-27T20:04:00.236Z"},"status":"resolved","cause":"Token test edits landed after the module fingerprint was refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T13:15:19.972Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T13:20:26.669Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T13:15:19.972Z"},"status":"resolved","cause":"Biome formatting in packages/tokens/src/tokens.test.ts after inserting the light-theme test-block extraction; two lines had insufficient indentation.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 14 files/202 tests + 4 skipped, context:check, docs:check)."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T13:20:26.669Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T16:45:03.171Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T16:45:03.171Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T17:18:55.326Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T17:18:55.326Z"},"status":"resolved","cause":"Biome formatting in frontend/console/src/ui/Nav.tsx and components.test.tsx after adding aria-hidden and test file.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 15 files/216 tests + 4 skipped, context:check, docs:check)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:21:00.026Z","exitCode":1}
+```
+
+```json
+{"kind":"deployment-followup","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"timestamp":"2026-10-27T20:25:05.885Z","status":"pending-external-activation","observation":"Actual deploy of main58838e1 uploaded a partial extraction Worker, then failed at /containers/me with HTTP401 requiring Workers Paid. workers.dev remains disabled and health/extract return404; settings readback returned provider500. Protected API run40577213391 awaits independent approval; existing API health200 at prior version.","next":"Owner activates planned Paid subscription, then retry the same Worker name and verify service configuration. Independently approve existing API run and verify its new aliases. Local integration can continue; do not enable real submissions before full acceptance.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
+```
+
+```json
+{"id":"OBS-20261027-DOCKER-START","status":"resolved","area":"local-deployment","observation":"Wrangler could not launch the Docker engine; the desktop-linux named pipe was absent.","cause":"Docker Desktop daemon was stopped.","resolution":"Started the existing Docker Desktop installation; docker info returned29.8.2 and the image build/upload completed. No daemon reset or data/cache deletion.","sources":["processing/Dockerfile"]}
+```
+
+```json
+{"id":"OBS-20261027-CONTAINER-SCHEDULER","status":"fixed-locally","area":"hosted-extraction-activation","observation":"After Paid entitlement succeeded, application creation failed VALIDATE_INPUT because this account cannot use default scheduling_policy.","cause":"Default was implicit, and the older Container helper does not support the provider-required durable_object policy.","resolution":"Use direct DurableObject startup, images.base, supported standard-1 size and native inactivity timeout. Keep service/source-grant checks unchanged. New configuration guard failed before the repair and passes afterward; lifecycle regressions cover readiness, concurrency and recovery. Hosted verification follows reviewed main release.","sources":["backend/wrangler.extraction.jsonc","backend/src/extraction-host.ts","backend/src/extraction-host.test.ts","scripts/menu-ingestion-infra.test.mjs"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"status":"resolved","evidence":"Paid entitlement succeeds and the existing extraction host is deployed. No subscription was purchased by the operator."}
+```
+
+```json
+{"kind":"resolution","references":{"id":"OBS-20261027-CONTAINER-SCHEDULER"},"status":"resolved","evidence":"PR60 main7bbe0d3 deployed successfully under durable_object scheduling. Authenticated hosted Python health200, job/source denials and signed private source/hash checks passed."}
+```
+
+```json
+{"id":"OBS-20261027-REMOTE-R2-PROOF","status":"resolved","observation":"A local test writer reported201 but the independently deployed source reader returned404.","cause":"The helper used unstable_dev local:true with experimental.forceLocal:true; its remote R2 flag did not establish a provider write.","resolution":"Changed helper to actual remote mode and repeated service/source and Queue/R2 tests. Hosted source read200, Python relay checks, real conditional-create race and cleanup/absence verification passed. Corrected the earlier R2 evidence claims and retained the failed run separately outside the repo.","sources":["docs/menu-ingestion-infrastructure.md","docs/operations.md"]}
+```
+
+## ERR-20261028-MAIN-DEVELOP-TYPES
+
+The first combined `pnpm verify typecheck` failed after importing main's Worker
+runtime declarations into develop: `TextDecoderConstructorOptions` required an
+explicit `ignoreBOM`, and Node's `fileURLToPath` rejected a Worker-global URL in
+the retrieval runtime test. This was a branch-integration type mismatch, not a
+failed hosted request or database change.
+
+Preserved the existing decoder behavior with `ignoreBOM: false` and imported
+Node's URL explicitly in the Node test, matching the existing dish integration
+fix. The same typecheck then passed. Full retrieval/workerd and repository
+regression results belong to the sync PR. Do not suppress strict types or drop
+develop's retrieval implementation to make a release merge compile.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```

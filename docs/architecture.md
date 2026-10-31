@@ -34,6 +34,8 @@ A redeem code links a browsing session to a POS ticket, not to an individual's t
 
 ## Implemented boundary
 
+Internal staging analytics has a separate read boundary under [ADR 0014](adr/0014-team-analytics-access.md). GitHub-authenticated teammates must be current repository collaborators; the Worker invokes a bounded security-definer read function owned by a non-login role. Its allowlisted responses omit visitor identities and arbitrary properties. Runtime and public roles cannot read the raw analytics tables or change project scope. The endpoints are absent outside local/staging configuration; hosted activation is tracked separately in [team data access](team-data-access.md).
+
 Current code has shells, health and dish-revision contracts, signed JWT verification and a staff-authorized write API. The command locks current membership, assigns transaction-local actor/venue context and serializes command identity and dish versions. Its event, live projection, receipt and pending outbox row commit together. A pure reducer reconstructs the dish projection; it never dispatches outbox work.
 
 PostgreSQL provides a restricted runtime group role. Membership's narrowly granted update privilege exists only to permit a share lock; its update policy denies every mutation. Runtime credentials remain server-only. JWT verification proves signed claims; active restaurant permission is checked in the database on every command, including retries. Provider session revocation behavior remains part of the real Supabase integration checkpoint.
