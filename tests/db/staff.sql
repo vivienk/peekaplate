@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(35);
+SELECT plan(39);
 
 INSERT INTO app_private.venues (id, name) VALUES
   ('00000000-0000-0000-0000-000000000101', 'Staff venue'),
@@ -40,12 +40,14 @@ SELECT has_table('app_private', 'menu_review_subject', 'canonical review subject
 SELECT has_table('app_private', 'menu_approval', 'immutable menu approvals exist');
 SELECT has_table('app_private', 'menu_review_current', 'menu review projection exists');
 SELECT has_table('app_private', 'menu_publication_current', 'menu publication projection exists');
+SELECT has_table('app_private', 'public_menu_bundle', 'immutable public menu bundle handoff exists');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.staff_membership'::regclass), true, 'membership RLS is forced');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.dish_current'::regclass), true, 'dish projection RLS is forced');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.menu_review_subject'::regclass), true, 'menu review subject RLS is forced');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.menu_approval'::regclass), true, 'menu approval RLS is forced');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.menu_review_current'::regclass), true, 'menu review RLS is forced');
 SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.menu_publication_current'::regclass), true, 'menu publication RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.public_menu_bundle'::regclass), true, 'public menu bundle RLS is forced');
 SELECT ok(NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolbypassrls AND NOT rolcanlogin AND NOT rolreplication AND NOT rolinherit, 'runtime role has only safe role attributes')
   FROM pg_roles WHERE rolname = 'peekaplate_runtime';
 SELECT ok(
@@ -65,6 +67,8 @@ SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.menu_ap
 SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.menu_approval', 'update, delete')), false, 'runtime cannot mutate immutable approvals');
 SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.menu_review_current', 'select, insert, update')), true, 'runtime can maintain the tenant-scoped review projection');
 SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.menu_publication_current', 'select, insert, update')), true, 'runtime can maintain the tenant-scoped publication projection');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.public_menu_bundle', 'select')), true, 'runtime can read tenant-scoped public bundle pointers');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.public_menu_bundle', 'insert, update, delete')), false, 'runtime cannot create or mutate approved public bundle pointers');
 
 SET ROLE peekaplate_runtime;
 SELECT is((SELECT count(*) FROM app_private.staff_membership), 0::bigint, 'actor-free runtime sees no membership');

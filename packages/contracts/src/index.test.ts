@@ -10,6 +10,10 @@ import {
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
   MenuPublicationSchema,
+  PublicMenuAllergenCodeSchema,
+  PublicMenuContentBundleSchema,
+  PublicMenuDeliverySchema,
+  PublicMenuDietaryCodeSchema,
   PublishMenuSchema,
   RetrievalRequestSchema,
   SourceReferenceSchema,
@@ -168,6 +172,251 @@ describe('RES-02 review and publication boundary', () => {
   });
 });
 
+describe('RES-02 immutable diner bundle boundary', () => {
+  const bundle = {
+    schema_version: 1,
+    venue_id: '00000000-0000-4000-8000-000000000101',
+    menu_id: '00000000-0000-4000-8000-000000000102',
+    menu_revision_id: '00000000-0000-4000-8000-000000000103',
+    restaurant: {
+      name: 'Synthetic Test Kitchen',
+      logo: null,
+    },
+    categories: [
+      {
+        category_id: '00000000-0000-4000-8000-000000000105',
+        name: 'Mains',
+        dishes: [
+          {
+            dish_id: '00000000-0000-4000-8000-000000000106',
+            dish_revision_id: '00000000-0000-4000-8000-000000000107',
+            complete: true,
+            name: 'Garden Bowl',
+            description: 'Synthetic fixture content.',
+            price: { amount: '12.50', currency: 'USD' },
+            ingredients: [
+              {
+                ingredient_id: '00000000-0000-4000-8000-000000000108',
+                name: 'Tomato',
+                description: null,
+              },
+            ],
+            allergens: ['sesame'],
+            dietary: ['vegan', 'gluten-free'],
+            images: {
+              card: {
+                url: 'https://assets.example.test/dishes/card.webp',
+                width: 640,
+                height: 480,
+                alt: 'Synthetic garden bowl fixture',
+              },
+              detail: {
+                url: 'https://assets.example.test/dishes/detail.webp',
+                width: 1280,
+                height: 960,
+                alt: 'Synthetic garden bowl fixture',
+              },
+            },
+          },
+          {
+            dish_id: '00000000-0000-4000-8000-000000000109',
+            dish_revision_id: '00000000-0000-4000-8000-000000000110',
+            complete: false,
+          },
+        ],
+      },
+    ],
+  } as const;
+
+  it('accepts an ordered T0 bundle with complete and deliberately incomplete dishes', () => {
+    expect(PublicMenuContentBundleSchema.parse(bundle)).toEqual(bundle);
+  });
+
+  it('accepts every approved allergen and dietary code and rejects display labels as wire values', () => {
+    const allergenCodes = [
+      'milk',
+      'egg',
+      'fish',
+      'crustacean shellfish',
+      'tree nut',
+      'peanut',
+      'wheat',
+      'soy',
+      'sesame',
+    ] as const;
+    const dietaryCodes = ['vegan', 'vegetarian', 'gluten-free'] as const;
+
+    for (const code of allergenCodes) expect(PublicMenuAllergenCodeSchema.parse(code)).toBe(code);
+    for (const code of dietaryCodes) expect(PublicMenuDietaryCodeSchema.parse(code)).toBe(code);
+    expect(PublicMenuAllergenCodeSchema.safeParse('Peanuts').success).toBe(false);
+    expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
+  });
+
+  it('keeps an unknown allergen review state distinct from a reviewed empty declaration', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    const withAllergenState = (allergens: null | []) => ({
+      ...bundle,
+      categories: [
+        {
+          ...bundle.categories[0],
+          dishes: [{ ...completeDish, allergens }],
+        },
+      ],
+    });
+
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState(null)).success).toBe(true);
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState([])).success).toBe(true);
+  });
+
+  it('rejects partial claims, unknown allergens and insecure image URLs', () => {
+    const incompleteDish = bundle.categories[0].dishes[1];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...incompleteDish, price: { amount: '8.00', currency: 'USD' } }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['gluten'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, description: '   ' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                images: {
+                  ...completeDish.images,
+                  card: {
+                    ...completeDish.images.card,
+                    url: 'http://assets.example.test/card.webp',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a pre-publication bundle only for its exact published menu revision', () => {
+    const response = {
+      schemaVersion: 1,
+      venueId: bundle.venue_id,
+      menuId: bundle.menu_id,
+      menuRevisionId: bundle.menu_revision_id,
+      publicationId: '00000000-0000-4000-8000-000000000104',
+      publicationHash: 'a'.repeat(64),
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: 'https://assets.example.test/menu.json',
+        contentHash: 'b'.repeat(64),
+        assetManifestHash: 'c'.repeat(64),
+      },
+      menuToken: 'synthetic-token',
+      tokenExpiresAt: '2026-10-27T00:30:00.000Z',
+    } as const;
+    expect(PublicMenuDeliverySchema.safeParse({ response, content: bundle }).success).toBe(true);
+    expect(
+      PublicMenuDeliverySchema.safeParse({
+        response: {
+          ...response,
+          menuRevisionId: '00000000-0000-4000-8000-000000000999',
+        },
+        content: bundle,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects duplicate identities and invalid money, allergen or dietary values independently', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [bundle.categories[0], { ...bundle.categories[0], name: 'Duplicate category' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [completeDish, { ...completeDish, dish_revision_id: bundle.menu_revision_id }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                price: { amount: '12.500', currency: 'usd' },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['wheat', 'wheat'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, dietary: ['vegan', 'vegan'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
 describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
   const sampleText = 'Roasted Tomato Soup with Basil: $12.50. Fresh vine tomatoes simmered.';
   const samplePassage = {
