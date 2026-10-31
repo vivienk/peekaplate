@@ -5,6 +5,12 @@ import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
+export function entrySourceFromSearch(search: string): 'qr' | 'direct_link' | 'unknown' {
+  const src = new URLSearchParams(search).get('src');
+  if (src === 'qr') return 'qr';
+  if (src === null) return 'direct_link';
+  return 'unknown';
+}
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'demo',
   'edge-cases',
@@ -227,10 +233,8 @@ export function mountMenuScreen(container: HTMLElement): void {
   let exposureObserver: IntersectionObserver | null = null;
   const menuViewedTrigger = createMenuViewedTrigger();
 
-  const entrySource = (): 'qr' | 'direct_link' | 'unknown' => {
-    // Interim: the QR marker is not defined yet. Report unknown rather than inventing src=qr.
-    return 'unknown';
-  };
+  const entrySource = (): 'qr' | 'direct_link' | 'unknown' =>
+    entrySourceFromSearch(window.location.search);
 
   const cleanupExposure = () => {
     exposureTimers.forEach((timer) => window.clearTimeout(timer));
