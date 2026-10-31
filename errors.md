@@ -478,3 +478,29 @@ commit; provider writes are not part of these local tests.
 ```json
 {"kind":"resolution","references":{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION"},"status":"resolved","evidence":"After deleting the unused draft, pnpm verify lint typecheck test build context:check docs:check passed in 20.143s: 69 Vitest tests and 57 script tests. Public exports, TypeScript source, runtime, migrations and deployment configuration are unchanged. Applicable GitHub PR checks remain a separate merge gate.","prevention":"Add reviewed shared contracts under packages/contracts/src and export them from src/index.ts through a PR into develop; verify formatting and contracts before promotion."}
 ```
+
+## OBS-20261031-OBSERVATION-RELEASE-REHEARSAL
+
+The first operator-only rehearsal could not identify its disposable container
+using Docker's publish filter. A second attempt reused a second database in
+the same cluster and collided with an existing export role: PostgreSQL roles
+are cluster-wide. The corrected rehearsal used its own named disposable
+container, then passed the exact four-migration upgrade, retry, preservation
+and rollback-only runtime checks in 6.453 seconds. No shared database was
+affected. Keep cluster-scoped role migrations in isolated rehearsal instances.
+The local engine was initially stopped; starting the existing Desktop install
+restored it without resetting or pruning data. `pnpm verify test:db` then passed.
+
+## OBS-20261031-HOSTED-RUNTIME-ROLE-PROBE
+
+The hosted metadata audit and both forward migrations passed, but a subsequent
+rollback-only SQL Editor probe returned SQLSTATE 42501 when attempting
+`SET LOCAL ROLE peekaplate_runtime`. Managed `postgres` is not an unrestricted
+superuser. Use the real restricted runtime/Hyperdrive connection for behavioral
+checks; do not expand editor role membership to bypass this boundary. Hosted
+write acceptance remains unverified; the subsequent real read-only Hyperdrive
+check passed without changing role membership. operations.md records the limit.
+
+## OBS-20261031-CONTEXT-SUMMARY-BOUND
+
+The initial release context update exceeded the existing bounded-summary limit. Context refresh/check failed before publication. The summary was rewritten within the schema limit rather than weakening validation; rerun context refresh/check and docs checks before committing. Retain existing error history byte-for-byte when appending new records.
