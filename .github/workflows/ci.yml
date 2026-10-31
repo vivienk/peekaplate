@@ -48,6 +48,7 @@ jobs:
               - 'backend/**'
               - 'packages/contracts/**'
               - 'packages/analytics/**'
+              - 'packages/tokens/**'
               - 'tests/e2e/**'
               - 'scripts/check-bundle*'
               - 'scripts/verify*'
@@ -78,8 +79,8 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/peekaplate-uv"
           "$RUNNER_TEMP/peekaplate-uv/bin/pip" install --disable-pip-version-check uv==0.12.10
-          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --frozen
-          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --frozen python -m unittest discover -s processing/tests
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --extra service --frozen
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --extra service --frozen python -m unittest discover -s processing/tests
           "$RUNNER_TEMP/peekaplate-uv/bin/uv" build --project processing
       - run: pnpm verify build
       - name: Context freshness

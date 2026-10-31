@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "peekaplate-extraction-staging",
+  "account_id": "51eda1917fd22a9478808a82d2980741",
+  "main": "src/extraction-host.ts",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "APP_ENV": "staging",
+    "EXTRACTION_SOURCE_ORIGIN": "https://peekaplate-extraction-staging.vxkong.workers.dev"
+  },
+  "r2_buckets": [{ "binding": "SOURCE_BUCKET", "bucket_name": "peekaplate-staging-assets" }],
+  "containers": [
+    {
+      "class_name": "ExtractionContainer",
+      "scheduling_policy": "durable_object",
+      "images": { "base": { "dockerfile": "../processing/Dockerfile" } }
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "EXTRACTOR", "class_name": "ExtractionContainer" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ExtractionContainer"] }]
+}

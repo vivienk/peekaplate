@@ -1,4 +1,5 @@
 @import "@peekaplate/tokens/tokens.css";
+@import "@peekaplate/ui/components.css";
 
 :root {
   font-family: system-ui, sans-serif;
