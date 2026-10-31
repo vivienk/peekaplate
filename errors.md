@@ -751,3 +751,13 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-30T06:15:32.706Z"},"status":"environment-limited","cause":"The verification runner stopped before Biome because pnpm attempted to register the newly expanded eight-workspace checkout with a Windows project symlink that the Codex sandbox rejected with EPERM.","evidence":"The same pinned Biome executable was invoked directly against the merged tree and checked 102 files with no fixes required. Direct context refresh/check, documentation-link validation and git diff --check also passed.","limit":"The merged TypeScript and Vitest suites were not rerun in this sandbox because the current checkout cannot link the new workspace dependencies. Hosted Linux CI remains required after push."}
 ```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-29T14:41:51.693Z","exitCode":1}
+```
+
+## RES-02 October 31 local reconciliation checks
+
+Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
+
+The project-local store avoided the registry-link step, but dependency linking still failed with EPERM. Direct script checks passed 54/57: the preview symlink fixture was denied, the database-launcher test could not resolve uninstalled Vitest, and the real pnpm invocation retried the denied registry link. Direct pinned Biome, context validation and documentation-link checks passed. Full TypeScript/application/database/browser verification is deferred to Linux CI; no tests or runtime protections were weakened.
