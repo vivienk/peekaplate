@@ -16,7 +16,7 @@ From this dataset folder, install the required dependency:
 
     python -B -m unittest discover -s tests -v
 
-Reviewed result: 73 tests passed, including 21 validator integration tests.
+Latest local verification: 76 tests passed, including 22 validator integration tests. Independent re-review pending.
 
 ## Validate the full dataset
 

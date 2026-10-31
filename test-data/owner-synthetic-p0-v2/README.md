@@ -128,7 +128,7 @@ These commands are intended to run from the `test-data/owner-synthetic-p0-v2` di
 
 | Check | Result |
 |---|---|
-| Automated unit and integration tests | PASS — 75 tests |
+| Automated unit and integration tests | PASS — 76 tests |
 | Real-validator integration tests | PASS — 22 tests included in the total |
 | Full dataset validation | PASS |
 | Starter dataset validation | PASS |

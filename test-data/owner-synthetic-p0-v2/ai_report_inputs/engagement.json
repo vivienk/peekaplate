@@ -3,11 +3,11 @@
   "report_type": "authorized_engagement_definitions",
   "data_scope": "fictional_synthetic_restaurant",
   "definitions": {
-    "active_visible_time": "Use completed active-visible time derived from linked opening checkpoints. Do not add cumulative checkpoint values together.",
-    "checkpoint_semantics": "Cumulative checkpoints describe progress within the same opening. The completed active time comes from the final valid checkpoint.",
+    "active_visible_time": "Use valid linked cumulative opening checkpoints to assess engagement qualification, including nonfinal checkpoints. Do not add cumulative checkpoint values together. Calculate completed-opening timing averages separately using final valid checkpoints only.",
+    "checkpoint_semantics": "Cumulative checkpoints describe progress within the same opening and must not be summed. A valid linked nonfinal checkpoint with cumulative_active_ms >= 10000 can establish provisional engagement without a final checkpoint. Completed-opening timing averages use only final valid checkpoints.",
     "comparison_picker": "Opening a comparison picker does not count as a displayed comparison.",
     "qualifying_comparison": "A comparison qualifies only when it is displayed and linked to a valid dish opening.",
-    "considered_dish": "A dish qualifies with at least 10000 milliseconds of completed active-visible time OR a qualifying displayed comparison.",
+    "considered_dish": "A dish qualifies when a valid linked opening checkpoint reaches at least 10000 milliseconds of cumulative active-visible time, even if the checkpoint is nonfinal, OR when there is a qualifying displayed comparison. A final checkpoint is not required for provisional engagement qualification.",
     "short_opening": "Opening a dish for fewer than 10 seconds does not automatically establish meaningful engagement.",
     "deduplication": "Count each qualifying dish once per visit."
   },

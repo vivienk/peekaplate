@@ -166,5 +166,40 @@ class TestAIReportInputs(unittest.TestCase):
 
                 check_fields(fixture, case["case_id"])
 
+
+
+    def test_engagement_definitions_support_nonfinal_checkpoint(self):
+        fixture = json.loads(
+            (ROOT / "ai_report_inputs" / "engagement.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        definitions = fixture["definitions"]
+
+        for field in (
+            "active_visible_time",
+            "checkpoint_semantics",
+            "considered_dish",
+        ):
+            with self.subTest(field=field):
+                self.assertIn("nonfinal", definitions[field].lower())
+
+        self.assertIn(
+            "10000", definitions["checkpoint_semantics"]
+        )
+        self.assertIn(
+            "10000", definitions["considered_dish"]
+        )
+        self.assertIn(
+            "final valid checkpoints",
+            definitions["active_visible_time"].lower(),
+        )
+        self.assertNotIn(
+            "completed active-visible time",
+            definitions["considered_dish"].lower(),
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
