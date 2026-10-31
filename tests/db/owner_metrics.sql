@@ -2,7 +2,7 @@
 -- PEEKAPLATE - S3-DATA-02 INTEGRATION TESTS (pgTAP ORACLE EDITION v4)
 -- PATH: tests/db/owner_metrics.sql
 -- DRI: Louis Dieme | Reviewers: Jeffin Sam Joji & Zhiliang Wang
--- Note: temp_events is a temporary scaffold; will switch to the 
+-- Note: temp_events is a temporary scaffold; will switch to the
 -- canonical view boundary once frozen in PR #32.
 -- =====================================================================
 
@@ -20,7 +20,7 @@ CREATE TEMPORARY TABLE temp_events (
     event_type TEXT,
     payload_checksum TEXT,
     traffic_class TEXT,
-    occurred_at TIMESTAMP, 
+    occurred_at TIMESTAMP,
     received_at TIMESTAMP
 );
 
@@ -28,7 +28,7 @@ CREATE TEMPORARY TABLE temp_events (
 INSERT INTO temp_events (tenant_id, event_id, session_id, event_type, payload_checksum, traffic_class, occurred_at, received_at) VALUES
     -- CASE 9: Frontier 9 (Must be suppressed and counts hidden)
     ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()),
-    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()), 
+    ('resto_9', 'evt_101', 'sess_01', 'dish_detail_opened', 'sha_A', 'live', NOW(), NOW()),
     ('resto_9', 'evt_102', 'sess_02', 'dish_detail_opened', 'sha_B', 'live', NOW(), NOW()),
     ('resto_9', 'evt_103', 'sess_03', 'dish_detail_opened', 'sha_C', 'live', NOW(), NOW()),
     ('resto_9', 'evt_104', 'sess_04', 'dish_detail_opened', 'sha_D', 'live', NOW(), NOW()),
@@ -40,7 +40,7 @@ INSERT INTO temp_events (tenant_id, event_id, session_id, event_type, payload_ch
 
     -- CASE 10: Frontier 10 (Must show metrics normally = 10)
     ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW(), NOW()),
-    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW(), NOW()), 
+    ('resto_10', 'evt_201', 'sess_A', 'dish_detail_opened', 'sha_1', 'live', NOW(), NOW()),
     ('resto_10', 'evt_202', 'sess_B', 'dish_detail_opened', 'sha_2', 'live', NOW(), NOW()),
     ('resto_10', 'evt_203', 'sess_C', 'dish_detail_opened', 'sha_3', 'live', NOW(), NOW()),
     ('resto_10', 'evt_204', 'sess_D', 'dish_detail_opened', 'sha_4', 'live', NOW(), NOW()),
@@ -69,44 +69,44 @@ INSERT INTO temp_events (tenant_id, event_id, session_id, event_type, payload_ch
     ('resto_11', 'evt_311', 'sess_x11', 'dish_detail_opened', 'sha_11', 'live', NOW(), NOW()),
 
     -- CASE EMPTY: Real Zero-Denominator (All events are excluded)
-    ('resto_empty', 'evt_901', 'bad_sess_1', 'dish_detail_opened', 'sha_11', 'internal_test', NOW(), NOW()), 
-    ('resto_empty', 'evt_902', 'bad_sess_2', 'dish_detail_opened', 'sha_11', 'live', NOW() - INTERVAL '25 hours', NOW()), 
-    ('resto_empty', 'evt_903', 'bad_sess_3', 'dish_detail_opened', 'sha_11', 'live', NOW() + INTERVAL '6 minutes', NOW()), 
-    ('resto_empty', 'evt_904', 'bad_sess_4', 'unknown_type', 'sha_11', 'live', NOW(), NOW()), 
-    ('resto_empty', NULL, 'bad_sess_5', 'dish_detail_opened', 'sha_11', 'live', NOW(), NOW()), 
+    ('resto_empty', 'evt_901', 'bad_sess_1', 'dish_detail_opened', 'sha_11', 'internal_test', NOW(), NOW()),
+    ('resto_empty', 'evt_902', 'bad_sess_2', 'dish_detail_opened', 'sha_11', 'live', NOW() - INTERVAL '25 hours', NOW()),
+    ('resto_empty', 'evt_903', 'bad_sess_3', 'dish_detail_opened', 'sha_11', 'live', NOW() + INTERVAL '6 minutes', NOW()),
+    ('resto_empty', 'evt_904', 'bad_sess_4', 'unknown_type', 'sha_11', 'live', NOW(), NOW()),
+    ('resto_empty', NULL, 'bad_sess_5', 'dish_detail_opened', 'sha_11', 'live', NOW(), NOW()),
     ('resto_empty', 'evt_905', 'bad_sess_6', 'dish_detail_opened', 'sha_conf_A', 'live', NOW(), NOW()),
     ('resto_empty', 'evt_905', 'bad_sess_7', 'dish_detail_opened', 'sha_conf_B', 'live', NOW(), NOW());
 
 -- 4. Analytical calculation view (Excluding tenant/publication authorization logic per contract guidance)
 CREATE TEMPORARY TABLE temp_report_results AS
-SELECT 
+SELECT
     v.tenant_id,
-    CASE 
+    CASE
         WHEN COUNT(DISTINCT ce.session_id) = 0 THEN NULL
-        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL 
-        ELSE COUNT(ce.event_id) 
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL
+        ELSE COUNT(ce.event_id)
     END AS total_clicks,
-    CASE 
+    CASE
         WHEN COUNT(DISTINCT ce.session_id) = 0 THEN NULL
-        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL 
-        ELSE COUNT(DISTINCT ce.session_id) 
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN NULL
+        ELSE COUNT(DISTINCT ce.session_id)
     END AS raw_unique_sessions,
     -- Using canonical string tokens for insufficient data boundaries
-    CASE 
+    CASE
         WHEN COUNT(DISTINCT ce.session_id) = 0 THEN 'not measurable'
-        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'insufficient_data' 
-        ELSE CAST(COUNT(DISTINCT ce.session_id) AS TEXT) 
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'insufficient_data'
+        ELSE CAST(COUNT(DISTINCT ce.session_id) AS TEXT)
     END AS reconciled_sessions,
-    CASE 
+    CASE
         WHEN COUNT(DISTINCT ce.session_id) = 0 THEN 'NOT MEASURABLE'
-        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'SUPPRESSED' 
-        ELSE 'NORMAL' 
+        WHEN COUNT(DISTINCT ce.session_id) < 10 THEN 'SUPPRESSED'
+        ELSE 'NORMAL'
     END AS status
 FROM (SELECT DISTINCT tenant_id FROM temp_events) v
 LEFT JOIN (
     SELECT MIN(te.id) as id, te.tenant_id, te.event_id, te.session_id
     FROM temp_events te
-    WHERE 
+    WHERE
         te.traffic_class = 'live'
         AND te.event_type = 'dish_detail_opened'
         AND te.event_id IS NOT NULL
