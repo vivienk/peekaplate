@@ -79,17 +79,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d08f53d1c49393f7eac8dc4e6060b73e005fb8503094ed776c6ddb0ee9e6978f"
+      "sourceFingerprint": "8378d1842aaa6b974b9c995eac00f291a5f985d4795ea5747e1bd740b3adc5e8"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
-        "frontend/console/package.json"
+        "frontend/console/package.json",
+        "frontend/console/foundations.html",
+        "frontend/console/src/foundations/Input.tsx",
+        "frontend/console/src/foundations/input.css",
+        "frontend/console/src/foundations/demo.tsx",
+        "tests/e2e/input.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -99,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "78a1ac131ac431ba3657c64a8f8101e0b1ddfa52c1d3efa69ae85a90cfacbf39"
+      "sourceFingerprint": "edd7eb2813fac4cbfc7fbcfbce673d741cd830b924dbbfb324d365f114abdc38"
     },
     {
       "id": "backend",
@@ -364,6 +369,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October31 PR30 reconciliation: preserved current develop tokens, shared component CSS, PDF retrieval and owner-metric tests while retaining the accessible Input foundation and dev-only synthetic demo. Context and frontend-design conflicts retain both intents; no input behavior or owner-report schema changed.",
+      "modules": [
+        "console",
+        "delivery"
+      ],
+      "next": "Run current repository/build/browser checks and exact-head CI, retarget PR30 to develop and merge it. Keep final Input visual approval and real review-form integration separate."
+    },
+    {
       "summary": "October31 PR29 reconciliation: retained bounded PDF retrieval and current develop tokens/UI, deployment foundations and PR22 owner-metric tests. The only merge conflict was the context graph; target responsibilities and the PDF source paths are both preserved.",
       "modules": [
         "backend",
@@ -440,14 +453,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
-    },
-    {
-      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
     }
   ]
 }
