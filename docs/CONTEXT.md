@@ -109,7 +109,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor memberships and projections use forced RLS. October31 staging now records all six migrations, including unchanged PR32/PR50 canonical index/conflicts, nine typed fact tables and two private live-only owner views. Hosted metadata verifies eleven forced-RLS tables, tenant policies, append-only triggers, restricted runtime grants, denied browser/exporter access and preserved baseline counts. Real remote Hyperdrive reads passed as the non-superuser, non-bypass staging login. Local upgrade/retry and tenant/write constraints pass. Hosted writes, consumer integration, report suppression, pooled recovery and restore remain separate. Earlier PostHog export/security history is preserved; the exporter has no application-schema access.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -121,7 +121,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261023120000_observation_index.sql",
+        "tests/db/observations.sql",
+        "migrations/20261026120000_observation_facts.sql",
+        "tests/db/observation-facts.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -130,7 +134,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0014-team-analytics-access.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5c576f557201a6d1af09e9c2c860bb1e5cd0430a3af8fdc6b3e8f1ee4528c0e6"
+      "sourceFingerprint": "8471c44dc230552d3ca7636bada2797dcd352e007bc36273718295b7aaea29be"
     },
     {
       "id": "measurement",
@@ -204,7 +208,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "04171ae7a656107ffe1ed2ad2d71abb97223e4becfd7f4e574fe3746c7f10811"
+      "sourceFingerprint": "5a864819f7505daf0b885fbf9afba450d36f6617c71ad791cd967ec043472a79"
     },
     {
       "id": "agents",
@@ -315,6 +319,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October31 focused schema release: unchanged PR32/PR50 SQL and tests promoted from develop. Applied both forward migrations to existing staging with history in one guarded transaction. Hosted metadata audit confirms six history rows, eleven forced-RLS tables, secure owner views, restricted grants and unchanged baseline counts. Real remote Hyperdrive read checks passed as the non-bypass staging login. No feature branch, Worker deployment, Queue activation or owner-report contract changed.",
+      "modules": [
+        "database",
+        "delivery"
+      ],
+      "next": "Require green exact-head release CI and merge the focused main promotion. Teeyansh can map the reviewed producer/consumer to the now-applied schema. Keep queues paused until compatible code and hosted write/conflict/recovery and browser-flow acceptance pass. SQL Editor cannot SET ROLE runtime; do not expand privileges to impersonate it. Operations records local/hosted evidence and limits."
+    },
+    {
       "summary": "October30 main cleanup: removed packages/contracts/owner-report.ts, an unexported draft outside the TypeScript source tree that broke Biome on main682ab7f. Local lint, typecheck, 69 Vitest and 57 script tests, builds and context/docs checks passed in 20.143s. No caller, runtime, migration or deployment changes; separate develop schema work is untouched.",
       "modules": [
         "contracts"
@@ -387,14 +399,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review this documentation PR. Before Actions activation, verify credential permissions, intended staging bindings and the independent approval process; the settings observation is not a successful workflow or deployment test."
-    },
-    {
-      "summary": "Updated deployment selection to main for both environments per the maintainer's explicit instruction. Configured verified non-secret staging account, issuer and Hyperdrive bindings. Provider audit found existing Supabase migrations, forced RLS, restricted staging login, an ES256 public key and uncached Hyperdrive; no duplicate database branch was created. Hosted request behavior remains unverified.",
-      "modules": [
-        "delivery",
-        "backend"
-      ],
-      "next": "Review and test the staging configuration, run hosted identity and tenant-isolation checks, and record deployment evidence. Production requires separate resources and human release approval for the same tested main SHA."
     }
   ]
 }
