@@ -57,6 +57,8 @@ jobs:
           VITE_POSTHOG_HOST: ''
           VITE_POSTHOG_ENVIRONMENT: ''
           VITE_POSTHOG_ALLOWED_ORIGIN: ''
+          # Preview-only: adds the synthetic console demo pages (never set for staging or production).
+          PEEKAPLATE_PREVIEW_DEMOS: 'true'
         run: |
           pnpm --filter @peekaplate/diner build
           pnpm --filter @peekaplate/console build
