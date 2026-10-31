@@ -1,4 +1,6 @@
+import { newExposureId, newOpeningId, startOpeningClock, track } from '../tracking';
 import { renderDishDetail } from './dishDetail';
+import { createMenuViewedTrigger, type DetailSource, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
@@ -218,17 +220,165 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   let savedScroll = 0;
   let currentMenu: Menu | null = null;
+  let openingClock: ReturnType<typeof startOpeningClock> | null = null;
+  let detailActivityHandler: (() => void) | null = null;
+  const exposureTimers = new Map<HTMLElement, number>();
+  const exposureIds = new Map<string, string>();
+  let exposureObserver: IntersectionObserver | null = null;
+  const menuViewedTrigger = createMenuViewedTrigger();
+
+  const entrySource = (): 'qr' | 'direct_link' | 'unknown' => {
+    // Interim: the QR marker is not defined yet. Report unknown rather than inventing src=qr.
+    return 'unknown';
+  };
+
+  const cleanupExposure = () => {
+    exposureTimers.forEach((timer) => window.clearTimeout(timer));
+    exposureTimers.clear();
+    if (exposureObserver) {
+      exposureObserver.disconnect();
+      exposureObserver = null;
+    }
+  };
 
   const showMenu = () => {
     if (!currentMenu) return;
+    if (detailActivityHandler) {
+      container.removeEventListener('click', detailActivityHandler);
+      container.removeEventListener('scroll', detailActivityHandler);
+      container.removeEventListener('keydown', detailActivityHandler);
+      container.removeEventListener('pointerdown', detailActivityHandler);
+      detailActivityHandler = null;
+    }
+    if (openingClock) {
+      openingClock.end();
+      openingClock = null;
+    }
     renderMenu(container, currentMenu, showDetail);
     window.scrollTo(0, savedScroll);
+    setupExposureTracking(currentMenu);
   };
 
   const showDetail = (dish: CompleteDish) => {
+    if (!currentMenu) return;
     savedScroll = window.scrollY;
+    cleanupExposure();
+    if (openingClock) {
+      openingClock.end();
+      openingClock = null;
+    }
     renderDishDetail(container, dish, showMenu);
     window.scrollTo(0, 0);
+
+    const opening: {
+      source: 'menu_card';
+      fromExposureId?: string;
+      saveAvailable: false;
+    } = {
+      source: 'menu_card',
+      saveAvailable: false,
+    };
+    const exposureId = exposureIds.get(dish.dishId);
+    if (exposureId !== undefined) opening.fromExposureId = exposureId;
+
+    const openingId = trackDishDetailOpened(currentMenu, dish, opening, track, newOpeningId);
+
+    if (openingId) {
+      openingClock = startOpeningClock(
+        {
+          publication_revision_id: currentMenu.publicationRevisionId,
+          dish_id: dish.dishId,
+          dish_revision_id: dish.dishRevisionId,
+          opening_id: openingId,
+        },
+        { send: track },
+      );
+
+    if (detailActivityHandler) {
+      container.removeEventListener('click', detailActivityHandler);
+      container.removeEventListener('scroll', detailActivityHandler);
+      container.removeEventListener('keydown', detailActivityHandler);
+      container.removeEventListener('pointerdown', detailActivityHandler);
+      detailActivityHandler = null;
+    }
+
+    const reportActivity = () => openingClock?.activity();
+    detailActivityHandler = reportActivity;
+    container.addEventListener('click', reportActivity);
+    container.addEventListener('scroll', reportActivity);
+    container.addEventListener('keydown', reportActivity);
+    container.addEventListener('pointerdown', reportActivity);
+    }
+  };
+
+  const setupExposureTracking = (menu: Menu) => {
+    cleanupExposure();
+    const complete = menu.categories.flatMap((category) =>
+      category.dishes.filter((dish): dish is CompleteDish => dish.kind === 'complete'),
+    );
+    const positionByDish = new Map<string, number>();
+    complete.forEach((dish, index) => positionByDish.set(dish.dishId, index + 1));
+
+    exposureObserver = new IntersectionObserver(
+      (entries) => {
+        if (document.hidden) return;
+        entries.forEach((entry) => {
+          const card = entry.target as HTMLElement;
+          const dishId = card.dataset.dishId;
+          if (!dishId) return;
+          const dish = complete.find((item) => item.dishId === dishId);
+          if (!dish) return;
+
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            if (!exposureTimers.has(card)) {
+              const timer = window.setTimeout(() => {
+                if (document.hidden) return;
+                const exposureId = newExposureId();
+                exposureIds.set(dishId, exposureId);
+                try {
+                  track('dish_viewed', {
+                    publication_revision_id: menu.publicationRevisionId,
+                    dish_id: dish.dishId,
+                    dish_revision_id: dish.dishRevisionId,
+                    exposure_id: exposureId,
+                    surface: 'menu_list',
+                    position: positionByDish.get(dishId) ?? 0,
+                    exposure_basis: 'viewport_50pct_1s',
+                  });
+                } catch {
+                  // Tracking must not break the menu.
+                }
+              }, 1000);
+              exposureTimers.set(card, timer);
+            }
+          } else {
+            const timer = exposureTimers.get(card);
+            if (timer !== undefined) {
+              window.clearTimeout(timer);
+              exposureTimers.delete(card);
+            }
+          }
+        });
+      },
+      { threshold: [0, 0.5] },
+    );
+
+    container.querySelectorAll<HTMLElement>('.pp-card[data-dish-id]').forEach((card) => {
+      exposureObserver?.observe(card);
+    });
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        exposureTimers.forEach((timer) => window.clearTimeout(timer));
+        exposureTimers.clear();
+      } else {
+        exposureObserver?.disconnect();
+        container.querySelectorAll<HTMLElement>('.pp-card[data-dish-id]').forEach((card) => {
+          exposureObserver?.observe(card);
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
   };
 
   void source.load().then((result: MenuLoadResult) => {
@@ -237,6 +387,8 @@ export function mountMenuScreen(container: HTMLElement): void {
       return;
     }
     currentMenu = result.menu;
+    menuViewedTrigger(currentMenu, entrySource());
     renderMenu(container, currentMenu, showDetail);
+    setupExposureTracking(currentMenu);
   });
 }
