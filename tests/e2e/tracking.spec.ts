@@ -63,3 +63,31 @@ test('IDs are lowercase UUIDs and nothing is kept outside the tab', async ({ pag
   expect(await page.evaluate(() => window.localStorage.length)).toBe(0);
   expect(await page.evaluate(() => document.cookie)).toBe('');
 });
+
+test('track() builds an envelope in a real page and sends nothing over the network', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
+  const logged = page.waitForEvent('console', (message) => message.text().startsWith('[track]'));
+  await page.evaluate(async () => {
+    const load = (path: string) => import(/* @vite-ignore */ path);
+    const { track } = await load('/src/tracking/index.ts');
+    track('menu_viewed', {
+      publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+      entry_source: 'qr',
+    });
+  });
+  const message = await logged;
+  const envelope = await message.args()[1]?.jsonValue();
+  expect(envelope).toMatchObject({
+    schema_version: 'observation.v2',
+    type: 'menu_viewed',
+    local_sequence: 1,
+    payload: { entry_source: 'qr' },
+  });
+  // Only the dev server's own module files were fetched; no tracking request left the page.
+  expect(requests.filter((url) => !url.startsWith(DINER))).toEqual([]);
+  expect(requests.filter((url) => /observations|posthog/i.test(url))).toEqual([]);
+});

@@ -124,9 +124,10 @@ export function browserSessionStore(): SessionStore | null {
 // from the back-forward cache.
 export function browserLifecycle(): Lifecycle {
   return {
-    onHide: (fn) => globalThis.addEventListener('pagehide', fn),
+    // Optional calls: outside a browser (tests, server rendering) there is no page lifecycle.
+    onHide: (fn) => globalThis.addEventListener?.('pagehide', fn),
     onShow: (fn) =>
-      globalThis.addEventListener('pageshow', (event) => {
+      globalThis.addEventListener?.('pageshow', (event) => {
         if ((event as PageTransitionEvent).persisted) fn();
       }),
   };

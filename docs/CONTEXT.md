@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist for screens to call; nothing calls them yet. See docs/posthog.md for activation and evidence limits. S3-TRK-01.1 core (src/tracking, not yet behind track()): allowlist, ID helpers, per-tab identity with a never-reused sequence (duplicate tabs start fresh), the observation.v2 envelope and the activity clock (cumulative 5 s checkpoints, 30 s idle pause, 300000 ms cap).",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist for screens to call; nothing calls them yet. See docs/posthog.md for activation and evidence limits. S3-TRK-01.1 (src/tracking; track() logs envelopes, no delivery yet): allowlist, ID helpers, per-tab identity with a never-reused sequence (duplicate tabs start fresh), the observation.v2 envelope and the activity clock (cumulative 5 s checkpoints, 30 s idle pause, 300000 ms cap).",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -97,7 +97,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "188a78c86b7286e00069e0ac0207f9167dab8173ad4362c096ca8e208365ff2d"
+      "sourceFingerprint": "9df32de6e095b5473bea0855aa109d8a925540bbc100cea07c84338161acc8b0"
     },
     {
       "id": "console",
