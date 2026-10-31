@@ -1,4 +1,5 @@
 import {
+  IsoDateTimeSchema,
   type ObservationQueueEnvelope,
   type ObservationReceipt,
   type ObservationReceiptBatch,
@@ -246,13 +247,15 @@ function conflictEvidence(
       : ALLOWED_TYPES.has(rawType)
         ? (rawType as ObservationV2['type'])
         : 'unknown';
+  const rawOccurredAt = record.occurred_at;
   const occurredAt =
-    typeof record.occurred_at === 'string' &&
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(
-      record.occurred_at,
+    typeof rawOccurredAt === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(
+      rawOccurredAt,
     ) &&
-    Number.isFinite(Date.parse(record.occurred_at))
-      ? new Date(record.occurred_at).toISOString()
+    IsoDateTimeSchema.safeParse(rawOccurredAt).success &&
+    Number.isFinite(Date.parse(rawOccurredAt))
+      ? new Date(rawOccurredAt).toISOString()
       : null;
   const rawPublication = record.publication_revision_id;
   const publicationStatus =

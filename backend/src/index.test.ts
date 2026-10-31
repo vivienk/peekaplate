@@ -479,4 +479,98 @@ describe('observation.v2 HTTP boundary', () => {
 
     expect(enqueueObservation).toHaveBeenCalledTimes(2);
   });
+
+  it('correctly handles fractional seconds up to nanoseconds and rejects invalid calendar dates in conflict evidence', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+
+    // 1. Valid event with microseconds
+    const validMicro = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.123456Z',
+    };
+
+    // 2. Conflicting copy with nanoseconds and invalid schema (triggers conflict metadata)
+    const invalidNano = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.123456789Z',
+      payload: { unknown_field: true },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(request([validMicro, invalidNano]));
+    expect(response.status).toBe(200);
+
+    const parsed = await parseObservationReceiptBatch(response);
+    expect(parsed.receipts).toHaveLength(2);
+    expect(parsed.receipts[0]?.status).toBe('rejected');
+    expect(parsed.receipts[0]?.reason_code).toBe('event_id_conflict');
+    expect(parsed.receipts[1]?.status).toBe('rejected');
+    expect(parsed.receipts[1]?.reason_code).toBe('event_id_conflict');
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const queued = enqueueObservation.mock.calls[0]?.[0] as {
+      kind: string;
+      copies: { validation: string; metadata?: { occurredAt: string | null } }[];
+    };
+    expect(queued.kind).toBe('observation_conflict.v1');
+    expect(queued.copies).toHaveLength(2);
+
+    // Microsecond copy is valid, so validation is 'valid'
+    expect(queued.copies[0]?.validation).toBe('valid');
+
+    // Nanosecond invalid copy metadata preserves occurredAt (not null)
+    expect(queued.copies[1]?.validation).toBe('invalid');
+    expect(queued.copies[1]?.metadata?.occurredAt).toBe('2026-10-31T12:30:45.123Z');
+  });
+
+  it('rejects invalid calendar dates and overflowing fractional digits in conflict metadata', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+
+    const validCopy = {
+      ...event(),
+      event_id: sharedEventId,
+    };
+
+    // Invalid calendar date: Feb 31 (must become null, not silently normalized to March 3)
+    const feb31Copy = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-02-31T12:30:45Z',
+      payload: { invalid: true },
+    };
+
+    // Overflowing fractional digits (> 9 digits)
+    const overflowFractionCopy = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.1234567890Z',
+      payload: { invalid: true },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(
+      request([validCopy, feb31Copy, overflowFractionCopy]),
+    );
+    expect(response.status).toBe(200);
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const queued = enqueueObservation.mock.calls[0]?.[0] as {
+      kind: string;
+      copies: { validation: string; metadata?: { occurredAt: string | null } }[];
+    };
+    expect(queued.kind).toBe('observation_conflict.v1');
+    expect(queued.copies).toHaveLength(3);
+
+    // Feb 31 must be sanitized to null
+    expect(queued.copies[1]?.validation).toBe('invalid');
+    expect(queued.copies[1]?.metadata?.occurredAt).toBeNull();
+
+    // 10-digit fractional seconds must be sanitized to null
+    expect(queued.copies[2]?.validation).toBe('invalid');
+    expect(queued.copies[2]?.metadata?.occurredAt).toBeNull();
+  });
 });

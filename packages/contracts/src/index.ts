@@ -295,13 +295,14 @@ const dishReference = {
   dish_id: observationUuid,
   dish_revision_id: observationUuid,
 };
+export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 const observationBase = z.strictObject({
   schema_version: z.literal('observation.v2'),
   event_id: observationUuid,
   session_id: observationUuid,
   producer_id: observationUuid,
   local_sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  occurred_at: z.iso.datetime({ offset: true }),
+  occurred_at: IsoDateTimeSchema,
   publication_revision_id: observationUuid,
 });
 
