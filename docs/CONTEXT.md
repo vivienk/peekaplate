@@ -94,17 +94,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d08f53d1c49393f7eac8dc4e6060b73e005fb8503094ed776c6ddb0ee9e6978f"
+      "sourceFingerprint": "8378d1842aaa6b974b9c995eac00f291a5f985d4795ea5747e1bd740b3adc5e8"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
-        "frontend/console/package.json"
+        "frontend/console/package.json",
+        "frontend/console/foundations.html",
+        "frontend/console/src/foundations/Input.tsx",
+        "frontend/console/src/foundations/input.css",
+        "frontend/console/src/foundations/demo.tsx",
+        "tests/e2e/input.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -114,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "78a1ac131ac431ba3657c64a8f8101e0b1ddfa52c1d3efa69ae85a90cfacbf39"
+      "sourceFingerprint": "edd7eb2813fac4cbfc7fbcfbce673d741cd830b924dbbfb324d365f114abdc38"
     },
     {
       "id": "backend",
@@ -171,12 +176,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7300436047e53531a33c1c6cd8895f1f55fb61def6741cb63b349fa7416b5e0d"
+      "sourceFingerprint": "0b164d7a95ba71a77ad1bfa9ee5ab7cbfa7ddae8c41c4fd44c9e686de4dc7649"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/event/command/outbox, actor-scoped memberships and tenant-scoped projections remain protected by forced RLS. Local tests cover schema upgrade, atomic commands and connection reuse; disposable Docker startup waits for TCP before migrations. Hosted staff checks are recorded separately. Private PostHog export remains append-only with eight raw copies/four deduplicated synthetic events. October 22 read-only audit confirms migration 20261021130000 and history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope directly; exporter has no application-schema access. Physical hosted pool reuse and restore remain unverified.",
+      "summary": "Private Postgres venue/event/command/outbox, actor memberships and tenant projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP-ready startup; hosted staff checks are separate. Private PostHog export is append-only: eight raw copies/four deduplicated synthetic events. The October 22 audit verifies migration 20261021130000/history, sole staging scope 675372, restricted security-definer ownership/execution and denied browser/runtime raw access. Runtime cannot read scope; exporter has no application-schema access. Hosted pool reuse/restore remain unverified. The standalone owner-metric oracle covers NULL-ID rejection, retries/conflicts and the ten-session fixture floor; canonical report integration remains separate. Canonical index/conflicts plus typed facts and tenant-restricted live-only owner views are defined; activity uses the greatest checkpoint. Report suppression/authorization and consumer integration remain separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -188,16 +193,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261020070000_posthog_exports.sql",
         "tests/db/posthog.sql",
         "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "tests/db/owner_metrics.sql",
+        "migrations/20261023120000_observation_index.sql",
+        "tests/db/observations.sql",
+        "migrations/20261026120000_observation_facts.sql",
+        "tests/db/observation-facts.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0013-posthog-export-boundary.md",
-        "docs/adr/0014-team-analytics-access.md"
+        "docs/adr/0014-team-analytics-access.md",
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5c576f557201a6d1af09e9c2c860bb1e5cd0430a3af8fdc6b3e8f1ee4528c0e6"
+      "sourceFingerprint": "107f87f6fa9137cdcd252696934b3c999aa54dd4c9040aed6f6f4286a9267a34"
     },
     {
       "id": "measurement",
@@ -271,7 +282,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "dbdb9b3b2a2ec29d91ac0e563992dd0bdd763fe4982ebfab25c230a2ba73f2c0"
+      "sourceFingerprint": "66124cbd605ad9d6cfd8157b7ee3581b4d07343450d09a5e0884960cd3a24976"
     },
     {
       "id": "agents",
@@ -422,6 +433,45 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
+      "modules": [
+        "database",
+        "delivery"
+      ],
+      "next": "Require green exact-head CI before merging PR50. Reconcile the canonical producer and consumer against these tables/views; wire owner-report queries separately. Hosted migration and live reporting acceptance remain separate operator work."
+    },
+    {
+      "summary": "October 31 PR32 reconciliation: preserved current develop owner-metric tests, PDF retrieval, Input and design-token work while adding canonical observation index/conflict schema and its 29 SQL assertions. Only the shared context conflicted; migration/test bytes remain unchanged from the previously reviewed c2a1331. Local verification passed 237 unit tests, 57 script tests, 113 SQL assertions and 20 database integration tests.",
+      "modules": [
+        "database",
+        "delivery"
+      ],
+      "next": "Require green exact-head CI before merging PR32, then retarget/reconcile PR50. Hosted migrations and Queue consumer activation remain separate operator work."
+    },
+    {
+      "summary": "October31 PR30 reconciliation: preserved current develop tokens, shared component CSS, PDF retrieval and owner-metric tests while retaining the accessible Input foundation and dev-only synthetic demo. Context and frontend-design conflicts retain both intents; no input behavior or owner-report schema changed.",
+      "modules": [
+        "console",
+        "delivery"
+      ],
+      "next": "Run current repository/build/browser checks and exact-head CI, retarget PR30 to develop and merge it. Keep final Input visual approval and real review-form integration separate."
+    },
+    {
+      "summary": "October31 PR29 reconciliation: retained bounded PDF retrieval and current develop tokens/UI, deployment foundations and PR22 owner-metric tests. The only merge conflict was the context graph; target responsibilities and the PDF source paths are both preserved.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Run actual Worker retrieval tests, builds, database checks and applicable CI on this reconciled head, then merge PR29. Representative menu relevance and hosted extraction/publication acceptance remain separate."
+    },
+    {
+      "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
+      "modules": [
+        "database"
+      ],
+      "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
+    },
+    {
       "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
       "modules": [
         "tokens",
@@ -467,48 +517,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review and merge runtime repair, deploy its exact main commit, configure matched service/signing secrets through protected provider stores and test real hosted container/R2 authorization. OCR/AI provider credentials are absent; real menu extraction and complete Queue-to-draft acceptance remain separate. Teeyansh can continue local integration, keeping the queue paused."
-    },
-    {
-      "summary": "VIS-01 staging menu Queue/DLQ created and synthetic R2/archive-before-ACK/retry-to-DLQ checks passed; empty/paused, observations unchanged. Added producer/report aliases and optional bounded Python HTTP/container host. Independent review found and reproduced partial CLI-exit handling and global source-authority gaps; fixes preserve exit2 reports and require tenant/job/hash grants signed outside Python.111Python tests and actual Worker/privateR2 grant-denial probe pass. Scoped Containers login authorized, but account eligibility API still denies activation; no plan upgrade, service deployment, feature PR, database or production change.",
-      "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "next": "Release bindings via reviewed main and protected staging approval. Account owner must resolve Container entitlement/member access; do not infer a missing paid plan from the provider error. Deploy service with protected signing/service/OCR/LLM secrets. Teeyansh aligns PR45 source snapshots, claim-time capability minting, deadlines/leases/report storage, reviewed migrations and real consumer. Replace temporary pull consumer and pass full menu-to-draft/retry/DLQ/tenant acceptance before collection."
-    },
-    {
-      "summary": "VIS-02/RES-01.1 follow-up adds three explicit model-input modes on the existing graph, with OCR+image default chosen explicitly. Grounded originals remain separate from private raw/cleared/rejected suggestions, exact page/image provenance and final timing sidecars. Image-only does not call OCR or invent text spans. Shared review schemas remain unchanged; synthetic regressions preserve complete monetary options, known zero, literal names and conservative association/dedup. PR55's promoted baseline was compared byte-for-byte; service/host retention is tested with a shared synthetic bundle and create-only tenant/job/attempt storage, without new public request or RES fields. Real-menu runs, images, credentials and private reports remain excluded. Bounded box corroboration now carries exact validated provenance through atomic Python assembly and existing public segment metadata; SourceSpan and TS schemas stay unchanged, with legacy empty-field omission. Bounded layout/source-entry recovery and explicit capped OCR/model page recovery preserve failures and incomplete coverage; no automatic retry, live-provider or whole-menu-quality acceptance is implied.",
-      "modules": [
-        "processing",
-        "contracts"
-      ],
-      "next": "Review exact-head verification and schema2/pipeline3 acceptance with VIS-01 and review API owners before integration. Coordinate the service transport already merged in PR54; retain extraction.json and final timings.json with original indices. Complete the representative ground-truth matrix, agreed thresholds, Sai independent validation and Vivien PM acceptance; neither ticket is closed by this draft. Private suggestion retention follows Sai's bounded clarification. Obtain consumer rendering/save-reload acceptance of candidate-linked OCR metadata. Image-only public evidence, variant models and human quality acceptance remain deferred."
-    },
-    {
-      "summary": "PR41 merge audit found staging healthy with unchanged deployments, default-main preview activation missing and a Windows link-fixture failure. Main-only repair PR #47 merged as ab6f9c4 with green CI. GitHub-held credentials passed synthetic PR #48 upload, exact-SHA aliases, browser rendering and one bot comment in run 40393096652. Closing PR #48 triggered cleanup 40393553935; both provider lists became empty and aliases/markers settled to 404. Portable link rejection and stale-marker regressions pass. Evidence is in docs/previews.md; staging, migrations and production are unchanged.",
-      "modules": [
-        "delivery"
-      ],
-      "next": "Finish the reviewed develop companion merge and recheck its final automatic cleanup. Review future PRs through their bot preview links; repeat lifecycle acceptance after workflow/provider changes. Application promotion and protected staging/production deployments remain separate."
-    },
-    {
-      "summary": "Fixed the Docker database readiness race observed after PR #24 in develop run 40146434333: SQL assertions and Worker integration passed, but the fresh local-smoke database refused TCP migrations. The readiness probe now uses 127.0.0.1:5432 instead of accepting the socket-only bootstrap server. A deterministic regression failed with the same connection-refused error before the fix and passes afterward. Real Docker checks passed all 73 SQL assertions, 20 integration cases and local startup/demo/cleanup. No application, schema, credentials or deployment behavior changed.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green CI on the fix and verify the resulting develop push. Preserve immediate migration failures and the bounded readiness loop; do not hide startup races with fixed sleeps or retries of arbitrary SQL."
-    },
-    {
-      "summary": "Reconciled PR #24 with merged PR #23 at develop 138a4b7. Preserved the retrieval/contracts nodes, local Python processing node, staging Queue/R2/access handoffs and both append-only error histories. Processing sources remain identical to reviewed 0e3f204; the merge adds no extraction, authorization, deployment or publication behavior. Windows checks passed: 89 Python, 187 TypeScript and 33 script tests, lint/types/context/docs, application dry-run builds and Python wheel/sdist. Four optional workerd cases were not rerun here. Retired only the historical design-link-only handoff to retain the ten-entry cap.",
-      "modules": [
-        "processing",
-        "backend",
-        "contracts",
-        "delivery"
-      ],
-      "next": "Keep shared-source adapter/application integration, representative OCR/LLM accuracy evidence, the verification layer and PM acceptance separate from package merge. PR #25 must rebase onto the merged extraction package rather than restore its old copy; follow #23 then #24 then #25."
     }
   ]
 }
