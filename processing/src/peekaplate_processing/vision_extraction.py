@@ -95,12 +95,8 @@ def scale_box(box: NormalizedBox, width: int, height: int) -> dict[str, int]:
 
 def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float = 90.0) -> list[V4Dish]:
     """Perform direct multimodal extraction on page images, returning dishes with native boxes."""
-    # Set provider-appropriate token limits: OpenRouter caps free tier credit at ~13,332 tokens; Google AI Studio supports 16,384+
-    base_url = str(getattr(llm, "openai_api_base", "") or "")
-    if "openrouter.ai" in base_url:
-        max_tok = 8192
-    else:
-        max_tok = getattr(llm, "max_tokens", 16384) or 16384
+    # Allow full 16384 token limit across providers (including Qwen on OpenRouter and Gemini on Google Studio)
+    max_tok = getattr(llm, "max_tokens", 16384) or 16384
     vision_llm = llm.bind(max_tokens=max_tok)
     all_dishes: list[V4Dish] = []
     schema_json = json.dumps(V4Batch.model_json_schema())
