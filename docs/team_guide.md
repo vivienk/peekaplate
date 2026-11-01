@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-VIS-01 infrastructure and OCR credential status updated October 28, 2026; team analytics evidence remains dated separately. The team research and board inventory below remains the dated October 14 snapshot.
+Observation database setup updated October 31, 2026. VIS-01 infrastructure and OCR credential evidence remains dated October 28; team analytics evidence is recorded separately. The research and board inventory below remains the dated October 14 snapshot.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
 
@@ -48,6 +48,17 @@ The visual experience is one part of this loop. Accurate food information, a usa
 ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
 
 ### Where to open staging
+
+**Observation database setup:** the two reviewed migrations from PRs #32 and #50
+are now applied to the existing staging Supabase database. They add the event
+index, conflicting-event records, typed event tables and two private owner
+views. All six migration-history entries are present, including the four
+earlier versions. The hosted audit verified tenant row rules, restricted
+runtime grants and denied browser/exporter access; existing record counts were
+unchanged. See the [database release record](operations.md#observation-schema-release--october-31-2026)
+for evidence and limits. Teeyansh can continue integration against these tables.
+The `/observations` endpoint, real Queue consumer and full live-flow acceptance
+still require their own reviewed release.
 
 **Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
 passed real synthetic delivery tests. Reports will use the existing private R2

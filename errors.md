@@ -847,3 +847,36 @@ At head 7299603, Linux CI run 41232592080 passed database and browser checks but
 ## RES-02 November 1 context reconciliation
 
 An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+```json
+{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION","status":"pending-verification","area":"main-ci","cause":"An unused owner-report schema was committed outside packages/contracts/src on main; Biome rejects its formatting while exports and TypeScript exclude it.","resolution":"Remove only the misplaced root-level draft. Keep the reviewed owner-report implementation on its separate develop-based branch.","regression":"Before deletion, pnpm exec biome check packages/contracts/owner-report.ts reproduced the formatting failure. Full local and PR checks follow the deletion.","sources":["packages/contracts/package.json","packages/contracts/tsconfig.json","https://github.com/vivienk/peekaplate/actions/runs/41111328548"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION"},"status":"resolved","evidence":"After deleting the unused draft, pnpm verify lint typecheck test build context:check docs:check passed in 20.143s: 69 Vitest tests and 57 script tests. Public exports, TypeScript source, runtime, migrations and deployment configuration are unchanged. Applicable GitHub PR checks remain a separate merge gate.","prevention":"Add reviewed shared contracts under packages/contracts/src and export them from src/index.ts through a PR into develop; verify formatting and contracts before promotion."}
+```
+
+## OBS-20261031-OBSERVATION-RELEASE-REHEARSAL
+
+The first operator-only rehearsal could not identify its disposable container
+using Docker's publish filter. A second attempt reused a second database in
+the same cluster and collided with an existing export role: PostgreSQL roles
+are cluster-wide. The corrected rehearsal used its own named disposable
+container, then passed the exact four-migration upgrade, retry, preservation
+and rollback-only runtime checks in 6.453 seconds. No shared database was
+affected. Keep cluster-scoped role migrations in isolated rehearsal instances.
+The local engine was initially stopped; starting the existing Desktop install
+restored it without resetting or pruning data. `pnpm verify test:db` then passed.
+
+## OBS-20261031-HOSTED-RUNTIME-ROLE-PROBE
+
+The hosted metadata audit and both forward migrations passed, but a subsequent
+rollback-only SQL Editor probe returned SQLSTATE 42501 when attempting
+`SET LOCAL ROLE peekaplate_runtime`. Managed `postgres` is not an unrestricted
+superuser. Use the real restricted runtime/Hyperdrive connection for behavioral
+checks; do not expand editor role membership to bypass this boundary. Hosted
+write acceptance remains unverified; the subsequent real read-only Hyperdrive
+check passed without changing role membership. operations.md records the limit.
+
+## OBS-20261031-CONTEXT-SUMMARY-BOUND
+
+The initial release context update exceeded the existing bounded-summary limit. Context refresh/check failed before publication. The summary was rewritten within the schema limit rather than weakening validation; rerun context refresh/check and docs checks before committing. Retain existing error history byte-for-byte when appending new records.

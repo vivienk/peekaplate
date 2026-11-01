@@ -218,6 +218,75 @@ Hosted verification requires a configured `AUTH_ISSUER` ending in `/auth/v1`, HT
 
 `pnpm test:e2e` starts local apps itself. Install Chromium once with `pnpm exec playwright install chromium`. CI installs system dependencies too. Four tests cover no-JavaScript diner content, the console/real local Worker health path, and axe accessibility plus narrow-screen overflow on both shells. Traces are retained on failure; there is no routine DOM dump. They do not exercise a live restaurant, staff login, queue or GPU viewer. Use `pnpm verify test:e2e` and `pnpm verify test:db` to record failed-check observations as described in [contributing](../CONTRIBUTING.md#local-checks).
 
+## Observation schema release — October 31, 2026
+
+The hosted preflight found the four previous versions intact in
+`public.schema_migrations`. The missing canonical relations were a release/apply
+gap: the two reviewed migrations had merged into `develop` but had not reached
+`main` or been applied online. This focused release carries the unchanged SQL
+and SQL tests from [PR #32](https://github.com/vivienk/peekaplate/pull/32) and
+[PR #50](https://github.com/vivienk/peekaplate/pull/50); it preserves earlier files.
+
+The operator applied only each file's `migrate:up` body, index before facts, in
+one transaction with its history inserts. The apply script had a known-baseline
+guard, transaction-scoped advisory lock and lock/statement timeouts. It was
+rehearsed against the exact four-migration baseline in a separate disposable
+PostgreSQL instance, including a no-op second application. The intentionally
+refusing `migrate:down` sections were excluded. Future changes must use new
+forward migrations rather than editing these applied files.
+
+**Hosted verification PASS at 2026-10-31T22:03:59.865746Z:**
+
+- History contains `202610130001`, `20261014210000`, `20261020070000`,
+  `20261021130000`, `20261023120000` and `20261026120000`.
+- Eleven observation tables have enabled and forced RLS, eleven tenant policies
+  and eleven append-only triggers.
+- `peekaplate_runtime` has SELECT/INSERT and lacks UPDATE/DELETE/TRUNCATE on
+  these tables. Both owner views have security-invoker/security-barrier options
+  and runtime read-only grants.
+- Effective table/view privileges are denied to the checked `anon`,
+  `authenticated` and PostHog export roles. No private schema was exposed through
+  the browser API or a shared administrator credential.
+- Existing venue, domain-event, command and outbox counts matched the preflight.
+  New canonical index and fact tables were empty; schema presence is not proof
+  of event ingestion.
+
+Local verification:
+
+- PASS: `pnpm verify test:db` — 135 pgTAP assertions, 14 database integration
+  tests and the local demo/cleanup, 32.235 seconds.
+- PASS: separate disposable exact-baseline upgrade/retry rehearsal — six history
+  entries, preserved existing venue, eleven forced-RLS tables, 6.453 seconds.
+- PASS locally: rollback-only runtime probes for accepted facts, duplicate
+  denial, conflict recording, fact-parent integrity, live-only views, denied
+  mutation and cross-tenant/missing-context access; zero retained probe venues.
+
+The existing Hyperdrive binding was also tested using real remote Worker
+execution at `2026-10-31T23:30:53.206Z`, 5.201 seconds. The database identified
+the connection as `peekaplate_staging_login`, with neither superuser nor
+RLS-bypass privileges. That login could read the new tables/views, had the
+expected restricted SELECT/INSERT grants, and returned zero rows without tenant
+context. The read-only transaction was rolled back and the temporary remote
+development session stopped. The live API deployment was not replaced. See
+[Cloudflare's remote Hyperdrive development procedure](https://developers.cloudflare.com/hyperdrive/configuration/local-development/#use-wrangler-dev---remote).
+
+**Hosted write-probe limitation:** the managed Supabase SQL Editor role
+cannot `SET LOCAL ROLE peekaplate_runtime` (SQLSTATE 42501). That rollback-only
+probe did not pass and is not a credential or migration failure. Do not grant
+new role membership merely to make the editor impersonate the runtime. The
+read-only Hyperdrive check above verifies the actual connection and grants;
+hosted write/conflict behavior and browser-to-Queue/R2/database acceptance remain
+separate checks. Empty-table reads do not demonstrate cross-tenant behavior on
+populated hosted tables; that behavior passed only in disposable local tests.
+
+The existing project is the staging candidate under ADR 0012 even though its
+Supabase branch is labelled `main / PRODUCTION`. This operation does not create
+a separate production database or deploy production. No Worker, Queue, R2 or
+credential configuration changed. Teeyansh can proceed with schema mapping and
+consumer integration; activation still requires the compatible reviewed
+producer/consumer release and live-flow acceptance. Louis's separate owner-report
+contract work on `develop` is untouched.
+
 ## Database change procedure
 
 Use `YYYYMMDDHHMMSS_description.sql` for new dbmate migrations (the initial migration uses a shorter ordered timestamp). Keep `-- migrate:up` and `-- migrate:down` sections. Applied files are immutable. The initial down migration deliberately refuses destructive rollback; future repairs should roll forward.
