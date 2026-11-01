@@ -1,6 +1,6 @@
 # Staging observation infrastructure
 
-This is the infrastructure handoff for Teeyansh's Queue consumer. It provides a place to send, retain and recover synthetic observations. It does not implement his consumer, the ingestion endpoint or canonical database facts. His unfinished PRs are unchanged.
+This is the infrastructure handoff for the observation ingestion pipeline. It provides a place to send, retain and recover synthetic observations. The canonical observation producer POST /observations is implemented in PR #70 with token-scoped rate limiting (approximate per-location limits, not a strict global token bucket) and queue-before-accepted delivery. Consumer processing and canonical database indexing belong to PR #31.
 
 ## Resources and bindings
 
@@ -13,6 +13,8 @@ Account: `51eda1917fd22a9478808a82d2980741`. The October 24, 2026 inventory foun
 | Existing R2 bucket | `peekaplate-staging-assets` | Private archive; shared with staging assets, so use a dedicated observation prefix |
 | Worker producer binding | `OBSERVATION_QUEUE` | Targets the observation Queue in `backend/wrangler.jsonc`, staging only |
 | Worker R2 binding | `OBSERVATION_ARCHIVE_BUCKET` | Targets the existing staging bucket, staging only |
+| Rate Limiter (Minute) | `OBSERVATION_RATE_LIMITER_MINUTE` | 60 requests per 60s; approximate per-location enforcement (not global token bucket) |
+| Rate Limiter (Burst) | `OBSERVATION_RATE_LIMITER_BURST` | 10 requests per 10s; approximate per-location enforcement (not global token bucket) |
 
 The binding configuration must reach a reviewed `main` release and the protected staging deployment before it exists in the live API Worker. Merely merging to `develop` does not deploy it. Keep the existing Hyperdrive, Auth issuer and `TEAM_GITHUB_TOKEN`; do not replace their credentials or add them to a frontend.
 

@@ -1,5 +1,6 @@
 import {
   canonicalJson,
+  classifyObservationTimeWindow,
   IsoDateTimeSchema,
   type ObservationQueueEnvelope,
   type ObservationReceipt,
@@ -12,8 +13,6 @@ import {
 import type { MenuAuthority } from './menu-token';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const MAX_FUTURE_MS = 5 * 60 * 1000;
 const ALLOWED_TYPES = new Set([
   'menu_viewed',
   'dish_viewed',
@@ -28,7 +27,7 @@ const ALLOWED_TYPES = new Set([
 
 export type ObservationIngestServices = {
   enqueue(message: ObservationQueueEnvelope): Promise<void>;
-  now?: () => Date;
+  now?: (() => Date) | undefined;
 };
 
 export type ObservationIngestResult =
@@ -122,14 +121,9 @@ export async function ingestObservations(
       receipts[index] = rejected(event.event_id, 'publication_not_allowed');
       continue;
     }
-    const occurredAt = Date.parse(event.occurred_at);
-    const age = now.getTime() - occurredAt;
-    if (age > MAX_AGE_MS) {
-      receipts[index] = rejected(event.event_id, 'too_old');
-      continue;
-    }
-    if (age < -MAX_FUTURE_MS) {
-      receipts[index] = rejected(event.event_id, 'future_time');
+    const timeClassification = classifyObservationTimeWindow(event.occurred_at, firstReceivedAt);
+    if (timeClassification.disposition === 'rejected') {
+      receipts[index] = rejected(event.event_id, timeClassification.reasonCode!);
       continue;
     }
     candidates.push({ index, event, canonical: canonicalJson(event) });
@@ -228,22 +222,28 @@ function conflictEvidence(
   authority: MenuAuthority,
 ): { canonical: string; evidence: ConflictEvidence } {
   const parsed = ObservationV2Schema.safeParse(raw);
-  if (parsed.success) {
+  if (
+    parsed.success &&
+    parsed.data.publication_revision_id.toLowerCase() === authority.publicationId
+  ) {
     return {
       canonical: canonicalJson(parsed.data),
       evidence: { validation: 'valid', event: parsed.data },
     };
   }
 
-  const record =
-    raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const record = parsed.success
+    ? (parsed.data as unknown as Record<string, unknown>)
+    : raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
   const schemaVersionStatus =
     record.schema_version === 'observation.v2'
       ? 'observation.v2'
       : record.schema_version === undefined
         ? 'missing'
         : 'other';
-  const rawType = rawEventType(raw);
+  const rawType = parsed.success ? parsed.data.type : rawEventType(raw);
   const eventType: ObservationV2['type'] | 'unknown' | 'missing' =
     rawType === null
       ? 'missing'
@@ -258,7 +258,7 @@ function conflictEvidence(
     ) &&
     IsoDateTimeSchema.safeParse(rawOccurredAt).success &&
     Number.isFinite(Date.parse(rawOccurredAt))
-      ? new Date(rawOccurredAt).toISOString()
+      ? rawOccurredAt
       : null;
   const rawPublication = record.publication_revision_id;
   const publicationStatus =
@@ -266,7 +266,7 @@ function conflictEvidence(
       ? 'missing'
       : typeof rawPublication !== 'string' || !UUID_PATTERN.test(rawPublication)
         ? 'invalid'
-        : rawPublication.toLowerCase() === authority.publicationId
+        : (rawPublication as string).toLowerCase() === authority.publicationId
           ? 'matches_authority'
           : 'mismatch';
   const metadata: Extract<ConflictEvidence, { validation: 'invalid' }>['metadata'] = {
@@ -280,7 +280,7 @@ function conflictEvidence(
       !Array.isArray(record.payload),
   };
   return {
-    canonical: canonicalJson(raw),
+    canonical: parsed.success ? canonicalJson(parsed.data) : canonicalJson(raw),
     evidence: { validation: 'invalid', metadata },
   };
 }

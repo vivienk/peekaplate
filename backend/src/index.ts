@@ -69,6 +69,7 @@ type Dependencies = {
     env: Bindings,
   ) => Promise<{ allowed: boolean; retryAfterSeconds: number }>;
   enqueueObservation?: (message: ObservationQueueEnvelope, env: Bindings) => Promise<void>;
+  now?: () => Date;
 };
 
 export async function authorizeStaffVenue(
@@ -116,6 +117,22 @@ let menuVerifier: {
   local: boolean;
   verify: ReturnType<typeof createMenuTokenVerifier>;
 };
+/**
+ * Exact diner-origin allowlist aligned with PR #43 and staging/production deployments.
+ * Preview and arbitrary origins are rejected; wildcard '*' is not used.
+ */
+export const DINER_CORS_ALLOWED_ORIGINS = [
+  'https://diner.peekaplate.com',
+  'https://peekaplate-diner-staging.pages.dev',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+] as const;
+
+/**
+ * Native rate limiting for token-scoped observation ingestion.
+ * Note: Cloudflare Worker rate limiting bindings enforce approximate per-location limits
+ * across edge locations, not a strict globally synchronized token bucket.
+ */
 export async function consumeJtiRateLimit(
   jti: string,
   env: Bindings,
@@ -230,7 +247,7 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/observations',
     cors({
-      origin: '*',
+      origin: [...DINER_CORS_ALLOWED_ORIGINS],
       allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type'],
       maxAge: 86400,
@@ -305,6 +322,7 @@ export function createApp(services: Dependencies = dependencies) {
     const enqueueObservation = services.enqueueObservation;
     const result = await ingestObservations(parsed.data.events, authority, {
       enqueue: (message) => enqueueObservation(message, c.env ?? {}),
+      ...(services.now ? { now: services.now } : {}),
     });
     if (result.queueUnavailable) return c.json({ error: 'queue_unavailable' }, 503);
     return c.json(result.response);

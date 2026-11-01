@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, canonical observation schemas (ObservationV2 with 9 P0 events, canonicalJson, sha256), Queue message contracts (ObservationQueueMessageSchema with server-derived traffic_class, ObservationConflictQueueMessageSchema with multi-copy conflict schema, microsecond window classification), and observation receipt schemas. Offsets, rank sequences, aggregate context limits, and microsecond precision boundaries strictly enforced.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c9498b819eb44aec3ecb5f9b5d6e5e6c73781ce0007e7fe20767ee7c84e1b83b"
+      "sourceFingerprint": "8af95ee06405169e085d75a6c4b85c90fcf745ddb45f872e3dd7578cc57630bb"
     },
     {
       "id": "tokens",
@@ -111,7 +111,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. OCR key is protected and standalone OCR passed. Full AI configuration, feature ingestion/migration/report tests remain pending; observation/menu queues stay paused. Publication and canonical observation writes are not implemented; JWT logout revocation remains expiry-bounded. Bounded retrieval supports linked PDF discovery, native page-aware text evidence and IPv4-mapped IPv6 SSRF checks within source/context limits; extraction and publication remain separate.",
+      "summary": "Hono Worker retains staff JWT/membership-checked draft commands and bounded GitHub collaborator staging reads. Develop VIS-04 retrieval keeps SSRF, Unicode/provenance and context limits. Main fixes add the deployed direct-DO extraction host, named image and native idle timeout, with signed tenant/job/hash source grants; Python never gets signing/database credentials. Canonical observation ingestion producer POST /observations validates ES256 menu tokens, enforces PR #43 diner CORS allowlist without wildcard, derives traffic_class, canonicalizes and enqueues to observation queue with queue-before-accepted semantics, and bounds conflict copies with safe metadata. Rate limits enforce approximate per-location windows rather than a strict global token bucket. Full AI configuration, consumer PR #31 integration and queue unpausing remain separate operator actions.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e9c38761d6fd57bebbc5eeeed4dc54caf67af38e0570b85bb4c2c82c3e785a85"
+      "sourceFingerprint": "a1b32701aa7629fe4b1f14307821b75ade89d86281a315b66943405ff47745e9"
     },
     {
       "id": "database",
@@ -269,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "26371fbe550ceb1fca96b1a08bced227583440bd2e34ec9a69500a2c51732a37"
+      "sourceFingerprint": "34ea76145a07676d5a7e3c9870531f56d98e0610d5a2cb01398d9cb8726a9285"
     },
     {
       "id": "agents",
@@ -380,13 +380,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "November 1 PR70 final review and staging readiness: aligned staging MENU_TOKEN_ISSUER in wrangler.jsonc to trusted HTTPS root origin (https://peekaplate-api-staging.vxkong.workers.dev), preventing runtime 503 from non-root pathname; resolved CORS preflight for POST /observations; aligned menu-token verification with PR #43 ES256, audience validation, and root-only trusted issuer; implemented trusted server-side traffic_class propagation through queue envelope; shared canonicalJson and sha256 from contracts; and expanded regression test suite.",
+      "summary": "November 2 PR70 review findings resolution: aligned canonical timestamp precision with PR #31/PostgreSQL microsecond semantics and banker's rounding; isolated unauthorized publications in conflict copies using bounded invalid metadata ('publicationStatus: mismatch') while preserving checksums; aligned CORS with PR #43 diner-origin allowlist without wildcard CORS; documented native Cloudflare Worker rate limiting semantics as approximate per-location limits (not a strict global token bucket); ensured traffic_class compatibility with PR #31; and expanded regression test coverage.",
       "modules": [
         "contracts",
         "backend",
         "delivery"
       ],
-      "next": "Unresolved decision for Sai/Vivien: rate-limiting architecture and environment bindings (Cloudflare Worker rate-limiting bindings vs KV / Durable Objects / non-production fallback when bindings are unset). Review PR #70; consumer PR31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
+      "next": "Release handoff notes that the two native rate windows (OBSERVATION_RATE_LIMITER_MINUTE and OBSERVATION_RATE_LIMITER_BURST) are approximate per-location limits, not a strict global token bucket. PR #70 is green and ready for review; consumer PR #31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
     },
     {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",

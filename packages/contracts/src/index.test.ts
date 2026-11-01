@@ -3,8 +3,10 @@ import {
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
   canonicalJson,
+  classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  FIVE_MINUTES_MICROS,
   HealthResponseSchema,
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
@@ -19,9 +21,11 @@ import {
   ObservationReceiptSchema,
   ObservationV2QueueEnvelopeSchema,
   ObservationV2Schema,
+  parseIsoToMicroseconds,
   RetrievalRequestSchema,
   SourceReferenceSchema,
   sha256,
+  TWENTY_FOUR_HOURS_MICROS,
   toCanonicalObservation,
 } from './index';
 
@@ -1135,5 +1139,130 @@ describe('canonical observation checksum and identity', () => {
     const circular: Record<string, unknown> = { a: 1 };
     circular.self = circular;
     expect(() => canonicalJson(circular)).toThrow('Circular reference detected');
+  });
+
+  describe('canonical microsecond timestamp parsing and window classification', () => {
+    const baseReceived = '2026-11-01T12:00:00.000Z';
+
+    it('parses ISO timestamps to exact microseconds matching PostgreSQL timestamptz', () => {
+      // Millisecond precision
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0, 123)) * 1000n,
+      );
+
+      // Microsecond precision (6 digits)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123456Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 123456n,
+      );
+
+      // Sub-microsecond rounding: banker round-to-even (.0000005 -> .000000)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000005Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+
+      // Sub-microsecond rounding: 7th digit 6 > 5 rounds up (.0000006 -> .000001)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000006Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Timezone offsets
+      expect(parseIsoToMicroseconds('2026-11-01T14:00:00.000+02:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+      expect(parseIsoToMicroseconds('2026-11-01T08:00:00.000-04:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+
+      // Longer fractional seconds (nanoseconds, 9 digits): .000000499 rounds down to .000000
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000499Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+      // .000000501 rounds up to .000001
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000501Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Invalid timestamps
+      expect(() => parseIsoToMicroseconds('not-a-timestamp')).toThrow('Invalid ISO timestamp');
+      expect(() => parseIsoToMicroseconds('')).toThrow('Invalid ISO timestamp');
+    });
+
+    it('classifies reviewer reproduction cases identically to PR #31 and PostgreSQL', () => {
+      // Case 1: 5 minutes + 1 microsecond -> rejected as future_time
+      const resCase1 = classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived);
+      expect(resCase1).toEqual({ disposition: 'rejected', reasonCode: 'future_time' });
+
+      // Case 2: 7-digit fractional seconds .9999999Z rounds up onto inclusive 24h lower boundary -> accepted
+      const resCase2 = classifyObservationTimeWindow('2026-10-31T11:59:59.9999999Z', baseReceived);
+      expect(resCase2).toEqual({ disposition: 'accepted' });
+    });
+
+    it('classifies exact microsecond boundaries matching PR #31', () => {
+      // Exact lower boundary (firstReceivedAt - 24 hours): accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary + 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000001Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary - 1 microsecond: rejected as too_old
+      expect(classifyObservationTimeWindow('2026-10-31T11:59:59.999999Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'too_old',
+      });
+
+      // Exact upper boundary (firstReceivedAt + 5 minutes): accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Upper boundary + 1 microsecond: rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // Upper boundary - 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:04:59.999999Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+    });
+
+    it('handles 7-digit and sub-microsecond fractional precision with banker rounding', () => {
+      // .0000004 rounds down to .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000004Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000005 rounds to even 0 -> .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000005Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .00000050 trailing zero still tie -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000050Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000006 rounds up to .000001 -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000006Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // .00000051 non-zero digit after 5 rounds up -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000051Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+    });
+
+    it('exports microsecond constants matching PR #31', () => {
+      expect(TWENTY_FOUR_HOURS_MICROS).toBe(86_400_000_000n);
+      expect(FIVE_MINUTES_MICROS).toBe(300_000_000n);
+    });
   });
 });

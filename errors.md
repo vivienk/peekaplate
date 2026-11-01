@@ -725,3 +725,30 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z"},"status":"resolved","evidence":"MenuAuthority made trafficClass optional with server-side live default; all workspace packages passed typecheck and pnpm check."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T20:41:29.007Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-01T20:41:29.007Z"},"status":"resolved","evidence":"Formatted new unit tests in backend/src/index.test.ts and packages/contracts/src/index.test.ts with biome."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z"},"status":"resolved","evidence":"Aligned ObservationIngestServices.now with exactOptionalPropertyTypes and spread into ingest call; typecheck passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z"},"status":"resolved","evidence":"Installed Playwright Chromium headless shell locally; pnpm verify test:e2e passed all 13 tests."}
+```

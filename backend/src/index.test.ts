@@ -1,4 +1,13 @@
-import { ObservationReceiptBatchSchema } from '@peekaplate/contracts';
+import {
+  canonicalJson,
+  classifyObservationTimeWindow,
+  ObservationConflictQueueMessageSchema,
+  ObservationQueueEnvelopeSchema,
+  ObservationQueueMessageSchema,
+  ObservationReceiptBatchSchema,
+  sha256,
+  toCanonicalObservation,
+} from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import app, { consumeJtiRateLimit, createApp } from './index';
 import { ingestObservations } from './observation-ingest';
@@ -153,9 +162,10 @@ describe('observation.v2 HTTP boundary', () => {
     );
   });
 
-  it('handles CORS and OPTIONS preflight for /observations', async () => {
+  it('handles CORS allowlist and OPTIONS preflight aligned with PR #43', async () => {
     const app = createApp(baseServices);
 
+    // 1. Allowed diner production origin preflight
     const preflight = await app.fetch(
       new Request('http://localhost/observations', {
         method: 'OPTIONS',
@@ -167,21 +177,79 @@ describe('observation.v2 HTTP boundary', () => {
       }),
     );
     expect(preflight.status).toBe(204);
-    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://diner.peekaplate.com',
+    );
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
     expect(preflight.headers.get('Access-Control-Allow-Methods')).toContain('POST');
     expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+    expect(preflight.headers.get('Access-Control-Max-Age')).toBe('86400');
+    expect(preflight.headers.get('Vary')).toContain('Origin');
+    expect(preflight.headers.get('Access-Control-Allow-Credentials')).toBeNull();
 
-    const postRes = await app.fetch(
+    // 2. Allowed staging and local origins
+    for (const allowedOrigin of [
+      'https://peekaplate-diner-staging.pages.dev',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ]) {
+      const res = await app.fetch(
+        request([event()], {
+          headers: {
+            Authorization: 'Bearer signed',
+            'Content-Type': 'application/json',
+            Origin: allowedOrigin,
+          },
+        }),
+      );
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(allowedOrigin);
+      expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+      expect(res.headers.get('Vary')).toContain('Origin');
+    }
+
+    // 3. Disallowed origin (e.g. malicious lookalike, external attacker, or preview) receives NO Access-Control-Allow-Origin
+    for (const disallowedOrigin of [
+      'https://attacker.example.com',
+      'https://diner.peekaplate.com.evil.com',
+      'https://pr-123.peekaplate-diner-preview.pages.dev',
+    ]) {
+      const disallowedPreflight = await app.fetch(
+        new Request('http://localhost/observations', {
+          method: 'OPTIONS',
+          headers: {
+            Origin: disallowedOrigin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization, Content-Type',
+          },
+        }),
+      );
+      expect(disallowedPreflight.status).toBe(204);
+      expect(disallowedPreflight.headers.get('Access-Control-Allow-Origin')).toBeNull();
+
+      const disallowedPost = await app.fetch(
+        request([event()], {
+          headers: {
+            Authorization: 'Bearer signed',
+            'Content-Type': 'application/json',
+            Origin: disallowedOrigin,
+          },
+        }),
+      );
+      expect(disallowedPost.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    }
+
+    // 3b. Missing Origin header (e.g. server-to-server or non-browser client) receives no CORS header
+    const noOriginPost = await app.fetch(
       request([event()], {
         headers: {
           Authorization: 'Bearer signed',
           'Content-Type': 'application/json',
-          Origin: 'https://diner.peekaplate.com',
         },
       }),
     );
-    expect(postRes.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(noOriginPost.headers.get('Access-Control-Allow-Origin')).toBeNull();
 
+    // 4. Unauthorized POST from allowed origin still sets CORS header but returns 401
     const unauthorizedRes = await app.fetch(
       new Request('http://localhost/observations', {
         method: 'POST',
@@ -193,7 +261,10 @@ describe('observation.v2 HTTP boundary', () => {
       }),
     );
     expect(unauthorizedRes.status).toBe(401);
-    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://diner.peekaplate.com',
+    );
+    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
   });
 
   it('propagates trusted traffic_class from verified menu token and ignores client-supplied values', async () => {
@@ -590,9 +661,9 @@ describe('observation.v2 HTTP boundary', () => {
     // Microsecond copy is valid, so validation is 'valid'
     expect(queued.copies[0]?.validation).toBe('valid');
 
-    // Nanosecond invalid copy metadata preserves occurredAt (not null)
+    // Nanosecond invalid copy metadata preserves occurredAt without sub-millisecond truncation
     expect(queued.copies[1]?.validation).toBe('invalid');
-    expect(queued.copies[1]?.metadata?.occurredAt).toBe('2026-10-31T12:30:45.123Z');
+    expect(queued.copies[1]?.metadata?.occurredAt).toBe('2026-10-31T12:30:45.123456789Z');
   });
 
   it('rejects invalid calendar dates and overflowing fractional digits in conflict metadata', async () => {
@@ -639,5 +710,237 @@ describe('observation.v2 HTTP boundary', () => {
     // 10-digit fractional seconds must be sanitized to null
     expect(queued.copies[2]?.validation).toBe('invalid');
     expect(queued.copies[2]?.metadata?.occurredAt).toBeNull();
+  });
+
+  it('enforces PostgreSQL-compatible microsecond timestamp precision and boundary classification matching PR #31', async () => {
+    const fixedNow = new Date('2026-11-01T12:00:00.000Z');
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const appInstance = createApp({
+      ...baseServices,
+      enqueueObservation,
+      now: () => fixedNow,
+    });
+
+    // 1. Reviewer reproduction case 1: 5 minutes + 1 microsecond is rejected as future_time
+    const resFuture1Micro = await appInstance.fetch(
+      request([
+        {
+          ...event(),
+          occurred_at: '2026-11-01T12:05:00.000001Z',
+        },
+      ]),
+    );
+    expect(resFuture1Micro.status).toBe(200);
+    const parsedFuture = await parseObservationReceiptBatch(resFuture1Micro);
+    expect(parsedFuture.receipts[0]?.status).toBe('rejected');
+    expect(parsedFuture.receipts[0]?.reason_code).toBe('future_time');
+    expect(
+      classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', fixedNow.toISOString()),
+    ).toEqual({ disposition: 'rejected', reasonCode: 'future_time' });
+
+    // 2. Reviewer reproduction case 2: 7-digit fractional second rounds onto inclusive 24h lower boundary and is accepted
+    const res7DigitOld = await appInstance.fetch(
+      request([
+        {
+          ...event(),
+          occurred_at: '2026-10-31T11:59:59.9999999Z',
+        },
+      ]),
+    );
+    expect(res7DigitOld.status).toBe(200);
+    const parsed7Digit = await parseObservationReceiptBatch(res7DigitOld);
+    expect(parsed7Digit.receipts[0]?.status).toBe('accepted');
+    expect(parsed7Digit.receipts[0]?.reason_code).toBeNull();
+    expect(
+      classifyObservationTimeWindow('2026-10-31T11:59:59.9999999Z', fixedNow.toISOString()),
+    ).toEqual({ disposition: 'accepted' });
+
+    // 3. Exact lower boundary (firstReceivedAt - 24 hours): accepted
+    const resExactLower = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T12:00:00.000000Z' }]),
+    );
+    const parsedExactLower = await parseObservationReceiptBatch(resExactLower);
+    expect(parsedExactLower.receipts[0]?.status).toBe('accepted');
+    expect(parsedExactLower.receipts[0]?.reason_code).toBeNull();
+
+    // 4. Lower boundary + 1 microsecond: accepted
+    const resLowerPlus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T12:00:00.000001Z' }]),
+    );
+    const parsedLowerPlus1Micro = await parseObservationReceiptBatch(resLowerPlus1Micro);
+    expect(parsedLowerPlus1Micro.receipts[0]?.status).toBe('accepted');
+
+    // 5. Lower boundary - 1 microsecond: rejected as too_old
+    const resLowerMinus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T11:59:59.999999Z' }]),
+    );
+    const parsedLowerMinus1Micro = await parseObservationReceiptBatch(resLowerMinus1Micro);
+    expect(parsedLowerMinus1Micro.receipts[0]?.status).toBe('rejected');
+    expect(parsedLowerMinus1Micro.receipts[0]?.reason_code).toBe('too_old');
+
+    // 6. Exact upper boundary (firstReceivedAt + 5 minutes): accepted
+    const resExactUpper = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.000000Z' }]),
+    );
+    const parsedExactUpper = await parseObservationReceiptBatch(resExactUpper);
+    expect(parsedExactUpper.receipts[0]?.status).toBe('accepted');
+
+    // 7. Upper boundary - 1 microsecond: accepted
+    const resUpperMinus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:04:59.999999Z' }]),
+    );
+    const parsedUpperMinus1Micro = await parseObservationReceiptBatch(resUpperMinus1Micro);
+    expect(parsedUpperMinus1Micro.receipts[0]?.status).toBe('accepted');
+
+    // 8. Halfway fractional timestamp .0000005Z (banker round-to-even) at upper boundary: accepted
+    const resHalfway = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.0000005Z' }]),
+    );
+    const parsedHalfway = await parseObservationReceiptBatch(resHalfway);
+    expect(parsedHalfway.receipts[0]?.status).toBe('accepted');
+
+    // 9. Sub-microsecond .0000006Z > 5 rounds up to .000001Z: rejected as future_time
+    const resRoundUpFuture = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.0000006Z' }]),
+    );
+    const parsedRoundUpFuture = await parseObservationReceiptBatch(resRoundUpFuture);
+    expect(parsedRoundUpFuture.receipts[0]?.status).toBe('rejected');
+    expect(parsedRoundUpFuture.receipts[0]?.reason_code).toBe('future_time');
+  });
+
+  it('correctly isolates unauthorized publication in conflict copies with bounded invalid metadata', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+    const authorizedPubId = publicationId;
+    const unauthorizedPubId = '50000000-0000-4000-8000-000000000002';
+
+    // Copy A: authorized publication
+    const copyA = {
+      ...event(),
+      event_id: sharedEventId,
+      publication_revision_id: authorizedPubId,
+      payload: {
+        ...event().payload,
+        shortlist_size: 1,
+      },
+    };
+
+    // Copy B: schema-valid event with a different, unauthorized publication ID
+    const copyB = {
+      ...event(),
+      event_id: sharedEventId,
+      publication_revision_id: unauthorizedPubId,
+      payload: {
+        ...event().payload,
+        shortlist_size: 2,
+      },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(request([copyA, copyB]));
+    expect(response.status).toBe(200);
+
+    // Both copies receive terminal conflict receipts
+    const receipts = await parseObservationReceiptBatch(response);
+    expect(receipts.receipts).toHaveLength(2);
+    expect(receipts.receipts[0]?.status).toBe('rejected');
+    expect(receipts.receipts[0]?.reason_code).toBe('event_id_conflict');
+    expect(receipts.receipts[1]?.status).toBe('rejected');
+    expect(receipts.receipts[1]?.reason_code).toBe('event_id_conflict');
+
+    // Verify enqueued conflict envelope
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const enqueuedEnvelope = enqueueObservation.mock.calls[0]?.[0];
+    expect(enqueuedEnvelope).toBeDefined();
+    expect(enqueuedEnvelope.kind).toBe('observation_conflict.v1');
+    expect(enqueuedEnvelope.tenantId).toBe(venueId);
+    expect(enqueuedEnvelope.eventId).toBe(sharedEventId);
+    expect(enqueuedEnvelope.authorizedPublicationId).toBe(authorizedPubId);
+    expect(enqueuedEnvelope.copies).toHaveLength(2);
+
+    const [queuedCopyA, queuedCopyB] = enqueuedEnvelope.copies;
+
+    // 1. Both copies retain their checksums
+    const checksumA = await sha256(canonicalJson(copyA));
+    const checksumB = await sha256(canonicalJson(copyB));
+    expect(queuedCopyA.canonicalChecksum).toBe(checksumA);
+    expect(queuedCopyB.canonicalChecksum).toBe(checksumB);
+
+    // 2. The authorized copy remains valid
+    expect(queuedCopyA.validation).toBe('valid');
+    expect(queuedCopyA.event).toEqual(copyA);
+
+    // 3. The unauthorized copy is represented with bounded invalid metadata
+    expect(queuedCopyB.validation).toBe('invalid');
+    expect(queuedCopyB.event).toBeUndefined();
+    expect(queuedCopyB.metadata).toEqual({
+      schemaVersionStatus: 'observation.v2',
+      eventType: 'dish_saved',
+      occurredAt: copyB.occurred_at,
+      publicationStatus: 'mismatch',
+      payloadObject: true,
+    });
+
+    // 4. Unauthorized copy does not bypass publication authorization
+    expect(queuedCopyB.metadata.publicationStatus).toBe('mismatch');
+
+    // 5. Shared contracts from PR #31 validate the envelope without error
+    expect(ObservationConflictQueueMessageSchema.safeParse(enqueuedEnvelope).success).toBe(true);
+    expect(ObservationQueueEnvelopeSchema.safeParse(enqueuedEnvelope).success).toBe(true);
+
+    // 6. Demonstrate consumer conflict handling succeeds and does not route to DLQ
+    // (Simulating consumer's validateConflictObservationEnvelope & processConflictMessage)
+    const copies = enqueuedEnvelope.copies;
+    const validatedCopies = [];
+    for (const copy of copies) {
+      if (copy.validation === 'valid') {
+        expect(copy.event.publication_revision_id).toBe(enqueuedEnvelope.authorizedPublicationId);
+        const recomputed = await sha256(canonicalJson(copy.event));
+        expect(copy.canonicalChecksum).toBe(recomputed);
+        validatedCopies.push({ checksum: copy.canonicalChecksum, valid: true });
+      } else if (copy.validation === 'invalid') {
+        expect(copy.metadata.publicationStatus).toBe('mismatch');
+        expect(copy.canonicalChecksum).toMatch(/^[0-9a-f]{64}$/);
+        validatedCopies.push({ checksum: copy.canonicalChecksum, valid: false });
+      }
+    }
+    expect(validatedCopies).toHaveLength(2);
+    expect(validatedCopies[0]?.valid).toBe(true);
+    expect(validatedCopies[1]?.valid).toBe(false);
+  });
+
+  it('proves traffic_class survives the producer-to-consumer handoff without breaking PR #31', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const services = {
+      ...baseServices,
+      verifyMenu: vi.fn().mockResolvedValue({
+        venueId,
+        publicationId,
+        jti,
+        trafficClass: 'demo',
+      }),
+      enqueueObservation,
+    };
+    const input = event();
+    const response = await createApp(services).fetch(request([input]));
+    expect(response.status).toBe(200);
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const enqueued = enqueueObservation.mock.calls[0]?.[0];
+    expect(enqueued.traffic_class).toBe('demo');
+
+    // Consumer parsing with shared contracts validates traffic_class
+    const parsedEnvelope = ObservationQueueEnvelopeSchema.parse(enqueued);
+    if (parsedEnvelope.kind === 'observation.v2') {
+      expect(parsedEnvelope.traffic_class).toBe('demo');
+      const canonical = toCanonicalObservation(parsedEnvelope);
+      expect(canonical.event_id).toBe(input.event_id);
+    }
+
+    // Message without traffic_class (older producer / PR #31 schema) cleanly defaults to 'live'
+    const withoutTrafficClass = { ...enqueued };
+    delete withoutTrafficClass.traffic_class;
+    const parsedDefault = ObservationQueueMessageSchema.parse(withoutTrafficClass);
+    expect(parsedDefault.traffic_class).toBe('live');
   });
 });
