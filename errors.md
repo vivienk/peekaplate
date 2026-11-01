@@ -747,3 +747,10 @@ limit, not an AI case failure; do not disable the test. The source-pinned Vitest
 run passed all 46 AI tests, including 21 new synthetic development evaluation
 cases, and the focused strict TypeScript check passed. Full frozen installation,
 the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
