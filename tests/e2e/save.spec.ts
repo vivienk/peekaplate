@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 
 // S3-DIN-02.1 shared Save state in a real browser: real localStorage, real reloads. No screen uses
@@ -333,4 +334,203 @@ test('the removed toast disappears after 5 seconds and the restored toast after 
   await expect(toasts).toContainText('Added back to Saved');
   await page.clock.runFor(200);
   await expect(toasts).toBeEmpty();
+});
+
+// S3-DIN-02.5: the Saved screen in a real page. `blockWrites` simulates storage that refuses writes.
+async function openSavedScreen(page: Page, preSaved: string[], blockWrites = false) {
+  await page.goto(DINER);
+  await page.evaluate(
+    async ({ preSaved, blockWrites }) => {
+      const load = (path: string) => import(/* @vite-ignore */ path);
+      const { createSaveState } = await load('/src/save/save-state.ts');
+      const { renderSavedScreen } = await load('/src/save/saved-screen.ts');
+      const fixtures = await load('/src/menu/fixtures.ts');
+      const { toMenu } = await load('/src/menu/adapter.ts');
+      const menu = toMenu(
+        fixtures.edgeCaseBundle,
+        'fixture',
+        fixtures.FIXTURE_PUBLICATION_REVISION_ID,
+      ).menu;
+      if (blockWrites) {
+        Storage.prototype.setItem = () => {
+          throw new DOMException('blocked', 'SecurityError');
+        };
+      }
+      const saveState = createSaveState({ venueId: menu.venueId });
+      saveState.reconcile(menu);
+      for (const key of preSaved) saveState.save(fixtures.DISH[key]);
+      const events: [string, Record<string, unknown>][] = [];
+      const opened: string[] = [];
+      let backs = 0;
+      const container = document.createElement('main');
+      document.body.replaceChildren(container);
+      const show = () =>
+        renderSavedScreen(container, {
+          saveState,
+          menu,
+          onOpenDish: (dish: { dishId: string }) => opened.push(dish.dishId),
+          onBack: () => {
+            backs += 1;
+          },
+          send: (name: string, payload: Record<string, unknown>) => events.push([name, payload]),
+        });
+      let cleanup = show();
+      Object.assign(window, {
+        saved: {
+          events,
+          opened,
+          backs: () => backs,
+          DISH: fixtures.DISH,
+          // Leaving and coming back (navigation) is a new display.
+          redisplay: () => {
+            cleanup();
+            cleanup = show();
+          },
+        },
+      });
+    },
+    { preSaved, blockWrites },
+  );
+}
+
+type SavedGlobals = {
+  saved: {
+    events: [string, Record<string, unknown>][];
+    opened: string[];
+    backs: () => number;
+    DISH: Record<string, string>;
+    redisplay: () => void;
+  };
+};
+const savedInfo = (page: Page) =>
+  page.evaluate(() => {
+    const { saved } = window as unknown as SavedGlobals;
+    return {
+      events: saved.events.map(([name, payload]) => ({ name, ...payload })),
+      opened: [...saved.opened],
+      backs: saved.backs(),
+      dish: saved.DISH,
+    };
+  });
+
+test('Saved screen lists saved dishes newest first, opens a complete dish and shows the placeholder', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast', 'incomplete', 'harvestPowerBowl']);
+  const items = page.locator('.pp-saved__item');
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toContainText('Harvest Power Bowl');
+  await expect(items.nth(1)).toContainText('More information needed — pending restaurant input');
+  await expect(items.nth(2)).toContainText('Avocado Toast');
+  // The placeholder can only be removed: no open button inside it.
+  await expect(items.nth(1).locator('.pp-saved__open')).toHaveCount(0);
+
+  await items.nth(0).locator('.pp-saved__open').click();
+  const info = await savedInfo(page);
+  expect(info.opened).toEqual([info.dish.harvestPowerBowl]);
+});
+
+test('shortlist_viewed fires once per display, not for changes while the screen is shown', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast', 'harvestPowerBowl']);
+  // Removing a dish redraws the list but is not a new view.
+  await page.locator('.pp-saved__item').first().locator('.pp-saved__save').click();
+  await expect(page.locator('.pp-saved__item')).toHaveCount(1);
+  let views = (await savedInfo(page)).events.filter((e) => e.name === 'shortlist_viewed');
+  expect(views).toEqual([expect.objectContaining({ shortlist_size: 2 })]);
+
+  // Coming back to the screen is a new display.
+  await page.evaluate(() => (window as unknown as SavedGlobals).saved.redisplay());
+  views = (await savedInfo(page)).events.filter((e) => e.name === 'shortlist_viewed');
+  expect(views.map((v) => v.shortlist_size)).toEqual([2, 1]);
+});
+
+test('removing the last dish shows the empty state; Undo brings it back; Browse menu goes back', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast']);
+  await page.locator('.pp-saved__save').click();
+  await expect(page.getByText('No saved dishes yet')).toBeVisible();
+  await expect(page.locator('.pp-toast-area')).toContainText('Removed from Saved');
+
+  await page.locator('.pp-toast-area').getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('.pp-saved__item')).toHaveCount(1);
+  const events = (await savedInfo(page)).events.map((e) => [
+    e.name,
+    e.save_surface ?? e.unsave_surface ?? null,
+  ]);
+  expect(events).toEqual([
+    ['shortlist_viewed', null],
+    ['dish_unsaved', 'saved_screen'],
+    ['dish_saved', 'saved_screen'],
+  ]);
+
+  await page.locator('.pp-saved__save').click();
+  await page.getByRole('button', { name: 'Browse menu' }).click();
+  expect((await savedInfo(page)).backs).toBe(1);
+});
+
+test('in session-only mode the Saved screen shows the notice and sends no Save or view events', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast'], true);
+  await expect(page.getByText('Saved for this session only')).toBeVisible();
+  await expect(page.locator('.pp-saved__item')).toHaveCount(1);
+  await page.locator('.pp-saved__save').click();
+  await expect(page.getByText('No saved dishes yet')).toBeVisible();
+  expect((await savedInfo(page)).events).toEqual([]);
+});
+
+// Matrix v0.1h (confirmed by Adam): no shortlist_viewed in session-only mode, including after a
+// switch mid-visit, since session-only saves send no dish_saved for the view to match.
+test('shortlist_viewed stops once storage fails mid-visit, on every later display', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast', 'harvestPowerBowl']);
+  const views = async () =>
+    (await savedInfo(page)).events.filter((e) => e.name === 'shortlist_viewed').length;
+  expect(await views()).toBe(1);
+
+  // Storage starts refusing writes; the next write (removing a dish here) switches the visit to
+  // session-only.
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+  });
+  await page.locator('.pp-saved__save').first().click();
+  await expect(page.getByText('Saved for this session only')).toBeVisible();
+
+  await page.evaluate(() => (window as unknown as SavedGlobals).saved.redisplay());
+  await page.evaluate(() => (window as unknown as SavedGlobals).saved.redisplay());
+  await expect(page.getByText('Saved for this session only')).toBeVisible();
+  expect(await views()).toBe(1);
+});
+
+test('Saved screen works by keyboard and passes an accessibility scan', async ({ page }) => {
+  await openSavedScreen(page, ['avocadoToast', 'incomplete']);
+  await expect(page.getByText('Saved for this session only')).toBeHidden();
+  // Newest first: the placeholder (saved last) comes first and offers only its remove heart.
+  await page.getByRole('button', { name: 'Back to menu' }).focus();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Remove this dish from Saved' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.pp-saved__item').nth(1).locator('.pp-saved__open')).toBeFocused();
+  await page.keyboard.press('Enter');
+  expect((await savedInfo(page)).opened).toHaveLength(1);
+
+  // Every control is at least 44px square, whatever the platform's font.
+  for (const button of await page.locator('.pp-saved button').all()) {
+    const box = await button.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(violations.map(({ id, nodes }) => ({ id, targets: nodes.map((n) => n.target) }))).toEqual(
+    [],
+  );
 });

@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite shell, readable without JavaScript; optional consent-gated PostHog shell views; the dish intent adapter is tested but awaits real controls. S3-DIN-01.1: a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback without backfill, a reload re-check that drops withdrawn and keeps incomplete dishes, and stale-tab-safe writes. S3-DIN-02.2: mountSaveHeart/mountSaveBadge/mountToastArea with latest-removal-only Undo, 5s/3s toasts and dish_saved/dish_unsaved payloads only for committed writes of complete dishes (injected sender until track() lands). No screen uses the menu or Save modules yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite shell, readable without JavaScript; optional consent-gated PostHog shell views; the dish intent adapter is tested but awaits real controls. S3-DIN-01.1: a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback without backfill, a reload re-check that drops withdrawn and keeps incomplete dishes, and stale-tab-safe writes. S3-DIN-02.2: mountSaveHeart/mountSaveBadge/mountToastArea with latest-removal-only Undo, 5s/3s toasts and dish_saved/dish_unsaved payloads only for committed writes of complete dishes (injected sender until track() lands). S3-DIN-02.5: renderSavedScreen (newest first, placeholders, empty state, session-only notice, one shortlist_viewed per display). No screen uses the menu or Save modules yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -87,7 +87,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/events.ts",
         "frontend/diner/src/save/feedback.ts",
         "frontend/diner/src/save/feedback.test.ts",
-        "frontend/diner/src/save/mount.ts"
+        "frontend/diner/src/save/mount.ts",
+        "frontend/diner/src/save/saved-screen.ts",
+        "frontend/diner/src/save/saved-screen-model.ts",
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -96,7 +100,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2791dcbb761de146b85b1ac50b74cb35727c894bf1ef37d66e6d22be57bd66f1"
+      "sourceFingerprint": "f8a08acbc4771c0f0d96082f9e59fcae20108451433257f492a3e92d8bc72c87"
     },
     {
       "id": "console",
