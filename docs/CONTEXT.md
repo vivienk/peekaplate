@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7b7ef35260fe21c508d7b9b1fbb70e3d4c2f9dcf7a1a9da76eff28b8fa88aa18"
+      "sourceFingerprint": "c9498b819eb44aec3ecb5f9b5d6e5e6c73781ce0007e7fe20767ee7c84e1b83b"
     },
     {
       "id": "tokens",
@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "dc0706115b8ac9989c1bd8c5ff800249b67a9f0c9fac47bbc820394f0d633708"
+      "sourceFingerprint": "d166168c23f86d2e5f1c80f3bc5ff99c66417b81bcdfd6e158b17ddb8edb7da5"
     },
     {
       "id": "database",
@@ -380,13 +380,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "October 31 PR70 reconciliation: reconciled canonical observation producer (S4-DATA-03) with current develop (05a173c) containing merged PR32 index/conflict and PR50 typed fact migrations. Reconciled contracts, widened timestamp sanitization to nanoseconds and calendar bounds, exported IsoDateTimeSchema, and verified in-batch deduplication and conflict quarantine.",
+      "summary": "November 1 PR70 final review readiness: resolved CORS preflight for POST /observations with maxAge and allowed headers; aligned menu-token verification with PR #43 ES256, audience validation, and root-only trusted issuer; implemented trusted server-side traffic_class propagation from verified token claims through queue envelope; shared canonicalJson (with PR #31 deterministic serialization matching -0, non-finite rejection, WeakSet cycles, and property omission) and sha256 from contracts; and expanded regression test suite.",
       "modules": [
         "contracts",
         "backend",
         "delivery"
       ],
-      "next": "Verify local check, typecheck, tests and CI on this reconciled head. Consumer PR31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
+      "next": "Unresolved decision for Sai/Vivien: rate-limiting architecture and environment bindings (Cloudflare Worker rate-limiting bindings vs KV / Durable Objects / non-production fallback when bindings are unset). Review PR #70; consumer PR31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
     },
     {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",

@@ -147,6 +147,75 @@ describe('observation.v2 HTTP boundary', () => {
         authorizedPublicationId: publicationId,
         schemaVersion: 'observation.v2',
         eventId: input.event_id,
+        traffic_class: 'live',
+      }),
+      {},
+    );
+  });
+
+  it('handles CORS and OPTIONS preflight for /observations', async () => {
+    const app = createApp(baseServices);
+
+    const preflight = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://diner.peekaplate.com',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Authorization, Content-Type',
+        },
+      }),
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(preflight.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+    expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+
+    const postRes = await app.fetch(
+      request([event()], {
+        headers: {
+          Authorization: 'Bearer signed',
+          'Content-Type': 'application/json',
+          Origin: 'https://diner.peekaplate.com',
+        },
+      }),
+    );
+    expect(postRes.headers.get('Access-Control-Allow-Origin')).toBe('*');
+
+    const unauthorizedRes = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://diner.peekaplate.com',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contract: 'observation.v2', events: [] }),
+      }),
+    );
+    expect(unauthorizedRes.status).toBe(401);
+    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).toBe('*');
+  });
+
+  it('propagates trusted traffic_class from verified menu token and ignores client-supplied values', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const services = {
+      ...baseServices,
+      verifyMenu: vi.fn().mockResolvedValue({
+        venueId,
+        publicationId,
+        jti,
+        trafficClass: 'test',
+      }),
+      enqueueObservation,
+    };
+    const input = event();
+    const response = await createApp(services).fetch(request([input]));
+    expect(response.status).toBe(200);
+    expect(enqueueObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: venueId,
+        traffic_class: 'test',
+        eventId: input.event_id,
       }),
       {},
     );

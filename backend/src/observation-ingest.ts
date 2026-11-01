@@ -1,4 +1,5 @@
 import {
+  canonicalJson,
   IsoDateTimeSchema,
   type ObservationQueueEnvelope,
   type ObservationReceipt,
@@ -6,6 +7,7 @@ import {
   ObservationReceiptBatchSchema,
   type ObservationV2,
   ObservationV2Schema,
+  sha256,
 } from '@peekaplate/contracts';
 import type { MenuAuthority } from './menu-token';
 
@@ -215,6 +217,7 @@ function toQueueMessage(
     authorizedPublicationId: authority.publicationId,
     producerId: event.producer_id,
     localSequence: event.local_sequence,
+    traffic_class: authority.trafficClass ?? authority.traffic_class ?? 'live',
     payload: event.payload,
     firstReceivedAt,
   };
@@ -282,12 +285,6 @@ function conflictEvidence(
   };
 }
 
-async function sha256(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 function rawEventId(raw: unknown): string | null {
   if (!raw || typeof raw !== 'object') return null;
   const value = (raw as Record<string, unknown>).event_id;
@@ -318,51 +315,4 @@ function rejected(
     reason_code: reasonCode,
     retryable: false,
   };
-}
-
-function canonicalJson(value: unknown): string {
-  const output: string[] = [];
-  const stack: ({ value: unknown } | { text: string })[] = [{ value }];
-  let nodes = 0;
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if ('text' in current) {
-      output.push(current.text);
-      continue;
-    }
-    nodes += 1;
-    if (nodes > 65_536) throw new Error('Observation payload is too complex.');
-    const entry = current.value;
-    if (entry === null || typeof entry !== 'object') {
-      const encoded = JSON.stringify(entry);
-      if (encoded === undefined) throw new Error('Observation payload is not JSON-compatible.');
-      output.push(encoded);
-      continue;
-    }
-    if (Array.isArray(entry)) {
-      output.push('[');
-      stack.push({ text: ']' });
-      for (let index = entry.length - 1; index >= 0; index -= 1) {
-        if (index < entry.length - 1) stack.push({ text: ',' });
-        stack.push({ value: entry[index] });
-      }
-      continue;
-    }
-    const fields = Object.entries(entry as Record<string, unknown>).sort(([left], [right]) =>
-      left.localeCompare(right),
-    );
-    output.push('{');
-    stack.push({ text: '}' });
-    for (let index = fields.length - 1; index >= 0; index -= 1) {
-      const field = fields[index];
-      if (!field) continue;
-      if (index < fields.length - 1) stack.push({ text: ',' });
-      stack.push({ value: field[1] });
-      stack.push({ text: ':' });
-      stack.push({ text: JSON.stringify(field[0]) });
-    }
-  }
-  return output.join('');
 }

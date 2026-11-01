@@ -9,6 +9,8 @@ import {
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
+  MENU_TOKEN_AUDIENCE,
+  MENU_TOKEN_TTL_SECONDS,
   ObservationBatchV2Schema,
   ObservationConflictQueueMessageSchema,
   ObservationConflictV1QueueEnvelopeSchema,
@@ -1070,5 +1072,68 @@ describe('canonical observation checksum and identity', () => {
     });
     const hashDiffSeq = await sha256(canonicalJson(diffSeq));
     expect(hashDiffSeq).not.toBe(baseHash);
+  });
+
+  it('aligns menu token constants with PR #43', () => {
+    expect(MENU_TOKEN_AUDIENCE).toBe('peekaplate-observations');
+    expect(MENU_TOKEN_TTL_SECONDS).toBe(1800);
+  });
+
+  it('validates traffic_class in ObservationQueueMessageSchema and defaults to live', () => {
+    const parsedDefault = ObservationQueueMessageSchema.parse(envelope);
+    expect(parsedDefault.traffic_class).toBe('live');
+
+    const parsedTest = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'test',
+    });
+    expect(parsedTest.traffic_class).toBe('test');
+
+    const parsedDemo = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'demo',
+    });
+    expect(parsedDemo.traffic_class).toBe('demo');
+
+    expect(() =>
+      ObservationQueueMessageSchema.parse({
+        ...envelope,
+        traffic_class: 'staging',
+      }),
+    ).toThrow();
+  });
+
+  it('matches PR #31 deterministic JSON serialization rules', () => {
+    // Normalizes -0 to 0
+    expect(canonicalJson({ zero: -0 })).toBe('{"zero":0}');
+
+    // Rejects non-finite numbers
+    expect(() => canonicalJson({ num: Number.NaN })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+    expect(() => canonicalJson({ num: Number.POSITIVE_INFINITY })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+
+    // Omits undefined, functions and symbols in objects
+    expect(
+      canonicalJson({
+        a: 1,
+        b: undefined,
+        c: () => {},
+        d: Symbol('test'),
+      }),
+    ).toBe('{"a":1}');
+
+    // Turns undefined, functions and symbols into null in arrays
+    expect(canonicalJson([1, undefined, () => {}, Symbol('test'), 2])).toBe('[1,null,null,null,2]');
+
+    // Sorts keys using localeCompare
+    expect(canonicalJson({ b: 2, a: 1, c: 3 })).toBe('{"a":1,"b":2,"c":3}');
+
+    // Detects circular references
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    expect(() => canonicalJson(circular)).toThrow('Circular reference detected');
   });
 });

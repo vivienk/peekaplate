@@ -12,6 +12,7 @@ import {
 } from '@peekaplate/contracts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
 import { CommandError, createDishRevision } from './dish-command';
@@ -225,6 +226,15 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
+  );
+  app.use(
+    '/observations',
+    cors({
+      origin: '*',
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
+      maxAge: 86400,
+    }),
   );
   app.use(
     '/observations',

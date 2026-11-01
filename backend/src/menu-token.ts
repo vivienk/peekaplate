@@ -1,15 +1,19 @@
+import { MENU_TOKEN_AUDIENCE, MENU_TOKEN_TTL_SECONDS } from '@peekaplate/contracts';
 import { createRemoteJWKSet, type JWTPayload, jwtVerify } from 'jose';
 
-const ALGORITHMS: ('RS256' | 'ES256')[] = ['RS256', 'ES256'];
+const ALGORITHMS: 'ES256'[] = ['ES256'];
 const MAX_BEARER_TOKEN_LENGTH = 8_192;
-const MAX_TOKEN_LIFETIME_SECONDS = 30 * 60;
 const CLOCK_TOLERANCE_SECONDS = 60;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export type TrafficClass = 'live' | 'test' | 'demo';
 
 export type MenuAuthority = {
   venueId: string;
   publicationId: string;
   jti: string;
+  trafficClass?: TrafficClass;
+  traffic_class?: TrafficClass;
 };
 
 export class MenuTokenAuthenticationError extends Error {
@@ -46,7 +50,7 @@ export function createMenuTokenVerifier(config: {
   allowLocalIssuer?: boolean;
 }): MenuTokenVerifier {
   const issuer = trustedIssuer(config);
-  const jwks = createRemoteJWKSet(new URL('.well-known/jwks.json', `${issuer}/`), {
+  const jwks = createRemoteJWKSet(new URL('.well-known/jwks.json', issuer), {
     timeoutDuration: 2_000,
     cooldownDuration: 30_000,
     cacheMaxAge: 600_000,
@@ -57,6 +61,7 @@ export function createMenuTokenVerifier(config: {
     try {
       const { payload } = await jwtVerify(token, jwks, {
         issuer,
+        audience: MENU_TOKEN_AUDIENCE,
         algorithms: ALGORITHMS,
         requiredClaims: ['exp', 'iat', 'jti'],
       });
@@ -93,12 +98,26 @@ export function validateMenuTokenClaims(
     payload.iat > nowSeconds + CLOCK_TOLERANCE_SECONDS ||
     payload.exp <= nowSeconds - CLOCK_TOLERANCE_SECONDS ||
     payload.exp <= payload.iat ||
-    payload.exp - payload.iat > MAX_TOKEN_LIFETIME_SECONDS
+    payload.exp - payload.iat > MENU_TOKEN_TTL_SECONDS
   ) {
     throw new MenuTokenAuthenticationError();
   }
   if (payload.scope !== 'observations') throw new MenuTokenAuthorizationError();
-  return { venueId, publicationId, jti };
+  if (payload.aud !== undefined && payload.aud !== MENU_TOKEN_AUDIENCE) {
+    throw new MenuTokenAuthenticationError();
+  }
+
+  const rawTrafficClass = payload.traffic_class ?? payload.trafficClass;
+  let trafficClass: TrafficClass = 'live';
+  if (rawTrafficClass !== undefined) {
+    if (rawTrafficClass === 'live' || rawTrafficClass === 'test' || rawTrafficClass === 'demo') {
+      trafficClass = rawTrafficClass;
+    } else {
+      throw new MenuTokenAuthenticationError();
+    }
+  }
+
+  return { venueId, publicationId, jti, trafficClass, traffic_class: trafficClass };
 }
 
 function bearerToken(authorization: string | undefined): string {
@@ -120,7 +139,14 @@ function trustedIssuer(config: { issuer: string; allowLocalIssuer?: boolean }): 
   const trustedProtocol =
     issuer.protocol === 'https:' ||
     (config.allowLocalIssuer === true && isLocal && issuer.protocol === 'http:');
-  if (!trustedProtocol || issuer.search || issuer.hash || issuer.username || issuer.password) {
+  if (
+    !trustedProtocol ||
+    issuer.pathname !== '/' ||
+    issuer.search ||
+    issuer.hash ||
+    issuer.username ||
+    issuer.password
+  ) {
     throw new MenuTokenUnavailableError();
   }
   return issuer.href;

@@ -71,6 +71,7 @@ for (const scenario of fixtures.delivery_cases) {
           eventId: event.event_id,
           producerId: event.producer_id,
           localSequence: event.local_sequence,
+          traffic_class: 'live',
           payload: event.payload,
         });
       }
