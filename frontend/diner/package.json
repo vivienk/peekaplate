@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@peekaplate/analytics": "workspace:*",
+    "@peekaplate/contracts": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
-    "@peekaplate/ui": "workspace:*"
+    "@peekaplate/ui": "workspace:*",
+    "zod": "4.6.7"
   }
 }

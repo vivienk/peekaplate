@@ -133,4 +133,26 @@ export function renderDishDetail(
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
   backButton?.addEventListener('click', onBack);
+
+  const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
+  if (detailImg) {
+    let triedCard = false;
+    const handleFailure = () => {
+      const cardFallback = dish.images?.card;
+      if (!triedCard && cardFallback && detailImg.getAttribute('src') !== cardFallback.url) {
+        triedCard = true;
+        detailImg.src = cardFallback.url;
+        detailImg.alt = cardFallback.alt;
+        return;
+      }
+      const missing = document.createElement('div');
+      missing.className = 'pp-detail__image pp-detail__image--missing';
+      missing.setAttribute('aria-hidden', 'true');
+      detailImg.replaceWith(missing);
+    };
+    detailImg.addEventListener('error', handleFailure);
+    if (detailImg.complete && detailImg.naturalWidth === 0) {
+      handleFailure();
+    }
+  }
 }
