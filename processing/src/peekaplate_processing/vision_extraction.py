@@ -52,6 +52,7 @@ class V4Dish(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     page_number: int = Field(ge=1)
     name: str = Field(min_length=1)
+    description: str | None = None
     category: str | None = None
     price_text: str | None = None
     price_amount: str | None = None
@@ -68,6 +69,7 @@ class V4Batch(BaseModel):
 V4_VISION_PROMPT = """Detect all distinct food and drink items from this menu page image.
 For each item, output:
 - name: dish title
+- description: item description (e.g. ingredients, sides, details), or null if none
 - category: section heading (e.g. STARTERS, SALADS, DESSERTS) or null
 - price_text: verbatim price text (e.g. "25.99") or null
 - price_amount: numeric price (e.g. "25.99") or null
@@ -212,6 +214,7 @@ def build_v4_result(
 
         # Defensively sanitize fields for DishDraft schema
         clean_name = d.name.strip()[:160]
+        clean_desc = d.description.strip()[:4000] if d.description and d.description.strip() else None
         clean_category = d.category.strip()[:160] if d.category and d.category.strip() else None
         clean_price_text = d.price_text.strip()[:160] if d.price_text and d.price_text.strip() else None
 
@@ -233,7 +236,7 @@ def build_v4_result(
         try:
             draft = DishDraft(
                 name=clean_name,
-                description=None,
+                description=clean_desc,
                 category=clean_category,
                 category_page_number=p_num,
                 price_text=clean_price_text,

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 from urllib.parse import urlsplit
 
 from langchain_openai import ChatOpenAI
@@ -22,6 +22,19 @@ from peekaplate_processing.errors import ExtractionError
 
 DEFAULT_TIMEOUT = 120
 DEFAULT_MAX_TOKENS = 16384
+# Verified working models tested on physical menu imagery
+WorkingModel = Literal[
+    "models/gemini-3-flash-preview",
+    "qwen/qwen3.8-flash",
+    "z-ai/glm-5.3-flash",
+    "deepseek/deepseek-v4.1-flash",
+]
+VERIFIED_WORKING_MODELS: tuple[WorkingModel, ...] = (
+    "models/gemini-3-flash-preview",
+    "qwen/qwen3.8-flash",
+    "z-ai/glm-5.3-flash",
+    "deepseek/deepseek-v4.1-flash",
+)
 
 
 @dataclass(frozen=True)
@@ -65,13 +78,40 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         default_model="google/gemini-3-flash-preview",
         extra_body={"reasoning": {"enabled": False}, "provider": {"require_parameters": True}},
     ),
+    "qwen": ModelProviderConfig(
+        name="qwen",
+        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        url_var="MENU_AI_API_URL",
+        model_var="MENU_AI_MODEL",
+        default_url="https://openrouter.ai/api/v1",
+        default_model="qwen/qwen3.8-flash",
+        extra_body={"reasoning": {"enabled": False}, "provider": {"require_parameters": True}},
+    ),
+    "glm": ModelProviderConfig(
+        name="glm",
+        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        url_var="MENU_AI_API_URL",
+        model_var="MENU_AI_MODEL",
+        default_url="https://openrouter.ai/api/v1",
+        default_model="z-ai/glm-5.3-flash",
+        extra_body={"provider": {"require_parameters": True}},
+    ),
+    "deepseek": ModelProviderConfig(
+        name="deepseek",
+        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        url_var="MENU_AI_API_URL",
+        model_var="MENU_AI_MODEL",
+        default_url="https://openrouter.ai/api/v1",
+        default_model="deepseek/deepseek-v4.1-flash",
+        extra_body={"provider": {"require_parameters": True}},
+    ),
     "a2agent": ModelProviderConfig(
         name="a2agent",
         key_vars=("a2agent_api_key",),
         url_var="a2agent_url",
         model_var="a2agent_api_MODEL",
         default_url="https://api.a2agent.me/v1",
-        default_model="minimax-m3",
+        default_model="MiniMax-M3.1-Flash",
         extra_body=None,
     ),
     "nara": ModelProviderConfig(
@@ -223,8 +263,8 @@ def _build_client_from_config(
         extra_body=extra,
     )
 def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[tuple[str, ChatOpenAI]]:
-    """Return configured clients in priority order: google_studio -> openrouter -> a2agent."""
-    cascade_order = ("google_studio", "openrouter", "a2agent")
+    """Return configured clients in priority order: google_studio -> qwen -> glm -> openrouter."""
+    cascade_order = ("google_studio", "qwen", "glm", "openrouter")
     available: list[tuple[str, ChatOpenAI]] = []
     for prov_name in cascade_order:
         try:
