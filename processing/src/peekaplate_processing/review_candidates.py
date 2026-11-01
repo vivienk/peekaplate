@@ -156,6 +156,16 @@ def prepare_review_candidates(report:MenuExtractionResult)->ReviewCandidateResul
     for segment in segments:
         if segment.segment_id in public_links:
             segment.metadata["candidate_box_evidence"]=public_links[segment.segment_id]
+        # Preserve vision_boxes in public review candidate metadata when present
+        orig_seg = next((s for s in report.segments if s.segment_id == segment.segment_id), None)
+        if orig_seg and "vision_boxes" in orig_seg.metadata:
+            # Map draft_id to candidate_id
+            draft_to_cand = {by_index[i].draft_id: candidates[i].candidate_id for i in range(len(candidates))}
+            mapped_boxes = {}
+            for d_id, b_list in orig_seg.metadata["vision_boxes"].items():
+                target_id = draft_to_cand.get(d_id, d_id)
+                mapped_boxes[target_id] = b_list
+            segment.metadata["vision_boxes"] = mapped_boxes
     return ReviewCandidateResult(
         schema_version=report.schema_version,
         extraction_id=extraction_id,
