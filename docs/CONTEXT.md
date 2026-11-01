@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.3 adds the Compare picker logic (options without the kept or shown dishes and incomplete dishes, single selection, search through searchMenu); its screen is not built yet. S3-DIN-01.4 and S3-DIN-02.3/.4 add screen-free logic: searchMenu (matching dish IDs plus the staff allergy line), Compare picker options and selection, and comparison start/Replace with the dish_compared payload; their screens are not built yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 and S3-DIN-02.3/.4 add screen-free logic: searchMenu (matching dish IDs plus the staff allergy line), Compare picker options and selection, and comparison start/Replace with the dish_compared payload; their screens are not built yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -91,7 +91,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7c035fc5ccef108ba60b3d049c1a07b1c38c9ab4db823889eb99abc8a8d6b24a"
+      "sourceFingerprint": "e157c154e8be582fdc340db1537e9b88451c848e16262856d944169714dcf242"
     },
     {
       "id": "console",
