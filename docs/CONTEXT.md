@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; S3-DIN-01.1 adds a replaceable menu source, adapter and \"Fixture data\"-labelled synthetic fixtures. The diner now renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders, 50% off-viewport dimming). Dish detail/search/events remain separate slices. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; S3-DIN-01.1 adds a replaceable menu source, adapter and \"Fixture data\"-labelled synthetic fixtures. The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states with retry on error and offline, incomplete placeholders, 50% off-viewport dimming, card and detail image fallbacks) and the dish detail screen. A strict Bundle v1 published-menu adapter (schema copied from PR #43 at a1c264c; content hash check fails closed in live mode) exists but is not connected to any screen or live API. Search, Save and events remain separate slices. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -78,6 +78,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/fixtures.test.ts",
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/published.ts",
+        "frontend/diner/src/menu/published.test.ts",
+        "tests/e2e/published-states.spec.ts",
         "vitest.config.ts"
       ],
       "adrs": [
@@ -87,7 +90,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9e83ab574d8595d1ab819caa82c2d21c9c07c9ab09acf029b6f4cdc0c2889f7c"
+      "sourceFingerprint": "c6911b16fc8dcd557a2bcb771856270d7e9d2d9fb1b95d3569a873d55b60d173"
     },
     {
       "id": "console",

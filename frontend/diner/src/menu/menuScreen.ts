@@ -51,19 +51,32 @@ function renderLoading(container: HTMLElement): void {
   `;
 }
 
-function renderFailure(container: HTMLElement, status: MenuLoadResult['status']): void {
+// INTERIM: Failure heading uses demoBundle.restaurant.name because an error or 404 response
+// carries no restaurant name. Design confirmation pending.
+function renderFailure(
+  container: HTMLElement,
+  status: MenuLoadResult['status'],
+  onRetry?: () => void,
+): void {
   const messages: Record<string, string> = {
     empty: 'No dishes are available right now.',
     unavailable: 'This menu is unavailable right now.',
     error: 'We could not load the menu. Please try again.',
     offline: 'You appear to be offline. Please check your connection.',
   };
+  const showRetry = (status === 'error' || status === 'offline') && Boolean(onRetry);
   container.innerHTML = `
     <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
+      ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
     </div>
   `;
+  if (showRetry && onRetry) {
+    container.querySelector<HTMLButtonElement>('[data-retry]')?.addEventListener('click', () => {
+      onRetry();
+    });
+  }
 }
 
 function renderCard(dish: CompleteDish): string {
@@ -207,17 +220,47 @@ function renderMenu(
     });
     openButton?.addEventListener('click', () => onOpenDetail(dish));
   });
+
+  container.querySelectorAll<HTMLImageElement>('img.pp-card__image').forEach((img) => {
+    const handleFailure = () => {
+      const missing = document.createElement('div');
+      missing.className = 'pp-card__image pp-card__image--missing';
+      missing.setAttribute('aria-hidden', 'true');
+      img.replaceWith(missing);
+    };
+    img.addEventListener('error', handleFailure);
+    if (img.complete && img.naturalWidth === 0) {
+      handleFailure();
+    }
+  });
+}
+
+function focusAfterRetry(container: HTMLElement, succeeded: boolean): void {
+  if (succeeded) {
+    // Focus the hidden h1 that names the restaurant to establish context for screen reader users
+    const heading = container.querySelector<HTMLElement>('h1');
+    if (heading) {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus();
+    }
+  } else {
+    // If retry fails again, keep focus on the retry button or state text
+    const retryBtn = container.querySelector<HTMLButtonElement>('[data-retry]');
+    if (retryBtn) {
+      retryBtn.focus();
+    } else {
+      const stateText = container.querySelector<HTMLElement>('.pp-state-text');
+      stateText?.setAttribute('tabindex', '-1');
+      stateText?.focus();
+    }
+  }
 }
 
 export function mountMenuScreen(container: HTMLElement): void {
-  renderLoading(container);
-
-  const scenario = scenarioFromQuery();
-  const delayMs = delayFromQuery();
-  const source = createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs });
-
   let savedScroll = 0;
   let currentMenu: Menu | null = null;
+  let isLoading = false;
+  let retryCount = 0;
 
   const showMenu = () => {
     if (!currentMenu) return;
@@ -231,12 +274,48 @@ export function mountMenuScreen(container: HTMLElement): void {
     window.scrollTo(0, 0);
   };
 
-  void source.load().then((result: MenuLoadResult) => {
-    if (result.status !== 'ready') {
-      renderFailure(container, result.status);
-      return;
-    }
-    currentMenu = result.menu;
-    renderMenu(container, currentMenu, showDetail);
-  });
+  const loadMenu = () => {
+    if (isLoading) return;
+    isLoading = true;
+    renderLoading(container);
+
+    // Re-reading scenario and delay from the query on each load allows retry recovery
+    // in tests while maintaining identical behavior in production where the query is static.
+    const scenario = scenarioFromQuery();
+    const delayMs = delayFromQuery();
+    const source = createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs });
+
+    const handleRetry = () => {
+      if (isLoading) return;
+      retryCount++;
+      loadMenu();
+    };
+
+    source
+      .load()
+      .then((result: MenuLoadResult) => {
+        isLoading = false;
+        if (result.status !== 'ready') {
+          renderFailure(container, result.status, handleRetry);
+          if (retryCount > 0) {
+            focusAfterRetry(container, false);
+          }
+          return;
+        }
+        currentMenu = result.menu;
+        renderMenu(container, currentMenu, showDetail);
+        if (retryCount > 0) {
+          focusAfterRetry(container, true);
+        }
+      })
+      .catch(() => {
+        isLoading = false;
+        renderFailure(container, 'error', handleRetry);
+        if (retryCount > 0) {
+          focusAfterRetry(container, false);
+        }
+      });
+  };
+
+  loadMenu();
 }

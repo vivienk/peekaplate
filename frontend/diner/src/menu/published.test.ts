@@ -150,4 +150,17 @@ describe('published adapter', () => {
     const delivery = parsePublishedDelivery(validDelivery);
     expect(verifyContentHash(delivery)).toBe(false);
   });
+
+  it('treats a complete dish with empty ingredients as incomplete placeholder', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    const secondDish = delivery.content.categories[0]?.dishes[1];
+    if (!secondDish || !secondDish.complete) throw new Error('expected complete dish at index 1');
+    secondDish.ingredients = [];
+    const result = deliveryToMenu(delivery);
+    if (result.status !== 'ready') throw new Error('expected ready');
+    const dish = result.menu.categories[0]?.dishes[1];
+    expect(dish?.kind).toBe('incomplete');
+    expect(dish).not.toHaveProperty('name');
+    expect(dish).not.toHaveProperty('price');
+  });
 });
