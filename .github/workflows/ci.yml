@@ -48,6 +48,7 @@ jobs:
               - 'backend/**'
               - 'packages/contracts/**'
               - 'packages/analytics/**'
+              - 'packages/tokens/**'
               - 'tests/e2e/**'
               - 'scripts/check-bundle*'
               - 'scripts/verify*'
