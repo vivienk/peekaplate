@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toMenu } from './adapter';
 import { createFixtureMenuSource, DISH, NO_ICON_ALLERGEN, NO_ICON_INGREDIENT } from './fixtures';
 import { searchMenu } from './search';
-import type { Menu } from './types';
+import { ALLERGENS, type Menu } from './types';
+import type { WireCompleteDish } from './wire';
 
 async function loadMenu(scenario: Parameters<typeof createFixtureMenuSource>[0]): Promise<Menu> {
   const result = await createFixtureMenuSource(scenario).load();
@@ -101,9 +103,6 @@ describe('searchMenu', () => {
         allergyNotice: true,
       });
     }
-    for (const query of ['tree nut', 'Tree nuts']) {
-      expect(searchMenu(menu, query).dishIds).toEqual([DISH.gardenAvocadoSalad]);
-    }
     const eggDishes = [
       DISH.avocadoToast,
       DISH.eggsBenedict,
@@ -132,6 +131,54 @@ describe('searchMenu', () => {
         allergyNotice: true,
       });
     }
+  });
+
+  it('finds both nut and peanut dishes for "nuts", and keeps the old "tree nut" names', () => {
+    // The P0 nut code is "nuts" (Nov 1), "tree nut" before #59 adopts it; both must work.
+    const nutCodes: readonly string[] = ['nuts', 'tree nut'];
+    const nutCode = ALLERGENS.find((a) => nutCodes.includes(a.code))?.code;
+    if (!nutCode) throw new Error('expected a P0 nut allergen');
+    const dish = (n: number, allergens: string[]): WireCompleteDish => ({
+      dish_id: `d${n}`,
+      dish_revision_id: `r${n}`,
+      complete: true,
+      name: `Dish ${n}`,
+      description: '',
+      price: { amount: '1.00', currency: 'USD' },
+      ingredients: [{ ingredient_id: `i${n}`, name: 'Rice', description: null }],
+      dietary: [],
+      allergens,
+      images: null,
+    });
+    const result = toMenu(
+      {
+        schema_version: 1,
+        venue_id: 'v',
+        menu_id: 'm',
+        menu_revision_id: 'mr',
+        restaurant: { name: 'Test', logo: null },
+        categories: [
+          {
+            category_id: 'c',
+            name: 'Mains',
+            dishes: [dish(1, [nutCode]), dish(2, ['peanut']), dish(3, ['milk'])],
+          },
+        ],
+      },
+      'fixture',
+      'p',
+    );
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    for (const query of ['nuts', 'Nuts', 'nut']) {
+      expect(searchMenu(result.menu, query)).toEqual({
+        dishIds: ['d1', 'd2'],
+        allergyNotice: true,
+      });
+    }
+    for (const query of ['tree nut', 'Tree nuts']) {
+      expect(searchMenu(result.menu, query).dishIds).toEqual(['d1']);
+    }
+    expect(searchMenu(result.menu, 'peanuts').dishIds).toEqual(['d2']);
   });
 
   it('finds an allergen value that has no icon', async () => {

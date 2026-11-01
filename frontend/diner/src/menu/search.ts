@@ -13,10 +13,18 @@ export type MenuSearchResult = {
 
 const NO_MATCH: MenuSearchResult = { dishIds: [], allergyNotice: false };
 
-// Other names diners use for a P0 allergen, e.g. "Soya" from the Figma icon set.
-const ALLERGEN_ALIASES: Partial<Record<(typeof ALLERGENS)[number]['code'], string[]>> = {
+// The P0 "nuts" allergen replaced "tree nut" (Adam, Nov 1); the old names stay as aliases so
+// existing data and searches keep working.
+const NUT_NAMES = ['nut', 'nuts', 'tree nut', 'tree nuts'];
+
+// Other names diners use for a P0 allergen, keyed by code, e.g. "Soya" from the Figma icon set.
+// "nuts" also finds Peanuts, so a nut search never misses a peanut dish.
+const ALLERGEN_ALIASES: Readonly<Record<string, readonly string[]>> = {
   soy: ['soya', 'soybean', 'soybeans'],
   sesame: ['sesame seed', 'sesame seeds'],
+  nuts: NUT_NAMES,
+  'tree nut': NUT_NAMES,
+  peanut: ['nut', 'nuts'],
 };
 
 // A P0 allergen chip matches its code, its label or an alias, so "egg" and "eggs" both find "Eggs"
@@ -35,8 +43,6 @@ const NOTICE_ONLY_TERMS = [
   'gluten',
   'shellfish',
   'crustacean',
-  'nut',
-  'nuts',
   'dairy',
   'mustard',
   'celery',
