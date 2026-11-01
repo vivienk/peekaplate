@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { timingSafeEqual } from 'node:crypto';
-import { readExtractionCapability } from './extraction-capability';
+import { Buffer } from 'node:buffer';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { type ExtractionSource, readExtractionCapability } from './extraction-capability';
 
 type Stub = { fetch(request: Request): Promise<Response> };
 export type ExtractionHostEnv = {
@@ -11,6 +12,11 @@ export type ExtractionHostEnv = {
   EXTRACTOR: { getByName(name: string): Stub };
   SOURCE_BUCKET: {
     get(key: string): Promise<{ size: number; body: ReadableStream<Uint8Array> } | null>;
+    put(
+      key: string,
+      value: string,
+      options: { onlyIf: { etagDoesNotMatch: string }; httpMetadata: { contentType: string } },
+    ): Promise<unknown | null>;
   };
 } & Partial<Record<(typeof pipelineVariables)[number], string>>;
 
@@ -100,6 +106,112 @@ const json = (error: string, status: number) =>
     },
   );
 
+const maxBundleBytes = 32_000_000;
+const record = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+async function readBundle(response: Response): Promise<unknown> {
+  if (
+    response.headers.get('x-extraction-artifact-bundle') !== '1' ||
+    !response.headers.get('content-type')?.startsWith('application/json') ||
+    Number(response.headers.get('content-length')) > maxBundleBytes ||
+    !response.body
+  ) {
+    await response.body?.cancel();
+    throw new Error('Invalid artifact transport');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false });
+  const chunks: string[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBundleBytes) {
+        await reader.cancel();
+        throw new Error('Artifact bundle too large');
+      }
+      chunks.push(decoder.decode(value, { stream: true }));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  chunks.push(decoder.decode());
+  return JSON.parse(chunks.join(''));
+}
+
+async function retainArtifacts(
+  response: Response,
+  env: ExtractionHostEnv,
+  scope: ExtractionSource,
+): Promise<Response> {
+  if (response.status !== 200) return response;
+  const bundle = await readBundle(response);
+  if (!record(bundle) || bundle.schema_version !== 1 || Object.keys(bundle).length !== 4)
+    throw new Error('Invalid artifact bundle');
+  const report = bundle.report;
+  const privateResult = bundle.review_suggestions;
+  const timings = bundle.timings;
+  if (
+    !record(report) ||
+    !record(report.source) ||
+    !record(report.configuration) ||
+    !(
+      (report.schema_version === 1 && report.pipeline_version === '2') ||
+      (report.schema_version === 2 && report.pipeline_version === '3')
+    ) ||
+    !['complete', 'incomplete', 'failed'].some((value) => value === report.status) ||
+    !Array.isArray(report.drafts) ||
+    !Array.isArray(report.evidence) ||
+    report.source.sha256 !== scope.sourceHash ||
+    report.source.source_id !== `sha256:${scope.sourceHash}` ||
+    report.configuration.input_mode !== 'ocr_image' ||
+    !record(privateResult) ||
+    privateResult.schema_version !== 1 ||
+    privateResult.source_id !== `sha256:${scope.sourceHash}` ||
+    privateResult.input_mode !== 'ocr_image' ||
+    !['complete', 'incomplete', 'failed'].some((value) => value === privateResult.status) ||
+    !Array.isArray(privateResult.suggestions) ||
+    privateResult.suggestions.some((value) => !record(value) || value.status !== 'unvalidated') ||
+    !record(timings) ||
+    timings.schema_version !== 1 ||
+    timings.input_mode !== 'ocr_image' ||
+    timings.status !== report.status ||
+    !record(timings.timings_seconds)
+  )
+    throw new Error('Artifact scope or version mismatch');
+  const attemptId = crypto.randomUUID();
+  const key = `menu-ingestion/review-artifacts/${scope.tenantId}/${scope.jobId}/${attemptId}/bundle.json`;
+  const stored = JSON.stringify({
+    ...bundle,
+    scope: {
+      tenant_id: scope.tenantId,
+      job_id: scope.jobId,
+      source_hash: scope.sourceHash,
+      attempt_id: attemptId,
+    },
+  });
+  if (Buffer.byteLength(stored, 'utf8') > maxBundleBytes)
+    throw new Error('Artifact bundle too large');
+  const digest = createHash('sha256').update(stored).digest('hex');
+  report.configuration = {
+    ...report.configuration,
+    private_review_artifact: { schema_version: 1, key, sha256: digest },
+  };
+  const publicReport = JSON.stringify(report);
+  if (Buffer.byteLength(publicReport, 'utf8') > 24_000_000) throw new Error('Report too large');
+  const written = await env.SOURCE_BUCKET.put(key, stored, {
+    onlyIf: { etagDoesNotMatch: '*' },
+    httpMetadata: { contentType: 'application/json' },
+  });
+  if (!written) throw new Error('Private artifact retention failed');
+  return new Response(publicReport, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+}
+
 export default {
   async fetch(request: Request, env: ExtractionHostEnv): Promise<Response> {
     const secret = env.EXTRACTION_SERVICE_SECRET;
@@ -168,7 +280,9 @@ export default {
             return json('forbidden', 403);
           const forwarded = new Request(request);
           forwarded.headers.set('X-Source-Hash', scope.sourceHash);
-          return await env.EXTRACTOR.getByName('staging-extractor').fetch(forwarded);
+          forwarded.headers.set('X-Extraction-Artifact-Bundle', '1');
+          const response = await env.EXTRACTOR.getByName('staging-extractor').fetch(forwarded);
+          return await retainArtifacts(response, env, scope);
         }
         return await env.EXTRACTOR.getByName('staging-extractor').fetch(request);
       }

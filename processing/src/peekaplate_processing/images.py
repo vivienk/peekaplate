@@ -1,10 +1,12 @@
 import io
 import warnings
+import time
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.ocr import OCRProvider, validate_ocr_settings
+from peekaplate_processing.timing import measure
 
 
 MAX_IMAGE_PIXELS=24_000_000
@@ -59,11 +61,16 @@ def prepare_ocr_image(data:bytes)->tuple[bytes,dict]:
 def extract_image(data:bytes, source_id:str, ocr:OCRProvider):
     from peekaplate_processing.schemas import SourceSegment
 
-    prepared,metadata=prepare_ocr_image(data)
-    response=ocr.extract(prepared)
+    started=time.perf_counter()
+    timings={}
+    with measure(timings, "image_prepare"):
+        prepared,metadata=prepare_ocr_image(data)
+    with measure(timings, "ocr"):
+        response=ocr.extract(prepared)
     validate_ocr_settings(response)
+    timings["total"]=round(time.perf_counter()-started, 6)
     return SourceSegment(
         segment_id=f"{source_id}#image-1", method="ocr_space_engine3", text=response["text"],
-        metadata={**metadata, "ocr_settings":response["settings"], "cache_hit":response["cache_hit"], "ocr_image_sha256":response.get("image_sha256"), "ocr_regions":response.get("regions", []), "ocr_region_status":response.get("region_status", "unavailable"), "ocr_coordinate_space":"uploaded_image_pixels"},
+        metadata={**metadata, "ocr_settings":response["settings"], "cache_hit":response["cache_hit"], "ocr_image_sha256":response.get("image_sha256"), "ocr_regions":response.get("regions", []), "ocr_region_status":response.get("region_status", "unavailable"), "ocr_coordinate_space":"uploaded_image_pixels", "timings_seconds":timings},
         warnings=["This image is menu-text evidence, not a verified photograph of a dish."]+([response["cache_warning"]] if response.get("cache_warning") else []),
     )
