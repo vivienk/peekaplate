@@ -13,10 +13,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. RES-02 adds strict owner approval/publication/withdrawal contracts. Commands identify immutable menu revision and independent content/asset approvals; hashes come from the trusted canonical review subject. Client authority and client hashes are rejected. Public read/token and strict Bundle v1 schemas bind venue/menu/revision/publication, reject duplicate IDs and draft fields, and preserve allergen null/empty knowledge states.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounds, and S3 owner dish report metrics bounds.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
