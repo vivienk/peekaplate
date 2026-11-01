@@ -1,12 +1,18 @@
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
-import { DishRevisionSchema } from '@peekaplate/contracts';
-import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import {
+  DishRevisionSchema,
+  MenuApprovalSchema,
+  MenuPublicationSchema,
+  PublicMenuResponseSchema,
+} from '@peekaplate/contracts';
+import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createDishRevision, replayDish } from './dish-command';
 import type { Bindings } from './index';
+import { replayPublication, replayReview } from './publication-command';
 import { readTeamAnalytics } from './team-analytics';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -24,6 +30,9 @@ let env: Bindings;
 let signingKey: CryptoKey;
 let collaboratorEnabled = true;
 const githubCalls: string[] = [];
+let menuPublicJwk: JWK;
+let menuSigningJwk: string;
+let menuTokenIssuer: string;
 let worker: Awaited<ReturnType<typeof unstable_dev>>;
 
 function command(patch = {}) {
@@ -73,6 +82,82 @@ async function requestEvidence(
   });
 }
 
+async function requestPublication(
+  menuId: string,
+  action: 'approvals' | 'publications' | 'withdrawals',
+  body: unknown,
+  tenant = venue,
+  subject = actor,
+) {
+  return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menus/${menuId}/${action}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await token(subject)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function approvalCommand(expectedVersion = 0) {
+  return {
+    commandId: crypto.randomUUID(),
+    expectedVersion,
+    menuRevisionId: crypto.randomUUID(),
+    contentApprovalId: crypto.randomUUID(),
+    assetApprovalId: crypto.randomUUID(),
+  };
+}
+
+async function registerReviewSubject(
+  menuId: string,
+  input: ReturnType<typeof approvalCommand>,
+  tenant = venue,
+) {
+  await admin.query(
+    `INSERT INTO app_private.menu_review_subject
+      (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash,
+       asset_approval_id, asset_manifest_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      tenant,
+      menuId,
+      input.menuRevisionId,
+      input.contentApprovalId,
+      'a'.repeat(64),
+      input.assetApprovalId,
+      'b'.repeat(64),
+    ],
+  );
+}
+
+async function registerPublicBundle(menuId: string, menuRevisionId: string, tenant = venue) {
+  await admin.query(
+    `INSERT INTO app_private.public_menu_bundle
+      (tenant_id, menu_id, menu_revision_id, bundle_url)
+     VALUES ($1, $2, $3, $4)`,
+    [tenant, menuId, menuRevisionId, `https://assets.example.test/${menuRevisionId}.json`],
+  );
+}
+
+async function requestPublicMenu(menuId: string, tenant = venue) {
+  return fetch(`http://127.0.0.1:${worker.port}/public/venues/${tenant}/menus/${menuId}`);
+}
+
+async function publicationCounts(menuId: string) {
+  const result = await admin.query(
+    `SELECT
+    (SELECT count(*)::int FROM app_private.es_event WHERE stream_id=$1) AS events,
+    (SELECT count(*)::int FROM app_private.menu_approval WHERE menu_id=$1) AS approvals,
+    (SELECT count(*)::int FROM app_private.menu_review_current WHERE menu_id=$1) AS reviews,
+    (SELECT count(*)::int FROM app_private.menu_publication_current WHERE menu_id=$1) AS publications,
+    (SELECT count(*)::int FROM app_private.es_command WHERE payload->>'menuId'=$1::text) AS receipts,
+    (SELECT count(*)::int FROM app_private.outbox WHERE payload->>'menuId'=$1::text) AS outbox`,
+    [menuId],
+  );
+  return result.rows[0];
+}
+
 async function counts(dishId: string) {
   const result = await admin.query(
     `SELECT
@@ -100,6 +185,19 @@ beforeAll(async () => {
   const keys = await generateKeyPair('ES256');
   signingKey = keys.privateKey;
   const jwk = { ...(await exportJWK(keys.publicKey)), kid: 'integration', alg: 'ES256' };
+  const menuKeys = await generateKeyPair('ES256', { extractable: true });
+  menuPublicJwk = {
+    ...(await exportJWK(menuKeys.publicKey)),
+    kid: 'menu-integration',
+    alg: 'ES256',
+    use: 'sig',
+  };
+  menuSigningJwk = JSON.stringify({
+    ...(await exportJWK(menuKeys.privateKey)),
+    kid: 'menu-integration',
+    alg: 'ES256',
+    use: 'sig',
+  });
   server = createServer((req, res) => {
     githubCalls.push(req.url ?? '');
     if (req.url === '/user') {
@@ -120,6 +218,12 @@ beforeAll(async () => {
         .end();
       return;
     }
+    if (req.url === '/.well-known/jwks.json') {
+      res
+        .writeHead(200, { 'Content-Type': 'application/jwk-set+json' })
+        .end(JSON.stringify({ keys: [menuPublicJwk] }));
+      return;
+    }
     if (req.url !== '/auth/v1/.well-known/jwks.json') {
       res.writeHead(404).end();
       return;
@@ -129,10 +233,13 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('No local JWKS listener');
+  menuTokenIssuer = `http://127.0.0.1:${address.port}`;
   env = {
     APP_ENV: 'local',
     AUTH_ISSUER: `http://127.0.0.1:${address.port}/auth/v1`,
     LOCAL_DATABASE_URL: runtimeUrl,
+    MENU_TOKEN_ISSUER: menuTokenIssuer,
+    MENU_TOKEN_SIGNING_JWK: menuSigningJwk,
   };
   worker = await unstable_dev(fileURLToPath(new URL('./index.ts', import.meta.url)), {
     config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
@@ -146,6 +253,8 @@ beforeAll(async () => {
       AUTH_ISSUER: env.AUTH_ISSUER!,
       LOCAL_DATABASE_URL: runtimeUrl!,
       POSTHOG_PROJECT_ID: '675372',
+      MENU_TOKEN_ISSUER: menuTokenIssuer,
+      MENU_TOKEN_SIGNING_JWK: menuSigningJwk,
       TEAM_GITHUB_TOKEN: 'fixture-server',
       LOCAL_GITHUB_API_URL: `http://127.0.0.1:${address.port}/`,
     },
@@ -509,6 +618,265 @@ describe('real PostgreSQL staff command', () => {
       const nonmember = crypto.randomUUID();
       const res2 = await requestEvidence({ query: 'Tuscan White Bean Soup' }, venue, nonmember);
       expect(res2.status).toBe(403);
+    });
+  });
+});
+
+describe('real PostgreSQL menu publication commands', () => {
+  it('serves only an active approved bundle and binds its menu token to the publication', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    await registerPublicBundle(menuId, approvalInput.menuRevisionId);
+
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', approvalInput)).json(),
+    );
+    const publication = MenuPublicationSchema.parse(
+      await (
+        await requestPublication(menuId, 'publications', {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          approvalId: approval.approvalId,
+        })
+      ).json(),
+    );
+
+    const response = await requestPublicMenu(menuId);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = PublicMenuResponseSchema.parse(await response.json());
+    expect(body).toMatchObject({
+      schemaVersion: 1,
+      venueId: venue,
+      menuId,
+      menuRevisionId: approvalInput.menuRevisionId,
+      publicationId: publication.publicationId,
+      publicationHash: publication.publicationHash,
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: `https://assets.example.test/${approvalInput.menuRevisionId}.json`,
+        contentHash: 'a'.repeat(64),
+        assetManifestHash: 'b'.repeat(64),
+      },
+    });
+    const verified = await jwtVerify(
+      body.menuToken,
+      createRemoteJWKSet(new URL('.well-known/jwks.json', `${menuTokenIssuer}/`)),
+      {
+        issuer: `${menuTokenIssuer}/`,
+        audience: 'peekaplate-observations',
+        algorithms: ['ES256'],
+      },
+    );
+    expect(verified.payload).toMatchObject({
+      venue,
+      publication: publication.publicationId,
+      scope: 'observations',
+    });
+    expect(Number(verified.payload.exp) - Number(verified.payload.iat)).toBe(1800);
+
+    const withdrawal = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawal.status).toBe(200);
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+  });
+
+  it('keeps approval, publication and withdrawal as separate atomic commands', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const approvalResponse = await requestPublication(menuId, 'approvals', approvalInput);
+    expect(approvalResponse.status).toBe(200);
+    const approval = MenuApprovalSchema.parse(await approvalResponse.json());
+
+    const publishCommand = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const publishedResponse = await requestPublication(menuId, 'publications', publishCommand);
+    expect(publishedResponse.status).toBe(200);
+    const published = MenuPublicationSchema.parse(await publishedResponse.json());
+    expect(published).toMatchObject({
+      menuId,
+      approvalId: approval.approvalId,
+      version: 1,
+      availabilityVersion: 1,
+      status: 'published',
+    });
+
+    const withdrawnResponse = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawnResponse.status).toBe(200);
+    expect(await withdrawnResponse.json()).toMatchObject({
+      publicationId: published.publicationId,
+      publicationHash: published.publicationHash,
+      version: 2,
+      availabilityVersion: 2,
+      status: 'withdrawn',
+    });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 3,
+      approvals: 1,
+      reviews: 1,
+      publications: 1,
+      receipts: 3,
+      outbox: 3,
+    });
+  });
+
+  it('denies non-owner approval before any publication write', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const response = await requestPublication(
+      menuId,
+      'approvals',
+      approvalInput,
+      venue,
+      otherActor,
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 0,
+      approvals: 0,
+      reviews: 0,
+      publications: 0,
+      receipts: 0,
+      outbox: 0,
+    });
+  });
+
+  it('returns the original publication receipt for an identical retry', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', approvalInput)).json(),
+    );
+    const publishCommand = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const first = await requestPublication(menuId, 'publications', publishCommand);
+    const retry = await requestPublication(menuId, 'publications', publishCommand);
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(await first.json());
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 2,
+      approvals: 1,
+      reviews: 1,
+      publications: 1,
+      receipts: 2,
+      outbox: 2,
+    });
+  });
+
+  it('allows only one of two concurrent first publications to commit', async () => {
+    const menuId = crypto.randomUUID();
+    const firstInput = approvalCommand();
+    const secondInput = approvalCommand(1);
+    await registerReviewSubject(menuId, firstInput);
+    await registerReviewSubject(menuId, secondInput);
+    const firstApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', firstInput)).json(),
+    );
+    const secondApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', secondInput)).json(),
+    );
+    const responses = await Promise.all([
+      requestPublication(menuId, 'publications', {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: firstApproval.approvalId,
+      }),
+      requestPublication(menuId, 'publications', {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: secondApproval.approvalId,
+      }),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 3,
+      approvals: 2,
+      reviews: 1,
+      publications: 1,
+      receipts: 3,
+      outbox: 3,
+    });
+
+    const events = await admin.query(
+      `SELECT tenant_id AS "tenantId", stream_type AS "streamType",
+        stream_id AS "streamId", version, schema_version AS "schemaVersion",
+        event_type AS "eventType", payload, metadata
+       FROM app_private.es_event
+       WHERE tenant_id=$1 AND stream_type='menu_publication' AND stream_id=$2
+       ORDER BY version`,
+      [venue, menuId],
+    );
+    const current = await admin.query(
+      `SELECT tenant_id AS "tenantId", menu_id AS "menuId",
+        publication_id AS "publicationId", version, approval_id AS "approvalId",
+        publication_hash AS "publicationHash",
+        availability_version AS "availabilityVersion", status
+       FROM app_private.menu_publication_current
+       WHERE tenant_id=$1 AND menu_id=$2`,
+      [venue, menuId],
+    );
+    expect(replayPublication(events.rows)).toEqual(current.rows[0]);
+
+    const reviewEvents = await admin.query(
+      `SELECT tenant_id AS "tenantId", stream_type AS "streamType",
+        stream_id AS "streamId", version, schema_version AS "schemaVersion",
+        event_type AS "eventType", payload, metadata
+       FROM app_private.es_event
+       WHERE tenant_id=$1 AND stream_type='menu_review' AND stream_id=$2
+       ORDER BY version`,
+      [venue, menuId],
+    );
+    const reviewCurrent = await admin.query(
+      `SELECT current.tenant_id AS "tenantId", current.menu_id AS "menuId",
+        approval.approval_id AS "approvalId", current.version,
+        approval.menu_revision_id AS "menuRevisionId",
+        approval.content_approval_id AS "contentApprovalId",
+        approval.content_hash AS "contentHash",
+        approval.asset_approval_id AS "assetApprovalId",
+        approval.asset_manifest_hash AS "assetManifestHash",
+        'approved' AS status
+       FROM app_private.menu_review_current current
+       JOIN app_private.menu_approval approval
+         ON approval.tenant_id=current.tenant_id
+        AND approval.menu_id=current.menu_id
+        AND approval.approval_id=current.approval_id
+       WHERE current.tenant_id=$1 AND current.menu_id=$2`,
+      [venue, menuId],
+    );
+    expect(replayReview(reviewEvents.rows)).toEqual(reviewCurrent.rows[0]);
+  });
+
+  it('rejects an owner-supplied revision that has no canonical review subject', async () => {
+    const menuId = crypto.randomUUID();
+    const response = await requestPublication(menuId, 'approvals', approvalCommand());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'review_subject_not_found' });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 0,
+      approvals: 0,
+      reviews: 0,
+      publications: 0,
+      receipts: 0,
+      outbox: 0,
     });
   });
 });
