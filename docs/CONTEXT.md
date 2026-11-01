@@ -82,7 +82,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f2a8b5c3d06bc22cb70cb0cbe5379e90a750c222a04c7a419277ca86d930979a"
+      "sourceFingerprint": "993908b8b9ecaf3740fefb9bbdd7e43408370da4372d9a2d4c1659e2bbc399fd"
     },
     {
       "id": "console",
@@ -377,11 +377,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-TRK-01.3 delivery: frontend/diner/src/tracking/delivery.ts. deliver(events, {endpoint, fetch, now}) POSTs {contract: observation.v2, events} with Bearer token in the header only, groups events by the token each was issued under, drops expired-token events unsent, splits over 25 events/32 KiB and halves on 413. Per-event receipts: accepted or rejected leave the outbox, retry stays; offline/503/429/unreadable keep all, 400/401/403 end them. Returns done/retry ids, Retry-After and aggregate counts only. retryDelayMs: 1 s doubling with jitter, 60 s cap. 16 Vitest cases.",
+      "summary": "S3-TRK-01.3 delivery: frontend/diner/src/tracking/delivery.ts. deliver(envelopes, {endpoint, fetch, now, token}) POSTs {contract: observation.v2, events} with the current menu token in the Authorization header only; the token is never stored. Events from another publication or under an expired token are dropped unsent and counted (never relabelled); with no token everything waits. Splits over 25 events/32 KiB and halves on 413. Receipts: accepted or rejected leave the outbox, retry stays; offline/503/429/unreadable keep all, 400/401/403 end them. createDeliver matches the TRK-01.2 batcher. retryDelayMs: 1 s doubling, 60 s cap. 19 Vitest cases.",
       "modules": [
         "diner"
       ],
-      "next": "Agree with Nifemi that the TRK-01.2 outbox stores each event with its issuing token and calls deliver/retryDelayMs. Add integration tests against PR #40 fixtures.json once it merges; endpoint URL per environment (PR #40), token from PR #43 and the DIN-03.1 re-read remain open; same-publication token refresh is open decision 1."
+      "next": "Wire createDeliver into Nifemi's TRK-01.2 batcher (#80) and hold the menu token in memory from the menu response (PR #43, DIN-03.1 re-read). Add integration tests against PR #40 fixtures.json once merged; endpoint URL per environment and same-publication token refresh (open decision 1) remain open."
     },
     {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",

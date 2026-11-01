@@ -10,15 +10,19 @@ export const MAX_BATCH_BYTES = 32 * 1024;
 export const RETRY_BASE_MS = 1_000;
 export const RETRY_CAP_MS = 60_000;
 
-export type MenuToken = Readonly<{ value: string; expiresAt: number }>;
+// The token from the current menu response (RES-02): held in memory for the visit only, never
+// stored in the outbox, so it never outlives the visit.
+export type MenuToken = Readonly<{
+  value: string;
+  expiresAt: number;
+  publicationRevisionId: string;
+}>;
 
 // The envelope from TRK-01.1, frozen at track() time, so a retry resends the same event_id and
-// payload. Only event_id is read here.
-export type QueuedEnvelope = Readonly<{ event_id: string } & Record<string, unknown>>;
-
-// Each queued event keeps the token it was issued under, so it is never sent with another one and
-// is dropped once that token expires (no relabelling after a publication or token change).
-export type QueuedEvent = Readonly<{ envelope: QueuedEnvelope; token: MenuToken }>;
+// payload. Only event_id and publication_revision_id are read here.
+export type QueuedEnvelope = Readonly<
+  { event_id: string; publication_revision_id: string } & Record<string, unknown>
+>;
 
 // Aggregate terminal counts for the local development log; never event contents or tokens.
 export type TerminalCounts = {
@@ -44,6 +48,8 @@ export type DeliveryOptions = {
   endpoint: string;
   fetch: typeof globalThis.fetch;
   now: () => number;
+  // The current menu token, or null before a menu with a token has loaded.
+  token: () => MenuToken | null;
 };
 
 type Receipt = { event_id: string | null; status: string; retryable: boolean };
@@ -59,8 +65,8 @@ function emptyCounts(): TerminalCounts {
   };
 }
 
-function requestBody(batch: QueuedEvent[]): string {
-  return JSON.stringify({ contract: 'observation.v2', events: batch.map((e) => e.envelope) });
+function requestBody(batch: QueuedEnvelope[]): string {
+  return JSON.stringify({ contract: 'observation.v2', events: batch });
 }
 
 function bodyBytes(body: string): number {
@@ -69,7 +75,7 @@ function bodyBytes(body: string): number {
 
 // Receipts come back in request order, one per event (observation-receipt.v1). Anything else is
 // an uncertain answer, so the whole batch is retried rather than guessed at.
-function readReceipts(body: unknown, batch: QueuedEvent[]): Receipt[] | null {
+function readReceipts(body: unknown, batch: QueuedEnvelope[]): Receipt[] | null {
   if (typeof body !== 'object' || body === null) return null;
   const { contract, receipts } = body as Record<string, unknown>;
   if (contract !== 'observation-receipt.v1' || !Array.isArray(receipts)) return null;
@@ -77,7 +83,7 @@ function readReceipts(body: unknown, batch: QueuedEvent[]): Receipt[] | null {
   const valid = receipts.every((r, i) => {
     if (typeof r !== 'object' || r === null) return false;
     const { event_id: id, status } = r as Record<string, unknown>;
-    const idMatches = id === batch[i]?.envelope.event_id || (id === null && status === 'rejected');
+    const idMatches = id === batch[i]?.event_id || (id === null && status === 'rejected');
     return idMatches && (status === 'accepted' || status === 'retry' || status === 'rejected');
   });
   return valid ? (receipts as Receipt[]) : null;
@@ -88,19 +94,19 @@ function retryAfterMs(response: Response): number | null {
   return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
 }
 
-function splitInHalf(batch: QueuedEvent[]): [QueuedEvent[], QueuedEvent[]] {
+function splitInHalf(batch: QueuedEnvelope[]): [QueuedEnvelope[], QueuedEnvelope[]] {
   const middle = Math.ceil(batch.length / 2);
   return [batch.slice(0, middle), batch.slice(middle)];
 }
 
-// Sends one batch that shares a token. Too-large batches are halved down to single events (413).
+// Sends one batch. Too-large batches are halved down to single events (413).
 async function sendBatch(
-  batch: QueuedEvent[],
+  batch: QueuedEnvelope[],
   token: MenuToken,
   options: DeliveryOptions,
   result: DeliveryResult,
 ): Promise<void> {
-  const ids = batch.map((e) => e.envelope.event_id);
+  const ids = batch.map((e) => e.event_id);
   const body = requestBody(batch);
 
   if (batch.length > MAX_BATCH_EVENTS || bodyBytes(body) > MAX_BATCH_BYTES) {
@@ -168,47 +174,65 @@ async function sendBatch(
 }
 
 async function splitOrDropOversized(
-  batch: QueuedEvent[],
+  batch: QueuedEnvelope[],
   token: MenuToken,
   options: DeliveryOptions,
   result: DeliveryResult,
 ): Promise<void> {
   if (batch.length === 1) {
     // A single event that is still too large leaves the queue (payload_too_large).
-    result.done.push(batch[0]?.envelope.event_id as string);
+    result.done.push(batch[0]?.event_id as string);
     result.counts.payloadTooLarge++;
     return;
   }
   for (const half of splitInHalf(batch)) await sendBatch(half, token, options, result);
 }
 
-// Sends the given queued events. Events whose token has expired are dropped without a request;
-// the rest are grouped by token so each request carries only the token its events were issued
-// under.
+// Sends the given queued events with the current menu token. An event is sent only under a valid
+// token for its own publication, so it is never relabelled: after a publication change or once the
+// token has expired, it is dropped without a request and counted. With no token yet, nothing is
+// sent and everything waits.
 export async function deliver(
-  events: readonly QueuedEvent[],
+  events: readonly QueuedEnvelope[],
   options: DeliveryOptions,
 ): Promise<DeliveryResult> {
   const result: DeliveryResult = { done: [], retry: [], retryAfterMs: null, counts: emptyCounts() };
-  const byToken = new Map<string, { token: MenuToken; events: QueuedEvent[] }>();
-
-  for (const event of events) {
-    if (options.now() >= event.token.expiresAt) {
-      result.done.push(event.envelope.event_id);
-      result.counts.expired++;
-      continue;
-    }
-    const group = byToken.get(event.token.value) ?? { token: event.token, events: [] };
-    group.events.push(event);
-    byToken.set(event.token.value, group);
+  const token = options.token();
+  if (!token) {
+    result.retry.push(...events.map((e) => e.event_id));
+    return result;
   }
 
-  for (const { token, events: batch } of byToken.values()) {
-    for (let start = 0; start < batch.length; start += MAX_BATCH_EVENTS) {
-      await sendBatch(batch.slice(start, start + MAX_BATCH_EVENTS), token, options, result);
+  const tokenValid = options.now() < token.expiresAt;
+  const sendable: QueuedEnvelope[] = [];
+  for (const event of events) {
+    if (tokenValid && event.publication_revision_id === token.publicationRevisionId) {
+      sendable.push(event);
+    } else {
+      result.done.push(event.event_id);
+      result.counts.expired++;
     }
+  }
+
+  for (let start = 0; start < sendable.length; start += MAX_BATCH_EVENTS) {
+    await sendBatch(sendable.slice(start, start + MAX_BATCH_EVENTS), token, options, result);
   }
   return result;
+}
+
+// The sender the TRK-01.2 batcher calls: it resolves to the event_ids that leave the outbox.
+// `onResult` gets the full result, for Retry-After backoff and the dev log of terminal counts.
+export function createDeliver(
+  options: DeliveryOptions,
+  onResult?: (result: DeliveryResult) => void,
+): (batch: readonly QueuedEnvelope[]) => Promise<string[]> {
+  return async (batch) => {
+    const result = await deliver(batch, options);
+    try {
+      onResult?.(result);
+    } catch {}
+    return result.done;
+  };
 }
 
 // Wait before the next attempt: doubling from 1 second, capped at 60 seconds, never shorter than
