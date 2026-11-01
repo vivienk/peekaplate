@@ -186,6 +186,7 @@ def build_v4_result(
                     "height": height,
                     "mime_type": ref.get("mime_type", "image/jpeg"),
                     "v4_vision": True,
+                    "vision_boxes": {},
                 },
             )
         )
@@ -249,6 +250,12 @@ def build_v4_result(
             if start < 0:
                 start = 0
             end = max(start + 1, start + len(source_text))
+
+            # Populate vision_boxes with the title and price pixel boxes for the UI
+            box_records = [{"page_number": p_num, "box": name_box, "text": clean_name, "type": "title"}]
+            if price_box and clean_price_text:
+                box_records.append({"page_number": p_num, "box": price_box, "text": clean_price_text, "type": "price"})
+            seg.metadata["vision_boxes"][draft_id] = box_records
 
             evidence.append(
                 DraftEvidence(
