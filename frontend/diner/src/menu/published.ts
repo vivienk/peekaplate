@@ -2,7 +2,6 @@
 // Not yet exported from packages/contracts. Keep all key-name mapping in this file.
 // Hash verification is a single, clearly marked step and is skipped in fixture mode.
 
-
 import { z } from 'zod';
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -321,10 +320,8 @@ export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSche
 export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
 export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
 
-
-import { toMenu } from './adapter';
+import { toMenu, type WireDish, type WireImage, type WireMenuBundle } from './adapter';
 import type { Menu, MenuLoadResult, MenuSource } from './types';
-import type { WireDish, WireMenuBundle } from './wire';
 
 // The single public-contract-to-screen mapping. It copies only approved public fields and never
 // fills in absent facts; `allergens: null` stays an omitted UI declaration, not an "allergen-free" claim.
@@ -389,9 +386,13 @@ export function deliveryToMenu(delivery: PublicMenuDelivery): MenuLoadResult {
 
 // Hash check is a single, clearly marked step. Fixture mode skips it. Live mode fails closed
 // until the hash rule (UTF-8 bytes vs canonical serialization) is agreed with the producer.
-export function verifyContentHash(_delivery: PublicMenuDelivery): boolean {
+export function verifyContentHash(
+  _delivery: PublicMenuDelivery,
+  mode: 'fixture' | 'live' = 'live',
+): boolean {
+  if (mode === 'fixture') return true;
   // INTERIM: hash rule is not agreed yet. Do not claim hash integrity is verified.
-  return true;
+  return false;
 }
 
 export function createPublishedMenuSource(): MenuSource {

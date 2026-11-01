@@ -3,6 +3,7 @@ import {
   deliveryToMenu,
   parsePublishedDelivery,
   publicBundleToWire,
+  verifyContentHash,
 } from './published';
 
 const validDelivery = {
@@ -46,12 +47,23 @@ const validDelivery = {
             name: 'Toast',
             description: 'Toast',
             price: { amount: '1.00', currency: 'USD' },
-            ingredients: [{ ingredient_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Bread', description: null }],
+            ingredients: [
+              {
+                ingredient_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                name: 'Bread',
+                description: null,
+              },
+            ],
             allergens: null,
             dietary: ['vegan'],
             images: {
               card: { url: 'https://example.test/card.jpg', width: 1, height: 1, alt: 'card' },
-              detail: { url: 'https://example.test/detail.jpg', width: 1, height: 1, alt: 'detail' },
+              detail: {
+                url: 'https://example.test/detail.jpg',
+                width: 1,
+                height: 1,
+                alt: 'detail',
+              },
             },
           },
         ],
@@ -95,7 +107,8 @@ describe('published adapter', () => {
 
   it('rejects a duplicate dish ID', () => {
     const invalid = structuredClone(validDelivery) as any;
-    invalid.content.categories[0].dishes[1].dish_id = invalid.content.categories[0].dishes[0].dish_id;
+    invalid.content.categories[0].dishes[1].dish_id =
+      invalid.content.categories[0].dishes[0].dish_id;
     expect(() => parsePublishedDelivery(invalid)).toThrow();
   });
 
@@ -121,5 +134,20 @@ describe('published adapter', () => {
     const delivery = parsePublishedDelivery(validDelivery);
     const wire = publicBundleToWire(delivery.content);
     expect(wire.venue_id).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('skips the content hash check in fixture mode', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    expect(verifyContentHash(delivery, 'fixture')).toBe(true);
+  });
+
+  it('fails the content hash check closed in live mode', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    expect(verifyContentHash(delivery, 'live')).toBe(false);
+  });
+
+  it('fails the content hash check closed when no mode is given', () => {
+    const delivery = parsePublishedDelivery(validDelivery);
+    expect(verifyContentHash(delivery)).toBe(false);
   });
 });

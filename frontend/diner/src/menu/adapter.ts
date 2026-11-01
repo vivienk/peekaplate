@@ -9,6 +9,8 @@ import {
 } from './types';
 import type { WireDish, WireImage, WireMenuBundle } from './wire';
 
+export type { WireDish, WireImage, WireMenuBundle } from './wire';
+
 export const FIXTURE_NOTICE = 'Fixture data';
 
 // Chip labels compare without case, hyphens or spaces, so "gluten free" equals "Gluten-free".
