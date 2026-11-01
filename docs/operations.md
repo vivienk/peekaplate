@@ -1,5 +1,32 @@
 # Local and staging operations
 
+## RES-02 publication staging preparation — November 1, 2026 (Phoenix)
+
+PRs [#42](https://github.com/vivienk/peekaplate/pull/42) and
+[#43](https://github.com/vivienk/peekaplate/pull/43) are merged into develop.
+Their reconciliation retained the newer diner fixtures/search, source paths and
+both operational error histories. Local checks on the reconciled public-menu
+head passed 308 Vitest tests, 57 script tests, 169 SQL assertions, 26 real
+PostgreSQL/workerd integration tests and 13 browser regressions. The PR CI was
+green before merge; these are not hosted publication results.
+
+With maintainer approval, the existing Supabase staging project
+`icwhkrlsecpzcomfjsso` received migrations `20261025120000` and
+`20261025130000` in one transaction. History readback confirms both versions.
+The five new publication tables have RLS enabled and forced; `anon` and
+`authenticated` have no direct SELECT privilege. The existing restricted runtime
+can read subjects/bundles but cannot insert them, while approval and current
+projection privileges match the reviewed migrations. No existing application
+record, role membership, production database or Queue consumer changed.
+
+The release candidate adds only the existing staging Worker origin as
+`MENU_TOKEN_ISSUER`; the ES256 private JWK belongs in its protected
+`MENU_TOKEN_SIGNING_JWK` secret. Source/bundle admission remains privileged.
+Main promotion, actual Worker deployment, signing-key activation and controlled
+hosted approval/read/withdrawal acceptance are still pending at this checkpoint.
+Do not interpret the vendor's project-branch label "PRODUCTION" as a production
+PeekaPlate release: ADR 0012 identifies this existing project as staging.
+
 ## OCR credential activation — October 28, 2026 (Phoenix)
 
 `OCR_SPACE_API_KEY` is configured in GitHub's existing protected `staging`

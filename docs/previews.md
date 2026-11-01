@@ -85,7 +85,7 @@ Historical observations below describe the earlier local setup attempt; see the 
 
 ## October 26 follow-up
 
-PR #41 merged into `develop` as `aa7c717`; its merged CI passed. Repository readback now shows `PREVIEW_DEPLOYMENT_ENABLED=true`, but `main` still lacks the workflow and helper, and no `pull_request_target` preview run was recorded. Existing manually uploaded previews do not establish automatic GitHub deployment or close cleanup.
+The initial October 26 check found PR #41 merged into `develop` as `aa7c717` with green CI and `PREVIEW_DEPLOYMENT_ENABLED=true`, while `main` still lacked the workflow/helper. The activation and lifecycle evidence below supersedes that missing-workflow state.
 
 The follow-up supplies the preview slice to `main`, adds exact-SHA readiness, and makes the symlink regression portable: Windows uses a directory junction, while other platforms use a directory symlink. Both exercise the same real `lstat` rejection; no security assertion is skipped.
 
@@ -93,4 +93,14 @@ Read-only provider inspection confirmed the two existing preview projects pass i
 
 GitHub changed this event's source/reference to the default branch in December 2025. See the [official event and environment-protection change](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/). Keep the preview environment restricted to trusted branches; do not work around activation by giving a PR-head workflow secrets.
 
-After the reviewed main merge, trigger an eligible PR and record its run, exact SHA, both rendered pages, single bot comment and actual close cleanup. Until then, GitHub-held token validity and the automatic lifecycle remain unverified.
+## Hosted lifecycle acceptance — October 26
+
+[PR #47](https://github.com/vivienk/peekaplate/pull/47) merged the reviewed delivery slice into `main` as `ab6f9c4`; [main CI passed](https://github.com/vivienk/peekaplate/actions/runs/40393030720). The following checks used synthetic PR #48 at `1339089062625ebde44b52b00be2a14ae6ae48ab`:
+
+- [Automatic preview run](https://github.com/vivienk/peekaplate/actions/runs/40393096652): build and deploy passed using GitHub-held credentials. Build took 19 seconds and deploy 41 seconds; the full run including queue time took 84 seconds.
+- Both provider records were `preview` deployments under `pr-48`, with the exact head SHA. Both aliases returned that same trusted marker and HTTP 200 with `connect-src 'none'`.
+- Both rendered screens were visible at 390×844, without uncaught JavaScript errors or horizontal overflow. These are browser checks, not real-phone performance measurements.
+- One [bot comment](https://github.com/vivienk/peekaplate/pull/48#issuecomment-6426202331) contained both links and the correct commit.
+- Closing the test PR triggered [automatic cleanup](https://github.com/vivienk/peekaplate/actions/runs/40393553935). The cleanup job passed in 16 seconds; provider readback found no `pr-48` deployments in either project. The same bot comment changed to removed. Edge retirement briefly returned transient errors; by `2026-10-26T20:13:56Z`, both page and marker URLs returned 404.
+
+The test PR is reopened for the final reviewed documentation/merge step; its eventual merge repeats cleanup. No Worker, Supabase, Queue/R2, PostHog or production deployment was changed. Repeat lifecycle acceptance when changing the workflow or provider configuration.

@@ -153,6 +153,7 @@ These records describe local validation limits, not application failures.
 
 ```json
 {"id":"ERR-20261019-POSTHOG-003","status":"resolved","area":"sandbox-local-servers","references":{"check":"test","timestamp":"2026-10-20T04:46:52.443Z"},"cause":"The restricted execution context rejected loopback server binding with EPERM, preventing existing auth/local-harness test setup.","prevention":"Run local-server checks in an approved context that permits loopback listeners; do not weaken auth tests.","regression":"The permitted pnpm check rerun passed 50 application and 21 script tests; pnpm verify build and pnpm verify test:e2e passed, including four foundation and four intercepted analytics browser cases."}
+```
 
 ```json
 {"id":"ERR-20261018-CLOUD-001","status":"resolved","area":"operator-authentication","cause":"Wrangler keyring login required its Windows helper; a non-interactive attempt could not install it. A later localhost OAuth retry expired and then rejected a mismatched callback state.","prevention":"Use Wrangler's interactive keyring setup and an isolated device-login flow when localhost callbacks are stale. Never disable OAuth state validation or print credentials.","regression":"wrangler login --device --scopes account:read user:read workers:write --use-keyring --browser=false succeeded. wrangler whoami confirmed encrypted credential storage and the approved scopes; an account-scoped wrangler hyperdrive list returned the expected staging connection.","limit":"Authentication and resource listing do not prove deployment or hosted database behavior."}
@@ -336,6 +337,24 @@ These records describe local validation limits, not application failures.
 {"id":"OBS-20261022-ADR15-PUSH-001","status":"resolved","area":"review-coordination","observation":"A normal PR-branch push was rejected because the author concurrently merged the same develop update.","cause":"The remote review head advanced after the local review was pinned.","regression":"Fetched and compared the new head, then merged it without force-pushing; the only retained local difference was the final technical-review context handoff. Context freshness, documentation links and diff checks passed after reconciliation.","prevention":"Re-pin and re-review a changed remote head; preserve concurrent commits and use an expected head when merging the PR."}
 ```
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-22T00:13:01.752Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-22T00:13:01.752Z"},"status":"resolved","cause":"The new shared-token CSS imports used single quotes; the repository Biome formatter requires double quotes in CSS.","prevention":"Run pnpm format or biome check --write on new CSS before verification.","regression":"Formatted both app imports and updated the token test's import assertion; pnpm check passed afterward."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-22T00:13:19.319Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-22T00:13:19.319Z"},"status":"resolved","cause":"The token test was edited after the context fingerprints were refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
 ## October 22 staging activation verification
 
 ```json
@@ -379,6 +398,245 @@ These records describe local validation limits, not application failures.
 ```json
 {"id":"OBS-20261024-INFRA-TOOLING-001","status":"resolved","area":"operator-tooling","observation":"Initial account-wide R2 inventory could not choose between two authorized accounts; a CORS read returned the documented no-configuration 404. A local probe syntax check, one atomic documentation patch and an intermediate scan-draft schema submission also rejected invalid local input before completion.","cause":"Account selection must be explicit for these commands; no CORS configuration is represented by provider error 10059. Local tooling input did not match its file/API schema.","prevention":"Pin the intended non-secret account, distinguish the exact no-CORS response from other errors, syntax-check probes before execution, inspect patch context and use documented scan fields. Never print credential-bearing subprocess output.","regression":"Corrected account-specific inventory, private-bucket readback, real R2/Queue probes and scan checkpoint succeeded. No token, raw analytics payload or private conversation was retained."}
 ```
+
+## OBS-20261022-VIS02-DRAFT-PREPARATION
+
+- Observation: the imported processing source has whitespace-only blank lines that
+  fail the default `git diff --check`; the user source style is retained for this
+  draft. This is a known review-preparation limitation, not a runtime test result.
+- Observation: the first offline package build could not create a temporary lock
+  in the read-only user uv cache. Repeating with a task-local writable cache
+  built both wheel and source distribution successfully.
+- Evidence: `uv --cache-dir /tmp/peeka-uv-cache build --offline --project
+  /tmp/peeka-vis02-review/processing --out-dir /tmp/peeka-vis02-dist` passed.
+  The isolated current processing suite passed all 82 tests with mocked providers.
+- Scope: no provider calls, application behavior change or performance refinement.
+
+## OBS-20261023-VIS02-REVIEW-CORRECTIONS
+
+- Cause: document iteration loaded each page before the per-page try block.
+  A failing synthetic middle-page load aborted extraction before the later page.
+- Correction: iterate bounded page indices and load inside the existing guard;
+  the regression now preserves ready/failed/ready segments and exact identities.
+- Test portability: cache hit/retry checks remain unconditional; mode 0600 is
+  asserted only on POSIX, without claiming verified Windows ACL privacy.
+- Test scheduling: SDK cancellation waits for mocked HTTP start; existing
+  wall-clock deadline tests cover timeout rejection and sibling-batch retention.
+- Cleanup: removed only the 18 imported whitespace-only lines flagged in review.
+  Reconciled current develop documentation and refreshed affected fingerprints.
+- No live provider calls or latency refinements were made for these corrections.
+
+- Packaging check: an existing ignored source-directory .env was included by the build backend. Added explicit source exclusions (also applied to wheels), retained the local env, and rebuilt the distributions for archive inspection. No artifacts were uploaded.
+
+## OBS-20261023-VIS02-LIVE-PDF
+
+Fresh OCR acquired all35pages in268.779s without old cache reuse. Allfour default LLM batches hit90s deadlines; a one-page/concurrency2 follow-up reused the fresh OCR and retained161 needs_review drafts in549.035s. Four pages timed out and six unsupported names were rejected; result remains incomplete. Source spans verified, field accuracy and acceptance pending. Defaults were not changed. See docs/ocr-delivery.md and test-data/README.md.
+
+## OBS-20261023-VIS02-CI-FORMAT
+
+Hosted run39931137291 failed biome formatting in scripts/processing-handoff.test.mjs; browser/database and docs/context/PR checks passed. Applied only the requested call/destructuring wraps. The same run showed account cache egress quota exhaustion and a roughly10minute setup delay; removed optional pnpm cache restore while preserving frozen installs and all checks. Node24.16.0/pnpm11.25.0 are available in temporary local tooling for native verification.
+
+Native verification: biome/typecheck/context/docs passed using pinned Node24.16.0/pnpm11.25.0. All56 Vitest cases and23 repository-script tests passed with bounded workers. One initial script-test invocation lacked the pnpm executable on PATH; rerunning in the installed pnpm environment passed without a source change.
+
+## OBS-20261024-VIS02-OCR-PROVENANCE
+
+An injected provider returning Engine 2 settings was accepted as complete while
+segment/report labels claimed Engine 3, for both image and PDF input. The new
+regressions reproduced this before the fix. Both callers now validate the
+current Engine-3-compatible response contract before accepting text; incompatible
+or missing settings fail the segment while native sibling pages survive.
+The 89-test Python suite passes with mocked providers; no live calls were made.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-24T06:28:20.278Z","exitCode":1}
+```
+
+Local verification initially lacked the cached pnpm launcher on PATH; native
+commands were rerun with that directory included. A main-checkout package-manager
+autostart was avoided by running its dependency-free context/link scripts directly.
+The first archive inspection also attempted to read uv's non-archive metadata;
+restricting inspection to wheel/sdist files passed. These were local command
+setup issues; no dependency, runtime or environment configuration was changed.
+
+The current develop branch advanced to 5da1642 before publication. GitHub blocked
+pull-request CI on shared context/error-ledger conflicts. Reconciled those files
+by preserving develop nodes/records and retaining this processing node/handoff;
+processing sources were unchanged. Repeated 89 Python tests and native quality,
+context and documentation checks passed on the reconciled tree.
+
+## OBS-20261024-VIS02-SHARED-DOC-MERGE
+
+Current develop 245b780 conflicted with the VIS-02 branch in shared context and
+error records. Retained develop module descriptions and recent infrastructure/
+team-access handoffs, the processing node and both appended error histories.
+Only the older design-link-only handoff was retired within the ten-entry cap.
+Processing files are unchanged from reviewed 0e3f204. The 89 Python tests, four
+context/Unicode script tests, context freshness and local documentation links
+passed. PR #23 remains separate; reconcile its merged result and rerun CI before
+the final integrated approval in the agreed #23 -> #24 -> #25 order.
+
+## OBS-20261024-DB-TCP-READINESS
+
+Develop run [40146434333](https://github.com/vivienk/peekaplate/actions/runs/40146434333)
+passed 73 SQL assertions and 20 Worker/Postgres cases, then failed the separate
+local-development smoke test while installing its fresh database schema:
+`connect: connection refused`. The aggregate `ci` failure followed that database
+failure; quality and browser checks passed.
+
+The hostless readiness command could accept PostgreSQL's temporary Unix-socket
+bootstrap server before the TCP listener used by dbmate existed. The installed
+official image entrypoint starts that temporary server with `listen_addresses=''`.
+The shared probe now explicitly checks `127.0.0.1:5432`; its existing bounded wait
+and immediate migration-error handling remain intact.
+
+Regression: `node --test scripts/test-db.test.mjs` reproduced the same migration
+connection refusal when socket readiness preceded TCP, then passed all six tests
+after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 real
+integration cases and the fresh local startup/demo/cleanup path. This changes
+disposable local/CI startup only, without a hosted database or application change.
+
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
+
+Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:05.288Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-25T18:21:14.241Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-25T18:21:38.931Z","exitCode":1}
+```
+
+### Preview verification follow-up
+
+The sandbox blocked the authentication test HTTP listener; rerunning with local network permission passed all 189 Vitest cases. Renaming the workflow left a stale team-guide link, which failed docs:check and its verification-runner regression. Updated that link; rerun required before publishing. Wrangler dry-run built successfully but could not write its external log under sandbox permissions.
+
+### Preview verification resolution
+
+PASS after correction: `pnpm check` (189 unit cases and 47 script cases), actionlint, both exact PR #37 frontend builds and static sanitizer. An offline PR #37 install lacked cached package-policy metadata; the subsequent normal install verified the unchanged frozen lockfile and both builds passed. The stale-link regression and sandbox listener failures are resolved for this validation run; Cloudflare connectivity remains unverified.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T01:20:35.736Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261025-RES02-DB-001","status":"open","area":"local-database-verification","observation":"The RES-02 disposable database lane did not start. Docker build first lacked access to its Buildx lock; after granting that narrow local permission, Docker Desktop exited without starting the Linux engine and the named pipe remained absent.","prevention":"Confirm docker version reaches the server before starting the recorded database lane. Do not weaken or replace the real PostgreSQL/Worker tests with mocks.","resolutionRequired":"Start the existing Docker Desktop Linux engine, then run pnpm verify test:db to exercise the migration, RLS, atomic commands, idempotency and concurrent publication cases. Current unit/type results do not establish database readiness."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:01:23.539Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-10-26T02:01:23.539Z"},"status":"resolved","cause":"The first user-run verification launched pnpm by absolute JavaScript path, but the verification child expected pnpm.cmd on PATH and exited before database tests.","prevention":"For the bundled Windows runtime, prepend its fallback command and Node directories to the current PowerShell PATH before invoking pnpm verify.","regression":"With the bundled fallback and Node directories on PATH, pnpm verify test:db completed with exit code 0."}
+```
+
+```json
+{"kind":"resolution","resolves":"OBS-20261025-RES02-DB-001","status":"resolved","evidence":"After the user started Docker Desktop and ran the repository verification outside the restricted named-pipe sandbox, pnpm verify test:db exited 0. It passed 92 pgTAP assertions, 25 real Worker/PostgreSQL integration tests, and the fresh local startup/demo/cleanup path.","limit":"This is disposable local evidence, not hosted deployment or upstream review-subject producer acceptance."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:19:34.003Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:19:51.505Z","exitCode":1}
+```
+
+## OBS-20261025-RES02-DEVELOP-MERGE-WINDOWS
+
+The post-merge pnpm check passed Biome, every workspace TypeScript check and all 201 Vitest cases (four optional cases skipped). Its repository-script phase passed 46 tests and failed only while the newly merged preview regression tried to create a Windows symlink inside the sandbox (EPERM); the earlier temp-directory rename restriction was avoided by moving TEMP and TMP into the writable worktree. Running the preview suite with only that privilege-dependent case skipped passed its remaining 12 tests. Context freshness, the ten-handoff limit, documentation links and git diff --check pass. No RES-02 runtime, contract, migration or database file conflicted with develop. Linux CI must run the symlink regression before merge; this local limitation is not a passing result for that case.
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:41:52.223Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:42:49.867Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:43:12.943Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:43:53.184Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:46:45.419Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:46:53.142Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:47:10.475Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:48:41.090Z","exitCode":1}
+```
+
+## OBS-20261025-RES02-PUBLIC-MENU-LOCAL
+
+The PR B implementation checks initially recorded transient lint failures while the route and dependency object were still being patched. The completed working tree passes Biome and all workspace TypeScript checks. Redirecting TEMP and TMP into the writable worktree avoids the sandbox rename restriction; all 209 Vitest cases pass with four optional cases skipped. The repository script suite passes 46 cases and cannot run only its Windows symlink-creation regression under the sandbox; Linux CI remains the required evidence for that case.
+
+The first PR B disposable-database attempts did not reach PostgreSQL. Docker Buildx first could not create its user-state lock, and after that narrow permission was granted the sandbox still denied the Docker Desktop Linux named pipe. This is an environment limitation, not a passing database result. Run `pnpm verify test:db` outside the restricted sandbox before publishing PR B; it must prove the new migration, four pgTAP privilege/RLS assertions, anonymous published read, token claims and withdrawal-to-404 integration.
+
+The contracts/backend/database fingerprints were stale after the intentional source changes. Their summaries and paths were reviewed, `pnpm context:refresh` updated the fingerprints, and `pnpm verify context:check docs:check` passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:57:46.694Z","exitCode":1}
+```
+
+### PR B review correction
+
+The first unrestricted Docker run on `5bcd86e` passed 96 pgTAP assertions in total (39 staff assertions) and all 26 Worker/PostgreSQL integration tests. That evidence proved the migration, restricted-role read, token claims and withdrawal behavior for the original signing implementation, but it became superseded when independent architecture review found that its HS256/fixed-issuer tokens were incompatible with DATA-01's remote-JWKS RS256/ES256 verifier.
+
+The producer contract now uses a URL issuer, ES256 private JWK from protected configuration, a public-only JWKS endpoint, `kid`, the shared observations audience and the same 30-minute claims boundary. The integration test verifies an issued token through a remote JWKS with DATA-01's algorithm/issuer model. The corrected local unit suite passes 210 cases with four optional skips. A second unrestricted database run is required for the corrected head.
+
+Correctness review also found two blank lines at the end of the forward migration. They were removed; `git diff --check` passes on the corrected working tree.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:59:35.504Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:59:44.456Z","exitCode":1}
+```
+
+The follow-up architecture review found that a URL issuer with a non-root path would make DATA-01 discover JWKS at a path the Worker did not expose. The signing configuration now accepts only an origin/root pathname, and the remote-JWKS integration fixture uses that root discovery path. This matches the documented production contract that `MENU_TOKEN_ISSUER` is the Worker origin.
+
+The first ES256/JWKS database rerun reached all assertions: 96 pgTAP checks and 25 of 26 integration cases passed. The token case failed only because its expected issuer omitted the trailing slash produced when both RES-02 and DATA-01 normalize an origin through `URL.href`. The regression expectation now uses that same normalized origin; signature verification, JWKS discovery and the remaining database behavior did not fail.
+
+Correctness follow-up required a direct regression for the origin-only issuer invariant. The unit suite now rejects `https://api.example.test/menu` explicitly, alongside the existing insecure-protocol and incompatible-key cases.
+
+The final unrestricted Docker rerun on the corrected ES256/JWKS candidate passed all 96 pgTAP assertions (foundation 27, PostHog 15, staff 39 and team analytics 15) and all 26 Worker/PostgreSQL integration tests. This supersedes the earlier issuer-expectation failure and confirms the normalized trailing-slash issuer, remote JWKS verification, publication binding and withdrawal behavior together. The logged `command_failed` entry is the expected injected outbox-failure case whose assertions passed.
+
 # ERR-20261026-PREVIEW-REPAIR
 
 PR #41 merged successfully into develop, but automatic previews did not run:
@@ -398,7 +656,26 @@ Sanitization now generates the marker from a checked SHA, rejects supplied
 markers and verifies both deployed aliases against that SHA before announcing
 readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
 commit; provider writes are not part of these local tests.
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
 
+Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
+Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
+both SHA markers and posted one bot comment. Close cleanup 40393553935 removed
+both provider deployments and changed that comment to removed. Edge readback
+briefly returned 500 after deletion; subsequent bounded readback confirmed
+both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
+alone does not establish instantaneous edge retirement. Staging deployment
+IDs and app data were unchanged; detailed evidence is in docs/previews.md.
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:54:53.626Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-27T19:54:53.626Z"},"status":"resolved","cause":"Color-role palette test edits introduced a Biome formatting violation (misaligned array element).","prevention":"Run pnpm format (biome check --write) on changed files before verification.","regression":"Biome formatting check passes; pnpm lint exits 0."}
+```
 
 ## October 27 VIS-01 infrastructure validation
 
@@ -444,6 +721,60 @@ commit; provider writes are not part of these local tests.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-10-27T19:55:28.261Z"},"status":"resolved","cause":"The color-role palette test used unsafe regex match destructuring (`[, ref]`) whose captured groups could be undefined under noUncheckedIndexedAccess.","prevention":"Parse regex matches through a typed helper that validates each capture before use.","regression":"pnpm typecheck passes; tokens suite passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-27T20:04:00.236Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-27T20:04:00.236Z"},"status":"resolved","cause":"Token test edits landed after the module fingerprint was refreshed, so the tokens node was correctly reported stale.","prevention":"Refresh context fingerprints after the last source edit, then rerun pnpm check.","regression":"pnpm context:refresh followed by pnpm check passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T13:15:19.972Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T13:20:26.669Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T13:15:19.972Z"},"status":"resolved","cause":"Biome formatting in packages/tokens/src/tokens.test.ts after inserting the light-theme test-block extraction; two lines had insufficient indentation.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 14 files/202 tests + 4 skipped, context:check, docs:check)."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T13:20:26.669Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-28T16:45:03.171Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-28T16:45:03.171Z"},"status":"resolved","cause":"Tokens module fingerprint stale after tokens.css and tokens.test.ts edits; refreshed context.","prevention":"Run pnpm context:refresh after source changes and review the diff.","regression":"pnpm context:check PASS (12 modules, 10 handoffs)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-28T17:18:55.326Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-28T17:18:55.326Z"},"status":"resolved","cause":"Biome formatting in frontend/console/src/ui/Nav.tsx and components.test.tsx after adding aria-hidden and test file.","prevention":"Run biome format on edited files before verification.","regression":"pnpm check PASS (lint, typecheck, 15 files/216 tests + 4 skipped, context:check, docs:check)."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T19:21:00.026Z","exitCode":1}
 ```
 
@@ -471,6 +802,51 @@ commit; provider writes are not part of these local tests.
 {"id":"OBS-20261027-REMOTE-R2-PROOF","status":"resolved","observation":"A local test writer reported201 but the independently deployed source reader returned404.","cause":"The helper used unstable_dev local:true with experimental.forceLocal:true; its remote R2 flag did not establish a provider write.","resolution":"Changed helper to actual remote mode and repeated service/source and Queue/R2 tests. Hosted source read200, Python relay checks, real conditional-create race and cleanup/absence verification passed. Corrected the earlier R2 evidence claims and retained the failed run separately outside the repo.","sources":["docs/menu-ingestion-infrastructure.md","docs/operations.md"]}
 ```
 
+## ERR-20261028-MAIN-DEVELOP-TYPES
+
+The first combined `pnpm verify typecheck` failed after importing main's Worker
+runtime declarations into develop: `TextDecoderConstructorOptions` required an
+explicit `ignoreBOM`, and Node's `fileURLToPath` rejected a Worker-global URL in
+the retrieval runtime test. This was a branch-integration type mismatch, not a
+failed hosted request or database change.
+
+Preserved the existing decoder behavior with `ignoreBOM: false` and imported
+Node's URL explicitly in the Node test, matching the existing dish integration
+fix. The same typecheck then passed. Full retrieval/workerd and repository
+regression results belong to the sync PR. Do not suppress strict types or drop
+develop's retrieval implementation to make a release merge compile.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-30T06:15:32.706Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-30T06:15:32.706Z"},"status":"environment-limited","cause":"The verification runner stopped before Biome because pnpm attempted to register the newly expanded eight-workspace checkout with a Windows project symlink that the Codex sandbox rejected with EPERM.","evidence":"The same pinned Biome executable was invoked directly against the merged tree and checked 102 files with no fixes required. Direct context refresh/check, documentation-link validation and git diff --check also passed.","limit":"The merged TypeScript and Vitest suites were not rerun in this sandbox because the current checkout cannot link the new workspace dependencies. Hosted Linux CI remains required after push."}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-29T14:41:51.693Z","exitCode":1}
+```
+
+## RES-02 October 31 local reconciliation checks
+
+Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
+
+The project-local store avoided the registry-link step, but dependency linking still failed with EPERM. Direct script checks passed 54/57: the preview symlink fixture was denied, the database-launcher test could not resolve uninstalled Vitest, and the real pnpm invocation retried the denied registry link. Direct pinned Biome, context validation and documentation-link checks passed. Full TypeScript/application/database/browser verification is deferred to Linux CI; no tests or runtime protections were weakened.
+
+## RES-02 public-menu integration response typing
+
+At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
+
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
 ```json
 {"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION","status":"pending-verification","area":"main-ci","cause":"An unused owner-report schema was committed outside packages/contracts/src on main; Biome rejects its formatting while exports and TypeScript exclude it.","resolution":"Remove only the misplaced root-level draft. Keep the reviewed owner-report implementation on its separate develop-based branch.","regression":"Before deletion, pnpm exec biome check packages/contracts/owner-report.ts reproduced the formatting failure. Full local and PR checks follow the deletion.","sources":["packages/contracts/package.json","packages/contracts/tsconfig.json","https://github.com/vivienk/peekaplate/actions/runs/41111328548"]}
 ```
@@ -504,3 +880,8 @@ check passed without changing role membership. operations.md records the limit.
 ## OBS-20261031-CONTEXT-SUMMARY-BOUND
 
 The initial release context update exceeded the existing bounded-summary limit. Context refresh/check failed before publication. The summary was rewritten within the schema limit rather than weakening validation; rerun context refresh/check and docs checks before committing. Retain existing error history byte-for-byte when appending new records.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:11:41.330Z","exitCode":1}
+```
