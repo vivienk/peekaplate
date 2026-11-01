@@ -105,15 +105,6 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         default_model="deepseek/deepseek-v4.1-flash",
         extra_body={"provider": {"require_parameters": True}},
     ),
-    "a2agent": ModelProviderConfig(
-        name="a2agent",
-        key_vars=("a2agent_api_key",),
-        url_var="a2agent_url",
-        model_var="a2agent_api_MODEL",
-        default_url="https://api.a2agent.me/v1",
-        default_model="MiniMax-M3.1-Flash",
-        extra_body=None,
-    ),
     "nara": ModelProviderConfig(
         name="nara",
         key_vars=("NARA_ROUTER_KEY",),
