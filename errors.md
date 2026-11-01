@@ -558,6 +558,84 @@ PASS after correction: `pnpm check` (189 unit cases and 47 script cases), action
 ## OBS-20261025-RES02-DEVELOP-MERGE-WINDOWS
 
 The post-merge pnpm check passed Biome, every workspace TypeScript check and all 201 Vitest cases (four optional cases skipped). Its repository-script phase passed 46 tests and failed only while the newly merged preview regression tried to create a Windows symlink inside the sandbox (EPERM); the earlier temp-directory rename restriction was avoided by moving TEMP and TMP into the writable worktree. Running the preview suite with only that privilege-dependent case skipped passed its remaining 12 tests. Context freshness, the ten-handoff limit, documentation links and git diff --check pass. No RES-02 runtime, contract, migration or database file conflicted with develop. Linux CI must run the symlink regression before merge; this local limitation is not a passing result for that case.
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:41:52.223Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:42:49.867Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T02:43:12.943Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:43:53.184Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-26T02:46:45.419Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:46:53.142Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:47:10.475Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:48:41.090Z","exitCode":1}
+```
+
+## OBS-20261025-RES02-PUBLIC-MENU-LOCAL
+
+The PR B implementation checks initially recorded transient lint failures while the route and dependency object were still being patched. The completed working tree passes Biome and all workspace TypeScript checks. Redirecting TEMP and TMP into the writable worktree avoids the sandbox rename restriction; all 209 Vitest cases pass with four optional cases skipped. The repository script suite passes 46 cases and cannot run only its Windows symlink-creation regression under the sandbox; Linux CI remains the required evidence for that case.
+
+The first PR B disposable-database attempts did not reach PostgreSQL. Docker Buildx first could not create its user-state lock, and after that narrow permission was granted the sandbox still denied the Docker Desktop Linux named pipe. This is an environment limitation, not a passing database result. Run `pnpm verify test:db` outside the restricted sandbox before publishing PR B; it must prove the new migration, four pgTAP privilege/RLS assertions, anonymous published read, token claims and withdrawal-to-404 integration.
+
+The contracts/backend/database fingerprints were stale after the intentional source changes. Their summaries and paths were reviewed, `pnpm context:refresh` updated the fingerprints, and `pnpm verify context:check docs:check` passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:57:46.694Z","exitCode":1}
+```
+
+### PR B review correction
+
+The first unrestricted Docker run on `5bcd86e` passed 96 pgTAP assertions in total (39 staff assertions) and all 26 Worker/PostgreSQL integration tests. That evidence proved the migration, restricted-role read, token claims and withdrawal behavior for the original signing implementation, but it became superseded when independent architecture review found that its HS256/fixed-issuer tokens were incompatible with DATA-01's remote-JWKS RS256/ES256 verifier.
+
+The producer contract now uses a URL issuer, ES256 private JWK from protected configuration, a public-only JWKS endpoint, `kid`, the shared observations audience and the same 30-minute claims boundary. The integration test verifies an issued token through a remote JWKS with DATA-01's algorithm/issuer model. The corrected local unit suite passes 210 cases with four optional skips. A second unrestricted database run is required for the corrected head.
+
+Correctness review also found two blank lines at the end of the forward migration. They were removed; `git diff --check` passes on the corrected working tree.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-10-26T02:59:35.504Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-26T02:59:44.456Z","exitCode":1}
+```
+
+The follow-up architecture review found that a URL issuer with a non-root path would make DATA-01 discover JWKS at a path the Worker did not expose. The signing configuration now accepts only an origin/root pathname, and the remote-JWKS integration fixture uses that root discovery path. This matches the documented production contract that `MENU_TOKEN_ISSUER` is the Worker origin.
+
+The first ES256/JWKS database rerun reached all assertions: 96 pgTAP checks and 25 of 26 integration cases passed. The token case failed only because its expected issuer omitted the trailing slash produced when both RES-02 and DATA-01 normalize an origin through `URL.href`. The regression expectation now uses that same normalized origin; signature verification, JWKS discovery and the remaining database behavior did not fail.
+
+Correctness follow-up required a direct regression for the origin-only issuer invariant. The unit suite now rejects `https://api.example.test/menu` explicitly, alongside the existing insecure-protocol and incompatible-key cases.
+
+The final unrestricted Docker rerun on the corrected ES256/JWKS candidate passed all 96 pgTAP assertions (foundation 27, PostHog 15, staff 39 and team analytics 15) and all 26 Worker/PostgreSQL integration tests. This supersedes the earlier issuer-expectation failure and confirms the normalized trailing-slash issuer, remote JWKS verification, publication binding and withdrawal behavior together. The logged `command_failed` entry is the expected injected outbox-failure case whose assertions passed.
 
 # ERR-20261026-PREVIEW-REPAIR
 
@@ -761,6 +839,10 @@ develop's retrieval implementation to make a release merge compile.
 Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
 
 The project-local store avoided the registry-link step, but dependency linking still failed with EPERM. Direct script checks passed 54/57: the preview symlink fixture was denied, the database-launcher test could not resolve uninstalled Vitest, and the real pnpm invocation retried the denied registry link. Direct pinned Biome, context validation and documentation-link checks passed. Full TypeScript/application/database/browser verification is deferred to Linux CI; no tests or runtime protections were weakened.
+
+## RES-02 public-menu integration response typing
+
+At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
 
 ## RES-02 November 1 context reconciliation
 

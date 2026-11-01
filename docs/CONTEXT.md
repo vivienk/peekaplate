@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. RES-02 adds strict owner approval/publication/withdrawal contracts. Commands identify immutable menu revision and independent content/asset approvals; hashes come from the trusted canonical review subject. Client authority and client hashes are rejected.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. RES-02 adds strict owner approval/publication/withdrawal contracts. Commands identify immutable menu revision and independent content/asset approvals; hashes come from the trusted canonical review subject. Client authority and client hashes are rejected. Public read/token and strict Bundle v1 schemas bind venue/menu/revision/publication, reject duplicate IDs and draft fields, and preserve allergen null/empty knowledge states.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts"
@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "55fd479c7dfc4c15cfb8d782ac33699f8542d957d66ef056f4a56a39c71fefbf"
+      "sourceFingerprint": "c719972d6a90fd33e3847afc9f626a6835e30743c79b3f8a6a09a36a22a93c87"
     },
     {
       "id": "tokens",
@@ -117,7 +117,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker: staff JWT/current membership draft commands, bounded GitHub collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance, linked PDF/native page evidence and context limits. The deployed direct-DO Python extraction host uses a named image, idle timeout and signed tenant/job/hash source grants; Python receives no signing/DB credentials. Protected OCR key and standalone OCR are verified; full AI ingestion/report acceptance remains pending and queues paused. RES-02 adds owner-only approve/publish/withdraw with current membership checks, expected versions, server-derived hashes from immutable same-tenant/menu review subjects, idempotent receipts, atomic events/projections/outbox and pure replay. Public reads/token issuance, privileged subject admission and canonical observation writes remain separate. JWT logout revocation is expiry-bounded.",
+      "summary": "Hono Worker: staff JWT/current membership draft commands, bounded GitHub collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance, linked PDF/native page evidence and context limits. The deployed direct-DO Python host uses a named image, idle timeout and tenant/job/hash source grants; Python gets no signing/DB credentials. Protected OCR key and standalone OCR are verified; full AI ingestion/report acceptance remains pending and queues paused. RES-02 adds owner-only approve/publish/withdraw with current membership checks, expected versions, server-derived hashes from immutable same-tenant/menu review subjects, idempotent receipts, atomic events/projections/outbox and pure replay. Public reads join active publication to exact immutable approval/bundle and issue 30-minute ES256 observation tokens; public JWKS excludes the private key. Privileged subject/bundle admission and canonical observation writes remain separate. JWT logout revocation is expiry-bounded.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -155,7 +155,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/extraction-capability.ts",
         "backend/tsconfig.json",
         "backend/src/publication-command.test.ts",
-        "backend/src/publication-command.ts"
+        "backend/src/publication-command.ts",
+        "backend/src/public-menu.test.ts",
+        "backend/src/public-menu.ts",
+        "docs/public-menu.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -167,12 +170,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1062d8502c3d4e7f3be7b73a44b66ff33e1bf51fc2b8d6273303330fa6abce4a"
+      "sourceFingerprint": "613aff777189e52662ae784732e147660a02c738695f36df5586b1835669e020"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/events/commands/outbox, memberships and projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP startup; hosted staff checks are separate and restore unverified. PostHog append-only export: eight raw/four unique synthetic events; October22 audit verifies migration20261021130000, scope675372, restricted definer ownership/execution and browser/runtime raw-access denial. Runtime cannot read scope; exporter cannot access app schema. Owner oracle covers NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, typed facts and tenant live-only views exist; activity uses greatest checkpoint. Report suppression/authorization and consumer integration remain separate. RES-02 adds immutable subjects, append-only exact approvals, review/publication projections and tenant/menu/hash foreign keys; runtime cannot create subjects. Hosted publication acceptance is pending.",
+      "summary": "Private Postgres venue/events/commands/outbox, memberships and projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP startup; hosted staff checks are separate and restore unverified. PostHog append-only export: eight raw/four unique synthetic events; October22 audit verifies migration20261021130000, scope675372, restricted definer ownership/execution and browser/runtime raw-access denial. Runtime cannot read scope; exporter cannot access app schema. Owner oracle covers NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, typed facts and tenant live-only views exist; activity uses greatest checkpoint. Report suppression/authorization and consumer integration remain separate. RES-02 adds immutable subjects, append-only exact approvals, review/publication projections and tenant/menu/hash foreign keys; runtime cannot create subjects. Append-only forced-RLS public bundles are runtime-read-only. Hosted acceptance pending.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -190,7 +193,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/observations.sql",
         "migrations/20261026120000_observation_facts.sql",
         "tests/db/observation-facts.sql",
-        "migrations/20261025120000_menu_publication.sql"
+        "migrations/20261025120000_menu_publication.sql",
+        "migrations/20261025130000_public_menu_bundle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -200,7 +204,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "0c5aa0411f5fb8deb4e35e821c2ef91522f42ec56dc596f19b3bd8806d0f15a0"
+      "sourceFingerprint": "b2d0900b635afcccb785528b413805279b7076d0776364fb9886189584d83475"
     },
     {
       "id": "measurement",
@@ -385,6 +389,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 1 PR43 reconciliation retains PR42 command transactions and all develop diner fixture/search updates. Public reads return only an active exact approved bundle plus publication-scoped ES256 token; unknown/draft/unbundled/withdrawn menus share404. Existing code and migrations are preserved during context/error-ledger reconciliation.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "After PR42 merges, retarget PR43 to develop and verify the resulting head. Hosted release needs the reviewed main candidate, both publication migrations, signing configuration and synthetic approval/read/withdrawal evidence. Privileged bundle admission, DIN-03 integrity/CORS integration and old-publication token renewal remain separate."
+    },
+    {
       "summary": "November 1 PR42 reconciliation preserves all develop module updates, including DIN-01.1 fixtures/adapter and DIN-01.4 local search, while retaining the reviewed RES-02 command core. Only shared context required conflict resolution; application and migration behavior is unchanged.",
       "modules": [
         "contracts",
@@ -456,16 +470,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console"
       ],
       "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
-    },
-    {
-      "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
-      "modules": [
-        "backend",
-        "contracts",
-        "processing",
-        "delivery"
-      ],
-      "next": "Record combined local/CI verification in the sync PR and merge after review. Teeyansh then updates his own feature branch from develop and reruns its checks; PR45 final review, approved AI configuration, migration/consumer release and full hosted ingestion acceptance remain separate. Keep menu delivery paused."
     }
   ]
 }
