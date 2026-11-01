@@ -1,6 +1,6 @@
 // Groups outbox events into small batches and hands them to the sender (S3-TRK-01.2). Limits follow
-// the ingestion contract (ADR 0015: 25 items or 32 KiB per request; Zhiliang to confirm they are
-// final). Flushes on a timer and when the page is hidden or closed; waits while offline and
+// the ingestion contract (ObservationBatchV2Schema, PR #70; confirmed by Zhiliang): 1 to 25 events
+// and at most 32,768 bytes for the whole JSON request body, both at once. Flushes on a timer and when the page is hidden or closed; waits while offline and
 // releases on reconnect. Events leave the outbox only when the sender reports them handled, so a
 // failure keeps them for the next try. Sending itself, receipts and retries are TRK-01.3.
 import type { Envelope } from './envelope';
@@ -42,10 +42,11 @@ export function browserBatchTriggers(): BatchTriggers {
 }
 
 const encoder = new TextEncoder();
-// The body shape is confirmed with the delivery contract in TRK-01.3.
-const bodySize = (batch: Envelope[]) => encoder.encode(JSON.stringify({ items: batch })).length;
+// Measured on the full request body, wrapper included, exactly as the server counts it.
+export const batchBody = (events: Envelope[]) => ({ contract: 'observation.v2', events }) as const;
+const bodySize = (batch: Envelope[]) => encoder.encode(JSON.stringify(batchBody(batch))).byteLength;
 
-// Oldest first, up to 25 events and 32 KiB. A single oversized event still goes alone, so the
+// Oldest first, up to 25 events and 32,768 bytes. A single oversized event still goes alone, so the
 // sender can handle the server's 413 for it (TRK-01.3).
 function nextBatch(pending: Envelope[]): Envelope[] {
   const batch: Envelope[] = [];
