@@ -30,6 +30,14 @@ test('menu ingestion has its own staging producer without redirecting observatio
   assert.equal(new Set(producers.map((item) => item.binding)).size, producers.length);
 });
 
+test('menu token issuer in staging wrangler configuration uses root trusted origin', () => {
+  const issuer = new URL(staging.vars.MENU_TOKEN_ISSUER);
+  assert.equal(issuer.protocol, 'https:');
+  assert.equal(issuer.pathname, '/');
+  assert.equal(issuer.search, '');
+  assert.equal(issuer.hash, '');
+});
+
 test('private ingestion reports reuse the staging bucket with an explicit binding', () => {
   const reports = staging.r2_buckets.find((item) => item.binding === 'INGESTION_REPORTS_BUCKET');
   const observations = staging.r2_buckets.find(

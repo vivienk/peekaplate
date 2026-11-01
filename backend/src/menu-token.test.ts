@@ -79,6 +79,14 @@ describe('menu-token claims', () => {
     );
   });
 
+  it('accepts valid HTTPS root issuer matching staging Worker configuration', () => {
+    expect(() =>
+      createMenuTokenVerifier({
+        issuer: 'https://peekaplate-api-staging.vxkong.workers.dev',
+      }),
+    ).not.toThrow();
+  });
+
   it('verifies signed ES256 token and audience via createMenuTokenVerifier', async () => {
     const { privateKey, publicKey } = await generateKeyPair('ES256');
     const publicJwk = await exportJWK(publicKey);

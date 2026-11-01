@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d166168c23f86d2e5f1c80f3bc5ff99c66417b81bcdfd6e158b17ddb8edb7da5"
+      "sourceFingerprint": "e9c38761d6fd57bebbc5eeeed4dc54caf67af38e0570b85bb4c2c82c3e785a85"
     },
     {
       "id": "database",
@@ -269,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "26371fbe550ceb1fca96b1a08bced227583440bd2e34ec9a69500a2c51732a37"
     },
     {
       "id": "agents",
@@ -380,7 +380,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "November 1 PR70 final review readiness: resolved CORS preflight for POST /observations with maxAge and allowed headers; aligned menu-token verification with PR #43 ES256, audience validation, and root-only trusted issuer; implemented trusted server-side traffic_class propagation from verified token claims through queue envelope; shared canonicalJson (with PR #31 deterministic serialization matching -0, non-finite rejection, WeakSet cycles, and property omission) and sha256 from contracts; and expanded regression test suite.",
+      "summary": "November 1 PR70 final review and staging readiness: aligned staging MENU_TOKEN_ISSUER in wrangler.jsonc to trusted HTTPS root origin (https://peekaplate-api-staging.vxkong.workers.dev), preventing runtime 503 from non-root pathname; resolved CORS preflight for POST /observations; aligned menu-token verification with PR #43 ES256, audience validation, and root-only trusted issuer; implemented trusted server-side traffic_class propagation through queue envelope; shared canonicalJson and sha256 from contracts; and expanded regression test suite.",
       "modules": [
         "contracts",
         "backend",
