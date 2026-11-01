@@ -843,3 +843,7 @@ The project-local store avoided the registry-link step, but dependency linking s
 ## RES-02 public-menu integration response typing
 
 At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
+
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
