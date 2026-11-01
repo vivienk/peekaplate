@@ -27,10 +27,12 @@
   font-weight: var(--pp-font-weight-semibold);
 }
 
-/* 44px touch target until Rania confirms the field height (the design system uses 40px for now). */
+/* Rania (1 Nov): the input box is 44px tall in every state (default, hover, focus, filled, error,
+ * disabled), measured on the box only, not the label, hint or error. Text is 16px on a 24px line
+ * height (paragraph-1 tokens in ui/Input). */
 .pp-field__control {
   box-sizing: border-box;
-  min-block-size: 2.75rem;
+  block-size: 2.75rem;
 }
 
 .pp-visually-hidden {

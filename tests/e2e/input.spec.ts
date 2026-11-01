@@ -84,6 +84,38 @@ test('keyboard focus skips disabled inputs and stays visible', async ({ page }) 
   }
 });
 
+// Rania's spec (1 Nov): the input box is exactly 44px tall in every state, with 16px text on a 24px
+// line height. Measured on the textbox itself, so the label and helper or error text are excluded.
+test('every input box is 44px tall in every state, with 16px text on a 24px line height', async ({
+  page,
+}) => {
+  await page.goto(demo);
+  const measure = (field: import('@playwright/test').Locator) =>
+    field.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: element.getBoundingClientRect().height,
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+      };
+    });
+  const spec = { height: 44, fontSize: '16px', lineHeight: '24px' };
+
+  const fields = await page.getByRole('textbox').all();
+  // Default, filled, error and disabled fields are all on the demo page.
+  await expect(page.locator('input[aria-invalid="true"]')).not.toHaveCount(0);
+  await expect(page.locator('input:disabled')).not.toHaveCount(0);
+  for (const field of fields) expect(await measure(field)).toEqual(spec);
+
+  const name = page.getByLabel('Dish name');
+  await name.hover();
+  expect(await measure(name)).toEqual(spec);
+  await name.focus();
+  expect(await measure(name)).toEqual(spec);
+  await name.fill('A very long dish name that fills the whole input box and keeps going');
+  expect(await measure(name)).toEqual(spec);
+});
+
 test('input demo fits a narrow viewport with usable touch targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto(demo);
