@@ -880,3 +880,8 @@ check passed without changing role membership. operations.md records the limit.
 ## OBS-20261031-CONTEXT-SUMMARY-BOUND
 
 The initial release context update exceeded the existing bounded-summary limit. Context refresh/check failed before publication. The summary was rewritten within the schema limit rather than weakening validation; rerun context refresh/check and docs checks before committing. Retain existing error history byte-for-byte when appending new records.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:11:41.330Z","exitCode":1}
+```
