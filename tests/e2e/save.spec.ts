@@ -482,6 +482,32 @@ test('in session-only mode the Saved screen shows the notice and sends no Save o
   expect((await savedInfo(page)).events).toEqual([]);
 });
 
+// Matrix v0.1h (confirmed by Adam): no shortlist_viewed in session-only mode, including after a
+// switch mid-visit, since session-only saves send no dish_saved for the view to match.
+test('shortlist_viewed stops once storage fails mid-visit, on every later display', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast', 'harvestPowerBowl']);
+  const views = async () =>
+    (await savedInfo(page)).events.filter((e) => e.name === 'shortlist_viewed').length;
+  expect(await views()).toBe(1);
+
+  // Storage starts refusing writes; the next write (removing a dish here) switches the visit to
+  // session-only.
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+  });
+  await page.locator('.pp-saved__save').first().click();
+  await expect(page.getByText('Saved for this session only')).toBeVisible();
+
+  await page.evaluate(() => (window as unknown as SavedGlobals).saved.redisplay());
+  await page.evaluate(() => (window as unknown as SavedGlobals).saved.redisplay());
+  await expect(page.getByText('Saved for this session only')).toBeVisible();
+  expect(await views()).toBe(1);
+});
+
 test('Saved screen works by keyboard and passes an accessibility scan', async ({ page }) => {
   await openSavedScreen(page, ['avocadoToast', 'incomplete']);
   await expect(page.getByText('Saved for this session only')).toBeHidden();

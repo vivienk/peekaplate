@@ -135,8 +135,9 @@ export function renderSavedScreen(
   draw();
   const stop = saveState.subscribe(draw);
 
-  // Pending confirmation: the ticket says unavailable-storage states fire nothing, so the view is
-  // not counted in session-only mode.
+  // Not counted in session-only mode (confirmed by Adam, matrix v0.1h): unavailable-storage states
+  // emit nothing, saves there fire no dish_saved, so a view would describe a list with no matching
+  // events and skew the numbers.
   if (saveState.mode() === 'persistent') {
     try {
       send('shortlist_viewed', shortlistViewedPayload(menu, saveState.savedCount()));
