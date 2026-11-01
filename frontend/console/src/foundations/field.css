@@ -1,0 +1,45 @@
+/*
+ * Text field structure (S3-TOK-01). The input box itself is the design-system .pp-input from
+ * @peekaplate/ui (colors, border, focus ring, error and disabled states); this file only lays out
+ * the label, hint and error around it, using shared tokens. Classes use .pp-field so they never
+ * collide with the design system's .pp-input.
+ */
+.pp-field {
+  display: grid;
+  gap: var(--pp-space-4);
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-field__label {
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+  font-weight: var(--pp-font-weight-medium);
+}
+
+.pp-field__hint,
+.pp-field__error {
+  margin: 0;
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+.pp-field__error {
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* Rania (1 Nov): the input box is 44px tall in every state (default, hover, focus, filled, error,
+ * disabled), measured on the box only, not the label, hint or error. Text is 16px on a 24px line
+ * height (paragraph-1 tokens in ui/Input). */
+.pp-field__control {
+  box-sizing: border-box;
+  block-size: 2.75rem;
+}
+
+.pp-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
