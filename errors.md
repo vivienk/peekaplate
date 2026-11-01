@@ -706,8 +706,3 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
 ```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-29T14:41:51.693Z","exitCode":1}
-```

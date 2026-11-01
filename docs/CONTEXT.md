@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist for screens to call; nothing calls them yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline). The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders, 50% off-viewport dimming) and the dish detail screen (allergen/dietary chips, name-only ingredient tiles). Save, Compare, search and a published menu are not wired. The console-only track(eventName, payload) placeholder (never throws) now has menu_viewed, dish_viewed and dish_detail_opened UI triggers wired on the fixture menu; dish_activity_checkpoint reporting is interim and owned by TRK-01. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -76,11 +76,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
         "vitest.config.ts",
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
-        "frontend/diner/src/menu/events.test.ts"
+        "frontend/diner/src/menu/events.test.ts",
+        "frontend/diner/src/tracking/activity.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -89,7 +92,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2f019062759256adf75ced52462d722b7405de3fe675db2281facf9533dfd96b"
+      "sourceFingerprint": "d69986e60c1366bd7e92829630e6bbef0f83750018e7dc65f60ef09d90d3b199"
     },
     {
       "id": "console",
@@ -384,11 +387,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
+      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery. The menu and detail screens now call the triggers (menu_viewed, dish_viewed, dish_detail_opened) on the fixture menu; entry_source reports unknown until the QR marker is defined, and save_available stays false until DIN-02.",
       "modules": [
         "diner"
       ],
-      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
+      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). Confirm how a QR link sets entry_source and whether dish_viewed needs category_filter (matrix 3.1). TRK-01 replaces the interim activity clock and the console body of track() without changing callers. save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false."
     },
     {
       "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
