@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.3 adds the Compare picker logic (options without the kept or shown dishes and incomplete dishes, single selection, search through searchMenu); its screen is not built yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 and S3-DIN-02.3/.4 add screen-free logic: searchMenu (matching dish IDs plus the staff allergy line), Compare picker options and selection, and comparison start/Replace with the dish_compared payload; their screens are not built yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -80,6 +80,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/search.test.ts",
         "frontend/diner/src/compare/picker.ts",
         "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/compare/comparison.ts",
+        "frontend/diner/src/compare/comparison.test.ts",
         "vitest.config.ts"
       ],
       "adrs": [
@@ -89,7 +91,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7c035fc5ccef108ba60b3d049c1a07b1c38c9ab4db823889eb99abc8a8d6b24a"
+      "sourceFingerprint": "e157c154e8be582fdc340db1537e9b88451c848e16262856d944169714dcf242"
     },
     {
       "id": "console",
@@ -384,6 +386,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Replace keeping comparison_id is confirmed (v0.1h). Build the result screen (two dishes, divider, View details with source compare_view, Replace, Back to Menu, aligned allergen rows) on the shared dish card, call track() from PR #65 and the TRK-01 ID helper, and read save_available from DIN-02.1 (false until it exists)."
+    },
+    {
       "summary": "S3-DIN-02.3 picker logic: frontend/diner/src/compare/picker.ts. pickerOptions(menu, exclude, query) returns the complete dishes the diner can pick, in menu order, without the kept dish (or both shown dishes when replacing); a query runs searchMenu so the rules and allergy line match the menu search. selectOption keeps one selection, ignores excluded, incomplete or unknown dishes and so blocks comparing a dish with itself. No API call, events or logging. 12 Vitest cases cover start, replace, search, one-dish and all-incomplete menus.",
       "modules": [
         "diner"
@@ -452,16 +461,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console"
       ],
       "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
-    },
-    {
-      "summary": "Reconciled main82f3876 into develop00856e1 through a dedicated sync branch. Kept develop retrieval routes/contracts/security tests, exports and hosted preview acceptance; imported main direct-DO runtime, worker types, OCR regression and current operations docs. Fixed the combined typecheck with an explicit default TextDecoder BOM option and Node URL import; no type weakening. Resolved context structurally and preserved both error/learning histories. No feature branch, cloud binding, key, migration or deployment changes.",
-      "modules": [
-        "backend",
-        "contracts",
-        "processing",
-        "delivery"
-      ],
-      "next": "Record combined local/CI verification in the sync PR and merge after review. Teeyansh then updates his own feature branch from develop and reruns its checks; PR45 final review, approved AI configuration, migration/consumer release and full hosted ingestion acceptance remain separate. Keep menu delivery paused."
     }
   ]
 }
