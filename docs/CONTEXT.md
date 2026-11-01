@@ -151,6 +151,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/index.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
+        "backend/src/owner-ai/evaluation.test.ts",
+        "scripts/evaluate-owner-ai.mjs",
         "docs/owner-ai.md"
       ],
       "adrs": [
@@ -163,7 +165,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "7de94b7a2f55d702180d500a622b40972e2112c970c495d1ac512d2236dbb23e"
+      "sourceFingerprint": "124838ed4c21c3f70d44738d82a7c6d4b8bb7671c7bc3f7eeced153e51610a0a"
     },
     {
       "id": "database",
@@ -269,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "92232e2c87c08dedb348a3fe0b7bdc6357a30e86f473939b6f93834bef33a7d9"
     },
     {
       "id": "agents",
@@ -380,12 +382,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "October 31 AI-01 reconciliation retains develop canonical observation index/facts, owner metric tests, bounded PDF retrieval and UI foundations alongside the deterministic recommendation core. No live report, model or owner HTTP integration is added.",
+      "summary": "AI-01 adds a synthetic offline development evaluation command with per-case expected/actual evidence, source revision and explicit independent/hosted verification limits. The deterministic core and runtime contracts are unchanged.",
       "modules": [
         "contracts",
         "backend"
       ],
-      "next": "Verify the reconciled head and request review of the bounded core. Align the DATA-02 response contract before adding its adapter; approved rubric, membership authorization, independent evaluation and hosted acceptance remain separate."
+      "next": "Review the offline evaluation slice stacked on the core. Align DATA-02 identity, scope and eligible-session fields before implementing its adapter; independent rubric approval and hosted acceptance remain separate."
     },
     {
       "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",

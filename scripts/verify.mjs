@@ -10,6 +10,7 @@ const checks = new Set([
   'lint',
   'typecheck',
   'test',
+  'eval:owner-ai',
   'build',
   'context:check',
   'docs:check',
