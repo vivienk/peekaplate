@@ -1,0 +1,33 @@
+{
+  "fixture_id": "sales_outcomes",
+  "report_type": "authorized_outcomes_summary",
+  "data_scope": "fictional_synthetic_restaurant",
+  "metrics": [
+    {
+      "metric": "verified_orders",
+      "status": "UNAVAILABLE",
+      "value": null
+    },
+    {
+      "metric": "verified_revenue",
+      "status": "UNAVAILABLE",
+      "value": null
+    },
+    {
+      "metric": "verified_waste",
+      "status": "UNAVAILABLE",
+      "value": null
+    },
+    {
+      "metric": "causal_sales_impact_of_comparisons",
+      "status": "NOT_ESTABLISHED",
+      "value": null
+    }
+  ],
+  "evidence_limitations": {
+    "save_is_purchase": false,
+    "opening_is_purchase": false,
+    "comparison_proves_sales_impact": false,
+    "verified_outcome_source_supplied": false
+  }
+}
