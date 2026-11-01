@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist for screens to call; nothing calls them yet. See docs/posthog.md for activation and evidence limits. S3-TRK-01.1 (src/tracking; track() logs envelopes, no delivery yet): allowlist, ID helpers, per-tab identity with a never-reused sequence (duplicate tabs start fresh), the observation.v2 envelope and the activity clock (cumulative 5 s checkpoints, 30 s idle pause, 300000 ms cap).",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. A console-only track(eventName, payload) placeholder (never throws) and menu_viewed / dish_detail_opened trigger functions exist for screens to call; nothing calls them yet. See docs/posthog.md for activation and evidence limits. S3-TRK-01 (src/tracking): track() builds observation.v2 envelopes; fixture mode only logs test events; live mode needs the default-off consent flag and queues in an IndexedDB outbox (500 events/1 MiB/24 h, batches 25/32 KiB). Nothing is sent until TRK-01.3.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -88,7 +88,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/core.test.ts",
         "tests/e2e/tracking.spec.ts",
         "frontend/diner/src/tracking/activity-clock.ts",
-        "frontend/diner/src/tracking/activity-clock.test.ts"
+        "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/consent.ts",
+        "frontend/diner/src/tracking/outbox.ts",
+        "frontend/diner/src/tracking/outbox.test.ts",
+        "frontend/diner/src/tracking/batcher.ts",
+        "frontend/diner/src/tracking/batcher.test.ts",
+        "tests/e2e/tracking-outbox.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -97,7 +103,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9df32de6e095b5473bea0855aa109d8a925540bbc100cea07c84338161acc8b0"
+      "sourceFingerprint": "f555fd692523388b2fe3f53778a24a2721d61dab6de5004a89d2d3a0f624f9e7"
     },
     {
       "id": "console",
