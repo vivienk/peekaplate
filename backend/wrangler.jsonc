@@ -17,7 +17,8 @@
       "vars": {
         "APP_ENV": "staging",
         "POSTHOG_PROJECT_ID": "675372",
-        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1"
+        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
+        "MENU_TOKEN_ISSUER": "https://peekaplate-api-staging.vxkong.workers.dev"
       },
       "hyperdrive": [
         {
@@ -33,6 +34,18 @@
         {
           "binding": "INGESTION_REPORTS_BUCKET",
           "bucket_name": "peekaplate-staging-assets"
+        }
+      ],
+      "ratelimits": [
+        {
+          "name": "OBSERVATION_RATE_LIMITER_MINUTE",
+          "namespace_id": "9014174611501",
+          "simple": { "limit": 60, "period": 60 }
+        },
+        {
+          "name": "OBSERVATION_RATE_LIMITER_BURST",
+          "namespace_id": "9014174611502",
+          "simple": { "limit": 10, "period": 10 }
         }
       ],
       "queues": {

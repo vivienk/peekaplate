@@ -13,17 +13,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. RES-02 adds strict owner approval/publication/withdrawal contracts. Commands identify immutable menu revision and independent content/asset approvals; hashes come from the trusted canonical review subject. Client authority and client hashes are rejected. Public read/token and strict Bundle v1 schemas bind venue/menu/revision/publication, reject duplicate IDs and draft fields, and preserve allergen null/empty knowledge states.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, RES-02 owner approval/publication/withdrawal, public read/token, and strict Bundle v1 schemas. Observation contracts define canonical ObservationV2 (9 P0 types), canonicalJson, sha256, microsecond window bounds ([-24h, +5m]), Queue message contracts (ObservationQueueMessageSchema with server-derived traffic_class, ObservationConflictQueueMessageSchema with multi-copy conflict schema), and observation receipts. Offsets, rank sequences, aggregate context limits, and microsecond precision boundaries strictly enforced.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/fixtures/observation.v2/fixtures.json",
+        "packages/contracts/fixtures/observation.v2/README.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c719972d6a90fd33e3847afc9f626a6835e30743c79b3f8a6a09a36a22a93c87"
+      "sourceFingerprint": "bc7ff833a3139b95afaf55e3848335c76a349962f449ece47fb9351da07c497b"
     },
     {
       "id": "tokens",
@@ -117,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker: staff JWT/current membership draft commands, bounded GitHub collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance, linked PDF/native page evidence and context limits. The deployed direct-DO Python host uses a named image, idle timeout and tenant/job/hash source grants; Python gets no signing/DB credentials. Protected OCR key and standalone OCR are verified; full AI ingestion/report acceptance remains pending and queues paused. RES-02 adds owner-only approve/publish/withdraw with current membership checks, expected versions, server-derived hashes from immutable same-tenant/menu review subjects, idempotent receipts, atomic events/projections/outbox and pure replay. Public reads join active publication to exact immutable approval/bundle and issue 30-minute ES256 observation tokens; public JWKS excludes the private key. Privileged subject/bundle admission and canonical observation writes remain separate. JWT logout revocation is expiry-bounded.",
+      "summary": "Hono Worker retains staff JWT/membership draft commands, collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance and context limits. Deployed direct-DO Python host uses named image, idle timeout and signed source grants without signing/DB credentials. RES-02 adds owner approve/publish/withdraw with atomic events/projections/outbox, public reads joining active publication to exact bundle, and 30-minute ES256 tokens. Canonical observation producer POST /observations validates ES256 menu tokens, enforces PR #43 diner CORS allowlist without wildcard, derives traffic_class, canonicalizes and enqueues to observation queue with queue-before-accepted delivery, and bounds conflict copies with safe metadata. Rate limits enforce approximate per-location windows rather than a strict global token bucket. Full AI configuration, consumer PR #31 integration and queue unpausing remain separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -129,6 +131,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/menu-token.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/observation-fixtures.test.ts",
+        "backend/src/observation-ingest.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -170,7 +176,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "613aff777189e52662ae784732e147660a02c738695f36df5586b1835669e020"
+      "sourceFingerprint": "d55221ffaa8544e1333e996f75bd2af5a92005f7e98c4e6282ea561134ffd751"
     },
     {
       "id": "database",
@@ -278,7 +284,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e7a5ab34a3d8fb7e1ac7bc00ee5014b78ffaa31921ac8c2a7dfb9624fffd5a44"
+      "sourceFingerprint": "34ea76145a07676d5a7e3c9870531f56d98e0610d5a2cb01398d9cb8726a9285"
     },
     {
       "id": "agents",
@@ -389,6 +395,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 2 PR70 review findings resolution: aligned canonical timestamp precision with PR #31/PostgreSQL microsecond semantics and banker's rounding; isolated unauthorized publications in conflict copies using bounded invalid metadata ('publicationStatus: mismatch') while preserving checksums; aligned CORS with PR #43 diner-origin allowlist without wildcard CORS; documented native Cloudflare Worker rate limiting semantics as approximate per-location limits (not a strict global token bucket); ensured traffic_class compatibility with PR #31; and expanded regression test coverage.",
+      "modules": [
+        "contracts",
+        "backend",
+        "delivery"
+      ],
+      "next": "Release handoff notes that the two native rate windows (OBSERVATION_RATE_LIMITER_MINUTE and OBSERVATION_RATE_LIMITER_BURST) are approximate per-location limits, not a strict global token bucket. PR #70 is green and ready for review; consumer PR #31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
+    },
+    {
       "summary": "November 1 PR43 reconciliation retains PR42 command transactions and all develop diner fixture/search updates. Public reads return only an active exact approved bundle plus publication-scoped ES256 token; unknown/draft/unbundled/withdrawn menus share404. Existing code and migrations are preserved during context/error-ledger reconciliation.",
       "modules": [
         "contracts",
@@ -460,16 +475,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
-    },
-    {
-      "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
-      "modules": [
-        "tokens",
-        "ui",
-        "diner",
-        "console"
-      ],
-      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
     }
   ]
 }

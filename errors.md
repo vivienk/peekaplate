@@ -847,3 +847,49 @@ At head 7299603, Linux CI run 41232592080 passed database and browser checks but
 ## RES-02 November 1 context reconciliation
 
 An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T21:02:44.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z"},"status":"resolved","evidence":"MenuAuthority made trafficClass optional with server-side live default; all workspace packages passed typecheck and pnpm check."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T20:41:29.007Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-01T20:41:29.007Z"},"status":"resolved","evidence":"Formatted new unit tests in backend/src/index.test.ts and packages/contracts/src/index.test.ts with biome."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z"},"status":"resolved","evidence":"Aligned ObservationIngestServices.now with exactOptionalPropertyTypes and spread into ingest call; typecheck passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z"},"status":"resolved","evidence":"Installed Playwright Chromium headless shell locally; pnpm verify test:e2e passed all 13 tests."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
+```

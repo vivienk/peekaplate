@@ -1,5 +1,19 @@
+import {
+  canonicalJson,
+  classifyObservationTimeWindow,
+  ObservationConflictQueueMessageSchema,
+  ObservationQueueEnvelopeSchema,
+  ObservationQueueMessageSchema,
+  ObservationReceiptBatchSchema,
+  sha256,
+  toCanonicalObservation,
+} from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import app, { createApp } from './index';
+import app, { consumeJtiRateLimit, createApp } from './index';
+import { ingestObservations } from './observation-ingest';
+
+const parseObservationReceiptBatch = async (response: Response) =>
+  ObservationReceiptBatchSchema.parse(await response.json());
 
 describe('foundation API', () => {
   it('returns a minimal liveness response without database or secret configuration', async () => {
@@ -84,6 +98,850 @@ describe('dish HTTP boundary', () => {
     });
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'service_unavailable' });
+  });
+});
+
+describe('observation.v2 HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000001';
+  const publicationId = '00000000-0000-4000-8000-000000000002';
+  const jti = '00000000-0000-4000-8000-000000000003';
+  const event = () => ({
+    schema_version: 'observation.v2',
+    event_id: crypto.randomUUID(),
+    type: 'dish_saved',
+    session_id: crypto.randomUUID(),
+    producer_id: crypto.randomUUID(),
+    local_sequence: 1,
+    occurred_at: new Date().toISOString(),
+    publication_revision_id: publicationId,
+    payload: {
+      dish_id: crypto.randomUUID(),
+      dish_revision_id: crypto.randomUUID(),
+      save_origin: 'direct',
+      save_surface: 'dish_detail',
+      shortlist_size: 1,
+    },
+  });
+  const request = (events: unknown[], init: RequestInit = {}) =>
+    new Request('http://localhost/observations', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contract: 'observation.v2', events }),
+      ...init,
+    });
+  const baseServices = {
+    verify: vi.fn(),
+    execute: vi.fn(),
+    verifyMenu: vi.fn().mockResolvedValue({ venueId, publicationId, jti }),
+    consumeObservationRateLimit: vi.fn().mockResolvedValue({ allowed: true, retryAfterSeconds: 1 }),
+  };
+
+  it('derives authority from the token and accepts only after Queue send resolves', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const input = event();
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([input]),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      contract: 'observation-receipt.v1',
+      receipts: [
+        { event_id: input.event_id, status: 'accepted', reason_code: null, retryable: false },
+      ],
+    });
+    expect(enqueueObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: venueId,
+        authorizedPublicationId: publicationId,
+        schemaVersion: 'observation.v2',
+        eventId: input.event_id,
+        traffic_class: 'live',
+      }),
+      {},
+    );
+  });
+
+  it('handles CORS allowlist and OPTIONS preflight aligned with PR #43', async () => {
+    const app = createApp(baseServices);
+
+    // 1. Allowed diner production origin preflight
+    const preflight = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://diner.peekaplate.com',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Authorization, Content-Type',
+        },
+      }),
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://diner.peekaplate.com',
+    );
+    expect(preflight.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+    expect(preflight.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+    expect(preflight.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+    expect(preflight.headers.get('Access-Control-Max-Age')).toBe('86400');
+    expect(preflight.headers.get('Vary')).toContain('Origin');
+    expect(preflight.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+
+    // 2. Allowed staging and local origins
+    for (const allowedOrigin of [
+      'https://peekaplate-diner-staging.pages.dev',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+    ]) {
+      const res = await app.fetch(
+        request([event()], {
+          headers: {
+            Authorization: 'Bearer signed',
+            'Content-Type': 'application/json',
+            Origin: allowedOrigin,
+          },
+        }),
+      );
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(allowedOrigin);
+      expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+      expect(res.headers.get('Vary')).toContain('Origin');
+    }
+
+    // 3. Disallowed origin (e.g. malicious lookalike, external attacker, or preview) receives NO Access-Control-Allow-Origin
+    for (const disallowedOrigin of [
+      'https://attacker.example.com',
+      'https://diner.peekaplate.com.evil.com',
+      'https://pr-123.peekaplate-diner-preview.pages.dev',
+    ]) {
+      const disallowedPreflight = await app.fetch(
+        new Request('http://localhost/observations', {
+          method: 'OPTIONS',
+          headers: {
+            Origin: disallowedOrigin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'Authorization, Content-Type',
+          },
+        }),
+      );
+      expect(disallowedPreflight.status).toBe(204);
+      expect(disallowedPreflight.headers.get('Access-Control-Allow-Origin')).toBeNull();
+
+      const disallowedPost = await app.fetch(
+        request([event()], {
+          headers: {
+            Authorization: 'Bearer signed',
+            'Content-Type': 'application/json',
+            Origin: disallowedOrigin,
+          },
+        }),
+      );
+      expect(disallowedPost.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    }
+
+    // 3b. Missing Origin header (e.g. server-to-server or non-browser client) receives no CORS header
+    const noOriginPost = await app.fetch(
+      request([event()], {
+        headers: {
+          Authorization: 'Bearer signed',
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
+    expect(noOriginPost.headers.get('Access-Control-Allow-Origin')).toBeNull();
+
+    // 4. Unauthorized POST from allowed origin still sets CORS header but returns 401
+    const unauthorizedRes = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: {
+          Origin: 'https://diner.peekaplate.com',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contract: 'observation.v2', events: [] }),
+      }),
+    );
+    expect(unauthorizedRes.status).toBe(401);
+    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).toBe(
+      'https://diner.peekaplate.com',
+    );
+    expect(unauthorizedRes.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+  });
+
+  it('propagates trusted traffic_class from verified menu token and ignores client-supplied values', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const services = {
+      ...baseServices,
+      verifyMenu: vi.fn().mockResolvedValue({
+        venueId,
+        publicationId,
+        jti,
+        trafficClass: 'test',
+      }),
+      enqueueObservation,
+    };
+    const input = event();
+    const response = await createApp(services).fetch(request([input]));
+    expect(response.status).toBe(200);
+    expect(enqueueObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: venueId,
+        traffic_class: 'test',
+        eventId: input.event_id,
+      }),
+      {},
+    );
+  });
+
+  it('returns per-item permanent rejections without enqueueing invalid observations', async () => {
+    const enqueueObservation = vi.fn();
+    const valid = event();
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([
+        { ...valid, schema_version: 2 },
+        { ...event(), type: 'ingredient_viewed' },
+        { ...event(), publication_revision_id: crypto.randomUUID() },
+        { ...event(), occurred_at: new Date(Date.now() - 86_400_001).toISOString() },
+        { ...event(), occurred_at: new Date(Date.now() + 360_001).toISOString() },
+      ]),
+    );
+    expect(response.status).toBe(200);
+    expect(
+      (await parseObservationReceiptBatch(response)).receipts.map((receipt) => receipt.reason_code),
+    ).toEqual([
+      'schema_invalid',
+      'unknown_type',
+      'publication_not_allowed',
+      'too_old',
+      'future_time',
+    ]);
+    expect(enqueueObservation).not.toHaveBeenCalled();
+  });
+
+  it('enqueues identical IDs once and rejects every conflicting in-batch copy', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const first = event();
+    const conflict = event();
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([
+        first,
+        structuredClone(first),
+        conflict,
+        { ...conflict, payload: { ...conflict.payload, shortlist_size: 2 } },
+      ]),
+    );
+    expect(response.status).toBe(200);
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
+      { status: 'accepted', reason_code: null },
+      { status: 'accepted', reason_code: 'duplicate_in_batch' },
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+    ]);
+    expect(enqueueObservation).toHaveBeenCalledTimes(2);
+    expect(enqueueObservation.mock.calls.map(([message]) => message.kind)).toEqual([
+      'observation_conflict.v1',
+      'observation.v2',
+    ]);
+  });
+
+  it('returns mixed receipts, but 503 without receipts when every Queue send is unavailable', async () => {
+    const first = event();
+    const second = event();
+    const partial = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('queue unavailable'));
+    const partialResponse = await createApp({ ...baseServices, enqueueObservation: partial }).fetch(
+      request([first, second]),
+    );
+    expect(partialResponse.status).toBe(200);
+    expect((await parseObservationReceiptBatch(partialResponse)).receipts).toMatchObject([
+      { status: 'accepted', retryable: false },
+      { status: 'retry', retryable: true },
+    ]);
+
+    const unavailableResponse = await createApp({
+      ...baseServices,
+      enqueueObservation: vi.fn().mockRejectedValue(new Error('queue unavailable')),
+    }).fetch(request([event()]));
+    expect(unavailableResponse.status).toBe(503);
+    expect(await unavailableResponse.json()).toEqual({ error: 'queue_unavailable' });
+  });
+
+  it('enforces authentication, token-scoped throttling and envelope limits before Queue use', async () => {
+    const enqueueObservation = vi.fn();
+    const app = createApp({ ...baseServices, enqueueObservation });
+    const missingAuth = await app.fetch(
+      request([event()], { headers: { 'Content-Type': 'application/json' } }),
+    );
+    expect(missingAuth.status).toBe(401);
+
+    const limited = await createApp({
+      ...baseServices,
+      consumeObservationRateLimit: vi
+        .fn()
+        .mockResolvedValue({ allowed: false, retryAfterSeconds: 3 }),
+      enqueueObservation,
+    }).fetch(request([event()]));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('Retry-After')).toBe('3');
+
+    const tooMany = await app.fetch(request(Array.from({ length: 26 }, event)));
+    expect(tooMany.status).toBe(413);
+
+    const malformed = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: '{',
+      }),
+    );
+    expect(malformed.status).toBe(400);
+    expect(enqueueObservation).not.toHaveBeenCalled();
+  });
+  it('accepts exactly 32 KiB and rejects 32 KiB plus one byte', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const app = createApp({ ...baseServices, enqueueObservation });
+    const envelope = JSON.stringify({ contract: 'observation.v2', events: [event()] });
+    const encodedLength = new TextEncoder().encode(envelope).byteLength;
+    expect(encodedLength).toBeLessThan(32_768);
+
+    const exact = `${envelope}${' '.repeat(32_768 - encodedLength)}`;
+    const accepted = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: exact,
+      }),
+    );
+    expect(new TextEncoder().encode(exact)).toHaveLength(32_768);
+    expect(accepted.status).toBe(200);
+
+    const oversized = await app.fetch(
+      new Request('http://localhost/observations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: `${exact} `,
+      }),
+    );
+    expect(oversized.status).toBe(413);
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts exact time boundaries and rejects a one-millisecond excess', async () => {
+    const now = new Date('2026-10-25T12:00:00.000Z');
+    const inputs = [
+      { ...event(), occurred_at: new Date(now.getTime() - 86_400_000).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() - 86_400_001).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() + 300_000).toISOString() },
+      { ...event(), occurred_at: new Date(now.getTime() + 300_001).toISOString() },
+    ];
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+    const result = await ingestObservations(
+      inputs,
+      { venueId, publicationId, jti },
+      { enqueue, now: () => now },
+    );
+    expect(result.queueUnavailable).toBe(false);
+    if (result.queueUnavailable) throw new Error('unexpected Queue failure');
+    expect(
+      result.response.receipts.map(({ status, reason_code }) => [status, reason_code]),
+    ).toEqual([
+      ['accepted', null],
+      ['rejected', 'too_old'],
+      ['accepted', null],
+      ['rejected', 'future_time'],
+    ]);
+    expect(enqueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies both Cloudflare windows to the verified token jti', async () => {
+    const minute = { limit: vi.fn().mockResolvedValue({ success: true }) };
+    const burst = { limit: vi.fn().mockResolvedValue({ success: true }) };
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: true, retryAfterSeconds: 1 });
+    expect(minute.limit).toHaveBeenCalledWith({ key: jti });
+    expect(burst.limit).toHaveBeenCalledWith({ key: jti });
+
+    minute.limit.mockResolvedValueOnce({ success: false });
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: false, retryAfterSeconds: 60 });
+
+    burst.limit.mockResolvedValueOnce({ success: false });
+    await expect(
+      consumeJtiRateLimit(jti, {
+        OBSERVATION_RATE_LIMITER_MINUTE: minute,
+        OBSERVATION_RATE_LIMITER_BURST: burst,
+      }),
+    ).resolves.toEqual({ allowed: false, retryAfterSeconds: 10 });
+  });
+
+  it('detects same-ID conflicts before per-item validation and quarantines both copies', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const valid = event();
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([
+        valid,
+        {
+          ...valid,
+          schema_version: 2,
+          search_text: 'private query',
+          email: 'person@example.com',
+          credential: 'secret-value',
+          full_url: 'https://example.com/private?token=secret',
+        },
+      ]),
+    );
+    expect(response.status).toBe(200);
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+    ]);
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    expect(enqueueObservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'observation_conflict.v1',
+        tenantId: venueId,
+        eventId: valid.event_id,
+        authorizedPublicationId: publicationId,
+        copies: expect.arrayContaining([
+          expect.objectContaining({ validation: 'valid', event: valid }),
+          expect.objectContaining({
+            validation: 'invalid',
+            metadata: expect.objectContaining({ schemaVersionStatus: 'other' }),
+          }),
+        ]),
+      }),
+      {},
+    );
+    const conflictMessage = enqueueObservation.mock.calls[0]?.[0];
+    expect(JSON.stringify(conflictMessage)).not.toContain('private query');
+    expect(JSON.stringify(conflictMessage)).not.toContain('person@example.com');
+    expect(JSON.stringify(conflictMessage)).not.toContain('secret-value');
+    expect(JSON.stringify(conflictMessage)).not.toContain('example.com/private');
+  });
+
+  it('rejects deeply nested invalid JSON without recursive canonicalization failure', async () => {
+    let payload: unknown = 'leaf';
+    for (let depth = 0; depth < 12_000; depth += 1) payload = [payload];
+    const enqueue = vi.fn();
+    const result = await ingestObservations(
+      [{ event_id: crypto.randomUUID(), payload }],
+      { venueId, publicationId, jti },
+      { enqueue },
+    );
+    expect(result.queueUnavailable).toBe(false);
+    if (result.queueUnavailable) throw new Error('unexpected Queue failure');
+    expect(result.response.receipts).toMatchObject([
+      { status: 'rejected', reason_code: 'schema_invalid', retryable: false },
+    ]);
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+  it('quarantines invalid same-metadata copies when their raw payload checksums differ', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const base = event();
+    const first = { ...base, schema_version: 2, payload: { ...base.payload, shortlist_size: 1 } };
+    const second = { ...base, schema_version: 2, payload: { ...base.payload, shortlist_size: 2 } };
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([first, second]),
+    );
+    expect(response.status).toBe(200);
+    expect((await parseObservationReceiptBatch(response)).receipts).toMatchObject([
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+      { status: 'rejected', reason_code: 'event_id_conflict' },
+    ]);
+    const message = enqueueObservation.mock.calls[0]?.[0];
+    expect(message.kind).toBe('observation_conflict.v1');
+    expect(message.copies[0].canonicalChecksum).not.toBe(message.copies[1].canonicalChecksum);
+    expect(JSON.stringify(message)).not.toContain('shortlist_size');
+  });
+  it('returns 503 when the conflict quarantine handoff is not confirmed', async () => {
+    const valid = event();
+    const response = await createApp({
+      ...baseServices,
+      enqueueObservation: vi.fn().mockRejectedValue(new Error('queue unavailable')),
+    }).fetch(request([valid, { ...valid, payload: { ...valid.payload, shortlist_size: 2 } }]));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'queue_unavailable' });
+  });
+
+  it('rejects client attempts to override venue_id or inject trusted/consent classification', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const attackerVenue = crypto.randomUUID();
+    const response = await createApp({ ...baseServices, enqueueObservation }).fetch(
+      request([
+        { ...event(), venue_id: attackerVenue },
+        { ...event(), tenant_id: attackerVenue },
+        { ...event(), is_trusted: true },
+        { ...event(), consent: true },
+        { ...event(), classification: 'real_diner' },
+      ]),
+    );
+    expect(response.status).toBe(200);
+    const parsed = await parseObservationReceiptBatch(response);
+    expect(parsed.receipts).toHaveLength(5);
+    for (const receipt of parsed.receipts) {
+      expect(receipt.status).toBe('rejected');
+      expect(receipt.reason_code).toBe('schema_invalid');
+    }
+    expect(enqueueObservation).not.toHaveBeenCalled();
+  });
+
+  it('enqueues repeated deliveries across separate requests for downstream consumer deduplication', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const original = event();
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+
+    const firstResponse = await appInstance.fetch(request([original]));
+    expect(firstResponse.status).toBe(200);
+    const firstParsed = await parseObservationReceiptBatch(firstResponse);
+    expect(firstParsed.receipts[0]).toMatchObject({
+      event_id: original.event_id,
+      status: 'accepted',
+      reason_code: null,
+    });
+
+    const secondResponse = await appInstance.fetch(request([original]));
+    expect(secondResponse.status).toBe(200);
+    const secondParsed = await parseObservationReceiptBatch(secondResponse);
+    expect(secondParsed.receipts[0]).toMatchObject({
+      event_id: original.event_id,
+      status: 'accepted',
+      reason_code: null,
+    });
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(2);
+  });
+
+  it('correctly handles fractional seconds up to nanoseconds and rejects invalid calendar dates in conflict evidence', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+
+    // 1. Valid event with microseconds
+    const validMicro = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.123456Z',
+    };
+
+    // 2. Conflicting copy with nanoseconds and invalid schema (triggers conflict metadata)
+    const invalidNano = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.123456789Z',
+      payload: { unknown_field: true },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(request([validMicro, invalidNano]));
+    expect(response.status).toBe(200);
+
+    const parsed = await parseObservationReceiptBatch(response);
+    expect(parsed.receipts).toHaveLength(2);
+    expect(parsed.receipts[0]?.status).toBe('rejected');
+    expect(parsed.receipts[0]?.reason_code).toBe('event_id_conflict');
+    expect(parsed.receipts[1]?.status).toBe('rejected');
+    expect(parsed.receipts[1]?.reason_code).toBe('event_id_conflict');
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const queued = enqueueObservation.mock.calls[0]?.[0] as {
+      kind: string;
+      copies: { validation: string; metadata?: { occurredAt: string | null } }[];
+    };
+    expect(queued.kind).toBe('observation_conflict.v1');
+    expect(queued.copies).toHaveLength(2);
+
+    // Microsecond copy is valid, so validation is 'valid'
+    expect(queued.copies[0]?.validation).toBe('valid');
+
+    // Nanosecond invalid copy metadata preserves occurredAt without sub-millisecond truncation
+    expect(queued.copies[1]?.validation).toBe('invalid');
+    expect(queued.copies[1]?.metadata?.occurredAt).toBe('2026-10-31T12:30:45.123456789Z');
+  });
+
+  it('rejects invalid calendar dates and overflowing fractional digits in conflict metadata', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+
+    const validCopy = {
+      ...event(),
+      event_id: sharedEventId,
+    };
+
+    // Invalid calendar date: Feb 31 (must become null, not silently normalized to March 3)
+    const feb31Copy = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-02-31T12:30:45Z',
+      payload: { invalid: true },
+    };
+
+    // Overflowing fractional digits (> 9 digits)
+    const overflowFractionCopy = {
+      ...event(),
+      event_id: sharedEventId,
+      occurred_at: '2026-10-31T12:30:45.1234567890Z',
+      payload: { invalid: true },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(request([validCopy, feb31Copy, overflowFractionCopy]));
+    expect(response.status).toBe(200);
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const queued = enqueueObservation.mock.calls[0]?.[0] as {
+      kind: string;
+      copies: { validation: string; metadata?: { occurredAt: string | null } }[];
+    };
+    expect(queued.kind).toBe('observation_conflict.v1');
+    expect(queued.copies).toHaveLength(3);
+
+    // Feb 31 must be sanitized to null
+    expect(queued.copies[1]?.validation).toBe('invalid');
+    expect(queued.copies[1]?.metadata?.occurredAt).toBeNull();
+
+    // 10-digit fractional seconds must be sanitized to null
+    expect(queued.copies[2]?.validation).toBe('invalid');
+    expect(queued.copies[2]?.metadata?.occurredAt).toBeNull();
+  });
+
+  it('enforces PostgreSQL-compatible microsecond timestamp precision and boundary classification matching PR #31', async () => {
+    const fixedNow = new Date('2026-11-01T12:00:00.000Z');
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const appInstance = createApp({
+      ...baseServices,
+      enqueueObservation,
+      now: () => fixedNow,
+    });
+
+    // 1. Reviewer reproduction case 1: 5 minutes + 1 microsecond is rejected as future_time
+    const resFuture1Micro = await appInstance.fetch(
+      request([
+        {
+          ...event(),
+          occurred_at: '2026-11-01T12:05:00.000001Z',
+        },
+      ]),
+    );
+    expect(resFuture1Micro.status).toBe(200);
+    const parsedFuture = await parseObservationReceiptBatch(resFuture1Micro);
+    expect(parsedFuture.receipts[0]?.status).toBe('rejected');
+    expect(parsedFuture.receipts[0]?.reason_code).toBe('future_time');
+    expect(
+      classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', fixedNow.toISOString()),
+    ).toEqual({ disposition: 'rejected', reasonCode: 'future_time' });
+
+    // 2. Reviewer reproduction case 2: 7-digit fractional second rounds onto inclusive 24h lower boundary and is accepted
+    const res7DigitOld = await appInstance.fetch(
+      request([
+        {
+          ...event(),
+          occurred_at: '2026-10-31T11:59:59.9999999Z',
+        },
+      ]),
+    );
+    expect(res7DigitOld.status).toBe(200);
+    const parsed7Digit = await parseObservationReceiptBatch(res7DigitOld);
+    expect(parsed7Digit.receipts[0]?.status).toBe('accepted');
+    expect(parsed7Digit.receipts[0]?.reason_code).toBeNull();
+    expect(
+      classifyObservationTimeWindow('2026-10-31T11:59:59.9999999Z', fixedNow.toISOString()),
+    ).toEqual({ disposition: 'accepted' });
+
+    // 3. Exact lower boundary (firstReceivedAt - 24 hours): accepted
+    const resExactLower = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T12:00:00.000000Z' }]),
+    );
+    const parsedExactLower = await parseObservationReceiptBatch(resExactLower);
+    expect(parsedExactLower.receipts[0]?.status).toBe('accepted');
+    expect(parsedExactLower.receipts[0]?.reason_code).toBeNull();
+
+    // 4. Lower boundary + 1 microsecond: accepted
+    const resLowerPlus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T12:00:00.000001Z' }]),
+    );
+    const parsedLowerPlus1Micro = await parseObservationReceiptBatch(resLowerPlus1Micro);
+    expect(parsedLowerPlus1Micro.receipts[0]?.status).toBe('accepted');
+
+    // 5. Lower boundary - 1 microsecond: rejected as too_old
+    const resLowerMinus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-10-31T11:59:59.999999Z' }]),
+    );
+    const parsedLowerMinus1Micro = await parseObservationReceiptBatch(resLowerMinus1Micro);
+    expect(parsedLowerMinus1Micro.receipts[0]?.status).toBe('rejected');
+    expect(parsedLowerMinus1Micro.receipts[0]?.reason_code).toBe('too_old');
+
+    // 6. Exact upper boundary (firstReceivedAt + 5 minutes): accepted
+    const resExactUpper = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.000000Z' }]),
+    );
+    const parsedExactUpper = await parseObservationReceiptBatch(resExactUpper);
+    expect(parsedExactUpper.receipts[0]?.status).toBe('accepted');
+
+    // 7. Upper boundary - 1 microsecond: accepted
+    const resUpperMinus1Micro = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:04:59.999999Z' }]),
+    );
+    const parsedUpperMinus1Micro = await parseObservationReceiptBatch(resUpperMinus1Micro);
+    expect(parsedUpperMinus1Micro.receipts[0]?.status).toBe('accepted');
+
+    // 8. Halfway fractional timestamp .0000005Z (banker round-to-even) at upper boundary: accepted
+    const resHalfway = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.0000005Z' }]),
+    );
+    const parsedHalfway = await parseObservationReceiptBatch(resHalfway);
+    expect(parsedHalfway.receipts[0]?.status).toBe('accepted');
+
+    // 9. Sub-microsecond .0000006Z > 5 rounds up to .000001Z: rejected as future_time
+    const resRoundUpFuture = await appInstance.fetch(
+      request([{ ...event(), occurred_at: '2026-11-01T12:05:00.0000006Z' }]),
+    );
+    const parsedRoundUpFuture = await parseObservationReceiptBatch(resRoundUpFuture);
+    expect(parsedRoundUpFuture.receipts[0]?.status).toBe('rejected');
+    expect(parsedRoundUpFuture.receipts[0]?.reason_code).toBe('future_time');
+  });
+
+  it('correctly isolates unauthorized publication in conflict copies with bounded invalid metadata', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const sharedEventId = crypto.randomUUID();
+    const authorizedPubId = publicationId;
+    const unauthorizedPubId = '50000000-0000-4000-8000-000000000002';
+
+    // Copy A: authorized publication
+    const copyA = {
+      ...event(),
+      event_id: sharedEventId,
+      publication_revision_id: authorizedPubId,
+      payload: {
+        ...event().payload,
+        shortlist_size: 1,
+      },
+    };
+
+    // Copy B: schema-valid event with a different, unauthorized publication ID
+    const copyB = {
+      ...event(),
+      event_id: sharedEventId,
+      publication_revision_id: unauthorizedPubId,
+      payload: {
+        ...event().payload,
+        shortlist_size: 2,
+      },
+    };
+
+    const appInstance = createApp({ ...baseServices, enqueueObservation });
+    const response = await appInstance.fetch(request([copyA, copyB]));
+    expect(response.status).toBe(200);
+
+    // Both copies receive terminal conflict receipts
+    const receipts = await parseObservationReceiptBatch(response);
+    expect(receipts.receipts).toHaveLength(2);
+    expect(receipts.receipts[0]?.status).toBe('rejected');
+    expect(receipts.receipts[0]?.reason_code).toBe('event_id_conflict');
+    expect(receipts.receipts[1]?.status).toBe('rejected');
+    expect(receipts.receipts[1]?.reason_code).toBe('event_id_conflict');
+
+    // Verify enqueued conflict envelope
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const enqueuedEnvelope = enqueueObservation.mock.calls[0]?.[0];
+    expect(enqueuedEnvelope).toBeDefined();
+    expect(enqueuedEnvelope.kind).toBe('observation_conflict.v1');
+    expect(enqueuedEnvelope.tenantId).toBe(venueId);
+    expect(enqueuedEnvelope.eventId).toBe(sharedEventId);
+    expect(enqueuedEnvelope.authorizedPublicationId).toBe(authorizedPubId);
+    expect(enqueuedEnvelope.copies).toHaveLength(2);
+
+    const [queuedCopyA, queuedCopyB] = enqueuedEnvelope.copies;
+
+    // 1. Both copies retain their checksums
+    const checksumA = await sha256(canonicalJson(copyA));
+    const checksumB = await sha256(canonicalJson(copyB));
+    expect(queuedCopyA.canonicalChecksum).toBe(checksumA);
+    expect(queuedCopyB.canonicalChecksum).toBe(checksumB);
+
+    // 2. The authorized copy remains valid
+    expect(queuedCopyA.validation).toBe('valid');
+    expect(queuedCopyA.event).toEqual(copyA);
+
+    // 3. The unauthorized copy is represented with bounded invalid metadata
+    expect(queuedCopyB.validation).toBe('invalid');
+    expect(queuedCopyB.event).toBeUndefined();
+    expect(queuedCopyB.metadata).toEqual({
+      schemaVersionStatus: 'observation.v2',
+      eventType: 'dish_saved',
+      occurredAt: copyB.occurred_at,
+      publicationStatus: 'mismatch',
+      payloadObject: true,
+    });
+
+    // 4. Unauthorized copy does not bypass publication authorization
+    expect(queuedCopyB.metadata.publicationStatus).toBe('mismatch');
+
+    // 5. Shared contracts from PR #31 validate the envelope without error
+    expect(ObservationConflictQueueMessageSchema.safeParse(enqueuedEnvelope).success).toBe(true);
+    expect(ObservationQueueEnvelopeSchema.safeParse(enqueuedEnvelope).success).toBe(true);
+
+    // 6. Demonstrate consumer conflict handling succeeds and does not route to DLQ
+    // (Simulating consumer's validateConflictObservationEnvelope & processConflictMessage)
+    const copies = enqueuedEnvelope.copies;
+    const validatedCopies = [];
+    for (const copy of copies) {
+      if (copy.validation === 'valid') {
+        expect(copy.event.publication_revision_id).toBe(enqueuedEnvelope.authorizedPublicationId);
+        const recomputed = await sha256(canonicalJson(copy.event));
+        expect(copy.canonicalChecksum).toBe(recomputed);
+        validatedCopies.push({ checksum: copy.canonicalChecksum, valid: true });
+      } else if (copy.validation === 'invalid') {
+        expect(copy.metadata.publicationStatus).toBe('mismatch');
+        expect(copy.canonicalChecksum).toMatch(/^[0-9a-f]{64}$/);
+        validatedCopies.push({ checksum: copy.canonicalChecksum, valid: false });
+      }
+    }
+    expect(validatedCopies).toHaveLength(2);
+    expect(validatedCopies[0]?.valid).toBe(true);
+    expect(validatedCopies[1]?.valid).toBe(false);
+  });
+
+  it('proves traffic_class survives the producer-to-consumer handoff without breaking PR #31', async () => {
+    const enqueueObservation = vi.fn().mockResolvedValue(undefined);
+    const services = {
+      ...baseServices,
+      verifyMenu: vi.fn().mockResolvedValue({
+        venueId,
+        publicationId,
+        jti,
+        trafficClass: 'demo',
+      }),
+      enqueueObservation,
+    };
+    const input = event();
+    const response = await createApp(services).fetch(request([input]));
+    expect(response.status).toBe(200);
+
+    expect(enqueueObservation).toHaveBeenCalledTimes(1);
+    const enqueued = enqueueObservation.mock.calls[0]?.[0];
+    expect(enqueued.traffic_class).toBe('demo');
+
+    // Consumer parsing with shared contracts validates traffic_class
+    const parsedEnvelope = ObservationQueueEnvelopeSchema.parse(enqueued);
+    if (parsedEnvelope.kind === 'observation.v2') {
+      expect(parsedEnvelope.traffic_class).toBe('demo');
+      const canonical = toCanonicalObservation(parsedEnvelope);
+      expect(canonical.event_id).toBe(input.event_id);
+    }
+
+    // Message without traffic_class (older producer / PR #31 schema) cleanly defaults to 'live'
+    const withoutTrafficClass = { ...enqueued };
+    delete withoutTrafficClass.traffic_class;
+    const parsedDefault = ObservationQueueMessageSchema.parse(withoutTrafficClass);
+    expect(parsedDefault.traffic_class).toBe('live');
   });
 });
 
