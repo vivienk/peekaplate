@@ -86,3 +86,126 @@ describe('dish HTTP boundary', () => {
     expect(await response.json()).toEqual({ error: 'service_unavailable' });
   });
 });
+
+describe('RES-02 publication HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000011';
+  const menuId = '00000000-0000-4000-8000-000000000012';
+  const actorId = '00000000-0000-4000-8000-000000000013';
+  const commandId = '00000000-0000-4000-8000-000000000014';
+  const basePath = `/venues/${venueId}/menus/${menuId}`;
+  const execute = vi.fn();
+  const verify = vi.fn().mockResolvedValue(actorId);
+
+  it('passes only validated immutable approval references to the command transaction', async () => {
+    const approval = {
+      menuId,
+      approvalId: '00000000-0000-4000-8000-000000000015',
+      version: 1,
+      menuRevisionId: '00000000-0000-4000-8000-000000000016',
+      contentApprovalId: '00000000-0000-4000-8000-000000000018',
+      contentHash: 'a'.repeat(64),
+      assetApprovalId: '00000000-0000-4000-8000-000000000019',
+      assetManifestHash: 'b'.repeat(64),
+      status: 'approved' as const,
+    };
+    const approve = vi.fn().mockResolvedValue(approval);
+    const body = {
+      commandId,
+      expectedVersion: 0,
+      menuRevisionId: approval.menuRevisionId,
+      contentApprovalId: approval.contentApprovalId,
+      assetApprovalId: approval.assetApprovalId,
+    };
+    const response = await createApp({ verify, execute, approve }).request(
+      `${basePath}/approvals`,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(approval);
+    expect(approve).toHaveBeenCalledWith(actorId, venueId, { ...body, menuId }, {});
+  });
+
+  it('keeps publish and withdrawal as distinct endpoints', async () => {
+    const publication = {
+      menuId,
+      publicationId: '00000000-0000-4000-8000-000000000017',
+      version: 1,
+      approvalId: '00000000-0000-4000-8000-000000000015',
+      publicationHash: 'c'.repeat(64),
+      availabilityVersion: 1,
+      status: 'published' as const,
+    };
+    const publish = vi.fn().mockResolvedValue(publication);
+    const withdraw = vi.fn().mockResolvedValue({
+      ...publication,
+      version: 2,
+      availabilityVersion: 2,
+      status: 'withdrawn',
+    });
+    const testApp = createApp({ verify, execute, publish, withdraw });
+    const publishBody = {
+      commandId,
+      expectedVersion: 0,
+      approvalId: publication.approvalId,
+    };
+    expect(
+      (
+        await testApp.request(`${basePath}/publications`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+          body: JSON.stringify(publishBody),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await testApp.request(`${basePath}/withdrawals`, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandId, expectedVersion: 1 }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(publish).toHaveBeenCalledWith(actorId, venueId, { ...publishBody, menuId }, {});
+    expect(withdraw).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      { commandId, expectedVersion: 1, menuId },
+      {},
+    );
+  });
+
+  it('rejects browser-supplied authority and malformed hashes before command execution', async () => {
+    const approve = vi.fn();
+    const testApp = createApp({ verify, execute, approve });
+    for (const body of [
+      {
+        commandId,
+        expectedVersion: 0,
+        menuRevisionId: '00000000-0000-4000-8000-000000000016',
+        contentApprovalId: '00000000-0000-4000-8000-000000000018',
+        assetApprovalId: '00000000-0000-4000-8000-000000000019',
+        actorId,
+      },
+      {
+        commandId,
+        expectedVersion: 0,
+        menuRevisionId: '00000000-0000-4000-8000-000000000016',
+        contentApprovalId: 'not-an-id',
+        assetApprovalId: '00000000-0000-4000-8000-000000000019',
+      },
+    ]) {
+      const response = await testApp.request(`${basePath}/approvals`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(approve).not.toHaveBeenCalled();
+  });
+});

@@ -1,12 +1,17 @@
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
-import { DishRevisionSchema } from '@peekaplate/contracts';
+import {
+  DishRevisionSchema,
+  MenuApprovalSchema,
+  MenuPublicationSchema,
+} from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createDishRevision, replayDish } from './dish-command';
 import type { Bindings } from './index';
+import { replayPublication, replayReview } from './publication-command';
 import { readTeamAnalytics } from './team-analytics';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -71,6 +76,69 @@ async function requestEvidence(
     },
     body: JSON.stringify(body),
   });
+}
+
+async function requestPublication(
+  menuId: string,
+  action: 'approvals' | 'publications' | 'withdrawals',
+  body: unknown,
+  tenant = venue,
+  subject = actor,
+) {
+  return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menus/${menuId}/${action}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${await token(subject)}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function approvalCommand(expectedVersion = 0) {
+  return {
+    commandId: crypto.randomUUID(),
+    expectedVersion,
+    menuRevisionId: crypto.randomUUID(),
+    contentApprovalId: crypto.randomUUID(),
+    assetApprovalId: crypto.randomUUID(),
+  };
+}
+
+async function registerReviewSubject(
+  menuId: string,
+  input: ReturnType<typeof approvalCommand>,
+  tenant = venue,
+) {
+  await admin.query(
+    `INSERT INTO app_private.menu_review_subject
+      (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash,
+       asset_approval_id, asset_manifest_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      tenant,
+      menuId,
+      input.menuRevisionId,
+      input.contentApprovalId,
+      'a'.repeat(64),
+      input.assetApprovalId,
+      'b'.repeat(64),
+    ],
+  );
+}
+
+async function publicationCounts(menuId: string) {
+  const result = await admin.query(
+    `SELECT
+    (SELECT count(*)::int FROM app_private.es_event WHERE stream_id=$1) AS events,
+    (SELECT count(*)::int FROM app_private.menu_approval WHERE menu_id=$1) AS approvals,
+    (SELECT count(*)::int FROM app_private.menu_review_current WHERE menu_id=$1) AS reviews,
+    (SELECT count(*)::int FROM app_private.menu_publication_current WHERE menu_id=$1) AS publications,
+    (SELECT count(*)::int FROM app_private.es_command WHERE payload->>'menuId'=$1::text) AS receipts,
+    (SELECT count(*)::int FROM app_private.outbox WHERE payload->>'menuId'=$1::text) AS outbox`,
+    [menuId],
+  );
+  return result.rows[0];
 }
 
 async function counts(dishId: string) {
@@ -509,6 +577,202 @@ describe('real PostgreSQL staff command', () => {
       const nonmember = crypto.randomUUID();
       const res2 = await requestEvidence({ query: 'Tuscan White Bean Soup' }, venue, nonmember);
       expect(res2.status).toBe(403);
+    });
+  });
+});
+
+describe('real PostgreSQL menu publication commands', () => {
+  it('keeps approval, publication and withdrawal as separate atomic commands', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const approvalResponse = await requestPublication(menuId, 'approvals', approvalInput);
+    expect(approvalResponse.status).toBe(200);
+    const approval = MenuApprovalSchema.parse(await approvalResponse.json());
+
+    const publishCommand = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const publishedResponse = await requestPublication(menuId, 'publications', publishCommand);
+    expect(publishedResponse.status).toBe(200);
+    const published = MenuPublicationSchema.parse(await publishedResponse.json());
+    expect(published).toMatchObject({
+      menuId,
+      approvalId: approval.approvalId,
+      version: 1,
+      availabilityVersion: 1,
+      status: 'published',
+    });
+
+    const withdrawnResponse = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawnResponse.status).toBe(200);
+    expect(await withdrawnResponse.json()).toMatchObject({
+      publicationId: published.publicationId,
+      publicationHash: published.publicationHash,
+      version: 2,
+      availabilityVersion: 2,
+      status: 'withdrawn',
+    });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 3,
+      approvals: 1,
+      reviews: 1,
+      publications: 1,
+      receipts: 3,
+      outbox: 3,
+    });
+  });
+
+  it('denies non-owner approval before any publication write', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const response = await requestPublication(
+      menuId,
+      'approvals',
+      approvalInput,
+      venue,
+      otherActor,
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 0,
+      approvals: 0,
+      reviews: 0,
+      publications: 0,
+      receipts: 0,
+      outbox: 0,
+    });
+  });
+
+  it('returns the original publication receipt for an identical retry', async () => {
+    const menuId = crypto.randomUUID();
+    const approvalInput = approvalCommand();
+    await registerReviewSubject(menuId, approvalInput);
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', approvalInput)).json(),
+    );
+    const publishCommand = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const first = await requestPublication(menuId, 'publications', publishCommand);
+    const retry = await requestPublication(menuId, 'publications', publishCommand);
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(await first.json());
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 2,
+      approvals: 1,
+      reviews: 1,
+      publications: 1,
+      receipts: 2,
+      outbox: 2,
+    });
+  });
+
+  it('allows only one of two concurrent first publications to commit', async () => {
+    const menuId = crypto.randomUUID();
+    const firstInput = approvalCommand();
+    const secondInput = approvalCommand(1);
+    await registerReviewSubject(menuId, firstInput);
+    await registerReviewSubject(menuId, secondInput);
+    const firstApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', firstInput)).json(),
+    );
+    const secondApproval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', secondInput)).json(),
+    );
+    const responses = await Promise.all([
+      requestPublication(menuId, 'publications', {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: firstApproval.approvalId,
+      }),
+      requestPublication(menuId, 'publications', {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: secondApproval.approvalId,
+      }),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 3,
+      approvals: 2,
+      reviews: 1,
+      publications: 1,
+      receipts: 3,
+      outbox: 3,
+    });
+
+    const events = await admin.query(
+      `SELECT tenant_id AS "tenantId", stream_type AS "streamType",
+        stream_id AS "streamId", version, schema_version AS "schemaVersion",
+        event_type AS "eventType", payload, metadata
+       FROM app_private.es_event
+       WHERE tenant_id=$1 AND stream_type='menu_publication' AND stream_id=$2
+       ORDER BY version`,
+      [venue, menuId],
+    );
+    const current = await admin.query(
+      `SELECT tenant_id AS "tenantId", menu_id AS "menuId",
+        publication_id AS "publicationId", version, approval_id AS "approvalId",
+        publication_hash AS "publicationHash",
+        availability_version AS "availabilityVersion", status
+       FROM app_private.menu_publication_current
+       WHERE tenant_id=$1 AND menu_id=$2`,
+      [venue, menuId],
+    );
+    expect(replayPublication(events.rows)).toEqual(current.rows[0]);
+
+    const reviewEvents = await admin.query(
+      `SELECT tenant_id AS "tenantId", stream_type AS "streamType",
+        stream_id AS "streamId", version, schema_version AS "schemaVersion",
+        event_type AS "eventType", payload, metadata
+       FROM app_private.es_event
+       WHERE tenant_id=$1 AND stream_type='menu_review' AND stream_id=$2
+       ORDER BY version`,
+      [venue, menuId],
+    );
+    const reviewCurrent = await admin.query(
+      `SELECT current.tenant_id AS "tenantId", current.menu_id AS "menuId",
+        approval.approval_id AS "approvalId", current.version,
+        approval.menu_revision_id AS "menuRevisionId",
+        approval.content_approval_id AS "contentApprovalId",
+        approval.content_hash AS "contentHash",
+        approval.asset_approval_id AS "assetApprovalId",
+        approval.asset_manifest_hash AS "assetManifestHash",
+        'approved' AS status
+       FROM app_private.menu_review_current current
+       JOIN app_private.menu_approval approval
+         ON approval.tenant_id=current.tenant_id
+        AND approval.menu_id=current.menu_id
+        AND approval.approval_id=current.approval_id
+       WHERE current.tenant_id=$1 AND current.menu_id=$2`,
+      [venue, menuId],
+    );
+    expect(replayReview(reviewEvents.rows)).toEqual(reviewCurrent.rows[0]);
+  });
+
+  it('rejects an owner-supplied revision that has no canonical review subject', async () => {
+    const menuId = crypto.randomUUID();
+    const response = await requestPublication(menuId, 'approvals', approvalCommand());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'review_subject_not_found' });
+    expect(await publicationCounts(menuId)).toEqual({
+      events: 0,
+      approvals: 0,
+      reviews: 0,
+      publications: 0,
+      receipts: 0,
+      outbox: 0,
     });
   });
 });

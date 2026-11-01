@@ -84,6 +84,57 @@ export const DishRevisionSchema = z.strictObject({
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
 export type DishRevision = z.infer<typeof DishRevisionSchema>;
 
+export const MenuScopeSchema = z.strictObject({ venueId: uuid, menuId: uuid });
+
+const commandVersion = z.number().int().nonnegative().max(2_147_483_646);
+
+export const ApproveMenuRevisionSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+});
+
+export const MenuApprovalSchema = z.strictObject({
+  menuId: uuid,
+  approvalId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  contentHash: hash,
+  assetApprovalId: uuid,
+  assetManifestHash: hash,
+  status: z.literal('approved'),
+});
+
+export const PublishMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  approvalId: uuid,
+});
+
+export const WithdrawMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+});
+
+export const MenuPublicationSchema = z.strictObject({
+  menuId: uuid,
+  publicationId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  approvalId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  status: z.enum(['published', 'withdrawn']),
+});
+
+export type ApproveMenuRevision = z.infer<typeof ApproveMenuRevisionSchema>;
+export type MenuApproval = z.infer<typeof MenuApprovalSchema>;
+export type PublishMenu = z.infer<typeof PublishMenuSchema>;
+export type WithdrawMenu = z.infer<typeof WithdrawMenuSchema>;
+export type MenuPublication = z.infer<typeof MenuPublicationSchema>;
+
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
 export const MAX_PASSAGES = 10;
