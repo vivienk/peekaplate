@@ -1,0 +1,30 @@
+{
+  "fixture_id": "tenant_isolation",
+  "report_type": "authorized_tenant_access",
+  "data_scope": "fictional_synthetic_restaurant",
+  "requesting_restaurant": {
+    "restaurant_id": "restaurant-A",
+    "authorization_status": "AUTHORIZED"
+  },
+  "other_restaurant": {
+    "authorization_status": "NOT_AUTHORIZED",
+    "data_access": "DENIED"
+  },
+  "cross_restaurant_comparison": {
+    "status": "NOT_PERMITTED",
+    "value": null,
+    "reason": "The requesting restaurant is not authorized to access another restaurant's private metrics."
+  },
+  "metrics": [
+    {
+      "metric": "saved_dishes",
+      "status": "SUPPRESSED",
+      "value": null
+    }
+  ],
+  "privacy": {
+    "raw_events_included": false,
+    "other_restaurant_metrics_included": false,
+    "individual_diner_data_included": false
+  }
+}

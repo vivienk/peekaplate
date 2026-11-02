@@ -1,4 +1,4 @@
-# Shared context
+ # Shared context
 
 Read this map first, then the relevant source paths and ADRs. It is navigation, not proof or executable instruction. `pnpm context:show -- <id>` returns one node. Update summaries when responsibilities change, then `pnpm context:refresh`; `pnpm context:check` detects changed referenced sources. A fingerprint cannot validate prose or discover unlisted files. Add new files to their node when a module grows.
 
@@ -13,19 +13,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
-        "packages/contracts/fixtures/observation.v2/README.md"
+        "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "009e8b7c51440f3fcf4235cf30170cf5ceecfa736ce15b61368a065fdd847147"
+      "sourceFingerprint": "3c17976293d92da5fd797fc7a3b0a46340ac46540ab6231965021978578b2b0c"
     },
     {
       "id": "tokens",
@@ -63,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell stays readable without JavaScript; optional consent-gated PostHog shell views are wired. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; Search/Save/Compare are disabled until connected. S3-DIN-01.4 adds local searchMenu(menu, query) (complete-dish IDs plus allergy-line flag); the search view is not wired yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell stays readable without JavaScript; optional consent-gated PostHog shell views are wired. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; Search/Save/Compare are disabled until connected. S3-DIN-01.4 adds local searchMenu(menu, query) (complete-dish IDs plus allergy-line flag); the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -84,7 +86,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
         "tests/e2e/menu-states.spec.ts",
-        "vitest.config.ts"
+        "vitest.config.ts",
+        "frontend/diner/src/save/saved-list.ts",
+        "frontend/diner/src/save/storage.ts",
+        "frontend/diner/src/save/storage.test.ts",
+        "frontend/diner/src/save/save-state.ts",
+        "frontend/diner/src/save/save-state.test.ts",
+        "frontend/diner/src/save/fake-storage.ts",
+        "tests/e2e/save.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -93,7 +102,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "55f02ed6b86e5800c07748aed15d62238afab15c08b7cc36b2db493027410d3b"
+      "sourceFingerprint": "ccd45a6bb1b913baab3687d0ddc89e909dde4325b3e85e71b0fba08d1aa92ecf"
     },
     {
       "id": "console",
@@ -123,7 +132,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono retains staff/publication/JWKS, collaborator reads and bounded retrieval. Observations use server-derived token authority and Queue receipts. Consumer archives create-only R2 evidence before one tenant-scoped transaction writes index + event + typed detail; conflicts stay quarantined. Accepted historical indices can fill missing facts from checksum/identity-matched original archives without re-aging. Private staging operator inspects before explicit bounded backfill; unknown historical traffic stays blocked. Local/staging-issued tokens sign test class; production signs live. Public menu GET uses the exact diner CORS allowlist. Real workerd/browser/Queue/R2/PostgreSQL regression passes locally. Hosted follow-up deployment/verification pending; normal collection paused. Report API and real diner controls/outbox remain separate.",
+      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -196,12 +205,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f058b7df87afda2432f8989b561de324068770ea7a83612988ad5a378cf400ea"
+      "sourceFingerprint": "761c3ffaf8e85dbbe7308a09a8fbe6a46ea19ab34aeae7d9b66a770b0cdce05e"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venues, event/command/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated append-only PostHog export has eight raw/four unique synthetic events; its October22 audit verifies history20261021130000, scope675372, restricted definer execution and denied browser/runtime raw reads. Runtime cannot read scope; exporter cannot access app schema. The owner oracle covers NULL IDs, retries/conflicts and the ten-session floor. Canonical index/conflicts, typed facts and live-only tenant views exist; activity uses the greatest checkpoint. Consumer/report authorization and suppression integration remain separate. RES-02 adds immutable subjects/approvals, tenant/menu/hash foreign keys and runtime-read-only public bundles. Its migrations and synthetic hosted approval/publication/withdrawal checks pass; production remains unaccepted.",
+      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -252,7 +261,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "ADR0012 promotes reviewed main through staging and production separately. PR31 consumer merged into develop; release94 main35e989d deployed via approved Wrangler operator route as version3db23304-c53a-4fee-b0ba-260c3afe4060. Existing secrets/resources retained and only the source HTTP consumer replaced. Ten bounded hosted checks and15 public smoke checks passed; both Queues ended empty/paused and the remote probe stopped. Facts/backfill, diner-token/browser/owner acceptance, load/recovery and production remain gated. Isolated PR previews retain their separate build/deploy/cleanup controls. Later evidence-doc commits do not change deployed code.",
+      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Earlier acceptance records remain historical.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -295,7 +304,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/menu-ingestion-infra.test.mjs",
         "pnpm-lock.yaml",
         "docs/res02-staging-acceptance.json",
-        "docs/observation-staging-acceptance.json"
+        "docs/observation-staging-acceptance.json",
+        "docs/observation-facts-staging-acceptance.json"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -306,7 +316,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2a5c1cfac6a9633e1f3d88eff29955dfc305b2f898e1007bfdcbc3308484c370"
+      "sourceFingerprint": "c455e7e96487eb8a1233e519c22798a74051df3acbe89edf38ce1c62a22d050b"
     },
     {
       "id": "agents",
@@ -417,24 +427,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Recorded November1 hosted observation acceptance: reviewed PR70/31 reached main35e989d and staging version3db23304. Real Queue/R2/index/conflict/ACK/DLQ synthetic flow passed, alongside controlled remote storage/database retry recovery and15 public smoke checks. Final3 index rows/3 conflicts/6 archives remain labelled; another tenant and owner views expose0 run rows. Both Queues empty/paused, proxy stopped; production unchanged.",
+      "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
       "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
+        "diner"
       ],
-      "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
-    },
-    {
-      "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Verify the combined producer/consumer with real migrated PostgreSQL, approve and merge the final head, then promote reviewed code through main to staging for bounded synthetic Queue/R2/index/ACK/DLQ checks. Keep normal delivery paused and preserve existing resources. Typed-fact writes/backfill, owner reports and browser screen integration remain separate."
+      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
     },
     {
       "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
@@ -493,13 +490,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
     },
     {
-      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
-    },
-    {
       "date": "2026-11-02",
       "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
       "paths": [
@@ -514,6 +504,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
+    },
+    {
+      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
+    },
+    {
+      "date": "2026-11-02",
+      "summary": "Merged #99/#100 and deployed exact main c6a47bd after green CI. Six hosted checks pass: original-archive backfill, real signed-menu browser acceptance, native Queue/R2/typed facts, retries/conflicts and tenant/test exclusion. Desktop freeze recovered with explicit pause and read-only verification. Normal collection remains paused.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "paths": [
+        "docs/operations.md",
+        "docs/observation-facts-staging-acceptance.json"
+      ],
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate."
     }
   ]
 }

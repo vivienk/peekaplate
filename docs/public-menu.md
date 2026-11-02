@@ -115,3 +115,10 @@ Immutable-bundle hosting needs its own origin configuration. The regression
 uses a real signed token and browser cross-origin fetch through the Worker,
 Queue, R2 and migrated disposable database. It does not implement original-
 publication renewal after token expiry, real diner controls or report APIs.
+
+Own-token verification uses the public half of the configured signing JWK
+locally. It retains ES256 signature, issuer, audience, expiry and claim checks,
+and refreshes its verifier when the configured key changes. It does not fetch
+this Worker's own JWKS URL: a real hosted probe confirmed Cloudflare 1042 on
+that self-fetch, which caused the first genuine-token POST to return 503.
+The public JWKS endpoint remains available for independent verification.
