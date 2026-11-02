@@ -186,7 +186,13 @@ def main() -> None:
         writer = csv.DictWriter(fh, fieldnames=["menu", "variant", "mode", "field", "dish", "expected", "actual", "error"])
         writer.writeheader()
         for e in all_errors:
-            writer.writerow({k: e.get(k, "") for k in writer.fieldnames})
+            row = {}
+            for k in writer.fieldnames:
+                val = str(e.get(k, ""))
+                if val and val[0] in ("=", "+", "-", "@", "\t", "\r"):
+                    val = "'" + val
+                row[k] = val
+            writer.writerow(row)
     (args.out / "summary.json").write_text(json.dumps(rows, indent=1))
     print("\n".join(lines))
     print(f"\nWrote detailed report to {args.out}")

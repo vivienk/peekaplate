@@ -37,21 +37,30 @@ def reset_attempts():
         return old
 
 
+def _is_loopback(address):
+    if isinstance(address, tuple) and len(address) >= 1:
+        host = str(address[0])
+        return host in ("127.0.0.1", "localhost", "::1")
+    return False
+
+
 def blocked_connect(self, address):
-    if self.family == getattr(socket, "AF_UNIX", None):
+    if self.family == getattr(socket, "AF_UNIX", None) or _is_loopback(address):
         return _original_connect(self, address)
     _record_attempt()
     raise AssertionError(f"Network disabled by offline socket guard: blocked connection to {address}")
 
 
 def blocked_connect_ex(self, address):
-    if self.family == getattr(socket, "AF_UNIX", None):
+    if self.family == getattr(socket, "AF_UNIX", None) or _is_loopback(address):
         return _original_connect_ex(self, address)
     _record_attempt()
     raise AssertionError(f"Network disabled by offline socket guard: blocked connection_ex to {address}")
 
 
 def blocked_create_connection(address, *args, **kwargs):
+    if _is_loopback(address):
+        return _original_create_connection(address, *args, **kwargs)
     _record_attempt()
     raise AssertionError(f"Network disabled by offline socket guard: blocked create_connection to {address}")
 

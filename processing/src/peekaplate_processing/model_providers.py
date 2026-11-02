@@ -52,7 +52,7 @@ class ModelProviderConfig:
 PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     "google_studio": ModelProviderConfig(
         name="google_studio",
-        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY"),
         url_var="GEMINI_API_URL",
         model_var="GEMINI_MODEL",
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
@@ -61,7 +61,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "gemini": ModelProviderConfig(
         name="gemini",
-        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY"),
         url_var="GEMINI_API_URL",
         model_var="GEMINI_MODEL",
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
@@ -70,7 +70,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "openrouter": ModelProviderConfig(
         name="openrouter",
-        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
@@ -79,7 +79,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "qwen": ModelProviderConfig(
         name="qwen",
-        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
@@ -88,7 +88,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "glm": ModelProviderConfig(
         name="glm",
-        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
@@ -97,7 +97,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "deepseek": ModelProviderConfig(
         name="deepseek",
-        key_vars=("OPENROUTER_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("OPENROUTER_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://openrouter.ai/api/v1",
@@ -115,7 +115,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "openai": ModelProviderConfig(
         name="openai",
-        key_vars=("OPENAI_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("OPENAI_API_KEY",),
         url_var="MENU_AI_API_URL",
         model_var="MENU_AI_MODEL",
         default_url="https://api.openai.com/v1",

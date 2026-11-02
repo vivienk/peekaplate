@@ -123,6 +123,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     if llm is None: llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     started=time.perf_counter()
+    started_dt = datetime.now(timezone.utc)
     timings={}
     report=None
     completed=False
@@ -148,10 +149,10 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes, v4_errors = extract_vision_v4(p_client, images)
+                        v4_dishes, v4_errors = extract_vision_v4(p_client, images, timeout=llm_timeout)
                     if not v4_dishes:
                         raise ExtractionError("Vision extraction produced 0 dishes.")
-                    v4_report = build_v4_result(report.source, images, v4_dishes, datetime.fromtimestamp(started, tz=timezone.utc), errors=image_errors + v4_errors)
+                    v4_report = build_v4_result(report.source, images, v4_dishes, started_dt, errors=image_errors + v4_errors)
                     v4_report.warnings.extend(fallback_warnings)
                     v4_report.extraction_model = getattr(p_client, "model_name", None)
                     with measure(timings, "extraction_write"):

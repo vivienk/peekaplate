@@ -141,14 +141,17 @@ def _parse_page(text: str, page_num: int, errors: list[str]) -> list[V4Dish]:
         return recovered
 
 
-def extract_vision_v4(llm: Any, page_images: list[dict]) -> tuple[list[V4Dish], list[str]]:
+def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None) -> tuple[list[V4Dish], list[str]]:
     """Run direct multimodal extraction per page.
 
     Returns dishes (page numbers forced to the page that was sent) and page-level errors
-    describing possible dish loss. The client carries its own request timeout.
+    describing possible dish loss.
     """
     max_tok = getattr(llm, "max_tokens", 16384) or 16384
-    vision_llm = llm.bind(max_tokens=max_tok)
+    bind_kwargs: dict[str, Any] = {"max_tokens": max_tok}
+    if timeout is not None:
+        bind_kwargs["timeout"] = timeout
+    vision_llm = llm.bind(**bind_kwargs)
     prompt = f"{V4_VISION_PROMPT}\n\nREQUIRED JSON SCHEMA:\n{json.dumps(V4Batch.model_json_schema())}"
     all_dishes: list[V4Dish] = []
     errors: list[str] = []
@@ -158,7 +161,10 @@ def extract_vision_v4(llm: Any, page_images: list[dict]) -> tuple[list[V4Dish], 
             {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
             {"type": "image_url", "image_url": {"url": page["image_url"]}},
         ]
-        response = vision_llm.invoke([("system", prompt), ("human", content)])
+        invoke_kwargs: dict[str, Any] = {}
+        if timeout is not None:
+            invoke_kwargs["timeout"] = timeout
+        response = vision_llm.invoke([("system", prompt), ("human", content)], **invoke_kwargs)
         raw_content = getattr(response, "content", None)
         if not isinstance(raw_content, str) or not raw_content.strip():
             errors.append(f"Page {page_num}: vision model returned no content.")
