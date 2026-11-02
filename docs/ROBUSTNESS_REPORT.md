@@ -9,7 +9,46 @@
 
 ---
 
-## 1. Full Benchmark Matrix (Counts, Ratios & Denominators)
+## 0. Current results (latest code, Gemini 3 Flash, single model across every condition)
+
+Code changes since the earlier runs: image preflight (rejects sideways, > 15° skew and low contrast before any OCR/model request; 10–15° is review-only), Gemini `reasoning_effort="low"` (thinking tokens had been consuming the output budget and truncating dense menus), a one-entry-per-item prompt rule plus a merge of split price options, and the corrected multi-price handling. Runs: `processing/work/full-check-1793660008`, `-1793660071`, `-1793660292`. Same agent-drafted, unreviewed keys.
+
+| Menu | Variant | Mode | Status | Recall | Precision | Single-price accuracy | Abstained | Wrong | Wrong rate |
+|---|---|---|---|---|---|---|---|---|---|
+| virginia | original | `vision_v4` | complete | 23/23 | 23/23 | 14/14 | 0 | 0 | 0.0% |
+| virginia | blur2 | `vision_v4` | complete | 23/23 | 23/23 | 14/14 | 0 | 0 | 0.0% |
+| virginia | rotate8 | `vision_v4` | complete | 23/23 | 23/23 | 14/14 | 0 | 0 | 0.0% |
+| virginia | rotate12 (review-only) | `vision_v4` | complete | 23/23 | 23/23 | 14/14 | 0 | 0 | 0.0% |
+| virginia | rotate15 (review-only) | `vision_v4` | complete | 23/23 | 23/23 | 14/14 | 0 | 0 | 0.0% |
+| virginia | original | `ocr_image` | complete | 23/23 | 23/23 | 11/14 | 3 | 1 | 4.3% |
+| virginia | blur2 | `ocr_image` | complete | 23/23 | 23/23 | 11/14 | 3 | 1 | 4.3% |
+| virginia | rotate8 | `ocr_image` | complete | 21/23 | 21/23 | 0/12 | 12 | 0 | 0.0% |
+| virginia | rotate12 (review-only) | `ocr_image` | complete | 21/23 | 21/23 | 0/12 | 11 | 1 | 4.8% |
+| virginia | rotate15 (review-only) | `ocr_image` | complete | 21/23 | 21/23 | 0/12 | 12 | 0 | 0.0% |
+| patis | original | `vision_v4` | complete | 83/83 | 83/83 | 77/77 | 0 | 0 | 0.0% |
+| patis | blur2 | `vision_v4` | complete | 82/83 | 82/83 | 76/77 | 0 | 1 | 1.2% |
+| patis | rotate8 | `vision_v4` | incomplete¹ | 82/83 | 82/83 | 77/77 | 0 | 0 | 0.0% |
+| patis | rotate12 (review-only) | `vision_v4` | complete | 82/83 | 82/83 | 75/77 | 0 | 2 | 2.4% |
+| patis | rotate15 (review-only) | `vision_v4` | incomplete¹ | 79/83 | 79/81 | 74/74 | 0 | 0 | 0.0% |
+| patis | original | `ocr_image` | complete | 79/83 | 79/83 | 34/77 | 43 | 0 | 0.0% |
+| patis | blur2 | `ocr_image` | incomplete | 54/83 | 54/55 | 44/53 | 1 | 8 | 14.8% |
+| patis | rotate8 | `ocr_image` | incomplete | 73/83 | 73/77 | 5/72 | 67 | 0 | 0.0% |
+| patis | rotate12 (review-only) | `ocr_image` | incomplete | 72/83 | 72/72 | 37/68 | 30 | 1 | 1.4% |
+| patis | rotate15 | `ocr_image` | failed² | — | — | — | — | — | — |
+| both | lowcontrast, rotate90 | both | **rejected by preflight** | — | — | — | — | — | no OCR/model request made |
+
+¹ The model appended malformed trailing output; all complete dishes were recovered and the run is honestly marked `incomplete`.
+² OCR.space returned HTTP 429 (quota), not an image failure; not counted.
+
+**Against the agreed targets (≥95% recall, ≥95% precision, ≥95% single-price accuracy, ≤2% wrong; clean/blur/≤10°):**
+- `vision_v4` **meets every target** on both menus for clean, blur and 8°: recall 82–83/83 and 23/23, single-price 76–77/77 and 14/14, wrong-price rate 0–1.2%. Single model, single run each; reviewed keys still required.
+- `ocr_image` **does not meet** the price targets (Virginia 11/14; Patis 34/77 clean, 5/72 at 8°; 14.8% wrong under blur). OCR mode remains a fallback whose prices need human review.
+- 10–15° stays review-only: vision was 14/14 and 74–77/77 there but Patis 12° had 2 wrong (2.4%).
+- Preflight correctly rejected all four low-contrast/sideways variants with zero API calls and accepted every upright original and real photo (calibration in `processing/src/peekaplate_processing/preflight.py`).
+
+---
+
+## 1. Earlier runs (before preflight, Gemini reasoning fix and split-option merge; mixed models)
 
 *Single-Price Denominator (`S-Denom`):* Strictly matched dishes where ground truth defines an unambiguous single price (excludes multi-price options such as `12/15` or unpriced entries).
 *Abstentions (`Abst`):* Matched single-price dishes where extraction safely set amount to `null` (due to ambiguity or lack of support) rather than guessing.
@@ -53,6 +92,8 @@
 
 ## 2. In-Depth Analysis: The 10°–15° Skew Band (Both Gemini and Qwen Tested)
 
+*Based on the earlier runs in section 1. Section 0 has the current-code results.*
+
 In response to Zhiliang's request to specifically investigate the 10°–15° skew band and exactly 15°:
 1. **Vision Mode (`vision_v4`):**
    - **At 12° Skew:** Both Gemini 3 Flash and Qwen 3.8 Flash achieved **100.0% single-price accuracy (14/14)** with **0 wrong prices**.
@@ -70,6 +111,8 @@ In response to Zhiliang's request to specifically investigate the 10°–15° sk
 ---
 
 ## 3. Proposed Acceptance Targets (not yet demonstrated for all modes)
+
+*The "observed" figures in this table come from the earlier runs. With the current code (section 0), `vision_v4` meets these targets on clean, blur and 8° inputs; `ocr_image` still does not.*
 
 | Metric | Target: Clean / Blurred / Skew ≤ 10° | 10°–15° Skew Band (Review-Only) | Degraded (> 15° Rotation or Low Contrast) |
 |---|---|---|---|

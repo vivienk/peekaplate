@@ -44,8 +44,11 @@ class RecordingLLM:
                                      response_metadata={"finish_reason":"stop"})}
 
 
-def photo(path):
-    with Image.new("RGB",(48,32),"white") as image:
+def photo(path, size=(48,32)):
+    """Synthetic menu photo: dark text-like rows on white, so image preflight accepts it."""
+    with Image.new("RGB",size,"white") as image:
+        for top in range(4,size[1]-3,6):
+            image.paste((0,0,0),(4,top,size[0]-4,top+2))
         image.save(path,format="PNG")
 
 
@@ -312,9 +315,51 @@ class InputModeTests(unittest.TestCase):
 class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
     def _image(self, folder):
         path=Path(folder)/"menu.png"
-        buffer=io.BytesIO(); Image.new("RGB",(200,120),"white").save(buffer,format="PNG")
-        path.write_bytes(buffer.getvalue())
+        photo(path,(200,120))
         return path
+
+    def test_preflight_rejects_unreadable_images_before_any_request(self):
+        for name,make in [("blank",lambda p:Image.new("RGB",(200,120),"white").save(p,format="PNG")),
+                          ("sideways",lambda p:(photo(p,(200,120)),Image.open(p).rotate(90,expand=True).save(p,format="PNG"))),
+                          ("skew20",lambda p:(photo(p,(200,120)),Image.open(p).rotate(20,expand=True,fillcolor="white").save(p,format="PNG")))]:
+            with self.subTest(name), tempfile.TemporaryDirectory() as folder, \
+                 patch("peekaplate_processing.run_pipeline.create_cascading_clients", side_effect=AssertionError("no model")), \
+                 patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("no OCR")):
+                path=Path(folder)/"menu.png"; make(path)
+                report=run_pipeline(path, Path(folder)/"run", input_mode="vision_v4", llm_cache_dir=None)
+                self.assertEqual(report.status,"failed")
+                self.assertEqual(report.drafts,[])
+                self.assertIn("preflight",report.configuration)
+    def test_single_price_amount_only_for_one_plain_price(self):
+        from peekaplate_processing.vision_extraction import single_price_amount
+        from decimal import Decimal
+        for text,amount,expected in [("25.99","25.99",Decimal("25.99")),("$12","12",Decimal("12")),
+                                     ("1,200","1,200",None),("12,50 €","12,50",None),("12/15","12/15",None),
+                                     ("10.00 / 12.00","10.00",None),("MP","MP",None),("9","8",None)]:
+            with self.subTest(text):
+                self.assertEqual(single_price_amount(text,amount),expected)
+
+    def test_split_price_options_merge_but_distinct_items_stay(self):
+        from peekaplate_processing.vision_extraction import V4Dish, merge_split_options
+        dish=lambda name,price,box:V4Dish.model_validate({"page_number":1,"name":name,"price_text":price,"price_amount":price,"box":box})
+        merged,warnings=merge_split_options([dish("Fettuccine","12.00",[88,331,99,668]),dish("Fettuccine","15.00",[120,315,131,650]),
+                                             dish("Spaghetti","10.00",[388,55,402,222]),dish("Spaghetti","12.00",[388,55,402,222])])
+        self.assertEqual([(d.name,d.price_text,d.price_amount) for d in merged],
+                         [("Fettuccine","12.00","12.00"),("Fettuccine","15.00","15.00"),("Spaghetti","10.00 / 12.00",None)])
+        self.assertEqual(len(warnings),1)
+
+    def test_inverted_box_is_omitted_and_run_is_incomplete_on_loss(self):
+        from datetime import datetime, timezone
+        from peekaplate_processing.vision_extraction import V4Dish, build_v4_result
+        from peekaplate_processing.schemas import SourceRecord
+        data=b"x"; digest=hashlib.sha256(data).hexdigest()
+        source=SourceRecord(source_id=f"sha256:{digest}",sha256=digest,kind="image",location="menu.png",retrieved_at=datetime.now(timezone.utc),size_bytes=1,snapshot_base64=base64.b64encode(data).decode())
+        dish=V4Dish.model_validate({"page_number":1,"name":"Soup","box":[500,600,400,100]})
+        report=build_v4_result(source,[{"page_number":1,"image_reference":{"width":100,"height":100}}],[dish],datetime.now(timezone.utc),errors=["Page 1: vision output hit the token limit; later dishes may be missing."])
+        self.assertEqual(report.status,"incomplete")
+        self.assertEqual(report.segments[0].metadata["vision_boxes"],{})
+        self.assertTrue(any("inverted" in warning for warning in report.warnings))
+
 
     def _dish(self):
         from peekaplate_processing.vision_extraction import V4Dish

@@ -18,6 +18,16 @@ The default input change is explicit follow-up scope, not independent quality or
 PM acceptance. Batch size, concurrency, model/provider and reasoning defaults remain
 unchanged. The graph's lower-level text default remains compatible with existing callers.
 Modes `ocr`, `ocr_image` and `image` make no extra model requests; `vision_v4` tries configured vision providers in priority order before cleanly falling back to `ocr_image` with warning capture.
+
+Image sources pass a Pillow-only preflight (`preflight.py`) before any OCR or model
+request: sideways images, skew above 15° and very low contrast (2nd–98th percentile
+luminance spread below 60) are rejected with a `failed` report and
+`configuration.preflight` estimates; 10–15° skew adds a review-only warning. The
+estimates are approximate and calibrated on the evaluation images; PDFs and
+`--pages-json` reuse are not gated. In `vision_v4`, one short retry follows a
+transient 429 (daily quotas move on), a deadline timeout cancels the request and
+ends the run without fallback, and repeated entries of one printed title are merged
+into a single item with all price options.
 All modes save private `review-suggestions.json` beside `extraction.json` and final
 `timings.json`. It retains schema-validated raw dish fields, changed/rejected field
 values and reasons, original page references and model section suggestions. Hidden

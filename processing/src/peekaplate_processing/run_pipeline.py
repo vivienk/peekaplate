@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import openai
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
@@ -24,6 +25,7 @@ from peekaplate_processing.workflow import INPUT_MODES, page_batches, run_menu_g
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
 from peekaplate_processing.vision import image_source, normalize_page_selection, page_images
+from peekaplate_processing.preflight import assess_image
 from peekaplate_processing.review_suggestions import private_result
 
 from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result
@@ -99,6 +101,18 @@ def saved_page_text(source, pages_json, *, recovery=False):
     )
 
 
+def _vision_with_retry(client, images, timeout, *, wait_seconds=2.0):
+    """One short retry for transient 429s (shared upstream pools); daily quotas move straight on."""
+    try:
+        return extract_vision_v4(client, images, timeout=timeout)
+    except openai.RateLimitError as error:
+        if "per day" in str(error).lower() or "perday" in str(error).lower():
+            raise
+        print(f"Rate limited; retrying once in {wait_seconds:g}s...", file=sys.stderr, flush=True)
+        time.sleep(wait_seconds)
+        return extract_vision_v4(client, images, timeout=timeout)
+
+
 def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None):
     if target_pages is not None:
         target_pages=normalize_page_selection(target_pages,limit=4)
@@ -132,6 +146,25 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     try:
         fallback_warnings = []
         prepared_images = []
+        if pages_json is None:
+            try:
+                source_bytes = read_file(source)
+            except ExtractionError:
+                source_bytes = None  # acquisition reports the read failure below
+            if source_bytes is not None and detect_kind(source_bytes) == "image":
+                with measure(timings, "preflight"):
+                    check = assess_image(source_bytes)
+                if check.rejected:
+                    print("Preflight rejected the image; no OCR or model request was made.", file=sys.stderr, flush=True)
+                    report = image_source(source)
+                    report.errors.extend(check.errors)
+                    report.configuration["preflight"] = check.metadata()
+                    report.status = "failed"
+                    report.finished_at = datetime.now(timezone.utc)
+                    save_json(report.model_dump(mode="json"), directory / "extraction.json")
+                    completed = True
+                    return report
+                fallback_warnings.extend(check.warnings)
         if input_mode == "vision_v4":
             print("Running V4 direct multimodal extraction with native bounding boxes...", file=sys.stderr, flush=True)
             with measure(timings, "acquisition"):
@@ -161,7 +194,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes, v4_errors = extract_vision_v4(p_client, images, timeout=llm_timeout)
+                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout)
                     if not v4_dishes:
                         raise ExtractionError("Vision extraction produced 0 dishes.")
                     v4_report = build_v4_result(report.source, images, v4_dishes, started_dt, errors=image_errors + v4_errors)

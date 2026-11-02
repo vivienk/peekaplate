@@ -80,7 +80,7 @@ For each item, output:
 - name: dish title
 - description: printed item description (e.g. ingredients, sides, details), or null if none
 - category: section heading (e.g. STARTERS, SALADS, DESSERTS) or null
-- price_text: verbatim price text (e.g. "25.99", "12/15") or null
+- price_text: verbatim price text (e.g. "25.99", "12/15") or null. If one item prints several prices (sizes or options), output ONE entry with every price in price_text separated by " / "; never repeat the item once per price.
 - price_amount: numeric price (e.g. "25.99") only when exactly one price is printed, else null
 - price_currency: 3-letter currency code only if printed or unambiguous from a symbol, else null
 - box: [ymin, xmin, ymax, xmax] around item title in 0..1000 normalized coordinates
@@ -101,6 +101,43 @@ def single_price_amount(price_text: str | None, price_amount: str | None) -> Dec
         if not text_match or Decimal(text_match.group(1)) != amount:
             return None
     return amount
+
+
+def _same_title(a: NormalizedBox, b: NormalizedBox) -> bool:
+    """True when two title boxes cover the same printed title (intersection over union >= 0.8)."""
+    width = min(a.xmax, b.xmax) - max(a.xmin, b.xmin)
+    height = min(a.ymax, b.ymax) - max(a.ymin, b.ymin)
+    if width <= 0 or height <= 0:
+        return False
+    overlap = width * height
+    union = (a.xmax - a.xmin) * (a.ymax - a.ymin) + (b.xmax - b.xmin) * (b.ymax - b.ymin) - overlap
+    return union > 0 and overlap / union >= 0.8
+
+
+def merge_split_options(dishes: list[V4Dish]) -> tuple[list[V4Dish], list[str]]:
+    """Rejoin price options the model split into repeated entries of one printed title.
+
+    Entries merge only when they are adjacent, on the same page, have the same name and their
+    title boxes cover the same printed title. Distinct items sharing a name (different title
+    boxes) stay separate. The merged entry keeps every price in price_text and no single amount.
+    """
+    merged: list[V4Dish] = []
+    warnings: list[str] = []
+    for dish in dishes:
+        last = merged[-1] if merged else None
+        if (last is not None and last.page_number == dish.page_number
+                and last.name.strip().casefold() == dish.name.strip().casefold()
+                and last.price_text and dish.price_text and _same_title(last.box, dish.box)):
+            merged[-1] = last.model_copy(update={
+                "price_text": f"{last.price_text} / {dish.price_text}",
+                "price_amount": None,
+                "description": last.description or dish.description,
+                "price_box": None,
+            })
+            warnings.append(f"Page {dish.page_number}: merged repeated entries of '{dish.name.strip()}' into one item with price options; option meanings require review.")
+            continue
+        merged.append(dish)
+    return merged, warnings
 
 
 def scale_box(box: NormalizedBox, width: int, height: int) -> dict[str, int] | None:
@@ -195,7 +232,7 @@ def build_v4_result(
 ) -> MenuExtractionResult:
     """Construct a MenuExtractionResult from V4 dishes; any error makes it incomplete."""
     errors = list(errors or [])
-    warnings: list[str] = []
+    v4_dishes, warnings = merge_split_options(v4_dishes)
     segments: list[SourceSegment] = []
     by_page_img = {p["page_number"]: p for p in page_images_list}
 

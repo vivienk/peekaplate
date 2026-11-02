@@ -58,6 +58,8 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
         default_model="models/gemini-3-flash-preview",
         extra_body=None,
+        # Gemini 3 thinking tokens count against max_tokens; dense menus were truncated at default effort.
+        reasoning_effort="low",
     ),
     "gemini": ModelProviderConfig(
         name="gemini",
@@ -67,6 +69,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
         default_model="models/gemini-3-flash-preview",
         extra_body=None,
+        reasoning_effort="low",
     ),
     "openrouter": ModelProviderConfig(
         name="openrouter",
