@@ -63,6 +63,7 @@ const postgresText = z
   .string()
   .refine((value) => !value.includes('\u0000'), 'NUL is not supported');
 
+export const VenueScopeSchema = z.strictObject({ venueId: uuid });
 export const DishRevisionScopeSchema = z.strictObject({ venueId: uuid, dishId: uuid });
 
 export const CreateDishRevisionSchema = z.strictObject({
@@ -82,6 +83,418 @@ export const DishRevisionSchema = z.strictObject({
 
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
 export type DishRevision = z.infer<typeof DishRevisionSchema>;
+
+export const MenuScopeSchema = z.strictObject({ venueId: uuid, menuId: uuid });
+
+const commandVersion = z.number().int().nonnegative().max(2_147_483_646);
+
+export const ApproveMenuRevisionSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+});
+
+export const MenuApprovalSchema = z.strictObject({
+  menuId: uuid,
+  approvalId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  contentHash: hash,
+  assetApprovalId: uuid,
+  assetManifestHash: hash,
+  status: z.literal('approved'),
+});
+
+export const PublishMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  approvalId: uuid,
+});
+
+export const WithdrawMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+});
+
+export const MenuPublicationSchema = z.strictObject({
+  menuId: uuid,
+  publicationId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  approvalId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  status: z.enum(['published', 'withdrawn']),
+});
+
+export type ApproveMenuRevision = z.infer<typeof ApproveMenuRevisionSchema>;
+export type MenuApproval = z.infer<typeof MenuApprovalSchema>;
+export type PublishMenu = z.infer<typeof PublishMenuSchema>;
+export type WithdrawMenu = z.infer<typeof WithdrawMenuSchema>;
+export type MenuPublication = z.infer<typeof MenuPublicationSchema>;
+
+export const PublicMenuBundleSchema = z.strictObject({
+  url: z.url().refine((value) => value.startsWith('https://'), 'Public bundles require HTTPS'),
+  contentHash: hash,
+  assetManifestHash: hash,
+});
+
+const publicMenuText = postgresText.trim();
+const publicHttpsUrl = z
+  .url()
+  .refine((value) => value.startsWith('https://'), 'Public menu assets require HTTPS');
+
+export const PublicMenuImageSchema = z.strictObject({
+  url: publicHttpsUrl,
+  width: z.number().int().positive().max(16_384),
+  height: z.number().int().positive().max(16_384),
+  alt: publicMenuText.min(1).max(500),
+});
+
+export const PublicMenuIngredientSchema = z.strictObject({
+  ingredient_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.max(1000).nullable(),
+});
+
+const publicMenuDishIdentity = {
+  dish_id: uuid,
+  dish_revision_id: uuid,
+};
+
+export const PublicMenuIncompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(false),
+});
+
+export const PublicMenuAllergenCodeSchema = z.enum([
+  'milk',
+  'egg',
+  'fish',
+  'crustacean shellfish',
+  'tree nut',
+  'peanut',
+  'wheat',
+  'soy',
+  'sesame',
+]);
+
+export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
+
+export const PublicMenuCompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(true),
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.min(1).max(4000),
+  price: z.strictObject({
+    amount: z.string().regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  }),
+  ingredients: z.array(PublicMenuIngredientSchema).max(100),
+  allergens: z
+    .array(PublicMenuAllergenCodeSchema)
+    .max(9)
+    .refine((values) => new Set(values).size === values.length, 'Allergen values must be unique')
+    .nullable(),
+  dietary: z
+    .array(PublicMenuDietaryCodeSchema)
+    .max(3)
+    .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
+  images: z.strictObject({
+    card: PublicMenuImageSchema,
+    detail: PublicMenuImageSchema,
+  }),
+});
+
+export const PublicMenuDishSchema = z.discriminatedUnion('complete', [
+  PublicMenuIncompleteDishSchema,
+  PublicMenuCompleteDishSchema,
+]);
+
+export const PublicMenuCategorySchema = z.strictObject({
+  category_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  dishes: z.array(PublicMenuDishSchema).max(500),
+});
+
+export const PublicMenuContentBundleSchema = z
+  .strictObject({
+    schema_version: z.literal(1),
+    venue_id: uuid,
+    menu_id: uuid,
+    menu_revision_id: uuid,
+    restaurant: z.strictObject({
+      name: publicMenuText.min(1).max(160),
+      logo: PublicMenuImageSchema.nullable(),
+    }),
+    categories: z.array(PublicMenuCategorySchema).max(100),
+  })
+  .superRefine((bundle, ctx) => {
+    const categoryIds = new Set<string>();
+    const dishIds = new Set<string>();
+    for (const [categoryIndex, category] of bundle.categories.entries()) {
+      if (categoryIds.has(category.category_id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['categories', categoryIndex, 'category_id'],
+          message: 'Category IDs must be unique',
+        });
+      }
+      categoryIds.add(category.category_id);
+      for (const [dishIndex, dish] of category.dishes.entries()) {
+        if (dishIds.has(dish.dish_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['categories', categoryIndex, 'dishes', dishIndex, 'dish_id'],
+            message: 'Dish IDs must be unique across the menu',
+          });
+        }
+        dishIds.add(dish.dish_id);
+        if (dish.complete) {
+          const ingredientIds = new Set<string>();
+          for (const [ingredientIndex, ingredient] of dish.ingredients.entries()) {
+            if (ingredientIds.has(ingredient.ingredient_id)) {
+              ctx.addIssue({
+                code: 'custom',
+                path: [
+                  'categories',
+                  categoryIndex,
+                  'dishes',
+                  dishIndex,
+                  'ingredients',
+                  ingredientIndex,
+                  'ingredient_id',
+                ],
+                message: 'Ingredient IDs must be unique within a dish',
+              });
+            }
+            ingredientIds.add(ingredient.ingredient_id);
+          }
+        }
+      }
+    }
+  });
+
+export const PublicMenuResponseSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  publicationId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  tier: z.literal('T0'),
+  bundle: PublicMenuBundleSchema,
+  menuToken: z.string().min(1).max(8192),
+  tokenExpiresAt: z.iso.datetime(),
+});
+
+export const PublicMenuDeliverySchema = z
+  .strictObject({
+    response: PublicMenuResponseSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .superRefine(({ response, content }, ctx) => {
+    const identities = [
+      ['venue_id', response.venueId, content.venue_id],
+      ['menu_id', response.menuId, content.menu_id],
+      ['menu_revision_id', response.menuRevisionId, content.menu_revision_id],
+    ] as const;
+    for (const [field, expected, actual] of identities) {
+      if (actual !== expected) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['content', field],
+          message: `${field} must match the active public response`,
+        });
+      }
+    }
+  });
+
+export const MENU_TOKEN_AUDIENCE = 'peekaplate-observations';
+export const MENU_TOKEN_TTL_SECONDS = 30 * 60;
+
+export const MenuTokenClaimsSchema = z
+  .strictObject({
+    venue: uuid,
+    publication: uuid,
+    scope: z.literal('observations'),
+    iat: z.number().int().nonnegative(),
+    exp: z.number().int().positive(),
+    jti: uuid,
+  })
+  .superRefine((claims, ctx) => {
+    if (claims.exp - claims.iat !== MENU_TOKEN_TTL_SECONDS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['exp'],
+        message: 'Menu tokens expire after 30 minutes',
+      });
+    }
+  });
+
+export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
+export type MenuTokenClaims = z.infer<typeof MenuTokenClaimsSchema>;
+export type PublicMenuImage = z.infer<typeof PublicMenuImageSchema>;
+export type PublicMenuIngredient = z.infer<typeof PublicMenuIngredientSchema>;
+export type PublicMenuAllergenCode = z.infer<typeof PublicMenuAllergenCodeSchema>;
+export type PublicMenuDietaryCode = z.infer<typeof PublicMenuDietaryCodeSchema>;
+export type PublicMenuDish = z.infer<typeof PublicMenuDishSchema>;
+export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
+export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
+export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
+
+// S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
+export const MAX_PASSAGE_CHARS = 2000;
+export const MAX_PASSAGES = 10;
+export const MAX_AGGREGATE_PASSAGE_CHARS = 16000;
+
+export const SourceReferenceSchema = z.strictObject({
+  source_id: z.string().min(1),
+  segment_id: z.string().min(1),
+  source_sha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  original_url: z.string().url().optional(),
+  final_url: z.string().url().optional(),
+  retrieved_at: z.iso.datetime({ offset: true }).optional(),
+});
+
+export const EvidencePassageSchema = z
+  .strictObject({
+    passage_id: z.string().min(1),
+    source: SourceReferenceSchema,
+    text: z.string().min(1).max(MAX_PASSAGE_CHARS),
+    start_offset: z.number().int().min(0),
+    end_offset: z.number().int().positive(),
+    rank: z.number().int().min(1).max(MAX_PASSAGES),
+    score: z.number().min(0).max(1).optional(),
+  })
+  .superRefine((passage, ctx) => {
+    if (passage.start_offset >= passage.end_offset) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['end_offset'],
+        message: 'end_offset must be strictly greater than start_offset',
+      });
+    }
+    if (passage.text.length !== passage.end_offset - passage.start_offset) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['text'],
+        message: 'text length must match end_offset - start_offset',
+      });
+    }
+  });
+
+export const BoundedRetrievalStatusSchema = z.enum(['success', 'no_result', 'ambiguous', 'failed']);
+
+export const BoundedRetrievalResultSchema = z
+  .strictObject({
+    schema_version: z.literal(1),
+    status: BoundedRetrievalStatusSchema,
+    passages: z.array(EvidencePassageSchema).max(MAX_PASSAGES),
+    warnings: z.array(z.string()),
+  })
+  .superRefine((result, ctx) => {
+    const totalChars = result.passages.reduce((sum, p) => sum + p.text.length, 0);
+    if (totalChars > MAX_AGGREGATE_PASSAGE_CHARS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['passages'],
+        message: `Total passage context (${totalChars} chars) exceeds maximum aggregate limit of ${MAX_AGGREGATE_PASSAGE_CHARS}`,
+      });
+    }
+
+    const seenIds = new Set<string>();
+    for (let i = 0; i < result.passages.length; i++) {
+      const passage = result.passages[i];
+      if (!passage) continue;
+      if (passage.rank !== i + 1) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['passages', i, 'rank'],
+          message: `Passage rank at index ${i} must be sequential ${i + 1}, got ${passage.rank}`,
+        });
+      }
+      if (seenIds.has(passage.passage_id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['passages', i, 'passage_id'],
+          message: `Duplicate passage_id: ${passage.passage_id}`,
+        });
+      }
+      seenIds.add(passage.passage_id);
+    }
+
+    if (result.status === 'success' && result.passages.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['passages'],
+        message: "Status 'success' requires at least one retrieved evidence passage",
+      });
+    }
+
+    if (result.status === 'no_result' && result.passages.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['passages'],
+        message: "Status 'no_result' must not contain passages",
+      });
+    }
+  });
+
+export const SourceInputSegmentSchema = z.strictObject({
+  segment_id: z.string().min(1),
+  text: z.string(),
+  page_number: z.number().int().positive().optional(),
+  method: z.enum(['text', 'html', 'pdf_native', 'ocr', 'ocr_space_engine3']).optional(),
+  status: z.enum(['ready', 'skipped', 'failed']).optional(),
+  error: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const SourceInputSchema = z.strictObject({
+  source_id: z.string().min(1),
+  kind: z.enum(['url', 'html', 'text', 'pdf', 'image', 'website']),
+  location: z.string().min(1).optional(),
+  content: z.string().optional(),
+  segments: z.array(SourceInputSegmentSchema).optional(),
+  sha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+  retrieved_at: z.iso.datetime({ offset: true }).optional(),
+  size_bytes: z.number().int().positive().max(12_000_000).optional(),
+  snapshot_base64: z.string().optional(),
+});
+
+export const RetrievalRequestSchema = z.strictObject({
+  query: z.string().trim().min(1).max(500),
+  venue_id: uuid.optional(),
+  candidate_urls: z.array(z.string().url()).max(5).optional(),
+  sources: z.array(SourceInputSchema).max(5).optional(),
+  max_passages: z.number().int().min(1).max(MAX_PASSAGES).default(MAX_PASSAGES),
+  max_context_chars: z
+    .number()
+    .int()
+    .min(100)
+    .max(MAX_AGGREGATE_PASSAGE_CHARS)
+    .default(MAX_AGGREGATE_PASSAGE_CHARS),
+});
+
+export type SourceReference = z.infer<typeof SourceReferenceSchema>;
+export type EvidencePassage = z.infer<typeof EvidencePassageSchema>;
+export type BoundedRetrievalStatus = z.infer<typeof BoundedRetrievalStatusSchema>;
+export type BoundedRetrievalResult = z.infer<typeof BoundedRetrievalResultSchema>;
+export type SourceInputSegment = z.infer<typeof SourceInputSegmentSchema>;
+export type SourceInput = z.infer<typeof SourceInputSchema>;
+export type RetrievalRequestInput = z.input<typeof RetrievalRequestSchema>;
+export type RetrievalRequest = z.infer<typeof RetrievalRequestSchema>;
 
 export const TeamAnalyticsQuerySchema = z
   .strictObject({

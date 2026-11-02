@@ -1,6 +1,7 @@
 import { mountAnalyticsConsent } from '@peekaplate/analytics/consent';
 import { StrictMode, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Button, Card } from './ui';
 import './style.css';
 
 const root = document.getElementById('root');
@@ -24,7 +25,10 @@ createRoot(root).render(
         The staff workspace is being prepared. Authentication, review and publication are not
         enabled yet.
       </p>
-      <p className="note">This environment contains no restaurant or customer records.</p>
+      <Card>
+        <p>This environment contains no restaurant or customer records.</p>
+        <Button variant="action">Save draft</Button>
+      </Card>
       <AnalyticsConsent />
     </main>
   </StrictMode>,

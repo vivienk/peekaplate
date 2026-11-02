@@ -48,6 +48,7 @@ jobs:
               - 'backend/**'
               - 'packages/contracts/**'
               - 'packages/analytics/**'
+              - 'packages/tokens/**'
               - 'tests/e2e/**'
               - 'scripts/check-bundle*'
               - 'scripts/verify*'
@@ -71,7 +72,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Code quality and unit tests
         run: pnpm verify lint typecheck test
@@ -106,7 +106,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify test:db
 
@@ -123,7 +122,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.16.0
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:e2e
