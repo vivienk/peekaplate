@@ -1,0 +1,61 @@
+/*
+ * Input foundation structure (S3-TOK-01). Uses only approved shared tokens. Border, focus, error
+ * and placeholder colors wait for the Input design and its color roles, so fields keep the
+ * browser's colors (including disabled), the border follows the field text color and focus keeps
+ * the browser's accessible outline. The rem gaps and padding are
+ * interim structure until the shared spacing tokens are available on this branch.
+ */
+.pp-input {
+  display: grid;
+  gap: 0.25rem;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-input__label {
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+  font-weight: var(--pp-font-weight-medium);
+}
+
+.pp-input__hint,
+.pp-input__error {
+  margin: 0;
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+.pp-input__error {
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* 16px text stops mobile Safari zooming on focus; 2.75rem keeps a 44px touch target. */
+.pp-input__control {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-block-size: 2.75rem;
+  padding-inline: 0.75rem;
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  border: 1px solid currentColor;
+  border-radius: var(--pp-radius-8);
+}
+
+/* The thicker error border takes 1px from the padding so the text does not shift. */
+.pp-input[data-invalid] .pp-input__control {
+  border-width: 2px;
+  padding-inline: calc(0.75rem - 1px);
+}
+
+.pp-input__control:disabled {
+  cursor: not-allowed;
+}
+
+.pp-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
