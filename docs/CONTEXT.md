@@ -119,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono retains staff/publication/JWKS, collaborator reads and bounded retrieval. Observations use server-derived token authority and Queue receipts. Consumer archives create-only R2 evidence before one tenant-scoped transaction writes index + event + typed detail; conflicts stay quarantined. Accepted historical indices can fill missing facts from checksum/identity-matched original archives without re-aging. Private staging operator inspects before explicit bounded backfill; unknown historical traffic stays blocked. Local/staging-issued tokens sign test class; production signs live. Public menu GET uses the exact diner CORS allowlist. Real workerd/browser/Queue/R2/PostgreSQL regression passes locally. Hosted follow-up deployment/verification pending; normal collection paused. Report API and real diner controls/outbox remain separate.",
+      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes; bounded private backfill restored three staging test records. Release3512a3f deployed; real browser found503 on Worker self-JWKS fetch. Follow-up verifies own tokens with configured public JWK locally, retaining ES256/issuer/audience/expiry checks and key-change cache refresh. No broad fetch flag or auth bypass. Staging signs test class; owner views exclude test/demo. Public-menu GET has exact diner CORS. Hosted follow-up verification pending; normal collection stays paused. Real controls/outbox and report API remain separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -192,7 +192,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f058b7df87afda2432f8989b561de324068770ea7a83612988ad5a378cf400ea"
+      "sourceFingerprint": "761c3ffaf8e85dbbe7308a09a8fbe6a46ea19ab34aeae7d9b66a770b0cdce05e"
     },
     {
       "id": "database",
@@ -413,16 +413,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Recorded November1 hosted observation acceptance: reviewed PR70/31 reached main35e989d and staging version3db23304. Real Queue/R2/index/conflict/ACK/DLQ synthetic flow passed, alongside controlled remote storage/database retry recovery and15 public smoke checks. Final3 index rows/3 conflicts/6 archives remain labelled; another tenant and owner views expose0 run rows. Both Queues empty/paused, proxy stopped; production unchanged.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
-    },
-    {
       "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
       "modules": [
         "contracts",
@@ -510,6 +500,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
+    },
+    {
+      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
     }
   ]
 }
