@@ -28,6 +28,7 @@ estimates are approximate and calibrated on the evaluation images; PDFs and
 transient 429 (daily quotas move on), a deadline timeout cancels the request and
 ends the run without fallback, and repeated entries of one printed title are merged
 into a single item with all price options.
+
 All modes save private `review-suggestions.json` beside `extraction.json` and final
 `timings.json`. It retains schema-validated raw dish fields, changed/rejected field
 values and reasons, original page references and model section suggestions. Hidden
