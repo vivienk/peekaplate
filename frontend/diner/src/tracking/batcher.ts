@@ -1,14 +1,15 @@
 // Groups outbox events into small batches and hands them to the sender (S3-TRK-01.2). Limits follow
 // the ingestion contract (ObservationBatchV2Schema, PR #70; confirmed by Zhiliang): 1 to 25 events
-// and at most 32,768 bytes for the whole JSON request body, both at once. Flushes on a timer and when the page is hidden or closed; waits while offline and
-// releases on reconnect. Events leave the outbox only when the sender reports them handled, so a
+// and at most 32,768 bytes for the whole JSON request body, both at once. Flushes every 5 seconds
+// (matrix v0.1h; implementation plan), as soon as a full batch is waiting, and when the page is
+// hidden or closed; waits while offline and releases on reconnect. Events leave the outbox only when the sender reports them handled, so a
 // failure keeps them for the next try. Sending itself, receipts and retries are TRK-01.3.
 import type { Envelope } from './envelope';
 import type { Outbox } from './outbox';
 
 export const BATCH_MAX_ITEMS = 25;
 export const BATCH_MAX_BYTES = 32 * 1024;
-export const FLUSH_EVERY_MS = 10_000;
+export const FLUSH_EVERY_MS = 5_000;
 
 // Returns the event_ids that were handled (accepted or permanently rejected).
 export type Deliver = (batch: Envelope[]) => Promise<string[]>;
@@ -58,6 +59,12 @@ function nextBatch(pending: Envelope[]): Envelope[] {
   return batch;
 }
 
+// A batch is full when it reached 25 events, or when the next waiting event no longer fits in it.
+function isFull(pending: Envelope[]): boolean {
+  const batch = nextBatch(pending);
+  return batch.length === BATCH_MAX_ITEMS || pending.length > batch.length;
+}
+
 export function createBatcher(
   outbox: Outbox,
   { deliver, triggers }: { deliver: Deliver; triggers: BatchTriggers },
@@ -88,6 +95,10 @@ export function createBatcher(
 
   return {
     flush,
+    // Call after each event is queued: a full batch goes now instead of waiting for the timer.
+    added() {
+      if (isFull(outbox.pending())) run();
+    },
     stop() {
       clearInterval(timer);
       stopHidden();

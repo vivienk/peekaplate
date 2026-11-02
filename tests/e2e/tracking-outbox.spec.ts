@@ -114,6 +114,21 @@ test('hiding the page flushes the current batch', async ({ page }) => {
   await expect.poll(() => delivered(page)).toBe(4);
 });
 
+test('25 queued events go as one full batch straight away, without hiding the page or waiting for the timer', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true });
+  await trackMenuViewed(page, 24);
+  await expect.poll(() => storedEvents(page)).toBe(24);
+  expect(await delivered(page)).toBe(0);
+  const started = Date.now();
+  await trackMenuViewed(page, 1);
+  await expect.poll(() => delivered(page), { timeout: 2_000 }).toBe(25);
+  // Well inside the 5-second timer, so the full-batch trigger sent it.
+  expect(Date.now() - started).toBeLessThan(2_000);
+});
+
 test('a full outbox drops the oldest events with a developer warning, and the page keeps working', async ({
   page,
 }) => {

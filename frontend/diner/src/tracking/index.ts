@@ -35,8 +35,8 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
   const now = () => Date.now();
   const ready = storePromise.then(async (store) => {
     const outbox = await createOutbox(store, { now, warn: (message) => devWarn(message) });
-    createBatcher(outbox, { deliver, triggers: browserBatchTriggers() });
-    return outbox;
+    const batcher = createBatcher(outbox, { deliver, triggers: browserBatchTriggers() });
+    return { outbox, batcher };
   });
   // Adds run in order, even while the store is still opening.
   let chain: Promise<unknown> = ready;
@@ -44,7 +44,10 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
     queue(envelope) {
       chain = chain
         .then(() => ready)
-        .then((outbox) => outbox.add(envelope))
+        .then(async ({ outbox, batcher }) => {
+          await outbox.add(envelope);
+          batcher.added();
+        })
         .catch(() => {});
     },
   };

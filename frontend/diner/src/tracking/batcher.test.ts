@@ -152,6 +152,59 @@ describe('batching', () => {
     expect(batches.map((batch) => batch.length)).toEqual([1, 1]);
   });
 
+  it('flushes every 5 seconds (matrix v0.1h), not before', async () => {
+    expect(FLUSH_EVERY_MS).toBe(5_000);
+    const { batches } = await setup(3);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(batches).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(batches).toHaveLength(1);
+  });
+
+  it('sends a full batch of 25 as soon as it is queued, without waiting for the timer', async () => {
+    const { batches, outbox, batcher } = await setup(0);
+    for (let n = 0; n < BATCH_MAX_ITEMS - 1; n++) {
+      await outbox.add(envelope());
+      batcher.added();
+    }
+    await settle();
+    expect(batches).toEqual([]);
+    await outbox.add(envelope());
+    batcher.added();
+    await settle();
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toHaveLength(BATCH_MAX_ITEMS);
+  });
+
+  it('counts a batch as full when the next event would push it past the byte limit', async () => {
+    const { batches, outbox, batcher } = await setup(0);
+    const big = 'x'.repeat(12 * 1024);
+    await outbox.add(envelope(big));
+    batcher.added();
+    await outbox.add(envelope(big));
+    batcher.added();
+    await settle();
+    expect(batches).toEqual([]); // Two fit in one body: not full yet.
+    await outbox.add(envelope(big));
+    batcher.added();
+    await settle();
+    expect(batches.map((batch) => batch.length)).toEqual([2]);
+  });
+
+  it('does not send a full batch while offline, and releases it on reconnect', async () => {
+    const { batches, outbox, batcher, page } = await setup(0);
+    page.goOffline();
+    for (let n = 0; n < BATCH_MAX_ITEMS; n++) {
+      await outbox.add(envelope());
+      batcher.added();
+    }
+    await settle();
+    expect(batches).toEqual([]);
+    page.goOnline();
+    await settle();
+    expect(batches[0]).toHaveLength(BATCH_MAX_ITEMS);
+  });
+
   it('flushes the current batch when the page is hidden or closed', async () => {
     const { batches, page } = await setup(3);
     page.hide();
