@@ -2,22 +2,23 @@
 
 This is the infrastructure handoff for the observation ingestion pipeline. The producer `POST /observations` verifies menu-token authority, applies approximate per-location rate limits and awaits Queue acceptance. The consumer archives evidence in private R2 before writing the canonical database index or conflict quarantine and acknowledging delivery. Deployment and hosted acceptance are separate from merging this code.
 
-**November 1 hosted status:** reviewed main `35e989d` is deployed as staging
-Worker version `3db23304-c53a-4fee-b0ba-260c3afe4060`. Ten bounded hosted
-pipeline checks and fifteen public HTTP checks passed. The real source Worker
-consumer is attached; both Queues are empty and paused again. See
-[Operations](operations.md#observation-consumer-hosted-acceptance) and the
-[acceptance record](observation-staging-acceptance.json) for scope and remaining work.
+**November 2 hosted status:** reviewed main `c6a47bd` is deployed as staging
+Worker version `60ac184a-a348-4e2c-843d-e380861771cc`. Six follow-up checks passed:
+three archived synthetic observations were backfilled, and a genuine issued-token
+Brave request reached the real Queue, private R2 and transactional typed facts.
+Retries produced one fact; changed reuse was quarantined. Both Queues are empty
+and paused. See [Operations](operations.md#observation-facts-hosted-acceptance)
+and the [sanitized evidence](observation-facts-staging-acceptance.json). The
+[November 1 record](observation-staging-acceptance.json) remains historical evidence.
 
 The reconciled contracts retain server-derived `traffic_class`, its `live`
 default, and canonical payload normalization. The combined producer/consumer
 regression uses the real migrated PostgreSQL database with simulated Queue/R2;
-it does not replace hosted acceptance. This consumer writes the canonical index
-and conflict records only. Transactional typed-fact persistence and an idempotent
-archive/index backfill still need their own implementation and tests before
-owner views can show those observations. Keep normal collection paused until
-that work and browser-to-destination acceptance pass. An operator may resume
-only the bounded, labelled synthetic acceptance run and pause it again afterward.
+it does not replace hosted acceptance. The deployed consumer now writes the
+accepted index and typed facts transactionally; its archive backfill also passed
+the bounded hosted checks. Keep normal collection paused until the real diner
+controls, consent/outbox/delivery and owner-report flow pass acceptance. An
+operator may resume only a bounded, labelled synthetic run and pause it afterward.
 
 ## Typed facts and archive recovery — November 2
 
@@ -112,8 +113,9 @@ to develop alone does not deploy. Keep the existing Hyperdrive, Auth issuer and
 
 The real Worker consumer replaced the temporary source HTTP pull consumer during
 the approved release. Bounded synthetic acceptance passed, then both Queues
-were paused again. Normal collection remains off because the diner/token path,
-transactional typed-fact writes/backfill and owner reporting are not accepted.
+were paused again. Genuine-token browser transport, typed-fact writes and
+backfill passed the November 2 follow-up. Normal collection remains off because
+real diner controls/outbox/privacy and owner reporting still need acceptance.
 The DLQ retains its existing HTTP pull consumer for controlled recovery.
 
 | Setting | Source Queue | DLQ |
@@ -141,8 +143,9 @@ The fresh complete repeat passed at `2026-10-24T17:30:36.147Z`, run `2c7d7bc7-6b
 That October 24 infrastructure probe did not establish product processing.
 The November 1 acceptance above adds actual canonical deduplication/conflicts,
 archive/index processing, Queue drain and native malformed-message DLQ delivery.
-Real diner-token HTTP delivery, typed facts, owner reports, native process-crash
-recovery and full DLQ-to-canonical replay remain separate integration gates.
+The November 2 follow-up additionally verifies genuine diner-token HTTP
+transport and typed facts. Real product controls, owner reports, native
+process-crash recovery and full DLQ-to-canonical replay remain separate gates.
 
 ## What Teeyansh can do now
 
@@ -150,7 +153,7 @@ recovery and full DLQ-to-canonical replay remain separate integration gates.
 2. Preserve create-only evidence: use an atomic conditional R2 write, then compare the existing checksum on a failed condition. An identical checksum is a retry; a different payload is quarantined without overwriting the original. A database lock taken after the R2 write cannot protect that earlier write.
 3. Persist the canonical index/facts idempotently, then individually ACK. R2 or database failure must retain/retry work. Calling `ack()` does not send a message to the DLQ.
 4. Include failure, concurrent-conflict and recovery tests in his PR. Keep source acceptance/time rules and first-received timestamps aligned with the shared contract.
-5. The real staging consumer is now attached and verified within its index/conflict scope. Finish typed-fact writes/backfill and browser/owner acceptance before requesting normal delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
+5. The staging consumer, typed facts, archive backfill and signed-token browser transport are verified within the synthetic scope. Reconcile the real diner controls/outbox and owner-report acceptance before requesting normal delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
 
 The existing collaborator analytics API gives read access to delayed PostHog diagnostics. It does not grant Cloudflare administration or turn those rows into canonical owner facts. Developers can submit code/configuration PRs without receiving the operator's provider token.
 
