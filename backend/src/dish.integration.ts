@@ -715,8 +715,9 @@ describe('real PostgreSQL menu publication commands', () => {
         ),
     );
     await new Promise<void>((resolve) => browserServer.listen(5173, '127.0.0.1', resolve));
-    const browser = await chromium.launch();
+    let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
     try {
+      browser = await chromium.launch();
       const page = await browser.newPage();
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
@@ -792,7 +793,7 @@ describe('real PostgreSQL menu publication commands', () => {
       ).toBe(0);
       expect(errors).toEqual([]);
     } finally {
-      await browser.close();
+      await browser?.close();
       await new Promise<void>((resolve) => browserServer.close(() => resolve()));
     }
 

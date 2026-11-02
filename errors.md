@@ -1041,3 +1041,14 @@ module IDs. Context freshness and local documentation checks passed afterward.
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T07:44:24.918Z","exitCode":1}
 ```
+
+The subsequent context refresh/check passed after restoring required handoff
+module IDs. Independent review also found a browser-launch failure could leave
+the transport test's HTTP server open. Launch now occurs inside its cleanup
+guard; the final database/browser regression passed all 46 tests in 44.147
+seconds including lint, type and documentation checks.
+
+Security-report finalization initially rejected invalid surface IDs/missing
+labels. The same pinned scan was resumed with valid labelled surfaces, sealed
+and read back successfully; no source-code or provider change was needed.
+Validate the saved draft result before calling its finalization operation.
