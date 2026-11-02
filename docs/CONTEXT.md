@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, RES-02 owner approval/publication/withdrawal, public read/token, and strict Bundle v1 schemas. Observation contracts define canonical ObservationV2 (9 P0 types), canonicalJson, sha256, microsecond window bounds ([-24h, +5m]), Queue message contracts (ObservationQueueMessageSchema with server-derived traffic_class, ObservationConflictQueueMessageSchema with multi-copy conflict schema), and observation receipts. Offsets, rank sequences, aggregate context limits, and microsecond precision boundaries strictly enforced.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "448822ccffea1e70dcf3ef0801b803e58838e397742669fa9448437f06030b22"
+      "sourceFingerprint": "bddeb8de03c19b241d517bc0e1ede3b925df8797d55624cc5f5a6e1e2266ee3d"
     },
     {
       "id": "tokens",
@@ -119,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/current-membership commands, collaborator staging reads and VIS-04 evidence retrieval. Python direct-DO extraction is deployed with signed source grants; full AI setup remains separate. RES-02 owner approve/publish/withdraw commits events, projection, receipt and outbox atomically; active public reads issue ES256 tokens and public-only JWKS. POST /observations verifies menu-token authority, exact diner CORS, strict batches and microsecond time bounds, preserves trusted traffic_class and awaits Queue sends before accepted receipts. Conflict copies retain authorized events or bounded invalid metadata. Rate windows are approximate per location. Hosted RES-02 acceptance is recorded; this producer is not yet deployed. PR31 consumer integration, transactional typed facts and paused-Queue activation remain separate.",
+      "summary": "Hono Worker retains staff/current-membership commands, collaborator staging reads, bounded retrieval and RES-02 approval/publication/JWKS. POST /observations verifies ES256 menu authority, exact diner CORS, request/time/rate bounds and Queue-before-accepted receipts. Queue consumer archives create-only evidence before tenant-scoped PostgreSQL index/conflict persistence and ACK; failures retry toward DLQ. PostgreSQL authoritatively classifies timestamps. Shared contracts retain traffic_class and canonical normalization. Python direct-DO extraction remains separate. This consumer does not write typed facts or owner metrics; collection stays paused pending hosted acceptance. Metadata-free restoration of sanitized conflict archives is unsupported; preserve checksum metadata.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -164,7 +164,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/menu-token.ts",
         "backend/src/menu-token.test.ts",
         "backend/src/observation-fixtures.test.ts",
-        "backend/src/observation-ingest.ts"
+        "backend/src/observation-ingest.ts",
+        "backend/src/consumer/canonical-json.test.ts",
+        "backend/src/consumer/canonical-json.ts",
+        "backend/src/consumer/consumer.integration.ts",
+        "backend/src/consumer/database.ts",
+        "backend/src/consumer/index.test.ts",
+        "backend/src/consumer/index.ts",
+        "backend/src/consumer/queue-consumer.test.ts",
+        "backend/src/consumer/queue-consumer.ts",
+        "backend/src/consumer/r2-storage.test.ts",
+        "backend/src/consumer/r2-storage.ts",
+        "backend/src/consumer/types.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -176,7 +187,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "43fb434109d5eadec406c516175d6609e111d35865e3feadf1ca385d39faee3c"
+      "sourceFingerprint": "c6ac2ce74ec99f510874e5988452661317d7f54c2ac80c327908c2d9df908414"
     },
     {
       "id": "database",
@@ -285,7 +296,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5584ec89fe4a8d1b2c0bfeb235dcb85a8d8bbbcb340f7761063439d1d770e0ee"
+      "sourceFingerprint": "67572b2a81effefaf94ab8c5b02bd0f342716e5c0e3b3f85d4df41253c436a71"
     },
     {
       "id": "agents",
@@ -396,6 +407,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Verify the combined producer/consumer with real migrated PostgreSQL, approve and merge the final head, then promote reviewed code through main to staging for bounded synthetic Queue/R2/index/ACK/DLQ checks. Keep normal delivery paused and preserve existing resources. Typed-fact writes/backfill, owner reports and browser screen integration remain separate."
+    },
+    {
       "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
       "modules": [
         "contracts",
@@ -473,14 +494,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Require green exact-head CI before merging PR32, then retarget/reconcile PR50. Hosted migrations and Queue consumer activation remain separate operator work."
-    },
-    {
-      "summary": "October31 PR30 reconciliation: preserved current develop tokens, shared component CSS, PDF retrieval and owner-metric tests while retaining the accessible Input foundation and dev-only synthetic demo. Context and frontend-design conflicts retain both intents; no input behavior or owner-report schema changed.",
-      "modules": [
-        "console",
-        "delivery"
-      ],
-      "next": "Run current repository/build/browser checks and exact-head CI, retarget PR30 to develop and merge it. Keep final Input visual approval and real review-form integration separate."
     }
   ]
 }

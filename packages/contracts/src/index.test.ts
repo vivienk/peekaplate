@@ -1311,6 +1311,34 @@ describe('canonical observation checksum and identity', () => {
     firstReceivedAt: '2026-10-24T12:00:01.000Z',
   };
 
+  it('DEF-03 regression: canonicalJson omits undefined object properties and serializes undefined array items as null', () => {
+    // Undefined property omitted deterministically
+    const withUndefined = { a: undefined, b: 'hello', c: 123 };
+    const withoutUndefined = { b: 'hello', c: 123 };
+    expect(canonicalJson(withUndefined)).toBe('{"b":"hello","c":123}');
+    expect(canonicalJson(withUndefined)).toBe(canonicalJson(withoutUndefined));
+
+    // Nested undefined property omitted
+    const nestedWithUndefined = { top: { optional: undefined, fixed: true } };
+    expect(canonicalJson(nestedWithUndefined)).toBe('{"top":{"fixed":true}}');
+
+    // Array with undefined element becomes null
+    expect(canonicalJson([undefined, 1, 'two'])).toBe('[null,1,"two"]');
+
+    // Number -0 normalized to 0
+    expect(canonicalJson(-0)).toBe('0');
+    expect(canonicalJson({ val: -0 })).toBe('{"val":0}');
+
+    // Non-finite numbers rejected
+    expect(() => canonicalJson(NaN)).toThrow(/Non-finite numbers/);
+    expect(() => canonicalJson(Infinity)).toThrow(/Non-finite numbers/);
+
+    // Circular references rejected
+    const circular: Record<string, unknown> = { key: 'val' };
+    circular.loop = circular;
+    expect(() => canonicalJson(circular)).toThrow(/Circular reference/);
+  });
+
   it('reconstructs complete canonical observation and computes matching checksum', async () => {
     const obs = toCanonicalObservation(envelope);
     expect(obs.schema_version).toBe('observation.v2');
@@ -1572,5 +1600,13 @@ describe('canonical observation checksum and identity', () => {
       expect(TWENTY_FOUR_HOURS_MICROS).toBe(86_400_000_000n);
       expect(FIVE_MINUTES_MICROS).toBe(300_000_000n);
     });
+  });
+});
+
+describe('observation canonical queue schema export verification', () => {
+  it('exports canonical ObservationQueueMessageSchema and ObservationConflictQueueMessageSchema', () => {
+    expect(ObservationQueueMessageSchema).toBeDefined();
+    expect(ObservationConflictQueueMessageSchema).toBeDefined();
+    expect(ObservationQueueEnvelopeSchema).toBeDefined();
   });
 });

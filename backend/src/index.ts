@@ -20,6 +20,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
+import { type ConsumerBindings, createQueueHandler, type QueueHandlerServices } from './consumer';
 import { CommandError, createDishRevision } from './dish-command';
 import {
   createMenuTokenVerifier,
@@ -587,4 +588,17 @@ export function createApp(services: Dependencies = dependencies) {
   return app;
 }
 
-export default createApp();
+export function createWorker(
+  services: Dependencies = dependencies,
+  queueServices: QueueHandlerServices = {},
+) {
+  const app = createApp(services);
+  const queue = createQueueHandler(queueServices);
+  return Object.assign(app, { queue });
+}
+
+export { type ConsumerBindings, createQueueHandler, type QueueHandlerServices };
+
+const defaultApp = createApp();
+export const queue = createQueueHandler();
+export default Object.assign(defaultApp, { queue });

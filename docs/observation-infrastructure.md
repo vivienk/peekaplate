@@ -1,14 +1,16 @@
 # Staging observation infrastructure
 
-This is the infrastructure handoff for the observation ingestion pipeline. It provides a place to send, retain and recover synthetic observations. The canonical observation producer POST /observations is implemented in PR #70 with token-scoped rate limiting (approximate per-location limits, not a strict global token bucket) and queue-before-accepted delivery. Consumer processing and canonical database indexing belong to PR #31.
+This is the infrastructure handoff for the observation ingestion pipeline. The producer `POST /observations` verifies menu-token authority, applies approximate per-location rate limits and awaits Queue acceptance. The consumer archives evidence in private R2 before writing the canonical database index or conflict quarantine and acknowledging delivery. Deployment and hosted acceptance are separate from merging this code.
 
-This producer change does not deploy or activate collection. When reconciling
-PR #31, preserve both the producer's server-derived `traffic_class` field and
-the consumer's canonical payload normalization in the shared contracts. The
-raw branches have a contract conflict; parsing only the producer's schema is
-not proof of consumer compatibility. Before release, test the combined actual
-consumer and its transactional typed-fact writes, then complete hosted
-browser-to-Queue/R2/database acceptance before unpausing delivery.
+The reconciled contracts retain server-derived `traffic_class`, its `live`
+default, and canonical payload normalization. The combined producer/consumer
+regression uses the real migrated PostgreSQL database with simulated Queue/R2;
+it does not replace hosted acceptance. This consumer writes the canonical index
+and conflict records only. Transactional typed-fact persistence and an idempotent
+archive/index backfill still need their own implementation and tests before
+owner views can show those observations. Keep normal collection paused until
+that work and browser-to-destination acceptance pass. An operator may resume
+only the bounded, labelled synthetic acceptance run and pause it again afterward.
 
 ## Canonical database handoff
 
@@ -50,7 +52,11 @@ The binding configuration must reach a reviewed `main` release and the protected
 
 ## Why delivery is paused
 
-The current API Worker has a `fetch` handler and no observation `queue` handler. Attaching an unfinished or empty handler could acknowledge work without archiving or indexing it. Instead, a temporary **HTTP pull consumer** establishes the source-to-DLQ routing without running product code.
+The last recorded infrastructure setup uses a temporary **HTTP pull consumer**
+with delivery paused. The reviewed code now exports the real `queue` handler;
+an operator must replace the temporary consumer only during the reviewed main
+release, retain the existing DLQ/retry settings and verify provider readback.
+Do not attach a second competing consumer or treat a code merge as deployment.
 
 | Setting | Source Queue | DLQ |
 | --- | --- | --- |
@@ -87,6 +93,13 @@ This infrastructure probe does **not** test canonical database deduplication/con
 The existing collaborator analytics API gives read access to delayed PostHog diagnostics. It does not grant Cloudflare administration or turn those rows into canonical owner facts. Developers can submit code/configuration PRs without receiving the operator's provider token.
 
 ## Operator checks
+
+Restore R2 archives with their `payload-checksum` custom metadata intact. For a
+sanitized invalid-conflict object, the original untrusted payload was deliberately
+discarded; hashing the safe JSON cannot reconstruct that original checksum.
+Metadata-free restoration of those objects is not supported by this consumer
+and can lead to retries. Preserve evidence and escalate for controlled recovery;
+never overwrite the object or silently ACK it to clear the Queue.
 
 Use the project-pinned Wrangler. Set `CLOUDFLARE_ACCOUNT_ID` to the staging account above when listing account-wide resources; some commands do not infer it from `--env staging` alone.
 

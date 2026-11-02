@@ -9,11 +9,79 @@ import {
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import app, { consumeJtiRateLimit, createApp } from './index';
+import app, { consumeJtiRateLimit, createApp, createWorker, queue } from './index';
 import { ingestObservations } from './observation-ingest';
 
 const parseObservationReceiptBatch = async (response: Response) =>
   ObservationReceiptBatchSchema.parse(await response.json());
+
+describe('worker queue consumer wiring', () => {
+  it('exports queue handler on default app and as named export', () => {
+    expect(typeof queue).toBe('function');
+    expect(typeof (app as any).queue).toBe('function');
+    expect((app as any).queue).toBe(queue);
+  });
+
+  it('safely handles queue invocation when archive bucket binding is missing', async () => {
+    let retried = false;
+    let delay: number | undefined;
+    const batch = {
+      queue: 'peekaplate-staging-observations',
+      messages: [
+        {
+          id: 'msg-1',
+          timestamp: new Date(),
+          body: { test: true },
+          attempts: 1,
+          ack: vi.fn(),
+          retry: vi.fn(),
+        },
+      ],
+      ackAll: vi.fn(),
+      retryAll: vi.fn((opts?: { delaySeconds?: number }) => {
+        retried = true;
+        delay = opts?.delaySeconds;
+      }),
+    };
+
+    await (app as any).queue(batch, { APP_ENV: 'staging' });
+    expect(retried).toBe(true);
+    expect(delay).toBe(10);
+  });
+
+  it('delegates to injected queue consumer service through createWorker', async () => {
+    let processBatchCalled = false;
+    let cleanupCalled = false;
+
+    const worker = createWorker(
+      { verify: vi.fn(), execute: vi.fn() },
+      {
+        createConsumer: async () => ({
+          consumer: {
+            processBatch: async () => {
+              processBatchCalled = true;
+              return { processed: 1, acknowledged: 1, retried: 0, deadLettered: 0 };
+            },
+          } as any,
+          cleanup: async () => {
+            cleanupCalled = true;
+          },
+        }),
+      },
+    );
+
+    const batch = {
+      queue: 'peekaplate-staging-observations',
+      messages: [],
+      ackAll: vi.fn(),
+      retryAll: vi.fn(),
+    };
+
+    await worker.queue(batch, {});
+    expect(processBatchCalled).toBe(true);
+    expect(cleanupCalled).toBe(true);
+  });
+});
 
 describe('foundation API', () => {
   it('returns a minimal liveness response without database or secret configuration', async () => {
