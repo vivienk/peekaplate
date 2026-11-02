@@ -7,6 +7,7 @@ are unverified proposals for human review, not OCR evidence.
 """
 import hashlib
 import json
+import concurrent.futures
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -161,10 +162,21 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
             {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
             {"type": "image_url", "image_url": {"url": page["image_url"]}},
         ]
-        invoke_kwargs: dict[str, Any] = {}
-        if timeout is not None:
-            invoke_kwargs["timeout"] = timeout
-        response = vision_llm.invoke([("system", prompt), ("human", content)], **invoke_kwargs)
+        def _call_invoke():
+            return vision_llm.invoke([("system", prompt), ("human", content)])
+
+        if timeout is not None and timeout > 0:
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            fut = pool.submit(_call_invoke)
+            try:
+                response = fut.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                pool.shutdown(wait=False, cancel_futures=True)
+                raise TimeoutError(f"Vision request timed out ({timeout:g}s); request cancelled.")
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
+        else:
+            response = _call_invoke()
         raw_content = getattr(response, "content", None)
         if not isinstance(raw_content, str) or not raw_content.strip():
             errors.append(f"Page {page_num}: vision model returned no content.")

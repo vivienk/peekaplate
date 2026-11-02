@@ -120,7 +120,9 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         raise ExtractionError("LLM deadline must be greater than zero and at most 300 seconds.")
     directory = Path(run_dir)
     if directory.exists() or directory.is_symlink(): raise ExtractionError("Choose a new run directory.")
-    if llm is None: llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
+    # Defer default LLM configuration so V4 can run with only provider-specific keys (e.g. GEMINI_API_KEY only)
+    if llm is None and (input_mode != "vision_v4" or provider is not None):
+        llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     started=time.perf_counter()
     started_dt = datetime.now(timezone.utc)
@@ -139,9 +141,12 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 prepared_images = images
             report.errors.extend(image_errors)
 
-            # Explicit provider, else cascade google_studio -> qwen -> glm -> openrouter, with the same deadline as an explicit client.
-            client_candidates = [(provider, llm)] if provider else create_cascading_clients(timeout=max(120, int(llm_timeout)))
-            if not client_candidates:
+            # Explicit provider, else cascade google_studio -> qwen -> glm -> openrouter
+            if provider:
+                client_candidates = [(provider, llm if llm is not None else configured_llm(timeout=max(120, int(llm_timeout)), provider=provider))]
+            else:
+                client_candidates = create_cascading_clients(timeout=max(120, int(llm_timeout)))
+            if not client_candidates and llm is not None:
                 client_candidates = [("default", llm)]
 
             v4_success = False
@@ -168,6 +173,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
             if not v4_success:
                 print("All vision providers failed; cleanly falling back to OCR mode...", file=sys.stderr, flush=True)
                 input_mode = "ocr_image"
+        if llm is None:
+            llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
             report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
