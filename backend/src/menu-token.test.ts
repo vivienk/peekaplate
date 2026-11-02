@@ -19,6 +19,42 @@ const base = {
   exp: now + 1_800,
 };
 
+it('verifies this Worker’s issued tokens from its configured public key without a self-fetch', async () => {
+  const { publicKey, privateKey } = await generateKeyPair('ES256');
+  const jwks = {
+    keys: [{ ...(await exportJWK(publicKey)), kid: 'local-key', alg: 'ES256', use: 'sig' }],
+  };
+  const config = { issuer: 'https://api.example.test', jwks };
+  const verify = createMenuTokenVerifier(config);
+  const issue = (audience: string, key = privateKey) =>
+    new SignJWT({ venue: base.venue, publication: base.publication, scope: 'observations' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'local-key' })
+      .setIssuer('https://api.example.test/')
+      .setAudience(audience)
+      .setIssuedAt()
+      .setExpirationTime('30m')
+      .setJti(base.jti)
+      .sign(key);
+  const fetch = vi
+    .spyOn(globalThis, 'fetch')
+    .mockRejectedValue(new Error('Synthetic Cloudflare 1042 self-fetch denial'));
+  try {
+    await expect(verify(`Bearer ${await issue(MENU_TOKEN_AUDIENCE)}`)).resolves.toMatchObject({
+      venueId: base.venue,
+    });
+    await expect(verify(`Bearer ${await issue('wrong-audience')}`)).rejects.toThrow(
+      MenuTokenAuthenticationError,
+    );
+    const forgedKey = await generateKeyPair('ES256');
+    await expect(
+      verify(`Bearer ${await issue(MENU_TOKEN_AUDIENCE, forgedKey.privateKey)}`),
+    ).rejects.toThrow(MenuTokenAuthenticationError);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    fetch.mockRestore();
+  }
+});
+
 describe('menu-token claims', () => {
   it('accepts the exact 30-minute lifetime and allowed clock skew', () => {
     expect(validateMenuTokenClaims(base, now)).toMatchObject({
