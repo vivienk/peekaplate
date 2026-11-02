@@ -1,0 +1,83 @@
+
+{
+  "task": "QA-02.2",
+  "title": "Owner-to-Diner Staging Journey Preparation",
+  "fixture_type": "fictional_synthetic",
+  "staging_execution": "NOT RUN",
+  "product_review": "PENDING",
+  "event_matrix_version": "v0.1h PROPOSED",
+  "cases": [
+    {
+      "case_id": "QA-DISH-01",
+      "description": "Complete dish approval and diner display",
+      "expected_results": [
+        "Owner correction persists after successful save and reload",
+        "Only explicitly approved revisions are published",
+        "Diner sees the approved dish and permitted T0 image",
+        "Successful direct Save emits dish_saved with save_origin=direct",
+        "Reload restores saved state without duplicate Save event"
+      ],
+      "source_reference": "PENDING",
+      "image_reference": "PENDING",
+      "status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-DISH-02",
+      "description": "Incomplete dish and missing information",
+      "expected_results": [
+        "Missing required ingredients prevent complete publication",
+        "Incomplete placeholder does not emit dish_viewed",
+        "Blocked detail does not emit dish_detail_opened",
+        "Blocked comparison does not emit dish_compared",
+        "Missing evidence never implies allergen safety"
+      ],
+      "missing_image_policy": "PENDING PRODUCT CONFIRMATION",
+      "status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-DISH-03",
+      "description": "Revision replacement and withdrawal",
+      "expected_results": [
+        "Unapproved draft changes do not replace published content",
+        "Explicitly approved replacement becomes visible on fresh load",
+        "Withdrawn dish is unavailable on a fresh diner load",
+        "Events reference the applicable publication revision"
+      ],
+      "status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-DINER-01",
+      "description": "Save, Unsave, Undo, and storage failures",
+      "expected_results": [
+        "Successful direct Save emits dish_saved with save_origin=direct",
+        "Successful Unsave emits dish_unsaved",
+        "Successful Undo emits dish_saved with save_origin=undo",
+        "Failed storage operations emit no success events",
+        "Successful readable Saved screen emits shortlist_viewed",
+        "Failed Saved screen read emits no shortlist_viewed",
+        "Reload does not emit a duplicate Save event",
+        "Search and ingredient interactions emit no P0 events"
+      ],
+      "status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-SEC-01",
+      "description": "Restaurant isolation and authorization",
+      "expected_results": [
+        "Restaurant A owner cannot access Restaurant B protected data",
+        "Restaurant B owner cannot access Restaurant A protected data",
+        "Revoked owner cannot perform protected operations",
+        "Outsider cannot access protected restaurant resources",
+        "Rejected requests do not modify protected data"
+      ],
+      "status": "BLOCKED",
+      "blocker": "Disposable staging identities and authorization evidence required"
+    }
+  ],
+  "allergen_terminology": {
+    "current_label": "nuts",
+    "previous_label": "tree nuts",
+    "safety_note": "Allergen claims require restaurant-validated evidence"
+  },
+  "overall_result": "NOT RUN"
+}
