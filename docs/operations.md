@@ -1,31 +1,79 @@
 # Local and staging operations
 
-## RES-02 publication staging preparation — November 1, 2026 (Phoenix)
+<a id="res02-hosted-acceptance"></a>
+
+## RES-02 publication hosted acceptance — November 1, 2026 (Phoenix)
 
 PRs [#42](https://github.com/vivienk/peekaplate/pull/42) and
-[#43](https://github.com/vivienk/peekaplate/pull/43) are merged into develop.
-Their reconciliation retained the newer diner fixtures/search, source paths and
-both operational error histories. Local checks on the reconciled public-menu
-head passed 308 Vitest tests, 57 script tests, 169 SQL assertions, 26 real
-PostgreSQL/workerd integration tests and 13 browser regressions. The PR CI was
-green before merge; these are not hosted publication results.
+[#43](https://github.com/vivienk/peekaplate/pull/43) merged into develop after
+preserving its newer fixture/search work and both error histories.
+[Release #86](https://github.com/vivienk/peekaplate/pull/86) promoted the reviewed
+code to main. The approved operator deployment used exact main commit
+`2eee264869548f6d461ff0fff43719c31a8f69e3`; its
+[main CI](https://github.com/vivienk/peekaplate/actions/runs/41391864863) passed.
+No GitHub protection setting was changed. Production and paused queues were unchanged.
 
-With maintainer approval, the existing Supabase staging project
-`icwhkrlsecpzcomfjsso` received migrations `20261025120000` and
-`20261025130000` in one transaction. History readback confirms both versions.
-The five new publication tables have RLS enabled and forced; `anon` and
-`authenticated` have no direct SELECT privilege. The existing restricted runtime
-can read subjects/bundles but cannot insert them, while approval and current
-projection privileges match the reviewed migrations. No existing application
-record, role membership, production database or Queue consumer changed.
+| Release item | Verified result |
+| --- | --- |
+| Staging API | `https://peekaplate-api-staging.vxkong.workers.dev` |
+| Active Worker version after signing configuration | `5529d2e4-7def-4b2c-9ff7-b30a55f2facd` |
+| Public signing-key ID | `staging-res02-20261101-7cfdaca9` |
+| Existing Supabase project | `icwhkrlsecpzcomfjsso`, used as staging under ADR 0012 |
+| Publication migrations | `20261025120000`, `20261025130000`; both committed and recorded in history |
+| New table access | Five forced-RLS tables; no direct browser SELECT; runtime cannot insert trusted subjects or bundle handoffs |
 
-The release candidate adds only the existing staging Worker origin as
-`MENU_TOKEN_ISSUER`; the ES256 private JWK belongs in its protected
-`MENU_TOKEN_SIGNING_JWK` secret. Source/bundle admission remains privileged.
-Main promotion, actual Worker deployment, signing-key activation and controlled
-hosted approval/read/withdrawal acceptance are still pending at this checkpoint.
-Do not interpret the vendor's project-branch label "PRODUCTION" as a production
-PeekaPlate release: ADR 0012 identifies this existing project as staging.
+The ES256 private JWK is stored only in the staging Worker's protected secret.
+The issuer is its existing HTTPS origin; JWKS exposes only the public key.
+The new secret created configuration versions without changing the release code.
+
+### Hosted checks and reconciliation
+
+A genuine Supabase test-user session called the deployed staff HTTP endpoints,
+using two labelled synthetic venues and an incomplete synthetic dish placeholder.
+An authorized operator admitted the exact trusted subject and temporary immutable
+HTTPS bundle. This does not implement the production admission pipeline.
+
+- **PASS:** owner approval, publication and withdrawal through the actual API;
+  identical retries return the original results; conflicting command reuse and
+  stale versions return 409.
+- **PASS:** another venue's approval returns 403; browser tenant overrides return
+  400; the other venue cannot read this publication.
+- **PASS:** draft/unknown and withdrawn menus return 404. The published menu
+  returns the exact approved pointer; its fetched synthetic bytes match the hash
+  and shared delivery schema. Remote JWKS verification confirms ES256, issuer,
+  audience, venue/publication scope and the 1,800-second token lifetime.
+- **PASS:** database readback shows exactly three events, three receipts and
+  three outbox rows, with publication/availability version 2 and status withdrawn.
+  Retries and the interrupted test added no duplicate commands or events.
+- **PASS:** after the synthetic permission changed from owner to viewer, retrying
+  the already-approved command returns 403. The verification session then ended
+  with 204. No existing restaurant permissions changed.
+- **PASS:** 12 baseline API checks; authenticated collaborator event/summary
+  reads and both existing staging Pages HTML roots still return the expected results.
+- **PASS:** the temporary fixture Worker was deleted and its URL returns 404;
+  the local verifier stopped. Synthetic append-only history remains labelled and
+  withdrawn for audit, with owner authority removed.
+
+The completed staff sequence contains 18 checks. The first attempt stopped on a
+20-second client timeout during a public read; an independent retry returned 200
+in 747 ms. The resumed run passed using the same command IDs. The interrupted
+evidence is retained in the [sanitized acceptance record](res02-staging-acceptance.json).
+The timeout's cause is unconfirmed; this is no load/latency guarantee.
+
+Local reconciled verification passed 308 Vitest tests, 57 script tests, 169 SQL
+assertions, 26 real PostgreSQL/workerd tests and 13 browser regressions; release
+and main CI also passed. Hosted checks complement those tests, rather than
+turning them into a completed diner or production acceptance result.
+
+### Handoff boundary
+
+DIN-03 and ingestion work can integrate against the real public-menu/JWKS
+contract. The trusted real-content producer, staff/diner screen wiring,
+production hash-input agreement, exact deployed CORS allowlist and original-
+publication token renewal remain their documented dependencies. No observation
+consumer, retention/recovery/load drill, owner dashboard or production launch
+was accepted by this test. The existing vendor project-branch label
+"PRODUCTION" does not change ADR 0012's use of this project as staging.
 
 ## OCR credential activation — October 28, 2026 (Phoenix)
 

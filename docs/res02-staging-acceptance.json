@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "scope": "RES-02 backend publication acceptance with labelled synthetic data; not complete diner/pilot acceptance",
+  "release": "2eee264869548f6d461ff0fff43719c31a8f69e3",
+  "workerVersion": "5529d2e4-7def-4b2c-9ff7-b30a55f2facd",
+  "issuer": "https://peekaplate-api-staging.vxkong.workers.dev/",
+  "publicKeyId": "staging-res02-20261101-7cfdaca9",
+  "verifiedAt": "2026-11-02T05:28:51.045Z",
+  "baselineChecks": [
+    {
+      "path": "/health",
+      "status": 200,
+      "requestId": "360c44af-670a-40a8-b879-6938f612a33c"
+    },
+    {
+      "path": "/.well-known/jwks.json",
+      "status": 200,
+      "requestId": "7d045092-20ce-4915-96c3-164b0234e22e"
+    },
+    {
+      "path": "/public/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe",
+      "status": 404,
+      "requestId": "01156cda-48f8-4a2a-9a84-0d54981e6270"
+    },
+    {
+      "path": "/public/venues/bad/menus/bad",
+      "status": 400,
+      "requestId": "284eaff9-a88b-4e07-9542-5b82e2483021"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/approvals",
+      "status": 401,
+      "requestId": "3c211676-96a0-4692-9a33-3f1c24df354d"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/approvals",
+      "status": 401,
+      "requestId": "4d106255-03ed-481f-a5f8-08c3bc157c92"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/publications",
+      "status": 401,
+      "requestId": "766913a1-4fe2-42f9-87b3-b07a37c3e3d5"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/publications",
+      "status": 401,
+      "requestId": "fd70e35a-4bb1-4294-a09f-d6bb2227d0fa"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/withdrawals",
+      "status": 401,
+      "requestId": "2821bd1c-1d88-4891-88ce-c903f45f479b"
+    },
+    {
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/withdrawals",
+      "status": 401,
+      "requestId": "d48616ea-dcff-443f-9f1d-267c48f549ff"
+    },
+    {
+      "path": "/team/analytics/events",
+      "status": 401,
+      "requestId": "7720032e-a894-4ad4-8d50-b13757da04d0"
+    },
+    {
+      "path": "/team/analytics/summary",
+      "status": 401,
+      "requestId": "c097be98-a907-46f0-ab1f-9fbbb9bc1ef9"
+    }
+  ],
+  "staffChecks": [
+    {
+      "label": "resume exact published fixture after preserved read timeout",
+      "status": 200,
+      "requestId": "dae3a90c-13dc-4e58-9fe6-9570e30582ca"
+    },
+    {
+      "label": "cross-venue approval denied",
+      "status": 403,
+      "requestId": "8db70c69-06d7-4f03-8f76-bfdebc611768"
+    },
+    {
+      "label": "client tenant override rejected",
+      "status": 400,
+      "requestId": "b87e38e0-387f-4b04-b30b-8586f0fd7498"
+    },
+    {
+      "label": "owner approval",
+      "status": 200,
+      "requestId": "8ed21495-fe8d-4960-a7ca-103fcad9c7e4"
+    },
+    {
+      "label": "approval identical retry",
+      "status": 200,
+      "requestId": "e2084cc0-65bd-4928-89ee-387e4d1eab2d"
+    },
+    {
+      "label": "conflicting command ID denied",
+      "status": 409,
+      "requestId": "86af63c5-0406-456e-bbb9-07093febf524"
+    },
+    {
+      "label": "owner publication",
+      "status": 200,
+      "requestId": "fe341434-b357-4caf-8f46-97cde7aecab5"
+    },
+    {
+      "label": "publication identical retry",
+      "status": 200,
+      "requestId": "5a735157-090c-45fa-8acc-1fdf5dc20e77"
+    },
+    {
+      "label": "stale publication denied",
+      "status": 409,
+      "requestId": "a9ba9dfd-8780-40cc-a25f-2e22fa7e18a2"
+    },
+    {
+      "label": "anonymous approved menu",
+      "status": 200,
+      "requestId": "eceaaac1-f076-40fd-beb6-5c6ab58752d2"
+    },
+    {
+      "label": "hosted immutable synthetic bundle hash and delivery schema",
+      "status": 200
+    },
+    {
+      "label": "remote ES256 signature/issuer/audience/TTL/publication binding",
+      "status": "PASS"
+    },
+    {
+      "label": "other venue cannot read publication",
+      "status": 404,
+      "requestId": "b2523d64-0b40-4323-bc39-e21ff3aa62ce"
+    },
+    {
+      "label": "owner withdrawal",
+      "status": 200,
+      "requestId": "e3b45e99-c894-4d6d-ba6c-38f49d2eb516"
+    },
+    {
+      "label": "withdrawal identical retry",
+      "status": 200,
+      "requestId": "2d71ca6c-e773-4152-9429-f43a041f02b3"
+    },
+    {
+      "label": "withdrawn fresh read hidden",
+      "status": 404,
+      "requestId": "2ced6709-1a6b-4e67-8f8f-dfd84e2951cc"
+    },
+    {
+      "label": "revoked owner cannot replay approved command",
+      "status": 403,
+      "requestId": "7b108037-baee-47b0-bd51-c4ef9d882cea"
+    },
+    {
+      "label": "end dedicated verification session",
+      "status": 204
+    }
+  ],
+  "existingServiceChecks": [
+    {
+      "label": "existing collaborator events",
+      "status": 200,
+      "requestId": "4856934f-30d2-4ee3-bdc8-48e1518a4ff5"
+    },
+    {
+      "label": "existing collaborator summary",
+      "status": 200,
+      "requestId": "2ce89ec1-074c-4b87-a859-9658d376fc9c"
+    },
+    {
+      "url": "https://peekaplate-diner-staging.pages.dev/",
+      "status": 200
+    },
+    {
+      "url": "https://peekaplate-console-staging.pages.dev/",
+      "status": 200
+    }
+  ],
+  "databaseAudit": {
+    "source": "Supabase staging SQL Editor guarded transaction and visible readback",
+    "passed": true,
+    "migrations": ["20261025120000", "20261025130000"],
+    "newTables": 5,
+    "allNewTablesForceRls": true,
+    "browserDirectSelect": false,
+    "runtimeMayInsertSubjectsOrBundles": false,
+    "syntheticPublication": {
+      "status": "withdrawn",
+      "version": 2,
+      "availabilityVersion": 2,
+      "events": 3,
+      "commandReceipts": 3,
+      "outboxRows": 3,
+      "otherVenueMemberships": 0,
+      "otherVenueEvents": 0,
+      "finalPermission": "viewer"
+    },
+    "existingRestaurantPermissionsChanged": false
+  },
+  "cleanup": {
+    "passed": true,
+    "verifiedAt": "2026-11-02T05:30:39.932Z",
+    "workerDeleted": true,
+    "fixtureHttpStatus": 404,
+    "fixtureNetworkCode": null,
+    "verifierStopped": true,
+    "withdrawnMenuStatus": 404,
+    "requestId": "d05a3f94-c89d-4c38-ac12-c8d09c1d6a29"
+  },
+  "interruptedAttempt": {
+    "outcome": "client timeout after 20 seconds at the approved public read",
+    "completedChecks": [
+      {
+        "label": "draft hidden",
+        "status": 404,
+        "requestId": "d6c23c74-c15c-4726-920d-378c8a4e228e"
+      },
+      {
+        "label": "cross-venue approval denied",
+        "status": 403,
+        "requestId": "e3d575af-78a5-4ee0-8013-4d3ad98ffd3d"
+      },
+      {
+        "label": "client tenant override rejected",
+        "status": 400,
+        "requestId": "a9e9dfb8-f72f-4a27-ad35-1f96027e1a42"
+      },
+      {
+        "label": "owner approval",
+        "status": 200,
+        "requestId": "7e75e023-9870-4660-9575-14cd8244766b"
+      },
+      {
+        "label": "approval identical retry",
+        "status": 200,
+        "requestId": "10ffae98-51bb-48d8-a080-71a737518aba"
+      },
+      {
+        "label": "conflicting command ID denied",
+        "status": 409,
+        "requestId": "de7424f0-5829-4c82-859a-3c1cd4c57010"
+      },
+      {
+        "label": "owner publication",
+        "status": 200,
+        "requestId": "1daf08b6-0f85-4b4e-b80e-a43f11a2b6f7"
+      },
+      {
+        "label": "publication identical retry",
+        "status": 200,
+        "requestId": "2171ccba-732a-4ea0-b055-3555f04f0306"
+      },
+      {
+        "label": "stale publication denied",
+        "status": 409,
+        "requestId": "9b50135d-a3e3-444f-b79d-8c28a6b9f528"
+      }
+    ],
+    "independentRetry": {
+      "status": 200,
+      "milliseconds": 747,
+      "requestId": "03fd00e4-e46f-43ab-bfbd-9ecebefe594f"
+    },
+    "resolution": "Resumed the same fixture with the original command IDs, completed acceptance and verified exactly three committed events/receipts/outbox rows. Root cause was not established; latency/load acceptance remains separate."
+  },
+  "limitations": [
+    "Trusted subject and bundle were admitted manually by an authorized operator for this synthetic check.",
+    "The fixture hash check used exact UTF-8 bytes for this test; the production producer/DIN-03 hash-input decision is not settled here.",
+    "No full staff/diner UI, production assets, deployed CORS integration, token renewal, observation Queue consumer, recovery/load or production acceptance is claimed."
+  ]
+}

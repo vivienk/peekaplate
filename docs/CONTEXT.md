@@ -170,12 +170,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "83f1aadcc8119ff3faa10934bb8ed9b3a3b1dc5be8dac665e0471ab7c1f1c826"
+      "sourceFingerprint": "1afe1e4feed745dadcd141397615e60af8a84e0267ccca0283b89e65d6be23b5"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/events/commands/outbox, memberships and projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP startup; hosted staff checks are separate and restore unverified. PostHog append-only export: eight raw/four unique synthetic events; October22 audit verifies migration20261021130000, scope675372, restricted definer ownership/execution and browser/runtime raw-access denial. Runtime cannot read scope; exporter cannot access app schema. Owner oracle covers NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, typed facts and tenant live-only views exist; activity uses greatest checkpoint. Report suppression/authorization and consumer integration remain separate. RES-02 adds immutable subjects, append-only exact approvals, review/publication projections and tenant/menu/hash foreign keys; runtime cannot create subjects. Append-only forced-RLS public bundles are runtime-read-only. Hosted acceptance pending.",
+      "summary": "Private Postgres venues, event/command/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated append-only PostHog export has eight raw/four unique synthetic events; its October22 audit verifies history20261021130000, scope675372, restricted definer execution and denied browser/runtime raw reads. Runtime cannot read scope; exporter cannot access app schema. The owner oracle covers NULL IDs, retries/conflicts and the ten-session floor. Canonical index/conflicts, typed facts and live-only tenant views exist; activity uses the greatest checkpoint. Consumer/report authorization and suppression integration remain separate. RES-02 adds immutable subjects/approvals, tenant/menu/hash foreign keys and runtime-read-only public bundles. Its migrations and synthetic hosted approval/publication/withdrawal checks pass; production remains unaccepted.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -267,7 +267,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/preview.test.mjs",
         "docs/menu-ingestion-infrastructure.md",
         "scripts/menu-ingestion-infra.test.mjs",
-        "pnpm-lock.yaml"
+        "pnpm-lock.yaml",
+        "docs/res02-staging-acceptance.json"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -278,7 +279,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7d0bd7734a0978f3a7edc1c1073759baf4447786b141d06bc59e43be5845dd02"
+      "sourceFingerprint": "686c7f68e2ee4f0e1df22a97c1407866a8a2f9858070a167508011b1eaa5ab6a"
     },
     {
       "id": "agents",
@@ -389,6 +390,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
+    },
+    {
       "summary": "November 1 RES-02 staging release preparation follows merged PR42 and PR43. Main observation-schema/cleanup history and all develop modules are retained. The existing staging Supabase project now records publication migrations20261025120000/20261025130000; application release and hosted runtime acceptance are not yet recorded. Staging token issuer is the existing Worker origin; signing key remains protected operator configuration.",
       "modules": [
         "contracts",
@@ -463,13 +474,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Run actual Worker retrieval tests, builds, database checks and applicable CI on this reconciled head, then merge PR29. Representative menu relevance and hosted extraction/publication acceptance remain separate."
-    },
-    {
-      "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
-      "modules": [
-        "database"
-      ],
-      "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
     }
   ]
 }
