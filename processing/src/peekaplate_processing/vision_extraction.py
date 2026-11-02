@@ -171,10 +171,17 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
             try:
                 response = fut.result(timeout=timeout)
             except concurrent.futures.TimeoutError:
-                pool.shutdown(wait=False, cancel_futures=True)
-                raise TimeoutError(f"Vision request timed out ({timeout:g}s); request cancelled.")
+                # A started request cannot be force-cancelled from Python. The client is bound to the same
+                # transport timeout; wait for the in-flight call to end so no fallback request overlaps it.
+                try:
+                    fut.result()
+                except Exception:
+                    pass
+                raise TimeoutError(
+                    f"Vision request exceeded its {timeout:g}s deadline; the in-flight call finished before fallback."
+                ) from None
             finally:
-                pool.shutdown(wait=False, cancel_futures=True)
+                pool.shutdown(wait=True)
         else:
             response = _call_invoke()
         raw_content = getattr(response, "content", None)

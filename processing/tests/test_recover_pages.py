@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 import stat
 import tempfile
 import unittest
@@ -62,9 +63,10 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(len(manifest['previous_failures']), 2)
         self.assertEqual(manifest['requests_attempted'], 2)
         self.assertEqual(self.input.read_bytes(), before)
-        self.assertEqual(stat.S_IMODE(self.output.stat().st_mode), 0o700)
-        for name in ['pages.json', 'manifest.json']:
-            self.assertEqual(stat.S_IMODE((self.output/name).stat().st_mode), 0o600)
+        if os.name == 'posix':
+            self.assertEqual(stat.S_IMODE(self.output.stat().st_mode), 0o700)
+            for name in ['pages.json', 'manifest.json']:
+                self.assertEqual(stat.S_IMODE((self.output/name).stat().st_mode), 0o600)
 
     def test_first_failure_stops_without_retry_and_preserves_unattempted(self):
         for error in [HTTPError('https://example.test',429,'limited',{},None), URLError('timeout')]:

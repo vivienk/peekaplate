@@ -61,21 +61,22 @@ In response to Zhiliang's request to specifically investigate the 10°–15° sk
 2. **OCR Mode (`ocr_image`):**
    - **At 12° Skew:** Dish names remain readable (91.3% recall on Gemini), but **single-price accuracy drops to 0.0% (0/12)** due to **11 safe abstentions** (cleared to null) and 1 wrong price.
    - **At exactly 15° Skew:** Across both Gemini and Qwen, dish names were fully extracted (23/23, 100%), but **all 14 single prices safely abstained (0/14 priced, 0 wrong prices)**. The geometric horizontal bounding algorithm strictly abstains when bounding boxes tilt past 8°–10°.
-3. **Formal Threshold Recommendation for Zhiliang:**
-   - **0°–10° Skew:** Supported in both modes (≥95% recall, ≥95% single-price accuracy, ≤2% wrong prices).
-   - **10°–15° Skew Band:** Must be designated **review-only**: `vision_v4` maintains 100% price accuracy, but `ocr_image` safely abstains on 100% of prices.
-   - **> 15° Rotation:** Enforce **preflight rejection**. At 90° rotation, vision models suffer silent 1-line price shifting (22.5% wrong-price rate on Patis).
+3. **Proposed acceptance targets vs. observed support (for Zhiliang):**
+   - The targets below (≥95% recall, ≥95% single-price accuracy, ≤2% wrong prices) are **acceptance targets, not demonstrated results for every mode**.
+   - **Observed support, 0°–10°:** `vision_v4` met the recall and single-price accuracy targets on clean, blurred and 8° inputs where runs completed, but its wrong-price rate was 4.3% on Virginia clean/blur (above the ≤2% target; one multi-price item received an amount). `ocr_image` did **not** meet the price target: clean Virginia was 11/12 (91.7%), 8° skew was 0/14 (all abstained). OCR mode is therefore supported for name extraction only; its prices need human review at any skew.
+   - **10°–15° Skew Band:** **review-only** in both modes: `vision_v4` measured 14/14 at 12° and 15° on one menu (Virginia), and `ocr_image` abstained on 100% of prices.
+   - **> 15° Rotation:** **preflight rejection**. At 90° rotation, Qwen `vision_v4` shifted prices by one line (22.5% wrong-price rate on Patis).
 
 ---
 
-## 3. Verified Thresholds Matrix for Zhiliang's Acceptance Gate
+## 3. Proposed Acceptance Targets (not yet demonstrated for all modes)
 
-| Metric | Clean / Blurred / Skew ≤ 10° | 10°–15° Skew Band (Review-Only) | Degraded (> 15° Rotation or Low Contrast) |
+| Metric | Target: Clean / Blurred / Skew ≤ 10° | 10°–15° Skew Band (Review-Only) | Degraded (> 15° Rotation or Low Contrast) |
 |---|---|---|---|
-| **Dish Recall** | ≥ 95% (`vision_v4`), ≥ 85% (`ocr_image`) | ≥ 90% names; prices unverified | *Preflight rejection* |
+| **Dish Recall** | ≥ 95% (`vision_v4`); `ocr_image` observed 91.3–100% | Names only; prices unverified | *Preflight rejection* |
 | **Dish Precision** | ≥ 95% | ≥ 90% | *Preflight rejection* |
-| **Single-Price Accuracy** | ≥ 95% (`vision_v4`), ≥ 80% (`ocr_image` clean) | 100% in vision; 0% in OCR (safe abstention) | *Preflight rejection* |
-| **Wrong Price Rate** | **≤ 2%** in vision mode; OCR blur requires human review | ≤ 5% | Must be 0% via preflight rejection |
+| **Single-Price Accuracy** | ≥ 95% (`vision_v4`, met where runs completed); `ocr_image` **not met** (91.7% clean, 0% at 8°) | Observed 100% in vision (one menu); 0% in OCR (all abstained) | *Preflight rejection* |
+| **Wrong Price Rate** | ≤ 2% target; OCR blur observed 14–16% (requires human review) | Observed 0–4.8% | Must be 0% via preflight rejection |
 | **Price Abstention Handling** | Safe nullification on ambiguous/tilted lines | Safe nullification required (100% in OCR) | Preflight rejection |
 
 ---

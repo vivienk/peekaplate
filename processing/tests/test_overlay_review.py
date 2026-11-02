@@ -414,7 +414,7 @@ class OverlayReviewTests(unittest.TestCase):
             args=["--input",str(rp),"--suggestions",str(sp),"--output",str(out)]
             with patch("builtins.print") as printed:self.assertEqual(main(args),0)
             self.assertNotIn(str(root),str(printed.call_args_list))
-            self.assertEqual(out.stat().st_mode & 0o777,0o600)
+            if os.name=="posix":self.assertEqual(out.stat().st_mode & 0o777,0o600)
             before=out.read_bytes()
             with self.assertRaises(SystemExit) as error:main(args)
             self.assertEqual(error.exception.code,1)

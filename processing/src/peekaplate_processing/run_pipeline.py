@@ -146,8 +146,15 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 client_candidates = [(provider, llm if llm is not None else configured_llm(timeout=max(120, int(llm_timeout)), provider=provider))]
             else:
                 client_candidates = create_cascading_clients(timeout=max(120, int(llm_timeout)))
-            if not client_candidates and llm is not None:
-                client_candidates = [("default", llm)]
+            if not client_candidates:
+                # No named provider credentials: use the generic configured client (its key/URL/model stay paired).
+                if llm is None:
+                    try:
+                        llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=None)
+                    except ExtractionError as config_err:
+                        fallback_warnings.append(f"No vision provider configured: {config_err}")
+                if llm is not None:
+                    client_candidates = [("default", llm)]
 
             v4_success = False
             for p_name, p_client in client_candidates:

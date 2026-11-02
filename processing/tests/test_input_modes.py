@@ -309,4 +309,56 @@ class InputModeTests(unittest.TestCase):
             self.assertEqual(llm.messages,[])
 
 
+class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
+    def _image(self, folder):
+        path=Path(folder)/"menu.png"
+        buffer=io.BytesIO(); Image.new("RGB",(200,120),"white").save(buffer,format="PNG")
+        path.write_bytes(buffer.getvalue())
+        return path
+
+    def _dish(self):
+        from peekaplate_processing.vision_extraction import V4Dish
+        return V4Dish.model_validate({"page_number":1,"name":"Soup","price_text":"8.50","price_amount":"8.50","box":[10,10,20,40]})
+
+    def _run(self, *, cascade, generic):
+        used=[]
+        def fake_extract(client, images, timeout=None):
+            used.append(client)
+            return [self._dish()], []
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=cascade), \
+             patch("peekaplate_processing.run_pipeline.configured_llm", side_effect=generic), \
+             patch("peekaplate_processing.run_pipeline.extract_vision_v4", side_effect=fake_extract), \
+             patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")):
+            report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_cache_dir=None)
+        return report, used
+
+    def test_generic_only_configuration_runs_vision_with_the_configured_client(self):
+        generic=SimpleNamespace(model_name="generic-model")
+        report, used=self._run(cascade=[], generic=lambda **kwargs: generic)
+        self.assertEqual(used,[generic])
+        self.assertTrue(report.configuration.get("v4_vision"))
+        self.assertGreaterEqual(report.started_at.year,2025)
+
+    def test_provider_only_configuration_runs_without_generic_settings(self):
+        named=SimpleNamespace(model_name="models/gemini")
+        report, used=self._run(cascade=[("google_studio",named)], generic=ExtractionError("Set MENU_AI_API_KEY"))
+        self.assertEqual(used,[named])
+        self.assertEqual(report.extraction_model,"models/gemini")
+
+    def test_deadline_waits_for_in_flight_call_before_fallback(self):
+        import threading, time
+        from peekaplate_processing.vision_extraction import extract_vision_v4
+        finished=threading.Event()
+        class Blocking:
+            def bind(self, **kwargs): return self
+            def invoke(self, messages):
+                time.sleep(0.3); finished.set()
+                return SimpleNamespace(content="{}")
+        with self.assertRaises(TimeoutError) as error:
+            extract_vision_v4(Blocking(), [{"page_number":1,"image_url":"data:,"}], timeout=0.01)
+        self.assertTrue(finished.is_set())
+        self.assertNotIn("cancelled", str(error.exception))
+
+
 if __name__ == "__main__": unittest.main()
