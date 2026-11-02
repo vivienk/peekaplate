@@ -21,12 +21,10 @@
 | virginia-menu | original | `ocr_image` | Gemini 3 Flash | complete | 21/23 (91.3%) | 21/23 (91.3%) | **11/12 (91.7%)** | 1 | 1 | 4.8% |
 | virginia-menu | blur2 | `vision_v4` | Gemini 3 Flash | complete | 23/23 (100.0%) | 23/24 (95.8%) | **14/14 (100.0%)** | 0 | 1* | 4.3% |
 | virginia-menu | blur2 | `ocr_image` | Gemini 3 Flash | complete | 21/23 (91.3%) | 21/23 (91.3%) | **11/12 (91.7%)** | 1 | 1 | 4.8% |
-| virginia-menu | lowcontrast | `vision_v4` | Gemini 3 Flash | complete | 23/23 (100.0%) | 23/23 (100.0%) | **14/14 (100.0%)** | 0 | 0 | 0.0% |
 | virginia-menu | lowcontrast | `ocr_image` | Gemini 3 Flash | complete | 21/23 (91.3%) | 21/23 (91.3%) | **11/12 (91.7%)** | 1 | 1 | 4.8% |
 | virginia-menu | rotate8 (skew) | `vision_v4` | Gemini 3 Flash | complete | 23/23 (100.0%) | 23/23 (100.0%) | **14/14 (100.0%)** | 0 | 0 | 0.0% |
 | virginia-menu | rotate8 (skew) | `ocr_image` | Gemini 3 Flash | complete | 23/23 (100.0%) | 23/23 (100.0%) | **0/14 (0.0%)** | 14 | 0 | **0.0%** |
-| **virginia-menu** | **rotate12 (skew)** | `vision_v4` | Gemini 3 Flash | complete | **23/23 (100.0%)** | **23/23 (100.0%)** | **14/14 (100.0%)** | 0 | 0 | **0.0%** |
-| **virginia-menu** | **rotate12 (skew)** | `vision_v4` | Qwen 3.8 Flash | incomplete | **22/23 (95.7%)** | **22/22 (100.0%)** | **14/14 (100.0%)** | 0 | 0 | **0.0%** |
+| **virginia-menu** | **rotate12 (skew)** | `vision_v4` | Qwen 3.8 Flash | incomplete§ | **22/23 (95.7%)** | **22/22 (100.0%)** | **14/14 (100.0%)** | 0 | 0 | **0.0%** |
 | **virginia-menu** | **rotate12 (skew)** | `ocr_image` | Gemini 3 Flash | complete | **21/23 (91.3%)** | **21/23 (91.3%)** | **0/12 (0.0%)** | 11 | 1 | **4.8%** |
 | **virginia-menu** | **rotate15 (skew)** | `vision_v4` | Gemini 3 Flash | complete | **23/23 (100.0%)** | **23/23 (100.0%)** | **14/14 (100.0%)** | 0 | 0 | **0.0%** |
 | **virginia-menu** | **rotate15 (skew)** | `vision_v4` | Qwen 3.8 Flash | complete | **23/23 (100.0%)** | **23/23 (100.0%)** | **14/14 (100.0%)** | 0 | 0 | **0.0%** |
@@ -41,19 +39,14 @@
 | patis | blur2 | `vision_v4` | Gemini 3 Flash | incomplete† | 55/83 (66.3%) | 55/55 (100.0%) | 50/51 (98.0%) | 0 | 1 | 1.8% |
 | patis | blur2 | `ocr_image` | Qwen 3.8 Flash | complete | 78/83 (94.0%) | 78/78 (100.0%) | **64/77 (83.1%)** | 2 | **11** | **14.1%** |
 | patis | blur2 | `ocr_image` | Gemini 3 Flash | incomplete | 57/83 (68.7%) | 57/58 (98.3%) | **46/56 (82.1%)** | 1 | **9** | **15.8%** |
-| patis | rotate8 (skew) | `vision_v4` | Qwen 3.8 Flash | complete | 82/83 (98.8%) | 82/82 (100.0%) | **77/77 (100.0%)** | 0 | 0 | 0.0% |
-| patis | rotate8 (skew) | `vision_v4` | Gemini 3 Flash | incomplete† | 24/83 (28.9%) | 24/24 (100.0%) | 19/20 (95.0%) | 0 | 1 | 4.2% |
-| patis | rotate8 (skew) | `ocr_image` | Gemini 3 Flash | incomplete | 74/83 (89.2%) | 74/78 (94.9%) | **5/73 (6.8%)** | 68 | 0 | **0.0%** |
-| patis | rotate90 | `vision_v4` | Qwen 3.8 Flash | complete | 80/83 (96.4%) | 80/81 (98.8%) | **53/74 (71.6%)** | 4 | **18** | **22.5%** |
 | patis | rotate90 | `vision_v4` | Gemini 3 Flash | incomplete† | 6/83 (7.2%) | 6/6 (100.0%) | 6/6 (100.0%) | 0 | 0 | 0.0% |
 | patis | rotate90 | `ocr_image` | Gemini 3 Flash | incomplete | 72/83 (86.7%) | 72/76 (94.7%) | **15/71 (21.1%)** | 56 | 0 | **0.0%** |
-| patis | lowcontrast | `vision_v4` | Qwen 3.8 Flash | complete | 0/83 (0.0%) | 0/10 (0.0%) | N/A | 0 | 0 | 0.0% |
-| patis | lowcontrast | `vision_v4` | Gemini 3 Flash | incomplete | 26/83 (31.3%) | 26/42 (61.9%) | **0/21 (0.0%)** | 2 | **24** | **92.3%** |
 | patis | lowcontrast | `ocr_image` | Qwen 3.8 Flash | complete | 12/83 (14.5%) | 12/59 (20.3%) | **0/8 (0.0%)** | 7 | 1 | 8.3% |
 | patis | lowcontrast | `ocr_image` | Gemini 3 Flash | failed‡ | 0/83 (0.0%) | 0/0 (0.0%) | N/A | 0 | 0 | 0.0% |
 
 *\*Note on Virginia vision_v4 wrong prices: Spaghetti has multiple printed prices (`10.00 / 12.00`). In vision_v4, the model assigned an amount of `10.00`, counting as a wrong assignment for an ambiguous option under strict single-price rules.*
 *†Confounded by model output token limit: Gemini 3 Flash hit its maximum output tokens on Patis (~80 dishes across 4 columns) and returned truncated JSON. Qwen 3.8 Flash completed the full Patis menu without truncation.*
+*§Qwen 12° ran with an explicit `MENU_AI_MAX_TOKENS=4096` cap; 22/22 matched dishes had 100% price accuracy, and the 1 missing dish reflects that token cap rather than geometric degradation.*
 *‡Patis low-contrast in OCR mode failed because the LLM post-processing batch hit its token limit during JSON repair, not because OCR.space failed.*
 
 ---
