@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Publication backend and hosted acceptance updated November 1, 2026; observation database setup updated October 31. VIS-01 infrastructure and OCR credential evidence remains dated October 28; team analytics evidence is recorded separately. The research and board inventory below remains the dated October 14 snapshot.
+Publication backend and hosted acceptance updated November 1, 2026; observation database setup updated October 31. VIS-01 infrastructure and OCR credential evidence remains dated October 28; team analytics evidence is recorded separately. The original foundation walkthrough, file inventory, research and board snapshot below retain their historical handoff dates. Use the November 1 publication section and Operations for current deployment status.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
 
@@ -84,8 +84,9 @@ tasks. The queues remain paused until their real consumers pass acceptance.
 **Observation database setup:** the two reviewed migrations from PRs #32 and #50
 are now applied to the existing staging Supabase database. They add the event
 index, conflicting-event records, typed event tables and two private owner
-views. All six migration-history entries are present, including the four
-earlier versions. The hosted audit verified tenant row rules, restricted
+views. The October 31 audit verified six migration-history entries, including
+the four earlier versions. Two publication migrations were added on November 1,
+bringing the recorded application history to eight entries. The hosted audit verified tenant row rules, restricted
 runtime grants and denied browser/exporter access; existing record counts were
 unchanged. See the [database release record](operations.md#observation-schema-release--october-31-2026)
 for evidence and limits. Teeyansh can continue integration against these tables.
@@ -166,7 +167,7 @@ Photo files belong in file storage; the database will hold their references, own
 
 Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The Worker now runs main release `afe45db`. The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. [Operations](operations.md#team-analytics-hosted-verification--october-22-2026) records the current Worker version and test evidence; the older deployment record preserves the earlier staff-command checks.
+The October 22 Worker release was `afe45db`. The current November 1 Worker release is main `2eee264`; its active configuration version and hosted results are in [Operations](operations.md#res02-hosted-acceptance). The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. The older deployment records preserve the earlier staff-command checks.
 
 ### Verified behavior, access and costs
 
@@ -186,7 +187,7 @@ There are two kinds here:
 
 | Kind | Plain example | Why keep it? | Built yet? |
 | --- | --- | --- | --- |
-| A staff action that changes the product | An authorized person saved a new version of Tomato Soup | Know what changed and preserve its history | Yes, for draft dish revisions |
+| A staff action that changes the product | An authorized person saved a new version of Tomato Soup | Know what changed and preserve its history | Yes: draft dish revisions and menu approval/publication/withdrawal |
 | An observation of diner behavior | A session opened Tomato Soup's details | Understand how the menu was used | No; the collection flow is planned |
 
 ### The events we save today
@@ -374,7 +375,7 @@ Link completed deliverables and PRs back to their ClickUp tickets during normal 
 
 The dependency plan is the final section of this guide. The commands and setup procedure are in [operations.md](operations.md). Do not start a later step just because a design task with a similar name is marked complete.
 
-For the next demo, be precise about what can be shown: a tested draft-save backend, the current prototype, and the remaining steps connecting them. An online menu, staff sign-in and restaurant analytics should only be described as working after those flows exist and have been exercised.
+For the next demo, be precise about what can be shown: tested draft-save and menu approval/publication backends, the current prototype, and the remaining screen connections. A connected diner menu, staff sign-in screen and restaurant analytics should only be described as working after those flows exist and have been exercised.
 
 ## Reference: the project files
 
