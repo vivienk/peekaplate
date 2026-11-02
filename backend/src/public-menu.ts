@@ -15,6 +15,7 @@ export type MenuTokenSigningConfig = {
   issuer: string;
   signingJwk: string;
   allowLocalIssuer?: boolean;
+  trafficClass?: 'live' | 'test' | 'demo';
 };
 
 type ParsedSigningKey = { key: CryptoKey; kid: string; publicJwk: JWK };
@@ -150,6 +151,7 @@ export async function issueMenuToken(
     venue: claims.venue,
     publication: claims.publication,
     scope: claims.scope,
+    traffic_class: config.trafficClass ?? 'live',
   })
     .setProtectedHeader({ alg: 'ES256', typ: 'JWT', kid: signing.kid })
     .setIssuer(issuer)
