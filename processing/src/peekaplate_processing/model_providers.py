@@ -52,7 +52,7 @@ class ModelProviderConfig:
 PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     "google_studio": ModelProviderConfig(
         name="google_studio",
-        key_vars=("GEMINI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
         url_var="GEMINI_API_URL",
         model_var="GEMINI_MODEL",
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
@@ -61,7 +61,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
     ),
     "gemini": ModelProviderConfig(
         name="gemini",
-        key_vars=("GEMINI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
+        key_vars=("GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "GOOGLE_API_KEY", "MENU_AI_API_KEY"),
         url_var="GEMINI_API_URL",
         model_var="GEMINI_MODEL",
         default_url="https://generativelanguage.googleapis.com/v1beta/openai",
