@@ -1052,3 +1052,19 @@ Security-report finalization initially rejected invalid surface IDs/missing
 labels. The same pinned scan was resumed with valid labelled surfaces, sealed
 and read back successfully; no source-code or provider change was needed.
 Validate the saved draft result before calling its finalization operation.
+
+## November 2 hosted menu-token self-fetch
+
+The first genuine Brave test loaded the published synthetic menu and exact-hash
+bundle but received 503 at observation acceptance. Both source/DLQ remained
+empty and paused; no event was falsely accepted. A bounded synthetic Worker
+confirmed Cloudflare 1042 when fetching its own public route. Own-token
+verification had fetched this API's own JWKS, unlike the separate JWKS server
+used by the existing local tests.
+
+The regression first failed with MenuTokenUnavailableError when self-fetch was
+blocked, then passed using the configured public JWK locally, including denial
+of wrong-audience and forged-signature tokens. Signature and claim checks stay
+enabled; no broad fetch compatibility flag, new credentials or public debug
+route is added. Fresh hosted acceptance must pass after the reviewed fix deploys.
+Reference: https://developers.cloudflare.com/workers/observability/errors/

@@ -1,5 +1,11 @@
 import { MENU_TOKEN_AUDIENCE, MENU_TOKEN_TTL_SECONDS } from '@peekaplate/contracts';
-import { createRemoteJWKSet, type JWTPayload, jwtVerify } from 'jose';
+import {
+  createLocalJWKSet,
+  createRemoteJWKSet,
+  type JSONWebKeySet,
+  type JWTPayload,
+  jwtVerify,
+} from 'jose';
 
 const ALGORITHMS: 'ES256'[] = ['ES256'];
 const MAX_BEARER_TOKEN_LENGTH = 8_192;
@@ -48,13 +54,16 @@ export type MenuTokenVerifier = (authorization: string | undefined) => Promise<M
 export function createMenuTokenVerifier(config: {
   issuer: string;
   allowLocalIssuer?: boolean;
+  jwks?: JSONWebKeySet;
 }): MenuTokenVerifier {
   const issuer = trustedIssuer(config);
-  const jwks = createRemoteJWKSet(new URL('.well-known/jwks.json', issuer), {
-    timeoutDuration: 2_000,
-    cooldownDuration: 30_000,
-    cacheMaxAge: 600_000,
-  });
+  const jwks = config.jwks
+    ? createLocalJWKSet(config.jwks)
+    : createRemoteJWKSet(new URL('.well-known/jwks.json', issuer), {
+        timeoutDuration: 2_000,
+        cooldownDuration: 30_000,
+        cacheMaxAge: 600_000,
+      });
 
   return async (authorization) => {
     const token = bearerToken(authorization);
