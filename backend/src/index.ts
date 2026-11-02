@@ -322,6 +322,7 @@ const dependencies: Dependencies = {
       issuer: env.MENU_TOKEN_ISSUER,
       signingJwk: env.MENU_TOKEN_SIGNING_JWK,
       allowLocalIssuer: env.APP_ENV === 'local',
+      trafficClass: env.APP_ENV === 'production' ? 'live' : 'test',
     });
   },
   async readMenuJwks(env) {
@@ -356,6 +357,14 @@ export function createApp(services: Dependencies = dependencies) {
   app.use(
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
+  );
+  app.use(
+    '/public/venues/*',
+    cors({
+      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      maxAge: 86400,
+    }),
   );
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());

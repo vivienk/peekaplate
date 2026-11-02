@@ -1,11 +1,14 @@
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
 import {
   DishRevisionSchema,
   MenuApprovalSchema,
   MenuPublicationSchema,
+  ObservationReceiptBatchSchema,
   PublicMenuResponseSchema,
 } from '@peekaplate/contracts';
+import { chromium } from '@playwright/test';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -34,6 +37,9 @@ let menuPublicJwk: JWK;
 let menuSigningJwk: string;
 let menuTokenIssuer: string;
 let worker: Awaited<ReturnType<typeof unstable_dev>>;
+const integrationConfig = fileURLToPath(
+  new URL('../.wrangler/observation-integration.json', import.meta.url),
+);
 
 function command(patch = {}) {
   return {
@@ -241,8 +247,27 @@ beforeAll(async () => {
     MENU_TOKEN_ISSUER: menuTokenIssuer,
     MENU_TOKEN_SIGNING_JWK: menuSigningJwk,
   };
+  const config = JSON.parse(await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
+  config.main = fileURLToPath(new URL('./index.ts', import.meta.url));
+  config.r2_buckets = [
+    { binding: 'OBSERVATION_ARCHIVE_BUCKET', bucket_name: 'local-observation-fixtures' },
+  ];
+  config.ratelimits = config.env.staging.ratelimits;
+  config.queues = {
+    producers: [{ binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' }],
+    consumers: [
+      {
+        queue: 'local-observation-fixtures',
+        max_batch_size: 10,
+        max_batch_timeout: 1,
+        max_retries: 1,
+      },
+    ],
+  };
+  await mkdir(fileURLToPath(new URL('../.wrangler/', import.meta.url)), { recursive: true });
+  await writeFile(integrationConfig, JSON.stringify(config));
   worker = await unstable_dev(fileURLToPath(new URL('./index.ts', import.meta.url)), {
-    config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+    config: integrationConfig,
     local: true,
     ip: '127.0.0.1',
     port: 0,
@@ -269,6 +294,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (worker) await worker.stop();
+  await unlink(integrationConfig).catch(() => {});
   await admin.end();
   if (server)
     await new Promise<void>((resolve, reject) =>
@@ -677,6 +703,99 @@ describe('real PostgreSQL menu publication commands', () => {
       scope: 'observations',
     });
     expect(Number(verified.payload.exp) - Number(verified.payload.iat)).toBe(1800);
+    expect(verified.payload.traffic_class).toBe('test');
+
+    // Real browser transport harness; DIN screens/outbox remain their owners' separate integration.
+    const eventId = crypto.randomUUID();
+    const browserServer = createServer((_, res) =>
+      res
+        .writeHead(200, { 'Content-Type': 'text/html' })
+        .end(
+          '<title>Synthetic observation transport</title><button>Send synthetic visit</button><output>Waiting</output>',
+        ),
+    );
+    await new Promise<void>((resolve) => browserServer.listen(5173, '127.0.0.1', resolve));
+    let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+    try {
+      browser = await chromium.launch();
+      const page = await browser.newPage();
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.goto('http://127.0.0.1:5173');
+      const api = `http://127.0.0.1:${worker.port}`;
+      const receipt = await page.evaluate(
+        async ({ api, menuId, venue, eventId }) => {
+          const response = await fetch(`${api}/public/venues/${venue}/menus/${menuId}`);
+          if (!response.ok) throw new Error('Public menu fetch failed');
+          const menu = (await response.json()) as { publicationId: string; menuToken: string };
+          const event = {
+            schema_version: 'observation.v2',
+            event_id: eventId,
+            session_id: crypto.randomUUID(),
+            producer_id: crypto.randomUUID(),
+            local_sequence: 1,
+            occurred_at: new Date().toISOString(),
+            publication_revision_id: menu.publicationId,
+            type: 'menu_viewed',
+            payload: { entry_source: 'qr' },
+          };
+          const send = async () => {
+            const result = await fetch(`${api}/observations`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${menu.menuToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ contract: 'observation.v2', events: [event] }),
+            });
+            if (!result.ok) throw new Error(`Observation HTTP ${result.status}`);
+            return result.json();
+          };
+          const first = await send();
+          const retry = await send();
+          return { first, retry };
+        },
+        { api, menuId, venue, eventId },
+      );
+      expect(ObservationReceiptBatchSchema.parse(receipt.first).receipts[0]?.status).toBe(
+        'accepted',
+      );
+      expect(ObservationReceiptBatchSchema.parse(receipt.retry).receipts[0]?.status).toBe(
+        'accepted',
+      );
+      await expect
+        .poll(
+          async () =>
+            (
+              await admin.query(
+                'SELECT traffic_class FROM app_private.observation_event WHERE tenant_id=$1 AND event_id=$2',
+                [venue, eventId],
+              )
+            ).rows,
+          { timeout: 10000 },
+        )
+        .toEqual([{ traffic_class: 'test' }]);
+      expect(
+        (
+          await admin.query(
+            'SELECT * FROM app_private.observation_menu_view WHERE tenant_id=$1 AND event_id=$2',
+            [venue, eventId],
+          )
+        ).rowCount,
+      ).toBe(1);
+      expect(
+        (
+          await admin.query(
+            'SELECT * FROM app_private.owner_observation_v1 WHERE tenant_id=$1 AND event_id=$2',
+            [venue, eventId],
+          )
+        ).rowCount,
+      ).toBe(0);
+      expect(errors).toEqual([]);
+    } finally {
+      await browser?.close();
+      await new Promise<void>((resolve) => browserServer.close(() => resolve()));
+    }
 
     const withdrawal = await requestPublication(menuId, 'withdrawals', {
       commandId: crypto.randomUUID(),

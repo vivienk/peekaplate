@@ -229,6 +229,9 @@ export class QueueConsumer {
     if (envelope.kind === 'observation_conflict.v1') {
       return this.processConflictMessage(envelope, body);
     }
+    const { venueId: _legacyAlias, ...normalizedEnvelope } = envelope;
+    let factEnvelope = normalizedEnvelope;
+    let hasTrustedClassification = true;
 
     const {
       tenantId,
@@ -264,7 +267,12 @@ export class QueueConsumer {
       } else if (body instanceof Uint8Array) {
         rawBytes = body;
       } else {
-        rawBytes = new TextEncoder().encode(JSON.stringify(body));
+        rawBytes = new TextEncoder().encode(
+          JSON.stringify({
+            ...(body as Record<string, unknown>),
+            traffic_class: envelope.traffic_class,
+          }),
+        );
       }
 
       archiveKey = buildRawArchiveKey(tenantId, eventId, occurredAt);
@@ -321,6 +329,21 @@ export class QueueConsumer {
               : 'conflict_recorded',
           };
         }
+        const original = await this.deps.r2Storage.getRawPayload(archiveKey);
+        if (!original || original.checksum !== checksum)
+          throw new Error('Original archive unavailable');
+        const archivedBody = JSON.parse(new TextDecoder().decode(original.rawBytes));
+        const archived = ObservationQueueMessageSchema.parse(archivedBody);
+        hasTrustedClassification = Object.hasOwn(archivedBody, 'traffic_class');
+        if (
+          archived.tenantId !== tenantId ||
+          archived.eventId !== eventId ||
+          (await sha256(canonicalJson(toCanonicalObservation(archived)))) !== checksum
+        ) {
+          throw new Error('Original archive identity mismatch');
+        }
+        // The first private archive owns server metadata; retries cannot relabel traffic or receipt time.
+        factEnvelope = archived;
       }
     } catch (err: unknown) {
       // Transient R2 failure -> retry message
@@ -344,10 +367,11 @@ export class QueueConsumer {
         eventType: type,
         authorizedPublicationId,
         occurredAt,
-        firstReceivedAt: firstReceivedAt ?? new Date().toISOString(),
+        firstReceivedAt: factEnvelope.firstReceivedAt,
         checksum,
         r2ArchiveKey: archiveKey,
         payload: canonicalObservation.payload as Record<string, unknown>,
+        ...(hasTrustedClassification ? { factEnvelope } : {}),
       });
 
       if (outcome.disposition === 'accepted') {

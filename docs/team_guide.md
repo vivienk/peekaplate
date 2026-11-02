@@ -41,7 +41,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Receiving code and real Queue → R2 → database index/conflict processing deployed and tested with synthetic data | Real diner controls/token delivery, typed metric facts, reporting and normal collection |
+| Diner tracking | Deployed index/conflict pipeline; transactional typed facts, archive recovery and genuine-token browser transport now implemented and locally tested | Hosted follow-up verification, real diner controls/outbox, report API and normal collection |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
@@ -95,29 +95,32 @@ the bounded tests below. Complete diner-to-report acceptance remains separate.
 
 ### Receiving and processing diner actions
 
-The staging backend can now process an observation, such as a synthetic dish
-Save. Think of its path as:
+The backend follows this path:
 
 ```text
-Receiving code checks the observation → Queue holds it → consumer saves the
-original evidence in private R2 → database indexes it → Queue marks it finished
+Browser action → signed-token checks → Queue → private R2 evidence
+→ database index + typed detail, together → Queue acknowledgement
+→ owner-report calculations, once their API is connected
 ```
 
-Sending the same observation again does not add another index record. Reusing
-its ID with different contents preserves the original and keeps separate
-conflict evidence. A repeatedly invalid message reaches the DLQ, our recovery
-tray. The hosted tests checked those behaviors and another restaurant's lack
-of access. Controlled storage/database failures also retried and recovered.
+A typed detail puts an action into useful columns: which dish was opened,
+which dishes were compared, or where Save/Unsave happened. The index prevents
+retries from counting twice. Both are now written in one database transaction;
+if the detail fails, the item retries. The backfill tool recovers missing facts
+from their original private files and never invents historical values.
 
-**The dashboard still needs the next step:** index records are not calculated
-metrics. Developers must write the matching typed facts and safely fill any
-earlier records before the owner views can use them. Real diner buttons and
-delivery with a genuine menu token also need integration tests. The successful
-hosted producer check used a protected operator test, not a diner screen.
+Staging tokens label observations as **test**. Owner views exclude test/demo
+data, so verification cannot inflate restaurant numbers. The local browser
+transport regression uses a genuine issued menu token and verifies one database
+fact after two identical sends. The real diner screens, consent/outbox delivery
+and owner-report API still have their own PRs and acceptance checks. Their work
+has not been replaced by this transport harness.
 
-Both observation Queues are empty and paused again; normal collection remains
-off. No production system was deployed. The release and exact test limits are
-in [Operations](operations.md#observation-consumer-hosted-acceptance).
+The current hosted release/evidence is in
+[Operations](operations.md#observation-consumer-hosted-acceptance). Keep normal
+collection paused until the complete browser-to-owner acceptance passes. See
+[fact recovery instructions](observation-infrastructure.md#recover-missing-facts)
+for the restricted operator command. Production has not been deployed.
 
 ### Other staging services
 
