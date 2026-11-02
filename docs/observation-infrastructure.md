@@ -2,6 +2,13 @@
 
 This is the infrastructure handoff for the observation ingestion pipeline. The producer `POST /observations` verifies menu-token authority, applies approximate per-location rate limits and awaits Queue acceptance. The consumer archives evidence in private R2 before writing the canonical database index or conflict quarantine and acknowledging delivery. Deployment and hosted acceptance are separate from merging this code.
 
+**November 1 hosted status:** reviewed main `35e989d` is deployed as staging
+Worker version `3db23304-c53a-4fee-b0ba-260c3afe4060`. Ten bounded hosted
+pipeline checks and fifteen public HTTP checks passed. The real source Worker
+consumer is attached; both Queues are empty and paused again. See
+[Operations](operations.md#observation-consumer-hosted-acceptance) and the
+[acceptance record](observation-staging-acceptance.json) for scope and remaining work.
+
 The reconciled contracts retain server-derived `traffic_class`, its `live`
 default, and canonical payload normalization. The combined producer/consumer
 regression uses the real migrated PostgreSQL database with simulated Queue/R2;
@@ -48,22 +55,25 @@ Account: `51eda1917fd22a9478808a82d2980741`. The October 24, 2026 inventory foun
 | Rate Limiter (Minute) | `OBSERVATION_RATE_LIMITER_MINUTE` | 60 requests per 60s; approximate per-location enforcement (not global token bucket) |
 | Rate Limiter (Burst) | `OBSERVATION_RATE_LIMITER_BURST` | 10 requests per 10s; approximate per-location enforcement (not global token bucket) |
 
-The binding configuration must reach a reviewed `main` release and the protected staging deployment before it exists in the live API Worker. Merely merging to `develop` does not deploy it. Keep the existing Hyperdrive, Auth issuer and `TEAM_GITHUB_TOKEN`; do not replace their credentials or add them to a frontend.
+The observation bindings and real consumer reached the live API through release
+#94. Future binding changes still require a reviewed main deployment; merging
+to develop alone does not deploy. Keep the existing Hyperdrive, Auth issuer and
+`TEAM_GITHUB_TOKEN`; never add their credentials to a frontend.
 
 ## Why delivery is paused
 
-The last recorded infrastructure setup uses a temporary **HTTP pull consumer**
-with delivery paused. The reviewed code now exports the real `queue` handler;
-an operator must replace the temporary consumer only during the reviewed main
-release, retain the existing DLQ/retry settings and verify provider readback.
-Do not attach a second competing consumer or treat a code merge as deployment.
+The real Worker consumer replaced the temporary source HTTP pull consumer during
+the approved release. Bounded synthetic acceptance passed, then both Queues
+were paused again. Normal collection remains off because the diner/token path,
+transactional typed-fact writes/backfill and owner reporting are not accepted.
+The DLQ retains its existing HTTP pull consumer for controlled recovery.
 
 | Setting | Source Queue | DLQ |
 | --- | --- | --- |
-| Consumer | HTTP pull; `a0b4e09af2af44b2bcab74b9bf5fac1c` | HTTP pull; `f3a3fef446fc49b1983a37be275e2845` |
+| Consumer | Worker `peekaplate-api-staging`; `9e89751e2efe4228b840d91843052c47` | HTTP pull; `f3a3fef446fc49b1983a37be275e2845` |
 | Maximum retries | 3 after the initial delivery | 100; operator recovery only |
 | Retry delay | 10 seconds | 10 seconds |
-| Visibility timeout | 30 seconds | 30 seconds |
+| Batch wait / visibility timeout | Maximum batch wait 30 seconds | Visibility timeout 30 seconds |
 | Batch size | 10 | 10 |
 | Retention | 86,400 seconds / 24 hours | 86,400 seconds / 24 hours |
 | Delivery | Paused outside bounded synthetic tests | Paused outside bounded synthetic tests |
@@ -80,15 +90,19 @@ The first Queue probe hit a transient `409` because the delivery plane still rep
 
 The fresh complete repeat passed at `2026-10-24T17:30:36.147Z`, run `2c7d7bc7-6b23-458f-968f-5c736fd1e14f`. R2 readback before ACK had SHA-256 `5195d6b28a0a3632840ce4b89fd775128e6c46f12752121507a05cf7c0b5f25d`. The failing probe was delivered with attempt counters `0, 1, 2, 3`, then observed and individually acknowledged in the DLQ. Post-cleanup provider readback showed both Queues paused and each backlog at zero. The run-owned R2 object was deleted. No real observation was sent or processed.
 
-This infrastructure probe does **not** test canonical database deduplication/conflict handling, actual consumer crashes, tenant authorization, ingest receipts or owner reports. The full Queue → R2 → canonical database → ACK/retry → DLQ/replay test remains an integration gate after the relevant code and migrations are approved.
+That October 24 infrastructure probe did not establish product processing.
+The November 1 acceptance above adds actual canonical deduplication/conflicts,
+archive/index processing, Queue drain and native malformed-message DLQ delivery.
+Real diner-token HTTP delivery, typed facts, owner reports, native process-crash
+recovery and full DLQ-to-canonical replay remain separate integration gates.
 
 ## What Teeyansh can do now
 
-1. Continue the consumer locally using the agreed `observation.v2` contract and Jeffin's forward migrations. Use the binding names above; credentials are injected by the platform, not committed to Git or shared in chat.
+1. Build on merged #70/#31 and the applied canonical migrations. Use the bindings above; credentials stay on the platform, not in frontend code or chat.
 2. Preserve create-only evidence: use an atomic conditional R2 write, then compare the existing checksum on a failed condition. An identical checksum is a retry; a different payload is quarantined without overwriting the original. A database lock taken after the R2 write cannot protect that earlier write.
 3. Persist the canonical index/facts idempotently, then individually ACK. R2 or database failure must retain/retry work. Calling `ack()` does not send a message to the DLQ.
 4. Include failure, concurrent-conflict and recovery tests in his PR. Keep source acceptance/time rules and first-received timestamps aligned with the shared contract.
-5. After review, an authorized operator replaces the temporary source HTTP pull consumer with the real Worker consumer, preserves the DLQ/retry configuration, deploys the reviewed release and runs the full integration acceptance. Only then resume normal source delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
+5. The real staging consumer is now attached and verified within its index/conflict scope. Finish typed-fact writes/backfill and browser/owner acceptance before requesting normal delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
 
 The existing collaborator analytics API gives read access to delayed PostHog diagnostics. It does not grant Cloudflare administration or turn those rows into canonical owner facts. Developers can submit code/configuration PRs without receiving the operator's provider token.
 
