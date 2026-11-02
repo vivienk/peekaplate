@@ -107,6 +107,8 @@ jobs:
         with:
           node-version: 24.16.0
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for the real token-to-fact database regression
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:db
 
   browser:
