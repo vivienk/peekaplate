@@ -159,6 +159,7 @@ let verifier: { issuer: string; local: boolean; verify: ReturnType<typeof create
 let menuVerifier: {
   issuer: string;
   local: boolean;
+  signingJwk: string;
   verify: ReturnType<typeof createMenuTokenVerifier>;
 };
 /**
@@ -205,19 +206,28 @@ const dependencies: Dependencies = {
     return verifier.verify(authorization);
   },
   async verifyMenu(authorization, env) {
-    if (!env.MENU_TOKEN_ISSUER) throw new MenuTokenUnavailableError();
+    if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK)
+      throw new MenuTokenUnavailableError();
     const local = env.APP_ENV === 'local';
     if (
       !menuVerifier ||
       menuVerifier.issuer !== env.MENU_TOKEN_ISSUER ||
-      menuVerifier.local !== local
+      menuVerifier.local !== local ||
+      menuVerifier.signingJwk !== env.MENU_TOKEN_SIGNING_JWK
     ) {
       menuVerifier = {
         issuer: env.MENU_TOKEN_ISSUER,
         local,
+        signingJwk: env.MENU_TOKEN_SIGNING_JWK,
         verify: createMenuTokenVerifier({
           issuer: env.MENU_TOKEN_ISSUER,
           allowLocalIssuer: local,
+          // Own issuance key: Workers cannot fetch their own public JWKS route (1042).
+          jwks: await menuJwks({
+            issuer: env.MENU_TOKEN_ISSUER,
+            signingJwk: env.MENU_TOKEN_SIGNING_JWK,
+            allowLocalIssuer: local,
+          }),
         }),
       };
     }
