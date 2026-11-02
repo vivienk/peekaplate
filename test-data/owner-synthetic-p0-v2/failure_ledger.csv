@@ -1,0 +1,11 @@
+item_id,area,status,evidence,notes
+UNIT-001,Starter fixture tests,PASS,test_results.txt,26 automated tests passed including 7 local negative checks
+DATA-001,Full dataset generation,PASS,events/full_dataset.jsonl,3150 deliveries and 3000 unique observations
+DATA-002,Event relationships,PASS,validation_results.txt,Exposure opening checkpoint and comparison links validated
+DATA-003,Save state transitions,PASS,validation_results.txt,Save Unsave Undo and shortlist sizes validated
+DATA-004,Full dataset metrics,PASS,validation_results.txt,Timing exposure opening and Save adoption checked
+NEG-REMAINING,Remaining negative scenarios,NOT_RUN,negative_cases.json,18 scenarios not covered by the 7 local negative tests
+AI-001-020,AI evaluation,NOT_RUN,ai_evaluation_cases.json,Actual application AI responses not evaluated
+PRIV-001,Production privacy enforcement,NOT_RUN,none,Threshold and suppression require implementation validation
+CONTRACT-001,Production event API mapping,PENDING,review_log.md,Requires engineering confirmation
+REVIEW-001,Independent validation,PENDING,review_log.md,Requires Sai review
