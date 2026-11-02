@@ -12,12 +12,12 @@ validation are reused. No extra verification model or new dependency is added.
 - `ocr_image` (default): source text plus original/bounded target-page images.
 - `ocr`: the earlier source-text-only model input; native PDF text/OCR acquisition is unchanged.
 - `image`: target-page images plus a labelled previous-page image, without OCR or native-text extraction.
-- `vision_v4`: direct multimodal vision extraction producing dishes and physical pixel bounding boxes without OCR, with cascading provider fallback (`google_studio` -> `qwen` -> `glm` -> `openrouter`) and automatic fallback to `ocr_image`. See [review candidates](review-candidates.md#vision-transcription-mode-vision_v4).
+- `vision_v4`: direct multimodal vision extraction producing dishes and physical pixel bounding boxes without OCR, with cascading provider fallback (`google_studio` -> `qwen` -> `glm` -> `openrouter`) and automatic fallback to `ocr_image`. See [review candidates](review-candidates.md).
+
 The default input change is explicit follow-up scope, not independent quality or
 PM acceptance. Batch size, concurrency, model/provider and reasoning defaults remain
 unchanged. The graph's lower-level text default remains compatible with existing callers.
-No mode silently falls back or makes an extra model request.
-
+Modes `ocr`, `ocr_image` and `image` make no extra model requests; `vision_v4` tries configured vision providers in priority order before cleanly falling back to `ocr_image` with warning capture.
 All modes save private `review-suggestions.json` beside `extraction.json` and final
 `timings.json`. It retains schema-validated raw dish fields, changed/rejected field
 values and reasons, original page references and model section suggestions. Hidden
