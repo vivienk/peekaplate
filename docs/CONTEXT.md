@@ -23,7 +23,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c719972d6a90fd33e3847afc9f626a6835e30743c79b3f8a6a09a36a22a93c87"
+      "sourceFingerprint": "a4c824d3ffe38628bff49a08951a26266ff0adb13020468654ac5430b2a46606"
     },
     {
       "id": "tokens",
@@ -170,7 +170,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "613aff777189e52662ae784732e147660a02c738695f36df5586b1835669e020"
+      "sourceFingerprint": "d4e41ffbf8a4055718310f0ff4077448da73ab3752a478338605debaefcb9d7d"
     },
     {
       "id": "database",
@@ -389,6 +389,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Proposed Bundle v1 correction uses nuts and peanut as separate reviewed wire codes. Strict parsing rejects legacy tree nut. Event payloads and owner metric definitions are unaffected.",
+      "modules": [
+        "contracts"
+      ],
+      "next": "Confirm producer and deployed reader compatibility before adopting the change or agreeing a versioned transition."
+    },
+    {
       "summary": "November 1 PR43 reconciliation retains PR42 command transactions and all develop diner fixture/search updates. Public reads return only an active exact approved bundle plus publication-scoped ES256 token; unknown/draft/unbundled/withdrawn menus share404. Existing code and migrations are preserved during context/error-ledger reconciliation.",
       "modules": [
         "contracts",
@@ -460,16 +467,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
-    },
-    {
-      "summary": "S3-TOK-01 ships shared @peekaplate/tokens imported by both apps, plus @peekaplate/ui CSS-only component library (Button, Card, Input, Typography, Nav) built only on tokens; console wraps these classes in React. Tokens encode Animation motion, Design System text styles, radius, spacing, shadows, palette and semantic roles, including nav hover icon and chip active/inactive roles from Figma. Surface-container is neutral-700 and needs a border; on-error/on-information use neutral-950 for WCAG AA. A WCAG contrast test covers active pairs; shells remain locally styled.",
-      "modules": [
-        "tokens",
-        "ui",
-        "diner",
-        "console"
-      ],
-      "next": "Confirm remaining design details (ease-out curve, licensed brand font, H2/footer weights, Figma shadow styles) and console light-theme role mappings; chip hover/pressed states remain pending Figma. Review stacked PR base feat/s3-tok-01-button-roles before merge."
     }
   ]
 }
