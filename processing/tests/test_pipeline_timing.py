@@ -141,7 +141,7 @@ class PipelineTimingTests(unittest.TestCase):
             MenuExtractionResult.model_validate(data)
 
     def test_model_settings(self):
-        settings={"a2agent_api_key":"synthetic", "a2agent_url":"https://api.a2agent.me/v1", "a2agent_api_MODEL":"minimax-m3.1-flash"}
+        settings={"MENU_AI_API_KEY":"synthetic", "MENU_AI_API_URL":"https://example.test/v1", "MENU_AI_MODEL":"synthetic-model"}
         with patch.dict(os.environ, settings, clear=True):
             model=configured_llm()
         self.assertIsNone(model.reasoning_effort)

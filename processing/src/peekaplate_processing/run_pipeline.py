@@ -107,9 +107,11 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     elif max_model_requests is not None:
         raise ExtractionError("A model-request budget requires an explicit target-page selection.")
     if input_mode not in INPUT_MODES:
-        raise ExtractionError("Input mode must be ocr, ocr_image or image.")
+        raise ExtractionError("Input mode must be ocr, ocr_image, image or vision_v4.")
     if input_mode=="image" and pages_json is not None:
         raise ExtractionError("Image-only mode cannot use --pages-json; no OCR text is read.")
+    if input_mode=="vision_v4" and (pages_json is not None or target_pages is not None):
+        raise ExtractionError("vision_v4 mode reads page images only; it cannot reuse saved pages or recover target pages.")
     if type(llm_concurrency) is not int or llm_concurrency not in (1, 2):
         raise ExtractionError("LLM concurrency must be 1 or 2.")
     if type(batch_pages) is not int or not 1 <= batch_pages <= 10:
@@ -136,8 +138,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 prepared_images = images
             report.errors.extend(image_errors)
 
-            # Provider cascade: explicit provider or cascade: google_studio -> openrouter -> a2agent
-            client_candidates = [(provider, llm)] if provider else create_cascading_clients(timeout=llm_timeout)
+            # Explicit provider, else cascade google_studio -> qwen -> glm -> openrouter, with the same deadline as an explicit client.
+            client_candidates = [(provider, llm)] if provider else create_cascading_clients(timeout=max(120, int(llm_timeout)))
             if not client_candidates:
                 client_candidates = [("default", llm)]
 
@@ -146,10 +148,11 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes = extract_vision_v4(p_client, images, timeout=llm_timeout)
+                        v4_dishes, v4_errors = extract_vision_v4(p_client, images)
                     if not v4_dishes:
                         raise ExtractionError("Vision extraction produced 0 dishes.")
-                    v4_report = build_v4_result(report.source, images, v4_dishes, datetime.fromtimestamp(started, tz=timezone.utc))
+                    v4_report = build_v4_result(report.source, images, v4_dishes, datetime.fromtimestamp(started, tz=timezone.utc), errors=image_errors + v4_errors)
+                    v4_report.warnings.extend(fallback_warnings)
                     v4_report.extraction_model = getattr(p_client, "model_name", None)
                     with measure(timings, "extraction_write"):
                         save_json(v4_report.model_dump(mode="json"), directory / "extraction.json")
@@ -276,7 +279,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
-    parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), or image (no OCR; private suggestions only).")
+    parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), image (no OCR; private suggestions only), or vision_v4 (vision-model transcription with approximate boxes; falls back to ocr_image).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--target-pages",type=int,nargs="+",help="Explicitly recover only 1 to 4 saved ready pages; no merging with old drafts or automatic retry.")
     parser.add_argument("--max-model-requests",type=int,help="Required with --target-pages: explicit maximum batch requests, 1 to 4; preflighted before calls.")
@@ -286,7 +289,7 @@ def main(argv=None):
     parser.add_argument("--no-llm-cache", action="store_true", help="Make fresh model requests instead of reusing complete cached candidates.")
     parser.add_argument("--no-ocr-cache", action="store_true", help="Skip OCR cache reads and writes for fresh OCR requests.")
     parser.add_argument("--no-ocr-table", action="store_true", help="Disable OCR.space table recognition (isTable); enabled by default.")
-    parser.add_argument("--provider", choices=list(sorted(PROVIDER_REGISTRY.keys())), default=None, help="Explicit model provider (e.g. google_studio, openrouter, a2agent, openai, nara).")
+    parser.add_argument("--provider", choices=list(sorted(PROVIDER_REGISTRY.keys())), default=None, help="Explicit model provider (e.g. google_studio, qwen, glm, openrouter, openai, nara).")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
     recovery={} if args.target_pages is None and args.max_model_requests is None else {

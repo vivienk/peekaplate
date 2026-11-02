@@ -18,6 +18,12 @@ from peekaplate_processing.sources import detect_kind, read_file
 from peekaplate_processing.storage import save_json
 
 
+def degenerate_ocr_text(text: str) -> bool:
+    """True when leader punctuation dominates the page, as when OCR runs away on dotted lines."""
+    visible = [c for c in text if not c.isspace()]
+    return len(visible) >= 200 and sum(c in ".…·_" for c in visible) > 0.6 * len(visible)
+
+
 def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-cache", timeout=120, ocr_provider: OCRProvider | None = None, is_table: bool = True) -> MenuExtractionResult:
     result = MenuExtractionResult(started_at=datetime.now(timezone.utc))
     result.configuration = {"stage": "text_acquisition", "pdf_engine": "pymupdf", "max_pdf_pages": 40, "min_pdf_native_text_chars": MIN_NATIVE_TEXT_CHARS, "ocr_is_table": bool(is_table)}
@@ -42,6 +48,10 @@ def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-
         for index, segment in enumerate(result.segments, start=1):
             segment.page_number = segment.page_number or index
             if segment.status == "failed": result.errors.append(f"Page {segment.page_number}: {segment.error}")
+            elif degenerate_ocr_text(segment.text):
+                message = "OCR text is mostly dot leaders; page text is likely truncated and dishes may be missing."
+                segment.warnings.append(message)
+                result.errors.append(f"Page {segment.page_number}: {message}")
 
         if sum(len(s.text) for s in result.segments) > 100_000:
             result.errors.append("Combined text exceeds the 100,000-character limit.")

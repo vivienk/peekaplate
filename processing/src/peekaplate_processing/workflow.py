@@ -583,6 +583,8 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                 if sec.page_number not in seen_sec_pages:
                     seen_sec_pages.add(sec.page_number)
                     deduped_sections.append(sec)
+                else:
+                    finding["warnings"].append(f"Page {sec.page_number}: extra section metadata ignored; only the first entry per page is kept.")
             parsed.sections = deduped_sections
             section_numbers = [sec.page_number for sec in parsed.sections]
             finding["sections"]=[section.model_dump() for section in parsed.sections]

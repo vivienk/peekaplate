@@ -111,6 +111,34 @@ own transcript namespace and unvalidated numeric proposals. It is not accepted b
 this exporter, does not mutate originals/IDs and is not inserted into segment
 metadata or the service bundle. It does not amend the public source-text contract.
 
+**Vision transcription mode (`vision_v4`).**
+
+`--input-mode vision_v4` is an explicit, opt-in exception to the image-only rule
+above, pending owner sign-off (Vivien, Sai). A multimodal model reads each page
+image and transcribes dishes; no OCR text exists for these candidates. The report
+marks this honestly rather than presenting it as OCR evidence:
+
+- Segment `metadata.text_origin` is `vision_model_transcription` and
+  `metadata.v4_vision` is `true`. Segment `text` is the model's transcribed dish
+  names, one per line; each candidate's span selects its own line. It is not OCR.
+- Every candidate and segment carries the warning that name, price and
+  description are unverified and boxes are approximate.
+- `price_amount` is set only for one plain price whose text agrees; options
+  (`12/15`), thousands/decimal commas, superscripts and `MP` stay null with
+  `price_text` preserved. Ingredients are never produced.
+- Page-image failures, empty or token-limited model output and rejected dishes are
+  report `errors`, so the status is `incomplete`, never silently `complete`.
+- `segments[].metadata.vision_boxes` maps candidate ID to
+  `[{page_number, type: "title" | "price", text, box}]`, `box` being integer
+  `left`, `top`, `width`, `height` in pixels of the segment's `width` × `height`
+  prepared page image. Empty or inverted model boxes are omitted with a warning.
+  These are model proposals, not OCR-joined `candidate_box_evidence`: on clean
+  single-column menus they align well, on dense multi-column photos they were
+  observed on the wrong rows. The UI must show them as approximate.
+
+If no configured vision provider succeeds, the run falls back to `ocr_image` and
+records each provider failure in `warnings`.
+
 Offsets count Python Unicode code points: zero-based start, exclusive end. The
 source text is never normalized by the exporter. TypeScript validates slices via
 `Array.from(text)`, not `text.slice(start, end)`. For multiple spans, slices in

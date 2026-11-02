@@ -140,17 +140,13 @@ uv run --frozen python -m peekaplate_processing.run_pipeline \
   --input work/test-menus/Dennys_Menu.pdf --run-dir work/dennys-redesign-001
 ```
 
-A2Agent takes precedence when any of `a2agent_api_key`, `a2agent_url` or
-`a2agent_api_MODEL` is configured; all three are then required. These names are
-case sensitive and match the existing private `.env`. For MiniMax M3 use
-`https://api.a2agent.me/v1` and `minimax-m3`, as documented in the
-[A2Agent quickstart](https://docs.a2agent.me/quickstart) and
-[MiniMax catalog](https://a2agent.me/models/minimax-m3). Nara-only/OpenRouter-only
-parameters are not sent to A2Agent. Availability and strict-schema support still
-need the one-request live check below. Leave all A2Agent fields blank to select
-the existing providers.
+Provider selection: `--provider` (or `MENU_AI_PROVIDER`) picks a registry entry:
+`google_studio`/`gemini` (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_URL`),
+`qwen`, `glm`, `deepseek` and `openrouter` (`OPENROUTER_API_KEY`; OpenRouter models
+`qwen/qwen3.8-flash`, `z-ai/glm-5.3-flash`, `deepseek/deepseek-v4.1-flash`),
+`nara` and `openai`. MiniMax/A2Agent is not supported.
 
-Otherwise, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
+Without an explicit provider, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
 when any Nara setting is present; all three must then be supplied. Use
 `https://router.bynara.id/v1` as the Nara chat base URL. Otherwise it uses
 `MENU_AI_API_KEY`, `MENU_AI_API_URL` and `MENU_AI_MODEL` from `.env`.

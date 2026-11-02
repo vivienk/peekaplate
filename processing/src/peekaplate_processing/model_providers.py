@@ -2,13 +2,12 @@
 
 Provides an extensible registry supporting:
 - google_studio / gemini (Google AI Studio)
-- openrouter (OpenRouter unified gateway)
-- a2agent (A2Agent / MiniMax)
+- openrouter, qwen, glm, deepseek (OpenRouter unified gateway)
 - nara (Nara Router)
 - openai (Direct OpenAI API)
 
 Supports explicit selection via --provider or MENU_AI_PROVIDER env var,
-with automatic precedence fallback matching the repository contract.
+otherwise Nara Router or generic MENU_AI_* settings.
 """
 from __future__ import annotations
 
@@ -111,7 +110,7 @@ PROVIDER_REGISTRY: dict[str, ModelProviderConfig] = {
         url_var="NARA_ROUTER_URL",
         model_var="NARA_ROUTER_MODEL",
         default_url="https://router.bynara.id/v1",
-        default_model="minimax-m3.1-flash:free",
+        default_model=None,
         reasoning_effort="none",
     ),
     "openai": ModelProviderConfig(
@@ -148,14 +147,10 @@ def create_model_client(
         config = PROVIDER_REGISTRY[canon_name]
         return _build_client_from_config(config, timeout=timeout, max_tokens=max_tokens, environ=environ)
 
-    # 2. Backward-compatible auto-detection order:
-    # A2Agent -> Nara Router -> Generic MENU_AI_*
-    a2_names = ("a2agent_api_key", "a2agent_url", "a2agent_api_MODEL")
+    # 2. Backward-compatible auto-detection order: Nara Router -> Generic MENU_AI_*
     nara_names = ("NARA_ROUTER_KEY", "NARA_ROUTER_URL", "NARA_ROUTER_MODEL")
 
-    if any(environ.get(n) for n in a2_names):
-        names = a2_names
-    elif any(environ.get(n) for n in nara_names):
+    if any(environ.get(n) for n in nara_names):
         names = nara_names
     else:
         names = ("MENU_AI_API_KEY", "MENU_AI_API_URL", "MENU_AI_MODEL")
@@ -254,13 +249,20 @@ def _build_client_from_config(
         extra_body=extra,
     )
 def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[tuple[str, ChatOpenAI]]:
-    """Return configured clients in priority order: google_studio -> qwen -> glm -> openrouter."""
+    """Return configured clients in priority order: google_studio -> qwen -> glm -> openrouter.
+
+    A provider whose model and endpoint repeat an earlier entry is skipped, so one model is never retried twice.
+    """
     cascade_order = ("google_studio", "qwen", "glm", "openrouter")
     available: list[tuple[str, ChatOpenAI]] = []
+    seen: set[tuple[str, str]] = set()
     for prov_name in cascade_order:
         try:
             client = create_model_client(provider_name=prov_name, timeout=timeout)
-            available.append((prov_name, client))
         except ExtractionError:
             continue
+        identity = (str(client.openai_api_base), client.model_name)
+        if identity not in seen:
+            seen.add(identity)
+            available.append((prov_name, client))
     return available

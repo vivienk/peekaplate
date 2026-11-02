@@ -361,22 +361,6 @@ class WorkflowTests(unittest.TestCase):
                     with self.assertRaises(ExtractionError):
                         run_pipeline(Path(directory)/"menu.pdf", Path(directory)/f"bad{index}", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
 
-    def test_a2agent_settings_override_nara_and_generic_without_provider_extras(self):
-        settings = {"a2agent_api_key": "synthetic-a2", "a2agent_url": "https://api.a2agent.me/v1/chat/completions", "a2agent_api_MODEL": "minimax-m3", "NARA_ROUTER_KEY": "synthetic-nara", "NARA_ROUTER_URL": "https://router.bynara.id/v1", "NARA_ROUTER_MODEL": "old-model", "MENU_AI_API_KEY": "synthetic-old", "MENU_AI_API_URL": "https://openrouter.ai/api/v1", "MENU_AI_MODEL": "old-model"}
-        with patch.dict(os.environ, settings, clear=True):
-            model = configured_llm()
-        self.assertEqual(str(model.openai_api_base), "https://api.a2agent.me/v1")
-        self.assertEqual(model.model_name, "minimax-m3")
-        self.assertEqual(model.openai_api_key.get_secret_value(), "synthetic-a2")
-        self.assertEqual(model.extra_body, {})
-        self.assertIsNone(model.reasoning_effort)
-        self.assertEqual(model.max_retries, 0)
-
-    def test_partial_a2agent_configuration_fails_instead_of_using_nara(self):
-        with patch.dict(os.environ, {"a2agent_api_key": "synthetic", "NARA_ROUTER_KEY": "synthetic-nara", "NARA_ROUTER_URL": "https://router.bynara.id/v1", "NARA_ROUTER_MODEL": "old-model"}, clear=True):
-            with self.assertRaisesRegex(ExtractionError, "a2agent_url"):
-                configured_llm()
-
     def test_real_sdk_accepts_only_complete_json_with_optional_outer_code_fence(self):
         import httpx
         from langchain_openai import ChatOpenAI

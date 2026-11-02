@@ -598,8 +598,10 @@ def _matches_remaining(text, remaining):
     bt = " ".join(text.casefold().split())
     if bt == remaining or remaining.startswith(bt + " "):
         return True
-    tail = re.sub(r"^[.\s…·•–—]+", "", bt[len(remaining):]).strip()
-    return bt.startswith(remaining + " ") and bool(_PRICE.fullmatch(tail))
+    rest = bt[len(remaining):]
+    if not bt.startswith(remaining) or rest[:1] not in (" ", ".", "…", "·", "•"):
+        return False
+    return bool(_PRICE.fullmatch(re.sub(r"^[.\s…·•–—]+", "", rest).strip()))
 
 def _headings(name, runs):
     normalized = " ".join(name.casefold().split())
