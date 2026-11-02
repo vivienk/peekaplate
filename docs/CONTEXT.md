@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "11bc96334717f208264c888874e5d5f1a59538a0df3a4dc30b40b533d56e9253"
+      "sourceFingerprint": "970ff1e35f5808bb80187041683cdb827fc6c092373c7e8e64d8cf2fdc07fbe7"
     },
     {
       "id": "console",
@@ -520,7 +520,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "docs/observation-facts-staging-acceptance.json"
       ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate."
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles."
     }
   ]
 }
