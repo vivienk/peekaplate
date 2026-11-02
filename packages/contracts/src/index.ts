@@ -324,6 +324,7 @@ export const MenuTokenClaimsSchema = z
     iat: z.number().int().nonnegative(),
     exp: z.number().int().positive(),
     jti: uuid,
+    traffic_class: z.enum(['live', 'test', 'demo']).optional(),
   })
   .superRefine((claims, ctx) => {
     if (claims.exp - claims.iat !== MENU_TOKEN_TTL_SECONDS) {

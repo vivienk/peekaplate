@@ -19,6 +19,54 @@ owner views can show those observations. Keep normal collection paused until
 that work and browser-to-destination acceptance pass. An operator may resume
 only the bounded, labelled synthetic acceptance run and pause it again afterward.
 
+## Typed facts and archive recovery — November 2
+
+The follow-up implementation writes an accepted index, the shared
+`observation_event` row and its matching detail row in one transaction. A failed
+detail write rolls everything back and keeps the Queue item retryable. Rejected
+events and quarantined copies never become reportable facts. Save and Unsave
+map their respective surface fields into `observation_save.surface`; Undo stays
+a Save with `save_origin=undo`. No applied migration is edited or added.
+
+The original private archive controls receipt time and traffic classification.
+An identical retry can fill missing facts but cannot rewrite the original or
+reclassify test traffic as live. Local/staging-issued tokens explicitly sign
+`traffic_class=test`; production issuance signs `live`. Owner views continue to
+exclude test/demo rows. These views are inputs to reports, not a completed
+report API or proof that the ten-session privacy floor is applied downstream.
+
+### Recover missing facts
+
+Only an authorized staging operator runs this, from the repository root:
+
+```sh
+pnpm --filter @peekaplate/backend exec node backfill-observations.mjs <venue-uuid>
+pnpm --filter @peekaplate/backend exec node backfill-observations.mjs <venue-uuid> --apply
+```
+
+The first command only inspects up to 100 accepted index rows missing facts.
+The second checks their original private R2 envelopes and fills them through
+the same repository transaction. It never resends observations to the Queue,
+changes their timestamps/disposition, writes PostHog tables or deletes archives.
+Existing Wrangler authorization supplies access; no shared database password or
+new permanent credential is needed. The temporary remote development proxy is
+authenticated with a secret held only in memory and is stopped afterward.
+Nothing is added to the deployed API's routes.
+
+Run only for the approved venue. Verify the reported IDs/counts and repeat until
+inspection is empty. A `blocked` result means missing/corrupt evidence, missing
+explicit historical traffic classification, or a persistence failure; it exits
+nonzero and remains pending. Restore/resolve that evidence before proceeding.
+Do not default historical unknown classification to live or skip blocked rows
+with a sequence cursor. Unrelated tenant rows remain invisible through forced RLS.
+
+The local browser test fetches a genuine token from the public-menu endpoint,
+sends the same observation twice through real workerd/Queue/local R2/PostgreSQL,
+and verifies one typed fact and no owner-view test rows. This is a transport
+harness, not the unfinished diner screens/outbox. Hosted verification and its
+exact release are recorded in Operations after deployment. Normal collection
+stays paused until real controls, outbox/privacy and owner-report acceptance pass.
+
 ## Canonical database handoff
 
 On October 31, the existing staging Supabase database received the unchanged
