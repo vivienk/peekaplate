@@ -1068,3 +1068,33 @@ of wrong-audience and forged-signature tokens. Signature and claim checks stay
 enabled; no broad fetch compatibility flag, new credentials or public debug
 route is added. Fresh hosted acceptance must pass after the reviewed fix deploys.
 Reference: https://developers.cloudflare.com/workers/observability/errors/
+
+## November 2 hosted follow-up and interrupted verifier
+
+The reviewed own-token fix deployed as main c6a47bd. Genuine Brave acceptance
+now passes; the previous 503/self-fetch1042 failure is resolved within this
+synthetic hosted scope. Six hosted checks verify typed facts/backfill, original
+archive integrity, retries/conflicts and tenant/test exclusion.
+
+A desktop freeze stopped the verifier after five saved PASS results, before
+its cleanup/final readback completed. The source Queue was explicitly paused,
+then a read-only continuation checked the same event IDs, archive metadata and
+empty/paused Queues. No events were resubmitted. Preserve intermediate evidence
+and verify provider state after client failure; a process finally block cannot
+guarantee cleanup after its host exits. A nested PowerShell process query also
+expanded dollar variables incorrectly; it was stopped and replaced with a
+file-backed command. Keep shell scripts with variables out of nested strings.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-02T18:14:48.185Z","exitCode":1}
+```
+
+The final evidence JSON initially used Windows CRLF rather than the repository
+formatter output. Formatting that single file fixed the lint failure; the
+subsequent lint, context and documentation checks all passed.
+
+The database context summary exceeded its 1,000-character limit during the
+final handoff edit. It was shortened without dropping tenant/privacy boundaries;
+context refresh passed. Hosted cleanup then restored viewer access, withdrew
+the synthetic publication, ended its session and removed its temporary host.
