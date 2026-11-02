@@ -547,3 +547,517 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 });
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
+
+// Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
+// Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
+const observationUuid = z.uuid().transform((value) => value.toLowerCase());
+const saveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
+const unsaveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
+const dishReference = {
+  dish_id: observationUuid,
+  dish_revision_id: observationUuid,
+};
+export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
+const observationBase = z.strictObject({
+  schema_version: z.literal('observation.v2'),
+  event_id: observationUuid,
+  session_id: observationUuid,
+  producer_id: observationUuid,
+  local_sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  occurred_at: IsoDateTimeSchema,
+  publication_revision_id: observationUuid,
+});
+
+const menuViewed = observationBase.extend({
+  type: z.literal('menu_viewed'),
+  payload: z.strictObject({
+    entry_source: z.enum(['qr', 'direct_link', 'unknown']),
+  }),
+});
+const dishViewed = observationBase.extend({
+  type: z.literal('dish_viewed'),
+  payload: z.strictObject({
+    ...dishReference,
+    exposure_id: observationUuid,
+    surface: z.literal('menu_list'),
+    position: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    exposure_basis: z.literal('viewport_50pct_1s'),
+    category_filter: z.string().trim().min(1).max(160).optional(),
+  }),
+});
+const dishDetailOpened = observationBase.extend({
+  type: z.literal('dish_detail_opened'),
+  payload: z.strictObject({
+    opening_id: observationUuid,
+    ...dishReference,
+    source: z.enum(['menu_card', 'compare_view', 'direct', 'saved_screen']),
+    from_exposure_id: observationUuid.optional(),
+    nav_relation: z.enum(['none', 'from_compare', 'back_navigation']).optional(),
+    save_available: z.boolean(),
+  }),
+});
+const dishActivityCheckpoint = observationBase.extend({
+  type: z.literal('dish_activity_checkpoint'),
+  payload: z.strictObject({
+    ...dishReference,
+    opening_id: observationUuid,
+    active_ms: z.number().int().nonnegative().max(300_000),
+    final: z.boolean(),
+  }),
+});
+const dishDetailClosed = observationBase.extend({
+  type: z.literal('dish_detail_closed'),
+  payload: z.strictObject({
+    ...dishReference,
+    opening_id: observationUuid,
+  }),
+});
+const dishCompared = observationBase.extend({
+  type: z.literal('dish_compared'),
+  payload: z
+    .strictObject({
+      ...dishReference,
+      other_dish_id: observationUuid,
+      other_dish_revision_id: observationUuid,
+      comparison_id: observationUuid,
+      compare_action: z.enum(['start', 'replace']),
+      save_available: z.boolean(),
+    })
+    .refine((payload) => payload.dish_id !== payload.other_dish_id, {
+      path: ['other_dish_id'],
+      message: 'Compared dishes must be different',
+    }),
+});
+const dishSaved = observationBase.extend({
+  type: z.literal('dish_saved'),
+  payload: z.strictObject({
+    ...dishReference,
+    save_origin: z.enum(['direct', 'undo']),
+    save_surface: saveSurface,
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+const dishUnsaved = observationBase.extend({
+  type: z.literal('dish_unsaved'),
+  payload: z.strictObject({
+    ...dishReference,
+    unsave_surface: unsaveSurface,
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+const shortlistViewed = observationBase.extend({
+  type: z.literal('shortlist_viewed'),
+  payload: z.strictObject({
+    shortlist_size: z.number().int().nonnegative().max(10_000),
+  }),
+});
+
+export const ObservationV2Schema = z.discriminatedUnion('type', [
+  menuViewed,
+  dishViewed,
+  dishDetailOpened,
+  dishActivityCheckpoint,
+  dishDetailClosed,
+  dishCompared,
+  dishSaved,
+  dishUnsaved,
+  shortlistViewed,
+]);
+
+export const ObservationTypeSchema = z.enum([
+  'menu_viewed',
+  'dish_viewed',
+  'dish_detail_opened',
+  'dish_detail_closed',
+  'dish_activity_checkpoint',
+  'dish_compared',
+  'dish_saved',
+  'dish_unsaved',
+  'shortlist_viewed',
+]);
+const observationEventType = ObservationTypeSchema;
+
+export const ObservationQueueMessageSchema = z
+  .strictObject({
+    kind: z.literal('observation.v2'),
+    tenantId: observationUuid,
+    eventId: observationUuid,
+    sessionId: observationUuid,
+    schemaVersion: z.literal('observation.v2'),
+    occurredAt: z.iso.datetime({ offset: true }),
+    type: observationEventType,
+    authorizedPublicationId: observationUuid,
+    producerId: observationUuid,
+    localSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    traffic_class: z.enum(['live', 'test', 'demo']).default('live'),
+    payload: z.record(z.string(), z.unknown()),
+    firstReceivedAt: z.iso.datetime({ offset: true }),
+  })
+  .superRefine((message, ctx) => {
+    const observation = ObservationV2Schema.safeParse({
+      schema_version: message.schemaVersion,
+      event_id: message.eventId,
+      session_id: message.sessionId,
+      producer_id: message.producerId,
+      local_sequence: message.localSequence,
+      occurred_at: message.occurredAt,
+      publication_revision_id: message.authorizedPublicationId,
+      type: message.type,
+      payload: message.payload,
+    });
+    if (!observation.success) {
+      ctx.addIssue({ code: 'custom', path: ['payload'], message: 'Invalid observation payload' });
+    }
+  });
+
+export const ConflictMetadataSchema = z.strictObject({
+  schemaVersionStatus: z.enum(['observation.v2', 'other', 'missing']),
+  eventType: observationEventType.or(z.enum(['unknown', 'missing'])),
+  occurredAt: z.iso.datetime({ offset: true }).nullable(),
+  publicationStatus: z.enum(['matches_authority', 'mismatch', 'invalid', 'missing']),
+  payloadObject: z.boolean(),
+});
+
+export const ConflictCopySchema = z.discriminatedUnion('validation', [
+  z.strictObject({
+    validation: z.literal('valid'),
+    canonicalChecksum: hash,
+    event: ObservationV2Schema,
+  }),
+  z.strictObject({
+    validation: z.literal('invalid'),
+    canonicalChecksum: hash,
+    metadata: ConflictMetadataSchema,
+  }),
+]);
+
+export const ObservationConflictQueueMessageSchema = z.strictObject({
+  kind: z.literal('observation_conflict.v1'),
+  tenantId: observationUuid,
+  eventId: observationUuid,
+  authorizedPublicationId: observationUuid,
+  firstReceivedAt: z.iso.datetime({ offset: true }),
+  reasonCode: z.literal('event_id_conflict'),
+  copies: z.array(ConflictCopySchema).min(2).max(25),
+});
+
+export const ObservationQueueEnvelopeSchema = z.union([
+  ObservationQueueMessageSchema,
+  ObservationConflictQueueMessageSchema,
+]);
+
+export const ObservationBatchV2Schema = z.strictObject({
+  contract: z.literal('observation.v2'),
+  events: z.array(z.unknown()).min(1).max(25),
+});
+
+export const ObservationReceiptReasonSchema = z.enum([
+  'duplicate_same_payload',
+  'duplicate_in_batch',
+  'schema_invalid',
+  'unknown_type',
+  'too_old',
+  'future_time',
+  'publication_not_allowed',
+  'event_id_conflict',
+]);
+
+const acceptedObservationReceipt = z.strictObject({
+  event_id: observationUuid,
+  status: z.literal('accepted'),
+  reason_code: z.enum(['duplicate_same_payload', 'duplicate_in_batch']).nullable(),
+  retryable: z.literal(false),
+});
+
+const retryObservationReceipt = z.strictObject({
+  event_id: observationUuid,
+  status: z.literal('retry'),
+  reason_code: z.literal('duplicate_in_batch').nullable(),
+  retryable: z.literal(true),
+});
+
+const rejectedObservationReceipt = z
+  .strictObject({
+    event_id: observationUuid.nullable(),
+    status: z.literal('rejected'),
+    reason_code: z.enum([
+      'schema_invalid',
+      'unknown_type',
+      'too_old',
+      'future_time',
+      'publication_not_allowed',
+      'event_id_conflict',
+    ]),
+    retryable: z.literal(false),
+  })
+  .superRefine((receipt, ctx) => {
+    if (
+      receipt.event_id === null &&
+      !['schema_invalid', 'unknown_type'].includes(receipt.reason_code)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['event_id'],
+        message: 'Identified rejection requires event_id',
+      });
+    }
+  });
+
+export const ObservationReceiptSchema = z.union([
+  acceptedObservationReceipt,
+  retryObservationReceipt,
+  rejectedObservationReceipt,
+]);
+
+export const ObservationReceiptBatchSchema = z.strictObject({
+  contract: z.literal('observation-receipt.v1'),
+  request_id: observationUuid,
+  receipts: z.array(ObservationReceiptSchema).min(1).max(25),
+});
+
+// Aliases for consumer compatibility
+export const ObservationV2QueueEnvelopeSchema = ObservationQueueMessageSchema;
+export const ObservationConflictV1QueueEnvelopeSchema = ObservationConflictQueueMessageSchema;
+
+export type ObservationType = z.infer<typeof ObservationTypeSchema>;
+export type ObservationV2 = z.infer<typeof ObservationV2Schema>;
+export type ConflictMetadata = z.infer<typeof ConflictMetadataSchema>;
+export type ConflictCopy = z.infer<typeof ConflictCopySchema>;
+export type ObservationQueueMessage = z.infer<typeof ObservationQueueMessageSchema>;
+export type ObservationConflictQueueMessage = z.infer<typeof ObservationConflictQueueMessageSchema>;
+export type ObservationV2QueueEnvelope = ObservationQueueMessage;
+export type ObservationConflictV1QueueEnvelope = ObservationConflictQueueMessage;
+export type ObservationQueueEnvelope = z.infer<typeof ObservationQueueEnvelopeSchema>;
+export type ObservationBatchV2 = z.infer<typeof ObservationBatchV2Schema>;
+export type ObservationReceipt = z.infer<typeof ObservationReceiptSchema>;
+export type ObservationReceiptBatch = z.infer<typeof ObservationReceiptBatchSchema>;
+
+/**
+ * Reconstructs a complete canonical observation from an observation.v2 queue envelope.
+ */
+export function toCanonicalObservation(message: {
+  schemaVersion: 'observation.v2';
+  eventId: string;
+  sessionId: string;
+  producerId: string;
+  localSequence: number;
+  occurredAt: string;
+  authorizedPublicationId: string;
+  type: ObservationV2['type'];
+  payload: Record<string, unknown>;
+}): ObservationV2 {
+  return {
+    schema_version: message.schemaVersion,
+    event_id: message.eventId,
+    session_id: message.sessionId,
+    producer_id: message.producerId,
+    local_sequence: message.localSequence,
+    occurred_at: message.occurredAt,
+    publication_revision_id: message.authorizedPublicationId,
+    type: message.type,
+    payload: message.payload,
+  } as ObservationV2;
+}
+
+/**
+ * Deterministic JSON canonicalization matching the producer implementation in PR #40.
+ * Safely handles undefined object properties (omitted), undefined array elements (null),
+ * numbers (-0 normalized to 0, rejects non-finite), and circular references.
+ */
+export function canonicalJson(value: unknown): string {
+  const output: string[] = [];
+  const stack: ({ value: unknown } | { text: string; exitSeen?: object })[] = [{ value }];
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if ('exitSeen' in current && current.exitSeen) {
+      seen.delete(current.exitSeen);
+    }
+    if ('text' in current) {
+      output.push(current.text);
+      continue;
+    }
+    nodes += 1;
+    if (nodes > 65_536) throw new Error('Observation payload is too complex.');
+    const entry = current.value;
+    if (entry === null || typeof entry !== 'object') {
+      if (typeof entry === 'number') {
+        if (!Number.isFinite(entry)) throw new Error('Non-finite numbers cannot be canonicalized');
+        if (Object.is(entry, -0)) {
+          output.push('0');
+          continue;
+        }
+      }
+      const encoded = JSON.stringify(entry);
+      if (encoded === undefined) throw new Error('Observation payload is not JSON-compatible.');
+      output.push(encoded);
+      continue;
+    }
+    if (seen.has(entry)) {
+      throw new Error('Circular reference detected');
+    }
+    seen.add(entry);
+
+    if (Array.isArray(entry)) {
+      output.push('[');
+      stack.push({ text: ']', exitSeen: entry });
+      for (let index = entry.length - 1; index >= 0; index -= 1) {
+        if (index < entry.length - 1) stack.push({ text: ',' });
+        const val = entry[index];
+        stack.push({
+          value:
+            val === undefined || typeof val === 'function' || typeof val === 'symbol' ? null : val,
+        });
+      }
+      continue;
+    }
+    const fields = Object.entries(entry as Record<string, unknown>)
+      .filter(
+        ([_, val]) => val !== undefined && typeof val !== 'function' && typeof val !== 'symbol',
+      )
+      .sort(([left], [right]) => left.localeCompare(right));
+    output.push('{');
+    stack.push({ text: '}', exitSeen: entry });
+    for (let index = fields.length - 1; index >= 0; index -= 1) {
+      const field = fields[index];
+      if (!field) continue;
+      if (index < fields.length - 1) stack.push({ text: ',' });
+      stack.push({ value: field[1] });
+      stack.push({ text: ':' });
+      stack.push({ text: JSON.stringify(field[0]) });
+    }
+  }
+  return output.join('');
+}
+
+/**
+ * Computes deterministic SHA-256 hex digest using Web Crypto API.
+ */
+export async function sha256(value: string | Uint8Array): Promise<string> {
+  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value;
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+  );
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Microsecond constants for observation ingest time window.
+ */
+export const TWENTY_FOUR_HOURS_MICROS = 24n * 60n * 60n * 1000n * 1000n; // 86_400_000_000n µs
+export const FIVE_MINUTES_MICROS = 5n * 60n * 1000n * 1000n; // 300_000_000n µs
+
+/**
+ * Parses an ISO-8601 timestamp with optional timezone offset and fractional seconds
+ * into exact integer microseconds (BigInt) since the Unix epoch (1970-01-01T00:00:00.000000Z).
+ * Correctly preserves fractional seconds up to microsecond precision, matching
+ * PostgreSQL's timestamptz microsecond representation.
+ */
+export function parseIsoToMicroseconds(isoString: string): bigint {
+  const trimmed = isoString.trim();
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):?(\d{2}))?$/i.exec(
+      trimmed,
+    );
+  if (
+    !match ||
+    match[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined ||
+    match[4] === undefined ||
+    match[5] === undefined ||
+    match[6] === undefined
+  ) {
+    const fallbackMs = Date.parse(trimmed);
+    if (Number.isNaN(fallbackMs)) {
+      throw new Error(`Invalid ISO timestamp: ${isoString}`);
+    }
+    return BigInt(fallbackMs) * 1000n;
+  }
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  const hour = parseInt(match[4], 10);
+  const min = parseInt(match[5], 10);
+  const sec = parseInt(match[6], 10);
+  const fractionStr = match[7] ?? '';
+  const tzSign = match[9];
+  const tzHourStr = match[10];
+  const tzMinStr = match[11];
+
+  let utcMs = Date.UTC(year, month, day, hour, min, sec);
+
+  if (tzSign && tzHourStr && tzMinStr) {
+    const offsetMinutes = parseInt(tzHourStr, 10) * 60 + parseInt(tzMinStr, 10);
+    if (tzSign === '+') {
+      utcMs -= offsetMinutes * 60 * 1000;
+    } else {
+      utcMs += offsetMinutes * 60 * 1000;
+    }
+  }
+
+  let totalMicros = BigInt(utcMs) * 1000n;
+
+  if (fractionStr.length > 0) {
+    if (fractionStr.length <= 6) {
+      totalMicros += BigInt(fractionStr.padEnd(6, '0'));
+    } else {
+      // PostgreSQL timestamptz parses fractional seconds to microsecond precision
+      // using round-to-nearest, ties-to-even (banker's rounding).
+      let micros = BigInt(fractionStr.slice(0, 6));
+      const seventhChar = fractionStr[6];
+      if (seventhChar !== undefined) {
+        if (seventhChar > '5') {
+          micros += 1n;
+        } else if (seventhChar === '5') {
+          // Check if there are any non-zero digits after the 7th character (e.g. .00000051)
+          const hasNonZeroAfter = fractionStr
+            .slice(7)
+            .split('')
+            .some((c) => c !== '0');
+          if (hasNonZeroAfter) {
+            micros += 1n;
+          } else {
+            // Exact tie (.5 µs): round to nearest EVEN microsecond
+            if (micros % 2n !== 0n) {
+              micros += 1n;
+            }
+          }
+        }
+      }
+      totalMicros += micros;
+    }
+  }
+
+  return totalMicros;
+}
+
+/**
+ * Classifies an observation's time window per ADR 0015 & PR #32:
+ * Lower bound: first_received_at - 24 hours (inclusive)
+ * Upper bound: first_received_at + 5 minutes (inclusive)
+ *
+ * Distinguishes boundary cases with microsecond precision to remain
+ * 100% consistent with PostgreSQL's timestamptz CHECK constraint.
+ */
+export function classifyObservationTimeWindow(
+  occurredAtIso: string,
+  firstReceivedAtIso: string,
+): { disposition: 'accepted' | 'rejected'; reasonCode?: 'too_old' | 'future_time' } {
+  const occurredMicros = parseIsoToMicroseconds(occurredAtIso);
+  const receivedMicros = parseIsoToMicroseconds(firstReceivedAtIso);
+  const diffMicros = occurredMicros - receivedMicros;
+
+  if (diffMicros < -TWENTY_FOUR_HOURS_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'too_old' };
+  }
+  if (diffMicros > FIVE_MINUTES_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'future_time' };
+  }
+  return { disposition: 'accepted' };
+}

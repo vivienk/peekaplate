@@ -13,17 +13,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, and S3-VIS-04 bounded menu evidence retrieval schemas (SourceReference, EvidencePassage, BoundedRetrievalResult, RetrievalRequest). Offsets, rank sequences, and aggregate context limits strictly enforced. Ingest and broader diner events remain planned. RES-02 adds strict owner approval/publication/withdrawal contracts. Commands identify immutable menu revision and independent content/asset approvals; hashes come from the trusted canonical review subject. Client authority and client hashes are rejected. Public read/token and strict Bundle v1 schemas bind venue/menu/revision/publication, reject duplicate IDs and draft fields, and preserve allergen null/empty knowledge states.",
+      "summary": "Strict health, staff dish-revision command/result, dish-intent, team analytics query/response schemas, S3-VIS-04 bounded menu evidence retrieval schemas, RES-02 owner approval/publication/withdrawal, public read/token, and strict Bundle v1 schemas. Observation contracts define canonical ObservationV2 (9 P0 types), canonicalJson, sha256, microsecond window bounds ([-24h, +5m]), Queue message contracts (ObservationQueueMessageSchema with server-derived traffic_class, ObservationConflictQueueMessageSchema with multi-copy conflict schema), and observation receipts. Offsets, rank sequences, aggregate context limits, and microsecond precision boundaries strictly enforced.",
       "paths": [
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/index.test.ts"
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/fixtures/observation.v2/fixtures.json",
+        "packages/contracts/fixtures/observation.v2/README.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c719972d6a90fd33e3847afc9f626a6835e30743c79b3f8a6a09a36a22a93c87"
+      "sourceFingerprint": "448822ccffea1e70dcf3ef0801b803e58838e397742669fa9448437f06030b22"
     },
     {
       "id": "tokens",
@@ -117,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker: staff JWT/current membership draft commands, bounded GitHub collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance, linked PDF/native page evidence and context limits. The deployed direct-DO Python host uses a named image, idle timeout and tenant/job/hash source grants; Python gets no signing/DB credentials. Protected OCR key and standalone OCR are verified; full AI ingestion/report acceptance remains pending and queues paused. RES-02 adds owner-only approve/publish/withdraw with current membership checks, expected versions, server-derived hashes from immutable same-tenant/menu review subjects, idempotent receipts, atomic events/projections/outbox and pure replay. Public reads join active publication to exact immutable approval/bundle and issue 30-minute ES256 observation tokens; public JWKS excludes the private key. Privileged subject/bundle admission and canonical observation writes remain separate. JWT logout revocation is expiry-bounded.",
+      "summary": "Hono Worker retains staff JWT/current-membership commands, collaborator staging reads and VIS-04 evidence retrieval. Python direct-DO extraction is deployed with signed source grants; full AI setup remains separate. RES-02 owner approve/publish/withdraw commits events, projection, receipt and outbox atomically; active public reads issue ES256 tokens and public-only JWKS. POST /observations verifies menu-token authority, exact diner CORS, strict batches and microsecond time bounds, preserves trusted traffic_class and awaits Queue sends before accepted receipts. Conflict copies retain authorized events or bounded invalid metadata. Rate windows are approximate per location. Hosted RES-02 acceptance is recorded; this producer is not yet deployed. PR31 consumer integration, transactional typed facts and paused-Queue activation remain separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -158,7 +160,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/publication-command.ts",
         "backend/src/public-menu.test.ts",
         "backend/src/public-menu.ts",
-        "docs/public-menu.md"
+        "docs/public-menu.md",
+        "backend/src/menu-token.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/observation-fixtures.test.ts",
+        "backend/src/observation-ingest.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -170,7 +176,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1afe1e4feed745dadcd141397615e60af8a84e0267ccca0283b89e65d6be23b5"
+      "sourceFingerprint": "43fb434109d5eadec406c516175d6609e111d35865e3feadf1ca385d39faee3c"
     },
     {
       "id": "database",
@@ -279,7 +285,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6a164b0885f7343259f73051c0835fca5bf465bf0c02c069fc4a1355a9f137c1"
+      "sourceFingerprint": "5584ec89fe4a8d1b2c0bfeb235dcb85a8d8bbbcb340f7761063439d1d770e0ee"
     },
     {
       "id": "agents",
@@ -390,6 +396,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
+      "modules": [
+        "contracts",
+        "backend",
+        "delivery"
+      ],
+      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
+    },
+    {
       "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
       "modules": [
         "contracts",
@@ -466,14 +481,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Run current repository/build/browser checks and exact-head CI, retarget PR30 to develop and merge it. Keep final Input visual approval and real review-form integration separate."
-    },
-    {
-      "summary": "October31 PR29 reconciliation: retained bounded PDF retrieval and current develop tokens/UI, deployment foundations and PR22 owner-metric tests. The only merge conflict was the context graph; target responsibilities and the PDF source paths are both preserved.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run actual Worker retrieval tests, builds, database checks and applicable CI on this reconciled head, then merge PR29. Representative menu relevance and hosted extraction/publication acceptance remain separate."
     }
   ]
 }
