@@ -885,3 +885,20 @@ The initial release context update exceeded the existing bounded-summary limit. 
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:11:41.330Z","exitCode":1}
 ```
+
+## RES-02 November 1 hosted configuration and interrupted acceptance
+
+The first new staging signing JWK included `key_ops`, which the reviewed strict
+configuration parser deliberately rejects. JWKS returned 503 without exposing
+private key material. The operator generated the allowed EC/P-256/ES256 fields,
+validated them with the same `menuJwks` implementation before upload, and the
+hosted public-only JWKS returned 200. No backend validation was weakened and no
+private key value was saved in Git or operator files.
+
+The first authenticated acceptance run completed approval/publication and retry
+checks, then its client aborted a public read after 20 seconds. An independent
+read returned 200 in 747 ms. A resumed test used the original command IDs and
+finished the bundle/hash/token, withdrawal and revoked-owner checks. Hosted
+readback remained exactly three events, three command receipts and three outbox
+rows. The original timeout is retained in the acceptance evidence; its cause is
+not established and the completed functional checks do not certify latency/load.
