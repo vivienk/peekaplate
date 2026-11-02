@@ -119,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff/current-membership commands, collaborator staging reads, bounded retrieval and RES-02 approval/publication/JWKS. POST /observations verifies ES256 menu authority, exact diner CORS, request/time/rate bounds and Queue-before-accepted receipts. Queue consumer archives create-only evidence before tenant-scoped PostgreSQL index/conflict persistence and ACK; failures retry toward DLQ. PostgreSQL authoritatively classifies timestamps. Shared contracts retain traffic_class and canonical normalization. Python direct-DO extraction remains separate. This consumer does not write typed facts or owner metrics; collection stays paused pending hosted acceptance. Metadata-free restoration of sanitized conflict archives is unsupported; preserve checksum metadata.",
+      "summary": "Hono Worker retains staff/current-membership commands, collaborator staging reads, bounded retrieval and RES-02 publication/JWKS. POST /observations validates signed menu authority, bounds and receipts. Consumer archives create-only R2 evidence before tenant-scoped PostgreSQL index/conflict writes and ACK; failures retry toward DLQ. Main35e989d is deployed to staging; bounded synthetic Queue/R2/index/dedup/quarantine and native malformed-message DLQ tests passed. Controlled remote dependency faults recovered. Genuine diner-token HTTP delivery and typed facts/backfill remain unverified; owner views are not populated by this consumer. Both Queues are empty/paused. Sanitized conflict restoration requires checksum metadata. Python extraction remains separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -243,7 +243,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main remains the staging/production release source under ADR0012. This sync reconciles main82f3876 release fixes with develop00856e1, preserving retrieval/contracts, preview lifecycle evidence and both error/learning histories. Direct-DO host runtime, OCR setup and current operations are shared with develop; this Git merge does not deploy or change credentials/data. Isolated previews retain trusted build/deploy separation and verified cleanup. Full hosted ingestion/reporting acceptance and production remain separate.",
+      "summary": "ADR0012 promotes reviewed main through staging and production separately. PR31 consumer merged into develop; release94 main35e989d deployed via approved Wrangler operator route as version3db23304-c53a-4fee-b0ba-260c3afe4060. Existing secrets/resources retained and only the source HTTP consumer replaced. Ten bounded hosted checks and15 public smoke checks passed; both Queues ended empty/paused and the remote probe stopped. Facts/backfill, diner-token/browser/owner acceptance, load/recovery and production remain gated. Isolated PR previews retain their separate build/deploy/cleanup controls. Later evidence-doc commits do not change deployed code.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -285,7 +285,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/menu-ingestion-infrastructure.md",
         "scripts/menu-ingestion-infra.test.mjs",
         "pnpm-lock.yaml",
-        "docs/res02-staging-acceptance.json"
+        "docs/res02-staging-acceptance.json",
+        "docs/observation-staging-acceptance.json"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -296,7 +297,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "67572b2a81effefaf94ab8c5b02bd0f342716e5c0e3b3f85d4df41253c436a71"
+      "sourceFingerprint": "5b80c4784929542ca82e9a6f90768a6b415de775b7c334289d6592327a1d0398"
     },
     {
       "id": "agents",
@@ -407,6 +408,26 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "Recorded November1 hosted observation acceptance: reviewed PR70/31 reached main35e989d and staging version3db23304. Real Queue/R2/index/conflict/ACK/DLQ synthetic flow passed, alongside controlled remote storage/database retry recovery and15 public smoke checks. Final3 index rows/3 conflicts/6 archives remain labelled; another tenant and owner views expose0 run rows. Both Queues empty/paused, proxy stopped; production unchanged.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
+    },
+    {
+      "summary": "Recorded November1 hosted observation acceptance: reviewed PR70/31 reached main35e989d and staging version3db23304. Real Queue/R2/index/conflict/ACK/DLQ synthetic flow passed, alongside controlled remote storage/database retry recovery and15 public smoke checks. Final3 index rows/3 conflicts/6 archives remain labelled; another tenant and owner views expose0 run rows. Both Queues empty/paused, proxy stopped; production unchanged.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
+    },
+    {
       "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
       "modules": [
         "contracts",
@@ -478,22 +499,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
-    },
-    {
-      "summary": "October 31 PR50 reconciliation: retained merged PR32 index/conflict schema and all current develop work while adding typed observation facts and owner views. Only shared context conflicted; migration/test bytes remain unchanged from the previously reviewed 15aedc4. Retargeted to develop after PR32. Local verification passed 237 unit tests, 57 script tests, 146 SQL assertions and 20 database integration tests.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green exact-head CI before merging PR50. Reconcile the canonical producer and consumer against these tables/views; wire owner-report queries separately. Hosted migration and live reporting acceptance remain separate operator work."
-    },
-    {
-      "summary": "October 31 PR32 reconciliation: preserved current develop owner-metric tests, PDF retrieval, Input and design-token work while adding canonical observation index/conflict schema and its 29 SQL assertions. Only the shared context conflicted; migration/test bytes remain unchanged from the previously reviewed c2a1331. Local verification passed 237 unit tests, 57 script tests, 113 SQL assertions and 20 database integration tests.",
-      "modules": [
-        "database",
-        "delivery"
-      ],
-      "next": "Require green exact-head CI before merging PR32, then retarget/reconcile PR50. Hosted migrations and Queue consumer activation remain separate operator work."
     }
   ]
 }
