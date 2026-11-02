@@ -7,12 +7,12 @@ validation are reused. No extra verification model or new dependency is added.
 
 ## Input modes and private review artifacts
 
-`run_pipeline.py` and its Python function accept three explicit `input_mode` values:
+`run_pipeline.py` and its Python function accept four explicit `input_mode` values:
 
 - `ocr_image` (default): source text plus original/bounded target-page images.
 - `ocr`: the earlier source-text-only model input; native PDF text/OCR acquisition is unchanged.
 - `image`: target-page images plus a labelled previous-page image, without OCR or native-text extraction.
-
+- `vision_v4`: direct multimodal vision extraction producing dishes and physical pixel bounding boxes without OCR, with cascading provider fallback (`google_studio` -> `qwen` -> `glm` -> `openrouter`) and automatic fallback to `ocr_image`. See [review candidates](review-candidates.md#vision-transcription-mode-vision_v4).
 The default input change is explicit follow-up scope, not independent quality or
 PM acceptance. Batch size, concurrency, model/provider and reasoning defaults remain
 unchanged. The graph's lower-level text default remains compatible with existing callers.
