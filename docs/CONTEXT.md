@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bddeb8de03c19b241d517bc0e1ede3b925df8797d55624cc5f5a6e1e2266ee3d"
+      "sourceFingerprint": "009e8b7c51440f3fcf4235cf30170cf5ceecfa736ce15b61368a065fdd847147"
     },
     {
       "id": "tokens",
@@ -119,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff/current-membership commands, collaborator staging reads, bounded retrieval and RES-02 publication/JWKS. POST /observations validates signed menu authority, bounds and receipts. Consumer archives create-only R2 evidence before tenant-scoped PostgreSQL index/conflict writes and ACK; failures retry toward DLQ. Main35e989d is deployed to staging; bounded synthetic Queue/R2/index/dedup/quarantine and native malformed-message DLQ tests passed. Controlled remote dependency faults recovered. Genuine diner-token HTTP delivery and typed facts/backfill remain unverified; owner views are not populated by this consumer. Both Queues are empty/paused. Sanitized conflict restoration requires checksum metadata. Python extraction remains separate.",
+      "summary": "Hono retains staff/publication/JWKS, collaborator reads and bounded retrieval. Observations use server-derived token authority and Queue receipts. Consumer archives create-only R2 evidence before one tenant-scoped transaction writes index + event + typed detail; conflicts stay quarantined. Accepted historical indices can fill missing facts from checksum/identity-matched original archives without re-aging. Private staging operator inspects before explicit bounded backfill; unknown historical traffic stays blocked. Local/staging-issued tokens sign test class; production signs live. Public menu GET uses the exact diner CORS allowlist. Real workerd/browser/Queue/R2/PostgreSQL regression passes locally. Hosted follow-up deployment/verification pending; normal collection paused. Report API and real diner controls/outbox remain separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -175,7 +175,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/consumer/queue-consumer.ts",
         "backend/src/consumer/r2-storage.test.ts",
         "backend/src/consumer/r2-storage.ts",
-        "backend/src/consumer/types.ts"
+        "backend/src/consumer/types.ts",
+        "backend/backfill-observations.mjs",
+        "backend/src/consumer/facts.ts",
+        "backend/src/consumer/facts.integration.ts",
+        "backend/src/consumer/backfill.ts",
+        "backend/src/consumer/backfill.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -187,7 +192,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c6ac2ce74ec99f510874e5988452661317d7f54c2ac80c327908c2d9df908414"
+      "sourceFingerprint": "86f7237c63ba82e48b72e78f540188f57191b3ff26583b420be6f2872951cd1b"
     },
     {
       "id": "database",
@@ -297,7 +302,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5b80c4784929542ca82e9a6f90768a6b415de775b7c334289d6592327a1d0398"
+      "sourceFingerprint": "2a5c1cfac6a9633e1f3d88eff29955dfc305b2f898e1007bfdcbc3308484c370"
     },
     {
       "id": "agents",
@@ -418,16 +423,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
     },
     {
-      "summary": "Recorded November1 hosted observation acceptance: reviewed PR70/31 reached main35e989d and staging version3db23304. Real Queue/R2/index/conflict/ACK/DLQ synthetic flow passed, alongside controlled remote storage/database retry recovery and15 public smoke checks. Final3 index rows/3 conflicts/6 archives remain labelled; another tenant and owner views expose0 run rows. Both Queues empty/paused, proxy stopped; production unchanged.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Implement transactional typed facts and idempotent archive/index backfill preserving archived traffic_class, excluding these synthetic test records. Integrate genuine diner-token HTTP delivery, real controls and owner metrics/security. Keep normal collection paused until the complete browser-to-owner path is accepted; preserve checksum metadata for archive recovery. See operations and observation-staging-acceptance.json."
-    },
-    {
       "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
       "modules": [
         "contracts",
@@ -499,6 +494,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
+    },
+    {
+      "date": "2026-11-02",
+      "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
+      "paths": [
+        "backend/src/consumer/facts.ts",
+        "backend/src/consumer/backfill.ts",
+        "backend/src/dish.integration.ts",
+        "docs/observation-infrastructure.md"
+      ],
+      "next": "Finish independent review and exact-main staging acceptance; preserve paused normal delivery. Reconcile frontend tracking/outbox/delivery and report API before pilot activation.",
+      "modules": [
+        "backend",
+        "contracts",
+        "delivery"
+      ]
     }
   ]
 }

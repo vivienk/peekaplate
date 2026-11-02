@@ -984,3 +984,60 @@ window and correctly received 400. The probe was corrected to use the existing
 bounded query contract; events and summary then both returned 200. No product
 code, permissions or credentials changed. Reuse the shared query schema or a
 known valid reporting window when checking authenticated read availability.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:27:05.785Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:28:30.719Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:30:19.504Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:30:55.676Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:38:48.270Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:39:48.686Z","exitCode":1}
+```
+
+## November 2 typed-fact integration verification
+
+The initial real-database regression proved the missing behavior: all nine
+accepted observations produced index rows but no typed facts. The follow-up
+writes index/event/detail in one transaction and fills historical accepted rows
+under the same identity lock. Unrelated detail uniqueness failures now retry;
+they cannot be hidden by the former generic unique-violation duplicate fallback.
+
+Intermediate checks caught an internal legacy venue alias entering a strict
+schema, Node/Worker URL type mismatches in a test, and a browser-test poll shorter
+than local Queue batching. The alias is excluded at the fact boundary, fixture
+paths use Node file paths, and bounded polling allows the actual Queue delivery.
+The corrected real database/browser run passed 189 SQL assertions and 46 tests.
+Shell quoting and two guessed test paths also failed during inspection; use
+discovered paths and file-backed patches rather than nested shell interpolation.
+These were local intermediate failures, not changes deployed to staging.
+
+The documentation helper initially used Windows' default encoding and then an
+incomplete context-handoff shape. The affected documents were restored from
+their exact Git bytes, reapplied with UTF-8, and the handoff gained its required
+module IDs. Context freshness and local documentation checks passed afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T07:44:24.918Z","exitCode":1}
+```

@@ -106,6 +106,21 @@ export class InvalidKeyError extends Error {
  * - app_private.observation_index: (tenant_id, event_id) PRIMARY KEY
  * - app_private.observation_conflict: (tenant_id, event_id, incoming_checksum) PRIMARY KEY
  */
+export type CanonicalObservationRecord = {
+  tenantId: string;
+  eventId: string;
+  sessionId?: string | undefined;
+  schemaVersion: 'observation.v2';
+  eventType: string;
+  authorizedPublicationId: string;
+  occurredAt: string;
+  firstReceivedAt: string;
+  checksum: string;
+  r2ArchiveKey: string;
+  payload: Record<string, unknown>;
+  factEnvelope?: ObservationQueueMessage | undefined;
+};
+
 export interface ObservationRepository {
   /**
    * Checks whether the event identity (tenant_id, event_id) already exists.
@@ -122,20 +137,7 @@ export interface ObservationRepository {
    * If a unique constraint violation occurs concurrently on (tenant_id, event_id),
    * returns duplicate or conflict outcome based on checksum comparison.
    */
-  persistCanonical(record: {
-    tenantId: string;
-    eventId: string;
-    sessionId?: string | undefined;
-    schemaVersion: 'observation.v2';
-    eventType: string;
-    authorizedPublicationId: string;
-    occurredAt: string;
-    firstReceivedAt: string;
-    checksum: string;
-    r2ArchiveKey: string;
-    payload: Record<string, unknown>;
-    factData?: Record<string, unknown> | undefined;
-  }): Promise<PersistenceOutcome>;
+  persistCanonical(record: CanonicalObservationRecord): Promise<PersistenceOutcome>;
 
   /**
    * Records a conflict into app_private.observation_conflict table

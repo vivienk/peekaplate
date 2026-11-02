@@ -1,5 +1,10 @@
 import type { Client } from 'pg';
-import type { ObservationRepository, PersistenceOutcome } from './types';
+import { insertObservationFacts } from './facts';
+import type {
+  CanonicalObservationRecord,
+  ObservationRepository,
+  PersistenceOutcome,
+} from './types';
 
 /**
  * Microsecond constants for observation ingest time window.
@@ -163,20 +168,7 @@ export class PostgresObservationRepository implements ObservationRepository {
     }
   }
 
-  async persistCanonical(record: {
-    tenantId: string;
-    eventId: string;
-    sessionId?: string | undefined;
-    schemaVersion: 'observation.v2';
-    eventType: string;
-    authorizedPublicationId: string;
-    occurredAt: string;
-    firstReceivedAt: string;
-    checksum: string;
-    r2ArchiveKey: string;
-    payload: Record<string, unknown>;
-    factData?: Record<string, unknown> | undefined;
-  }): Promise<PersistenceOutcome> {
+  async persistCanonical(record: CanonicalObservationRecord): Promise<PersistenceOutcome> {
     let started = false;
     try {
       await this.client.query('BEGIN');
@@ -201,6 +193,9 @@ export class PostgresObservationRepository implements ObservationRepository {
 
       if (existing.rows.length > 0) {
         const stored = existing.rows[0]!;
+        if (stored.checksum === record.checksum && stored.disposition === 'accepted') {
+          await insertObservationFacts(this.client, record);
+        }
         await this.client.query('COMMIT');
         started = false;
 
@@ -252,14 +247,7 @@ export class PostgresObservationRepository implements ObservationRepository {
         ],
       );
 
-      // Typed fact persistence boundary: PR #31 writes the canonical index row (app_private.observation_index)
-      // and conflict records (app_private.observation_conflict) matching PR #32.
-      // Typed fact table persistence (app_private.observation_event and typed fact tables)
-      // belongs to follow-up work once PR #50's migration merges into develop and the producer
-      // contract provides server-derived traffic_class. The raw payload is fully preserved in R2.
-      if (record.factData) {
-        // Reserved for future PR #50 typed facts integration
-      }
+      if (disposition === 'accepted') await insertObservationFacts(this.client, record);
 
       await this.client.query('COMMIT');
       started = false;
@@ -278,8 +266,12 @@ export class PostgresObservationRepository implements ObservationRepository {
       }
 
       // Duplicate key violation (code 23505) fallback on concurrent race
-      const pgErr = err as { code?: string };
-      if (pgErr.code === '23505') {
+      const pgErr = err as { code?: string; constraint?: string };
+      if (
+        pgErr.code === '23505' &&
+        pgErr.constraint === 'observation_index_pkey' &&
+        !record.factEnvelope
+      ) {
         const check = await this.lookupExisting(record.tenantId, record.eventId);
         if (!check) {
           // Concurrent transaction may have rolled back; re-throw so queue retries
@@ -410,20 +402,7 @@ export class FakeObservationRepository implements ObservationRepository {
     return { checksum: found.checksum, disposition: found.disposition };
   }
 
-  async persistCanonical(record: {
-    tenantId: string;
-    eventId: string;
-    sessionId?: string | undefined;
-    schemaVersion: 'observation.v2';
-    eventType: string;
-    authorizedPublicationId: string;
-    occurredAt: string;
-    firstReceivedAt: string;
-    checksum: string;
-    r2ArchiveKey: string;
-    payload: Record<string, unknown>;
-    factData?: Record<string, unknown> | undefined;
-  }): Promise<PersistenceOutcome> {
+  async persistCanonical(record: CanonicalObservationRecord): Promise<PersistenceOutcome> {
     if (this.failNextPersist || (this.failOnEventId && record.eventId === this.failOnEventId)) {
       this.failNextPersist = false;
       throw new Error('Database transaction timeout / connection failure');

@@ -40,6 +40,11 @@ const menu: PublicMenuRecord = {
 };
 
 describe('RES-02 public menu token', () => {
+  it('signs server-selected staging traffic classification', async () => {
+    const result = await issueMenuToken(menu, { ...signingConfig, trafficClass: 'test' });
+    const verified = await jwtVerify(result.menuToken, keyPair.publicKey);
+    expect(verified.payload.traffic_class).toBe('test');
+  });
   it('binds a 30-minute observations token to the exact venue and publication', async () => {
     const now = 1_798_000_000;
     const result = await issueMenuToken(menu, signingConfig, now);
@@ -117,6 +122,18 @@ describe('RES-02 public menu token', () => {
 describe('RES-02 anonymous public menu HTTP boundary', () => {
   const path = `/public/venues/${venueId}/menus/${menuId}`;
   const baseDependencies = { verify: vi.fn(), execute: vi.fn() };
+  it('allows only the configured diner origin to read public menu responses in a browser', async () => {
+    const app = createApp({
+      ...baseDependencies,
+      readPublicMenu: vi.fn().mockResolvedValue(undefined),
+      issuePublicMenu: vi.fn(),
+    });
+    const origin = 'https://peekaplate-diner-staging.pages.dev';
+    const allowed = await app.request(path, { headers: { Origin: origin } });
+    expect(allowed.headers.get('access-control-allow-origin')).toBe(origin);
+    const denied = await app.request(path, { headers: { Origin: 'https://untrusted.example' } });
+    expect(denied.headers.get('access-control-allow-origin')).toBeNull();
+  });
 
   it('returns only the active typed bundle and issued token without staff authentication', async () => {
     const responseBody = await createPublicMenuResponse(menu, signingConfig);
