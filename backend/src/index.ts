@@ -1,17 +1,34 @@
 import {
+  ApproveMenuRevisionSchema,
   type BoundedRetrievalResult,
   CreateDishRevisionSchema,
   DishRevisionScopeSchema,
   type HealthResponse,
+  MenuScopeSchema,
+  type PublicMenuResponse,
+  PublishMenuSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   VenueScopeSchema,
+  WithdrawMenuSchema,
 } from '@peekaplate/contracts';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { Client } from 'pg';
 import { AuthenticationError, AuthUnavailableError, createStaffVerifier } from './auth';
 import { CommandError, createDishRevision } from './dish-command';
+import {
+  createPublicMenuResponse,
+  menuJwks,
+  type PublicMenuRecord,
+  readPublicMenu,
+} from './public-menu';
+import {
+  approveMenuRevision,
+  PublicationCommandError,
+  publishMenu,
+  withdrawMenu,
+} from './publication-command';
 import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
@@ -24,6 +41,8 @@ export type Bindings = {
   POSTHOG_PROJECT_ID?: string;
   TEAM_GITHUB_TOKEN?: string;
   LOCAL_GITHUB_API_URL?: string;
+  MENU_TOKEN_ISSUER?: string;
+  MENU_TOKEN_SIGNING_JWK?: string;
 };
 
 type Dependencies = {
@@ -34,6 +53,24 @@ type Dependencies = {
     input: Parameters<typeof createDishRevision>[3],
     env: Bindings,
   ) => ReturnType<typeof createDishRevision>;
+  approve?: (
+    actorId: string,
+    venueId: string,
+    input: Parameters<typeof approveMenuRevision>[3],
+    env: Bindings,
+  ) => ReturnType<typeof approveMenuRevision>;
+  publish?: (
+    actorId: string,
+    venueId: string,
+    input: Parameters<typeof publishMenu>[3],
+    env: Bindings,
+  ) => ReturnType<typeof publishMenu>;
+  withdraw?: (
+    actorId: string,
+    venueId: string,
+    input: Parameters<typeof withdrawMenu>[3],
+    env: Bindings,
+  ) => ReturnType<typeof withdrawMenu>;
   authorizeVenue?: (actorId: string, venueId: string, env: Bindings) => Promise<void>;
   retrieve?: (request: unknown) => Promise<BoundedRetrievalResult>;
   readAnalytics?: (
@@ -43,6 +80,13 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
+  readPublicMenu?: (
+    venueId: string,
+    menuId: string,
+    env: Bindings,
+  ) => Promise<PublicMenuRecord | undefined>;
+  issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
+  readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
 };
 
 export async function authorizeStaffVenue(
@@ -110,6 +154,42 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async approve(actorId, venueId, input, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await approveMenuRevision(client, actorId, venueId, input);
+    } finally {
+      await client.end();
+    }
+  },
+  async publish(actorId, venueId, input, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await publishMenu(client, actorId, venueId, input);
+    } finally {
+      await client.end();
+    }
+  },
+  async withdraw(actorId, venueId, input, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await withdrawMenu(client, actorId, venueId, input);
+    } finally {
+      await client.end();
+    }
+  },
   async authorizeVenue(actorId, venueId, env) {
     const connectionString =
       env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
@@ -138,6 +218,34 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async readPublicMenu(venueId, menuId, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await readPublicMenu(client, venueId, menuId);
+    } finally {
+      await client.end();
+    }
+  },
+  async issuePublicMenu(menu, env) {
+    if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
+    return createPublicMenuResponse(menu, {
+      issuer: env.MENU_TOKEN_ISSUER,
+      signingJwk: env.MENU_TOKEN_SIGNING_JWK,
+      allowLocalIssuer: env.APP_ENV === 'local',
+    });
+  },
+  async readMenuJwks(env) {
+    if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
+    return menuJwks({
+      issuer: env.MENU_TOKEN_ISSUER,
+      signingJwk: env.MENU_TOKEN_SIGNING_JWK,
+      allowLocalIssuer: env.APP_ENV === 'local',
+    });
+  },
 };
 
 export function createApp(services: Dependencies = dependencies) {
@@ -154,10 +262,23 @@ export function createApp(services: Dependencies = dependencies) {
       stage: 'foundation',
     } satisfies HealthResponse),
   );
+  app.get('/.well-known/jwks.json', async (c) => {
+    if (!services.readMenuJwks) throw new AuthUnavailableError();
+    c.header('Content-Type', 'application/jwk-set+json');
+    return c.json(await services.readMenuJwks(c.env ?? {}));
+  });
   app.use(
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
   );
+  app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
+    const scope = MenuScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readPublicMenu || !services.issuePublicMenu) throw new AuthUnavailableError();
+    const menu = await services.readPublicMenu(scope.data.venueId, scope.data.menuId, c.env ?? {});
+    if (!menu) return c.json({ error: 'not_found' }, 404);
+    return c.json(await services.issuePublicMenu(menu, c.env ?? {}));
+  });
   app.get('/team/analytics/:kind', async (c) => {
     const env = c.env ?? {};
     if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
@@ -216,6 +337,59 @@ export function createApp(services: Dependencies = dependencies) {
     );
     return c.json(result);
   });
+  const publicationRoute = (
+    path: string,
+    schema: typeof ApproveMenuRevisionSchema | typeof PublishMenuSchema | typeof WithdrawMenuSchema,
+    execute:
+      | NonNullable<Dependencies['approve']>
+      | NonNullable<Dependencies['publish']>
+      | NonNullable<Dependencies['withdraw']>
+      | undefined,
+  ) => {
+    app.post(path, async (c) => {
+      const authorization = c.req.header('Authorization');
+      if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+        return c.json({ error: 'unauthorized' }, 401);
+      }
+      const actorId = await services.verify(authorization, c.env ?? {});
+      const scope = MenuScopeSchema.safeParse(c.req.param());
+      if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+      if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+        return c.json({ error: 'unsupported_media_type' }, 415);
+      }
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ error: 'invalid_json' }, 400);
+      }
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+      if (!execute) throw new AuthUnavailableError();
+      const result = await execute(
+        actorId,
+        scope.data.venueId,
+        { ...parsed.data, menuId: scope.data.menuId } as never,
+        c.env ?? {},
+      );
+      return c.json(result);
+    });
+  };
+  publicationRoute(
+    '/venues/:venueId/menus/:menuId/approvals',
+    ApproveMenuRevisionSchema,
+    services.approve,
+  );
+  publicationRoute(
+    '/venues/:venueId/menus/:menuId/publications',
+    PublishMenuSchema,
+    services.publish,
+  );
+  publicationRoute(
+    '/venues/:venueId/menus/:menuId/withdrawals',
+    WithdrawMenuSchema,
+    services.withdraw,
+  );
   app.post('/venues/:venueId/menu-evidence', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -256,6 +430,8 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
+    if (error instanceof PublicationCommandError)
+      return c.json({ error: error.code }, error.status);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
       JSON.stringify({ event: 'command_failed', requestId: c.res.headers.get('X-Request-ID') }),
