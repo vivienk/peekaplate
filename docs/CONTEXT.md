@@ -25,7 +25,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bc7ff833a3139b95afaf55e3848335c76a349962f449ece47fb9351da07c497b"
+      "sourceFingerprint": "448822ccffea1e70dcf3ef0801b803e58838e397742669fa9448437f06030b22"
     },
     {
       "id": "tokens",
@@ -119,7 +119,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker retains staff JWT/membership draft commands, collaborator staging reads, and VIS-04 retrieval with SSRF, Unicode/provenance and context limits. Deployed direct-DO Python host uses named image, idle timeout and signed source grants without signing/DB credentials. RES-02 adds owner approve/publish/withdraw with atomic events/projections/outbox, public reads joining active publication to exact bundle, and 30-minute ES256 tokens. Canonical observation producer POST /observations validates ES256 menu tokens, enforces PR #43 diner CORS allowlist without wildcard, derives traffic_class, canonicalizes and enqueues to observation queue with queue-before-accepted delivery, and bounds conflict copies with safe metadata. Rate limits enforce approximate per-location windows rather than a strict global token bucket. Full AI configuration, consumer PR #31 integration and queue unpausing remain separate.",
+      "summary": "Hono Worker retains staff JWT/current-membership commands, collaborator staging reads and VIS-04 evidence retrieval. Python direct-DO extraction is deployed with signed source grants; full AI setup remains separate. RES-02 owner approve/publish/withdraw commits events, projection, receipt and outbox atomically; active public reads issue ES256 tokens and public-only JWKS. POST /observations verifies menu-token authority, exact diner CORS, strict batches and microsecond time bounds, preserves trusted traffic_class and awaits Queue sends before accepted receipts. Conflict copies retain authorized events or bounded invalid metadata. Rate windows are approximate per location. Hosted RES-02 acceptance is recorded; this producer is not yet deployed. PR31 consumer integration, transactional typed facts and paused-Queue activation remain separate.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -131,10 +131,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish.integration.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
-        "backend/src/menu-token.ts",
-        "backend/src/menu-token.test.ts",
-        "backend/src/observation-fixtures.test.ts",
-        "backend/src/observation-ingest.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -164,7 +160,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/publication-command.ts",
         "backend/src/public-menu.test.ts",
         "backend/src/public-menu.ts",
-        "docs/public-menu.md"
+        "docs/public-menu.md",
+        "backend/src/menu-token.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/observation-fixtures.test.ts",
+        "backend/src/observation-ingest.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -176,12 +176,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d55221ffaa8544e1333e996f75bd2af5a92005f7e98c4e6282ea561134ffd751"
+      "sourceFingerprint": "43fb434109d5eadec406c516175d6609e111d35865e3feadf1ca385d39faee3c"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private Postgres venue/events/commands/outbox, memberships and projections use forced RLS. Docker tests cover upgrades, atomic commands, connection reuse and TCP startup; hosted staff checks are separate and restore unverified. PostHog append-only export: eight raw/four unique synthetic events; October22 audit verifies migration20261021130000, scope675372, restricted definer ownership/execution and browser/runtime raw-access denial. Runtime cannot read scope; exporter cannot access app schema. Owner oracle covers NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, typed facts and tenant live-only views exist; activity uses greatest checkpoint. Report suppression/authorization and consumer integration remain separate. RES-02 adds immutable subjects, append-only exact approvals, review/publication projections and tenant/menu/hash foreign keys; runtime cannot create subjects. Append-only forced-RLS public bundles are runtime-read-only. Hosted acceptance pending.",
+      "summary": "Private Postgres venues, event/command/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated append-only PostHog export has eight raw/four unique synthetic events; its October22 audit verifies history20261021130000, scope675372, restricted definer execution and denied browser/runtime raw reads. Runtime cannot read scope; exporter cannot access app schema. The owner oracle covers NULL IDs, retries/conflicts and the ten-session floor. Canonical index/conflicts, typed facts and live-only tenant views exist; activity uses the greatest checkpoint. Consumer/report authorization and suppression integration remain separate. RES-02 adds immutable subjects/approvals, tenant/menu/hash foreign keys and runtime-read-only public bundles. Its migrations and synthetic hosted approval/publication/withdrawal checks pass; production remains unaccepted.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "tests/db/foundation.sql",
@@ -273,7 +273,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/preview.test.mjs",
         "docs/menu-ingestion-infrastructure.md",
         "scripts/menu-ingestion-infra.test.mjs",
-        "pnpm-lock.yaml"
+        "pnpm-lock.yaml",
+        "docs/res02-staging-acceptance.json"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -284,7 +285,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "34ea76145a07676d5a7e3c9870531f56d98e0610d5a2cb01398d9cb8726a9285"
+      "sourceFingerprint": "5584ec89fe4a8d1b2c0bfeb235dcb85a8d8bbbcb340f7761063439d1d770e0ee"
     },
     {
       "id": "agents",
@@ -395,13 +396,33 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "November 2 PR70 review findings resolution: aligned canonical timestamp precision with PR #31/PostgreSQL microsecond semantics and banker's rounding; isolated unauthorized publications in conflict copies using bounded invalid metadata ('publicationStatus: mismatch') while preserving checksums; aligned CORS with PR #43 diner-origin allowlist without wildcard CORS; documented native Cloudflare Worker rate limiting semantics as approximate per-location limits (not a strict global token bucket); ensured traffic_class compatibility with PR #31; and expanded regression test coverage.",
+      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
       "modules": [
         "contracts",
         "backend",
         "delivery"
       ],
-      "next": "Release handoff notes that the two native rate windows (OBSERVATION_RATE_LIMITER_MINUTE and OBSERVATION_RATE_LIMITER_BURST) are approximate per-location limits, not a strict global token bucket. PR #70 is green and ready for review; consumer PR #31 integration, live migration deployment and staging queue unpausing remain separate operator actions."
+      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
+    },
+    {
+      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
+    },
+    {
+      "summary": "November 1 RES-02 staging release preparation follows merged PR42 and PR43. Main observation-schema/cleanup history and all develop modules are retained. The existing staging Supabase project now records publication migrations20261025120000/20261025130000; application release and hosted runtime acceptance are not yet recorded. Staging token issuer is the existing Worker origin; signing key remains protected operator configuration.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "delivery"
+      ],
+      "next": "Verify and review this exact main promotion, deploy the approved main commit to staging, set its private ES256 key without exposing it, and run scoped synthetic publication/token/withdrawal and tenant tests. Record actual version/evidence. Keep production, paused queues, bundle producer and DIN-03 work outside this release acceptance."
     },
     {
       "summary": "November 1 PR43 reconciliation retains PR42 command transactions and all develop diner fixture/search updates. Public reads return only an active exact approved bundle plus publication-scoped ES256 token; unknown/draft/unbundled/withdrawn menus share404. Existing code and migrations are preserved during context/error-ledger reconciliation.",
@@ -460,21 +481,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Run current repository/build/browser checks and exact-head CI, retarget PR30 to develop and merge it. Keep final Input visual approval and real review-form integration separate."
-    },
-    {
-      "summary": "October31 PR29 reconciliation: retained bounded PDF retrieval and current develop tokens/UI, deployment foundations and PR22 owner-metric tests. The only merge conflict was the context graph; target responsibilities and the PDF source paths are both preserved.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run actual Worker retrieval tests, builds, database checks and applicable CI on this reconciled head, then merge PR29. Representative menu relevance and hosted extraction/publication acceptance remain separate."
-    },
-    {
-      "summary": "October31: cleaned PR22 owner-metric SQL whitespace and reconciled current develop without changing SQL behavior. The temporary oracle is indexed under database context; separate owner-report schema work is untouched.",
-      "modules": [
-        "database"
-      ],
-      "next": "Verify the reconciled head with real PostgreSQL and repository checks, then merge PR22. Canonical reports still depend on the observation index/fact-view work; this oracle does not implement the owner API."
     }
   ]
 }

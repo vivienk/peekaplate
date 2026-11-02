@@ -2,6 +2,36 @@
 
 This is the infrastructure handoff for the observation ingestion pipeline. It provides a place to send, retain and recover synthetic observations. The canonical observation producer POST /observations is implemented in PR #70 with token-scoped rate limiting (approximate per-location limits, not a strict global token bucket) and queue-before-accepted delivery. Consumer processing and canonical database indexing belong to PR #31.
 
+This producer change does not deploy or activate collection. When reconciling
+PR #31, preserve both the producer's server-derived `traffic_class` field and
+the consumer's canonical payload normalization in the shared contracts. The
+raw branches have a contract conflict; parsing only the producer's schema is
+not proof of consumer compatibility. Before release, test the combined actual
+consumer and its transactional typed-fact writes, then complete hosted
+browser-to-Queue/R2/database acceptance before unpausing delivery.
+
+## Canonical database handoff
+
+On October 31, the existing staging Supabase database received the unchanged
+migrations from [PR #32](https://github.com/vivienk/peekaplate/pull/32) and
+[PR #50](https://github.com/vivienk/peekaplate/pull/50), in this order:
+`20261023120000_observation_index.sql`, then
+`20261026120000_observation_facts.sql`. All four previous history entries remain.
+
+The schema contains `app_private.observation_index`,
+`app_private.observation_conflict`, nine typed fact tables, and
+`app_private.owner_observation_v1` / `app_private.owner_opening_activity_v1`.
+The hosted audit verified forced tenant RLS on all eleven tables, append-only
+triggers, restricted runtime SELECT/INSERT grants, protected security-invoker
+views and denied browser/exporter access. Owner views exclude test/demo traffic;
+report suppression and HTTP authorization belong to the report implementation.
+
+See the [release record](operations.md#observation-schema-release--october-31-2026)
+for verification and limits. Consumer integration must persist accepted index
+and matching typed facts transactionally before those facts can drive owner
+metrics. Creating empty tables does not activate a consumer or certify that
+integration. Delivery remains paused until the reviewed flow passes acceptance.
+
 ## Resources and bindings
 
 Account: `51eda1917fd22a9478808a82d2980741`. The October 24, 2026 inventory found no Queues; only the two missing staging Queues were created. The existing private staging bucket was reused. No production resource, database, subscription or token was created or changed.

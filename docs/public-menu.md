@@ -1,5 +1,18 @@
 # Public menu handoff and token
 
+## Staging status — November 1, 2026
+
+PR42/PR43 are merged and the backend is deployed from approved main `2eee264`.
+The two publication migrations, private ES256 key and public JWKS are active.
+Genuine staff HTTP approval/retry/publication/withdrawal, scoped public reads,
+remote signature checks and revoked-owner retry denial passed with synthetic data.
+See [operations](operations.md#res02-hosted-acceptance) and the
+[sanitized evidence](res02-staging-acceptance.json). The synthetic publication is
+withdrawn and its temporary bundle host is removed. This does not complete the
+real-content producer, DIN-03 UI, deployed CORS, production hash-input decision
+or original-publication token renewal described below.
+
+
 Status: local implementation slice for S3-RES-02. This is not a staging or production deployment record.
 
 ## Boundary

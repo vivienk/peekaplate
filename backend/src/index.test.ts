@@ -884,11 +884,11 @@ describe('observation.v2 HTTP boundary', () => {
     // 4. Unauthorized copy does not bypass publication authorization
     expect(queuedCopyB.metadata.publicationStatus).toBe('mismatch');
 
-    // 5. Shared contracts from PR #31 validate the envelope without error
+    // 5. Current shared contracts validate the envelope without error.
     expect(ObservationConflictQueueMessageSchema.safeParse(enqueuedEnvelope).success).toBe(true);
     expect(ObservationQueueEnvelopeSchema.safeParse(enqueuedEnvelope).success).toBe(true);
 
-    // 6. Demonstrate consumer conflict handling succeeds and does not route to DLQ
+    // 6. Check conflict integrity locally; this simulation does not execute PR #31.
     // (Simulating consumer's validateConflictObservationEnvelope & processConflictMessage)
     const copies = enqueuedEnvelope.copies;
     const validatedCopies = [];
@@ -909,7 +909,7 @@ describe('observation.v2 HTTP boundary', () => {
     expect(validatedCopies[1]?.valid).toBe(false);
   });
 
-  it('proves traffic_class survives the producer-to-consumer handoff without breaking PR #31', async () => {
+  it('preserves traffic_class in the shared Queue envelope and canonical reconstruction', async () => {
     const enqueueObservation = vi.fn().mockResolvedValue(undefined);
     const services = {
       ...baseServices,

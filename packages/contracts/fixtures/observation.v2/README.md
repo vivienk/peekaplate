@@ -1,6 +1,6 @@
 # Shared observation.v2 fixtures
 
-Local verification: six fixture tests, 46 contract tests, and all 27 HTTP boundary tests pass. Lint and typecheck pass. Full pnpm check passes (58 script tests pass). This fixture delivery does not claim hosted integration acceptance.
+Local verification covers the fixture, contract, menu-token and HTTP boundary tests. Record current commands, counts and runtimes in the PR verification section. These fixtures do not establish hosted integration acceptance.
 
 Synthetic inputs for TRK-01. Load fixtures.json: valid_events covers nine P0 types; invalid_events contains negative cases; delivery_cases contains ordered HTTP request bodies and expected ingestion receipt statuses. Send only request bodies, not fixture metadata.
 
