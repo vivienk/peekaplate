@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { OwnerDishReportSchema, PRIVACY_FLOOR_SESSIONS } from './owner-report';
+import {
+  MAX_AVERAGE_ACTIVE_SECONDS,
+  OwnerDishReportSchema,
+  PRIVACY_FLOOR_SESSIONS,
+} from './owner-report';
 
 // One valid synthetic report; each test changes a single field, so a rejection can only come
 // from the rule the test names.
@@ -99,6 +103,32 @@ describe('OwnerDishReportSchema', () => {
       expect(issuePaths(report({ metrics }))).toContain('dishes.0.metrics.open_rate.status');
     });
 
+    it('suppresses a dish with 0 active sessions, since 0 is below the floor', () => {
+      expect(
+        accepts(report({ dish: { evidence_state: 'SUPPRESSED' }, metrics: suppressedMetrics() })),
+      ).toBe(true);
+      const zero = { ...suppressedMetrics(), active_sessions: metric(0, 'VALID_ZERO') };
+      expect(
+        issuePaths(report({ dish: { evidence_state: 'SUPPRESSED' }, metrics: zero })),
+      ).toContain('dishes.0.metrics.active_sessions.status');
+    });
+
+    it('allows MISSING active sessions only when no other metric shows a value', () => {
+      const missing = Object.fromEntries(
+        Object.keys(validMetrics()).map((name) => [name, metric(null, 'MISSING')]),
+      );
+      expect(
+        accepts(report({ dish: { evidence_state: 'NOT_MEASURABLE' }, metrics: missing })),
+      ).toBe(true);
+      const leaky = { ...validMetrics(), active_sessions: metric(null, 'MISSING') };
+      expect(issuePaths(report({ metrics: leaky }))).toContain('dishes.0.metrics.save_rate.status');
+    });
+
+    it('allows VALID_ZERO for other metrics above the floor (0 saves out of 15 sessions)', () => {
+      const metrics = { ...validMetrics(15), save_rate: metric(0, 'VALID_ZERO') };
+      expect(accepts(report({ metrics }))).toBe(true);
+    });
+
     it('rejects a suppressed metric that still carries a value', () => {
       const metrics = { ...suppressedMetrics(), active_sessions: metric(9, 'SUPPRESSED') };
       expect(accepts(report({ dish: { evidence_state: 'SUPPRESSED' }, metrics }))).toBe(false);
@@ -122,6 +152,23 @@ describe('OwnerDishReportSchema', () => {
       expect(issuePaths(report({ metrics: five }))).toEqual([
         'dishes.0.metrics.avg_interaction_time_seconds',
       ]);
+    });
+
+    it('takes average interaction time in seconds with decimals (plan example 25/3)', () => {
+      const metrics = { ...validMetrics(), avg_interaction_time_seconds: metric(25 / 3) };
+      expect(accepts(report({ metrics }))).toBe(true);
+    });
+
+    it('caps average interaction time at the 300-second per-opening cap', () => {
+      expect(MAX_AVERAGE_ACTIVE_SECONDS).toBe(300);
+      const atCap = { ...validMetrics(), avg_interaction_time_seconds: metric(300) };
+      expect(accepts(report({ metrics: atCap }))).toBe(true);
+      const over = { ...validMetrics(), avg_interaction_time_seconds: metric(300.5) };
+      expect(issuePaths(report({ metrics: over }))).toContain(
+        'dishes.0.metrics.avg_interaction_time_seconds.value',
+      );
+      const negative = { ...validMetrics(), avg_interaction_time_seconds: metric(-1) };
+      expect(accepts(report({ metrics: negative }))).toBe(false);
     });
 
     it('keeps rates between 0 and 1', () => {
