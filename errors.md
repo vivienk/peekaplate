@@ -834,6 +834,10 @@ develop's retrieval implementation to make a release merge compile.
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-29T14:41:51.693Z","exitCode":1}
 ```
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+
 ## RES-02 October 31 local reconciliation checks
 
 Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
@@ -843,6 +847,257 @@ The project-local store avoided the registry-link step, but dependency linking s
 ## RES-02 public-menu integration response typing
 
 At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
+
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T21:02:44.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z"},"status":"resolved","evidence":"MenuAuthority made trafficClass optional with server-side live default; all workspace packages passed typecheck and pnpm check."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
+```
+
+## ERR-20261031-CONSUMER-SANDBOX-PNPM
+
+Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded exit code 1 due to sandbox filesystem isolation restricting reading the user-level pnpm preference directory (`/Users/teeyanshshukla/Library/Preferences/pnpm/config.yaml`). Direct invocation via `node scripts/check-docs.mjs` confirmed all 44 documentation files checked with 0 broken links.
+
+```json
+{"kind":"resolution","references":{"id":"ERR-20261031-CONSUMER-SANDBOX-PNPM"},"status":"resolved","evidence":"Direct verification via node scripts/check-docs.mjs confirmed passing on 44 markdown files."}
+```
+
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T20:41:29.007Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-01T20:41:29.007Z"},"status":"resolved","evidence":"Formatted new unit tests in backend/src/index.test.ts and packages/contracts/src/index.test.ts with biome."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
+```
+
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z"},"status":"resolved","evidence":"Aligned ObservationIngestServices.now with exactOptionalPropertyTypes and spread into ingest call; typecheck passed."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z"},"status":"resolved","evidence":"Installed Playwright Chromium headless shell locally; pnpm verify test:e2e passed all 13 tests."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION","status":"pending-verification","area":"main-ci","cause":"An unused owner-report schema was committed outside packages/contracts/src on main; Biome rejects its formatting while exports and TypeScript exclude it.","resolution":"Remove only the misplaced root-level draft. Keep the reviewed owner-report implementation on its separate develop-based branch.","regression":"Before deletion, pnpm exec biome check packages/contracts/owner-report.ts reproduced the formatting failure. Full local and PR checks follow the deletion.","sources":["packages/contracts/package.json","packages/contracts/tsconfig.json","https://github.com/vivienk/peekaplate/actions/runs/41111328548"]}
+```
+
+```json
+{"kind":"resolution","references":{"id":"ERR-20261030-MAIN-OWNER-REPORT-LOCATION"},"status":"resolved","evidence":"After deleting the unused draft, pnpm verify lint typecheck test build context:check docs:check passed in 20.143s: 69 Vitest tests and 57 script tests. Public exports, TypeScript source, runtime, migrations and deployment configuration are unchanged. Applicable GitHub PR checks remain a separate merge gate.","prevention":"Add reviewed shared contracts under packages/contracts/src and export them from src/index.ts through a PR into develop; verify formatting and contracts before promotion."}
+```
+
+## OBS-20261031-OBSERVATION-RELEASE-REHEARSAL
+
+The first operator-only rehearsal could not identify its disposable container
+using Docker's publish filter. A second attempt reused a second database in
+the same cluster and collided with an existing export role: PostgreSQL roles
+are cluster-wide. The corrected rehearsal used its own named disposable
+container, then passed the exact four-migration upgrade, retry, preservation
+and rollback-only runtime checks in 6.453 seconds. No shared database was
+affected. Keep cluster-scoped role migrations in isolated rehearsal instances.
+The local engine was initially stopped; starting the existing Desktop install
+restored it without resetting or pruning data. `pnpm verify test:db` then passed.
+
+## OBS-20261031-HOSTED-RUNTIME-ROLE-PROBE
+
+The hosted metadata audit and both forward migrations passed, but a subsequent
+rollback-only SQL Editor probe returned SQLSTATE 42501 when attempting
+`SET LOCAL ROLE peekaplate_runtime`. Managed `postgres` is not an unrestricted
+superuser. Use the real restricted runtime/Hyperdrive connection for behavioral
+checks; do not expand editor role membership to bypass this boundary. Hosted
+write acceptance remains unverified; the subsequent real read-only Hyperdrive
+check passed without changing role membership. operations.md records the limit.
+
+## OBS-20261031-CONTEXT-SUMMARY-BOUND
+
+The initial release context update exceeded the existing bounded-summary limit. Context refresh/check failed before publication. The summary was rewritten within the schema limit rather than weakening validation; rerun context refresh/check and docs checks before committing. Retain existing error history byte-for-byte when appending new records.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:11:41.330Z","exitCode":1}
+```
+
+## RES-02 November 1 hosted configuration and interrupted acceptance
+
+The first new staging signing JWK included `key_ops`, which the reviewed strict
+configuration parser deliberately rejects. JWKS returned 503 without exposing
+private key material. The operator generated the allowed EC/P-256/ES256 fields,
+validated them with the same `menuJwks` implementation before upload, and the
+hosted public-only JWKS returned 200. No backend validation was weakened and no
+private key value was saved in Git or operator files.
+
+The first authenticated acceptance run completed approval/publication and retry
+checks, then its client aborted a public read after 20 seconds. An independent
+read returned 200 in 747 ms. A resumed test used the original command IDs and
+finished the bundle/hash/token, withdrawal and revoked-owner checks. Hosted
+readback remained exactly three events, three command receipts and three outbox
+rows. The original timeout is retained in the acceptance evidence; its cause is
+not established and the completed functional checks do not certify latency/load.
+
+## PR31 November 1 shared-contract reconciliation
+
+The first direct Biome check caught a duplicate closing statement while joining
+the two contract-test tails. Removed only that duplicated closure and retained
+both branches' assertions. The corrected focused run passed 191 tests; full
+verification passed 467 unit tests and 58 script tests, and the real migrated
+PostgreSQL run passed 189 SQL assertions plus 40 integration tests, including
+the new actual-producer/consumer retry and publication-conflict case. This was
+an intermediate merge error caught before commit, not a deployed regression.
+
+## PR31 November 2 collaborator smoke query
+
+An additional authenticated team-read probe omitted the required `from`/`until`
+window and correctly received 400. The probe was corrected to use the existing
+bounded query contract; events and summary then both returned 200. No product
+code, permissions or credentials changed. Reuse the shared query schema or a
+known valid reporting window when checking authenticated read availability.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:27:05.785Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:28:30.719Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:30:19.504Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:30:55.676Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:38:48.270Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-02T07:39:48.686Z","exitCode":1}
+```
+
+## November 2 typed-fact integration verification
+
+The initial real-database regression proved the missing behavior: all nine
+accepted observations produced index rows but no typed facts. The follow-up
+writes index/event/detail in one transaction and fills historical accepted rows
+under the same identity lock. Unrelated detail uniqueness failures now retry;
+they cannot be hidden by the former generic unique-violation duplicate fallback.
+
+Intermediate checks caught an internal legacy venue alias entering a strict
+schema, Node/Worker URL type mismatches in a test, and a browser-test poll shorter
+than local Queue batching. The alias is excluded at the fact boundary, fixture
+paths use Node file paths, and bounded polling allows the actual Queue delivery.
+The corrected real database/browser run passed 189 SQL assertions and 46 tests.
+Shell quoting and two guessed test paths also failed during inspection; use
+discovered paths and file-backed patches rather than nested shell interpolation.
+These were local intermediate failures, not changes deployed to staging.
+
+The documentation helper initially used Windows' default encoding and then an
+incomplete context-handoff shape. The affected documents were restored from
+their exact Git bytes, reapplied with UTF-8, and the handoff gained its required
+module IDs. Context freshness and local documentation checks passed afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T07:44:24.918Z","exitCode":1}
+```
+
+The subsequent context refresh/check passed after restoring required handoff
+module IDs. Independent review also found a browser-launch failure could leave
+the transport test's HTTP server open. Launch now occurs inside its cleanup
+guard; the final database/browser regression passed all 46 tests in 44.147
+seconds including lint, type and documentation checks.
+
+Security-report finalization initially rejected invalid surface IDs/missing
+labels. The same pinned scan was resumed with valid labelled surfaces, sealed
+and read back successfully; no source-code or provider change was needed.
+Validate the saved draft result before calling its finalization operation.
+
+## November 2 hosted menu-token self-fetch
+
+The first genuine Brave test loaded the published synthetic menu and exact-hash
+bundle but received 503 at observation acceptance. Both source/DLQ remained
+empty and paused; no event was falsely accepted. A bounded synthetic Worker
+confirmed Cloudflare 1042 when fetching its own public route. Own-token
+verification had fetched this API's own JWKS, unlike the separate JWKS server
+used by the existing local tests.
+
+The regression first failed with MenuTokenUnavailableError when self-fetch was
+blocked, then passed using the configured public JWK locally, including denial
+of wrong-audience and forged-signature tokens. Signature and claim checks stay
+enabled; no broad fetch compatibility flag, new credentials or public debug
+route is added. Fresh hosted acceptance must pass after the reviewed fix deploys.
+Reference: https://developers.cloudflare.com/workers/observability/errors/
+
+## November 2 hosted follow-up and interrupted verifier
+
+The reviewed own-token fix deployed as main c6a47bd. Genuine Brave acceptance
+now passes; the previous 503/self-fetch1042 failure is resolved within this
+synthetic hosted scope. Six hosted checks verify typed facts/backfill, original
+archive integrity, retries/conflicts and tenant/test exclusion.
+
+A desktop freeze stopped the verifier after five saved PASS results, before
+its cleanup/final readback completed. The source Queue was explicitly paused,
+then a read-only continuation checked the same event IDs, archive metadata and
+empty/paused Queues. No events were resubmitted. Preserve intermediate evidence
+and verify provider state after client failure; a process finally block cannot
+guarantee cleanup after its host exits. A nested PowerShell process query also
+expanded dollar variables incorrectly; it was stopped and replaced with a
+file-backed command. Keep shell scripts with variables out of nested strings.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-02T18:14:48.185Z","exitCode":1}
+```
+
+The final evidence JSON initially used Windows CRLF rather than the repository
+formatter output. Formatting that single file fixed the lint failure; the
+subsequent lint, context and documentation checks all passed.
+
+The database context summary exceeded its 1,000-character limit during the
+final handoff edit. It was shortened without dropping tenant/privacy boundaries;
+context refresh passed. Hosted cleanup then restored viewer access, withdrew
+the synthetic publication, ended its session and removed its temporary host.
 
 ## RES-02 November 1 context reconciliation
 

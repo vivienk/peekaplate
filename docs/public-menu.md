@@ -1,5 +1,18 @@
 # Public menu handoff and token
 
+## Staging status — November 1, 2026
+
+PR42/PR43 are merged and the backend is deployed from approved main `2eee264`.
+The two publication migrations, private ES256 key and public JWKS are active.
+Genuine staff HTTP approval/retry/publication/withdrawal, scoped public reads,
+remote signature checks and revoked-owner retry denial passed with synthetic data.
+See [operations](operations.md#res02-hosted-acceptance) and the
+[sanitized evidence](res02-staging-acceptance.json). The synthetic publication is
+withdrawn and its temporary bundle host is removed. This does not complete the
+real-content producer, DIN-03 UI, deployed CORS, production hash-input decision
+or original-publication token renewal described below.
+
+
 Status: local implementation slice for S3-RES-02. This is not a staging or production deployment record.
 
 ## Boundary
@@ -79,7 +92,8 @@ The Worker signs an `ES256` JWT with the protected private JWK in `MENU_TOKEN_SI
 - `publication`: the active publication UUID;
 - `scope`: exactly `observations`;
 - `iat` and `exp`: exactly 30 minutes apart;
-- `jti`: a fresh UUID used for token-scoped rate limiting.
+- `jti`: a fresh UUID used for token-scoped rate limiting;
+- `traffic_class`: signed server metadata (`test` for local/staging issuance, `live` for production). The browser cannot choose it. Older tokens may omit this claim; the verifier retains its documented compatibility default.
 
 The token travels only in `Authorization: Bearer <menu_token>` when the observation endpoint is integrated. QR navigation uses `/venues/:venueId/menus/:menuId`; an optional `?src=qr` records only `entry_source` and is never part of menu identity or authorization. It is not restaurant authority for staff commands. Withdrawal blocks new public reads immediately; already issued tokens may remain cryptographically valid until expiry. The diner re-reads the public endpoint on load and before token expiry. That current-publication GET refreshes only the token for the publication it returns; it cannot authorize an old queue after replacement or withdrawal. The separately defined RES-02 renewal operation must either verify the original allowed exposure and issue a token for that same original publication, or return a bounded terminal rejection. Its eligibility policy for replaced and withdrawn publications, request proof and errors are not yet specified or implemented. Until they are, the client preserves unchanged old events subject to its normal 24-hour/size bounds and must not claim post-expiry delivery support. The API intentionally does not distinguish missing, draft and withdrawn content. The diner may show one menu-unavailable state for HTTP 404, while transport/offline failure remains a separate retryable state.
 
@@ -92,3 +106,19 @@ Local fixtures use only synthetic UUIDs, hashes and `example.test` URLs. They do
 ## Observation field mapping
 
 For `observation.v2`, `publication_revision_id` is copied from the public response `publicationId`. Dish events copy `dish_id` and `dish_revision_id` from the selected immutable bundle item. `menuRevisionId` identifies the approved menu content revision but is not substituted for publication authority. The legacy `publicationHash`, `dishRevisionHash` and `displayedTier` fields belong to the earlier dish-intent contract and are not added to `observation.v2`; the current bundle already fixes T0 and the server retains the approved hashes.
+
+## November 2 integration update
+
+The public-menu GET now uses the same exact diner-origin allowlist as
+`POST /observations`, with `Vary: Origin`; static PR previews remain excluded.
+Immutable-bundle hosting needs its own origin configuration. The regression
+uses a real signed token and browser cross-origin fetch through the Worker,
+Queue, R2 and migrated disposable database. It does not implement original-
+publication renewal after token expiry, real diner controls or report APIs.
+
+Own-token verification uses the public half of the configured signing JWK
+locally. It retains ES256 signature, issuer, audience, expiry and claim checks,
+and refreshes its verifier when the configured key changes. It does not fetch
+this Worker's own JWKS URL: a real hosted probe confirmed Cloudflare 1042 on
+that self-fetch, which caused the first genuine-token POST to return 503.
+The public JWKS endpoint remains available for independent verification.
