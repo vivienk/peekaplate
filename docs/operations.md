@@ -1,5 +1,61 @@
 # Local and staging operations
 
+<a id="observation-consumer-hosted-acceptance"></a>
+
+## Observation consumer hosted acceptance — November 1, 2026 (Phoenix)
+
+PR [#70](https://github.com/vivienk/peekaplate/pull/70) supplied the producer;
+PR [#31](https://github.com/vivienk/peekaplate/pull/31) reconciled its contracts
+with the actual consumer. [Release #94](https://github.com/vivienk/peekaplate/pull/94)
+promoted the reviewed tree through main. Main `35e989d7c533c858decf0a95d5ac987fbb8223ad`
+passed [CI](https://github.com/vivienk/peekaplate/actions/runs/41401657326) and
+was deployed by the approved Wrangler operator route. The active staging API
+version is `3db23304-c53a-4fee-b0ba-260c3afe4060`.
+
+The existing observation Queue, DLQ, private R2 bucket and Hyperdrive were
+reused. The temporary source HTTP pull consumer was replaced with the API's
+real Worker consumer. Batch size 10, maximum wait 30 seconds, retries 3,
+retry delay 10 seconds and the existing DLQ route were verified by provider
+readback. Existing signing/extraction/team secrets were preserved. No migration,
+new Queue, database, subscription or production deployment was needed.
+
+Ten hosted checks passed in 236.252 seconds, including intentional batching and
+retry waits; this is a functional test duration, not a latency benchmark:
+
+- Real restricted Hyperdrive login, eleven forced-RLS observation tables and
+  no index/fact rows without tenant context.
+- Both Queues empty before starting; actual producer Queue acceptance followed
+  by the deployed consumer's R2 archive, canonical checksum and database index.
+- Duplicate redelivery drains without another index/conflict row. Changed
+  payload reuse preserves the original and creates distinct quarantine evidence.
+- Mixed authorized/unauthorized-publication conflict copies reach safe durable
+  quarantine without raw unauthorized fields or canonical promotion.
+- Controlled one-time archive/database exceptions return retry, then recover
+  using real R2/PostgreSQL. These exceptions were injected around the remote
+  consumer's dependencies, not into the deployed Queue worker.
+- A malformed synthetic message passes through the deployed consumer's native
+  retry/DLQ route. Only the exact run-owned message was acknowledged in the DLQ.
+- Final readback: 3 canonical index rows, 3 conflict rows, 6 preserved private
+  archives, 0 cross-tenant rows and 0 owner-view rows. Both Queues are empty and
+  paused; the temporary authenticated remote proxy is stopped.
+
+Fifteen public staging HTTP checks also passed: health/JWKS, observation
+401/413 responses, exact-origin preflight, protected staff/team routes, the
+withdrawn synthetic publication and existing Pages roots. See the
+[sanitized acceptance record](observation-staging-acceptance.json).
+On November 2, both existing authenticated collaborator analytics reads also
+returned 200 with the required reporting window; no response data or credentials
+were retained. Their request IDs are included in the same record.
+
+**Boundary:** the accepted producer test used an operator-scoped synthetic
+authority and the actual ingestion function. It did not supply a genuine diner
+menu token to the public HTTP endpoint. That browser/token path, real diner
+controls, typed-fact writes/backfill, owner metrics, native process-crash recovery,
+load, backup restoration and production acceptance remain separate. The consumer
+currently writes index/conflict records only; it does not populate the owner
+views. Keep normal collection paused until the remaining integration passes.
+Preserve the labelled synthetic archives and exclude them from future analytics.
+
 <a id="res02-hosted-acceptance"></a>
 
 ## RES-02 publication hosted acceptance — November 1, 2026 (Phoenix)

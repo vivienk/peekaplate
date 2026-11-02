@@ -976,3 +976,11 @@ verification passed 467 unit tests and 58 script tests, and the real migrated
 PostgreSQL run passed 189 SQL assertions plus 40 integration tests, including
 the new actual-producer/consumer retry and publication-conflict case. This was
 an intermediate merge error caught before commit, not a deployed regression.
+
+## PR31 November 2 collaborator smoke query
+
+An additional authenticated team-read probe omitted the required `from`/`until`
+window and correctly received 400. The probe was corrected to use the existing
+bounded query contract; events and summary then both returned 200. No product
+code, permissions or credentials changed. Reuse the shared query schema or a
+known valid reporting window when checking authenticated read availability.

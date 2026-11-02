@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Publication backend and hosted acceptance updated November 1, 2026; observation database setup updated October 31. VIS-01 infrastructure and OCR credential evidence remains dated October 28; team analytics evidence is recorded separately. The original foundation walkthrough, file inventory, research and board snapshot below retain their historical handoff dates. Use the November 1 publication section and Operations for current deployment status.
+Current staging status updated November 2, 2026; publication and observation-consumer acceptance were verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
 
@@ -41,7 +41,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
+| Diner tracking | Receiving code and real Queue → R2 → database index/conflict processing deployed and tested with synthetic data | Real diner controls/token delivery, typed metric facts, reporting and normal collection |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
@@ -90,8 +90,36 @@ bringing the recorded application history to eight entries. The hosted audit ver
 runtime grants and denied browser/exporter access; existing record counts were
 unchanged. See the [database release record](operations.md#observation-schema-release--october-31-2026)
 for evidence and limits. Teeyansh can continue integration against these tables.
-The `/observations` endpoint, real Queue consumer and full live-flow acceptance
-still require their own reviewed release.
+The receiving endpoint and real Queue consumer are now deployed and have passed
+the bounded tests below. Complete diner-to-report acceptance remains separate.
+
+### Receiving and processing diner actions
+
+The staging backend can now process an observation, such as a synthetic dish
+Save. Think of its path as:
+
+```text
+Receiving code checks the observation → Queue holds it → consumer saves the
+original evidence in private R2 → database indexes it → Queue marks it finished
+```
+
+Sending the same observation again does not add another index record. Reusing
+its ID with different contents preserves the original and keeps separate
+conflict evidence. A repeatedly invalid message reaches the DLQ, our recovery
+tray. The hosted tests checked those behaviors and another restaurant's lack
+of access. Controlled storage/database failures also retried and recovered.
+
+**The dashboard still needs the next step:** index records are not calculated
+metrics. Developers must write the matching typed facts and safely fill any
+earlier records before the owner views can use them. Real diner buttons and
+delivery with a genuine menu token also need integration tests. The successful
+hosted producer check used a protected operator test, not a diner screen.
+
+Both observation Queues are empty and paused again; normal collection remains
+off. No production system was deployed. The release and exact test limits are
+in [Operations](operations.md#observation-consumer-hosted-acceptance).
+
+### Other staging services
 
 **Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
 passed real synthetic delivery tests. Reports will use the existing private R2
@@ -114,7 +142,11 @@ paused until that passes. Follow the
 interfaces and who does what next. Provisioned infrastructure is not a completed
 menu-processing feature.
 
-The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is provisioned with live API bindings. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. Actual archive-to-database processing remains separate work; the menu-infrastructure acceptance does not certify that feature.
+The [observation infrastructure handoff](observation-infrastructure.md) lists
+the attached real consumer, bindings and remaining work. These Queues retain
+messages for 24 hours even while paused, so real collection must remain off
+until the next integration is accepted. The menu-extraction Queues are a
+separate pipeline and retain their own acceptance requirements.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -167,7 +199,12 @@ Photo files belong in file storage; the database will hold their references, own
 
 Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The October 22 Worker release was `afe45db`. The current November 1 Worker release is main `2eee264`; its active configuration version and hosted results are in [Operations](operations.md#res02-hosted-acceptance). The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. The older deployment records preserve the earlier staff-command checks.
+The current November 1 Worker release is main `35e989d`; its provider version
+and hosted observation results are in [Operations](operations.md#observation-consumer-hosted-acceptance).
+It preserves the earlier `2eee264` publication release and `afe45db` staff/API
+history. The diner and console pages were last released with PostHog setup at
+`2a135fa`; this backend deployment did not rebuild those pages. Later docs-only
+commits do not change running applications.
 
 ### Verified behavior, access and costs
 
@@ -205,13 +242,20 @@ Those records are saved together. If one fails, none of that change should remai
 
 History also lets us rebuild the current dish from previous changes. That is **replay**. Rebuilding must not send a notification or repeat an outside action. The current code tests rebuilding a dish's data; a complete operational recovery tool is still future work.
 
-### The diner events we will add
+### Diner observations and the remaining screen integration
 
 Suppose a diner opens the soup details while their connection is unreliable. The future tracking flow needs to remember the observation, retry safely and avoid counting it twice. It must also identify the exact menu and dish version that person saw.
 
-The plan is for the browser to send observations to a receiving service. Accepted observations wait in a **queue**, which holds work until it can be processed. A background consumer will save an archive in Cloudflare R2, then add searchable information to PostgreSQL, our database. Only then should it mark that queued work finished. Failed work needs a recovery path.
+The receiving service and background consumer now implement that backend path:
+accepted observations wait in a **queue**, then the consumer saves evidence in
+Cloudflare R2 and indexes it in PostgreSQL before marking the work finished.
+The staged synthetic tests passed; real browser controls and token delivery
+are still being connected.
 
-This flow is not running yet. A queue is not needed to save today's dish revision: that change is saved directly in the database transaction. Keeping the two paths separate prevents a browsing action from being mistaken for permission to change a restaurant's menu.
+Normal collection stays paused while typed facts and report integration are
+unfinished. Saving a staff dish revision uses its own direct database transaction;
+it does not wait for this Queue. Keeping the paths separate prevents a browsing
+action from being mistaken for permission to change a restaurant's menu.
 
 ## 4. Follow a dish change through the code
 
