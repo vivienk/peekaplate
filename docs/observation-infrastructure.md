@@ -1,6 +1,93 @@
 # Staging observation infrastructure
 
-This is the infrastructure handoff for Teeyansh's Queue consumer. It provides a place to send, retain and recover synthetic observations. It does not implement his consumer, the ingestion endpoint or canonical database facts. His unfinished PRs are unchanged.
+This is the infrastructure handoff for the observation ingestion pipeline. The producer `POST /observations` verifies menu-token authority, applies approximate per-location rate limits and awaits Queue acceptance. The consumer archives evidence in private R2 before writing the canonical database index or conflict quarantine and acknowledging delivery. Deployment and hosted acceptance are separate from merging this code.
+
+**November 1 hosted status:** reviewed main `35e989d` is deployed as staging
+Worker version `3db23304-c53a-4fee-b0ba-260c3afe4060`. Ten bounded hosted
+pipeline checks and fifteen public HTTP checks passed. The real source Worker
+consumer is attached; both Queues are empty and paused again. See
+[Operations](operations.md#observation-consumer-hosted-acceptance) and the
+[acceptance record](observation-staging-acceptance.json) for scope and remaining work.
+
+The reconciled contracts retain server-derived `traffic_class`, its `live`
+default, and canonical payload normalization. The combined producer/consumer
+regression uses the real migrated PostgreSQL database with simulated Queue/R2;
+it does not replace hosted acceptance. This consumer writes the canonical index
+and conflict records only. Transactional typed-fact persistence and an idempotent
+archive/index backfill still need their own implementation and tests before
+owner views can show those observations. Keep normal collection paused until
+that work and browser-to-destination acceptance pass. An operator may resume
+only the bounded, labelled synthetic acceptance run and pause it again afterward.
+
+## Typed facts and archive recovery — November 2
+
+The follow-up implementation writes an accepted index, the shared
+`observation_event` row and its matching detail row in one transaction. A failed
+detail write rolls everything back and keeps the Queue item retryable. Rejected
+events and quarantined copies never become reportable facts. Save and Unsave
+map their respective surface fields into `observation_save.surface`; Undo stays
+a Save with `save_origin=undo`. No applied migration is edited or added.
+
+The original private archive controls receipt time and traffic classification.
+An identical retry can fill missing facts but cannot rewrite the original or
+reclassify test traffic as live. Local/staging-issued tokens explicitly sign
+`traffic_class=test`; production issuance signs `live`. Owner views continue to
+exclude test/demo rows. These views are inputs to reports, not a completed
+report API or proof that the ten-session privacy floor is applied downstream.
+
+### Recover missing facts
+
+Only an authorized staging operator runs this, from the repository root:
+
+```sh
+pnpm --filter @peekaplate/backend exec node backfill-observations.mjs <venue-uuid>
+pnpm --filter @peekaplate/backend exec node backfill-observations.mjs <venue-uuid> --apply
+```
+
+The first command only inspects up to 100 accepted index rows missing facts.
+The second checks their original private R2 envelopes and fills them through
+the same repository transaction. It never resends observations to the Queue,
+changes their timestamps/disposition, writes PostHog tables or deletes archives.
+Existing Wrangler authorization supplies access; no shared database password or
+new permanent credential is needed. The temporary remote development proxy is
+authenticated with a secret held only in memory and is stopped afterward.
+Nothing is added to the deployed API's routes.
+
+Run only for the approved venue. Verify the reported IDs/counts and repeat until
+inspection is empty. A `blocked` result means missing/corrupt evidence, missing
+explicit historical traffic classification, or a persistence failure; it exits
+nonzero and remains pending. Restore/resolve that evidence before proceeding.
+Do not default historical unknown classification to live or skip blocked rows
+with a sequence cursor. Unrelated tenant rows remain invisible through forced RLS.
+
+The local browser test fetches a genuine token from the public-menu endpoint,
+sends the same observation twice through real workerd/Queue/local R2/PostgreSQL,
+and verifies one typed fact and no owner-view test rows. This is a transport
+harness, not the unfinished diner screens/outbox. Hosted verification and its
+exact release are recorded in Operations after deployment. Normal collection
+stays paused until real controls, outbox/privacy and owner-report acceptance pass.
+
+## Canonical database handoff
+
+On October 31, the existing staging Supabase database received the unchanged
+migrations from [PR #32](https://github.com/vivienk/peekaplate/pull/32) and
+[PR #50](https://github.com/vivienk/peekaplate/pull/50), in this order:
+`20261023120000_observation_index.sql`, then
+`20261026120000_observation_facts.sql`. All four previous history entries remain.
+
+The schema contains `app_private.observation_index`,
+`app_private.observation_conflict`, nine typed fact tables, and
+`app_private.owner_observation_v1` / `app_private.owner_opening_activity_v1`.
+The hosted audit verified forced tenant RLS on all eleven tables, append-only
+triggers, restricted runtime SELECT/INSERT grants, protected security-invoker
+views and denied browser/exporter access. Owner views exclude test/demo traffic;
+report suppression and HTTP authorization belong to the report implementation.
+
+See the [release record](operations.md#observation-schema-release--october-31-2026)
+for verification and limits. Consumer integration must persist accepted index
+and matching typed facts transactionally before those facts can drive owner
+metrics. Creating empty tables does not activate a consumer or certify that
+integration. Delivery remains paused until the reviewed flow passes acceptance.
 
 ## Resources and bindings
 
@@ -13,19 +100,28 @@ Account: `51eda1917fd22a9478808a82d2980741`. The October 24, 2026 inventory foun
 | Existing R2 bucket | `peekaplate-staging-assets` | Private archive; shared with staging assets, so use a dedicated observation prefix |
 | Worker producer binding | `OBSERVATION_QUEUE` | Targets the observation Queue in `backend/wrangler.jsonc`, staging only |
 | Worker R2 binding | `OBSERVATION_ARCHIVE_BUCKET` | Targets the existing staging bucket, staging only |
+| Rate Limiter (Minute) | `OBSERVATION_RATE_LIMITER_MINUTE` | 60 requests per 60s; approximate per-location enforcement (not global token bucket) |
+| Rate Limiter (Burst) | `OBSERVATION_RATE_LIMITER_BURST` | 10 requests per 10s; approximate per-location enforcement (not global token bucket) |
 
-The binding configuration must reach a reviewed `main` release and the protected staging deployment before it exists in the live API Worker. Merely merging to `develop` does not deploy it. Keep the existing Hyperdrive, Auth issuer and `TEAM_GITHUB_TOKEN`; do not replace their credentials or add them to a frontend.
+The observation bindings and real consumer reached the live API through release
+#94. Future binding changes still require a reviewed main deployment; merging
+to develop alone does not deploy. Keep the existing Hyperdrive, Auth issuer and
+`TEAM_GITHUB_TOKEN`; never add their credentials to a frontend.
 
 ## Why delivery is paused
 
-The current API Worker has a `fetch` handler and no observation `queue` handler. Attaching an unfinished or empty handler could acknowledge work without archiving or indexing it. Instead, a temporary **HTTP pull consumer** establishes the source-to-DLQ routing without running product code.
+The real Worker consumer replaced the temporary source HTTP pull consumer during
+the approved release. Bounded synthetic acceptance passed, then both Queues
+were paused again. Normal collection remains off because the diner/token path,
+transactional typed-fact writes/backfill and owner reporting are not accepted.
+The DLQ retains its existing HTTP pull consumer for controlled recovery.
 
 | Setting | Source Queue | DLQ |
 | --- | --- | --- |
-| Consumer | HTTP pull; `a0b4e09af2af44b2bcab74b9bf5fac1c` | HTTP pull; `f3a3fef446fc49b1983a37be275e2845` |
+| Consumer | Worker `peekaplate-api-staging`; `9e89751e2efe4228b840d91843052c47` | HTTP pull; `f3a3fef446fc49b1983a37be275e2845` |
 | Maximum retries | 3 after the initial delivery | 100; operator recovery only |
 | Retry delay | 10 seconds | 10 seconds |
-| Visibility timeout | 30 seconds | 30 seconds |
+| Batch wait / visibility timeout | Maximum batch wait 30 seconds | Visibility timeout 30 seconds |
 | Batch size | 10 | 10 |
 | Retention | 86,400 seconds / 24 hours | 86,400 seconds / 24 hours |
 | Delivery | Paused outside bounded synthetic tests | Paused outside bounded synthetic tests |
@@ -42,19 +138,30 @@ The first Queue probe hit a transient `409` because the delivery plane still rep
 
 The fresh complete repeat passed at `2026-10-24T17:30:36.147Z`, run `2c7d7bc7-6b23-458f-968f-5c736fd1e14f`. R2 readback before ACK had SHA-256 `5195d6b28a0a3632840ce4b89fd775128e6c46f12752121507a05cf7c0b5f25d`. The failing probe was delivered with attempt counters `0, 1, 2, 3`, then observed and individually acknowledged in the DLQ. Post-cleanup provider readback showed both Queues paused and each backlog at zero. The run-owned R2 object was deleted. No real observation was sent or processed.
 
-This infrastructure probe does **not** test canonical database deduplication/conflict handling, actual consumer crashes, tenant authorization, ingest receipts or owner reports. The full Queue → R2 → canonical database → ACK/retry → DLQ/replay test remains an integration gate after the relevant code and migrations are approved.
+That October 24 infrastructure probe did not establish product processing.
+The November 1 acceptance above adds actual canonical deduplication/conflicts,
+archive/index processing, Queue drain and native malformed-message DLQ delivery.
+Real diner-token HTTP delivery, typed facts, owner reports, native process-crash
+recovery and full DLQ-to-canonical replay remain separate integration gates.
 
 ## What Teeyansh can do now
 
-1. Continue the consumer locally using the agreed `observation.v2` contract and Jeffin's forward migrations. Use the binding names above; credentials are injected by the platform, not committed to Git or shared in chat.
+1. Build on merged #70/#31 and the applied canonical migrations. Use the bindings above; credentials stay on the platform, not in frontend code or chat.
 2. Preserve create-only evidence: use an atomic conditional R2 write, then compare the existing checksum on a failed condition. An identical checksum is a retry; a different payload is quarantined without overwriting the original. A database lock taken after the R2 write cannot protect that earlier write.
 3. Persist the canonical index/facts idempotently, then individually ACK. R2 or database failure must retain/retry work. Calling `ack()` does not send a message to the DLQ.
 4. Include failure, concurrent-conflict and recovery tests in his PR. Keep source acceptance/time rules and first-received timestamps aligned with the shared contract.
-5. After review, an authorized operator replaces the temporary source HTTP pull consumer with the real Worker consumer, preserves the DLQ/retry configuration, deploys the reviewed release and runs the full integration acceptance. Only then resume normal source delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
+5. The real staging consumer is now attached and verified within its index/conflict scope. Finish typed-fact writes/backfill and browser/owner acceptance before requesting normal delivery. Keep the DLQ for controlled recovery; do not attach a second competing consumer.
 
 The existing collaborator analytics API gives read access to delayed PostHog diagnostics. It does not grant Cloudflare administration or turn those rows into canonical owner facts. Developers can submit code/configuration PRs without receiving the operator's provider token.
 
 ## Operator checks
+
+Restore R2 archives with their `payload-checksum` custom metadata intact. For a
+sanitized invalid-conflict object, the original untrusted payload was deliberately
+discarded; hashing the safe JSON cannot reconstruct that original checksum.
+Metadata-free restoration of those objects is not supported by this consumer
+and can lead to retries. Preserve evidence and escalate for controlled recovery;
+never overwrite the object or silently ACK it to clear the Queue.
 
 Use the project-pinned Wrangler. Set `CLOUDFLARE_ACCOUNT_ID` to the staging account above when listing account-wide resources; some commands do not infer it from `--env staging` alone.
 
