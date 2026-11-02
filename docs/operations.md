@@ -1,5 +1,80 @@
 # Local and staging operations
 
+<a id="observation-facts-hosted-acceptance"></a>
+
+## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
+
+PRs [#97](https://github.com/vivienk/peekaplate/pull/97) and
+[#98](https://github.com/vivienk/peekaplate/pull/98) added atomic typed facts and
+private archive recovery. The first hosted browser attempt then exposed a 503:
+the Worker could not fetch its own public JWKS route (Cloudflare 1042).
+PRs [#99](https://github.com/vivienk/peekaplate/pull/99) and
+[#100](https://github.com/vivienk/peekaplate/pull/100) fix verification using the
+configured public signing key, preserving signature and claim checks.
+
+Reviewed main `c6a47bdc7da792f2eb41080fcccb1547c166603e` passed
+[main CI](https://github.com/vivienk/peekaplate/actions/runs/41492170073) and was
+deployed through the approved Wrangler operator route. Active Worker version:
+`60ac184a-a348-4e2c-843d-e380861771cc`. Existing bindings, signing/extraction/team
+secrets and all eight migration entries were preserved; no migration, new
+resource, plan upgrade, Pages rebuild or production deployment was required.
+
+Six bounded hosted checks passed, with eight browser HTTP subchecks:
+
+- Backfilled exactly three earlier synthetic accepted observations from their
+  original private R2 archives. A second inspection found no missing facts.
+- Brave fetched the active synthetic menu, checked the immutable bundle hash
+  and used its genuinely issued token at `POST /observations`.
+- Initial acceptance, an in-batch retry and redelivery produced one new typed
+  fact. Changed reuse of the event ID preserved the original and produced
+  checksum-matched conflict quarantine evidence.
+- Wrong-publication and browser-supplied venue authority were rejected;
+  missing authentication returned 401.
+- Final readback found four index/event rows: three Save details and one menu
+  view. All were `test`; owner views, cross-tenant reads and reads without
+  tenant context returned zero. Original and conflict archive metadata matched.
+- Both Queues were empty and paused after verification.
+
+Cleanup passed: the real staff withdrawal returned 200 (menu version 4), fresh
+public reads return 404, the only synthetic test membership is back to viewer,
+and the staff session ended. The temporary synthetic bundle Worker was removed
+and both read-only proxies stopped. Append-only archive/database evidence remains.
+
+A desktop freeze interrupted the verifier after five passed checks. The source
+Queue was explicitly re-paused, then the last check ran read-only against the
+same IDs; no browser event was replayed to manufacture a passing result. Check
+durations in the [sanitized record](observation-facts-staging-acceptance.json)
+include provider work/waits and are not a performance benchmark.
+
+Local release verification also passed: `pnpm verify lint typecheck test build
+context:check docs:check test:db test:e2e` — 472 unit tests, 58 script tests,
+189 SQL assertions, 46 Worker/database tests and 13 browser tests in 94.747
+seconds. These are distinct suites; do not add them as one product-coverage score.
+
+**Boundary:** this is a real hosted transport harness with synthetic data,
+not proof of connected diner controls or owner dashboards. Normal collection
+stays paused for real screen/consent/outbox delivery and report acceptance.
+Native process-crash recovery, full DLQ replay, load, restore and production
+acceptance remain separate. Keep append-only synthetic evidence for audit.
+
+### Next backend integration order
+
+This is dependency order, not approval to merge an unreviewed head. Reconcile
+each branch with current develop, preserve the observation handler and rerun
+its relevant tests before release.
+
+| Work | Order / dependency | Remaining gate |
+| --- | --- | --- |
+| Menu extraction | Resolve [#44](https://github.com/vivienk/peekaplate/pull/44) decisions, then [#58](https://github.com/vivienk/peekaplate/pull/58) → [#45](https://github.com/vivienk/peekaplate/pull/45) | Current #58 has new commits; producer/adapter compatibility, job migration, provider settings and hosted menu Queue acceptance need review |
+| Owner review persistence | [#73](https://github.com/vivienk/peekaplate/pull/73) consumes #58's review-candidate contract; it can reconcile in parallel with #45 | Review/correction API and its own migration acceptance; correcting a draft does not publish it |
+| Owner reports / AI | [#72](https://github.com/vivienk/peekaplate/pull/72) contract → report SQL/API implementation → integration with [#46](https://github.com/vivienk/peekaplate/pull/46) | #72 is schema only; #46's safety core is not a live model/report API |
+| Real diner tracking | [#65](https://github.com/vivienk/peekaplate/pull/65) → [#77](https://github.com/vivienk/peekaplate/pull/77) → [#80](https://github.com/vivienk/peekaplate/pull/80) → [#84](https://github.com/vivienk/peekaplate/pull/84), with actual menu controls/published adapter | Several are drafts; consent, stored retries, real Save/compare transitions and browser-to-owner acceptance remain |
+| Visual assets | [#25](https://github.com/vivienk/peekaplate/pull/25), in parallel | Its asset-ID/review gates are independent of observation transport |
+
+The earlier index/conflict and native retry/DLQ evidence follows below as a
+historical release record; its statement that typed facts were missing applied
+to that earlier release only.
+
 <a id="observation-consumer-hosted-acceptance"></a>
 
 ## Observation consumer hosted acceptance — November 1, 2026 (Phoenix)

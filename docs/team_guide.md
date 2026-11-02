@@ -1,6 +1,6 @@
 # PeekaPlate: team guide
 
-Current staging status updated November 2, 2026; publication and observation-consumer acceptance were verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
+Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
 
@@ -41,7 +41,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
 | Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Deployed index/conflict pipeline; transactional typed facts, archive recovery and genuine-token browser transport now implemented and locally tested | Hosted follow-up verification, real diner controls/outbox, report API and normal collection |
+| Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
@@ -110,14 +110,17 @@ if the detail fails, the item retries. The backfill tool recovers missing facts
 from their original private files and never invents historical values.
 
 Staging tokens label observations as **test**. Owner views exclude test/demo
-data, so verification cannot inflate restaurant numbers. The local browser
-transport regression uses a genuine issued menu token and verifies one database
-fact after two identical sends. The real diner screens, consent/outbox delivery
+data, so verification cannot inflate restaurant numbers. In staging, Brave
+fetched a published menu, verified its file hash and sent a genuine issued token.
+The real Queue consumer stored one new fact despite repeated delivery, while
+changed event reuse went into quarantine. Three earlier observations were also
+recovered from their original private archives without changing their timestamps.
+The real diner screens, consent/outbox delivery
 and owner-report API still have their own PRs and acceptance checks. Their work
 has not been replaced by this transport harness.
 
 The current hosted release/evidence is in
-[Operations](operations.md#observation-consumer-hosted-acceptance). Keep normal
+[Operations](operations.md#observation-facts-hosted-acceptance). Keep normal
 collection paused until the complete browser-to-owner acceptance passes. See
 [fact recovery instructions](observation-infrastructure.md#recover-missing-facts)
 for the restricted operator command. Production has not been deployed.
@@ -202,8 +205,8 @@ Photo files belong in file storage; the database will hold their references, own
 
 Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The current November 1 Worker release is main `35e989d`; its provider version
-and hosted observation results are in [Operations](operations.md#observation-consumer-hosted-acceptance).
+The current November 2 Worker release is main `c6a47bd`; its provider version
+and hosted observation results are in [Operations](operations.md#observation-facts-hosted-acceptance).
 It preserves the earlier `2eee264` publication release and `afe45db` staff/API
 history. The diner and console pages were last released with PostHog setup at
 `2a135fa`; this backend deployment did not rebuild those pages. Later docs-only
@@ -228,7 +231,7 @@ There are two kinds here:
 | Kind | Plain example | Why keep it? | Built yet? |
 | --- | --- | --- | --- |
 | A staff action that changes the product | An authorized person saved a new version of Tomato Soup | Know what changed and preserve its history | Yes: draft dish revisions and menu approval/publication/withdrawal |
-| An observation of diner behavior | A session opened Tomato Soup's details | Understand how the menu was used | No; the collection flow is planned |
+| An observation of diner behavior | A session opened Tomato Soup's details | Understand how the menu was used | Receiving, Queue processing and typed database storage are tested; real screen tracking is still being connected |
 
 ### The events we save today
 
@@ -255,8 +258,9 @@ Cloudflare R2 and indexes it in PostgreSQL before marking the work finished.
 The staged synthetic tests passed; real browser controls and token delivery
 are still being connected.
 
-Normal collection stays paused while typed facts and report integration are
-unfinished. Saving a staff dish revision uses its own direct database transaction;
+Normal collection stays paused while real diner tracking, consent/outbox
+delivery and owner-report integration remain unfinished. Saving a staff dish
+revision uses its own direct database transaction;
 it does not wait for this Queue. Keeping the paths separate prevents a browsing
 action from being mistaken for permission to change a restaurant's menu.
 
