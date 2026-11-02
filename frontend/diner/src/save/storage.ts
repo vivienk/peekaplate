@@ -59,29 +59,25 @@ export function createSavedPersistence({
   const key = savedKey(venueId);
   let mode: SaveMode = storage && canWrite(storage) ? 'persistent' : 'session-only';
 
+  // The latest list another tab may have written, or null when storage can't be read right now,
+  // so a failed read is never mistaken for "nothing saved".
+  function reread(): string[] | null {
+    if (!storage) return null;
+    try {
+      return parseSaved(storage.getItem(key));
+    } catch {
+      return null;
+    }
+  }
+
   return {
     mode: (): SaveMode => mode,
 
-    // Earlier saves are still read when only writing is blocked.
-    load(): string[] {
-      if (!storage) return [];
-      try {
-        return parseSaved(storage.getItem(key));
-      } catch {
-        return [];
-      }
-    },
+    // Earlier saves are still read when only writing is blocked; at startup an unreadable list
+    // simply starts empty.
+    load: (): string[] => reread() ?? [],
 
-    // The latest list another tab may have written, or null when storage can't be read right now,
-    // so a failed read is never mistaken for "nothing saved".
-    reread(): string[] | null {
-      if (!storage) return null;
-      try {
-        return parseSaved(storage.getItem(key));
-      } catch {
-        return null;
-      }
-    },
+    reread,
 
     // True only when the write committed. A failed write switches to session-only for the rest
     // of the visit, and later writes are skipped so nothing is backfilled.

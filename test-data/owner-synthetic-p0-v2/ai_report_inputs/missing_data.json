@@ -1,0 +1,36 @@
+{
+  "fixture_id": "missing_data",
+  "report_type": "authorized_data_availability",
+  "data_scope": "fictional_synthetic_restaurant",
+  "metrics": [
+    {
+      "metric": "previous_week_engagement",
+      "status": "UNAVAILABLE",
+      "value": null
+    },
+    {
+      "metric": "engagement_growth",
+      "status": "NOT_CALCULABLE",
+      "value": null,
+      "reason": "No verified previous-week baseline is available."
+    },
+    {
+      "metric": "detail_open_rate_zero_denominator",
+      "status": "UNDEFINED",
+      "numerator": 0,
+      "denominator": 0,
+      "value": null,
+      "reason": "No eligible dish-card exposures exist in this standalone example."
+    }
+  ],
+  "reporting_tool": {
+    "status": "FAILED",
+    "result": null,
+    "estimated_values_allowed": false
+  },
+  "privacy": {
+    "raw_events_included": false,
+    "suppressed_counts_included": false,
+    "individual_diner_data_included": false
+  }
+}

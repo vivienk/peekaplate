@@ -67,13 +67,40 @@ export function isProhibitedIPv6(ip: string): boolean {
   if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
   // :: (Unspecified)
   if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return true;
-
   // IPv4-mapped IPv6 (::ffff:192.0.2.128 or ::ffff:c000:0280)
-  if (normalized.startsWith('::ffff:') || normalized.startsWith('0:0:0:0:0:ffff:')) {
-    const lastPart = normalized.substring(normalized.lastIndexOf(':') + 1);
-    if (lastPart.includes('.')) {
-      return isProhibitedIPv4(lastPart);
+  // Check both dotted-decimal and hexadecimal IPv4 representations.
+  const mappedMatch = normalized.match(/^(?:::ffff:|0:0:0:0:0:ffff:)(.+)$/);
+
+  if (mappedMatch) {
+    const mappedAddress = mappedMatch[1];
+
+    if (mappedAddress === undefined) {
+      return true;
     }
+
+    if (mappedAddress.includes('.')) {
+      return isProhibitedIPv4(mappedAddress);
+    }
+
+    // The final two 16-bit groups encode the four IPv4 octets.
+    const hexGroups = mappedAddress.split(':');
+    if (hexGroups.length === 2 && hexGroups.every((group) => /^[0-9a-f]{1,4}$/.test(group))) {
+      const highGroup = hexGroups[0];
+      const lowGroup = hexGroups[1];
+
+      if (highGroup === undefined || lowGroup === undefined) {
+        return true;
+      }
+
+      const high = Number.parseInt(highGroup, 16);
+      const low = Number.parseInt(lowGroup, 16);
+      const ipv4 = [(high >> 8) & 0xff, high & 0xff, (low >> 8) & 0xff, low & 0xff].join('.');
+
+      return isProhibitedIPv4(ipv4);
+    }
+
+    // Fail closed for malformed IPv4-mapped representations.
+    return true;
   }
 
   // fc00::/7 (Unique local address: fc00:: - fdff::)

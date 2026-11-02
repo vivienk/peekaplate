@@ -334,3 +334,27 @@ test('the removed toast disappears after 5 seconds and the restored toast after 
   await page.clock.runFor(200);
   await expect(toasts).toBeEmpty();
 });
+
+// Sai's review (2 Nov): in a tab where reading storage fails but writing still works, a save must
+// not write that tab's stale list over another tab's saves.
+test("a tab that cannot read storage never overwrites another tab's saves", async ({ context }) => {
+  const tabA = await context.newPage();
+  const tabB = await context.newPage();
+  const { venueId, dish } = await openSaveState(tabA, 'edge-cases');
+  await openSaveState(tabB, 'edge-cases');
+
+  await saveState(tabB).save(dish.avocadoToast ?? '');
+  await tabA.evaluate(() => {
+    Storage.prototype.getItem = () => {
+      throw new DOMException('blocked', 'SecurityError');
+    };
+  });
+  expect(await saveState(tabA).save(dish.harvestPowerBowl ?? '')).toEqual({
+    changed: true,
+    persisted: false,
+    savedCount: 1,
+  });
+  expect(JSON.parse((await storedValue(tabB, venueId)) ?? 'null').dishIds).toEqual([
+    dish.avocadoToast,
+  ]);
+});
