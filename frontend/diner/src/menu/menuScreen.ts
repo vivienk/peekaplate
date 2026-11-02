@@ -148,7 +148,7 @@ function renderMenu(
         ${categories
           .map(
             (category) => `
-              <button class="pp-tab${category.categoryId === selectedId ? ' pp-tab--active' : ''}" type="button" data-category-id="${escapeHtml(category.categoryId)}">
+              <button class="pp-tab${category.categoryId === selectedId ? ' pp-tab--active' : ''}" type="button" data-category-id="${escapeHtml(category.categoryId)}" aria-pressed="${category.categoryId === selectedId}">
                 ${escapeHtml(category.name)}
               </button>
             `,
@@ -182,7 +182,10 @@ function renderMenu(
     button.addEventListener('click', () => {
       const target = button.dataset.categoryId ?? null;
       activeCategoryId = target;
-      tabButtons.forEach((item) => item.classList.toggle('pp-tab--active', item === button));
+      tabButtons.forEach((item) => {
+        item.classList.toggle('pp-tab--active', item === button);
+        item.setAttribute('aria-pressed', String(item === button));
+      });
       categoryBlocks.forEach((block) => {
         block.hidden = block.dataset.categoryId !== target;
       });

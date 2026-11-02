@@ -161,6 +161,30 @@ p {
   color: #2a2d36;
 }
 
+.pp-card__body {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+main:has(> .pp-menu),
+main:has(> .pp-detail) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pp-card__open {
+  max-width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
 .pp-dishes {
   display: flex;
   flex-direction: column;
