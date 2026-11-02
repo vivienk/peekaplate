@@ -7,7 +7,7 @@ are unverified proposals for human review, not OCR evidence.
 """
 import hashlib
 import json
-import concurrent.futures
+import asyncio
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -162,28 +162,17 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
             {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
             {"type": "image_url", "image_url": {"url": page["image_url"]}},
         ]
-        def _call_invoke():
-            return vision_llm.invoke([("system", prompt), ("human", content)])
-
+        messages = [("system", prompt), ("human", content)]
         if timeout is not None and timeout > 0:
-            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            fut = pool.submit(_call_invoke)
+            # Same pattern as the OCR graph: cancel the awaited HTTP request when the deadline passes.
+            async def _bounded():
+                return await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
             try:
-                response = fut.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
-                # A started request cannot be force-cancelled from Python. The client is bound to the same
-                # transport timeout; wait for the in-flight call to end so no fallback request overlaps it.
-                try:
-                    fut.result()
-                except Exception:
-                    pass
-                raise TimeoutError(
-                    f"Vision request exceeded its {timeout:g}s deadline; the in-flight call finished before fallback."
-                ) from None
-            finally:
-                pool.shutdown(wait=True)
+                response = asyncio.run(_bounded())
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
         else:
-            response = _call_invoke()
+            response = vision_llm.invoke(messages)
         raw_content = getattr(response, "content", None)
         if not isinstance(raw_content, str) or not raw_content.strip():
             errors.append(f"Page {page_num}: vision model returned no content.")

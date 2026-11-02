@@ -346,19 +346,25 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertEqual(used,[named])
         self.assertEqual(report.extraction_model,"models/gemini")
 
-    def test_deadline_waits_for_in_flight_call_before_fallback(self):
-        import threading, time
-        from peekaplate_processing.vision_extraction import extract_vision_v4
-        finished=threading.Event()
+    def test_deadline_cancels_request_and_starts_no_fallback(self):
+        import asyncio
+        cancelled=[]
         class Blocking:
+            model_name="slow"
             def bind(self, **kwargs): return self
-            def invoke(self, messages):
-                time.sleep(0.3); finished.set()
-                return SimpleNamespace(content="{}")
-        with self.assertRaises(TimeoutError) as error:
-            extract_vision_v4(Blocking(), [{"page_number":1,"image_url":"data:,"}], timeout=0.01)
-        self.assertTrue(finished.is_set())
-        self.assertNotIn("cancelled", str(error.exception))
+            async def ainvoke(self, messages):
+                try:
+                    await asyncio.sleep(5)
+                except asyncio.CancelledError:
+                    cancelled.append(True); raise
+        second=SimpleNamespace(model_name="second")
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=[("slow",Blocking()),("second",second)]), \
+             patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")):
+            report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_timeout=0.05, llm_cache_dir=None)
+        self.assertEqual(cancelled,[True])
+        self.assertEqual(report.status,"failed")
+        self.assertIn("No fallback request was started", report.errors[-1])
 
 
 if __name__ == "__main__": unittest.main()

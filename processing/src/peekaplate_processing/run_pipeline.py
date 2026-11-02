@@ -173,6 +173,17 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     completed = True
                     v4_success = True
                     return report
+                except TimeoutError as deadline_err:
+                    # The budget is spent: no further provider or OCR request may start.
+                    print(f"Provider '{p_name}' exceeded the deadline; stopping without fallback.", file=sys.stderr, flush=True)
+                    report.warnings.extend(fallback_warnings)
+                    report.errors.append(f"Provider '{p_name}': {deadline_err} No fallback request was started.")
+                    report.status = "failed"
+                    report.finished_at = datetime.now(timezone.utc)
+                    with measure(timings, "extraction_write"):
+                        save_json(report.model_dump(mode="json"), directory / "extraction.json")
+                    completed = True
+                    return report
                 except Exception as prov_err:
                     print(f"Provider '{p_name}' failed ({prov_err}); trying next provider in cascade...", file=sys.stderr, flush=True)
                     fallback_warnings.append(f"Provider '{p_name}' failed: {prov_err}")
