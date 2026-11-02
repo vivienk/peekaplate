@@ -55,6 +55,7 @@ export function renderDishDetail(
   container: HTMLElement,
   dish: CompleteDish,
   onBack: () => void,
+  notice: string | null = null,
 ): void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
@@ -69,12 +70,13 @@ export function renderDishDetail(
     <div class="pp-detail">
       <header class="pp-detail__topbar">
         <button class="pp-detail__back" type="button" aria-label="Back to menu">←</button>
-        <h1 class="pp-detail__title">Dish details</h1>
-        <button class="pp-detail__save" type="button" aria-label="Save ${escapeHtml(dish.name)}" aria-pressed="false">
+        <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
+        <button class="pp-detail__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
           <span aria-hidden="true">♡</span>
           <span>Save</span>
         </button>
       </header>
+      ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
 
       <div class="pp-detail__image-wrap">
         ${imageMarkup}
@@ -125,12 +127,14 @@ export function renderDishDetail(
         </div>
 
         <div class="pp-detail__actions">
-          <button class="pp-btn pp-btn--outlined" type="button">Compare</button>
+          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare</button>
         </div>
+        <p class="pp-notice">Save and Compare are not available yet.</p>
       </section>
     </div>
   `;
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
   backButton?.addEventListener('click', onBack);
+  container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 }
