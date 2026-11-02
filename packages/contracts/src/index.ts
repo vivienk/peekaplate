@@ -84,6 +84,268 @@ export const DishRevisionSchema = z.strictObject({
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
 export type DishRevision = z.infer<typeof DishRevisionSchema>;
 
+export const MenuScopeSchema = z.strictObject({ venueId: uuid, menuId: uuid });
+
+const commandVersion = z.number().int().nonnegative().max(2_147_483_646);
+
+export const ApproveMenuRevisionSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+});
+
+export const MenuApprovalSchema = z.strictObject({
+  menuId: uuid,
+  approvalId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  contentHash: hash,
+  assetApprovalId: uuid,
+  assetManifestHash: hash,
+  status: z.literal('approved'),
+});
+
+export const PublishMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+  approvalId: uuid,
+});
+
+export const WithdrawMenuSchema = z.strictObject({
+  commandId: uuid,
+  expectedVersion: commandVersion,
+});
+
+export const MenuPublicationSchema = z.strictObject({
+  menuId: uuid,
+  publicationId: uuid,
+  version: z.number().int().positive().max(2_147_483_647),
+  approvalId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  status: z.enum(['published', 'withdrawn']),
+});
+
+export type ApproveMenuRevision = z.infer<typeof ApproveMenuRevisionSchema>;
+export type MenuApproval = z.infer<typeof MenuApprovalSchema>;
+export type PublishMenu = z.infer<typeof PublishMenuSchema>;
+export type WithdrawMenu = z.infer<typeof WithdrawMenuSchema>;
+export type MenuPublication = z.infer<typeof MenuPublicationSchema>;
+
+export const PublicMenuBundleSchema = z.strictObject({
+  url: z.url().refine((value) => value.startsWith('https://'), 'Public bundles require HTTPS'),
+  contentHash: hash,
+  assetManifestHash: hash,
+});
+
+const publicMenuText = postgresText.trim();
+const publicHttpsUrl = z
+  .url()
+  .refine((value) => value.startsWith('https://'), 'Public menu assets require HTTPS');
+
+export const PublicMenuImageSchema = z.strictObject({
+  url: publicHttpsUrl,
+  width: z.number().int().positive().max(16_384),
+  height: z.number().int().positive().max(16_384),
+  alt: publicMenuText.min(1).max(500),
+});
+
+export const PublicMenuIngredientSchema = z.strictObject({
+  ingredient_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.max(1000).nullable(),
+});
+
+const publicMenuDishIdentity = {
+  dish_id: uuid,
+  dish_revision_id: uuid,
+};
+
+export const PublicMenuIncompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(false),
+});
+
+export const PublicMenuAllergenCodeSchema = z.enum([
+  'milk',
+  'egg',
+  'fish',
+  'crustacean shellfish',
+  'tree nut',
+  'peanut',
+  'wheat',
+  'soy',
+  'sesame',
+]);
+
+export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
+
+export const PublicMenuCompleteDishSchema = z.strictObject({
+  ...publicMenuDishIdentity,
+  complete: z.literal(true),
+  name: publicMenuText.min(1).max(160),
+  description: publicMenuText.min(1).max(4000),
+  price: z.strictObject({
+    amount: z.string().regex(/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  }),
+  ingredients: z.array(PublicMenuIngredientSchema).max(100),
+  allergens: z
+    .array(PublicMenuAllergenCodeSchema)
+    .max(9)
+    .refine((values) => new Set(values).size === values.length, 'Allergen values must be unique')
+    .nullable(),
+  dietary: z
+    .array(PublicMenuDietaryCodeSchema)
+    .max(3)
+    .refine((values) => new Set(values).size === values.length, 'Dietary values must be unique'),
+  images: z.strictObject({
+    card: PublicMenuImageSchema,
+    detail: PublicMenuImageSchema,
+  }),
+});
+
+export const PublicMenuDishSchema = z.discriminatedUnion('complete', [
+  PublicMenuIncompleteDishSchema,
+  PublicMenuCompleteDishSchema,
+]);
+
+export const PublicMenuCategorySchema = z.strictObject({
+  category_id: uuid,
+  name: publicMenuText.min(1).max(160),
+  dishes: z.array(PublicMenuDishSchema).max(500),
+});
+
+export const PublicMenuContentBundleSchema = z
+  .strictObject({
+    schema_version: z.literal(1),
+    venue_id: uuid,
+    menu_id: uuid,
+    menu_revision_id: uuid,
+    restaurant: z.strictObject({
+      name: publicMenuText.min(1).max(160),
+      logo: PublicMenuImageSchema.nullable(),
+    }),
+    categories: z.array(PublicMenuCategorySchema).max(100),
+  })
+  .superRefine((bundle, ctx) => {
+    const categoryIds = new Set<string>();
+    const dishIds = new Set<string>();
+    for (const [categoryIndex, category] of bundle.categories.entries()) {
+      if (categoryIds.has(category.category_id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['categories', categoryIndex, 'category_id'],
+          message: 'Category IDs must be unique',
+        });
+      }
+      categoryIds.add(category.category_id);
+      for (const [dishIndex, dish] of category.dishes.entries()) {
+        if (dishIds.has(dish.dish_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['categories', categoryIndex, 'dishes', dishIndex, 'dish_id'],
+            message: 'Dish IDs must be unique across the menu',
+          });
+        }
+        dishIds.add(dish.dish_id);
+        if (dish.complete) {
+          const ingredientIds = new Set<string>();
+          for (const [ingredientIndex, ingredient] of dish.ingredients.entries()) {
+            if (ingredientIds.has(ingredient.ingredient_id)) {
+              ctx.addIssue({
+                code: 'custom',
+                path: [
+                  'categories',
+                  categoryIndex,
+                  'dishes',
+                  dishIndex,
+                  'ingredients',
+                  ingredientIndex,
+                  'ingredient_id',
+                ],
+                message: 'Ingredient IDs must be unique within a dish',
+              });
+            }
+            ingredientIds.add(ingredient.ingredient_id);
+          }
+        }
+      }
+    }
+  });
+
+export const PublicMenuResponseSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  publicationId: uuid,
+  publicationHash: hash,
+  availabilityVersion: z.number().int().positive().max(2_147_483_647),
+  tier: z.literal('T0'),
+  bundle: PublicMenuBundleSchema,
+  menuToken: z.string().min(1).max(8192),
+  tokenExpiresAt: z.iso.datetime(),
+});
+
+export const PublicMenuDeliverySchema = z
+  .strictObject({
+    response: PublicMenuResponseSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .superRefine(({ response, content }, ctx) => {
+    const identities = [
+      ['venue_id', response.venueId, content.venue_id],
+      ['menu_id', response.menuId, content.menu_id],
+      ['menu_revision_id', response.menuRevisionId, content.menu_revision_id],
+    ] as const;
+    for (const [field, expected, actual] of identities) {
+      if (actual !== expected) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['content', field],
+          message: `${field} must match the active public response`,
+        });
+      }
+    }
+  });
+
+export const MENU_TOKEN_AUDIENCE = 'peekaplate-observations';
+export const MENU_TOKEN_TTL_SECONDS = 30 * 60;
+
+export const MenuTokenClaimsSchema = z
+  .strictObject({
+    venue: uuid,
+    publication: uuid,
+    scope: z.literal('observations'),
+    iat: z.number().int().nonnegative(),
+    exp: z.number().int().positive(),
+    jti: uuid,
+  })
+  .superRefine((claims, ctx) => {
+    if (claims.exp - claims.iat !== MENU_TOKEN_TTL_SECONDS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['exp'],
+        message: 'Menu tokens expire after 30 minutes',
+      });
+    }
+  });
+
+export type PublicMenuResponse = z.infer<typeof PublicMenuResponseSchema>;
+export type MenuTokenClaims = z.infer<typeof MenuTokenClaimsSchema>;
+export type PublicMenuImage = z.infer<typeof PublicMenuImageSchema>;
+export type PublicMenuIngredient = z.infer<typeof PublicMenuIngredientSchema>;
+export type PublicMenuAllergenCode = z.infer<typeof PublicMenuAllergenCodeSchema>;
+export type PublicMenuDietaryCode = z.infer<typeof PublicMenuDietaryCodeSchema>;
+export type PublicMenuDish = z.infer<typeof PublicMenuDishSchema>;
+export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
+export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
+export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
+
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
 export const MAX_PASSAGES = 10;
@@ -286,7 +548,7 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
 
-// Observation Queue contract (ADR 0015 / S3-DATA-01).
+// Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
 // Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
 const observationUuid = z.uuid().transform((value) => value.toLowerCase());
 const saveSurface = z.enum(['menu_card', 'dish_detail', 'compare_view', 'saved_screen']);
@@ -295,13 +557,14 @@ const dishReference = {
   dish_id: observationUuid,
   dish_revision_id: observationUuid,
 };
+export const IsoDateTimeSchema = z.iso.datetime({ offset: true });
 const observationBase = z.strictObject({
   schema_version: z.literal('observation.v2'),
   event_id: observationUuid,
   session_id: observationUuid,
   producer_id: observationUuid,
   local_sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  occurred_at: z.iso.datetime({ offset: true }),
+  occurred_at: IsoDateTimeSchema,
   publication_revision_id: observationUuid,
 });
 
@@ -426,6 +689,7 @@ export const ObservationQueueMessageSchema = z
     authorizedPublicationId: observationUuid,
     producerId: observationUuid,
     localSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    traffic_class: z.enum(['live', 'test', 'demo']).default('live'),
     payload: z.record(z.string(), z.unknown()),
     firstReceivedAt: z.iso.datetime({ offset: true }),
   })
@@ -556,12 +820,18 @@ export const ObservationReceiptBatchSchema = z.strictObject({
   receipts: z.array(ObservationReceiptSchema).min(1).max(25),
 });
 
+// Aliases for consumer compatibility
+export const ObservationV2QueueEnvelopeSchema = ObservationQueueMessageSchema;
+export const ObservationConflictV1QueueEnvelopeSchema = ObservationConflictQueueMessageSchema;
+
 export type ObservationType = z.infer<typeof ObservationTypeSchema>;
 export type ObservationV2 = z.infer<typeof ObservationV2Schema>;
 export type ConflictMetadata = z.infer<typeof ConflictMetadataSchema>;
 export type ConflictCopy = z.infer<typeof ConflictCopySchema>;
 export type ObservationQueueMessage = z.infer<typeof ObservationQueueMessageSchema>;
 export type ObservationConflictQueueMessage = z.infer<typeof ObservationConflictQueueMessageSchema>;
+export type ObservationV2QueueEnvelope = ObservationQueueMessage;
+export type ObservationConflictV1QueueEnvelope = ObservationConflictQueueMessage;
 export type ObservationQueueEnvelope = z.infer<typeof ObservationQueueEnvelopeSchema>;
 export type ObservationBatchV2 = z.infer<typeof ObservationBatchV2Schema>;
 export type ObservationReceipt = z.infer<typeof ObservationReceiptSchema>;
@@ -684,4 +954,121 @@ export async function sha256(value: string | Uint8Array): Promise<string> {
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   );
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Microsecond constants for observation ingest time window.
+ */
+export const TWENTY_FOUR_HOURS_MICROS = 24n * 60n * 60n * 1000n * 1000n; // 86_400_000_000n µs
+export const FIVE_MINUTES_MICROS = 5n * 60n * 1000n * 1000n; // 300_000_000n µs
+
+/**
+ * Parses an ISO-8601 timestamp with optional timezone offset and fractional seconds
+ * into exact integer microseconds (BigInt) since the Unix epoch (1970-01-01T00:00:00.000000Z).
+ * Correctly preserves fractional seconds up to microsecond precision, matching
+ * PostgreSQL's timestamptz microsecond representation.
+ */
+export function parseIsoToMicroseconds(isoString: string): bigint {
+  const trimmed = isoString.trim();
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(?:(Z)|([+-])(\d{2}):?(\d{2}))?$/i.exec(
+      trimmed,
+    );
+  if (
+    !match ||
+    match[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined ||
+    match[4] === undefined ||
+    match[5] === undefined ||
+    match[6] === undefined
+  ) {
+    const fallbackMs = Date.parse(trimmed);
+    if (Number.isNaN(fallbackMs)) {
+      throw new Error(`Invalid ISO timestamp: ${isoString}`);
+    }
+    return BigInt(fallbackMs) * 1000n;
+  }
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10) - 1;
+  const day = parseInt(match[3], 10);
+  const hour = parseInt(match[4], 10);
+  const min = parseInt(match[5], 10);
+  const sec = parseInt(match[6], 10);
+  const fractionStr = match[7] ?? '';
+  const tzSign = match[9];
+  const tzHourStr = match[10];
+  const tzMinStr = match[11];
+
+  let utcMs = Date.UTC(year, month, day, hour, min, sec);
+
+  if (tzSign && tzHourStr && tzMinStr) {
+    const offsetMinutes = parseInt(tzHourStr, 10) * 60 + parseInt(tzMinStr, 10);
+    if (tzSign === '+') {
+      utcMs -= offsetMinutes * 60 * 1000;
+    } else {
+      utcMs += offsetMinutes * 60 * 1000;
+    }
+  }
+
+  let totalMicros = BigInt(utcMs) * 1000n;
+
+  if (fractionStr.length > 0) {
+    if (fractionStr.length <= 6) {
+      totalMicros += BigInt(fractionStr.padEnd(6, '0'));
+    } else {
+      // PostgreSQL timestamptz parses fractional seconds to microsecond precision
+      // using round-to-nearest, ties-to-even (banker's rounding).
+      let micros = BigInt(fractionStr.slice(0, 6));
+      const seventhChar = fractionStr[6];
+      if (seventhChar !== undefined) {
+        if (seventhChar > '5') {
+          micros += 1n;
+        } else if (seventhChar === '5') {
+          // Check if there are any non-zero digits after the 7th character (e.g. .00000051)
+          const hasNonZeroAfter = fractionStr
+            .slice(7)
+            .split('')
+            .some((c) => c !== '0');
+          if (hasNonZeroAfter) {
+            micros += 1n;
+          } else {
+            // Exact tie (.5 µs): round to nearest EVEN microsecond
+            if (micros % 2n !== 0n) {
+              micros += 1n;
+            }
+          }
+        }
+      }
+      totalMicros += micros;
+    }
+  }
+
+  return totalMicros;
+}
+
+/**
+ * Classifies an observation's time window per ADR 0015 & PR #32:
+ * Lower bound: first_received_at - 24 hours (inclusive)
+ * Upper bound: first_received_at + 5 minutes (inclusive)
+ *
+ * Distinguishes boundary cases with microsecond precision to remain
+ * 100% consistent with PostgreSQL's timestamptz CHECK constraint.
+ */
+export function classifyObservationTimeWindow(
+  occurredAtIso: string,
+  firstReceivedAtIso: string,
+): { disposition: 'accepted' | 'rejected'; reasonCode?: 'too_old' | 'future_time' } {
+  const occurredMicros = parseIsoToMicroseconds(occurredAtIso);
+  const receivedMicros = parseIsoToMicroseconds(firstReceivedAtIso);
+  const diffMicros = occurredMicros - receivedMicros;
+
+  if (diffMicros < -TWENTY_FOUR_HOURS_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'too_old' };
+  }
+  if (diffMicros > FIVE_MINUTES_MICROS) {
+    return { disposition: 'rejected', reasonCode: 'future_time' };
+  }
+  return { disposition: 'accepted' };
 }

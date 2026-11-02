@@ -1,24 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ApproveMenuRevisionSchema,
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
   canonicalJson,
+  classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  FIVE_MINUTES_MICROS,
   HealthResponseSchema,
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
+  MENU_TOKEN_AUDIENCE,
+  MENU_TOKEN_TTL_SECONDS,
+  MenuPublicationSchema,
   ObservationBatchV2Schema,
   ObservationConflictQueueMessageSchema,
+  ObservationConflictV1QueueEnvelopeSchema,
   ObservationQueueEnvelopeSchema,
   ObservationQueueMessageSchema,
   ObservationReceiptSchema,
+  ObservationV2QueueEnvelopeSchema,
   ObservationV2Schema,
+  PublicMenuAllergenCodeSchema,
+  PublicMenuContentBundleSchema,
+  PublicMenuDeliverySchema,
+  PublicMenuDietaryCodeSchema,
+  PublishMenuSchema,
+  parseIsoToMicroseconds,
   RetrievalRequestSchema,
   SourceReferenceSchema,
   sha256,
+  TWENTY_FOUR_HOURS_MICROS,
   toCanonicalObservation,
+  WithdrawMenuSchema,
 } from './index';
 
 const event = {
@@ -118,6 +134,306 @@ describe('dish command boundary', () => {
   });
 });
 
+describe('RES-02 review and publication boundary', () => {
+  const commandId = '00000000-0000-4000-8000-000000000001';
+  const approvalId = '00000000-0000-4000-8000-000000000002';
+  const approval = {
+    commandId,
+    expectedVersion: 0,
+    menuRevisionId: '00000000-0000-4000-8000-000000000003',
+    contentApprovalId: '00000000-0000-4000-8000-000000000006',
+    assetApprovalId: '00000000-0000-4000-8000-000000000007',
+  };
+
+  it('pins the exact immutable menu and asset revisions under review', () => {
+    expect(ApproveMenuRevisionSchema.parse(approval)).toEqual(approval);
+  });
+
+  it('keeps approval, publication and withdrawal as separate commands', () => {
+    expect(PublishMenuSchema.parse({ commandId, expectedVersion: 0, approvalId })).toEqual({
+      commandId,
+      expectedVersion: 0,
+      approvalId,
+    });
+    expect(WithdrawMenuSchema.parse({ commandId, expectedVersion: 1 })).toEqual({
+      commandId,
+      expectedVersion: 1,
+    });
+  });
+
+  it('rejects claimed authority, unknown fields and malformed immutable references', () => {
+    for (const patch of [
+      { venueId: approvalId },
+      { actorId: approvalId },
+      { permission: 'owner' },
+      { expectedVersion: -1 },
+      { menuRevisionId: 'not-a-uuid' },
+      { contentApprovalId: 'not-a-uuid' },
+      { assetApprovalId: 'not-a-uuid' },
+    ]) {
+      expect(ApproveMenuRevisionSchema.safeParse({ ...approval, ...patch }).success).toBe(false);
+    }
+  });
+
+  it('represents withdrawn content explicitly without changing its publication identity', () => {
+    const publication = {
+      menuId: '00000000-0000-4000-8000-000000000004',
+      publicationId: '00000000-0000-4000-8000-000000000005',
+      version: 2,
+      approvalId,
+      publicationHash: 'c'.repeat(64),
+      availabilityVersion: 2,
+      status: 'withdrawn' as const,
+    };
+    expect(MenuPublicationSchema.parse(publication)).toEqual(publication);
+  });
+});
+
+describe('RES-02 immutable diner bundle boundary', () => {
+  const bundle = {
+    schema_version: 1,
+    venue_id: '00000000-0000-4000-8000-000000000101',
+    menu_id: '00000000-0000-4000-8000-000000000102',
+    menu_revision_id: '00000000-0000-4000-8000-000000000103',
+    restaurant: {
+      name: 'Synthetic Test Kitchen',
+      logo: null,
+    },
+    categories: [
+      {
+        category_id: '00000000-0000-4000-8000-000000000105',
+        name: 'Mains',
+        dishes: [
+          {
+            dish_id: '00000000-0000-4000-8000-000000000106',
+            dish_revision_id: '00000000-0000-4000-8000-000000000107',
+            complete: true,
+            name: 'Garden Bowl',
+            description: 'Synthetic fixture content.',
+            price: { amount: '12.50', currency: 'USD' },
+            ingredients: [
+              {
+                ingredient_id: '00000000-0000-4000-8000-000000000108',
+                name: 'Tomato',
+                description: null,
+              },
+            ],
+            allergens: ['sesame'],
+            dietary: ['vegan', 'gluten-free'],
+            images: {
+              card: {
+                url: 'https://assets.example.test/dishes/card.webp',
+                width: 640,
+                height: 480,
+                alt: 'Synthetic garden bowl fixture',
+              },
+              detail: {
+                url: 'https://assets.example.test/dishes/detail.webp',
+                width: 1280,
+                height: 960,
+                alt: 'Synthetic garden bowl fixture',
+              },
+            },
+          },
+          {
+            dish_id: '00000000-0000-4000-8000-000000000109',
+            dish_revision_id: '00000000-0000-4000-8000-000000000110',
+            complete: false,
+          },
+        ],
+      },
+    ],
+  } as const;
+
+  it('accepts an ordered T0 bundle with complete and deliberately incomplete dishes', () => {
+    expect(PublicMenuContentBundleSchema.parse(bundle)).toEqual(bundle);
+  });
+
+  it('accepts every approved allergen and dietary code and rejects display labels as wire values', () => {
+    const allergenCodes = [
+      'milk',
+      'egg',
+      'fish',
+      'crustacean shellfish',
+      'tree nut',
+      'peanut',
+      'wheat',
+      'soy',
+      'sesame',
+    ] as const;
+    const dietaryCodes = ['vegan', 'vegetarian', 'gluten-free'] as const;
+
+    for (const code of allergenCodes) expect(PublicMenuAllergenCodeSchema.parse(code)).toBe(code);
+    for (const code of dietaryCodes) expect(PublicMenuDietaryCodeSchema.parse(code)).toBe(code);
+    expect(PublicMenuAllergenCodeSchema.safeParse('Peanuts').success).toBe(false);
+    expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
+  });
+
+  it('keeps an unknown allergen review state distinct from a reviewed empty declaration', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    const withAllergenState = (allergens: null | []) => ({
+      ...bundle,
+      categories: [
+        {
+          ...bundle.categories[0],
+          dishes: [{ ...completeDish, allergens }],
+        },
+      ],
+    });
+
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState(null)).success).toBe(true);
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState([])).success).toBe(true);
+  });
+
+  it('rejects partial claims, unknown allergens and insecure image URLs', () => {
+    const incompleteDish = bundle.categories[0].dishes[1];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...incompleteDish, price: { amount: '8.00', currency: 'USD' } }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['gluten'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, description: '   ' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                images: {
+                  ...completeDish.images,
+                  card: {
+                    ...completeDish.images.card,
+                    url: 'http://assets.example.test/card.webp',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a pre-publication bundle only for its exact published menu revision', () => {
+    const response = {
+      schemaVersion: 1,
+      venueId: bundle.venue_id,
+      menuId: bundle.menu_id,
+      menuRevisionId: bundle.menu_revision_id,
+      publicationId: '00000000-0000-4000-8000-000000000104',
+      publicationHash: 'a'.repeat(64),
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: 'https://assets.example.test/menu.json',
+        contentHash: 'b'.repeat(64),
+        assetManifestHash: 'c'.repeat(64),
+      },
+      menuToken: 'synthetic-token',
+      tokenExpiresAt: '2026-10-27T00:30:00.000Z',
+    } as const;
+    expect(PublicMenuDeliverySchema.safeParse({ response, content: bundle }).success).toBe(true);
+    expect(
+      PublicMenuDeliverySchema.safeParse({
+        response: {
+          ...response,
+          menuRevisionId: '00000000-0000-4000-8000-000000000999',
+        },
+        content: bundle,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects duplicate identities and invalid money, allergen or dietary values independently', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [bundle.categories[0], { ...bundle.categories[0], name: 'Duplicate category' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [completeDish, { ...completeDish, dish_revision_id: bundle.menu_revision_id }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                price: { amount: '12.500', currency: 'usd' },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['wheat', 'wheat'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, dietary: ['vegan', 'vegan'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
 describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
   const sampleText = 'Roasted Tomato Soup with Basil: $12.50. Fresh vine tomatoes simmered.';
   const samplePassage = {
@@ -1096,6 +1412,194 @@ describe('canonical observation checksum and identity', () => {
     });
     const hashDiffSeq = await sha256(canonicalJson(diffSeq));
     expect(hashDiffSeq).not.toBe(baseHash);
+  });
+
+  it('aligns menu token constants with PR #43', () => {
+    expect(MENU_TOKEN_AUDIENCE).toBe('peekaplate-observations');
+    expect(MENU_TOKEN_TTL_SECONDS).toBe(1800);
+  });
+
+  it('validates traffic_class in ObservationQueueMessageSchema and defaults to live', () => {
+    const parsedDefault = ObservationQueueMessageSchema.parse(envelope);
+    expect(parsedDefault.traffic_class).toBe('live');
+
+    const parsedTest = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'test',
+    });
+    expect(parsedTest.traffic_class).toBe('test');
+
+    const parsedDemo = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'demo',
+    });
+    expect(parsedDemo.traffic_class).toBe('demo');
+
+    expect(() =>
+      ObservationQueueMessageSchema.parse({
+        ...envelope,
+        traffic_class: 'staging',
+      }),
+    ).toThrow();
+  });
+
+  it('matches PR #31 deterministic JSON serialization rules', () => {
+    // Normalizes -0 to 0
+    expect(canonicalJson({ zero: -0 })).toBe('{"zero":0}');
+
+    // Rejects non-finite numbers
+    expect(() => canonicalJson({ num: Number.NaN })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+    expect(() => canonicalJson({ num: Number.POSITIVE_INFINITY })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+
+    // Omits undefined, functions and symbols in objects
+    expect(
+      canonicalJson({
+        a: 1,
+        b: undefined,
+        c: () => {},
+        d: Symbol('test'),
+      }),
+    ).toBe('{"a":1}');
+
+    // Turns undefined, functions and symbols into null in arrays
+    expect(canonicalJson([1, undefined, () => {}, Symbol('test'), 2])).toBe('[1,null,null,null,2]');
+
+    // Sorts keys using localeCompare
+    expect(canonicalJson({ b: 2, a: 1, c: 3 })).toBe('{"a":1,"b":2,"c":3}');
+
+    // Detects circular references
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    expect(() => canonicalJson(circular)).toThrow('Circular reference detected');
+  });
+
+  describe('canonical microsecond timestamp parsing and window classification', () => {
+    const baseReceived = '2026-11-01T12:00:00.000Z';
+
+    it('parses ISO timestamps to exact microseconds matching PostgreSQL timestamptz', () => {
+      // Millisecond precision
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0, 123)) * 1000n,
+      );
+
+      // Microsecond precision (6 digits)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123456Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 123456n,
+      );
+
+      // Sub-microsecond rounding: banker round-to-even (.0000005 -> .000000)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000005Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+
+      // Sub-microsecond rounding: 7th digit 6 > 5 rounds up (.0000006 -> .000001)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000006Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Timezone offsets
+      expect(parseIsoToMicroseconds('2026-11-01T14:00:00.000+02:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+      expect(parseIsoToMicroseconds('2026-11-01T08:00:00.000-04:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+
+      // Longer fractional seconds (nanoseconds, 9 digits): .000000499 rounds down to .000000
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000499Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+      // .000000501 rounds up to .000001
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000501Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Invalid timestamps
+      expect(() => parseIsoToMicroseconds('not-a-timestamp')).toThrow('Invalid ISO timestamp');
+      expect(() => parseIsoToMicroseconds('')).toThrow('Invalid ISO timestamp');
+    });
+
+    it('classifies reviewer reproduction cases identically to PR #31 and PostgreSQL', () => {
+      // Case 1: 5 minutes + 1 microsecond -> rejected as future_time
+      const resCase1 = classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived);
+      expect(resCase1).toEqual({ disposition: 'rejected', reasonCode: 'future_time' });
+
+      // Case 2: 7-digit fractional seconds .9999999Z rounds up onto inclusive 24h lower boundary -> accepted
+      const resCase2 = classifyObservationTimeWindow('2026-10-31T11:59:59.9999999Z', baseReceived);
+      expect(resCase2).toEqual({ disposition: 'accepted' });
+    });
+
+    it('classifies exact microsecond boundaries matching PR #31', () => {
+      // Exact lower boundary (firstReceivedAt - 24 hours): accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary + 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000001Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary - 1 microsecond: rejected as too_old
+      expect(classifyObservationTimeWindow('2026-10-31T11:59:59.999999Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'too_old',
+      });
+
+      // Exact upper boundary (firstReceivedAt + 5 minutes): accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Upper boundary + 1 microsecond: rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // Upper boundary - 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:04:59.999999Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+    });
+
+    it('handles 7-digit and sub-microsecond fractional precision with banker rounding', () => {
+      // .0000004 rounds down to .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000004Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000005 rounds to even 0 -> .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000005Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .00000050 trailing zero still tie -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000050Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000006 rounds up to .000001 -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000006Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // .00000051 non-zero digit after 5 rounds up -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000051Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+    });
+
+    it('exports microsecond constants matching PR #31', () => {
+      expect(TWENTY_FOUR_HOURS_MICROS).toBe(86_400_000_000n);
+      expect(FIVE_MINUTES_MICROS).toBe(300_000_000n);
+    });
   });
 });
 

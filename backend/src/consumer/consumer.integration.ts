@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { canonicalJson, sha256, toCanonicalObservation } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { ingestObservations } from '../observation-ingest';
 import { canonicalizeJson, sha256Hex } from './canonical-json';
 import { PostgresObservationRepository } from './database';
 import { QueueConsumer, type QueueMessage } from './queue-consumer';
@@ -155,6 +156,115 @@ afterAll(async () => {
 });
 
 describe('real PostgreSQL Queue Consumer integration (S3-DATA-02 / PR #32)', () => {
+  it('runs the merged producer through real canonical persistence, retries and publication-conflict quarantine', async () => {
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+    try {
+      const repository = new PostgresObservationRepository(client);
+      const r2 = new FakeR2ArchiveStorage();
+      const consumer = new QueueConsumer({ r2Storage: r2, repository });
+      const fixedNow = new Date('2026-11-01T12:00:00.000Z');
+      const authority = {
+        venueId: tenant1,
+        publicationId: pubId1,
+        jti: crypto.randomUUID(),
+        trafficClass: 'demo' as const,
+      };
+      const event = {
+        schema_version: 'observation.v2',
+        event_id: crypto.randomUUID(),
+        type: 'dish_saved',
+        session_id: crypto.randomUUID(),
+        producer_id: crypto.randomUUID(),
+        local_sequence: 1,
+        occurred_at: fixedNow.toISOString(),
+        publication_revision_id: pubId1,
+        payload: {
+          dish_id: crypto.randomUUID(),
+          dish_revision_id: crypto.randomUUID(),
+          save_origin: 'direct',
+          save_surface: 'dish_detail',
+          shortlist_size: 1,
+        },
+      };
+      const produce = async (events: unknown[]) => {
+        const messages: unknown[] = [];
+        const result = await ingestObservations(events, authority, {
+          now: () => fixedNow,
+          enqueue: async (message) => {
+            messages.push(message);
+          },
+        });
+        if (result.queueUnavailable) throw new Error('Synthetic Queue submission failed');
+        return { messages, receipts: result.response.receipts };
+      };
+      const first = await produce([event, event]);
+      expect(first.messages).toHaveLength(1);
+      expect(first.receipts.map((receipt) => receipt.status)).toEqual(['accepted', 'accepted']);
+      expect(await consumer.processMessage(first.messages[0])).toEqual({
+        status: 'acknowledged',
+        reason: 'persisted',
+      });
+      const key = buildRawArchiveKey(tenant1, event.event_id);
+      const raw = await r2.getRawPayload(key);
+      expect(JSON.parse(new TextDecoder().decode(raw!.rawBytes)).traffic_class).toBe('demo');
+      expect(await consumer.processMessage(first.messages[0])).toEqual({
+        status: 'acknowledged',
+        reason: 'duplicate_same_payload',
+      });
+      const changed = await produce([
+        { ...event, payload: { ...event.payload, shortlist_size: 2 } },
+      ]);
+      expect(changed.receipts[0]?.status).toBe('accepted');
+      expect(await consumer.processMessage(changed.messages[0])).toEqual({
+        status: 'acknowledged',
+        reason: 'conflict_recorded',
+      });
+      const stored = await admin.query(
+        'SELECT canonical_payload_checksum, disposition FROM app_private.observation_index WHERE tenant_id=$1 AND event_id=$2',
+        [tenant1, event.event_id],
+      );
+      expect(stored.rows).toEqual([
+        { canonical_payload_checksum: raw!.checksum, disposition: 'accepted' },
+      ]);
+      const conflicts = await admin.query(
+        'SELECT count(*)::int AS count FROM app_private.observation_conflict WHERE tenant_id=$1 AND event_id=$2',
+        [tenant1, event.event_id],
+      );
+      expect(conflicts.rows[0].count).toBe(1);
+
+      const conflictId = crypto.randomUUID();
+      const mixed = await produce([
+        { ...event, event_id: conflictId },
+        { ...event, event_id: conflictId, publication_revision_id: pubId2 },
+      ]);
+      expect(mixed.receipts.map((receipt) => receipt.reason_code)).toEqual([
+        'event_id_conflict',
+        'event_id_conflict',
+      ]);
+      expect(await consumer.processMessage(mixed.messages[0])).toEqual({
+        status: 'acknowledged',
+        reason: 'conflict_recorded',
+      });
+      const evidence = await admin.query(
+        'SELECT r2_archive_key FROM app_private.observation_conflict WHERE tenant_id=$1 AND event_id=$2',
+        [tenant1, conflictId],
+      );
+      expect(evidence.rows).toHaveLength(2);
+      for (const row of evidence.rows) {
+        const archive = await r2.getRawPayload(row.r2_archive_key);
+        expect(new TextDecoder().decode(archive!.rawBytes)).not.toContain(pubId2);
+      }
+      const noIndex = await admin.query(
+        'SELECT count(*)::int AS count FROM app_private.observation_index WHERE tenant_id=$1 AND event_id=$2',
+        [tenant1, conflictId],
+      );
+      expect(noIndex.rows[0].count).toBe(0);
+    } finally {
+      await client.end();
+    }
+  });
+
   it('A. First accepted observation persists all canonical columns with forced RLS', async () => {
     const client = new Client({ connectionString: runtimeUrl });
     await client.connect();

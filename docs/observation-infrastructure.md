@@ -1,6 +1,38 @@
 # Staging observation infrastructure
 
-This is the infrastructure handoff for Teeyansh's Queue consumer. It provides a place to send, retain and recover synthetic observations. It does not implement his consumer, the ingestion endpoint or canonical database facts. His unfinished PRs are unchanged.
+This is the infrastructure handoff for the observation ingestion pipeline. The producer `POST /observations` verifies menu-token authority, applies approximate per-location rate limits and awaits Queue acceptance. The consumer archives evidence in private R2 before writing the canonical database index or conflict quarantine and acknowledging delivery. Deployment and hosted acceptance are separate from merging this code.
+
+The reconciled contracts retain server-derived `traffic_class`, its `live`
+default, and canonical payload normalization. The combined producer/consumer
+regression uses the real migrated PostgreSQL database with simulated Queue/R2;
+it does not replace hosted acceptance. This consumer writes the canonical index
+and conflict records only. Transactional typed-fact persistence and an idempotent
+archive/index backfill still need their own implementation and tests before
+owner views can show those observations. Keep normal collection paused until
+that work and browser-to-destination acceptance pass. An operator may resume
+only the bounded, labelled synthetic acceptance run and pause it again afterward.
+
+## Canonical database handoff
+
+On October 31, the existing staging Supabase database received the unchanged
+migrations from [PR #32](https://github.com/vivienk/peekaplate/pull/32) and
+[PR #50](https://github.com/vivienk/peekaplate/pull/50), in this order:
+`20261023120000_observation_index.sql`, then
+`20261026120000_observation_facts.sql`. All four previous history entries remain.
+
+The schema contains `app_private.observation_index`,
+`app_private.observation_conflict`, nine typed fact tables, and
+`app_private.owner_observation_v1` / `app_private.owner_opening_activity_v1`.
+The hosted audit verified forced tenant RLS on all eleven tables, append-only
+triggers, restricted runtime SELECT/INSERT grants, protected security-invoker
+views and denied browser/exporter access. Owner views exclude test/demo traffic;
+report suppression and HTTP authorization belong to the report implementation.
+
+See the [release record](operations.md#observation-schema-release--october-31-2026)
+for verification and limits. Consumer integration must persist accepted index
+and matching typed facts transactionally before those facts can drive owner
+metrics. Creating empty tables does not activate a consumer or certify that
+integration. Delivery remains paused until the reviewed flow passes acceptance.
 
 ## Resources and bindings
 
@@ -13,12 +45,18 @@ Account: `51eda1917fd22a9478808a82d2980741`. The October 24, 2026 inventory foun
 | Existing R2 bucket | `peekaplate-staging-assets` | Private archive; shared with staging assets, so use a dedicated observation prefix |
 | Worker producer binding | `OBSERVATION_QUEUE` | Targets the observation Queue in `backend/wrangler.jsonc`, staging only |
 | Worker R2 binding | `OBSERVATION_ARCHIVE_BUCKET` | Targets the existing staging bucket, staging only |
+| Rate Limiter (Minute) | `OBSERVATION_RATE_LIMITER_MINUTE` | 60 requests per 60s; approximate per-location enforcement (not global token bucket) |
+| Rate Limiter (Burst) | `OBSERVATION_RATE_LIMITER_BURST` | 10 requests per 10s; approximate per-location enforcement (not global token bucket) |
 
 The binding configuration must reach a reviewed `main` release and the protected staging deployment before it exists in the live API Worker. Merely merging to `develop` does not deploy it. Keep the existing Hyperdrive, Auth issuer and `TEAM_GITHUB_TOKEN`; do not replace their credentials or add them to a frontend.
 
 ## Why delivery is paused
 
-The current API Worker has a `fetch` handler and no observation `queue` handler. Attaching an unfinished or empty handler could acknowledge work without archiving or indexing it. Instead, a temporary **HTTP pull consumer** establishes the source-to-DLQ routing without running product code.
+The last recorded infrastructure setup uses a temporary **HTTP pull consumer**
+with delivery paused. The reviewed code now exports the real `queue` handler;
+an operator must replace the temporary consumer only during the reviewed main
+release, retain the existing DLQ/retry settings and verify provider readback.
+Do not attach a second competing consumer or treat a code merge as deployment.
 
 | Setting | Source Queue | DLQ |
 | --- | --- | --- |
@@ -55,6 +93,13 @@ This infrastructure probe does **not** test canonical database deduplication/con
 The existing collaborator analytics API gives read access to delayed PostHog diagnostics. It does not grant Cloudflare administration or turn those rows into canonical owner facts. Developers can submit code/configuration PRs without receiving the operator's provider token.
 
 ## Operator checks
+
+Restore R2 archives with their `payload-checksum` custom metadata intact. For a
+sanitized invalid-conflict object, the original untrusted payload was deliberately
+discarded; hashing the safe JSON cannot reconstruct that original checksum.
+Metadata-free restoration of those objects is not supported by this consumer
+and can lead to retries. Preserve evidence and escalate for controlled recovery;
+never overwrite the object or silently ACK it to clear the Queue.
 
 Use the project-pinned Wrangler. Set `CLOUDFLARE_ACCOUNT_ID` to the staging account above when listing account-wide resources; some commands do not infer it from `--env staging` alone.
 
