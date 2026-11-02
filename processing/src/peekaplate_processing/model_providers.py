@@ -134,8 +134,9 @@ def create_model_client(
 ) -> ChatOpenAI:
     """Instantiate a ChatOpenAI client based on provider config or environment auto-detection."""
     environ = os.environ if env is None else env
-
-    # 1. Explicit provider selection
+    env_max = environ.get("MENU_AI_MAX_TOKENS", "").strip()
+    if env_max and env_max.isdigit():
+        max_tokens = int(env_max)
     if provider_name is None:
         provider_name = environ.get("MENU_AI_PROVIDER", "").strip().lower() or None
 

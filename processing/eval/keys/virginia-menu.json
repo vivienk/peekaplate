@@ -1,0 +1,162 @@
+{
+  "status": "AGENT-DRAFTED, UNREVIEWED. Transcribed by the AI assistant from crops of the clean original image only (no overlays or model outputs). Must be verified by a human before it counts as reviewed ground truth.",
+  "fields": "name, category (main heading), price_text (printed), price_amount (single unambiguous price, else null)",
+  "source": "virginia-menu.jpg",
+  "items": [
+    {
+      "name": "Fettuccine Alfredo",
+      "category": "ENTREES",
+      "price_text": "12.00",
+      "price_amount": "12.00"
+    },
+    {
+      "name": "Fettuccine Alfredo",
+      "category": "ENTREES",
+      "price_text": "15.00",
+      "price_amount": "15.00"
+    },
+    {
+      "name": "Fettuccine Alfredo",
+      "category": "ENTREES",
+      "price_text": "15.00",
+      "price_amount": "15.00"
+    },
+    {
+      "name": "Pasta Romana",
+      "category": "ENTREES",
+      "price_text": "13.00",
+      "price_amount": "13.00"
+    },
+    {
+      "name": "Chicken Fusaro",
+      "category": "ENTREES",
+      "price_text": "17.00",
+      "price_amount": "17.00"
+    },
+    {
+      "name": "Chicken Miseno",
+      "category": "ENTREES",
+      "price_text": "17.00",
+      "price_amount": "17.00"
+    },
+    {
+      "name": "Penne Primavera",
+      "category": "ENTREES",
+      "price_text": "13.00",
+      "price_amount": "13.00"
+    },
+    {
+      "name": "Penne Vodka with Chicken & Shrimp",
+      "category": "ENTREES",
+      "price_text": "17.00",
+      "price_amount": "17.00"
+    },
+    {
+      "name": "Spaghetti",
+      "category": "ENTREES",
+      "price_text": "10.00 / 12.00",
+      "price_amount": null
+    },
+    {
+      "name": "Chicken Parmigiana with Spaghetti",
+      "category": "BAKED DISHES",
+      "price_text": "16.00",
+      "price_amount": "16.00"
+    },
+    {
+      "name": "Eggplant Parmigiana with Spaghetti",
+      "category": "BAKED DISHES",
+      "price_text": "14.00",
+      "price_amount": "14.00"
+    },
+    {
+      "name": "Baked Lasagna",
+      "category": "BAKED DISHES",
+      "price_text": "10.00",
+      "price_amount": "10.00"
+    },
+    {
+      "name": "Cheese Ravioli",
+      "category": "BAKED DISHES",
+      "price_text": "11.00",
+      "price_amount": "11.00"
+    },
+    {
+      "name": "Baked Manicotti",
+      "category": "BAKED DISHES",
+      "price_text": "11.00",
+      "price_amount": "11.00"
+    },
+    {
+      "name": "Baked Ziti",
+      "category": "BAKED DISHES",
+      "price_text": "12.00",
+      "price_amount": "12.00"
+    },
+    {
+      "name": "Buffalo Chicken Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Chicken Caesar Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Chicken Fajita Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Philly Cheesesteak Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Grilled Veggie Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Grilled Chicken Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Chicken Bacon Ranch Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    },
+    {
+      "name": "Create Your Own Wrap",
+      "category": "WRAPS",
+      "price_text": "9.00",
+      "price_amount": "9.00",
+      "accept_null_amount": true,
+      "note": "price printed once in section header: ALL WRAPS - $9.00 EA."
+    }
+  ],
+  "unreadable": []
+}
