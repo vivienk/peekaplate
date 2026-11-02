@@ -60,27 +60,32 @@ export function createSaveState({
 
   // Another tab may have changed storage since this one last read it (Adam, 30 Oct: no live sync
   // in P0). In persistent mode every change starts from the latest stored list, so a stale tab
-  // never writes back an old one. Session-only mode cannot write, so it stays memory-only, and a
-  // failed read keeps this tab's list. Returns true when the list was refreshed.
-  function refresh(): boolean {
-    if (persistence.mode() !== 'persistent') return false;
+  // never writes back an old one. Session-only mode cannot write, so it stays memory-only.
+  // 'unreadable' means the stored list is unknown right now: the caller must not write, or this
+  // tab's stale list could overwrite saves made in another tab (Sai's review, 2 Nov).
+  function refresh(): 'refreshed' | 'unchanged' | 'unreadable' {
+    if (persistence.mode() !== 'persistent') return 'unchanged';
     const latest = persistence.reread();
-    if (latest === null || sameIds(latest, dishIds)) return false;
+    if (latest === null) return 'unreadable';
+    if (sameIds(latest, dishIds)) return 'unchanged';
     dishIds = latest;
-    return true;
+    return 'refreshed';
   }
 
   // Applies this tab's own change to the latest list: write, then update the state, then notify,
   // then report the result. Another tab's work is never reported as this tab's change, so it can
   // never fire an event; a refresh alone only updates the screens.
+  // When storage can't be read, the change is kept in this tab's memory only and reported as not
+  // persisted (so no Save event fires); the next change that can read storage starts again from
+  // the stored list.
   function change(update: (ids: readonly string[]) => readonly string[]): SaveChange {
-    const refreshed = refresh();
+    const read = refresh();
     const next = update(dishIds);
     if (next === dishIds) {
-      if (refreshed) notify();
+      if (read === 'refreshed') notify();
       return { changed: false, persisted: false, savedCount: dishIds.length };
     }
-    const persisted = persistence.persist(next);
+    const persisted = read === 'unreadable' ? false : persistence.persist(next);
     dishIds = next;
     notify();
     return { changed: true, persisted, savedCount: next.length };
