@@ -469,6 +469,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/sources.py",
         "processing/src/peekaplate_processing/storage.py",
         "processing/src/peekaplate_processing/workflow.py",
+        "processing/tests/fixture_factory.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
         "processing/tests/test_pdf_images.py",
@@ -532,7 +533,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b1547476eb1eb39c335d42280d8d471c4d72b23ace36d042ff109af292f07488"
+      "sourceFingerprint": "2c32e673e24d32724eb9e549a3d96185569368533e7bd4e87bd7748858e58848"
     },
     {
       "id": "assets",
@@ -546,7 +547,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/spatial.py",
         "processing/tests/test_assets.py",
         "processing/tests/test_spatial.py",
-        "processing/tests/fixture_factory.py",
         "docs/asset-delivery.md",
         "processing/src/peekaplate_processing/prepare_presentation.py",
         "processing/src/peekaplate_processing/presentation.py",
@@ -559,18 +559,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "45cb0a29a32512cdbf6a4513de809ca1c32215926d212802571fc5cd1c1e5447"
+      "sourceFingerprint": "1db9823840d11089b654dae8d737af2e6862c8e9698b81c9f0f389fc13ee8b50"
     }
   ],
   "handoffs": [
     {
-      "summary": "Rebased S3-VIS-03 onto develop 0477653, preserving reviewed OCR/retrieval, staging container service and CI workflows. Addressed PR #25 P2/P3 viewer findings: live prefers-reduced-motion media query listener with style/metrics clearing, and Object.create(null) prototype-safe layer retries. Added optional post-cutout dish presentation prompt, provider interface, square/transparent PNG validation and automatic T0 fallback retention. All Python and repository checks pass.",
+      "date": "2026-11-03",
+      "summary": "S3-VIS-03 PR #25 reconciled with develop c005b0f. Presentation asset ids are now derived after candidate validation from the T0 id, dish/revision, cutout/reference hashes, prompt version and hash, effective model version and the candidate PNG hash (or a distinct fallback identity), so different candidates or models no longer collide and identical content stays create-only. Earlier viewer, fallback, budget and reduced-motion findings remain resolved.",
       "modules": [
         "processing",
         "assets",
         "delivery"
       ],
-      "next": "Complete PR #25 code review and offline validation. Keep presentation and 2.5D manifests provisional (needs_review, publication.eligible=false) until S3-ARC-01 contract freeze; align presentation and spatial fields with S3-RES-02."
+      "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
     },
     {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",

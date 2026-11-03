@@ -352,6 +352,40 @@ def read_t0_manifest(path: Path) -> tuple[AssetManifest, bytes]:
         raise ExtractionError("Invalid T0 asset manifest.") from None
 
 
+def presentation_asset_id(
+    *,
+    t0_asset_id: str,
+    dish_id: object,
+    revision_id: object,
+    cutout_sha256: str,
+    reference_sha256: str,
+    prompt_sha256: str,
+    model_version: str,
+    candidate_sha256: str | None,
+    fallback_sha256: str,
+    rejected_candidate_sha256: str | None = None,
+) -> str:
+    """Content-addressed id over every input that changes the delivered bytes or provenance."""
+    if candidate_sha256:
+        outcome = f"candidate:{candidate_sha256}"
+    else:
+        outcome = f"fallback:{fallback_sha256}:rejected:{rejected_candidate_sha256 or 'none'}"
+    parts = (
+        RECIPE_VERSION,
+        t0_asset_id,
+        dish_id,
+        revision_id,
+        cutout_sha256,
+        reference_sha256,
+        PRESENTATION_PROMPT_VERSION,
+        prompt_sha256,
+        model_version,
+        outcome,
+    )
+    preimage = json.dumps([str(part) for part in parts], ensure_ascii=False, separators=(",", ":"))
+    return "pres_" + hashlib.sha256(preimage.encode("utf-8")).hexdigest()[:32]
+
+
 def prepare_presentation_bundle(
     *,
     t0_manifest_path: Path,
@@ -390,19 +424,7 @@ def prepare_presentation_bundle(
     )
     prompt_sha256 = hashlib.sha256(PRESENTATION_PROMPT.encode("utf-8")).hexdigest()
 
-    identity_preimage = (
-        f"{t0_manifest.asset_id}:{dish_ref.dish_id}:{dish_ref.revision_id}:"
-        f"{cutout_asset.sha256}:{ref_asset.sha256}:{RECIPE_VERSION}"
-    )
-    asset_id = "pres_" + hashlib.sha256(identity_preimage.encode("utf-8")).hexdigest()[:32]
-
     output_root_path = Path(output_root)
-    final_directory = output_root_path / asset_id
-    if final_directory.exists():
-        raise ExtractionError(
-            f"Output bundle already exists: {final_directory}. Choose a new output root to preserve the previous bundle."
-        )
-
     output_root_existed = output_root_path.exists()
     output_root_path.mkdir(parents=True, exist_ok=True)
     temporary_directory = output_root_path / f".tmp-{uuid4().hex}"
@@ -412,6 +434,7 @@ def prepare_presentation_bundle(
     validation_errors: list[str] = []
     status: str = "ready"
     fallback_retained: bool = False
+    rejected_candidate_sha256: str | None = None
 
     try:
         temporary_directory.mkdir()
@@ -426,6 +449,8 @@ def prepare_presentation_bundle(
 
         try:
             result = provider.generate(request)
+            if isinstance(result.png_bytes, (bytes, bytearray)):
+                rejected_candidate_sha256 = hashlib.sha256(result.png_bytes).hexdigest()
             presentation_asset = validate_presentation_png(result.png_bytes, budget_bytes)
             presentation_png_bytes = result.png_bytes
             effective_model_version = result.model_version or model_version
@@ -448,6 +473,26 @@ def prepare_presentation_bundle(
             effective_preserved_vp = preserved_original_viewpoint
             effective_reconstructed = reconstructed_details_flagged
             effective_notes = list(fidelity_notes or [])
+
+        # Derive the id only after validation, so it identifies the delivered candidate and its
+        # provenance rather than the source recipe alone. A retained fallback has its own identity.
+        asset_id = presentation_asset_id(
+            t0_asset_id=t0_manifest.asset_id,
+            dish_id=dish_ref.dish_id,
+            revision_id=dish_ref.revision_id,
+            cutout_sha256=cutout_asset.sha256,
+            reference_sha256=ref_asset.sha256,
+            prompt_sha256=prompt_sha256,
+            model_version=effective_model_version,
+            candidate_sha256=presentation_asset.sha256 if presentation_asset is not None else None,
+            fallback_sha256=detail_sha,
+            rejected_candidate_sha256=None if presentation_asset is not None else rejected_candidate_sha256,
+        )
+        final_directory = output_root_path / asset_id
+        if final_directory.exists():
+            raise ExtractionError(
+                f"Output bundle already exists: {final_directory}. Choose a new output root to preserve the previous bundle."
+            )
 
         # Write common assets
         (temporary_directory / cutout_asset.path).write_bytes(cutout_bytes)

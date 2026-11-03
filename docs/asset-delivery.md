@@ -99,6 +99,12 @@ Key architecture and safety invariants:
   links the source T0 `asset_id` and manifest SHA-256, source JPEG SHA-256, cutout
   SHA-256, reference SHA-256, prompt SHA-256, model version, dish and revision UUIDs,
   and optional PR #24 `draft_id`.
+- **Content-addressed presentation id:** `asset_id` (`pres_…`) is derived after candidate
+  validation from the recipe version, T0 `asset_id`, dish and revision ids, cutout and
+  reference SHA-256, prompt version and prompt SHA-256, the effective model version and the
+  outcome: the validated candidate PNG SHA-256, or `fallback:<detail SHA-256>` plus the
+  rejected candidate's SHA-256 when the T0 photo is retained. Different candidates or model
+  versions therefore get different ids; identical content is refused as already existing.
 - **Human Review Gate:** Manifests never self-approve (`review.status = "needs_review"`,
   `publication.eligible = False`). Fidelity requirements (`preserved_original_viewpoint`,
   `reconstructed_details_flagged`, `fidelity_notes`) persist on `manifest.prompt` and
@@ -129,7 +135,11 @@ Key architecture and safety invariants:
   unchanged source produces the same `asset_id` and is refused as already
   existing; recompute into a fresh output root per revision.
 - The spatial pipeline validates a human-prepared layered sample. It never
-  generates layers, food imagery or depth maps.
+  generates layers, food imagery or depth maps. The separate, optional presentation
+  helper (requested on S3-VIS-03, 2026-10-28) prepares an AI-assisted candidate only
+  through an explicit provider; it is always `needs_review`, never publishable, and
+  keeps the approved T0 photo as the fallback. It does not relax the
+  no-fabricated-food acceptance requirement or the T0/Bundle v1 priority.
 
 ## Acceptance still required
 

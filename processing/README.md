@@ -431,6 +431,9 @@ Inputs and outputs:
   `(0, 0)`, `(w-1, 0)`, `(0, h-1)`, `(w-1, h-1)` to reject opaque backgrounds or watermarks.
 - `presentation-manifest.json` links the source T0 `asset_id` and SHA-256, source JPEG SHA-256,
   cutout and reference SHA-256, prompt SHA-256, model version, dish/revision identifiers, and optional `draft_id`.
+- `asset_id` is derived after validation and includes the candidate PNG SHA-256 (or a distinct
+  fallback identity), the effective model version and the prompt version/SHA-256, so different
+  candidates or models never share an id; identical content is refused as already existing.
 - Manifests never self-approve: `review.status` is `needs_review` and `publication.eligible` is `false`.
   Flags (`--reconstructed-details-flagged`, `--preserved-original-viewpoint`, `--fidelity-note`)
   persist on `manifest.prompt` and add explicit review warnings.

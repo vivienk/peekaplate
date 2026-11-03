@@ -111,6 +111,69 @@ class PresentationTests(unittest.TestCase):
         pres_file = prepared.directory / PRESENTATION_FILENAME
         self.assertEqual(pres_file.read_bytes(), self.valid_png_bytes)
 
+    def _prepare(self, output_root, candidate_bytes, model_version="model-a", budget_bytes=None):
+        return prepare_presentation_bundle(
+            t0_manifest_path=self.t0_manifest_path,
+            cutout_path=self.cutout_path,
+            reference_path=self.ref_path,
+            output_root=output_root,
+            capture_evidence="Permitted studio capture.",
+            budget_bytes=budget_bytes,
+            provider=FilePresentationProvider(candidate_bytes=candidate_bytes, model_version=model_version),
+            model_version=model_version,
+        )
+
+    def test_asset_id_identifies_the_validated_candidate_and_its_provenance(self):
+        small = presentation_photo(512, 512, transparent_corners=True, has_alpha=True)
+        large = presentation_photo(768, 768, transparent_corners=True, has_alpha=True)
+        self.assertNotEqual(hashlib.sha256(small).hexdigest(), hashlib.sha256(large).hexdigest())
+
+        # Different valid candidates from the same inputs get different ids, in separate roots ...
+        first = self._prepare(self.root / "pres-a", small)
+        second = self._prepare(self.root / "pres-b", large)
+        self.assertEqual(first.manifest.processing.status, "ready")
+        self.assertEqual(second.manifest.processing.status, "ready")
+        self.assertNotEqual(first.asset_id, second.asset_id)
+
+        # ... and in one root, where the second candidate is retained under its own identity.
+        shared = self.root / "pres-shared"
+        kept_small = self._prepare(shared, small)
+        kept_large = self._prepare(shared, large)
+        self.assertNotEqual(kept_small.asset_id, kept_large.asset_id)
+        self.assertTrue(kept_small.directory.exists())
+        self.assertTrue(kept_large.directory.exists())
+
+        # The same PNG from a different effective model version is a different asset.
+        other_model = self._prepare(self.root / "pres-model-b", small, model_version="model-b")
+        self.assertNotEqual(first.asset_id, other_model.asset_id)
+        self.assertEqual(other_model.manifest.prompt.model_version, "model-b")
+
+        # A retained fallback never shares the successful candidate's identity, and two different
+        # rejected candidates keep distinct fallback records.
+        over_budget = self._prepare(self.root / "pres-fallback", small, budget_bytes=10)
+        self.assertTrue(over_budget.manifest.fallback_retained)
+        self.assertNotEqual(first.asset_id, over_budget.asset_id)
+        other_rejected = self._prepare(self.root / "pres-fallback", large, budget_bytes=10)
+        self.assertNotEqual(over_budget.asset_id, other_rejected.asset_id)
+
+        # The manifest records the id it was stored under.
+        self.assertEqual(first.manifest.asset_id, first.asset_id)
+        self.assertEqual(first.directory.name, first.asset_id)
+
+    def test_identical_presentation_content_remains_create_only(self):
+        output_root = self.root / "pres-repeat"
+        first = self._prepare(output_root, self.valid_png_bytes)
+        manifest_file = first.directory / "presentation-manifest.json"
+        before = manifest_file.read_bytes()
+        with self.assertRaisesRegex(ExtractionError, "already exists"):
+            self._prepare(output_root, self.valid_png_bytes)
+        self.assertEqual(manifest_file.read_bytes(), before)
+        self.assertEqual(
+            sorted(p.name for p in output_root.iterdir()),
+            [first.asset_id],
+            "a rejected repeat must not leave a temporary directory behind",
+        )
+
     def test_multimodal_request_embeds_cutout_and_reference_image_bytes_with_exact_prompt(self):
         req = PresentationRequest(
             cutout_path=self.cutout_path,
