@@ -92,11 +92,11 @@ function renderCard(dish: CompleteDish): string {
         <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
         <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}"><span class="pp-card__name-text">${escapeHtml(dish.name)}</span></button></h2>
         <p class="pp-card__price">${escapeHtml(money(dish))}</p>
+        <button class="pp-card__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
+        <span aria-hidden="true">♡</span><span aria-hidden="true">Save</span>
+        </button>
         <p class="pp-card__description">${escapeHtml(dish.description)}</p>
       </div>
-      <button class="pp-card__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-        <span aria-hidden="true">♡</span>
-      </button>
     </article>
   `;
 }

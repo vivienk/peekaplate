@@ -315,11 +315,16 @@ main:has(> .pp-detail) {
 }
 
 .pp-card__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 0;
   background: transparent;
   color: #fafafa;
   cursor: pointer;
-  padding: 0 16px 0 0;
+  padding: 0;
+  font-size: 18px;
+  line-height: 28px;
 }
 
 .pp-card--placeholder .pp-card__placeholder {
@@ -700,10 +705,7 @@ main:has(> .pp-detail) {
     text-align: left;
     padding: 8px 16px;
   }
-  .pp-card__save {
-    align-self: flex-end;
-    padding: 0 16px 8px 0;
-  }
+
   .pp-card__open {
     text-align: left;
   }
