@@ -3,19 +3,27 @@
 export const DIETARY_VALUES = ['Vegan', 'Vegetarian', 'Gluten-free'] as const;
 export type DietaryValue = (typeof DIETARY_VALUES)[number];
 
-// P0 allergens approved by Vivien (Oct 29): the code value in the data and the label screens show.
-// Codes are still to be confirmed, so the adapter accepts either. Every one has a Figma icon.
+// P0 allergens from the approved table (Vivien Oct 29, updated by Adam Nov 1: "nuts" replaces
+// "tree nut"; Vivien and Rania confirmed the Soy and Nuts labels): the code value in the data and
+// the label screens show. The adapter accepts either. Every one has a Figma icon.
 export const ALLERGENS = [
   { code: 'milk', label: 'Milk' },
   { code: 'egg', label: 'Eggs' },
   { code: 'fish', label: 'Fish' },
   { code: 'crustacean shellfish', label: 'Crustacean shellfish' },
-  { code: 'tree nut', label: 'Tree nuts' },
+  { code: 'nuts', label: 'Nuts' },
   { code: 'peanut', label: 'Peanuts' },
   { code: 'wheat', label: 'Wheat' },
   { code: 'soy', label: 'Soy' },
   { code: 'sesame', label: 'Sesame' },
 ] as const;
+
+// Older names for a P0 allergen, mapped to its current code, so data written before the Nov 1
+// table (Bundle v1 still uses "tree nut" until PR #87) shows the current label.
+export const LEGACY_ALLERGEN_CODES: Readonly<Record<string, (typeof ALLERGENS)[number]['code']>> = {
+  'tree nut': 'nuts',
+  'tree nuts': 'nuts',
+};
 
 export type MenuImage = { url: string; width: number; height: number; alt: string };
 
