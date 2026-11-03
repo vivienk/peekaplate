@@ -13,12 +13,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Contracts reject client authority and private/unknown payload fields. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3, preserving IDs, printed prices, hierarchy and code-point evidence with synthetic fixtures; segment metadata preserves Python-validated candidate box links (TypeScript does not verify OCR joins). Offline contract, not a deployed review API.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 adds strict review candidates for paired schema1/pipeline2 and schema2/pipeline3 with code-point evidence and synthetic fixtures; segment metadata preserves Python-validated candidate box links.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
         "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts",
         "packages/contracts/src/review-candidates.ts",
         "packages/contracts/src/review-candidates.test.ts",
         "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
@@ -40,7 +42,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d2d8867bf3829ef2e26b7a4891875170d53c5f17669ec9058e4cab15401b8e07"
+      "sourceFingerprint": "3c17976293d92da5fd797fc7a3b0a46340ac46540ab6231965021978578b2b0c"
     },
     {
       "id": "tokens",
@@ -102,7 +104,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save-state.ts",
         "frontend/diner/src/save/save-state.test.ts",
         "frontend/diner/src/save/fake-storage.ts",
-        "tests/e2e/save.spec.ts"
+        "tests/e2e/save.spec.ts",
+        "frontend/diner/src/compare/picker.ts",
+        "frontend/diner/src/compare/picker.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -111,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "11bc96334717f208264c888874e5d5f1a59538a0df3a4dc30b40b533d56e9253"
+      "sourceFingerprint": "77575cbc7d964ba6e361d11815dc2d1adb644f7d311184c39317ab84230138f4"
     },
     {
       "id": "console",
@@ -577,7 +581,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "docs/observation-facts-staging-acceptance.json"
       ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate."
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending."
     }
   ]
 }
