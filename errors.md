@@ -1099,6 +1099,15 @@ final handoff edit. It was shortened without dropping tenant/privacy boundaries;
 context refresh passed. Hosted cleanup then restored viewer access, withdrew
 the synthetic publication, ended its session and removed its temporary host.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T23:24:30.741Z","exitCode":1}
+```
+
+PR88 reconciliation resolution: the appended allergen note exceeded the diner
+node's 1000-character summary limit. Moved the note to the bounded handoff,
+preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
+pass. Keep node summaries within the existing limit when resolving conflicts.
 ## RES-02 November 1 context reconciliation
 
 An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
