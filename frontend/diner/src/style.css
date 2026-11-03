@@ -228,8 +228,8 @@ main:has(> .pp-detail) {
   min-height: 215px;
   padding: 0;
   border-radius: 16px;
-  background: #2d3038;
-  border: 1px solid rgba(113, 115, 122, 0.3);
+  background: transparent;
+  border: 0;
   overflow: hidden;
 }
 
@@ -266,9 +266,12 @@ main:has(> .pp-detail) {
 }
 
 .pp-card__media {
-  flex: 0 0 clamp(96px, 38%, 215px);
+  flex: 0 0 min(215px, 60%);
   min-width: 0;
-  height: 215px;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 16px;
+  overflow: hidden;
   background: rgba(255, 255, 255, 0.00001);
 }
 
@@ -291,10 +294,10 @@ main:has(> .pp-detail) {
   overflow-wrap: break-word;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
   padding: 8px 16px 8px 8px;
-  text-align: right;
+  text-align: left;
 }
 
 .pp-card__category {
@@ -701,6 +704,22 @@ main:has(> .pp-detail) {
   cursor: not-allowed;
 }
 
+@media (min-width: 361px) {
+  .pp-category > .pp-card:nth-child(even) {
+    flex-direction: row-reverse;
+  }
+  .pp-category > .pp-card:nth-child(even) .pp-card__body {
+    align-items: flex-end;
+    text-align: right;
+  }
+  .pp-category > .pp-card:nth-child(even) .pp-card__open {
+    text-align: right;
+  }
+  .pp-category > .pp-card:nth-child(even) .pp-card__save {
+    flex-direction: row-reverse;
+  }
+}
+
 @media (max-width: 360px) {
   .pp-card {
     flex-direction: column;
@@ -711,14 +730,5 @@ main:has(> .pp-detail) {
     flex: none;
     width: 100%;
     height: 160px;
-  }
-  .pp-card__body {
-    align-items: flex-start;
-    text-align: left;
-    padding: 8px 16px;
-  }
-
-  .pp-card__open {
-    text-align: left;
   }
 }

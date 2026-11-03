@@ -323,3 +323,20 @@ test('All tab is selected by default and shows every dish', async ({ page }) => 
   await page.getByRole('button', { name: 'Salads', exact: true }).click();
   await expect(page.locator('.pp-category:not([hidden]) .pp-card')).toHaveCount(1);
 });
+
+test('cards are borderless and alternate image side', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await waitForFinalState(page, 'demo');
+
+  const cards = page.locator('.pp-category:not([hidden]) .pp-card');
+  const sides = await cards.evaluateAll((els) =>
+    els.slice(0, 3).map((card) => {
+      const media = card.querySelector('.pp-card__media')?.getBoundingClientRect();
+      const body = card.querySelector('.pp-card__body')?.getBoundingClientRect();
+      return media && body && media.left < body.left ? 'left' : 'right';
+    }),
+  );
+  expect(sides).toEqual(['left', 'right', 'left']);
+  await expect(cards.first()).toHaveCSS('border-top-width', '0px');
+});
