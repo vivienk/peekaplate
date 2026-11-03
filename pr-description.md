@@ -42,6 +42,12 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 > [!NOTE]
 > Synthetic contract tests prove the TypeScript adapter mapping and schema bounds. Local pgTAP tests prove PostgreSQL RLS policies and table constraints. Vitest integration tests prove database queries execute against a real PostgreSQL 16 instance. `representative-extraction-v2.json` and `vis02-mohammad-bundle.json` are synthetic/reconstructed fixtures. **None of these constitute live end-to-end staging verification, which has not yet been performed.**
 
+## Deferred / future work
+
+- Live containerized Python extraction service integration testing in staging.
+- Streaming extraction report persistence for large multi-page scans to minimize Worker memory usage.
+- Rolling window submission deduplication by menu content hash.
+
 ## Release controls / handoff
 
 The staging menu queues remain paused. The checked-in Worker config currently has a Queue producer binding only: it does not activate a menu Worker consumer or establish its batch size, concurrency, retry budget, visibility timeout, or DLQ routing. Before activation, review and configure those controls alongside the lease-aware recovery policy; the temporary HTTP pull consumer is not that policy. The per-message recovery delay schedules the first early-redelivery retry past the 15-minute lease fence, leaving a later delivery within a default three-retry budget. Controlled acceptance remains source → extraction → private report → drafts → ACK/retry/DLQ, including early redelivery through lease expiry, post-expiry recovery, and genuine DLQ exhaustion. Hosted end-to-end acceptance remains separate. Both Queue dispatch paths (`INGESTION_QUEUE`, `OBSERVATION_QUEUE`) and shared contracts are unified and preserved.
