@@ -114,7 +114,7 @@ const manyChips = dish(4, {
   description: 'Mixed leaves, avocado and walnuts with peanut dressing and sesame tofu croutons.',
   price: usd('13.00'),
   ingredients: ['Mixed leaves', 'Avocado', 'Walnuts', 'Peanut dressing', 'Tofu croutons'],
-  allergens: ['tree nut', 'peanut', 'soy', 'sesame', NO_ICON_ALLERGEN],
+  allergens: ['nuts', 'peanut', 'soy', 'sesame', NO_ICON_ALLERGEN],
   dietary: ['Vegan', 'Vegetarian'],
   images: images('Garden Avocado Salad'),
 });
