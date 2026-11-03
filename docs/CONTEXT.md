@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell stays readable without JavaScript; optional consent-gated PostHog shell views are wired. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled synthetic fixtures. The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; Search/Save/Compare are disabled until connected. S3-DIN-01.4 adds local searchMenu(menu, query) (complete-dish IDs plus allergy-line flag); the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static Vite shell readable without JavaScript; consent-gated PostHog shell views wired. Fixture menu source and adapter (S3-DIN-01.1) feed the menu screen and dish detail: loading/empty/error/offline/unavailable states, retry on error and offline, placeholders, dimming, image fallbacks, focus restore and a \"Fixture data\" label. Search/Save/Compare controls stay disabled until connected. searchMenu (DIN-01.4), shared Save state (src/save, DIN-02.1) and compare picker logic exist but are not wired. A strict Bundle v1 published-menu adapter (schema copied from PR #43 at a1c264c; hash check fails closed in live mode) is not connected to any screen or API. See docs/posthog.md.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -83,9 +83,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/menuScreen.test.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/published.ts",
+        "frontend/diner/src/menu/published.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
         "tests/e2e/menu-states.spec.ts",
+        "tests/e2e/published-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -104,7 +107,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "56cc1d294db244ae43435435725ccd6516a0a32ee61b188c4138b4cdce35ea2b"
+      "sourceFingerprint": "33611fc730777f3df216cbd6d00a2a8a754764df7347e3adbe78b68471a30c14"
     },
     {
       "id": "console",
@@ -318,7 +321,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c455e7e96487eb8a1233e519c22798a74051df3acbe89edf38ce1c62a22d050b"
+      "sourceFingerprint": "86a7af03e680079971db625430a1ac467b6e3ae0d0c348f82527c95aa1250d4a"
     },
     {
       "id": "agents",
