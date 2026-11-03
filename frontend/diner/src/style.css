@@ -447,7 +447,7 @@ main:has(> .pp-detail) {
 .pp-detail__image-wrap {
   display: flex;
   justify-content: center;
-  padding: 0;
+  padding: 0 0 16px;
 }
 
 .pp-detail__image {
