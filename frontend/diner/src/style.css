@@ -161,12 +161,6 @@ p {
   color: #2a2d36;
 }
 
-.pp-card__body {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 main:has(> .pp-menu),
 main:has(> .pp-detail) {
   max-width: none;
@@ -175,6 +169,8 @@ main:has(> .pp-detail) {
 }
 
 .pp-card__open {
+  display: block;
+  width: 100%;
   max-width: 100%;
   background: none;
   border: 0;
@@ -183,6 +179,15 @@ main:has(> .pp-detail) {
   font: inherit;
   text-align: right;
   cursor: pointer;
+}
+
+.pp-card__name-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: break-word;
 }
 
 .pp-dishes {
@@ -248,8 +253,8 @@ main:has(> .pp-detail) {
 }
 
 .pp-card__media {
-  flex: 0 0 215px;
-  width: 215px;
+  flex: 0 0 clamp(96px, 38%, 215px);
+  min-width: 0;
   height: 215px;
   background: rgba(255, 255, 255, 0.00001);
 }
@@ -268,7 +273,9 @@ main:has(> .pp-detail) {
 }
 
 .pp-card__body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -664,4 +671,29 @@ main:has(> .pp-detail) {
 .pp-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+@media (max-width: 360px) {
+  .pp-card {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 0;
+  }
+  .pp-card__media {
+    flex: none;
+    width: 100%;
+    height: 160px;
+  }
+  .pp-card__body {
+    align-items: flex-start;
+    text-align: left;
+    padding: 8px 16px;
+  }
+  .pp-card__save {
+    align-self: flex-end;
+    padding: 0 16px 8px 0;
+  }
+  .pp-card__open {
+    text-align: left;
+  }
 }

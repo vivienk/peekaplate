@@ -90,7 +90,7 @@ function renderCard(dish: CompleteDish): string {
       <div class="pp-card__media">${imageMarkup}</div>
       <div class="pp-card__body">
         <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
-        <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}">${escapeHtml(dish.name)}</button></h2>
+        <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}"><span class="pp-card__name-text">${escapeHtml(dish.name)}</span></button></h2>
         <p class="pp-card__price">${escapeHtml(money(dish))}</p>
         <p class="pp-card__description">${escapeHtml(dish.description)}</p>
       </div>

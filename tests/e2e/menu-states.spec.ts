@@ -174,7 +174,7 @@ test('keyboard open and back restores category and focus', async ({ page }) => {
   await page.locator('.pp-detail__back').focus();
   await page.keyboard.press('Enter');
 
-  // Check initial aria-pressed state
+  // Check post-Back aria-pressed state
   await expect(page.getByRole('button', { name: 'Brunch Bowls' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -205,8 +205,8 @@ test('delayed-load regression: empty with delayMs=3000', async ({ page }) => {
 });
 
 for (const scenario of ['edge-cases', 'layout-20']) {
-  test(`card boundary test at 320px and 390px for ${scenario}`, async ({ page }) => {
-    for (const width of [320, 390]) {
+  test(`card layout at common phone widths for ${scenario}`, async ({ page }) => {
+    for (const width of [320, 360, 390, 412]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(`http://127.0.0.1:5173/?scenario=${scenario}`);
 
@@ -240,6 +240,34 @@ for (const scenario of ['edge-cases', 'layout-20']) {
         });
 
         expect(problems).toEqual([]);
+
+        const unreadable = await page.evaluate(() => {
+          const out: string[] = [];
+          document
+            .querySelectorAll('.pp-category:not([hidden]) .pp-card:not(.pp-card--placeholder)')
+            .forEach((card) => {
+              const body = card.querySelector('.pp-card__body')?.getBoundingClientRect();
+              const nameEl = card.querySelector('.pp-card__name') as HTMLElement | null;
+              const name = nameEl?.getBoundingClientRect();
+              const price = card.querySelector('.pp-card__price')?.getBoundingClientRect();
+              if (!body || !nameEl || !name || !price) return;
+
+              if (body.width < 120) out.push(`body too narrow: ${Math.round(body.width)}px`);
+              if (price.height > 28) out.push(`price wraps: ${Math.round(price.height)}px`);
+
+              // A name box narrower than its longest word means the word was split mid-word.
+              const longestWord = Math.max(
+                ...(nameEl.textContent ?? '').split(/\s+/).map((w) => w.length),
+              );
+              const label = `${window.innerWidth}px "${(nameEl.textContent ?? '').trim().slice(0, 40)}"`;
+              if (name.width < longestWord * 7)
+                out.push(`${label}: name too narrow ${Math.round(name.width)}px`);
+              if (name.height > 28 * 3)
+                out.push(`${label}: name over 3 lines ${Math.round(name.height)}px`);
+            });
+          return out;
+        });
+        expect(unreadable).toEqual([]);
       }
     }
   });

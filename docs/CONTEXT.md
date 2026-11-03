@@ -93,7 +93,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save-state.ts",
         "frontend/diner/src/save/save-state.test.ts",
         "frontend/diner/src/save/fake-storage.ts",
-        "tests/e2e/save.spec.ts"
+        "tests/e2e/save.spec.ts",
+        "frontend/diner/src/compare/picker.ts",
+        "frontend/diner/src/compare/picker.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -102,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ccd45a6bb1b913baab3687d0ddc89e909dde4325b3e85e71b0fba08d1aa92ecf"
+      "sourceFingerprint": "56cc1d294db244ae43435435725ccd6516a0a32ee61b188c4138b4cdce35ea2b"
     },
     {
       "id": "console",
@@ -524,7 +526,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "docs/observation-facts-staging-acceptance.json"
       ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate."
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending."
     }
   ]
 }
