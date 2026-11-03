@@ -127,9 +127,10 @@ export function renderDishDetail(
         </div>
 
         <div class="pp-detail__actions">
-          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare</button>
+          <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
+          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
         </div>
-        <p class="pp-notice">Save and Compare are not available yet.</p>
+        <p class="pp-notice">View Portion, Save and Compare are not available yet.</p>
       </section>
     </div>
   `;

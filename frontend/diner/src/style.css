@@ -438,9 +438,15 @@ main:has(> .pp-detail) {
   cursor: pointer;
 }
 
-.pp-detail__back { justify-self: start; }
-.pp-detail__save { justify-self: end; }
-.pp-detail__title { text-align: center; }
+.pp-detail__back {
+  justify-self: start;
+}
+.pp-detail__save {
+  justify-self: end;
+}
+.pp-detail__title {
+  text-align: center;
+}
 
 .pp-detail__title {
   font-size: 18px;
