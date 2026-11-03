@@ -603,6 +603,7 @@ main:has(> .pp-detail) {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   width: 92px;
   min-height: 88px;
