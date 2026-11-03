@@ -1082,3 +1082,21 @@ of wrong-audience and forged-signature tokens. Signature and claim checks stay
 enabled; no broad fetch compatibility flag, new credentials or public debug
 route is added. Fresh hosted acceptance must pass after the reviewed fix deploys.
 Reference: https://developers.cloudflare.com/workers/observability/errors/
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T15:55:44.603Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-03T15:57:21.681Z","exitCode":2}
+```
+
+## November 3 PR45 menu-ingestion merge reconciliation
+
+Merging `develop` into `feat/s3-vis-01-menu-ingestion` produced lint and typecheck observations:
+1. `biome check` flagged import ordering and trailing formatting in `backend/src/index.test.ts` and `packages/contracts/src/index.test.ts`. Fixed via `biome check --write .`.
+2. `tsc` flagged missing observation/public-menu handlers in `Dependencies` in `backend/src/index.ts` (`verifyMenu`, `consumeObservationRateLimit`, `enqueueObservation`, `now`, `readPublicMenu`, `issuePublicMenu`, `readMenuJwks`) that were temporarily dropped during merge conflict resolution. Restored the canonical `Dependencies` interface.
+Full verification suite passed: all 33 Vitest suites (577 tests), 64 script tests, `tsc` across all 7 packages, Biome checks, context graph validation, and real PostgreSQL pgTAP + DB integration tests (60 assertions).
+

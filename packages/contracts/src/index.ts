@@ -1076,7 +1076,6 @@ export function classifyObservationTimeWindow(
   return { disposition: 'accepted' };
 }
 
-
 // ============================================================================
 // S3-VIS-01 / VIS-02: Menu Extraction & Structured Draft Ingestion Contracts
 // ============================================================================

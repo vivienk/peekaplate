@@ -9,7 +9,13 @@ import {
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import app, { consumeJtiRateLimit, createApp, createWorker, queue, handleQueueBatch } from './index';
+import app, {
+  consumeJtiRateLimit,
+  createApp,
+  createWorker,
+  handleQueueBatch,
+  queue,
+} from './index';
 import { ingestObservations } from './observation-ingest';
 
 const parseObservationReceiptBatch = async (response: Response) =>
@@ -1135,7 +1141,6 @@ describe('RES-02 publication HTTP boundary', () => {
     expect(approve).not.toHaveBeenCalled();
   });
 });
-
 
 describe('menu ingestion HTTP boundary', () => {
   const venueId = '00000000-0000-4000-8000-000000000001';

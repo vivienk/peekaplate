@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   ApproveDishDraftRequestSchema,
-  ExtractionDishDraftSchema,
-  ExtractionDraftEvidenceSchema,
-  ExtractionSourceRecordSchema,
-  ExtractionSourceSegmentSchema,
-  ExtractionSourceSpanSchema,
-  MenuExtractionResultSchema,
-  MenuIngestionQueueMessageSchema,
-  StructuredDishDraftSchema,
-  SubmitMenuIngestionRequestSchema,
   ApproveMenuRevisionSchema,
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
@@ -17,6 +8,11 @@ import {
   classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  ExtractionDishDraftSchema,
+  ExtractionDraftEvidenceSchema,
+  ExtractionSourceRecordSchema,
+  ExtractionSourceSegmentSchema,
+  ExtractionSourceSpanSchema,
   FIVE_MINUTES_MICROS,
   HealthResponseSchema,
   MAX_AGGREGATE_PASSAGE_CHARS,
@@ -24,6 +20,8 @@ import {
   MAX_PASSAGES,
   MENU_TOKEN_AUDIENCE,
   MENU_TOKEN_TTL_SECONDS,
+  MenuExtractionResultSchema,
+  MenuIngestionQueueMessageSchema,
   MenuPublicationSchema,
   ObservationBatchV2Schema,
   ObservationConflictQueueMessageSchema,
@@ -41,6 +39,8 @@ import {
   parseIsoToMicroseconds,
   RetrievalRequestSchema,
   SourceReferenceSchema,
+  StructuredDishDraftSchema,
+  SubmitMenuIngestionRequestSchema,
   sha256,
   TWENTY_FOUR_HOURS_MICROS,
   toCanonicalObservation,
@@ -1054,7 +1054,6 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       ).toBe(false);
     });
   });
-
 });
 
 describe('observation.v2 contract', () => {

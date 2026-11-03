@@ -74,7 +74,6 @@ import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
-
 export type Bindings = {
   APP_ENV?: string;
   AUTH_ISSUER?: string;
@@ -138,6 +137,20 @@ type Dependencies = {
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
+  verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
+  consumeObservationRateLimit?: (
+    jti: string,
+    env: Bindings,
+  ) => Promise<{ allowed: boolean; retryAfterSeconds: number }>;
+  enqueueObservation?: (message: ObservationQueueEnvelope, env: Bindings) => Promise<void>;
+  now?: () => Date;
+  readPublicMenu?: (
+    venueId: string,
+    menuId: string,
+    env: Bindings,
+  ) => Promise<PublicMenuRecord | undefined>;
+  issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
+  readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
     actorId: string,
     venueId: string,
@@ -400,8 +413,6 @@ const dependencies: Dependencies = {
   },
 };
 
-
-
 export async function approveDishDraftAtomic(
   client: Client,
   actorId: string,
@@ -523,8 +534,6 @@ export async function approveDishDraftAtomic(
     throw error;
   }
 }
-
-
 
 export function createApp(services: Dependencies = dependencies) {
   const app = new Hono<{ Bindings: Bindings }>();
@@ -767,9 +776,8 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await retrieverFn(retrievalRequest);
     return c.json(result);
   });
-  
 
-app.post('/venues/:venueId/menus/jobs', async (c) => {
+  app.post('/venues/:venueId/menus/jobs', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
       return c.json({ error: 'unauthorized' }, 401);
@@ -930,7 +938,6 @@ app.post('/venues/:venueId/menus/jobs', async (c) => {
     );
     return c.json(result);
   });
-  
 
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
@@ -1031,8 +1038,6 @@ export async function handleQueueBatch(
   }
 }
 
-
-
 export function createWorker(
   services: Dependencies = dependencies,
   queueServices: QueueHandlerServices = {},
@@ -1056,7 +1061,11 @@ export function createWorker(
   return Object.assign(app, { queue });
 }
 
-export { type ConsumerBindings, createObservationQueueHandler as createQueueHandler, type QueueHandlerServices };
+export {
+  type ConsumerBindings,
+  createObservationQueueHandler as createQueueHandler,
+  type QueueHandlerServices,
+};
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();
