@@ -93,7 +93,7 @@ describe('fixture menu source', () => {
 
   it('keeps every validated allergen, including one without an icon, for chip wrapping', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.gardenAvocadoSalad);
-    expect(dish.allergens).toEqual(['Tree nuts', 'Peanuts', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
+    expect(dish.allergens).toEqual(['Nuts', 'Peanuts', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
     expect(dish.dietary).toEqual(['Vegan', 'Vegetarian']);
   });
 
@@ -197,6 +197,25 @@ describe('menu adapter', () => {
       ...ALLERGENS.map((a) => a.label),
       'Lupin',
     ]);
+  });
+
+  it('shows older "tree nut" data with the current Nuts label', () => {
+    const result = toMenu(
+      {
+        ...edgeCaseBundle,
+        categories: [
+          {
+            category_id: CATEGORY.breakfast,
+            name: 'B',
+            dishes: [{ ...wireDish(), allergens: ['tree nut', 'Tree nuts', 'peanut'] }],
+          },
+        ],
+      },
+      'fixture',
+      FIXTURE_PUBLICATION_REVISION_ID,
+    );
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual(['Nuts', 'Peanuts']);
   });
 
   it('still suppresses Gluten-free when an unlisted Gluten value is given', () => {
