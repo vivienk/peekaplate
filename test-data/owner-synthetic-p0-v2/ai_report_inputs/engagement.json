@@ -1,0 +1,32 @@
+{
+  "fixture_id": "engagement",
+  "report_type": "authorized_engagement_definitions",
+  "data_scope": "fictional_synthetic_restaurant",
+  "definitions": {
+    "active_visible_time": "Use valid linked cumulative opening checkpoints to assess engagement qualification, including nonfinal checkpoints. Do not add cumulative checkpoint values together. Calculate completed-opening timing averages separately using final valid checkpoints only.",
+    "checkpoint_semantics": "Cumulative checkpoints describe progress within the same opening and must not be summed. A valid linked nonfinal checkpoint with cumulative_active_ms >= 10000 can establish provisional engagement without a final checkpoint. Completed-opening timing averages use only final valid checkpoints.",
+    "comparison_picker": "Opening a comparison picker does not count as a displayed comparison.",
+    "qualifying_comparison": "A comparison qualifies only when it is displayed and linked to a valid dish opening.",
+    "considered_dish": "A dish qualifies when a valid linked opening checkpoint reaches at least 10000 milliseconds of cumulative active-visible time, even if the checkpoint is nonfinal, OR when there is a qualifying displayed comparison. A final checkpoint is not required for provisional engagement qualification.",
+    "short_opening": "Opening a dish for fewer than 10 seconds does not automatically establish meaningful engagement.",
+    "deduplication": "Count each qualifying dish once per visit."
+  },
+  "comparison_attribution": {
+    "status": "PROVISIONAL_PENDING_PRODUCT_CONFIRMATION",
+    "current_test_assumption": "Only the dish linked to the opening qualifies.",
+    "unresolved_question": "Should a displayed comparison qualify both displayed dishes?"
+  },
+  "metrics": [
+    {
+      "metric": "considered_dishes_per_visit",
+      "status": "SUPPRESSED",
+      "value": null
+    }
+  ],
+  "privacy": {
+    "minimum_eligible_sessions": 10,
+    "raw_events_included": false,
+    "checkpoint_histories_included": false,
+    "individual_diner_data_included": false
+  }
+}

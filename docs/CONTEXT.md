@@ -13,12 +13,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts, canonical observation types, receipts, canonical JSON, microsecond time helpers, S3-VIS-04 bounded menu evidence retrieval schemas, and S3-VIS-01 / VIS-02 menu extraction and structured dish draft contracts (MenuExtractionResultSchema supporting schema 1/pipeline 2 and schema 2/pipeline 3 with subcategory, category_page_number, price_text, candidate_id, draft_index; ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, ExtractionSourceRecordSchema, ExtractionSourceSegmentSchema, ExtractionCaptureRequestSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; offsets, rank sequences, decimal price precision, and aggregate context limits strictly enforced.",
+      "summary": "Strict staff/publication/public-menu, analytics, owner report, S3-VIS-04 bounded retrieval, and S3-VIS-01 / VIS-02 menu extraction contracts (MenuExtractionResultSchema supporting schema 1/pipeline 2 and schema 2/pipeline 3 with subcategory, category_page_number, price_text, candidate_id, draft_index; ExtractionDishDraftSchema, ExtractionDraftEvidenceSchema, ExtractionSourceSpanSchema, StructuredDishDraftSchema, SubmitMenuIngestionRequestSchema, ApproveDishDraftRequestSchema, JobScopeSchema, DraftScopeSchema). Observation contracts normalize through ObservationV2 before hashing; offsets, rank sequences, and decimal price precision strictly enforced.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
-        "packages/contracts/fixtures/observation.v2/README.md"
+        "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -26,7 +28,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "37432edb0d728437a4c981103c8fa0b2576f07a38cbbc4350dea4f755652d220"
+      "sourceFingerprint": "4411e44090c6874530eb4aeb3725e25abe5d3581ebf3e0ff8b5cc8dd375046b0"
     },
     {
       "id": "tokens",
@@ -64,7 +66,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -81,7 +83,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/fixtures.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
-        "vitest.config.ts"
+        "vitest.config.ts",
+        "frontend/diner/src/save/storage.ts",
+        "frontend/diner/src/save/storage.test.ts",
+        "frontend/diner/src/save/save-state.ts",
+        "frontend/diner/src/save/save-state.test.ts",
+        "frontend/diner/src/save/fake-storage.ts",
+        "frontend/diner/src/save/saved-list.ts",
+        "tests/e2e/save.spec.ts",
+        "frontend/diner/src/compare/picker.ts",
+        "frontend/diner/src/compare/picker.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -91,7 +102,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tokens",
         "ui"
       ],
-      "sourceFingerprint": "bd34d8c1a4660f6aae9970e7ae5790465c19d969e9af25f03930bed24f2ab90b"
+      "sourceFingerprint": "77575cbc7d964ba6e361d11815dc2d1adb644f7d311184c39317ab84230138f4"
     },
     {
       "id": "console",
@@ -304,7 +315,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/menu-ingestion-infra.test.mjs",
         "pnpm-lock.yaml",
         "docs/res02-staging-acceptance.json",
-        "docs/observation-staging-acceptance.json"
+        "docs/observation-staging-acceptance.json",
+        "docs/observation-facts-staging-acceptance.json"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -315,7 +327,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6169c6f3ad07c1f6f7d15ba68e47b8e7a79785d4e06f897c29b6f4c2fced9c11"
+      "sourceFingerprint": "d94914a673fa469428858594c3d9dc2aa08e646d1a442bd85301083572b54744"
     },
     {
       "id": "agents",
@@ -426,13 +438,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "November 3 PR45 reconciliation (Teeyansh): Finalized S3-VIS-01 menu ingestion orchestration reconciling ADR 0016 (PR #44), Mohammad's extraction bundle contract (PR #58), and develop observation/publication pipelines. Accepts URL (with SSRF protections), PDF, and photo ingestion into Cloudflare Queue; routes to Python extraction transport with signed capabilities; adapts schemas 1/2 and pipelines 2/3; stores durable report artifacts; persists draft dishes with atomic approval and es_command idempotency.",
+      "summary": "November 3 PR45 reconciliation (Teeyansh): Finalized S3-VIS-01 menu ingestion orchestration reconciling ADR 0016 (PR #44), Mohammad's extraction bundle contract (PR #58), and develop observation/publication/save pipelines. Accepts URL (with SSRF protections), PDF, and photo ingestion into Cloudflare Queue; routes to Python extraction transport with signed capabilities; adapts schemas 1/2 and pipelines 2/3; stores durable report artifacts; persists draft dishes with atomic approval and es_command idempotency.",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
       "next": "Keep menu queues paused. Review Worker consumer binding, batch/concurrency limits, and DLQ together, then run controlled source → extraction → private report → drafts/ACK acceptance before enabling submissions."
+    },
+    {
+      "summary": "November 2 S3-DIN-02.1 Save state: createSaveState(venueId, options) in frontend/diner/src/save/save-state.ts with initial savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
     },
     {
       "summary": "November 1 PR31 reconciliation retains merged PR70 producer/publication contracts, trusted traffic_class, payload normalization and every develop module/history. The fractional timestamp fix now classifies in PostgreSQL. Consumer scope is append-only canonical index/conflict persistence; R2 checksum metadata is required when restoring sanitized conflict archives. No hosted activation is implied by local tests.",
@@ -498,13 +517,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Wire search bar into diner screen and test user interaction."
     },
     {
-      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Integrate MenuSource with diner menu presentation."
-    },
-    {
       "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
       "modules": [
         "backend",
@@ -515,4 +527,3 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ]
 }
 ```
-
