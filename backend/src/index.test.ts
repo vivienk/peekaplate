@@ -1135,3 +1135,134 @@ describe('RES-02 publication HTTP boundary', () => {
     expect(approve).not.toHaveBeenCalled();
   });
 });
+import { describe, it, expect, vi } from 'vitest';
+
+describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', () => {
+  
+  it('1. Case < 10 sessions: Should return SUPPRESSED status and null values', async () => {
+    // Simulation d'un plat ayant seulement 5 sessions uniques au total
+    const mockDbResult = {
+      rows: [
+        {
+          dish_id: 'dish-123',
+          dish_name: 'Thieboudienne',
+          evidence_state: 'SUPPRESSED',
+          active_sessions_value: null,
+          active_sessions_status: 'SUPPRESSED',
+          open_rate_value: null,
+          open_rate_status: 'SUPPRESSED',
+          engagement_rate_value: null,
+          engagement_rate_status: 'SUPPRESSED',
+          save_rate_value: null,
+          save_rate_status: 'SUPPRESSED'
+        }
+      ]
+    };
+
+    // Injection de la fausse réponse de la base de données
+    const mockEnv = {
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+    };
+
+    // Appel simulé à votre application Hono
+    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data[0].evidence_state).toBe('SUPPRESSED');
+    expect(body.data[0].metrics.active_sessions.value).toBeNull();
+    expect(body.data[0].metrics.open_rate.status).toBe('SUPPRESSED');
+  });
+
+  it('2. Case with 0 total session: Should return NOT_MEASURABLE status', async () => {
+    const mockDbResult = {
+      rows: [
+        {
+          dish_id: 'dish-456',
+          dish_name: 'Yassa Poulet',
+          evidence_state: 'NORMAL',
+          active_sessions_value: 12, // Le plat global passe le plancher
+          active_sessions_status: 'NORMAL',
+          open_rate_value: null,
+          open_rate_status: 'NOT_MEASURABLE', // Mais ce taux précis a un dénominateur à 0
+          engagement_rate_value: null,
+          engagement_rate_status: 'NOT_MEASURABLE',
+          save_rate_value: null,
+          save_rate_status: 'NOT_MEASURABLE'
+        }
+      ]
+    };
+
+    const mockEnv = {
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+    };
+
+    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const body = await res.json();
+
+    expect(body.data[0].metrics.open_rate.status).toBe('NOT_MEASURABLE');
+    expect(body.data[0].metrics.open_rate.value).toBeNull();
+  });
+
+  it('3. Case with valid sessions but 0 engagement: Should return VALID_ZERO status', async () => {
+    const mockDbResult = {
+      rows: [
+        {
+          dish_id: 'dish-789',
+          dish_name: 'Pastels',
+          evidence_state: 'NORMAL',
+          active_sessions_value: 25,
+          active_sessions_status: 'NORMAL',
+          open_rate_value: '0.400',
+          open_rate_status: 'NORMAL',
+          engagement_rate_value: '0.000',
+          engagement_rate_status: 'VALID_ZERO', // 0 engagement vérifié sur un volume > 10
+          saved_dishes: '0.000',
+          save_rate_status: 'VALID_ZERO'
+        }
+      ]
+    };
+
+    const mockEnv = {
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+    };
+
+    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const body = await res.json();
+
+    expect(body.data[0].metrics.engagement_rate.status).toBe('VALID_ZERO');
+    expect(body.data[0].metrics.engagement_rate.value).toBe(0);
+  });
+
+  it('4. Boundary Case "2-of-20" sessions (Sai Requirement)', async () => {
+    const mockDbResult = {
+      rows: [
+        {
+          dish_id: 'dish-999',
+          dish_name: 'Mafé',
+          evidence_state: 'NORMAL',
+          active_sessions_value: 20, // Passe le plancher global de 20
+          active_sessions_status: 'NORMAL',
+          open_rate_value: '0.100', // 2 ouvertures sur 20 sessions = 10%
+          open_rate_status: 'NORMAL',
+          engagement_rate_value: null, 
+          engagement_rate_status: 'SUPPRESSED', // Supprimé si les sessions contributrices < 10
+          save_rate_value: null,
+          save_rate_status: 'SUPPRESSED'
+        }
+      ]
+    };
+
+    const mockEnv = {
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+    };
+
+    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const body = await res.json();
+
+    expect(body.data[0].metrics.active_sessions.value).toBe(20);
+    expect(body.data[0].metrics.engagement_rate.status).toBe('SUPPRESSED');
+    expect(body.data[0].metrics.engagement_rate.value).toBeNull();
+  });
+});

@@ -46,6 +46,7 @@ import { retrieveMenuEvidence } from './retrieval';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
+
 export type Bindings = {
   APP_ENV?: string;
   AUTH_ISSUER?: string;
@@ -364,6 +365,100 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
+  app.get('/api/v1/owner/analytics/dishes', async (c) => {
+  const tenantId = c.get('jwtPayload')?.tenant_id || c.req.query('venue_id'); 
+
+  if (!tenantId) {
+    return c.json({ success: false, error: 'Missing authentication or venue identifier' }, 400);
+  }
+
+  const query = `
+    SELECT 
+        v.dish_id,
+        v.dish_name,
+        
+        -- 1. Active Sessions (Plancher global)
+        CASE 
+            WHEN v.total_sessions < 10 THEN 'SUPPRESSED'
+            ELSE 'NORMAL'
+        END AS evidence_state,
+        CASE WHEN v.total_sessions < 10 THEN NULL ELSE v.total_sessions END AS active_sessions_value,
+        CASE WHEN v.total_sessions < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS active_sessions_status,
+        
+        -- 2. Open Rate (Dénominateur = total_sessions)
+        CASE 
+            WHEN v.total_sessions < 10 THEN NULL 
+            ELSE ROUND(CAST(v.total_opens AS NUMERIC) / v.total_sessions, 3) 
+        END AS open_rate_value,
+        CASE 
+            WHEN v.total_sessions < 10 THEN 'SUPPRESSED'
+            WHEN v.total_sessions = 0 THEN 'NOT_MEASURABLE'
+            ELSE 'NORMAL'
+        END AS open_rate_status,
+
+        -- 3. Engagement Rate
+        CASE 
+            WHEN v.open_eligible_sessions < 10 THEN NULL 
+            ELSE ROUND(CAST(v.engaged_sessions AS NUMERIC) / v.total_opens, 3) 
+        END AS engagement_rate_value,
+        CASE 
+            WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED'
+            WHEN v.total_opens = 0 THEN 'NOT_MEASURABLE'
+            WHEN v.engaged_sessions = 0 THEN 'VALID_ZERO'
+            ELSE 'NORMAL'
+        END AS engagement_rate_status,
+
+        -- 4. Save Rate
+        CASE 
+            WHEN v.open_eligible_sessions < 10 THEN NULL 
+            ELSE ROUND(CAST(v.saved_dishes AS NUMERIC) / v.total_opens, 3) 
+        END AS save_rate_value,
+        CASE 
+            WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED'
+            WHEN v.total_opens = 0 THEN 'NOT_MEASURABLE'
+            WHEN v.saved_dishes = 0 THEN 'VALID_ZERO'
+            ELSE 'NORMAL'
+        END AS save_rate_status
+
+    FROM app_private.owner_observation_v1 v
+    WHERE v.venue_id = $1;
+  `;
+
+  try {
+    const result = await c.env.DB.query(query, [tenantId]);
+    const rows = result.rows || result.results || [];
+
+    const reportData = rows.map((row: any) => ({
+      dish_id: row.dish_id,
+      dish_name: row.dish_name,
+      evidence_state: row.evidence_state,
+      metrics: {
+        active_sessions: {
+          value: row.active_sessions_value ? parseInt(row.active_sessions_value, 10) : null,
+          status: row.active_sessions_status
+        },
+        open_rate: {
+          value: row.open_rate_value ? parseFloat(row.open_rate_value) : null,
+          status: row.open_rate_status
+        },
+        engagement_rate: {
+          value: row.engagement_rate_value ? parseFloat(row.engagement_rate_value) : null,
+          status: row.engagement_rate_status
+        },
+        save_rate: {
+          value: row.save_rate_value ? parseFloat(row.save_rate_value) : null,
+          status: row.save_rate_status
+        }
+      }
+    }));
+
+    return c.json({ success: true, data: reportData }, 200);
+
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Database error' }, 500);
+  }
+});
+
   app.use(
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
