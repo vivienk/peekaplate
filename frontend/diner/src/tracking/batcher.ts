@@ -67,12 +67,21 @@ function isFull(pending: Envelope[]): boolean {
 
 export function createBatcher(
   outbox: Outbox,
-  { deliver, triggers }: { deliver: Deliver; triggers: BatchTriggers },
+  {
+    deliver,
+    triggers,
+    now = () => Date.now(),
+  }: { deliver: Deliver; triggers: BatchTriggers; now?: () => number },
 ) {
   let flushing = false;
+  // Retry pause (agreed with Ehab and Jeffin, 3 Nov): TRK-01.3 delivery calls pauseUntil after a
+  // failed send, e.g. Date.now() + retryDelayMs(attempt, retryAfterMs), so a 429's Retry-After is
+  // honoured. While paused, every trigger skips sending; events keep queuing in the outbox.
+  let pausedUntil = 0;
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function flush() {
-    if (flushing || !triggers.isOnline()) return;
+    if (flushing || !triggers.isOnline() || now() < pausedUntil) return;
     const batch = nextBatch(outbox.pending());
     if (batch.length === 0) return;
     flushing = true;
@@ -99,7 +108,19 @@ export function createBatcher(
     added() {
       if (isFull(outbox.pending())) run();
     },
+    // Pauses every flush until timestampMs (Date.now() clock). The later time wins, so a shorter
+    // pause never cuts an existing one short, and one flush runs when the pause ends. In memory
+    // only; never throws.
+    pauseUntil(timestampMs: number) {
+      try {
+        if (!Number.isFinite(timestampMs) || timestampMs <= Math.max(pausedUntil, now())) return;
+        pausedUntil = timestampMs;
+        clearTimeout(resumeTimer);
+        resumeTimer = setTimeout(run, timestampMs - now());
+      } catch {}
+    },
     stop() {
+      clearTimeout(resumeTimer);
       clearInterval(timer);
       stopHidden();
       stopOnline();

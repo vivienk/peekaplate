@@ -256,3 +256,75 @@ describe('batching', () => {
     release();
   });
 });
+
+// Retry pause (agreed with Ehab and Jeffin, 3 Nov): TRK-01.3 delivery calls pauseUntil after a
+// failed send so retries back off and a 429's Retry-After is honoured.
+describe('retry pause', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'],
+    });
+  });
+
+  it('skips the timer, page-hidden, back-online and full-batch flushes while paused', async () => {
+    const { batches, outbox, batcher, page } = await setup(3);
+    batcher.pauseUntil(Date.now() + 60_000);
+    await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS * 2);
+    page.hide();
+    page.goOffline();
+    page.goOnline();
+    for (let n = 0; n < BATCH_MAX_ITEMS; n++) {
+      await outbox.add(envelope());
+      batcher.added();
+    }
+    await settle();
+    expect(batches).toEqual([]);
+    expect(outbox.pending()).toHaveLength(3 + BATCH_MAX_ITEMS);
+  });
+
+  it('runs one flush as soon as the pause ends, without waiting for the next tick', async () => {
+    const { batches, batcher } = await setup(3);
+    batcher.pauseUntil(Date.now() + 2_500);
+    await vi.advanceTimersByTimeAsync(2_499);
+    expect(batches).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(batches).toHaveLength(1);
+  });
+
+  it('lets the later time win: a shorter pause never cuts an existing one short', async () => {
+    const { batches, batcher } = await setup(3);
+    batcher.pauseUntil(Date.now() + 30_000);
+    batcher.pauseUntil(Date.now() + 1_000);
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(batches).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(batches).toHaveLength(1);
+  });
+
+  it('extends the pause when a later time arrives', async () => {
+    const { batches, batcher } = await setup(3);
+    batcher.pauseUntil(Date.now() + 1_000);
+    batcher.pauseUntil(Date.now() + 8_000);
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(batches).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(batches).toHaveLength(1);
+  });
+
+  it('ignores a time in the past or a non-number, and never throws', async () => {
+    const { batches, batcher } = await setup(3);
+    expect(() => batcher.pauseUntil(Date.now() - 1)).not.toThrow();
+    expect(() => batcher.pauseUntil(Number.NaN)).not.toThrow();
+    expect(() => batcher.pauseUntil(Number.POSITIVE_INFINITY)).not.toThrow();
+    await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS);
+    expect(batches).toHaveLength(1);
+  });
+
+  it('cancels the pending resume flush on stop', async () => {
+    const { batches, batcher } = await setup(3);
+    batcher.pauseUntil(Date.now() + 2_000);
+    batcher.stop();
+    await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS * 2);
+    expect(batches).toEqual([]);
+  });
+});

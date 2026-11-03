@@ -29,7 +29,7 @@ const devWarn = (message: string, detail?: string) => {
   if (import.meta.env.DEV) console.warn(`[track] ${message}`, ...(detail ? [detail] : []));
 };
 
-type Pipeline = { queue(envelope: Envelope): void };
+type Pipeline = { queue(envelope: Envelope): void; pauseUntil(timestampMs: number): void };
 
 function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): Pipeline {
   const now = () => Date.now();
@@ -49,6 +49,9 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
           batcher.added();
         })
         .catch(() => {});
+    },
+    pauseUntil(timestampMs) {
+      ready.then(({ batcher }) => batcher.pauseUntil(timestampMs)).catch(() => {});
     },
   };
 }
@@ -72,6 +75,16 @@ const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
 export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
   mode = 'live';
   liveDeliver = deliver;
+}
+
+// For TRK-01.3 delivery: after a failed send, pause live delivery until timestampMs (Date.now()
+// clock), e.g. Date.now() + retryDelayMs(attempt, retryAfterMs). The later time wins, one flush
+// runs when it ends, it is in memory only and never throws. Fixture mode never sends, so it is a
+// no-op there, as it is before any live event has been queued.
+export function pauseDeliveryUntil(timestampMs: number): void {
+  try {
+    if (mode === 'live') pipelines.live?.pauseUntil(timestampMs);
+  } catch {}
 }
 
 function pipeline(): Pipeline {

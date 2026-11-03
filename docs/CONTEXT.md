@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite shell, readable without JavaScript, with optional consent-gated PostHog shell views; dish intent adapter awaits real controls. S3-DIN-01.1: replaceable menu source, the only wire-to-diner adapter and \"Fixture data\" synthetic fixtures. S3-DIN-01.4: searchMenu returns matching complete-dish IDs and the staff allergy line flag. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback, reload re-check, stale-tab-safe writes. S3-DIN-01.5/S3-TRK-01: track() and menu_viewed/dish_detail_opened triggers build observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) plus the activity clock. Fixture mode only logs; live mode needs the default-off consent flag, queues in an IndexedDB outbox (500/1 MiB/24 h) and batches 25 events/32 KiB every 5 s; nothing is sent until TRK-01.3. No screen uses these yet; see docs/posthog.md.",
+      "summary": "Static TypeScript/Vite shell, readable without JavaScript, with optional consent-gated PostHog shell views; dish intent adapter awaits real controls. S3-DIN-01.1: replaceable menu source, the only wire-to-diner adapter and \"Fixture data\" synthetic fixtures. S3-DIN-01.4: searchMenu returns matching complete-dish IDs and the staff allergy line flag. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback, reload re-check, stale-tab-safe writes. S3-DIN-01.5/S3-TRK-01: track() and menu_viewed/dish_detail_opened triggers build observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) plus the activity clock. Fixture mode only logs; live mode needs the default-off consent flag, queues in an IndexedDB outbox (500/1 MiB/24 h) and batches 25 events/32 KiB every 5 s, with a retry pause (pauseDeliveryUntil) for TRK-01.3. No screen uses these yet; see docs/posthog.md.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -118,7 +118,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3be0129057079f77eb48ed77805c02dd78852369c43d46c9a1a8845d0e65da89"
+      "sourceFingerprint": "5b62c29af14fc3b2ed91a47cfa94791f49b953eb98ca885c9fd0bde6361619fc"
     },
     {
       "id": "console",

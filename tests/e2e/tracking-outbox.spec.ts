@@ -129,6 +129,27 @@ test('25 queued events go as one full batch straight away, without hiding the pa
   expect(Date.now() - started).toBeLessThan(2_000);
 });
 
+test('pauseDeliveryUntil holds every flush until the pause ends, then sends once by itself', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true });
+  await trackMenuViewed(page, 1);
+  await expect.poll(() => storedEvents(page)).toBe(1);
+  await page.evaluate(() => {
+    const { tracking } = window as unknown as {
+      tracking: { pauseDeliveryUntil(timestampMs: number): void };
+    };
+    tracking.pauseDeliveryUntil(Date.now() + 2_000);
+  });
+  // A hidden page and a full batch would both normally send straight away.
+  await trackMenuViewed(page, 24);
+  await hidePage(page);
+  await page.waitForTimeout(1_000);
+  expect(await delivered(page)).toBe(0);
+  await expect.poll(() => delivered(page), { timeout: 4_000 }).toBe(25);
+});
+
 test('a full outbox drops the oldest events with a developer warning, and the page keeps working', async ({
   page,
 }) => {
