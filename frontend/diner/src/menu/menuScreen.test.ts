@@ -100,6 +100,7 @@ describe('menu screen category visibility', () => {
     expect(tags[0]).toContain('data-category-id="all"');
     expect(tags[0]).not.toContain('hidden');
 
+    // Every category block after it is hidden.
     for (let i = 1; i < tags.length; i++) {
       expect(tags[i]).toContain('hidden');
     }
@@ -112,9 +113,9 @@ describe('menu screen category visibility', () => {
 
     const tabs =
       container.innerHTML.match(/<button class="pp-tab[^>]*data-category-id="[^"]*"/g) ?? [];
-    const categories = extractCategoryTags(container.innerHTML).length;
+    const blocks = extractCategoryTags(container.innerHTML).length;
 
-    expect(tabs.length).toBe(categories);
+    expect(tabs.length).toBe(blocks);
     expect(tabs[0]).toContain('data-category-id="all"');
   });
 });

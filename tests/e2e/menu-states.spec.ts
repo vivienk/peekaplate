@@ -64,7 +64,9 @@ test('incomplete placeholder is non-interactive and accessible', async ({ page }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://127.0.0.1:5173/?scenario=edge-cases');
 
-  const placeholder = page.locator('.pp-card--placeholder').first();
+  const placeholder = page
+    .locator('.pp-category:not([data-category-id="all"]) .pp-card--placeholder')
+    .first();
   await expect(placeholder).toBeAttached({ timeout: 10_000 });
   const categoryId = await placeholder
     .locator('xpath=ancestor::div[contains(@class,"pp-category")]')
@@ -119,15 +121,17 @@ test('only selected category is visible', async ({ page }) => {
   await waitForFinalState(page, 'demo');
 
   const categories = page.locator('.pp-category');
-  await expect(categories).toHaveCount(3);
+  await expect(categories).toHaveCount(4);
   await expect(categories.nth(0)).toBeVisible();
   await expect(categories.nth(1)).toBeHidden();
   await expect(categories.nth(2)).toBeHidden();
+  await expect(categories.nth(3)).toBeHidden();
 
   await page.getByRole('button', { name: 'Brunch Bowls' }).click();
   await expect(categories.nth(0)).toBeHidden();
-  await expect(categories.nth(1)).toBeVisible();
-  await expect(categories.nth(2)).toBeHidden();
+  await expect(categories.nth(1)).toBeHidden();
+  await expect(categories.nth(2)).toBeVisible();
+  await expect(categories.nth(3)).toBeHidden();
 });
 
 for (const width of [320, 390]) {
@@ -184,7 +188,9 @@ test('keyboard open and back restores category and focus', async ({ page }) => {
     'false',
   );
 
-  await expect(page.locator(`[data-open-dish-id="${dishId}"]`)).toBeFocused();
+  await expect(
+    page.locator(`.pp-category:not([hidden]) [data-open-dish-id="${dishId}"]`),
+  ).toBeFocused();
 });
 
 test('delayed-load regression: empty with delayMs=3000', async ({ page }) => {
@@ -301,4 +307,19 @@ test('observers are disconnected across open/Back cycles', async ({ page }) => {
     expect(await liveCount()).toBe(0);
     await page.locator('.pp-detail__back').click();
   }
+});
+
+test('All tab is selected by default and shows every dish', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await waitForFinalState(page, 'demo');
+
+  await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.pp-category:not([hidden]) .pp-card')).toHaveCount(5);
+
+  await page.getByRole('button', { name: 'Salads', exact: true }).click();
+  await expect(page.locator('.pp-category:not([hidden]) .pp-card')).toHaveCount(1);
 });

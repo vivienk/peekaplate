@@ -140,7 +140,7 @@ p {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 0 solid #f89537;
+  border: 0;
   border-radius: 8px;
   background: transparent;
   color: #fafafa;
@@ -462,14 +462,12 @@ main:has(> .pp-detail) {
 .pp-detail__save {
   justify-self: end;
 }
-.pp-detail__title {
-  text-align: center;
-}
 
 .pp-detail__title {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+  text-align: center;
 }
 
 .pp-detail__image-wrap {
@@ -494,6 +492,7 @@ main:has(> .pp-detail) {
   height: auto;
   aspect-ratio: 1 / 1;
   background: #1f222a;
+  filter: none;
 }
 
 .pp-detail__section {
@@ -516,7 +515,7 @@ main:has(> .pp-detail) {
 
 .pp-detail__name-row {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: flex-start;
   gap: 4px;
 }

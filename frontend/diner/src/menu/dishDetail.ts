@@ -1,3 +1,4 @@
+import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
 function escapeHtml(value: string): string {
@@ -7,10 +8,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function money(dish: CompleteDish): string {
-  return `${dish.price.currency} ${dish.price.amount}`.trim();
 }
 
 function allergenChips(dish: CompleteDish): string {
@@ -86,7 +83,7 @@ export function renderDishDetail(
         <p class="pp-detail__category">${escapeHtml(dish.categoryName)}</p>
         <div class="pp-detail__name-row">
           <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
-          <p class="pp-detail__price">${escapeHtml(money(dish))}</p>
+          <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
         </div>
         <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
 

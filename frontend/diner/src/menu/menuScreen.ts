@@ -1,6 +1,7 @@
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { formatPrice } from './price';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
@@ -38,10 +39,6 @@ function delayFromQuery(): number | undefined {
   if (value === null) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
-function money(dish: CompleteDish): string {
-  return `${dish.price.currency} ${dish.price.amount}`.trim();
 }
 
 function escapeHtml(value: string): string {
@@ -92,7 +89,7 @@ function renderCard(dish: CompleteDish): string {
       <div class="pp-card__body">
         <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
         <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}"><span class="pp-card__name-text">${escapeHtml(dish.name)}</span></button></h2>
-        <p class="pp-card__price">${escapeHtml(money(dish))}</p>
+        <p class="pp-card__price">${escapeHtml(formatPrice(dish.price))}</p>
         <button class="pp-card__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
         <span aria-hidden="true">♡</span><span aria-hidden="true">Save</span>
         </button>
