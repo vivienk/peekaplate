@@ -178,7 +178,7 @@ export const PublicMenuAllergenCodeSchema = z.enum([
   'egg',
   'fish',
   'crustacean shellfish',
-  'tree nut',
+  'nuts',
   'peanut',
   'wheat',
   'soy',
