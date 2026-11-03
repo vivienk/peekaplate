@@ -1249,26 +1249,46 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       );
     });
 
-    it('rejects raw URL submission before job creation or queue dispatch', async () => {
-      const idemKey = `idem_url_reject_${crypto.randomUUID()}`;
+    it('rejects SSRF URL submission before job creation or queue dispatch and accepts valid URL submission', async () => {
+      const ssrfIdemKey = `idem_url_ssrf_${crypto.randomUUID()}`;
       await expect(
         submitMenuIngestion(runtimeClient, {
           venueId,
           sourceType: 'url',
-          sourceUrl: 'https://example.com/menu',
-          idempotencyKey: idemKey,
+          sourceUrl: 'http://169.254.169.254/latest/meta-data',
+          idempotencyKey: ssrfIdemKey,
         }),
       ).rejects.toMatchObject({
-        code: 'unsupported_source_type',
+        code: 'ssrf_destination_prohibited',
         status: 400,
       });
 
-      // Verify no job was created in database
+      // Verify no job was created in database for SSRF
       const check = await adminClient.query(
         `SELECT id FROM app_private.menu_ingestion_jobs WHERE tenant_id = $1 AND idempotency_key = $2`,
-        [venueId, idemKey],
+        [venueId, ssrfIdemKey],
       );
       expect(check.rowCount).toBe(0);
+
+      // Verify valid URL ingestion creates job
+      const validIdemKey = `idem_url_valid_${crypto.randomUUID()}`;
+      const validJob = await submitMenuIngestion(runtimeClient, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: validIdemKey,
+      });
+      expect(validJob.status).toBe('queued');
+      expect(validJob.source_type).toBe('url');
+      expect(validJob.source_url).toBe('https://example.com/menu');
+
+      const checkValid = await adminClient.query(
+        `SELECT id, status, source_type, source_url FROM app_private.menu_ingestion_jobs WHERE tenant_id = $1 AND idempotency_key = $2`,
+        [venueId, validIdemKey],
+      );
+      expect(checkValid.rowCount).toBe(1);
+      expect(checkValid.rows[0].source_type).toBe('url');
+      expect(checkValid.rows[0].source_url).toBe('https://example.com/menu');
     });
   });
 });

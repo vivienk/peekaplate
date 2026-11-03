@@ -120,19 +120,29 @@ function createMockClient() {
 describe('Ingestion Orchestrator', () => {
   const venueId = '00000000-0000-0000-0000-000000000501';
 
-  it('submitMenuIngestion rejects unmaterialized url/text and enforces sourceHash on pdf/photo', async () => {
+  it('submitMenuIngestion accepts valid url, rejects invalid/ssrf url, rejects text, and enforces sourceHash on pdf/photo', async () => {
     const { client } = createMockClient();
 
-    // Rejects url at submission boundary until materialization is connected
+    // Accepts valid url
+    const urlJob = await submitMenuIngestion(client, {
+      venueId,
+      sourceType: 'url',
+      sourceUrl: 'https://example.com/menu',
+      idempotencyKey: 'idem_url_accept',
+    });
+    expect(urlJob.status).toBe('queued');
+    expect(urlJob.source_type).toBe('url');
+    expect(urlJob.source_url).toBe('https://example.com/menu');
+
+    // Rejects url without sourceUrl
     await expect(
       submitMenuIngestion(client, {
         venueId,
         sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
-        idempotencyKey: 'idem_url_reject',
+        idempotencyKey: 'idem_url_no_url',
       }),
     ).rejects.toMatchObject({
-      code: 'unsupported_source_type',
+      code: 'invalid_source_url',
       status: 400,
     });
 
@@ -143,6 +153,19 @@ describe('Ingestion Orchestrator', () => {
     expect(() => validateIngestionUrl('https://user:pass@example.com/menu')).toThrowError();
     expect(() => validateIngestionUrl('https://example.com:8080/menu')).toThrowError();
     expect(validateIngestionUrl('https://example.com/menu').href).toBe('https://example.com/menu');
+
+    // Rejects SSRF attempt through submitMenuIngestion directly
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'http://169.254.169.254/latest/meta-data',
+        idempotencyKey: 'idem_url_ssrf',
+      }),
+    ).rejects.toMatchObject({
+      code: 'ssrf_destination_prohibited',
+      status: 400,
+    });
 
     // Accepts pdf with valid sourceHash
     const pdfJob = await submitMenuIngestion(client, {

@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "environment": "staging",
+  "release": "35e989d7c533c858decf0a95d5ac987fbb8223ad",
+  "workerVersion": "3db23304-c53a-4fee-b0ba-260c3afe4060",
+  "verifiedAt": "2026-11-02T06:57:30.031Z",
+  "scope": "Actual deployed consumer Queue/R2/PostgreSQL index/conflict/ACK/DLQ; operator-bound ingestion, not public diner authenticated HTTP or typed-fact acceptance",
+  "runId": "ca0cea22-2de1-4bf6-8bc2-694311924dcc",
+  "seconds": 236.252,
+  "syntheticFixture": {
+    "label": "Operator-only synthetic observation acceptance; not restaurant/customer data",
+    "venue": "4c1b9f0d-cc45-4229-828e-e239b6906ac8",
+    "otherVenue": "dc1a5e5d-4895-4b06-a778-f27a2ab3effd",
+    "eventIds": {
+      "normal": "cd515f29-4782-43dd-9347-e2b9aa7f2289",
+      "mixed": "ee294289-d070-4161-b843-ef155d879215",
+      "r2Fault": "4cf6570d-193d-4099-be52-5bd0644f39f6",
+      "dbFault": "46aad945-b666-4a00-bb50-e63402d35420"
+    },
+    "trafficClass": "test"
+  },
+  "pipelineChecks": [
+    {
+      "label": "real restricted Hyperdrive and forced tenant policies",
+      "result": "PASS",
+      "seconds": 5.387,
+      "detail": {
+        "identity": {
+          "login": "peekaplate_staging_login",
+          "rolsuper": false,
+          "rolbypassrls": false
+        },
+        "counts": {
+          "index_without_tenant": 0,
+          "facts_without_tenant": 0
+        },
+        "policies": {
+          "tables": 11,
+          "forced_rls": true
+        }
+      }
+    },
+    {
+      "label": "source and DLQ empty before synthetic test",
+      "result": "PASS",
+      "seconds": 2.304,
+      "detail": {
+        "source": {
+          "backlogCount": 0,
+          "backlogBytes": 0
+        },
+        "dlq": {
+          "backlogCount": 0,
+          "backlogBytes": 0
+        }
+      }
+    },
+    {
+      "label": "normal producer receipts and deployed consumer persistence",
+      "result": "PASS",
+      "seconds": 35.233,
+      "detail": {
+        "contract": "observation-receipt.v1",
+        "request_id": "1a5a7979-8220-423d-9e7c-bfacbab4c855",
+        "receipts": [
+          {
+            "event_id": "cd515f29-4782-43dd-9347-e2b9aa7f2289",
+            "status": "accepted",
+            "reason_code": null,
+            "retryable": false
+          },
+          {
+            "event_id": "cd515f29-4782-43dd-9347-e2b9aa7f2289",
+            "status": "accepted",
+            "reason_code": "duplicate_in_batch",
+            "retryable": false
+          }
+        ]
+      }
+    },
+    {
+      "label": "duplicate redelivery ACKs without index or conflict duplication",
+      "result": "PASS",
+      "seconds": 36.472
+    },
+    {
+      "label": "conflicting reuse preserves original and archives distinct evidence",
+      "result": "PASS",
+      "seconds": 33.609
+    },
+    {
+      "label": "mixed publication conflict durably quarantines safe evidence",
+      "result": "PASS",
+      "seconds": 35.885
+    },
+    {
+      "label": "controlled r2 failure retries then recovers with real storage/database",
+      "result": "PASS",
+      "seconds": 0.765,
+      "detail": {
+        "first": {
+          "status": "retry"
+        },
+        "second": {
+          "status": "acknowledged",
+          "reason": "persisted"
+        },
+        "injectedFailure": true
+      }
+    },
+    {
+      "label": "controlled db failure retries then recovers with real storage/database",
+      "result": "PASS",
+      "seconds": 0.985,
+      "detail": {
+        "first": {
+          "status": "retry"
+        },
+        "second": {
+          "status": "acknowledged",
+          "reason": "persisted"
+        },
+        "injectedFailure": true
+      }
+    },
+    {
+      "label": "malformed source delivery exhausts retries and reaches actual DLQ",
+      "result": "PASS",
+      "seconds": 74.082,
+      "detail": {
+        "metricsBeforePull": {
+          "source": {
+            "backlogCount": 0,
+            "backlogBytes": 0,
+            "oldestMessageTimestamp": "2026-11-02T06:56:06.297Z"
+          },
+          "dlq": {
+            "backlogCount": 1,
+            "backlogBytes": 80
+          }
+        },
+        "ownMessageId": "c5eac268200bd57cd311ca9aa406d406",
+        "dlqDeliveryAttempts": 0
+      }
+    },
+    {
+      "label": "final canonical evidence and tenant boundary",
+      "result": "PASS",
+      "seconds": 1.339,
+      "detail": {
+        "indexRows": 3,
+        "conflictRows": 3,
+        "archives": 6,
+        "ownerRows": 0,
+        "crossTenantRows": 0
+      }
+    }
+  ],
+  "httpChecks": [
+    {
+      "label": "health",
+      "path": "/health",
+      "status": 200,
+      "requestId": "8001fac4-d23f-4fd7-a32e-bdb8bea9c09a"
+    },
+    {
+      "label": "public JWKS retains key and excludes private fields",
+      "path": "/.well-known/jwks.json",
+      "status": 200,
+      "requestId": "d2ecdcff-0752-4b98-9754-7066534815d1"
+    },
+    {
+      "label": "missing observation token denied",
+      "path": "/observations",
+      "status": 401,
+      "requestId": "273d3f2a-3296-4bfb-a480-a4277853fefc"
+    },
+    {
+      "label": "invalid observation token denied",
+      "path": "/observations",
+      "status": 401,
+      "requestId": "9109a616-ad26-41e3-8faa-4a817aeb90ce"
+    },
+    {
+      "label": "oversized observation body bounded",
+      "path": "/observations",
+      "status": 413,
+      "requestId": "11504c61-7b66-4d3a-80a4-bd6455f93815"
+    },
+    {
+      "label": "exact diner origin preflight",
+      "path": "/observations",
+      "status": 204,
+      "requestId": "16a69d4c-c3de-4f30-a306-2d249d473484"
+    },
+    {
+      "label": "untrusted origin preflight has no permission",
+      "path": "/observations",
+      "status": 204,
+      "requestId": "6cf6dd8a-165e-4dda-98da-9d57d05f8777"
+    },
+    {
+      "label": "withdrawn synthetic publication remains hidden",
+      "path": "/public/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe",
+      "status": 404,
+      "requestId": "054c30e8-9fef-47a4-8fa0-75e64adab1da"
+    },
+    {
+      "label": "team events remains protected",
+      "path": "/team/analytics/events",
+      "status": 401,
+      "requestId": "c06595e0-f970-42ce-8d9d-0edc350d3ed3"
+    },
+    {
+      "label": "team summary remains protected",
+      "path": "/team/analytics/summary",
+      "status": 401,
+      "requestId": "88dcb18d-c2ca-443d-b7d5-f73433a49b09"
+    },
+    {
+      "label": "staff approvals remains protected",
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/approvals",
+      "status": 401,
+      "requestId": "e1d70866-df2c-4107-a76b-cbb92ff91cfd"
+    },
+    {
+      "label": "staff publications remains protected",
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/publications",
+      "status": 401,
+      "requestId": "38cad929-c96a-48b6-9376-85ae079b1666"
+    },
+    {
+      "label": "staff withdrawals remains protected",
+      "path": "/venues/25325815-7e50-4a25-a3c9-e58fb94eb378/menus/d64b419d-3b62-4d18-bcff-d9c3e78735fe/withdrawals",
+      "status": 401,
+      "requestId": "0a0df067-c38f-4892-b0b0-c22afb8fffa6"
+    },
+    {
+      "label": "existing Pages shell",
+      "url": "https://peekaplate-diner-staging.pages.dev/",
+      "status": 200
+    },
+    {
+      "label": "existing Pages shell",
+      "url": "https://peekaplate-console-staging.pages.dev/",
+      "status": 200
+    }
+  ],
+  "collaboratorReadVerifiedAt": "2026-11-02T07:07:31.906Z",
+  "collaboratorReadChecks": [
+    {
+      "endpoint": "events",
+      "status": 200,
+      "requestId": "82b288b0-2e71-4527-a20f-0497d4863c3a"
+    },
+    {
+      "endpoint": "summary",
+      "status": 200,
+      "requestId": "566801df-2eca-4a14-a719-3069d3a5541e"
+    }
+  ],
+  "finalData": {
+    "index": [
+      {
+        "event_id": "46aad945-b666-4a00-bb50-e63402d35420",
+        "canonical_payload_checksum": "de19ac7f17f52aefdf9b345bef4ded3bcf9977e10a70907b890bafad0465ad15",
+        "disposition": "accepted",
+        "reason_code": null,
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/46aad945-b666-4a00-bb50-e63402d35420.json"
+      },
+      {
+        "event_id": "4cf6570d-193d-4099-be52-5bd0644f39f6",
+        "canonical_payload_checksum": "91135b6edf85539616dcbc38019bccba8f91d8cfed5ad62e022f30d305a33308",
+        "disposition": "accepted",
+        "reason_code": null,
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/4cf6570d-193d-4099-be52-5bd0644f39f6.json"
+      },
+      {
+        "event_id": "cd515f29-4782-43dd-9347-e2b9aa7f2289",
+        "canonical_payload_checksum": "91591bbfabe771dd364b68eacc1ae38859cafb1ad567ba95c78074dbcd03d695",
+        "disposition": "accepted",
+        "reason_code": null,
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/cd515f29-4782-43dd-9347-e2b9aa7f2289.json"
+      }
+    ],
+    "conflicts": [
+      {
+        "event_id": "cd515f29-4782-43dd-9347-e2b9aa7f2289",
+        "incoming_checksum": "3e3cb11dbd6313d89190296b4d20d4c11cee72476246a777353f46faf2a878ea",
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/cd515f29-4782-43dd-9347-e2b9aa7f2289-3e3cb11dbd6313d89190296b4d20d4c11cee72476246a777353f46faf2a878ea.json"
+      },
+      {
+        "event_id": "ee294289-d070-4161-b843-ef155d879215",
+        "incoming_checksum": "1d50bdc72464a5db19d3a9994c76ca35d0a110babf15515d8dc68129a91f48dd",
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/ee294289-d070-4161-b843-ef155d879215-1d50bdc72464a5db19d3a9994c76ca35d0a110babf15515d8dc68129a91f48dd.json"
+      },
+      {
+        "event_id": "ee294289-d070-4161-b843-ef155d879215",
+        "incoming_checksum": "69bc3a8ef32647c7ecab6c73a04f7792524e5eaa946a69c9a290cb6bcda37784",
+        "r2_archive_key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/ee294289-d070-4161-b843-ef155d879215-69bc3a8ef32647c7ecab6c73a04f7792524e5eaa946a69c9a290cb6bcda37784.json"
+      }
+    ],
+    "ownerRows": 0,
+    "crossTenant": 0,
+    "archives": [
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/46aad945-b666-4a00-bb50-e63402d35420.json",
+        "present": true,
+        "checksum": "de19ac7f17f52aefdf9b345bef4ded3bcf9977e10a70907b890bafad0465ad15",
+        "trafficClass": "test",
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": false
+      },
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/4cf6570d-193d-4099-be52-5bd0644f39f6.json",
+        "present": true,
+        "checksum": "91135b6edf85539616dcbc38019bccba8f91d8cfed5ad62e022f30d305a33308",
+        "trafficClass": "test",
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": false
+      },
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/cd515f29-4782-43dd-9347-e2b9aa7f2289.json",
+        "present": true,
+        "checksum": "91591bbfabe771dd364b68eacc1ae38859cafb1ad567ba95c78074dbcd03d695",
+        "trafficClass": "test",
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": false
+      },
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/cd515f29-4782-43dd-9347-e2b9aa7f2289-3e3cb11dbd6313d89190296b4d20d4c11cee72476246a777353f46faf2a878ea.json",
+        "present": true,
+        "checksum": "3e3cb11dbd6313d89190296b4d20d4c11cee72476246a777353f46faf2a878ea",
+        "trafficClass": "test",
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": false
+      },
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/ee294289-d070-4161-b843-ef155d879215-1d50bdc72464a5db19d3a9994c76ca35d0a110babf15515d8dc68129a91f48dd.json",
+        "present": true,
+        "checksum": "1d50bdc72464a5db19d3a9994c76ca35d0a110babf15515d8dc68129a91f48dd",
+        "trafficClass": null,
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": true
+      },
+      {
+        "key": "raw/observations/4c1b9f0d-cc45-4229-828e-e239b6906ac8/ee294289-d070-4161-b843-ef155d879215-69bc3a8ef32647c7ecab6c73a04f7792524e5eaa946a69c9a290cb6bcda37784.json",
+        "present": true,
+        "checksum": "69bc3a8ef32647c7ecab6c73a04f7792524e5eaa946a69c9a290cb6bcda37784",
+        "trafficClass": null,
+        "containsUnauthorizedPublication": false,
+        "safeInvalid": false
+      }
+    ],
+    "canonicalMatches": true
+  },
+  "source": {
+    "queue_id": "f4979c52a09a4c40ad55e46d32b0ff93",
+    "queue_name": "peekaplate-staging-observations",
+    "settings": {
+      "delivery_delay": 0,
+      "delivery_paused": true,
+      "message_retention_period": 86400
+    },
+    "consumers": [
+      {
+        "script": "peekaplate-api-staging",
+        "dead_letter_queue": "peekaplate-staging-observations-dlq",
+        "settings": {
+          "batch_size": 10,
+          "max_retries": 3,
+          "max_wait_time_ms": 30000,
+          "retry_delay": 10
+        },
+        "consumer_id": "9e89751e2efe4228b840d91843052c47",
+        "type": "worker"
+      }
+    ],
+    "producers": [
+      {
+        "script": "peekaplate-api-staging",
+        "type": "worker"
+      }
+    ]
+  },
+  "dlq": {
+    "queue_id": "45eda79d781d47fe8bca7bb6f5d05bde",
+    "queue_name": "peekaplate-staging-observations-dlq",
+    "settings": {
+      "delivery_delay": 0,
+      "delivery_paused": true,
+      "message_retention_period": 86400
+    },
+    "consumers": [
+      {
+        "settings": {
+          "batch_size": 10,
+          "max_retries": 100,
+          "visibility_timeout_ms": 30000,
+          "retry_delay": 10
+        },
+        "consumer_id": "f3a3fef446fc49b1983a37be275e2845",
+        "type": "http_pull"
+      }
+    ],
+    "producers": []
+  },
+  "finalMetrics": {
+    "source": {
+      "backlogCount": 0,
+      "backlogBytes": 0
+    },
+    "dlq": {
+      "backlogCount": 0,
+      "backlogBytes": 0
+    }
+  },
+  "temporaryRemoteProxyStopped": true,
+  "remainingGates": [
+    "Genuine diner menu-token delivery to the public POST /observations endpoint and real controls",
+    "Transactional typed-fact persistence and idempotent archive/index backfill",
+    "Owner-report metrics, authorization/privacy/suppression and complete browser-to-dashboard acceptance",
+    "Native process-crash and metadata-stripped archive restoration drills; controlled dependency failures are narrower",
+    "Load/latency SLO, backup restoration, monitoring and production acceptance"
+  ]
+}

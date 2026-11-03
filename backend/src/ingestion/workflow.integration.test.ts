@@ -696,7 +696,7 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
       });
     });
 
-    it('rejects raw URL submission before job creation or queue dispatch', async () => {
+    it('rejects SSRF URL submission and accepts valid URL submission', async () => {
       const { client } = createMockDatabase();
 
       await expect(
@@ -707,21 +707,19 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
           idempotencyKey: 'idem_url_reject_1',
         }),
       ).rejects.toMatchObject({
-        code: 'unsupported_source_type',
+        code: 'ssrf_destination_prohibited',
         status: 400,
       });
 
-      await expect(
-        submitMenuIngestion(client, {
-          venueId,
-          sourceType: 'url',
-          sourceUrl: 'https://example.com/menu',
-          idempotencyKey: 'idem_url_reject_2',
-        }),
-      ).rejects.toMatchObject({
-        code: 'unsupported_source_type',
-        status: 400,
+      const validJob = await submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_url_accept_2',
       });
+      expect(validJob.status).toBe('queued');
+      expect(validJob.source_type).toBe('url');
+      expect(validJob.source_url).toBe('https://example.com/menu');
     });
   });
 
