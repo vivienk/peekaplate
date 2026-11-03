@@ -15,6 +15,7 @@ const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
 ]);
 
 const FIXTURE_LABEL = 'Fixture data';
+const ALL_CATEGORY_ID = 'all';
 
 let menuObserver: IntersectionObserver | null = null;
 let activeCategoryId: string | null = null;
@@ -119,9 +120,22 @@ function renderMenu(
   disposeObserver();
 
   const categories = menu.categories;
-  const stillExists = categories.find((c) => c.categoryId === activeCategoryId);
-  const selectedId = stillExists?.categoryId ?? categories[0]?.categoryId ?? '';
+  const current = activeCategoryId;
+  const selectedId =
+    current !== null &&
+    (current === ALL_CATEGORY_ID || categories.some((c) => c.categoryId === current))
+      ? current
+      : ALL_CATEGORY_ID;
   activeCategoryId = selectedId;
+
+  const tabs = [
+    { categoryId: ALL_CATEGORY_ID, name: 'All' },
+    ...categories.map((c) => ({ categoryId: c.categoryId, name: c.name })),
+  ];
+  const blocks = [
+    { categoryId: ALL_CATEGORY_ID, dishes: categories.flatMap((c) => c.dishes) },
+    ...categories.map((c) => ({ categoryId: c.categoryId, dishes: c.dishes })),
+  ];
 
   container.innerHTML = `
     <div class="pp-menu">
@@ -145,7 +159,7 @@ function renderMenu(
       }
 
       <nav class="pp-tabs" aria-label="Menu categories">
-        ${categories
+        ${tabs
           .map(
             (category) => `
               <button class="pp-tab${category.categoryId === selectedId ? ' pp-tab--active' : ''}" type="button" data-category-id="${escapeHtml(category.categoryId)}" aria-pressed="${category.categoryId === selectedId}">
@@ -157,7 +171,7 @@ function renderMenu(
       </nav>
 
       <section class="pp-dishes" aria-live="polite">
-        ${categories
+        ${blocks
           .map((category) => {
             const cards = category.dishes
               .map((dish) =>
@@ -251,9 +265,9 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const restoreOpenerFocus = () => {
     if (!openerDishId) return;
-    const opener = Array.from(container.querySelectorAll<HTMLElement>('.pp-card__open')).find(
-      (el) => el.dataset.openDishId === openerDishId,
-    );
+    const opener = Array.from(
+      container.querySelectorAll<HTMLElement>('.pp-category:not([hidden]) .pp-card__open'),
+    ).find((el) => el.dataset.openDishId === openerDishId);
     opener?.focus({ preventScroll: true });
   };
 

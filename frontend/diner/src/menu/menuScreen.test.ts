@@ -88,7 +88,7 @@ async function mountAndWait(container: FakeContainer): Promise<void> {
 }
 
 describe('menu screen category visibility', () => {
-  it('shows only the first category, hiding the rest with the hidden attribute', async () => {
+  it('shows only the All block first, hiding every category block', async () => {
     const container = new FakeContainer();
 
     await mountAndWait(container);
@@ -96,25 +96,26 @@ describe('menu screen category visibility', () => {
     const tags = extractCategoryTags(container.innerHTML);
     expect(tags.length).toBeGreaterThan(1);
 
-    // First category should not have hidden
+    // The first block is All, and it is visible.
+    expect(tags[0]).toContain('data-category-id="all"');
     expect(tags[0]).not.toContain('hidden');
 
-    // All other categories should have hidden
     for (let i = 1; i < tags.length; i++) {
       expect(tags[i]).toContain('hidden');
     }
   });
 
-  it('renders category tabs matching each category', async () => {
+  it('renders an All tab first, then one tab per category', async () => {
     const container = new FakeContainer();
 
     await mountAndWait(container);
 
-    // Count tab buttons (one per category)
-    const tabs = (container.innerHTML.match(/<button[^>]*data-category-id/g) ?? []).length;
+    const tabs =
+      container.innerHTML.match(/<button class="pp-tab[^>]*data-category-id="[^"]*"/g) ?? [];
     const categories = extractCategoryTags(container.innerHTML).length;
 
-    expect(tabs).toBe(categories);
+    expect(tabs.length).toBe(categories);
+    expect(tabs[0]).toContain('data-category-id="all"');
   });
 });
 
