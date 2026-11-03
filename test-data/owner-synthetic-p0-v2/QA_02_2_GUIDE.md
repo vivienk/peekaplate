@@ -10,17 +10,17 @@ This package does not demonstrate successful staging execution.
 
 ## Files in this preparation package
 
-- GUIDE.md — QA-02.2 scenarios and staging evidence template
+- QA_02_2_GUIDE.md — QA-02.2 scenarios and staging evidence template
 - qa_02_2_dish_cases.json — Three fictional dish fixtures
 - qa_02_2_expected_answers.json — Expected results for the test cases
 
 ## Relationship to PR #52
 
-The original P0 v2 synthetic dataset is maintained in PR #52.
+The original P0 v2 synthetic dataset from PR #52 is merged into develop. See the original dataset [GUIDE.md](GUIDE.md).
 
-This QA-02.2 branch references that dataset but does not include its complete event files, validators, or test suite.
+This QA-02.2 branch includes the original P0 v2 dataset, validators, and test suite through the merge from develop. The QA-02.2 staging scenarios are separate preparation materials.
 
-Dataset validation results from PR #52 must not be represented as QA-02.2 staging results.
+Dataset validation results from merged PR #52 must not be represented as QA-02.2 staging results.
 
 ## Review and execution boundaries
 
@@ -44,7 +44,7 @@ This is a preparation package, not proof of successful staging execution.
 
 ### Evidence and approval status
 
-- Existing P0 v2 synthetic dataset: available on PR #52
+- Existing P0 v2 synthetic dataset: merged into develop via PR #52
 - Event Matrix v0.1h: PROPOSED; product expectations require review
 - Allergen terminology: use "nuts" instead of "tree nuts" per Adam's update
 - Three restaurant-approved dish sources and T0 image assets: PENDING
@@ -73,20 +73,20 @@ All three are fictional case templates until permitted sources and approved imag
 
 ### QA-DISH-01 — Complete Dish: Owner Approval to Diner Display
 
-**Case status:** NOT RUN  
-**Fixture type:** Fictional synthetic example  
-**Restaurant:** Restaurant A (fictional)  
-**Dish ID:** qa-dish-01  
-**Source/page reference:** PENDING  
-**Original dish fields:** PENDING approved source  
-**T0 image reference:** PENDING approval  
-**Draft/revision identity:** PENDING staging assignment  
+**Case status:** NOT RUN
+**Fixture type:** Fictional synthetic example
+**Restaurant:** Restaurant A (fictional)
+**Dish ID:** qa-dish-01
+**Source/page reference:** PENDING
+**Original dish fields:** PENDING approved source
+**T0 image reference:** PENDING approval
+**Draft/revision identity:** PENDING staging assignment
 
 #### Preconditions
 - Restaurant A has an authorized owner account.
 - Required dish information and a permitted T0 image are available.
-- The owner explicitly approves publication.
-- The diner opens the published menu through its QR link.
+- A saved dish draft is available for the owner to review.
+- The diner has a QR link to use after explicit publication.
 
 #### Test steps and expected results
 
@@ -95,11 +95,12 @@ All three are fictional case templates until permitted sources and approved imag
 | 1 | Owner opens the dish draft | Original source fields are displayed |
 | 2 | Owner corrects a dish field | Correction is saved only after a successful write |
 | 3 | Owner reloads the draft | Saved correction remains visible |
-| 4 | Owner explicitly approves publication | Approved revision becomes eligible for publication |
-| 5 | Diner opens the QR menu | Published, readable menu is displayed |
-| 6 | Diner opens the complete dish detail | Correct approved fields and T0 image are displayed |
-| 7 | Diner saves the dish | Saved state appears after successful storage |
-| 8 | Diner reloads the page | Saved state is restored without a duplicate Save event |
+| 4 | Owner explicitly approves the exact saved dish revision | Approved revision becomes eligible for publication |
+| 5 | Owner explicitly publishes the approved revision and records the returned publication ID | Publication succeeds and the returned publication ID is captured as evidence |
+| 6 | Diner opens the published menu through its QR link | Published, readable menu is displayed |
+| 7 | Diner opens the complete dish detail | Correct approved fields and T0 image are displayed |
+| 8 | Diner saves the dish | Saved state appears after successful storage |
+| 9 | Diner reloads the page | Saved state is restored without a duplicate Save event |
 
 #### Expected P0 events
 - menu_viewed: after the approved menu becomes readable
@@ -114,21 +115,21 @@ All three are fictional case templates until permitted sources and approved imag
 - Browser or physical-phone screenshots
 - Actual event results and failure owner
 
-**Actual result:** NOT RUN  
-**Product review:** PENDING Adam/Shirley  
+**Actual result:** NOT RUN
+**Product review:** PENDING Adam/Shirley
 **Independent validation:** PENDING Sai
 
 
 ### QA-DISH-02 — Incomplete Dish and Missing Information
 
-**Case status:** NOT RUN  
-**Fixture type:** Fictional synthetic example  
-**Restaurant:** Restaurant A (fictional)  
-**Dish ID:** qa-dish-02  
-**Source/page reference:** PENDING  
-**Original dish fields:** PENDING approved source  
-**T0 image reference:** MISSING — negative test  
-**Draft/revision identity:** PENDING staging assignment  
+**Case status:** NOT RUN
+**Fixture type:** Fictional synthetic example
+**Restaurant:** Restaurant A (fictional)
+**Dish ID:** qa-dish-02
+**Source/page reference:** PENDING
+**Original dish fields:** PENDING approved source
+**T0 image reference:** MISSING — negative test
+**Draft/revision identity:** PENDING staging assignment
 
 #### Purpose
 Verify that a dish missing required information cannot accidentally become a complete, published diner dish.
@@ -172,22 +173,22 @@ Verify that a dish missing required information cannot accidentally become a com
 - Diner screenshots and actual emitted events
 - Expected versus actual results and failure owner
 
-**Actual result:** NOT RUN  
-**Product review:** PENDING Adam/Shirley  
+**Actual result:** NOT RUN
+**Product review:** PENDING Adam/Shirley
 **Independent validation:** PENDING Sai
 
 
 
 ### QA-DISH-03 — Changed Revision, Publication Replacement, and Withdrawal
 
-**Case status:** NOT RUN  
-**Fixture type:** Fictional synthetic example  
-**Restaurant:** Restaurant A (fictional)  
-**Dish ID:** qa-dish-03  
-**Source/page reference:** PENDING  
-**Original dish fields:** PENDING approved source  
-**T0 image reference:** PENDING approval  
-**Draft/revision identity:** PENDING staging assignment  
+**Case status:** NOT RUN
+**Fixture type:** Fictional synthetic example
+**Restaurant:** Restaurant A (fictional)
+**Dish ID:** qa-dish-03
+**Source/page reference:** PENDING
+**Original dish fields:** PENDING approved source
+**T0 image reference:** PENDING approval
+**Draft/revision identity:** PENDING staging assignment
 
 #### Purpose
 Verify that changing a dish creates a controlled revision, publication requires explicit approval, and withdrawn content is no longer available on a fresh diner load.
@@ -237,17 +238,17 @@ Verify that changing a dish creates a controlled revision, publication requires 
 - Fresh-load diner screenshots
 - Expected versus actual results and failure owner
 
-**Actual result:** NOT RUN  
-**Product review:** PENDING Adam/Shirley  
+**Actual result:** NOT RUN
+**Product review:** PENDING Adam/Shirley
 **Independent validation:** PENDING Sai
 
 
 
 ### QA-DINER-01 — Save, Unsave, Undo, and Storage Failure
 
-**Case status:** NOT RUN  
-**Fixture type:** Fictional synthetic test case  
-**Reference:** Event Matrix v0.1h (PROPOSED)  
+**Case status:** NOT RUN
+**Fixture type:** Fictional synthetic test case
+**Reference:** Event Matrix v0.1h (PROPOSED)
 **Product review:** PENDING Adam/Shirley
 
 #### Purpose
@@ -295,16 +296,16 @@ Verify that diner Save, Unsave, and Undo actions produce the correct visible sta
 - Expected versus actual results
 - Failure owner for any discrepancy
 
-**Actual result:** NOT RUN  
+**Actual result:** NOT RUN
 **Independent validation:** PENDING Sai
 
 
 
 ### QA-SEC-01 — Restaurant Isolation and Authorization
 
-**Case status:** NOT RUN  
-**Fixture type:** Fictional synthetic test case  
-**Product review:** PENDING Adam/Shirley  
+**Case status:** NOT RUN
+**Fixture type:** Fictional synthetic test case
+**Product review:** PENDING Adam/Shirley
 **Authentication setup:** BLOCKED pending staging identities
 
 #### Purpose
@@ -353,18 +354,18 @@ Verify that restaurant owners can access only their authorized restaurant data, 
 - Expected versus actual results
 - Failure owner for discrepancies
 
-**Actual result:** NOT RUN  
-**Engineering provisioning:** BLOCKED  
+**Actual result:** NOT RUN
+**Engineering provisioning:** BLOCKED
 **Independent validation:** PENDING Sai
 
 
 
 ### QA-02.2 — Staging Execution and Evidence Template
 
-**Preparation status:** IN PROGRESS  
-**Staging execution:** NOT RUN  
-**Product review:** PENDING Adam/Shirley  
-**Staging execution owner:** Jeffin (coordination pending)  
+**Preparation status:** IN PROGRESS
+**Staging execution:** NOT RUN
+**Product review:** PENDING Adam/Shirley
+**Staging execution owner:** Jeffin (coordination pending)
 **Independent reviewer:** Sai
 
 #### Environment and build information
@@ -424,4 +425,3 @@ Verify that restaurant owners can access only their authorized restaurant data, 
 - Uneeza: maintain preparation cases, expected answers, and unresolved decisions.
 
 **Overall staging result: NOT RUN**
-
