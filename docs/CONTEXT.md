@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite shell, readable without JavaScript, with optional consent-gated PostHog shell views; no published menu or dish controls yet. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1: replaceable menu source, the only wire-to-diner adapter and \"Fixture data\"-labelled synthetic fixtures. S3-DIN-01.4: searchMenu(menu, query) returns matching complete-dish IDs and whether to show the staff allergy line. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback without backfill, a reload re-check that drops withdrawn dishes, stale-tab-safe writes. S3-DIN-01.5/S3-TRK-01.1: track() with menu_viewed/dish_detail_opened triggers builds observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) and the activity clock (5 s checkpoints, 30 s idle pause, 300000 ms cap); no delivery yet. No screen uses these yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite shell, readable without JavaScript, with optional consent-gated PostHog shell views; no published menu or dish controls yet. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1: replaceable menu source, the only wire-to-diner adapter and \"Fixture data\"-labelled synthetic fixtures. S3-DIN-01.4: searchMenu(menu, query) returns matching complete-dish IDs and whether to show the staff allergy line. S3-DIN-02.1 Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback without backfill, a reload re-check that drops withdrawn dishes, stale-tab-safe writes. S3-DIN-01.5/S3-TRK-01.1: track() with menu_viewed/dish_detail_opened triggers builds schema-checked observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) and the activity clock (5 s checkpoints, 30 s idle pause, 300000 ms cap); no delivery yet. No screen uses these yet. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -103,7 +103,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/core.test.ts",
         "tests/e2e/tracking.spec.ts",
         "frontend/diner/src/tracking/activity-clock.ts",
-        "frontend/diner/src/tracking/activity-clock.test.ts"
+        "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/validate.ts",
+        "frontend/diner/src/tracking/validate.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -112,7 +114,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8b50275f9424f9ee142f9ba0c20d1b59c124e5252606b625391518b07ac43dda"
+      "sourceFingerprint": "2a141f0b5ea9975b7ddba46a15b40e2b6a331a4152edc283a5f5515ea30cef5c"
     },
     {
       "id": "console",
@@ -326,7 +328,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c455e7e96487eb8a1233e519c22798a74051df3acbe89edf38ce1c62a22d050b"
+      "sourceFingerprint": "1b926e0ab08fc6aec4650fa204cadad2e7e143673d25732f08a3490e94374003"
     },
     {
       "id": "agents",

@@ -4,6 +4,7 @@
 // assigned, so a dropped event never uses one (Zhiliang). Clients never send venue authority.
 import { isAllowedEvent, type P0EventName } from './event-names';
 import type { Identity } from './identity';
+import { isValidObservation } from './validate';
 
 export const SCHEMA_VERSION = 'observation.v2';
 
@@ -19,9 +20,12 @@ export type Envelope = Readonly<{
   payload: Readonly<Record<string, unknown>>;
 }>;
 
-// Strict per-event payload validation plugs in here. The observation.v2 schema (PR #40) is written
-// with zod, which the diner does not depend on yet, so the default only checks the shape.
-export type PayloadValidator = (type: P0EventName, payload: Record<string, unknown>) => boolean;
+// Every event is checked against the shared observation.v2 schema (validate.ts) by default.
+export type PayloadValidator = (
+  type: P0EventName,
+  publicationRevisionId: string,
+  payload: Record<string, unknown>,
+) => boolean;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
@@ -36,13 +40,13 @@ export function buildEnvelope(
     identity,
     now,
     uuid,
-    validate = () => true,
+    validate = isValidObservation,
   }: { identity: Identity; now: () => number; uuid: () => string; validate?: PayloadValidator },
 ): Envelope | null {
   if (!isAllowedEvent(name) || !isPlainObject(input)) return null;
   const { publication_revision_id: publicationRevisionId, ...payload } = input;
   if (typeof publicationRevisionId !== 'string' || publicationRevisionId === '') return null;
-  if (!validate(name, payload)) return null;
+  if (!validate(name, publicationRevisionId, payload)) return null;
 
   const { sessionId, producerId, localSequence } = identity.next();
   // Frozen so a retry can only ever resend the same event_id and payload.
