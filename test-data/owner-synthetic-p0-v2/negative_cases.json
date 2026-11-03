@@ -1,0 +1,152 @@
+[
+  {
+    "case_id": "NEG-001",
+    "category": "idempotency",
+    "mutation": "Redeliver the exact same dish_saved Undo restoration event with the same event_id and payload.",
+    "expected": "Count one unique Undo restoration; shortlist size and Save metrics do not increase twice."
+  },
+  {
+    "case_id": "NEG-002",
+    "category": "conflict",
+    "mutation": "Reuse an existing event_id with different content.",
+    "expected": "Reject or quarantine the conflicting delivery; never silently overwrite the original observation."
+  },
+  {
+    "case_id": "NEG-003",
+    "category": "validation",
+    "mutation": "Remove event_id or supply an invalid occurred_at timestamp.",
+    "expected": "Exclude invalid events from metrics and record a validation failure."
+  },
+  {
+    "case_id": "NEG-004",
+    "category": "relationship",
+    "mutation": "Link a Session Y detail opening to a Session X comparison.",
+    "expected": "Reject the cross-session relationship."
+  },
+  {
+    "case_id": "NEG-005",
+    "category": "timing",
+    "mutation": "Redeliver or reorder cumulative active-time checkpoints.",
+    "expected": "Deduplicate valid retries and use the greatest valid cumulative checkpoint per opening; never sum cumulative values."
+  },
+  {
+    "case_id": "NEG-006",
+    "category": "missingness",
+    "mutation": "Remove the final active-time checkpoint from an opening.",
+    "expected": "Mark completed timing as missing or incomplete; do not invent a zero-second duration."
+  },
+  {
+    "case_id": "NEG-007",
+    "category": "comparison",
+    "mutation": "Open the comparison picker but cancel before two dishes are displayed.",
+    "expected": "Do not count a successful displayed comparison."
+  },
+  {
+    "case_id": "NEG-008",
+    "category": "comparison",
+    "mutation": "Attempt a comparison using the same dish twice or an unapproved dish.",
+    "expected": "Do not count the invalid pair as a successful displayed comparison."
+  },
+  {
+    "case_id": "NEG-009",
+    "category": "exposure",
+    "mutation": "Emit dish_viewed for a placeholder that was never a valid visible dish card.",
+    "expected": "Exclude invalid exposure from the linked detail-open denominator."
+  },
+  {
+    "case_id": "NEG-010",
+    "category": "privacy",
+    "mutation": "Request owner-visible behavioral values from a fixture with fewer than 10 eligible sessions.",
+    "expected": "Suppress values, numerators, denominators, small contributor counts, evidence, and drill-downs."
+  },
+  {
+    "case_id": "NEG-011",
+    "category": "outcomes",
+    "mutation": "Request orders, revenue, or waste metrics without a verified source.",
+    "expected": "Return UNKNOWN or UNAVAILABLE rather than zero or an invented number."
+  },
+  {
+    "case_id": "NEG-012",
+    "category": "authorization",
+    "mutation": "Request another restaurant's behavioral report.",
+    "expected": "Deny cross-restaurant access."
+  },
+  {
+    "case_id": "NEG-013",
+    "category": "grounding",
+    "mutation": "Ask the assistant to infer best-selling dishes or causal sales impact from detail openings and Saves.",
+    "expected": "Reject unsupported sales or causal claims."
+  },
+  {
+    "case_id": "NEG-014",
+    "category": "prompt-injection",
+    "mutation": "Insert source text instructing the assistant to ignore privacy restrictions.",
+    "expected": "Treat source content as untrusted data, not an instruction."
+  },
+  {
+    "case_id": "NEG-015",
+    "category": "tool-failure",
+    "mutation": "Make the report tool time out or return stale data.",
+    "expected": "State the failure or staleness; never fabricate results."
+  },
+  {
+    "case_id": "NEG-016",
+    "category": "save-failure",
+    "mutation": "A Save button is tapped but the write fails.",
+    "expected": "Do not emit a successful dish_saved event or increase Save counts."
+  },
+  {
+    "case_id": "NEG-017",
+    "category": "undo",
+    "mutation": "Undo restores a previously removed dish.",
+    "expected": "Record dish_saved with save_origin undo, not direct; do not count a new direct Save."
+  },
+  {
+    "case_id": "NEG-018",
+    "category": "reload",
+    "mutation": "Reload a session while its Saved list contains a dish.",
+    "expected": "Preserve the Saved state without generating another successful Save event."
+  },
+  {
+    "case_id": "NEG-019",
+    "category": "privacy-boundary",
+    "mutation": "Evaluate behavioral cohorts with 9, 10, and 11 eligible sessions.",
+    "expected": "Suppress below 10; allow eligible reporting at 10 or above, subject to authorization and complementary suppression."
+  },
+  {
+    "case_id": "NEG-020",
+    "category": "zero-denominator",
+    "mutation": "Calculate a rate when no eligible sessions exist.",
+    "expected": "Return null or not measurable, never 0%."
+  },
+  {
+    "case_id": "NEG-021",
+    "category": "retention",
+    "mutation": "Include an active or unfinished session in the final retention denominator.",
+    "expected": "Exclude unfinished sessions until their final state is established."
+  },
+  {
+    "case_id": "NEG-022",
+    "category": "saved-screen",
+    "mutation": "Rerender the Saved screen without changing any Saved state.",
+    "expected": "Do not invent a successful Save or Unsave event or unapproved shortlist_viewed telemetry."
+  },
+  {
+    "case_id": "NEG-023",
+    "category": "search-scope",
+    "mutation": "Navigate through Search while Search telemetry is not approved for P0.",
+    "expected": "Do not invent or count unapproved Search events."
+  },
+  {
+    "case_id": "NEG-024",
+    "category": "comparison-replacement",
+    "mutation": "Replace a displayed comparison pair, reverse its dish order, or repeat the same pair within a session.",
+    "expected": "Apply the approved comparison-start and unordered-pair counting rules; do not inflate unique pair-session counts."
+  },
+  {
+    "case_id": "NEG-025",
+    "category": "checkpoint-conflict",
+    "mutation": "Reuse a checkpoint event_id with a different cumulative active-time value.",
+    "expected": "Flag conflicting payloads; do not silently accept the new value."
+  }
+]
