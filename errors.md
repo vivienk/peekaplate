@@ -1101,6 +1101,16 @@ the synthetic publication, ended its session and removed its temporary host.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T23:24:30.741Z","exitCode":1}
+```
+
+PR88 reconciliation resolution: the appended allergen note exceeded the diner
+node's 1000-character summary limit. Moved the note to the bounded handoff,
+preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
+pass. Keep node summaries within the existing limit when resolving conflicts.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T15:15:48.512Z","exitCode":1}
 ```
 
