@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter and \"Fixture data\"-labelled synthetic fixtures; screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. menu/icons.ts maps allergen, dietary and ingredient names to Figma icons. See docs/posthog.md for activation and evidence limits.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -91,7 +91,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/fake-storage.ts",
         "tests/e2e/save.spec.ts",
         "frontend/diner/src/compare/picker.ts",
-        "frontend/diner/src/compare/picker.test.ts"
+        "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "frontend/diner/src/menu/icons.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -100,7 +102,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "77575cbc7d964ba6e361d11815dc2d1adb644f7d311184c39317ab84230138f4"
+      "sourceFingerprint": "0f7b8579cb2cc3f4797c3b9b40972a4383cf1364cd319d699912c8d8571e7090"
     },
     {
       "id": "console",
