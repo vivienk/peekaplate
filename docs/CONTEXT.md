@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite shell stays readable without JavaScript. Optional consent-gated PostHog shell views are wired; published dish screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side while keeping comparison_id, and build a payload without sending it. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without tracking backfill. The shared track() placeholder and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering still require integration. See docs/posthog.md for activation limits.",
+      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side while keeping comparison_id, and build a payload without sending it. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without tracking backfill. The shared track() placeholder and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering still require integration. See docs/posthog.md for activation limits. Icon lookups map approved allergen/dietary values and ingredient names to Figma assets; fixtures include a synthetic logo. Icons are not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -97,7 +97,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/events.ts",
         "frontend/diner/src/menu/events.test.ts",
         "frontend/diner/src/compare/comparison.ts",
-        "frontend/diner/src/compare/comparison.test.ts"
+        "frontend/diner/src/compare/comparison.test.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "frontend/diner/src/menu/icons.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -106,7 +108,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f86a1033aa84746b04a2447a4b0acbb43de55c360d7f26400ded35cded68024d"
+      "sourceFingerprint": "1cb0e86c52500845326b2d2303d305990e9952a2075d097baef9e930599a63b7"
     },
     {
       "id": "console",
@@ -433,6 +435,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
+    },
+    {
       "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
       "modules": [
         "diner"
@@ -511,14 +520,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
-    },
-    {
-      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
     }
   ]
 }
