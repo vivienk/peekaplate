@@ -259,7 +259,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. PR previews of merged PRs are kept; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical.",
+      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Merged PRs keep their last successfully deployed preview; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -314,7 +314,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3fe5e9484c6288ac2ca8ff501036903f446495d3d7caaef7a144a3669812345e"
+      "sourceFingerprint": "e90251c30352c54f30db2f86860b83e2f6d87f838200ac04d619efb807957f6b"
     },
     {
       "id": "agents",

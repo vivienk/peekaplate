@@ -143,7 +143,7 @@ jobs:
           | Diner | $DINER_URL |
           | Console | $CONSOLE_URL |
 
-          Built from \`${SHA:0:7}\`. Static pages only: no API, database or analytics. Kept after merge; deleted if this PR closes without merging. See [preview guide](https://github.com/$REPO/blob/develop/docs/previews.md)."
+          Built from \`${SHA:0:7}\`. Static pages only: no API, database or analytics. After merge the last successful preview is kept (check this SHA against the final commit); deleted if this PR closes without merging. See [preview guide](https://github.com/$REPO/blob/develop/docs/previews.md)."
           echo "$body" >> "$GITHUB_STEP_SUMMARY"
           id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\"))) | .id" | head -n1)
@@ -154,7 +154,7 @@ jobs:
           fi
 
   cleanup:
-    # Merged PRs keep their preview as a record of what merged; closed-unmerged PRs are deleted.
+    # Merged PRs keep their last successfully deployed preview; closed-unmerged PRs are deleted.
     if: >-
       (github.event_name == 'workflow_dispatch' &&
        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||

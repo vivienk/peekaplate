@@ -33,7 +33,7 @@ Analytics are disabled in every preview build. Trusted response headers addition
 
 - **build** runs for same-repository PRs. It checks out the exact PR head SHA with persisted Git credentials disabled, installs dependencies, builds both apps with analytics disabled and uploads the files as a three-day artifact. It has no deployment credentials.
 - **deploy** runs no PR code. It checks out the trusted default-branch commit, rejects server-side functions, Workers, redirects, configuration, symlinks and a supplied `peekaplate-preview.json`, then writes trusted headers and that commit marker using the requested PR head SHA. It verifies both target projects and uploads static files with Wrangler under the `pr-<number>` branch alias. Both aliases must return the expected SHA in their marker before the PR comment is updated; HTTP 200 alone can belong to an older build. Marker checks retry up to six times with ten seconds between attempts.
-- **cleanup** runs when the PR closes without merging. It deletes every deployment for that PR's branch alias from both projects and marks the comment as removed. A merged PR keeps its preview, so its link still shows exactly what merged.
+- **cleanup** runs when the PR closes without merging. It deletes every deployment for that PR's branch alias from both projects and marks the comment as removed. A merged PR keeps its last successfully deployed preview at the same link.
 
 The normal **CI** workflow remains the required build and test check. **PR preview** is separate and not required, so a credentials or provider outage cannot block merges.
 
@@ -48,7 +48,7 @@ Limitation: a Cloudflare Pages token is account-wide, so it could also edit the 
 
 ## Retention
 
-- Merged PRs keep their preview at the same `pr-<number>` link. It shows that PR's last commit, not the current `develop`, and is not updated again.
+- Merged PRs keep their last successfully deployed preview at the same `pr-<number>` link. It is not updated again and never shows the current `develop`. It may be older than the merged commit: if the final head's optional preview failed or had not finished when the PR merged, the link still shows the previous successful build. Before treating it as the merged revision, compare the "Built from" SHA in the preview comment with the PR's final commit.
 - When a PR closes without merging, cleanup attempts to delete all matching preview deployments, including active aliases via the provider API. Failures remain visible and require retry. Cleanup runs even when new previews are disabled.
 - Built artifacts expire after three days.
 - If cleanup fails, run **PR preview** manually from the Actions tab and enter the PR number. Its `cleanup` job deletes that PR's deployments, including a merged PR's kept preview.
