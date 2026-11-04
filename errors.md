@@ -1108,3 +1108,71 @@ PR88 reconciliation resolution: the appended allergen note exceeded the diner
 node's 1000-character summary limit. Moved the note to the bounded handoff,
 preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
 pass. Keep node summaries within the existing limit when resolving conflicts.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-31T21:38:10.001Z"},"status":"resolved","cause":"The new scripts/console-preview-demos.test.mjs was not run through the Biome formatter before pnpm check (one over-long line).","prevention":"Run pnpm format (or biome check --write) on new files before pnpm check.","regression":"Formatted the file; pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T15:15:48.512Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T15:15:48.512Z"},"status":"resolved","cause":"S3-DIN-02.2 changed tests/e2e/save.spec.ts, which the diner context node lists, without refreshing the node; the first rewrite of the diner summary then exceeded the 1000-character limit, so context:refresh rejected it.","prevention":"Run the full pnpm check (not only lint/typecheck/test) before pushing, and keep node summaries under 1000 characters.","regression":"Condensed the diner summary to 850 characters, added the DIN-02.2 files to the node and refreshed fingerprints; pnpm context:check reports the context valid and fresh."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T21:38:51.084Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T21:38:51.084Z"},"status":"resolved","cause":"Formatting scripts/console-preview-demos.test.mjs after the context refresh changed a source listed in the delivery node, so its fingerprint was stale.","prevention":"Format first, then pnpm context:refresh, then pnpm check.","regression":"pnpm context:refresh followed by pnpm check passes."}
+```
+
+## November 4 Bundle context reconciliation
+
+The develop merge conflicted only in the context handoff list. Preserve the
+new tracking handoff and Bundle correction; retire the superseded pre-merge
+PR43 handoff to retain the ten-entry bound. Context refresh/check and direct
+documentation checks pass. A first refresh failed at eleven handoffs.
+`pnpm verify context:check docs:check` could not start because the Windows
+sandbox denied pnpm's project-store symlink. Source-pinned contract tests
+initially hit a temporary-directory rename denial; using a writable workspace
+TEMP/TMP passed all 58 cases. Biome does not process Markdown, so it is not
+Markdown validation. A first direct context invocation used the parent working
+directory; rerunning in the repository corrected that command-path mistake.
+Full frozen-install workspace validation remains delegated to Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T22:42:55.035Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T21:06:43.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-04T21:06:43.047Z"},"status":"resolved","cause":"While re-syncing the S3-TRK-01 strict-validation branch onto the tracking core, the combined diner summary came to 1007 characters, so the resolution script stopped before writing docs/CONTEXT.md; the following commands still staged the file with its conflict markers and ran pnpm check against it.","prevention":"Stop a resolution sequence at the first failed step (set -e) and confirm no conflict markers remain before staging.","regression":"Shortened the diner summary to 1000 characters without dropping facts, added the validation files, refreshed fingerprints; no markers remain and pnpm check passes."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z"},"status":"environment-limited","cause":"The S3-DIN-02.2 toast timing test ('Undo survives moving to another screen') is flaky on branches based on develop: Playwright's installed clock keeps running in real time, so a slow run can expire the 5-second toast before the check. The fix (pausing the clock) is in #76, which has not merged into develop yet.","prevention":"Merge #76, which pauses the clock in both toast timing tests.","regression":"The test passed on rerun; it is stable on #76, where a 6-second real-time probe fails with a running clock and passes with the paused one."}
+```

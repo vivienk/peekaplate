@@ -1,7 +1,10 @@
 // Synthetic fixtures for S3-DIN-01.1. Dish names follow Rania's Figma frames; every value is
 // invented test data, not an approved restaurant menu, and images are labelled placeholders, not
 // food photos. Allergens use the approved P0 code values; the adapter turns them into labels.
+// Ingredient names match the Figma icon set (./icons), except NO_ICON_INGREDIENT and dishes the
+// icon set does not cover, so screens can test both layouts.
 import { toMenu } from './adapter';
+import logo from './fixture-assets/ember-and-stone-logo.png';
 import type { MenuLoadResult, MenuSource } from './types';
 import type { WireCompleteDish, WireDish, WireImage, WireMenuBundle } from './wire';
 
@@ -32,7 +35,7 @@ export const DISH = {
 
 // Every P0 allergen has an icon, so the no-icon case is a validated value outside the P0 list.
 export const NO_ICON_ALLERGEN = 'Mustard';
-export const NO_ICON_INGREDIENT = 'House sauce';
+export const NO_ICON_INGREDIENT = 'Black pepper';
 
 function placeholderImage(label: string): WireImage {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640"><rect width="640" height="640" fill="#3a3d45"/><text x="320" y="320" fill="#c9cbd1" font-family="sans-serif" font-size="28" text-anchor="middle">Fixture photo</text></svg>`;
@@ -74,9 +77,16 @@ const usd = (amount: string) => ({ amount, currency: 'USD' });
 const avocadoToast = dish(1, {
   name: 'Avocado Toast',
   description:
-    'Smashed avocado on toasted sourdough with a poached egg, cherry tomatoes and greens.',
+    'Smashed avocado on toasted sourdough with a poached egg, cherry tomatoes, chili flakes and greens.',
   price: usd('14.00'),
-  ingredients: ['Sourdough bread', 'Avocado', 'Poached egg', 'Cherry tomatoes', 'Microgreens'],
+  ingredients: [
+    'Sourdough bread',
+    'Avocado',
+    'Poached egg',
+    'Cherry tomato',
+    'Chili flakes',
+    'Microgreens',
+  ],
   allergens: ['wheat', 'egg'],
   dietary: ['Vegetarian'],
   images: images('Avocado Toast'),
@@ -85,7 +95,7 @@ const harvestPowerBowl = dish(2, {
   name: 'Harvest Power Bowl',
   description: 'Quinoa with grilled chicken, roasted sweet potato, avocado, kale and red cabbage.',
   price: usd('18.00'),
-  ingredients: ['Quinoa', 'Grilled chicken', 'Roasted sweet potato', 'Avocado', 'Kale'],
+  ingredients: ['Quinoa', 'Grilled chicken', 'Sweet potato', 'Avocado', 'Kale'],
   allergens: [],
   dietary: ['Gluten-free'],
   images: images('Harvest Power Bowl'),
@@ -113,7 +123,7 @@ const manyChips = dish(4, {
   name: 'Garden Avocado Salad',
   description: 'Mixed leaves, avocado and walnuts with peanut dressing and sesame tofu croutons.',
   price: usd('13.00'),
-  ingredients: ['Mixed leaves', 'Avocado', 'Walnuts', 'Peanut dressing', 'Tofu croutons'],
+  ingredients: ['Mixed greens', 'Avocado', 'Walnuts', 'Peanut dressing', 'Tofu croutons'],
   allergens: ['nuts', 'peanut', 'soy', 'sesame', NO_ICON_ALLERGEN],
   dietary: ['Vegan', 'Vegetarian'],
   images: images('Garden Avocado Salad'),
@@ -201,7 +211,11 @@ function bundle(
   revision: number,
   categories: { breakfast: WireDish[]; brunchBowls: WireDish[]; salads: WireDish[] },
 ): WireMenuBundle {
-  const restaurant = { name: 'Ember & Stone', logo: null, internal_code: DRAFT_MARKER };
+  const restaurant = {
+    name: 'Ember & Stone',
+    logo: { url: logo, width: 256, height: 253, alt: 'Ember & Stone logo (synthetic fixture)' },
+    internal_code: DRAFT_MARKER,
+  };
   return {
     schema_version: 1,
     venue_id: id('a6', 1),
