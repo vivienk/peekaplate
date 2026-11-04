@@ -538,7 +538,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "T0 asset preparation emits create-only hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks human-prepared layered samples against the T0 detail variant with a dependency-free fallback harness; optional presentation preparation pairs dish cutouts and reference images with the frozen presentation prompt, validates square transparent PNGs and retains the T0 fallback on failure. Manifests never self-approve (needs_review, publication.eligible=false), and Python gets no signing/database credentials.",
+      "summary": "T0 asset preparation emits create-only hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks human-prepared layered samples against the T0 detail variant with a dependency-free fallback harness; optional presentation preparation pairs dish cutouts and reference images with the frozen presentation prompt, validates square transparent PNGs and retains the T0 fallback on failure. Manifests never self-approve (needs_review, publication.eligible=false), and Python gets no signing/database credentials. Offline review_preview accepts a supplied grayscale mask and optional provenance-linked PNG, creates a non-publishable comparison/download page with bounded shallow-card motion. No automatic segmentation, provider calls or diner integration.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -550,7 +550,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/asset-delivery.md",
         "processing/src/peekaplate_processing/prepare_presentation.py",
         "processing/src/peekaplate_processing/presentation.py",
-        "processing/tests/test_presentation.py"
+        "processing/tests/test_presentation.py",
+        "processing/src/peekaplate_processing/review_preview.py",
+        "processing/src/peekaplate_processing/review_preview_html.py",
+        "processing/tests/test_review_preview.py",
+        "playwright.review-preview.config.ts",
+        "tests/review-preview/review-preview.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md",

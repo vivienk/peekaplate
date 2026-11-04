@@ -439,3 +439,11 @@ Inputs and outputs:
   persist on `manifest.prompt` and add explicit review warnings.
 - On generation/validation failure, the approved T0 detail photo is automatically retained as
   `fallback.jpg` with `fallback_retained = True`, `active_display_path = "fallback.jpg"`, and CLI exit code 2.
+
+### Supplied-mask and candidate-PNG review
+
+Use `python -m peekaplate_processing.review_preview --help` for the offline,
+create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
+an optional generated PNG with its actual prompt/model provenance. See
+[asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
+for commands, non-approval behavior, browser controls and test boundaries.

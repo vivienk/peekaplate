@@ -174,3 +174,56 @@ no transform, a deleted layer produced `layer_load_failed` with the T0 photo
 still visible, a missing manifest produced one retry, and a missing fallback
 produced `fallback_load_failed`. Those are local measurements, not a phone
 benchmark.
+
+## Offline supplied-mask and PNG review preview
+
+`review_preview` bridges a prepared T0 detail photograph, a supplied grayscale
+mask, and an optional externally generated transparent PNG into a local review
+page. It does not perform segmentation, call an image provider, approve an asset,
+create a production T1 contract, or wire the diner application.
+
+The mask must be a single-channel grayscale image at exactly the oriented T0
+`detail-1280` dimensions: 0 removes background and 255 keeps source pixels.
+Intermediate values provide antialiased edges. No per-dish polygon or photo is
+embedded in the implementation. Candidate PNGs use the existing square/alpha/
+transparent-corner validation. Supply the actual generation prompt and model
+identifier; use an explicitly unknown identifier if the tool does not expose it.
+The review manifest records input hashes, evidence, mode, and byte counts without
+absolute input paths. Neither mask quality nor food fidelity is auto-approved.
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.review_preview \
+  --t0-manifest work/t0/manifest.json \
+  --mask work/mask.png \
+  --candidate work/generated-dish.png \
+  --prompt work/generation-prompt.txt \
+  --model-version actual-model-or-explicitly-unknown \
+  --capture-evidence "Permitted capture; local review only" \
+  --output-root work/review
+```
+
+Omit candidate/prompt/model arguments to review the supplied cutout alone. Serve
+only the resulting bundle on localhost, then open `index.html`. The original
+photo is the default before JavaScript runs or if the candidate cannot load.
+A malformed candidate yields an original-photo review bundle and CLI exit 2.
+Invalid masks, tampered T0 data, missing provenance and over-budget artifacts fail
+without publishing an output bundle. Identical runs refuse to overwrite output.
+Every bundle remains `needs_review` and `publication.eligible=false`.
+
+The page offers PNG downloads, original comparison, bounded +/-3 degree pointer
+and keyboard tilt, horizontal touch dragging, vertical scroll cooperation and a
+smooth return on pointer exit/touch release. Reduce Motion applies immediately.
+This is a single-card depth illusion, not reconstructed geometry or a production
+viewer. The default 10 MB **offline review bundle** ceiling includes downloadable
+PNG originals; it is not the ADR 0004 production T1 400 KB acceptance budget.
+
+Verification:
+
+```sh
+uv run --project processing --frozen python -m unittest discover -s processing/tests -p test_review_preview.py
+pnpm exec playwright test --config playwright.review-preview.config.ts
+```
+
+Browser tests include synthetic pointer events for touch logic. Real-device
+scrolling, performance, screen readers and restaurant fidelity remain manual
+acceptance gates. No restaurant photos or generated dish assets are committed.
