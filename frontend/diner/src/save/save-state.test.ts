@@ -405,6 +405,47 @@ describe('two tabs of the same restaurant', () => {
     expect(tabA.savedDishIds()).toEqual([DISH.harvestPowerBowl, DISH.avocadoToast]);
   });
 
+  // Sai's review of 6c099a2: a failed re-read must never let this tab's stale list overwrite
+  // saves it cannot see. The change stays in this tab's memory only, and is reported as not
+  // persisted, so no Save event fires for it.
+  it("a failed re-read never overwrites another tab's save", async () => {
+    const { storage, menu, tabA, tabB } = await twoTabs();
+    tabB.save(DISH.avocadoToast);
+    storage.failReads = true;
+    expect(tabA.save(DISH.harvestPowerBowl)).toEqual({
+      changed: true,
+      persisted: false,
+      savedCount: 1,
+    });
+    storage.failReads = false;
+    expect(stored(storage, menu.venueId).dishIds).toEqual([DISH.avocadoToast]);
+    expect(tabA.savedDishIds()).toEqual([DISH.harvestPowerBowl]);
+  });
+
+  it('a failed re-read never lets an unsave or a menu re-check overwrite storage', async () => {
+    const { storage, menu, tabA, tabB } = await twoTabs();
+    tabA.save(DISH.avocadoToast);
+    tabB.save(DISH.harvestPowerBowl);
+    storage.failReads = true;
+    expect(tabA.unsave(DISH.avocadoToast).persisted).toBe(false);
+    expect(tabA.reconcile(menu)).toEqual({ removed: [] });
+    storage.failReads = false;
+    expect(stored(storage, menu.venueId).dishIds).toEqual([
+      DISH.harvestPowerBowl,
+      DISH.avocadoToast,
+    ]);
+  });
+
+  it('writes again once storage can be read, starting from the latest stored list', async () => {
+    const { storage, menu, tabA, tabB } = await twoTabs();
+    tabB.save(DISH.avocadoToast);
+    storage.failReads = true;
+    tabA.save(DISH.harvestPowerBowl);
+    storage.failReads = false;
+    expect(tabA.save(DISH.eggsBenedict)).toEqual({ changed: true, persisted: true, savedCount: 2 });
+    expect(stored(storage, menu.venueId).dishIds).toEqual([DISH.eggsBenedict, DISH.avocadoToast]);
+  });
+
   it('stays memory-only in session-only mode', async () => {
     const { storage, menu } = await readyState();
     storage.failWrites = true;

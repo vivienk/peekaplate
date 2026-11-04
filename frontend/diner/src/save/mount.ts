@@ -16,7 +16,10 @@ const UNDO_TEXT = 'Undo';
 // not sent.
 const noSend: SendEvent = () => {};
 
-type Hub = { feedback: SaveFeedback; areas: HTMLElement[] };
+// `toast` is the one currently showing, kept here so a screen that mounts its toast area while it is
+// showing (for example after navigating) gets it redrawn. Its timer stays in the feedback, so the
+// original expiry holds; drawing never sends an event.
+type Hub = { feedback: SaveFeedback; areas: HTMLElement[]; toast: Toast | null };
 const hubs = new WeakMap<SaveState, Hub>();
 
 // One feedback per Save state, so there is one toast and one Undo across every screen.
@@ -25,14 +28,19 @@ function hubFor(saveState: SaveState): Hub {
   if (existing) return existing;
   const hub: Hub = {
     areas: [],
-    feedback: createSaveFeedback(saveState, (toast) => draw(hub, toast)),
+    toast: null,
+    feedback: createSaveFeedback(saveState, (toast) => {
+      hub.toast = toast;
+      draw(hub);
+    }),
   };
   hubs.set(saveState, hub);
   return hub;
 }
 
 // The toast goes in the most recently mounted toast area that is still on the page.
-function draw(hub: Hub, toast: Toast | null) {
+function draw(hub: Hub) {
+  const { toast } = hub;
   for (const area of hub.areas) area.replaceChildren();
   const area = [...hub.areas].reverse().find((candidate) => candidate.isConnected);
   if (!area || toast === null) return;
@@ -56,9 +64,13 @@ function draw(hub: Hub, toast: Toast | null) {
 export function mountToastArea(element: HTMLElement, saveState: SaveState): () => void {
   const hub = hubFor(saveState);
   hub.areas.push(element);
+  // A toast that is already showing moves into the new area (Sai's review, 4 Nov).
+  draw(hub);
   return () => {
     hub.areas = hub.areas.filter((area) => area !== element);
     element.replaceChildren();
+    // If another area is still mounted, the toast moves back there.
+    draw(hub);
   };
 }
 

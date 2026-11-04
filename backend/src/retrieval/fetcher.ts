@@ -33,6 +33,7 @@ export type SafeFetchOptions = {
 
 export type SafeFetchResult = {
   content: string;
+  bytes: Uint8Array;
   contentType: string;
   finalUrl: string;
   redirectCount: number;
@@ -47,7 +48,12 @@ export type SafeFetchResult = {
 async function readBoundedBody(
   response: Response,
   maxBytes: number,
-): Promise<{ text: string; size: number; sha256: string }> {
+): Promise<{
+  text: string;
+  bytes: Uint8Array;
+  size: number;
+  sha256: string;
+}> {
   // Check Content-Length header early if available
   const contentLengthHeader = response.headers.get('content-length');
   if (contentLengthHeader) {
@@ -62,7 +68,12 @@ async function readBoundedBody(
 
   if (!response.body) {
     const emptySha = createHash('sha256').update('').digest('hex');
-    return { text: '', size: 0, sha256: emptySha };
+    return {
+      text: '',
+      bytes: new Uint8Array(0),
+      size: 0,
+      sha256: emptySha,
+    };
   }
 
   const reader = response.body.getReader();
@@ -98,7 +109,12 @@ async function readBoundedBody(
 
   const sha256 = createHash('sha256').update(fullBuffer).digest('hex');
   const decoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: false });
-  return { text: decoder.decode(fullBuffer), size: totalBytes, sha256 };
+  return {
+    text: decoder.decode(fullBuffer),
+    bytes: fullBuffer,
+    size: totalBytes,
+    sha256,
+  };
 }
 
 /**
@@ -216,10 +232,11 @@ export async function safeFetch(
       const isHtml = contentType.includes('text/html');
       const maxAllowedBytes = isHtml ? MAX_HTML_BYTES : MAX_SOURCE_BYTES;
 
-      const { text, size, sha256 } = await readBoundedBody(response, maxAllowedBytes);
+      const { text, bytes, size, sha256 } = await readBoundedBody(response, maxAllowedBytes);
 
       return {
         content: text,
+        bytes,
         contentType,
         finalUrl: validatedUrl.toString(),
         redirectCount,
