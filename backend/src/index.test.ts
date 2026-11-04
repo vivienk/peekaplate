@@ -1135,12 +1135,13 @@ describe('RES-02 publication HTTP boundary', () => {
     expect(approve).not.toHaveBeenCalled();
   });
 });
-import { describe, it, expect, vi } from 'vitest';
+
 
 describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', () => {
   
   it('1. Case < 10 sessions: Should return SUPPRESSED status and null values', async () => {
     // Simulation d'un plat ayant seulement 5 sessions uniques au total
+    const app = createApp(services);
     const mockDbResult = {
       rows: [
         {
@@ -1165,7 +1166,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
     };
 
     // Appel simulé à votre application Hono
-    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -1176,6 +1177,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
   });
 
   it('2. Case with 0 total session: Should return NOT_MEASURABLE status', async () => {
+    const app = createApp(services);
     const mockDbResult = {
       rows: [
         {
@@ -1198,7 +1200,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
       DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
     };
 
-    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
     const body = await res.json();
 
     expect(body.data[0].metrics.open_rate.status).toBe('NOT_MEASURABLE');
@@ -1206,6 +1208,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
   });
 
   it('3. Case with valid sessions but 0 engagement: Should return VALID_ZERO status', async () => {
+    const app = createApp(services);
     const mockDbResult = {
       rows: [
         {
@@ -1228,7 +1231,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
       DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
     };
 
-    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
     const body = await res.json();
 
     expect(body.data[0].metrics.engagement_rate.status).toBe('VALID_ZERO');
@@ -1236,6 +1239,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
   });
 
   it('4. Boundary Case "2-of-20" sessions (Sai Requirement)', async () => {
+    const app = createApp(services);
     const mockDbResult = {
       rows: [
         {
@@ -1258,7 +1262,7 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
       DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
     };
 
-    const res = await testApp.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
     const body = await res.json();
 
     expect(body.data[0].metrics.active_sessions.value).toBe(20);
