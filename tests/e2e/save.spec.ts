@@ -242,13 +242,37 @@ async function openSaveUi(page: Page) {
     const events: [string, Record<string, unknown>][] = [];
     const send = (name: string, payload: Record<string, unknown>) => events.push([name, payload]);
     const q = (id: string) => document.querySelector(`[data-testid="${id}"]`);
-    mountToastArea(q('toasts'), saveState);
+    const stopToasts = mountToastArea(q('toasts'), saveState);
     mountSaveBadge(q('badge'), saveState);
     mountSaveHeart(q('card-heart'), { saveState, menu, dish, surface: 'menu_card', send });
     mountSaveHeart(q('detail-heart'), { saveState, menu, dish, surface: 'dish_detail', send });
-    Object.assign(window, { saveEvents: events });
+    // Navigation for the remount tests: the current screen's toast area goes away and the next
+    // screen mounts its own.
+    const navigate = (firstMountNext: boolean) => {
+      const next = document.createElement('div');
+      next.className = 'pp-toast-area';
+      next.setAttribute('aria-live', 'polite');
+      next.setAttribute('aria-atomic', 'true');
+      next.dataset.testid = 'next-toasts';
+      const old = q('toasts');
+      const mountNext = () => {
+        document.body.append(next);
+        mountToastArea(next, saveState);
+      };
+      if (firstMountNext) mountNext();
+      stopToasts();
+      old?.remove();
+      if (!firstMountNext) mountNext();
+    };
+    Object.assign(window, { saveEvents: events, navigate });
   });
 }
+
+const navigateTo = (page: Page, firstMountNext = false) =>
+  page.evaluate(
+    (first) => (window as unknown as { navigate(first: boolean): void }).navigate(first),
+    firstMountNext,
+  );
 
 const sentEvents = (page: Page) =>
   page.evaluate(() =>
@@ -310,6 +334,51 @@ test('unsave shows the removed toast; Undo by keyboard restores the dish and sho
     ['dish_saved', 'undo'],
   ]);
   await expect(toasts).toHaveAttribute('aria-live', 'polite');
+});
+
+// Sai's review (4 Nov): the toast and its Undo follow the diner to the next screen and still
+// expire at the original deadline, with no extra event.
+test('Undo survives moving to another screen and still expires at the original deadline', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  await card.click();
+  await card.click();
+  await page.clock.runFor(2000);
+
+  // The old screen's area unmounts first, then the next screen mounts its own.
+  await navigateTo(page);
+  const next = page.getByTestId('next-toasts');
+  await expect(page.getByTestId('toasts')).toHaveCount(0);
+  await expect(next).toContainText('Removed from Saved');
+  await expect(next.getByRole('button', { name: 'Undo' })).toBeVisible();
+
+  await page.clock.runFor(2900);
+  await expect(next).toContainText('Removed from Saved');
+  await page.clock.runFor(200);
+  await expect(next).toBeEmpty();
+  expect((await sentEvents(page)).map((e) => e.name)).toEqual(['dish_saved', 'dish_unsaved']);
+});
+
+test('Undo still works after moving screens, in either mount order', async ({ page }) => {
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  await card.click();
+  await card.click();
+
+  // The next screen mounts before the old one unmounts.
+  await navigateTo(page, true);
+  const next = page.getByTestId('next-toasts');
+  await next.getByRole('button', { name: 'Undo' }).click();
+  await expect(next).toContainText('Added back to Saved');
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  expect((await sentEvents(page)).map((e) => [e.name, e.save_origin ?? null])).toEqual([
+    ['dish_saved', 'direct'],
+    ['dish_unsaved', null],
+    ['dish_saved', 'undo'],
+  ]);
 });
 
 test('the removed toast disappears after 5 seconds and the restored toast after 3', async ({
