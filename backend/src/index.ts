@@ -364,23 +364,26 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
-app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
-  const venueId = c.req.param('venueId');
-  
-  // 1. Authentication & Tenant Isolation
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ success: false, error: 'Unauthorized: Missing token' }, 401);
-  }
-  
-  const token = authHeader.split(' ')[1];
-  const verifiedSession = await services.verify(token);
-  if (!verifiedSession || !verifiedSession.staff_memberships?.some(m => m.venue_id === venueId)) {
-    return c.json({ success: false, error: 'Forbidden' }, 403);
-  }
+  app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
+    const venueId = c.req.param('venueId');
 
-  // 2. Corrected SQL Query aligning denominators to distinct open_eligible_sessions
-  const query = `
+    // 1. Authentication & Tenant Isolation
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ success: false, error: 'Unauthorized: Missing token' }, 401);
+    }
+
+    const token = authHeader.split(' ')[1];
+    const verifiedSession = await services.verify(token);
+    if (
+      !verifiedSession ||
+      !verifiedSession.staff_memberships?.some((m) => m.venue_id === venueId)
+    ) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    // 2. Corrected SQL Query aligning denominators to distinct open_eligible_sessions
+    const query = `
     SELECT 
         v.dish_id, v.dish_name, v.total_sessions, v.open_eligible_sessions,
         
@@ -404,58 +407,57 @@ app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
     WHERE v.venue_id = $1;
   `;
 
-  try {
-    const result = await services.db.query(query, [venueId]);
-    const rows = result.rows || [];
+    try {
+      const result = await services.db.query(query, [venueId]);
+      const rows = result.rows || [];
 
-    // Map rows and preserve explicit numeric zero 
-    const dishesReport = rows.map((row: any) => ({
-      dish_id: row.dish_id,
-      name: row.dish_name,
-      evidence_state: row.active_sessions_status,
-      metrics: {
-        active_sessions: { 
-          value: row.active_sessions_value === null ? null : Number(row.active_sessions_value), 
-          status: row.active_sessions_status 
+      // Map rows and preserve explicit numeric zero
+      const dishesReport = rows.map((row: any) => ({
+        dish_id: row.dish_id,
+        name: row.dish_name,
+        evidence_state: row.active_sessions_status,
+        metrics: {
+          active_sessions: {
+            value: row.active_sessions_value === null ? null : Number(row.active_sessions_value),
+            status: row.active_sessions_status,
+          },
+          open_rate: {
+            value: row.open_rate_value === null ? null : Number(row.open_rate_value),
+            status: row.open_rate_status,
+          },
+          engagement_rate: {
+            value: row.engagement_rate_value === null ? null : Number(row.engagement_rate_value),
+            status: row.engagement_rate_status,
+          },
+          save_rate: {
+            value: row.save_rate_value === null ? null : Number(row.save_rate_value),
+            status: row.save_rate_status,
+          },
         },
-        open_rate: { 
-          value: row.open_rate_value === null ? null : Number(row.open_rate_value), 
-          status: row.open_rate_status 
+      }));
+
+      // 3. Output the exact compliant merged owner_report.v1 shape with structural metadata
+      const fullInternalReport = {
+        schema_version: 'owner_report.v1',
+        venue_id: venueId,
+        source: 'synthetic',
+        report_metadata: {
+          calculation_version: 'production.v1',
+          generated_at: new Date().toISOString(),
+          date_window: { duration_hours: 24 }, // Dynamized via your pipelines
+          freshness: { is_stale: false },
+          report_status: 'NORMAL',
         },
-        engagement_rate: { 
-          value: row.engagement_rate_value === null ? null : Number(row.engagement_rate_value), 
-          status: row.engagement_rate_status 
-        },
-        save_rate: { 
-          value: row.save_rate_value === null ? null : Number(row.save_rate_value), 
-          status: row.save_rate_status 
-        }
-      }
-    }));
+        dishes: dishesReport,
+      };
 
-    // 3. Output the exact compliant merged owner_report.v1 shape with structural metadata
-    const fullInternalReport = {
-      schema_version: 'owner_report.v1',
-      venue_id: venueId,
-      source: 'synthetic',
-      report_metadata: {
-        calculation_version: 'production.v1',
-        generated_at: new Date().toISOString(),
-        date_window: { duration_hours: 24 }, // Dynamized via your pipelines
-        freshness: { is_stale: false },
-        report_status: 'NORMAL'
-      },
-      dishes: dishesReport
-    };
-
-    // Filter via Efimie's toOwnerReport contract mapper before shipping to the client
-    const outputReport = services.contracts.toOwnerReport(fullInternalReport);
-    return c.json(outputReport, 200);
-
-  } catch (error) {
-    return c.json({ success: false, error: 'Internal Server Error' }, 500);
-  }
-});
+      // Filter via Efimie's toOwnerReport contract mapper before shipping to the client
+      const outputReport = services.contracts.toOwnerReport(fullInternalReport);
+      return c.json(outputReport, 200);
+    } catch (error) {
+      return c.json({ success: false, error: 'Internal Server Error' }, 500);
+    }
+  });
   app.use(
     '/venues/*',
     bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),

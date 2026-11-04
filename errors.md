@@ -1140,3 +1140,8 @@ TEMP/TMP passed all 58 cases. Biome does not process Markdown, so it is not
 Markdown validation. A first direct context invocation used the parent working
 directory; rerunning in the repository corrected that command-path mistake.
 Full frozen-install workspace validation remains delegated to Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T17:17:10.334Z","exitCode":1}
+```

@@ -1136,9 +1136,7 @@ describe('RES-02 publication HTTP boundary', () => {
   });
 });
 
-
 describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', () => {
-  
   it('1. Case < 10 sessions: Should return SUPPRESSED status and null values', async () => {
     // Simulation d'un plat ayant seulement 5 sessions uniques au total
     const app = createApp(services);
@@ -1155,18 +1153,22 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
           engagement_rate_value: null,
           engagement_rate_status: 'SUPPRESSED',
           save_rate_value: null,
-          save_rate_status: 'SUPPRESSED'
-        }
-      ]
+          save_rate_status: 'SUPPRESSED',
+        },
+      ],
     };
 
     // Injection de la fausse réponse de la base de données
     const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
     };
 
     // Appel simulé à votre application Hono
-    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request(
+      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
+      { method: 'GET' },
+      mockEnv,
+    );
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -1191,16 +1193,20 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
           engagement_rate_value: null,
           engagement_rate_status: 'NOT_MEASURABLE',
           save_rate_value: null,
-          save_rate_status: 'NOT_MEASURABLE'
-        }
-      ]
+          save_rate_status: 'NOT_MEASURABLE',
+        },
+      ],
     };
 
     const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
     };
 
-    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request(
+      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
+      { method: 'GET' },
+      mockEnv,
+    );
     const body = await res.json();
 
     expect(body.data[0].metrics.open_rate.status).toBe('NOT_MEASURABLE');
@@ -1222,16 +1228,20 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
           engagement_rate_value: '0.000',
           engagement_rate_status: 'VALID_ZERO', // 0 engagement vérifié sur un volume > 10
           saved_dishes: '0.000',
-          save_rate_status: 'VALID_ZERO'
-        }
-      ]
+          save_rate_status: 'VALID_ZERO',
+        },
+      ],
     };
 
     const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
     };
 
-    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request(
+      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
+      { method: 'GET' },
+      mockEnv,
+    );
     const body = await res.json();
 
     expect(body.data[0].metrics.engagement_rate.status).toBe('VALID_ZERO');
@@ -1250,19 +1260,23 @@ describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', 
           active_sessions_status: 'NORMAL',
           open_rate_value: '0.100', // 2 ouvertures sur 20 sessions = 10%
           open_rate_status: 'NORMAL',
-          engagement_rate_value: null, 
+          engagement_rate_value: null,
           engagement_rate_status: 'SUPPRESSED', // Supprimé si les sessions contributrices < 10
           save_rate_value: null,
-          save_rate_status: 'SUPPRESSED'
-        }
-      ]
+          save_rate_status: 'SUPPRESSED',
+        },
+      ],
     };
 
     const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) }
+      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
     };
 
-    const res = await app.request('/api/v1/owner/analytics/dishes?venue_id=venue-abc', { method: 'GET' }, mockEnv);
+    const res = await app.request(
+      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
+      { method: 'GET' },
+      mockEnv,
+    );
     const body = await res.json();
 
     expect(body.data[0].metrics.active_sessions.value).toBe(20);
