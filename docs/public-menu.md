@@ -51,10 +51,12 @@ Allergen and dietary values are explicit restaurant assertions, never inferred. 
 
 | Type | Exact codes |
 | --- | --- |
-| Allergen | `milk`, `egg`, `fish`, `crustacean shellfish`, `tree nut`, `peanut`, `wheat`, `soy`, `sesame` |
+| Allergen | `milk`, `egg`, `fish`, `crustacean shellfish`, `nuts`, `peanut`, `wheat`, `soy`, `sesame` |
 | Dietary | `vegan`, `vegetarian`, `gluten-free` |
 
 Codes are stable contract identifiers rather than display labels or icon names. The diner maps them to the approved presentation; renaming a label does not change the wire value. Unknown or duplicate codes fail validation.
+
+New bundles use separate `nuts` and `peanut` codes. A search alias may match both. Legacy candidate wording can be normalized before restaurant review. Public bundle validation rejects `tree nut`; rewriting approved bytes would invalidate the content hash. Before requesting review of this v1 correction, verify that neither staging nor production serves an active bundle with the legacy code. If either environment does, preserve the published bytes and use a versioned transition.
 
 `allergens` is required on a complete dish but has an explicit review state: `null` means the declaration is unavailable or has not been reviewed, `[]` means the reviewed declaration contains no values from this closed list, and a non-empty array contains the reviewed declared codes. Neither `null` nor `[]` is a guarantee that a dish is allergen-free, and the diner must not present either state as such. Dietary codes remain explicit restaurant assertions rather than inferred medical or safety claims.
 

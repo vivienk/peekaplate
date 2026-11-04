@@ -1111,12 +1111,44 @@ pass. Keep node summaries within the existing limit when resolving conflicts.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-31T21:38:10.001Z"},"status":"resolved","cause":"The new scripts/console-preview-demos.test.mjs was not run through the Biome formatter before pnpm check (one over-long line).","prevention":"Run pnpm format (or biome check --write) on new files before pnpm check.","regression":"Formatted the file; pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T15:15:48.512Z","exitCode":1}
 ```
 
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T15:15:48.512Z"},"status":"resolved","cause":"S3-DIN-02.2 changed tests/e2e/save.spec.ts, which the diner context node lists, without refreshing the node; the first rewrite of the diner summary then exceeded the 1000-character limit, so context:refresh rejected it.","prevention":"Run the full pnpm check (not only lint/typecheck/test) before pushing, and keep node summaries under 1000 characters.","regression":"Condensed the diner summary to 850 characters, added the DIN-02.2 files to the node and refreshed fingerprints; pnpm context:check reports the context valid and fresh."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T21:38:51.084Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T21:38:51.084Z"},"status":"resolved","cause":"Formatting scripts/console-preview-demos.test.mjs after the context refresh changed a source listed in the delivery node, so its fingerprint was stale.","prevention":"Format first, then pnpm context:refresh, then pnpm check.","regression":"pnpm context:refresh followed by pnpm check passes."}
+```
+
+## November 4 Bundle context reconciliation
+
+The develop merge conflicted only in the context handoff list. Preserve the
+new tracking handoff and Bundle correction; retire the superseded pre-merge
+PR43 handoff to retain the ten-entry bound. Context refresh/check and direct
+documentation checks pass. A first refresh failed at eleven handoffs.
+`pnpm verify context:check docs:check` could not start because the Windows
+sandbox denied pnpm's project-store symlink. Source-pinned contract tests
+initially hit a temporary-directory rename denial; using a writable workspace
+TEMP/TMP passed all 58 cases. Biome does not process Markdown, so it is not
+Markdown validation. A first direct context invocation used the parent working
+directory; rerunning in the repository corrected that command-path mistake.
+Full frozen-install workspace validation remains delegated to Linux CI.
 
 <!-- automatic observation; not root cause -->
 ```json
