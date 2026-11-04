@@ -43,6 +43,32 @@ class TestRevisionPrivacy(unittest.TestCase):
             [8, 12, 9, 15],
         )
 
+    def test_privacy_threshold_boundaries_per_revision(self):
+        revisions = [
+            ("rev-nine", 9, "SUPPRESSED"),
+            ("rev-ten", 10, "ELIGIBLE"),
+            ("rev-eleven", 11, "ELIGIBLE"),
+        ]
+
+        events = [
+            {
+                "revision_id": revision,
+                "session_id": f"{revision}-session-{i}",
+            }
+            for revision, count, _ in revisions
+            for i in range(count)
+        ]
+
+        result = revision_privacy_status(events)
+
+        for revision, count, expected_status in revisions:
+            with self.subTest(revision=revision):
+                self.assertEqual(
+                    result[revision]["eligible_sessions"], count
+                )
+                self.assertEqual(
+                    result[revision]["status"], expected_status
+                )
 
 if __name__ == "__main__":
     unittest.main()

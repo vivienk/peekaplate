@@ -4,13 +4,15 @@
 Add regression coverage for the product clarifications relayed by Adam and Zhiliang.
 
 ## Locally verified
+- Comparison ordering: Soup opened before a displayed Soup/Salad comparison qualifies; Salad opened only afterward does not retroactively qualify under the current metric helper.
+- Privacy boundary: 9 eligible sessions are SUPPRESSED, while 10 and 11 are ELIGIBLE, evaluated independently per publication revision.
 - Soup and Salad: both previously opened dishes count once when included in a qualifying displayed comparison, even when Salad has only 5 seconds of active time.
 - Late arrival: an event received after a newer visit remains in its original visit when grouped by occurrence timestamp.
 - Publication revisions: each revision is evaluated separately against the 10 eligible-session privacy threshold.
 - Existing tests cover 29-minute and 30-minute inactivity boundaries.
 
 ## Test results
-- Python unittest discovery: 79 tests passed, 0 failures.
+- Python unittest discovery: 81 tests passed, 0 failures (November 4, 2026).
 - Application staging execution: NOT RUN.
 - Independent validation by Sai: PENDING.
 

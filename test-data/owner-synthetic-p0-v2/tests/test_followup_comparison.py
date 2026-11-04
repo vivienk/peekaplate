@@ -13,5 +13,31 @@ class TestFollowupComparison(unittest.TestCase):
         self.assertEqual(considered_dishes(events), {"soup", "salad"})
 
 
+    def test_salad_opened_after_comparison(self):
+        events = [
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-soup",
+                "dish_id": "soup",
+            },
+            {
+                "event_type": "dish_compared",
+                "session_id": "session-A",
+                "dish_ids": ["soup", "salad"],
+                "compare_action": "start",
+                "display_state": "displayed",
+            },
+            {
+                "event_type": "dish_detail_opened",
+                "session_id": "session-A",
+                "opening_id": "open-salad",
+                "dish_id": "salad",
+            },
+        ]
+
+        self.assertEqual(considered_dishes(events), {"soup"})
+
+
 if __name__ == "__main__":
     unittest.main()
