@@ -73,6 +73,30 @@
       "blocker": "Disposable staging identities and authorization evidence required"
     }
   ],
+
+  "tracking_acceptance": {
+    "reference": "QA_02_2_GUIDE.md — Shared tracking acceptance",
+    "linked_work": "TRK pilot funnel acceptance",
+    "consent_preconditions": [
+      "Approved live-mode consent and applicable privacy signals must permit tracking before events are expected",
+      "Denied or withdrawn consent must suppress disallowed tracking in both PostHog and canonical ingestion",
+      "Applicable privacy signals must suppress disallowed tracking without blocking browsing"
+    ],
+    "delivery_expectations": [
+      "Each permitted UI action reaches PostHog through the SDK",
+      "Each permitted UI action independently reaches canonical ingestion",
+      "No duplicate event capture occurs in either destination",
+      "Failure in either destination does not block the other destination or browsing"
+    ],
+    "posthog_actual_result": "NOT RUN",
+    "canonical_ingestion_actual_result": "NOT RUN",
+    "consent_and_privacy_actual_result": "NOT RUN",
+    "duplicate_capture_actual_result": "NOT RUN",
+    "failure_isolation_actual_result": "NOT RUN",
+    "status": "BLOCKED",
+    "blocker": "Tracking integration not yet available",
+    "pilot_funnel_status": "BLOCKED — linked TRK acceptance; outside QA-02.2 preparation scope"
+  },
   "allergen_terminology": {
     "current_label": "nuts",
     "previous_label": "tree nuts",

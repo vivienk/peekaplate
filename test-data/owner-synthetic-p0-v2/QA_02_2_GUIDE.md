@@ -60,6 +60,29 @@ This is a preparation package, not proof of successful staging execution.
 
 All three are fictional case templates until permitted sources and approved image assets are confirmed.
 
+### Shared tracking acceptance — Consent and dual delivery (TRK)
+
+These requirements apply to all QA-02.2 event-producing scenarios, including menu views, dish views, detail opens, Save, Unsave, Undo, and Saved screen views.
+
+- **Approved live-mode consent:** Verify that the required tracking consent has been granted and applicable privacy signals permit tracking before expecting events.
+- **Denied or withdrawn consent:** Browsing, menu viewing, and permitted UI actions must continue working, but disallowed tracking must not reach either PostHog or canonical ingestion.
+- **Privacy signals:** Applicable privacy signals must suppress disallowed tracking in both destinations without breaking browsing.
+- **PostHog SDK:** For each eligible UI action, record whether the expected event reaches PostHog through its SDK, including event identity and duplicate checks.
+- **Canonical ingestion:** Independently verify the corresponding event reaches canonical ingestion, including event identity and duplicate checks. PostHog delivery alone does not prove canonical delivery.
+- **Failure isolation:** Failure of PostHog must not block canonical ingestion or browsing. Failure of canonical ingestion must not block PostHog or browsing.
+- **Pilot funnel:** Link the working pilot funnel check to the separate TRK acceptance work. Building or validating the funnel is outside this QA-02.2 preparation ticket.
+
+**Separate execution evidence:**
+- Consent mode and applicable privacy signals: NOT RUN
+- PostHog SDK actual result: NOT RUN
+- Canonical ingestion actual result: NOT RUN
+- Duplicate capture check: NOT RUN
+- Destination failure-isolation check: NOT RUN
+- Linked TRK pilot funnel acceptance: BLOCKED — pending tracking integration
+
+**Execution status:** NOT RUN / BLOCKED until tracking integration is available. Do not mark these requirements PASS based on documentation alone.
+
+
 ### Safety and isolation rules
 
 - Missing ingredients must never imply allergen safety.
@@ -103,6 +126,8 @@ All three are fictional case templates until permitted sources and approved imag
 | 9 | Diner reloads the page | Saved state is restored without a duplicate Save event |
 
 #### Expected P0 events
+
+All event expectations below are conditional on the consent and privacy requirements in **Shared tracking acceptance — Consent and dual delivery (TRK)**. Verify PostHog SDK and canonical ingestion separately; keep actual results NOT RUN/BLOCKED until tracking integration is available.
 - menu_viewed: after the approved menu becomes readable
 - dish_viewed: after the complete dish card is at least 50% visible continuously for 1 second
 - dish_detail_opened: after readable detail is displayed
@@ -154,6 +179,8 @@ Verify that a dish missing required information cannot accidentally become a com
 | 8 | Diner attempts to compare the incomplete dish | Comparison is unavailable for the incomplete placeholder |
 
 #### Expected P0 events
+
+All event expectations below are conditional on the consent and privacy requirements in **Shared tracking acceptance — Consent and dual delivery (TRK)**. Verify PostHog SDK and canonical ingestion separately; keep actual results NOT RUN/BLOCKED until tracking integration is available.
 - No dish_viewed for an incomplete grey placeholder.
 - No dish_detail_opened when readable detail was not displayed.
 - No dish_compared when comparison was blocked.
@@ -215,6 +242,8 @@ Verify that changing a dish creates a controlled revision, publication requires 
 | 9 | Diner freshly loads the menu again | Withdrawn dish is not presented as available |
 
 #### Expected P0 events
+
+All event expectations below are conditional on the consent and privacy requirements in **Shared tracking acceptance — Consent and dual delivery (TRK)**. Verify PostHog SDK and canonical ingestion separately; keep actual results NOT RUN/BLOCKED until tracking integration is available.
 - menu_viewed only after an approved menu becomes readable.
 - dish_viewed only for a complete eligible card satisfying the visibility threshold.
 - dish_detail_opened only after readable detail is displayed.
@@ -271,6 +300,8 @@ Verify that diner Save, Unsave, and Undo actions produce the correct visible sta
 | 10 | Diner opens the Saved screen when storage cannot be read | Unavailable/error state appears; no shortlist_viewed event |
 
 #### Expected P0 events
+
+All event expectations below are conditional on the consent and privacy requirements in **Shared tracking acceptance — Consent and dual delivery (TRK)**. Verify PostHog SDK and canonical ingestion separately; keep actual results NOT RUN/BLOCKED until tracking integration is available.
 
 - Successful direct Save: `dish_saved` with `save_origin=direct`
 - Successful Unsave: `dish_unsaved`
