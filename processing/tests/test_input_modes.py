@@ -361,6 +361,20 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertTrue(any("inverted" in warning for warning in report.warnings))
 
 
+    def test_multi_page_vision_extraction_reuses_client_without_event_loop_closed(self):
+        from peekaplate_processing.vision_extraction import extract_vision_v4
+        calls=[]
+        class MultiPageLLM:
+            def bind(self, **kwargs): return self
+            async def ainvoke(self, messages):
+                calls.append(len(messages))
+                return SimpleNamespace(content='{"dishes":[{"page_number":1,"name":"Dish","box":[1,2,3,4]}]}')
+        dishes, errors = extract_vision_v4(MultiPageLLM(), [{"page_number":1,"image_url":"data:,"}, {"page_number":2,"image_url":"data:,"}], timeout=30)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(dishes), 2)
+        self.assertEqual([d.page_number for d in dishes], [1, 2])
+        self.assertEqual(errors, [])
+
     def _dish(self):
         from peekaplate_processing.vision_extraction import V4Dish
         return V4Dish.model_validate({"page_number":1,"name":"Soup","price_text":"8.50","price_amount":"8.50","box":[10,10,20,40]})

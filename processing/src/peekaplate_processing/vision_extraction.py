@@ -191,35 +191,36 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
         bind_kwargs["timeout"] = timeout
     vision_llm = llm.bind(**bind_kwargs)
     prompt = f"{V4_VISION_PROMPT}\n\nREQUIRED JSON SCHEMA:\n{json.dumps(V4Batch.model_json_schema())}"
-    all_dishes: list[V4Dish] = []
-    errors: list[str] = []
-    for page in page_images:
-        page_num = page["page_number"]
-        content = [
-            {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
-            {"type": "image_url", "image_url": {"url": page["image_url"]}},
-        ]
-        messages = [("system", prompt), ("human", content)]
-        if timeout is not None and timeout > 0:
-            # Same pattern as the OCR graph: cancel the awaited HTTP request when the deadline passes.
-            async def _bounded():
-                return await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
-            try:
-                response = asyncio.run(_bounded())
-            except asyncio.TimeoutError:
-                raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
-        else:
-            response = vision_llm.invoke(messages)
-        raw_content = getattr(response, "content", None)
-        if not isinstance(raw_content, str) or not raw_content.strip():
-            errors.append(f"Page {page_num}: vision model returned no content.")
-            continue
-        metadata = getattr(response, "response_metadata", None) or {}
-        if metadata.get("finish_reason") == "length":
-            errors.append(f"Page {page_num}: vision output hit the token limit; later dishes may be missing.")
-        dishes = _parse_page(raw_content.strip(), page_num, errors)
-        all_dishes.extend(d.model_copy(update={"page_number": page_num}) for d in dishes)
-    return all_dishes, errors
+    async def _extract_all() -> tuple[list[V4Dish], list[str]]:
+        all_dishes: list[V4Dish] = []
+        errors: list[str] = []
+        for page in page_images:
+            page_num = page["page_number"]
+            content = [
+                {"type": "text", "text": f"Extract all menu items from Page {page_num}."},
+                {"type": "image_url", "image_url": {"url": page["image_url"]}},
+            ]
+            messages = [("system", prompt), ("human", content)]
+            if timeout is not None and timeout > 0:
+                # Same pattern as the OCR graph: cancel the awaited HTTP request when the deadline passes.
+                try:
+                    response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
+            else:
+                response = await vision_llm.ainvoke(messages)
+            raw_content = getattr(response, "content", None)
+            if not isinstance(raw_content, str) or not raw_content.strip():
+                errors.append(f"Page {page_num}: vision model returned no content.")
+                continue
+            metadata = getattr(response, "response_metadata", None) or {}
+            if metadata.get("finish_reason") == "length":
+                errors.append(f"Page {page_num}: vision output hit the token limit; later dishes may be missing.")
+            dishes = _parse_page(raw_content.strip(), page_num, errors)
+            all_dishes.extend(d.model_copy(update={"page_number": page_num}) for d in dishes)
+        return all_dishes, errors
+
+    return asyncio.run(_extract_all())
 
 
 def build_v4_result(

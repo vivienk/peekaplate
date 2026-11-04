@@ -224,6 +224,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
             if not v4_success:
                 print("All vision providers failed; cleanly falling back to OCR mode...", file=sys.stderr, flush=True)
                 input_mode = "ocr_image"
+                # Instantiate a fresh client for the OCR graph so its async transport is not bound to a closed loop
+                llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         if llm is None:
             llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)

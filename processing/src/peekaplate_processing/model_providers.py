@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Literal
 from urllib.parse import urlsplit
 
+import httpx
 from langchain_openai import ChatOpenAI
 from peekaplate_processing.errors import ExtractionError
 
@@ -189,6 +190,7 @@ def create_model_client(
         max_retries=0,
         max_tokens=max_tokens,
         extra_body=extra,
+        http_async_client=httpx.AsyncClient(timeout=timeout),
     )
 
 
@@ -251,6 +253,7 @@ def _build_client_from_config(
         max_retries=0,
         max_tokens=max_tokens,
         extra_body=extra,
+        http_async_client=httpx.AsyncClient(timeout=timeout),
     )
 def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[tuple[str, ChatOpenAI]]:
     """Return configured clients in priority order: google_studio -> qwen -> glm -> openrouter.
