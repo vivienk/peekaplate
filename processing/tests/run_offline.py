@@ -5,6 +5,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+# Ensure UTF-8 mode on Windows automatically without requiring manual $env:PYTHONUTF8='1'
+if sys.platform == "win32":
+    if not getattr(sys.flags, "utf8_mode", 0):
+        os.environ["PYTHONUTF8"] = "1"
+        import subprocess
+        proc = subprocess.run([sys.executable, "-X", "utf8"] + sys.argv)
+        sys.exit(proc.returncode)
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 tests_dir = Path(__file__).resolve().parent
 if str(tests_dir) not in sys.path:
     sys.path.insert(0, str(tests_dir))

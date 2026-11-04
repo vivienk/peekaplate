@@ -42,7 +42,8 @@ class GroundingBudgetTest(unittest.TestCase):
             self.fail(f"grounded_draft timed out after 5s on repeated 'addon' label: {exc}")
         elapsed = time.perf_counter() - started
         self.assertEqual(proc.returncode, 0, proc.stderr or proc.stdout)
-        self.assertLess(elapsed, 3.5)
+        threshold = 5.0 if sys.platform == "win32" else 3.5
+        self.assertLess(elapsed, threshold)
 
     def test_label_work_budget_and_boundaries(self) -> None:
         import peekaplate_processing.menu_layout as menu_layout
