@@ -63,6 +63,11 @@ p {
   font-family: "Inter", system-ui, sans-serif;
 }
 
+.pp-menu button,
+.pp-detail button {
+  font-family: inherit;
+}
+
 .pp-header {
   display: flex;
   align-items: flex-end;
@@ -153,7 +158,7 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 0 0;
+  padding: 24px 0 0;
 }
 
 .pp-tab {
@@ -502,11 +507,17 @@ main:has(> .pp-detail) {
 .pp-detail__section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24px;
   padding: 24px 16px;
   background: #2a2d36;
   border: 1px solid rgba(113, 115, 122, 0.3);
   border-radius: 16px;
+}
+
+.pp-detail__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .pp-detail__category {
@@ -613,6 +624,7 @@ main:has(> .pp-detail) {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
 }
 
 .pp-ingredients__title {
@@ -662,7 +674,7 @@ main:has(> .pp-detail) {
 .pp-detail__actions {
   display: flex;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .pp-btn {

@@ -80,12 +80,14 @@ export function renderDishDetail(
       </div>
 
       <section class="pp-detail__section">
-        <p class="pp-detail__category">${escapeHtml(dish.categoryName)}</p>
-        <div class="pp-detail__name-row">
-          <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
-          <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
+        <div class="pp-detail__text">
+          <p class="pp-detail__category">${escapeHtml(dish.categoryName)}</p>
+          <div class="pp-detail__name-row">
+            <h2 class="pp-detail__name">${escapeHtml(dish.name)}</h2>
+            <p class="pp-detail__price">${escapeHtml(formatPrice(dish.price))}</p>
+          </div>
+          <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
         </div>
-        <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
 
         ${
           showAllergenSection
