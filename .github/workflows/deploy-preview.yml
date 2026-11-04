@@ -145,7 +145,7 @@ jobs:
           | Diner | $DINER_URL |
           | Console | $CONSOLE_URL |
 
-          Built from \`${SHA:0:7}\`. Static pages only: no API, database or analytics. Deleted when this PR closes. See [preview guide](https://github.com/$REPO/blob/develop/docs/previews.md)."
+          Built from \`${SHA:0:7}\`. Static pages only: no API, database or analytics. After merge the last successful preview is kept (check this SHA against the final commit); deleted if this PR closes without merging. See [preview guide](https://github.com/$REPO/blob/develop/docs/previews.md)."
           echo "$body" >> "$GITHUB_STEP_SUMMARY"
           id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\"))) | .id" | head -n1)
@@ -156,10 +156,12 @@ jobs:
           fi
 
   cleanup:
+    # Merged PRs keep their last successfully deployed preview; closed-unmerged PRs are deleted.
     if: >-
       (github.event_name == 'workflow_dispatch' &&
        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
       (github.event_name == 'pull_request_target' && github.event.action == 'closed' &&
+       github.event.pull_request.merged != true &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-24.04
@@ -195,4 +197,4 @@ jobs:
           gh api -X PATCH "repos/$REPO/issues/comments/$id" \
             -f body="$MARKER
           ### Preview
-          Removed after this PR closed." > /dev/null
+          Removed after this PR closed without merging." > /dev/null
