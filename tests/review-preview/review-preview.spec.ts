@@ -110,3 +110,14 @@ test('no JavaScript still displays the original photograph', async ({ browser })
   ).toBe(512);
   await context.close();
 });
+
+test('missing original blocks review and retains a clear error even if both images fail', async ({
+  page,
+}) => {
+  await page.route('**/fallback.jpg', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/presentation.png', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.reload();
+  await expect(page.locator('#stage')).toBeHidden();
+  await expect(page.locator('#status')).toContainText('Original photo unavailable');
+  await expect(page.locator('#compare')).toBeDisabled();
+});

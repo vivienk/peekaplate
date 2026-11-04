@@ -19,7 +19,7 @@ function render(){var off=query.matches||showOriginal||!ready;card.style.transfo
 function reset(){drag=null;x=0;y=0;stage.classList.remove('tracking');render();}
 function allowed(){return ready&&!showOriginal&&!query.matches;}
 function clamp(n){return Math.max(-1,Math.min(1,n));}
-function fail(){ready=false;reset();stage.classList.remove('ready');compare.disabled=true;status.textContent='Preview unavailable — showing the original photo.';}
+function fail(){ready=false;reset();stage.classList.remove('ready');compare.disabled=true;if(!stage.hidden)status.textContent='Preview unavailable — showing the original photo.';}
 original.addEventListener('error',function(){ready=false;reset();stage.hidden=true;compare.disabled=true;status.textContent='Original photo unavailable. Restore the fallback before reviewing.';});
 dish.addEventListener('error',fail);
 function loadCandidate(){

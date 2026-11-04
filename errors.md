@@ -1432,3 +1432,22 @@ including the November 2 allergen-label note, are preserved.
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T07:52:52.132Z","exitCode":1}
+```
+
+## PR25 local review-preview packaging checks
+
+- Initial repository tests could not bind the local authentication test server
+  (`EPERM` on loopback). Re-running with local test networking permitted passed
+  the unit/script suites; this was an execution restriction, not a product fix.
+- The added processing context summary exceeded the 1000-character limit.
+  Independent review identified the cause; shortened the summary and refreshed
+  the context fingerprint. The required context check is the regression gate.
