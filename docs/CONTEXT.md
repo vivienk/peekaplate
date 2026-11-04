@@ -94,7 +94,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. Synthetic foundations.html is included only in flagged PR preview builds; normal builds exclude it.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -104,7 +104,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/foundations/Input.tsx",
         "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
-        "tests/e2e/input.spec.ts"
+        "tests/e2e/input.spec.ts",
+        "frontend/console/vite.config.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -114,7 +115,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "edd7eb2813fac4cbfc7fbcfbce673d741cd830b924dbbfb324d365f114abdc38"
+      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
     },
     {
       "id": "backend",
@@ -292,7 +293,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "pnpm-lock.yaml",
         "docs/res02-staging-acceptance.json",
         "docs/observation-staging-acceptance.json",
-        "docs/observation-facts-staging-acceptance.json"
+        "docs/observation-facts-staging-acceptance.json",
+        "scripts/console-preview-demos.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -303,7 +305,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "35aa8efd4efacc658af8b52a355ac1f4a40673f27bb2ae8daacea8648bf20eb8"
+      "sourceFingerprint": "4f251ffb36fad04e14e3c6f8565507a2351489c5124f85b497777eb869ca442e"
     },
     {
       "id": "agents",
@@ -511,7 +513,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "docs/observation-facts-staging-acceptance.json"
       ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate."
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Focused PR79/PR104 main promotion enables preview-only demo build inputs and retention of merged PRs last successful preview; verify a fresh hosted foundations.html and SHA marker after merging the trusted workflow."
     }
   ]
 }
