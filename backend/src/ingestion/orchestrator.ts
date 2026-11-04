@@ -157,48 +157,26 @@ export async function submitMenuIngestion(
     throw new IngestionError('invalid_request', 400, 'venueId and idempotencyKey are required');
   }
 
-  // Reject text sources at submission boundary
-  if (request.sourceType === 'text') {
+  // Reject raw text and unmaterialized url sources at submission boundary until retrieval materialization is connected
+  if (request.sourceType === 'text' || request.sourceType === 'url') {
+    if (request.sourceType === 'url' && request.sourceUrl) {
+      validateIngestionUrl(request.sourceUrl);
+    }
     throw new IngestionError(
       'unsupported_source_type',
       400,
-      `Source type "${request.sourceType}" is not supported for direct extraction without materialization.`,
+      `Source type "${request.sourceType}" is not supported for direct extraction without materialization. Please submit 'pdf' or 'photo' with sourceHash and sourceStorageKey.`,
     );
   }
 
-  let sourceHash = request.sourceHash ?? null;
-
-  if (request.sourceType === 'url') {
-    if (!request.sourceUrl || typeof request.sourceUrl !== 'string') {
-      throw new IngestionError(
-        'invalid_source_url',
-        400,
-        'A valid http or https sourceUrl is required for URL menu ingestion',
-      );
-    }
-    // Validate destination and enforce SSRF protections
-    validateIngestionUrl(request.sourceUrl);
-
-    if (sourceHash) {
-      if (!/^[0-9a-f]{64}$/.test(sourceHash)) {
-        throw new IngestionError(
-          'invalid_source_hash',
-          400,
-          'A valid 64-character SHA-256 hex sourceHash is required if provided for URL menu extraction',
-        );
-      }
-    } else {
-      sourceHash = null;
-    }
-  } else {
-    // PDF and photo sources require SHA-256 hash
-    if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
-      throw new IngestionError(
-        'missing_source_hash',
-        400,
-        'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
-      );
-    }
+  const sourceHash = request.sourceHash ?? null;
+  // PDF and photo sources require SHA-256 hash
+  if (!sourceHash || !/^[0-9a-f]{64}$/.test(sourceHash)) {
+    throw new IngestionError(
+      'missing_source_hash',
+      400,
+      'A valid 64-character SHA-256 hex sourceHash is required for menu extraction',
+    );
   }
 
   const jobId = crypto.randomUUID();
@@ -229,8 +207,6 @@ export async function submitMenuIngestion(
       );
     }
     sourceStorageKey = request.sourceStorageKey;
-  } else if (request.sourceType === 'url') {
-    sourceStorageKey = null;
   }
 
   const job = await createIngestionJob(client, {
@@ -324,19 +300,42 @@ export async function executeIngestionWorkflow(
     if (!adapted.success || adapted.status === 'failed') {
       const errorMsg = !adapted.success
         ? adapted.errors.join('; ')
-        : adapted.warnings.join('; ') || 'Extraction marked as failed by producer';
+        : adapted.errors.length > 0
+          ? adapted.errors.join('; ')
+          : adapted.warnings.join('; ') || 'Extraction marked as failed by producer';
+
+      // Durably retain complete private report before updating job status so diagnostics are never lost
+      let resultStorageKey: string | null = null;
+      if (params.reportStorage) {
+        resultStorageKey = `reports/${params.tenantId}/${params.jobId}/attempts/${claim.claimToken}/extraction.json`;
+        try {
+          await params.reportStorage.put(resultStorageKey, JSON.stringify(rawResult));
+        } catch (storageErr) {
+          throw new IngestionError(
+            'report_storage_failed',
+            500,
+            `Failed to persist extraction report artifact: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`,
+          );
+        }
+      }
+
       await failIngestionJob(client, {
         tenantId: params.tenantId,
         jobId: params.jobId,
         claimToken: claim.claimToken,
         errorCode: !adapted.success ? 'schema_validation_failed' : 'extraction_failed',
         errorDetails: errorMsg,
+        resultStorageKey,
+        terminal: true,
         ...(params.leaseTimeoutMinutes !== undefined
           ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
           : {}),
       });
 
       const failedJob = (await getIngestionJob(client, params.tenantId, params.jobId))!;
+      if (failedJob.status === 'running') {
+        throw new IngestionError('lease_expired_or_reclaimed', 409);
+      }
       return {
         job: failedJob,
         drafts: [],
@@ -385,16 +384,71 @@ export async function executeIngestionWorkflow(
     const errorCode = error instanceof IngestionError ? error.code : 'extraction_exception';
     const errorDetails = error instanceof Error ? error.message : String(error);
 
-    await failIngestionJob(client, {
-      tenantId: params.tenantId,
-      jobId: params.jobId,
-      claimToken: claim.claimToken,
-      errorCode,
-      errorDetails,
-      ...(params.leaseTimeoutMinutes !== undefined
-        ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
-        : {}),
-    });
+    const isDeterministicSourceError =
+      error instanceof IngestionError &&
+      (error.code === 'unsupported_extractor_source_type' ||
+        error.code === 'missing_materialized_source' ||
+        error.code === 'invalid_source_url' ||
+        error.code === 'ssrf_destination_prohibited');
+
+    let resultStorageKey: string | null = null;
+    if (params.reportStorage && claim?.claimToken) {
+      resultStorageKey = `reports/${params.tenantId}/${params.jobId}/attempts/${claim.claimToken}/extraction.json`;
+      try {
+        const failureDiagnostic = {
+          schema_version: 1,
+          pipeline_version: '2',
+          status: 'failed',
+          source: {
+            source_id: job.source_storage_key ?? job.id,
+            sha256: job.source_hash ?? '0'.repeat(64),
+            kind: job.source_type,
+            location: job.source_url ?? job.source_storage_key ?? '',
+            retrieved_at: new Date().toISOString(),
+            size_bytes: 1,
+            snapshot_base64: 'AA==',
+          },
+          segments: [],
+          drafts: [],
+          evidence: [],
+          capture_requests: [],
+          warnings: [],
+          errors: [errorDetails],
+        };
+        await params.reportStorage.put(resultStorageKey, JSON.stringify(failureDiagnostic));
+      } catch {
+        resultStorageKey = null;
+      }
+    }
+
+    try {
+      await failIngestionJob(client, {
+        tenantId: params.tenantId,
+        jobId: params.jobId,
+        claimToken: claim.claimToken,
+        errorCode,
+        errorDetails,
+        resultStorageKey,
+        terminal: isDeterministicSourceError,
+        ...(params.leaseTimeoutMinutes !== undefined
+          ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+          : {}),
+      });
+    } catch {
+      // Lease may have expired or been reclaimed
+    }
+
+    if (isDeterministicSourceError) {
+      const failedJob = await getIngestionJob(client, params.tenantId, params.jobId);
+      if (failedJob && failedJob.status === 'failed') {
+        return {
+          job: failedJob,
+          drafts: [],
+          persistedCount: 0,
+          supersededCount: 0,
+        };
+      }
+    }
 
     throw error;
   }
@@ -461,10 +515,22 @@ export async function processIngestionQueueBatch(
           jobId,
           error: `Job requeued for retry: ${workflowOutcome.job.error_code ?? 'unknown_error'}`,
         });
-      } else {
+      } else if (
+        workflowOutcome.job.status === 'complete' ||
+        workflowOutcome.job.status === 'incomplete' ||
+        workflowOutcome.job.status === 'failed'
+      ) {
         msg.ack();
         acknowledged += 1;
         processed += 1;
+      } else {
+        // Any non-terminal state (e.g. 'running' due to lost lease / race condition) must NEVER be ACKed
+        msg.retry();
+        retried += 1;
+        errors.push({
+          jobId,
+          error: `Job ${jobId} ended workflow in non-terminal status '${workflowOutcome.job.status}'; retrying queue delivery`,
+        });
       }
     } catch (err: unknown) {
       if (err instanceof IngestionError) {
@@ -482,6 +548,46 @@ export async function processIngestionQueueBatch(
           }
           retried += 1;
           errors.push({ jobId, error: 'Job is currently running under an active lease' });
+          continue;
+        }
+        if (
+          err.code === 'lease_expired_or_reclaimed' ||
+          err.code === 'lease_expired_at_completion'
+        ) {
+          try {
+            const existing = await getIngestionJob(client, tenantId, jobId);
+            if (
+              existing &&
+              (existing.status === 'complete' ||
+                existing.status === 'incomplete' ||
+                existing.status === 'failed')
+            ) {
+              msg.ack();
+              acknowledged += 1;
+              continue;
+            }
+            if (existing && existing.status === 'running') {
+              const leaseTimeoutMinutes =
+                options?.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
+              const delaySeconds = activeLeaseRetryDelaySeconds(
+                existing.locked_at,
+                leaseTimeoutMinutes,
+              );
+              msg.retry({ delaySeconds });
+              retried += 1;
+              errors.push({
+                jobId,
+                error: `Lease expired during processing; delayed redelivery by ${delaySeconds}s for active lease`,
+              });
+              continue;
+            }
+          } catch {}
+          msg.retry();
+          retried += 1;
+          errors.push({
+            jobId,
+            error: 'Lease expired or reclaimed during processing; retrying delivery',
+          });
           continue;
         }
         if (err.code === 'job_already_complete' || err.code === 'job_already_locked_or_complete') {

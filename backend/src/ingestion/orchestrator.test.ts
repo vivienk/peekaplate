@@ -101,11 +101,12 @@ function createMockClient() {
         return { rows: [], rowCount: 1 };
       }
 
-      if (text.includes('SET status = CASE WHEN attempt_count >= max_attempts')) {
+      if (text.includes('SET status = CASE WHEN')) {
         if (store.job) {
           store.job.status = 'failed';
           store.job.error_code = values![0] as string;
           store.job.error_details = values![1] as string;
+          store.job.result_storage_key = values![2] as string | null;
         }
         return { rows: [], rowCount: 1 };
       }
@@ -120,19 +121,21 @@ function createMockClient() {
 describe('Ingestion Orchestrator', () => {
   const venueId = '00000000-0000-0000-0000-000000000501';
 
-  it('submitMenuIngestion accepts valid url, rejects invalid/ssrf url, rejects text, and enforces sourceHash on pdf/photo', async () => {
+  it('submitMenuIngestion rejects unmaterialized url and text, rejects invalid/ssrf url, and enforces sourceHash on pdf/photo', async () => {
     const { client } = createMockClient();
 
-    // Accepts valid url
-    const urlJob = await submitMenuIngestion(client, {
-      venueId,
-      sourceType: 'url',
-      sourceUrl: 'https://example.com/menu',
-      idempotencyKey: 'idem_url_accept',
+    // Rejects unmaterialized url source
+    await expect(
+      submitMenuIngestion(client, {
+        venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_url_reject',
+      }),
+    ).rejects.toMatchObject({
+      code: 'unsupported_source_type',
+      status: 400,
     });
-    expect(urlJob.status).toBe('queued');
-    expect(urlJob.source_type).toBe('url');
-    expect(urlJob.source_url).toBe('https://example.com/menu');
 
     // Rejects url without sourceUrl
     await expect(
@@ -142,7 +145,7 @@ describe('Ingestion Orchestrator', () => {
         idempotencyKey: 'idem_url_no_url',
       }),
     ).rejects.toMatchObject({
-      code: 'invalid_source_url',
+      code: 'unsupported_source_type',
       status: 400,
     });
 
@@ -622,7 +625,7 @@ describe('Ingestion Orchestrator', () => {
               {
                 segment_id: 'seg_q',
                 start: 0,
-                end: 5,
+                end: 17,
               },
             ],
           },
@@ -729,7 +732,7 @@ describe('Ingestion Orchestrator', () => {
       // Override client query so failIngestionJob sets status to 'queued' (retryable)
       const originalQuery = client.query.bind(client);
       client.query = async (text: string, values?: unknown[]) => {
-        if (text.includes('SET status = CASE WHEN attempt_count >= max_attempts')) {
+        if (text.includes('SET status = CASE WHEN')) {
           if (store.job) {
             store.job.status = 'queued'; // Requeued for retry
             store.job.error_code = values![0] as string;

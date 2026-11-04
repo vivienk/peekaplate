@@ -137,13 +137,15 @@ function createMockDatabase() {
       }
 
       // 7. Fail job
-      if (text.includes('SET status = CASE WHEN attempt_count >= max_attempts')) {
+      if (text.includes('SET status = CASE WHEN')) {
         if (store.job) {
           store.job.attempt_count = (store.job.attempt_count ?? 0) + 1;
+          const isTerminal = values && values[6] === true;
           store.job.status =
-            store.job.attempt_count >= store.job.max_attempts ? 'failed' : 'queued';
+            isTerminal || store.job.attempt_count >= store.job.max_attempts ? 'failed' : 'queued';
           store.job.error_code = values![0] as string;
           store.job.error_details = values![1] as string;
+          store.job.result_storage_key = values![2] as string | null;
           store.job.claim_token = null;
           store.job.locked_at = null;
         }
@@ -711,15 +713,17 @@ describe('S3-VIS-01 Menu Ingestion End-to-End Integration Suite', () => {
         status: 400,
       });
 
-      const validJob = await submitMenuIngestion(client, {
-        venueId,
-        sourceType: 'url',
-        sourceUrl: 'https://example.com/menu',
-        idempotencyKey: 'idem_url_accept_2',
+      await expect(
+        submitMenuIngestion(client, {
+          venueId,
+          sourceType: 'url',
+          sourceUrl: 'https://example.com/menu',
+          idempotencyKey: 'idem_url_reject_2',
+        }),
+      ).rejects.toMatchObject({
+        code: 'unsupported_source_type',
+        status: 400,
       });
-      expect(validJob.status).toBe('queued');
-      expect(validJob.source_type).toBe('url');
-      expect(validJob.source_url).toBe('https://example.com/menu');
     });
   });
 

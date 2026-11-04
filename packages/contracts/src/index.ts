@@ -1097,10 +1097,54 @@ export const ExtractionSourceSpanSchema = z
     }
   });
 
+export const ExtractionBoxCoordinatesSchema = z.strictObject({
+  left: z
+    .number()
+    .min(0)
+    .refine(
+      (n) => typeof n === 'number' && Number.isFinite(n),
+      'left must be a finite non-negative number',
+    ),
+  top: z
+    .number()
+    .min(0)
+    .refine(
+      (n) => typeof n === 'number' && Number.isFinite(n),
+      'top must be a finite non-negative number',
+    ),
+  width: z
+    .number()
+    .positive()
+    .refine(
+      (n) => typeof n === 'number' && Number.isFinite(n),
+      'width must be a finite positive number',
+    ),
+  height: z
+    .number()
+    .positive()
+    .refine(
+      (n) => typeof n === 'number' && Number.isFinite(n),
+      'height must be a finite positive number',
+    ),
+});
+
+export const ExtractionBoxEvidenceSchema = z.strictObject({
+  page_number: z.number().int().min(1),
+  box: ExtractionBoxCoordinatesSchema,
+  text: z
+    .string()
+    .refine(
+      (val) => val.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(val),
+      'text must be a nonblank literal without control characters',
+    ),
+  saved_region_index: z.number().int().min(0),
+});
+
 export const ExtractionDraftEvidenceSchema = z.strictObject({
   draft_id: z.string().min(1),
   draft_index: z.number().int().min(0),
   spans: z.array(ExtractionSourceSpanSchema).min(1),
+  box_evidence: z.array(ExtractionBoxEvidenceSchema).optional(),
 });
 
 export const ExtractionDishDraftSchema = z.strictObject({
@@ -1255,11 +1299,14 @@ export const StructuredDishDraftSchema = z.strictObject({
   image_id: z.string().trim().min(1).nullable(),
   code_point_spans: z.array(ExtractionSourceSpanSchema).min(1),
   utf16_spans: z.array(ExtractionSourceSpanSchema).min(1),
+  box_evidence: z.array(ExtractionBoxEvidenceSchema).optional(),
   review_warnings: z.array(z.string()),
   status: z.literal('needs_review'),
 });
 
 export type ExtractionSourceSpan = z.infer<typeof ExtractionSourceSpanSchema>;
+export type ExtractionBoxCoordinates = z.infer<typeof ExtractionBoxCoordinatesSchema>;
+export type ExtractionBoxEvidence = z.infer<typeof ExtractionBoxEvidenceSchema>;
 export type ExtractionDraftEvidence = z.infer<typeof ExtractionDraftEvidenceSchema>;
 export type ExtractionDishDraft = z.infer<typeof ExtractionDishDraftSchema>;
 export type ExtractionSourceRecord = z.infer<typeof ExtractionSourceRecordSchema>;

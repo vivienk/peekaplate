@@ -362,10 +362,10 @@ describe('Ingestion Repository', () => {
       expect(text).toContain('UPDATE app_private.menu_ingestion_jobs');
       expect(text).toContain('error_code = $1');
       expect(text).toContain(
-        "SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END",
+        "SET status = CASE WHEN $7::boolean = true OR attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END",
       );
       expect(text).toContain(
-        'finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END',
+        'finished_at = CASE WHEN $7::boolean = true OR attempt_count >= max_attempts THEN now() ELSE NULL END',
       );
       expect(values![0]).toBe('timeout_error');
       return { rows: [], rowCount: 1 };

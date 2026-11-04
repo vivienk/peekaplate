@@ -378,6 +378,9 @@ export async function persistExtractedDrafts(
           JSON.stringify({
             code_point_spans: draft.code_point_spans,
             utf16_spans: draft.utf16_spans,
+            ...(draft.box_evidence && draft.box_evidence.length > 0
+              ? { box_evidence: draft.box_evidence }
+              : {}),
           }),
           draft.review_warnings ?? [],
         ],
@@ -453,7 +456,9 @@ export async function failIngestionJob(
     claimToken: string;
     errorCode: string;
     errorDetails?: string | null | undefined;
+    resultStorageKey?: string | null | undefined;
     leaseTimeoutMinutes?: number | undefined;
+    terminal?: boolean | undefined;
   },
   options?: { inTransaction?: boolean },
 ): Promise<void> {
@@ -467,28 +472,37 @@ export async function failIngestionJob(
     await client.query("SELECT set_config('app.tenant_id', $1, true);", [params.tenantId]);
 
     const timeout = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
-    await client.query(
+    const isTerminal = params.terminal === true;
+    const result = await client.query(
       `UPDATE app_private.menu_ingestion_jobs
-       SET status = CASE WHEN attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
+       SET status = CASE WHEN $7::boolean = true OR attempt_count >= max_attempts THEN 'failed' ELSE 'queued' END,
            error_code = $1,
            error_details = $2,
-           finished_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,
+           result_storage_key = COALESCE($3, result_storage_key),
+           finished_at = CASE WHEN $7::boolean = true OR attempt_count >= max_attempts THEN now() ELSE NULL END,
            locked_at = NULL,
            locked_by = NULL,
            claim_token = NULL
-       WHERE id = $3 AND tenant_id = $4
+       WHERE id = $4 AND tenant_id = $5
          AND status = 'running'
-         AND claim_token = $5
-         AND locked_at >= now() - ($6 || ' minutes')::interval;`,
+         AND claim_token = $6
+         AND locked_at >= now() - ($8 || ' minutes')::interval;`,
       [
         params.errorCode,
         params.errorDetails ?? null,
+        params.resultStorageKey ?? null,
         params.jobId,
         params.tenantId,
         params.claimToken,
+        isTerminal,
         timeout.toString(),
       ],
     );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw new IngestionError('lease_expired_or_reclaimed', 409);
+    }
+
     if (!inTx) {
       await client.query('COMMIT;');
     }

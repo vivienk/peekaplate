@@ -10,18 +10,26 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 
 ## Changes
 
-- `packages/contracts/src/index.ts`: Shared schemas for ingestion jobs, drafts, and queue messages with schema 1/2 and pipeline 2/3 support (`SubmitMenuIngestionRequestSchema`, `MenuExtractionResultSchema`, `ExtractionDishDraftSchema`, `ExtractionDraftEvidenceSchema`, `ExtractionSourceSpanSchema`, `StructuredDishDraftSchema`, `ApproveDishDraftRequestSchema`, `JobScopeSchema`, `DraftScopeSchema`).
-- `packages/contracts/src/index.test.ts`: Unified contract schema validation tests across observation, owner report, and menu ingestion.
-- `backend/src/ingestion/orchestrator.ts`: Orchestration pipeline with URL (with SSRF protections), PDF, and photo intake; report storage retention in `INGESTION_REPORTS_BUCKET`, attempt-scoped report keys (`result_storage_key`), and lease-aware Queue retries delayed through active lease expiry.
-- `backend/src/ingestion/adapter.ts`: Extraction adapter with multi-span evidence reconstruction, grouped price handling, and support for Schema 1/Pipeline 2 and Schema 2/Pipeline 3.
-- `backend/src/ingestion/repository.ts`: Job lifecycle and draft persistence with lease fencing, `draft_index` preservation, and atomic draft approval under concurrency with required `commandId` and `es_command` idempotency.
-- `backend/src/ingestion/transport.ts`: Typed HTTP transport to Python extraction service (Mohammad's PR #58 `/extract/bundle`) with configurable 720s timeout budget (`DEFAULT_EXTRACTION_TIMEOUT_MS = 720_000`), required materialized source validation (`source_storage_key` and `source_hash`), signed HMAC capability tokens (`X-Extraction-Capability`), and granular error mapping.
+- `packages/contracts/src/index.ts`: Shared schemas for ingestion jobs, drafts, and queue messages with schema 1/2 and pipeline 2/3 support (`SubmitMenuIngestionRequestSchema`, `MenuExtractionResultSchema`, `ExtractionDishDraftSchema`, `ExtractionDraftEvidenceSchema`, `ExtractionBoxEvidenceSchema`, `ExtractionBoxCoordinatesSchema`, `ExtractionSourceSpanSchema`, `StructuredDishDraftSchema`, `ApproveDishDraftRequestSchema`, `JobScopeSchema`, `DraftScopeSchema`).
+- `packages/contracts/src/index.test.ts`: Unified contract schema validation tests across observation, owner report, menu ingestion, and OCR box evidence.
+- `backend/src/ingestion/orchestrator.ts`: Orchestration pipeline with intake boundaries, URL rejection with SSRF check, attempt-scoped report keys (`result_storage_key`), durable failure diagnostic persistence, and lease-aware Queue retries delayed through active lease expiry.
+- `backend/src/ingestion/adapter.ts`: Extraction adapter with multi-span and OCR box evidence reconstruction, grouped price handling, and support for Schema 1/Pipeline 2 and Schema 2/Pipeline 3.
+- `backend/src/ingestion/repository.ts`: Job lifecycle and draft persistence with lease fencing across both completion and failure, `draft_index` preservation, and atomic draft approval under concurrency with required `commandId` and `es_command` idempotency.
+- `backend/src/ingestion/transport.ts`: Typed HTTP transport to Python extraction service (Mohammad's PR #58 `/extract` endpoint with `X-Extraction-Artifact-Bundle: 1` private sidecar negotiation) with configurable 720s timeout budget (`DEFAULT_EXTRACTION_TIMEOUT_MS = 720_000`), required materialized source validation (`source_storage_key` and `source_hash`), signed HMAC capability tokens (`X-Source-Capability`), and granular error mapping.
 - `backend/src/ingestion/contract.test.ts`: Layer A fixture and contract verification suite across all 9 fixtures and high-volume 35-page/210-draft synthetic verification.
 - `backend/src/index.ts`: Authenticated staff endpoints (`/venues/:venueId/menus/jobs`, `/venues/:venueId/menus/drafts/:draftId/approve`), Cloudflare Queue consumer dispatch routing menu jobs to `handleQueueBatch` and observation events to `createObservationQueueHandler`.
 - `backend/wrangler.jsonc`: Queue producer bindings (`INGESTION_QUEUE`, `OBSERVATION_QUEUE`), `EXTRACTION_TIMEOUT_MS`, and `INGESTION_REPORTS_BUCKET` R2 binding.
 - `migrations/20261026220000_menu_ingestion_drafts.sql`: Forward-only migration with forced RLS, lease fencing, exact numeric prices, and draft columns.
 - `tests/db/menu_ingestion.sql`: pgTAP test suite (23 assertions).
 - `tests/fixtures/menu-ingestion/`: Complete synthetic/reconstructed test fixtures including Mohammad's VIS-02 bundle fixture.
+
+## Review & Correctness Stabilization
+
+Resolves all reviewer inline comments and the four core correctness invariants:
+1. **URL Intake & Extraction Contract (Gap 1)**: Unmaterialized URL sources (and raw text) are strictly rejected at the intake boundary (`submitMenuIngestion`) with HTTP 400 `unsupported_source_type` (preserving URL validation via `validateIngestionUrl`). For any pre-existing or queued URL jobs, extraction dispatch deterministically traps the unsupported source error, durably records a structured extraction diagnostic in report storage, and transitions the job to terminal `failed` so workers can ACK without infinite redelivery loops.
+2. **OCR Box Evidence Schema (Gap 2)**: Added `ExtractionBoxCoordinatesSchema` and `ExtractionBoxEvidenceSchema` to contracts, supporting valid fractional float OCR bounding boxes (`left`, `top`, `width`, `height`, `page_number`, `saved_region_index`, `text`) from PR #58 across `ExtractionDraftEvidenceSchema` and `StructuredDishDraftSchema`. Strictly rejects non-numbers, negative values, zero dimensions, NaN, Infinity, and malformed inputs. Preserves and stores box evidence through adapter to `dish_drafts.evidence`.
+3. **Failure Diagnostics Persistence & ACK Invariant (Gap 3)**: Guaranteed that no failed extraction job is acknowledged until its diagnostic report is durably persisted to report storage (`reports/${tenantId}/${jobId}/attempts/${claimToken}/extraction.json`) and linked via `result_storage_key` in the database. If diagnostic report storage fails, database transition is aborted and message is retried (not ACKed).
+4. **Lease Fencing on Failure & Concurrency Transitions (Gap 4)**: Updated `failIngestionJob` with atomic lease fencing (`WHERE id = $1 AND claim_token = $2 AND locked_at >= now() - ($leaseTimeout * '1 minute'::interval)`). If a worker's lease expired or was reclaimed by another worker, late failed results throw `lease_expired_or_reclaimed`, preventing stale workers from mutating job state or falsely completing/failing active jobs.
 
 ## Verification
 

@@ -278,6 +278,7 @@ export function adaptPythonExtractionResult(
       image_id: draft.image_id ?? null,
       code_point_spans: codePointSpans,
       utf16_spans: utf16Spans,
+      box_evidence: evidence.box_evidence ?? [],
       review_warnings: [...draft.review_warnings],
       status: 'needs_review',
     };

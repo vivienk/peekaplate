@@ -1140,3 +1140,12 @@ Merging `develop` into `feat/s3-vis-01-menu-ingestion` produced lint and typeche
 2. `tsc` flagged missing observation/public-menu handlers in `Dependencies` in `backend/src/index.ts` (`verifyMenu`, `consumeObservationRateLimit`, `enqueueObservation`, `now`, `readPublicMenu`, `issuePublicMenu`, `readMenuJwks`) that were temporarily dropped during merge conflict resolution. Restored the canonical `Dependencies` interface.
 Full verification suite passed: all 33 Vitest suites (577 tests), 64 script tests, `tsc` across all 7 packages, Biome checks, context graph validation, and real PostgreSQL pgTAP + DB integration tests (60 assertions).
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-04T19:53:00.867Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T19:58:00.859Z","exitCode":1}
+```

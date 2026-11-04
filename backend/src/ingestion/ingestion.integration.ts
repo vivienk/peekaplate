@@ -13,6 +13,7 @@ import {
   listDishDrafts,
   persistExtractedDrafts,
 } from './repository';
+import { createHttpPythonExtractor } from './transport';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
@@ -764,7 +765,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       // Keep this short enough to test real PostgreSQL expiry without a
       // fifteen-minute sleep. The focused orchestrator test asserts the
       // production 15-minute policy requests approximately 901 seconds.
-      const testLeaseTimeoutMinutes = 0.001;
+      const testLeaseTimeoutMinutes = 0.02;
       const consumerMaxRetries = 3;
 
       // 1. Worker 1 claims job
@@ -815,7 +816,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       // The actual retry request, rather than a manually injected message,
       // creates one delayed redelivery after the DB lease has expired.
       expect(retryDelaySeconds).toBeGreaterThanOrEqual(1);
-      expect(retryDelaySeconds).toBeLessThanOrEqual(2);
+      expect(retryDelaySeconds).toBeLessThanOrEqual(3);
       expect(retryCount).toBeLessThan(consumerMaxRetries);
       expect(mockExtractor).not.toHaveBeenCalled();
 
@@ -901,6 +902,148 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(recoveryBatchResult.retried).toBe(0);
       expect(acked2).toBe(true);
       expect(retried2).toBe(false);
+
+      const completedJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(completedJob?.status).toBe('complete');
+      expect(completedJob?.draft_count).toBe(1);
+    });
+
+    it('rejects ACK and preserves recovery when a failed result arrives after lease expiry', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'd'.repeat(64),
+        idempotencyKey: `idem_expired_fail_${jobId}`,
+      });
+
+      const shortLeaseMinutes = 0.01; // 0.6s
+
+      // Worker 1 finishes after lease expiry with a failed extraction report
+      let acked1 = false;
+      let retried1 = false;
+      const lateMsg: QueueMessage<unknown> = {
+        id: 'msg_late_fail',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: () => {
+          acked1 = true;
+        },
+        retry: () => {
+          retried1 = true;
+        },
+      };
+
+      const lateFailingExtractor = vi.fn().mockImplementation(async () => {
+        // Extraction takes longer than worker lease (750ms > 600ms)
+        await new Promise((resolve) => setTimeout(resolve, 750));
+        return {
+          schema_version: 1,
+          pipeline_version: '2',
+          status: 'failed',
+          source: null,
+          started_at: '2026-10-24T12:00:00.000Z',
+          finished_at: '2026-10-24T12:00:02.000Z',
+          extraction_mode: 'layout',
+          segments: [],
+          drafts: [],
+          evidence: [],
+          capture_requests: [],
+          warnings: [],
+          errors: ['Late producer failure after timeout'],
+        };
+      });
+
+      const lateBatchResult = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [lateMsg] },
+        lateFailingExtractor,
+        { workerId: 'worker_slow_fail', leaseTimeoutMinutes: shortLeaseMinutes },
+      );
+
+      // Invariant 4: Late failed result after expiry must NOT be ACKed!
+      expect(lateBatchResult.acknowledged).toBe(0);
+      expect(lateBatchResult.retried).toBe(1);
+      expect(acked1).toBe(false);
+      expect(retried1).toBe(true);
+
+      // Job is not left permanently failed by the stale worker; it remains reclaimable
+      const currentJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(currentJob?.status).toBe('running');
+
+      // Worker 2 can now reclaim and complete the job
+      let acked2 = false;
+      const recoveryMsg: QueueMessage<unknown> = {
+        id: 'msg_recovery_w2',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: () => {
+          acked2 = true;
+        },
+        retry: () => {},
+      };
+
+      const recoveryExtractor = vi.fn().mockResolvedValue({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'complete',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [
+          {
+            segment_id: 'seg_rec_2',
+            page_number: 1,
+            method: 'text',
+            status: 'ready',
+            text: 'Worker 2 Soup $14.00',
+            warnings: [],
+          },
+        ],
+        drafts: [
+          {
+            draft_id: `draft_w2_${jobId}`,
+            draft_index: 0,
+            name: 'Worker 2 Soup',
+            price_amount: '14.00',
+            price_currency: 'USD',
+            source_id: 'src_rec_2',
+            source_text: 'Worker 2 Soup $14.00',
+            review_warnings: [],
+            status: 'needs_review',
+          },
+        ],
+        evidence: [
+          {
+            draft_id: `draft_w2_${jobId}`,
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_rec_2', start: 0, end: 20 }],
+          },
+        ],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      });
+
+      const w2BatchResult = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [recoveryMsg] },
+        recoveryExtractor,
+        { workerId: 'worker_2', leaseTimeoutMinutes: shortLeaseMinutes },
+      );
+
+      expect(w2BatchResult.acknowledged).toBe(1);
+      expect(acked2).toBe(true);
 
       const completedJob = await getIngestionJob(runtimeClient, venueId, jobId);
       expect(completedJob?.status).toBe('complete');
@@ -1249,7 +1392,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       );
     });
 
-    it('rejects SSRF URL submission before job creation or queue dispatch and accepts valid URL submission', async () => {
+    it('rejects SSRF URL submission before job creation or queue dispatch and rejects unmaterialized URL at intake', async () => {
       const ssrfIdemKey = `idem_url_ssrf_${crypto.randomUUID()}`;
       await expect(
         submitMenuIngestion(runtimeClient, {
@@ -1270,25 +1413,299 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       );
       expect(check.rowCount).toBe(0);
 
-      // Verify valid URL ingestion creates job
-      const validIdemKey = `idem_url_valid_${crypto.randomUUID()}`;
-      const validJob = await submitMenuIngestion(runtimeClient, {
-        venueId,
+      // Verify raw unmaterialized URL is rejected at intake before job creation
+      const unmaterializedIdemKey = `idem_url_unmat_${crypto.randomUUID()}`;
+      await expect(
+        submitMenuIngestion(runtimeClient, {
+          venueId,
+          sourceType: 'url',
+          sourceUrl: 'https://example.com/menu',
+          idempotencyKey: unmaterializedIdemKey,
+        }),
+      ).rejects.toMatchObject({
+        code: 'unsupported_source_type',
+        status: 400,
+      });
+
+      const checkUnmat = await adminClient.query(
+        `SELECT id FROM app_private.menu_ingestion_jobs WHERE tenant_id = $1 AND idempotency_key = $2`,
+        [venueId, unmaterializedIdemKey],
+      );
+      expect(checkUnmat.rowCount).toBe(0);
+    });
+
+    it('processes existing URL job with configured extractor by failing deterministically with persisted diagnostics', async () => {
+      const jobId = crypto.randomUUID();
+      // Insert existing URL job directly (simulating pre-existing or accepted URL job)
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
         sourceType: 'url',
         sourceUrl: 'https://example.com/menu',
-        idempotencyKey: validIdemKey,
+        idempotencyKey: `idem_url_proc_${jobId}`,
       });
-      expect(validJob.status).toBe('queued');
-      expect(validJob.source_type).toBe('url');
-      expect(validJob.source_url).toBe('https://example.com/menu');
 
-      const checkValid = await adminClient.query(
-        `SELECT id, status, source_type, source_url FROM app_private.menu_ingestion_jobs WHERE tenant_id = $1 AND idempotency_key = $2`,
-        [venueId, validIdemKey],
+      const storedReports = new Map<string, string>();
+      const reportStorage = {
+        async put(key: string, data: string): Promise<void> {
+          storedReports.set(key, data);
+        },
+      };
+
+      // Configured HTTP Python Extractor requires materialized PDF/photo
+      const configuredExtractor = createHttpPythonExtractor({
+        serviceUrl: 'http://127.0.0.1:9999',
+        authToken: 'secret',
+      });
+
+      let acked = false;
+      let retried = false;
+      const msg: QueueMessage<unknown> = {
+        id: 'msg_url_job',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: () => {
+          acked = true;
+        },
+        retry: () => {
+          retried = true;
+        },
+      };
+
+      const result = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msg] },
+        configuredExtractor,
+        { workerId: 'worker_url_diag', reportStorage },
       );
-      expect(checkValid.rowCount).toBe(1);
-      expect(checkValid.rows[0].source_type).toBe('url');
-      expect(checkValid.rows[0].source_url).toBe('https://example.com/menu');
+
+      // Invariant 1: Fails deterministically with persisted diagnostics and ACKs rather than endless poison retries
+      expect(result.acknowledged).toBe(1);
+      expect(result.retried).toBe(0);
+      expect(acked).toBe(true);
+      expect(retried).toBe(false);
+
+      const failedJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(failedJob?.status).toBe('failed');
+      expect(failedJob?.error_code).toBe('unsupported_extractor_source_type');
+      expect(failedJob?.result_storage_key).not.toBeNull();
+
+      // Diagnostic artifact must be durably stored
+      expect(storedReports.has(failedJob!.result_storage_key!)).toBe(true);
+      const diagnostic = JSON.parse(storedReports.get(failedJob!.result_storage_key!)!);
+      expect(diagnostic.status).toBe('failed');
+      expect(diagnostic.errors.length).toBeGreaterThan(0);
+    });
+
+    it('persists failure report diagnostics under attempt key before terminal ACK and retries on storage failure', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'b'.repeat(64),
+        sourceStorageKey: 'sources/test.pdf',
+        idempotencyKey: `idem_diag_pers_${jobId}`,
+      });
+
+      const storedReports = new Map<string, string>();
+      let shouldStorageFail = false;
+      const reportStorage = {
+        async put(key: string, data: string): Promise<void> {
+          if (shouldStorageFail) {
+            throw new Error('R2 storage connection refused');
+          }
+          storedReports.set(key, data);
+        },
+      };
+
+      const failingReportExtractor = vi.fn().mockResolvedValue({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'failed',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [],
+        drafts: [],
+        evidence: [],
+        capture_requests: [],
+        warnings: [],
+        errors: ['Producer model execution failure: invalid layout'],
+      });
+
+      // Part A: When report storage fails, message must NOT be acknowledged
+      shouldStorageFail = true;
+      let ackedFail = false;
+      let retriedFail = false;
+      const msgStorageFail: QueueMessage<unknown> = {
+        id: 'msg_storage_fail',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          ackedFail = true;
+        },
+        retry: () => {
+          retriedFail = true;
+        },
+      };
+
+      const batchResultFail = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msgStorageFail] },
+        failingReportExtractor,
+        { workerId: 'worker_storage_fail', reportStorage },
+      );
+
+      // Invariant 3: Message is not acknowledged if diagnostics cannot be persisted
+      expect(batchResultFail.acknowledged).toBe(0);
+      expect(batchResultFail.retried).toBe(1);
+      expect(ackedFail).toBe(false);
+      expect(retriedFail).toBe(true);
+
+      // Part B: When report storage succeeds, diagnostics are durably stored and message is ACKed
+      shouldStorageFail = false;
+      let ackedSuccess = false;
+      let retriedSuccess = false;
+      const msgStorageSuccess: QueueMessage<unknown> = {
+        id: 'msg_storage_success',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          ackedSuccess = true;
+        },
+        retry: () => {
+          retriedSuccess = true;
+        },
+      };
+
+      const batchResultSuccess = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msgStorageSuccess] },
+        failingReportExtractor,
+        { workerId: 'worker_storage_success', reportStorage },
+      );
+
+      expect(batchResultSuccess.acknowledged).toBe(1);
+      expect(batchResultSuccess.retried).toBe(0);
+      expect(ackedSuccess).toBe(true);
+      expect(retriedSuccess).toBe(false);
+
+      const failedJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(failedJob?.status).toBe('failed');
+      expect(failedJob?.error_code).toBe('extraction_failed');
+      expect(failedJob?.error_details).toBe('Producer model execution failure: invalid layout');
+      expect(failedJob?.result_storage_key).not.toBeNull();
+      expect(storedReports.has(failedJob!.result_storage_key!)).toBe(true);
+    });
+
+    it('persists and validates valid OCR box evidence from PR #58 with fractional coordinates in dish_drafts', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'c'.repeat(64),
+        sourceStorageKey: 'sources/box_test.pdf',
+        idempotencyKey: `idem_box_evidence_${jobId}`,
+      });
+
+      const ocrBoxEvidence = [
+        {
+          page_number: 1,
+          saved_region_index: 0,
+          text: '24.50',
+          box: {
+            left: 15.25,
+            top: 42.5,
+            width: 58.75,
+            height: 18.0,
+          },
+        },
+      ];
+
+      const extractorWithBox = vi.fn().mockResolvedValue({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'complete',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [
+          {
+            segment_id: 'seg_box_1',
+            page_number: 1,
+            method: 'text',
+            status: 'ready',
+            text: 'Truffle Pizza 24.50',
+            warnings: [],
+          },
+        ],
+        drafts: [
+          {
+            draft_id: `draft_box_${jobId}`,
+            draft_index: 0,
+            name: 'Truffle Pizza',
+            price_amount: '24.50',
+            price_currency: 'USD',
+            source_id: 'src_box_1',
+            source_text: 'Truffle Pizza 24.50',
+            review_warnings: [],
+            status: 'needs_review',
+          },
+        ],
+        evidence: [
+          {
+            draft_id: `draft_box_${jobId}`,
+            draft_index: 0,
+            spans: [{ segment_id: 'seg_box_1', start: 0, end: 19 }],
+            box_evidence: ocrBoxEvidence,
+          },
+        ],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      });
+
+      let acked = false;
+      const msg: QueueMessage<unknown> = {
+        id: 'msg_box_1',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          acked = true;
+        },
+        retry: () => {},
+      };
+
+      const result = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msg] },
+        extractorWithBox,
+        { workerId: 'worker_box' },
+      );
+
+      // Invariant 2: Valid OCR box evidence is accepted and persisted without schema rejection
+      expect(result.acknowledged).toBe(1);
+      expect(acked).toBe(true);
+
+      const drafts = await listDishDrafts(runtimeClient, { tenantId: venueId, jobId });
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0]?.name).toBe('Truffle Pizza');
+
+      // Query raw evidence JSON from PostgreSQL to verify fractional box preservation
+      const rawRow = await adminClient.query(
+        `SELECT evidence FROM app_private.dish_drafts WHERE tenant_id = $1 AND job_id = $2`,
+        [venueId, jobId],
+      );
+      expect(rawRow.rowCount).toBe(1);
+      const parsedEvidence = rawRow.rows[0].evidence;
+      expect(parsedEvidence.box_evidence).toEqual(ocrBoxEvidence);
+      expect(parsedEvidence.box_evidence[0].box.left).toBe(15.25);
+      expect(parsedEvidence.box_evidence[0].box.width).toBe(58.75);
     });
   });
 });

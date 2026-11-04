@@ -8,6 +8,8 @@ import {
   classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  ExtractionBoxCoordinatesSchema,
+  ExtractionBoxEvidenceSchema,
   ExtractionDishDraftSchema,
   ExtractionDraftEvidenceSchema,
   ExtractionSourceRecordSchema,
@@ -1030,7 +1032,189 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
           expectedVersion: 0,
         }).success,
       ).toBe(false);
+    });
 
+    it('validates valid OCR box evidence from PR #58 and retains fractional bounding boxes', () => {
+      const validBox = {
+        left: 10.25,
+        top: 20.0,
+        width: 30.5,
+        height: 12.0,
+      };
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: validBox,
+      };
+
+      // Valid Box Coordinates
+      expect(ExtractionBoxCoordinatesSchema.parse(validBox)).toEqual(validBox);
+
+      // Valid Box Evidence
+      expect(ExtractionBoxEvidenceSchema.parse(validBoxRecord)).toEqual(validBoxRecord);
+
+      // Valid Draft Evidence with box_evidence
+      const evidenceWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        spans: [validSpan],
+        box_evidence: [validBoxRecord],
+      };
+      expect(ExtractionDraftEvidenceSchema.parse(evidenceWithBox)).toEqual(evidenceWithBox);
+
+      // Extraction result with box_evidence parses cleanly
+      const resultWithBox = {
+        ...validExtractionResult,
+        evidence: [evidenceWithBox],
+      };
+      const parsed = MenuExtractionResultSchema.parse(resultWithBox);
+      expect(parsed.evidence[0]?.box_evidence).toHaveLength(1);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.left).toBe(10.25);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.width).toBe(30.5);
+
+      // Persistence StructuredDishDraft with box_evidence
+      const structuredWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        name: 'Tomato Soup',
+        description: null,
+        category: null,
+        price_amount: '8.50',
+        price_currency: 'CAD',
+        ingredients: null,
+        source_id: 'src_doc_1',
+        source_text: 'Tomato Soup 8.50 CAD',
+        image_id: null,
+        code_point_spans: [validSpan],
+        utf16_spans: [validSpan],
+        box_evidence: [validBoxRecord],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      };
+      expect(StructuredDishDraftSchema.parse(structuredWithBox).box_evidence).toEqual([
+        validBoxRecord,
+      ]);
+    });
+
+    it('rejects malformed OCR box evidence according to the strict contract', () => {
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: {
+          left: 10.25,
+          top: 20.0,
+          width: 30.5,
+          height: 12.0,
+        },
+      };
+
+      // Missing required coordinate
+      const missingLeft = { ...validBoxRecord, box: { top: 20, width: 30, height: 12 } };
+      expect(ExtractionBoxEvidenceSchema.safeParse(missingLeft).success).toBe(false);
+
+      // Invalid coordinate types
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: '10.25' },
+        }).success,
+      ).toBe(false);
+
+      // Non-finite coordinates (NaN / Infinity)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: Number.NaN },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: Number.POSITIVE_INFINITY },
+        }).success,
+      ).toBe(false);
+
+      // Negative coordinates
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: -1 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, top: -0.5 },
+        }).success,
+      ).toBe(false);
+
+      // Zero or negative width / height
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: 0 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, height: -5 },
+        }).success,
+      ).toBe(false);
+
+      // Invalid page_number (must be integer >= 1)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 0 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: -1 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 1.5 }).success,
+      ).toBe(false);
+
+      // Invalid saved_region_index (must be integer >= 0)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: -1 })
+          .success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: 0.5 })
+          .success,
+      ).toBe(false);
+
+      // Blank or control characters in text
+      expect(ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '' }).success).toBe(
+        false,
+      );
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '   ' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\n50' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\x7f50' }).success,
+      ).toBe(false);
+
+      // Extra unexpected fields forbidden under strict schema
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, extra_coord: 100 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          unexpected_extra_prop: 'rejected',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates MenuIngestionQueueMessageSchema', () => {
       const validQueueMessage = {
         version: 1 as const,
         tenantId: '0199b409-a700-7000-8000-000000000001',
