@@ -132,7 +132,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance. AI-01 validates scoped evidence and returns a review-only draft or abstention.",
+      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance. AI-01 validates scoped evidence and returns a review-only draft or abstention. AI report input validation selects one dish from the internal owner_report.v1 contract, checks venue and per-metric cohorts, preserves valid zero, withholds unavailable states and honors report-level failures. API/core identity integration remains pending.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -195,6 +195,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/consumer/backfill.ts",
         "backend/src/consumer/backfill.test.ts",
         "backend/src/owner-ai/index.ts",
+        "backend/src/owner-ai/report-input.ts",
+        "backend/src/owner-ai/report-input.test.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
         "docs/owner-ai.md",
@@ -211,7 +213,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8a9c1c263f661062261f7084c6bd5b19abf50ebbd3d4f7b3dfef78a44a925350"
+      "sourceFingerprint": "1431c099f80bcfe3b4780b6a9cc02b538b657a5cc7a0679c25003d38e3200408"
     },
     {
       "id": "database",
@@ -433,6 +435,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-03",
+      "summary": "AI-01 internal report input validation and synthetic status regressions.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Louis aligns report production with owner_report.v1; agree report/evidence identity and dish-scoped core integration before connecting the API."
+    },
+    {
       "date": "2026-11-02",
       "summary": "AI-01 offline evaluation synchronized with the recommendation core and merged owner dish report contract.",
       "modules": [
@@ -512,22 +523,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
-      "paths": [
-        "backend/src/consumer/facts.ts",
-        "backend/src/consumer/backfill.ts",
-        "backend/src/dish.integration.ts",
-        "docs/observation-infrastructure.md"
-      ],
-      "next": "Finish independent review and exact-main staging acceptance; preserve paused normal delivery. Reconcile frontend tracking/outbox/delivery and report API before pilot activation.",
-      "modules": [
-        "backend",
-        "contracts",
-        "delivery"
-      ]
     }
   ]
 }

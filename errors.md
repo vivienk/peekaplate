@@ -1155,3 +1155,15 @@ alias masked that package-resolution defect. Declare the existing pinned
 zod 4.6.7 as a backend development dependency and update its lockfile importer.
 The failed Linux typecheck is the reproducer; rerun frozen-install CI before
 claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
+## 2026-11-03 — AI report input verification
+
+The new report-input suite initially failed collection because its implementation
+did not yet exist. After implementation, 20 report-input cases passed alongside
+46 existing AI cases using the source-pinned local configuration. Focused strict
+TypeScript also passed. A Biome invocation from the parent workspace encountered
+nested root configuration; running from this repository corrected the invocation.
+Frozen dependency installation still fails at pnpm store project symlink creation
+with EPERM, matching the earlier Windows limitation. Full workspace and hosted
+integration remain unverified in this environment; source aliases do not verify
+frozen dependency wiring.

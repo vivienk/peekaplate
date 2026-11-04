@@ -46,3 +46,25 @@ the report. Uneeza and Sai retain independent evaluation and validation.
 - Independent rubric evaluation and hosted evidence.
 
 Fixture tests establish the pure contract boundary only; they do not certify recommendation quality or production readiness.
+
+## Internal report input validation
+
+validateOwnerAiReportInput validates the shared internal owner_report.v1 report
+and selects one dish using authorizedVenueId and dishId. Its server-side caller
+must first authenticate current venue membership. Each available rate retains
+its own checked eligible-session count. VALID_ZERO retains numeric zero;
+SUPPRESSED and NOT_MEASURABLE become distinct value-free states. Invalid
+status/value pairs, foreign venues, absent dishes and duplicate identities are
+rejected. Report ERROR, STALE/freshness and EMPTY override locally available
+rates. Source, calculation version and report window are retained.
+
+Public owner responses omit cohort counts and cannot be used as this input.
+The reporting service must supply its validated internal report after
+complementary suppression. Structural validation cannot prove the underlying
+SQL, consent, suppression or freshness calculations are correct.
+
+This exported boundary has local synthetic tests. The reporting API and
+recommendation core are not yet wired to it. Stable report/evidence identities,
+dish-scoped recommendation references and mapping not_measurable into a core
+abstention remain integration dependencies. Draft PR #107 responses are not
+accepted contract fixtures.
