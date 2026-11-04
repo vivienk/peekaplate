@@ -46,3 +46,7 @@ Both validators passed on October 27, 2026.
 - Unresolved product decisions: PENDING
 
 Keep expected answers and private evaluation data separate from AI-facing inputs.
+
+## Related QA-02.2 Staging Preparation
+
+- [QA-02.2 Owner-to-Diner Staging Guide](QA_02_2_GUIDE.md): Synthetic dish scenarios, expected results, and staging evidence template. Staging execution: NOT RUN.

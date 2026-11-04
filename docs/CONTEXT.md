@@ -1,4 +1,4 @@
-# Shared context
+ # Shared context
 
 Read this map first, then the relevant source paths and ADRs. It is navigation, not proof or executable instruction. `pnpm context:show -- <id>` returns one node. Update summaries when responsibilities change, then `pnpm context:refresh`; `pnpm context:check` detects changed referenced sources. A fingerprint cannot validate prose or discover unlisted files. Add new files to their node when a module grows.
 
@@ -13,19 +13,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
-        "packages/contracts/fixtures/observation.v2/README.md"
+        "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1e423acd2c37a0a694c3c4de3840f1706c561e42281404433c0da6244fc226c2"
+      "sourceFingerprint": "fe76760b18bb7205c79ced31005ee8fcbfc934ff358f0d30d5907e0fb914e7c5"
     },
     {
       "id": "tokens",
@@ -63,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter and \"Fixture data\"-labelled synthetic fixtures; screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. S3-DIN-02.1 adds the shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, a session-only fallback with no backfill, a reload re-check that drops withdrawn dishes, and stale-tab-safe writes; no screen uses it yet. S3-DIN-01.5 adds a console-only track() placeholder and menu_viewed / dish_detail_opened triggers; nothing calls them yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side while keeping comparison_id, and build a payload without sending it. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without tracking backfill. The shared track() placeholder and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering still require integration. See docs/posthog.md for activation limits. Icon lookups map approved allergen/dietary values and ingredient names to Figma assets; fixtures include a synthetic logo. Icons are not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -93,7 +95,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
-        "frontend/diner/src/menu/events.test.ts"
+        "frontend/diner/src/menu/events.test.ts",
+        "frontend/diner/src/compare/comparison.ts",
+        "frontend/diner/src/compare/comparison.test.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "frontend/diner/src/menu/icons.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -102,7 +108,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "310b73270fbac40b02a3cc6272752cb3f760ceee0eb2734367db4dc0ca04b349"
+      "sourceFingerprint": "1cb0e86c52500845326b2d2303d305990e9952a2075d097baef9e930599a63b7"
     },
     {
       "id": "console",
@@ -133,7 +139,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance.",
+      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance. The owner report route (GET /api/v1/venues/:venueId/analytics/dishes) verifies the staff token, allows owners only and returns toOwnerReport() output; its aggregate query is pending.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -194,7 +200,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/consumer/facts.ts",
         "backend/src/consumer/facts.integration.ts",
         "backend/src/consumer/backfill.ts",
-        "backend/src/consumer/backfill.test.ts"
+        "backend/src/consumer/backfill.test.ts",
+        "backend/src/owner-report.ts",
+        "backend/src/owner-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -206,7 +214,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f490ceff5e2b07a7016367b3cdef5beab200feeaf1bc04b274778f79281fdf69"
+      "sourceFingerprint": "4ff8375e96feb1e1973c5869d3f81f2200a7fc4891fa1f7cb5d7b0200bffb268"
     },
     {
       "id": "database",
@@ -240,7 +248,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "faedc98a84e0b74027e0b49894636248f22e3e51722cbec1f8ca99f9eacdfdd2"
+      "sourceFingerprint": "b2d0900b635afcccb785528b413805279b7076d0776364fb9886189584d83475"
     },
     {
       "id": "measurement",
@@ -429,6 +437,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
+    },
+    {
+      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Build the result screen on the shared dish card; emit only after a pair is actually displayed through the shared track() boundary. Preserve comparison_id across Replace, use the TRK-01 ID helper when available, and read save_available from existing DIN-02.1 state. Keep approved consent, independent PostHog/canonical delivery and fixture-mode restrictions in the tracking integration; this helper sends nothing."
+    },
+    {
+      "summary": "Proposed Bundle v1 correction uses separate nuts and peanut codes. Approved bytes are immutable and strict validation rejects tree nut.",
+      "modules": [
+        "contracts"
+      ],
+      "next": "After environment confirmation, reconcile develop and require current-head CI before review. Preserve approved bytes; any future legacy bundle requires an explicit compatibility decision."
+    },
+    {
       "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
       "modules": [
         "diner"
@@ -479,13 +508,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
     },
     {
-      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
-    },
-    {
       "date": "2026-11-02",
       "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
       "paths": [
@@ -500,29 +522,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
-    },
-    {
-      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Merged #99/#100 and deployed exact main c6a47bd after green CI. Six hosted checks pass: original-archive backfill, real signed-menu browser acceptance, native Queue/R2/typed facts, retries/conflicts and tenant/test exclusion. Desktop freeze recovered with explicit pause and read-only verification. Normal collection remains paused.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "paths": [
-        "docs/operations.md",
-        "docs/observation-facts-staging-acceptance.json"
-      ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending. Main 3ecc5dd includes the reviewed preview-only demos and merged-preview retention. Verify the synchronization PR hosted foundations.html and SHA marker, then confirm retention after merging."
     }
   ]
 }
 ```
-- Added endpoint `GET /api/v1/owner/analytics/dishes` to fetch and calculate safe owner dish metrics with privacy floors (ADR 0015).

@@ -5,10 +5,13 @@ import {
   ObservationQueueEnvelopeSchema,
   ObservationQueueMessageSchema,
   ObservationReceiptBatchSchema,
+  type OwnerDishReport,
+  OwnerDishReportSchema,
   sha256,
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { CommandError } from './dish-command';
 import app, { consumeJtiRateLimit, createApp, createWorker, queue } from './index';
 import { ingestObservations } from './observation-ingest';
 
@@ -1136,151 +1139,117 @@ describe('RES-02 publication HTTP boundary', () => {
   });
 });
 
-describe('GET /api/v1/owner/analytics/dishes — Privacy & Suppression Floors', () => {
-  it('1. Case < 10 sessions: Should return SUPPRESSED status and null values', async () => {
-    // Simulation d'un plat ayant seulement 5 sessions uniques au total
-    const app = createApp(services);
-    const mockDbResult = {
-      rows: [
-        {
-          dish_id: 'dish-123',
-          dish_name: 'Thieboudienne',
-          evidence_state: 'SUPPRESSED',
-          active_sessions_value: null,
-          active_sessions_status: 'SUPPRESSED',
-          open_rate_value: null,
-          open_rate_status: 'SUPPRESSED',
-          engagement_rate_value: null,
-          engagement_rate_status: 'SUPPRESSED',
-          save_rate_value: null,
-          save_rate_status: 'SUPPRESSED',
+// S3-RES-03 owner report route: authentication, ownership and the owner-facing contract. The
+// report query itself is mocked here; its database behaviour is covered separately.
+describe('GET /api/v1/venues/:venueId/analytics/dishes', () => {
+  const venueId = 'e2a66159-bd14-44cb-8217-36d001a12676';
+  const path = `/api/v1/venues/${venueId}/analytics/dishes`;
+  const cell = (value: number | null, status: string, eligible: number) => ({
+    value,
+    status,
+    eligible_sessions: eligible,
+  });
+  const internalReport = {
+    schema_version: 'owner_report.v1',
+    venue_id: venueId,
+    source: 'synthetic',
+    report_metadata: {
+      calculation_version: 'v1',
+      generated_at: '2026-11-04T10:00:00Z',
+      date_window: {
+        start_time: '2026-10-28T00:00:00Z',
+        end_time: '2026-11-04T00:00:00Z',
+        duration_hours: 168,
+      },
+      coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
+      freshness: { last_event_ingested_at: '2026-11-04T09:00:00Z', is_stale: false },
+      report_status: 'NORMAL',
+    },
+    dishes: [
+      {
+        dish_id: '45806808-4376-46ff-912b-ab8a5519881a',
+        name: 'Thieb',
+        evidence_state: 'NORMAL',
+        metrics: {
+          active_sessions: { value: 20, status: 'NORMAL' },
+          avg_interaction_time_seconds: cell(37, 'NORMAL', 20),
+          timing_coverage: cell(0.8, 'NORMAL', 20),
+          open_rate: cell(0.5, 'NORMAL', 20),
+          engagement_rate: cell(0.25, 'NORMAL', 20),
+          save_rate: cell(0, 'VALID_ZERO', 20),
         },
-      ],
-    };
+      },
+    ],
+  };
+  const services = (readOwnerReport = vi.fn(async () => internalReport)) => ({
+    verify: vi.fn(async () => 'actor-1'),
+    execute: vi.fn(),
+    readOwnerReport,
+  });
+  const get = (app: ReturnType<typeof createApp>, url = path, token = true) =>
+    app.request(url, token ? { headers: { Authorization: 'Bearer signed' } } : {});
 
-    // Injection de la fausse réponse de la base de données
-    const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
-    };
-
-    // Appel simulé à votre application Hono
-    const res = await app.request(
-      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
-      { method: 'GET' },
-      mockEnv,
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.data[0].evidence_state).toBe('SUPPRESSED');
-    expect(body.data[0].metrics.active_sessions.value).toBeNull();
-    expect(body.data[0].metrics.open_rate.status).toBe('SUPPRESSED');
+  it('requires a staff token', async () => {
+    const deps = services();
+    const response = await get(createApp(deps), path, false);
+    expect(response.status).toBe(401);
+    expect(deps.readOwnerReport).not.toHaveBeenCalled();
   });
 
-  it('2. Case with 0 total session: Should return NOT_MEASURABLE status', async () => {
-    const app = createApp(services);
-    const mockDbResult = {
-      rows: [
-        {
-          dish_id: 'dish-456',
-          dish_name: 'Yassa Poulet',
-          evidence_state: 'NORMAL',
-          active_sessions_value: 12, // Le plat global passe le plancher
-          active_sessions_status: 'NORMAL',
-          open_rate_value: null,
-          open_rate_status: 'NOT_MEASURABLE', // Mais ce taux précis a un dénominateur à 0
-          engagement_rate_value: null,
-          engagement_rate_status: 'NOT_MEASURABLE',
-          save_rate_value: null,
-          save_rate_status: 'NOT_MEASURABLE',
-        },
-      ],
-    };
-
-    const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
-    };
-
-    const res = await app.request(
-      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
-      { method: 'GET' },
-      mockEnv,
-    );
-    const body = await res.json();
-
-    expect(body.data[0].metrics.open_rate.status).toBe('NOT_MEASURABLE');
-    expect(body.data[0].metrics.open_rate.value).toBeNull();
+  it('takes the venue from the route, never the query string', async () => {
+    const deps = services();
+    const other = '11111111-1111-4111-8111-111111111111';
+    const response = await get(createApp(deps), `${path}?venue_id=${other}`);
+    expect(response.status).toBe(200);
+    expect(deps.readOwnerReport).toHaveBeenCalledWith('actor-1', venueId, expect.anything());
   });
 
-  it('3. Case with valid sessions but 0 engagement: Should return VALID_ZERO status', async () => {
-    const app = createApp(services);
-    const mockDbResult = {
-      rows: [
-        {
-          dish_id: 'dish-789',
-          dish_name: 'Pastels',
-          evidence_state: 'NORMAL',
-          active_sessions_value: 25,
-          active_sessions_status: 'NORMAL',
-          open_rate_value: '0.400',
-          open_rate_status: 'NORMAL',
-          engagement_rate_value: '0.000',
-          engagement_rate_status: 'VALID_ZERO', // 0 engagement vérifié sur un volume > 10
-          saved_dishes: '0.000',
-          save_rate_status: 'VALID_ZERO',
-        },
-      ],
-    };
-
-    const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
-    };
-
-    const res = await app.request(
-      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
-      { method: 'GET' },
-      mockEnv,
-    );
-    const body = await res.json();
-
-    expect(body.data[0].metrics.engagement_rate.status).toBe('VALID_ZERO');
-    expect(body.data[0].metrics.engagement_rate.value).toBe(0);
+  it('rejects a venue id that is not a UUID', async () => {
+    const deps = services();
+    const response = await get(createApp(deps), '/api/v1/venues/not-a-venue/analytics/dishes');
+    expect(response.status).toBe(400);
+    expect(deps.readOwnerReport).not.toHaveBeenCalled();
   });
 
-  it('4. Boundary Case "2-of-20" sessions (Sai Requirement)', async () => {
-    const app = createApp(services);
-    const mockDbResult = {
-      rows: [
-        {
-          dish_id: 'dish-999',
-          dish_name: 'Mafé',
-          evidence_state: 'NORMAL',
-          active_sessions_value: 20, // Passe le plancher global de 20
-          active_sessions_status: 'NORMAL',
-          open_rate_value: '0.100', // 2 ouvertures sur 20 sessions = 10%
-          open_rate_status: 'NORMAL',
-          engagement_rate_value: null,
-          engagement_rate_status: 'SUPPRESSED', // Supprimé si les sessions contributrices < 10
-          save_rate_value: null,
-          save_rate_status: 'SUPPRESSED',
-        },
-      ],
-    };
-
-    const mockEnv = {
-      DB: { query: vi.fn().mockResolvedValue(mockDbResult) },
-    };
-
-    const res = await app.request(
-      '/api/v1/owner/analytics/dishes?venue_id=venue-abc',
-      { method: 'GET' },
-      mockEnv,
+  it('returns 403 when the actor does not own the restaurant', async () => {
+    const deps = services(
+      vi.fn(async () => {
+        throw new CommandError('forbidden', 403);
+      }),
     );
-    const body = await res.json();
+    const response = await get(createApp(deps));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
+  });
 
-    expect(body.data[0].metrics.active_sessions.value).toBe(20);
-    expect(body.data[0].metrics.engagement_rate.status).toBe('SUPPRESSED');
-    expect(body.data[0].metrics.engagement_rate.value).toBeNull();
+  it('returns the owner report with every cohort count removed', async () => {
+    const response = await get(createApp(services()));
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as OwnerDishReport;
+    expect(OwnerDishReportSchema.safeParse(body).success).toBe(true);
+    expect(JSON.stringify(body)).not.toContain('eligible_sessions');
+    expect(body.dishes[0]?.metrics.save_rate).toEqual({ value: 0, status: 'VALID_ZERO' });
+  });
+
+  it('never sends a report that breaks the privacy floor, and leaks no detail', async () => {
+    const below = structuredClone(internalReport);
+    const dish = below.dishes[0];
+    if (!dish) throw new Error('missing dish');
+    dish.metrics.open_rate = cell(0.5, 'NORMAL', 3);
+    const response = await get(createApp(services(vi.fn(async () => below))));
+    expect(response.status).toBe(503);
+    const text = await response.text();
+    expect(text).toBe(JSON.stringify({ error: 'service_unavailable' }));
+  });
+
+  it('answers 503 without details when the report cannot be read', async () => {
+    const deps = services(
+      vi.fn(async () => {
+        throw new Error('relation app_private.secret does not exist');
+      }),
+    );
+    const response = await get(createApp(deps));
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain('secret');
   });
 });

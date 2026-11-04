@@ -12,6 +12,7 @@ import {
   PublishMenuSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
+  toOwnerReport,
   VenueScopeSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
@@ -30,6 +31,7 @@ import {
   MenuTokenUnavailableError,
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
+import { readOwnerReport } from './owner-report';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -114,6 +116,7 @@ type Dependencies = {
   ) => Promise<PublicMenuRecord | undefined>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
+  readOwnerReport?: (actorId: string, venueId: string, env: Bindings) => Promise<unknown>;
 };
 
 export async function authorizeStaffVenue(
@@ -326,6 +329,18 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async readOwnerReport(actorId, venueId, env) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await readOwnerReport(client, actorId, venueId, new Date());
+    } finally {
+      await client.end();
+    }
+  },
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -364,99 +379,20 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
+  // Owner dish report (S3-RES-03). The venue comes from the route and the actor from the verified
+  // staff token; readOwnerReport checks ownership. toOwnerReport() enforces the per-metric privacy
+  // floor and strips cohort counts. Any failure goes to onError, which never leaks details.
   app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
-    const venueId = c.req.param('venueId');
-
-    // 1. Authentication & Tenant Isolation
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ success: false, error: 'Unauthorized: Missing token' }, 401);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
     }
-
-    const token = authHeader.split(' ')[1];
-    const verifiedSession = await services.verify(token);
-    if (
-      !verifiedSession ||
-      !verifiedSession.staff_memberships?.some((m) => m.venue_id === venueId)
-    ) {
-      return c.json({ success: false, error: 'Forbidden' }, 403);
-    }
-
-    // 2. Corrected SQL Query aligning denominators to distinct open_eligible_sessions
-    const query = `
-    SELECT 
-        v.dish_id, v.dish_name, v.total_sessions, v.open_eligible_sessions,
-        
-        -- Active Sessions Floor
-        CASE WHEN v.total_sessions < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS active_sessions_status,
-        CASE WHEN v.total_sessions < 10 THEN NULL ELSE v.total_sessions END AS active_sessions_value,
-        
-        -- Open Rate (Denominator = total_sessions)
-        CASE WHEN v.total_sessions < 10 THEN 'SUPPRESSED' WHEN v.total_sessions = 0 THEN 'NOT_MEASURABLE' ELSE 'NORMAL' END AS open_rate_status,
-        CASE WHEN v.total_sessions < 10 THEN NULL ELSE ROUND(CAST(v.total_opens AS NUMERIC) / v.total_sessions, 3) END AS open_rate_value,
-
-        -- Engagement Rate (Aligned with agreed distinct-session formula: open_eligible_sessions)
-        CASE WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED' WHEN v.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' WHEN v.engaged_sessions = 0 THEN 'VALID_ZERO' ELSE 'NORMAL' END AS engagement_rate_status,
-        CASE WHEN v.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(v.engaged_sessions AS NUMERIC) / v.open_eligible_sessions, 3) END AS engagement_rate_value,
-
-        -- Save Rate (Aligned with agreed distinct-session formula: open_eligible_sessions)
-        CASE WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED' WHEN v.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' WHEN v.saved_dishes = 0 THEN 'VALID_ZERO' ELSE 'NORMAL' END AS save_rate_status,
-        CASE WHEN v.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(v.saved_dishes AS NUMERIC) / v.open_eligible_sessions, 3) END AS save_rate_value
-
-    FROM app_private.owner_observation_v1 v
-    WHERE v.venue_id = $1;
-  `;
-
-    try {
-      const result = await services.db.query(query, [venueId]);
-      const rows = result.rows || [];
-
-      // Map rows and preserve explicit numeric zero
-      const dishesReport = rows.map((row: any) => ({
-        dish_id: row.dish_id,
-        name: row.dish_name,
-        evidence_state: row.active_sessions_status,
-        metrics: {
-          active_sessions: {
-            value: row.active_sessions_value === null ? null : Number(row.active_sessions_value),
-            status: row.active_sessions_status,
-          },
-          open_rate: {
-            value: row.open_rate_value === null ? null : Number(row.open_rate_value),
-            status: row.open_rate_status,
-          },
-          engagement_rate: {
-            value: row.engagement_rate_value === null ? null : Number(row.engagement_rate_value),
-            status: row.engagement_rate_status,
-          },
-          save_rate: {
-            value: row.save_rate_value === null ? null : Number(row.save_rate_value),
-            status: row.save_rate_status,
-          },
-        },
-      }));
-
-      // 3. Output the exact compliant merged owner_report.v1 shape with structural metadata
-      const fullInternalReport = {
-        schema_version: 'owner_report.v1',
-        venue_id: venueId,
-        source: 'synthetic',
-        report_metadata: {
-          calculation_version: 'production.v1',
-          generated_at: new Date().toISOString(),
-          date_window: { duration_hours: 24 }, // Dynamized via your pipelines
-          freshness: { is_stale: false },
-          report_status: 'NORMAL',
-        },
-        dishes: dishesReport,
-      };
-
-      // Filter via Efimie's toOwnerReport contract mapper before shipping to the client
-      const outputReport = services.contracts.toOwnerReport(fullInternalReport);
-      return c.json(outputReport, 200);
-    } catch (error) {
-      return c.json({ success: false, error: 'Internal Server Error' }, 500);
-    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const internal = await services.readOwnerReport(actorId, scope.data.venueId, c.env ?? {});
+    return c.json(toOwnerReport(internal));
   });
   app.use(
     '/venues/*',
