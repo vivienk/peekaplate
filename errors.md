@@ -1119,3 +1119,35 @@ PR88 reconciliation resolution: the appended allergen note exceeded the diner
 node's 1000-character summary limit. Moved the note to the bounded handoff,
 preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
 pass. Keep node summaries within the existing limit when resolving conflicts.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-31T21:38:10.001Z"},"status":"resolved","cause":"The new scripts/console-preview-demos.test.mjs was not run through the Biome formatter before pnpm check (one over-long line).","prevention":"Run pnpm format (or biome check --write) on new files before pnpm check.","regression":"Formatted the file; pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T21:38:51.084Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T21:38:51.084Z"},"status":"resolved","cause":"Formatting scripts/console-preview-demos.test.mjs after the context refresh changed a source listed in the delivery node, so its fingerprint was stale.","prevention":"Format first, then pnpm context:refresh, then pnpm check.","regression":"pnpm context:refresh followed by pnpm check passes."}
+```
+
+## November 4 Bundle context reconciliation
+
+The develop merge conflicted only in the context handoff list. Preserve the
+new tracking handoff and Bundle correction; retire the superseded pre-merge
+PR43 handoff to retain the ten-entry bound. Context refresh/check and direct
+documentation checks pass. A first refresh failed at eleven handoffs.
+`pnpm verify context:check docs:check` could not start because the Windows
+sandbox denied pnpm's project-store symlink. Source-pinned contract tests
+initially hit a temporary-directory rename denial; using a writable workspace
+TEMP/TMP passed all 58 cases. Biome does not process Markdown, so it is not
+Markdown validation. A first direct context invocation used the parent working
+directory; rerunning in the repository corrected that command-path mistake.
+Full frozen-install workspace validation remains delegated to Linux CI.
