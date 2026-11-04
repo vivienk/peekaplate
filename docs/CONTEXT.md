@@ -109,7 +109,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -307,7 +307,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "pnpm-lock.yaml",
         "docs/res02-staging-acceptance.json",
         "docs/observation-staging-acceptance.json",
-        "docs/observation-facts-staging-acceptance.json"
+        "docs/observation-facts-staging-acceptance.json",
+        "scripts/console-preview-demos.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -318,7 +319,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c455e7e96487eb8a1233e519c22798a74051df3acbe89edf38ce1c62a22d050b"
+      "sourceFingerprint": "425975f1877bc5ccaa987e2680737b9dd51913ab19b950bbf1e0c6c2234a06bd"
     },
     {
       "id": "agents",
@@ -523,7 +524,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "docs/observation-facts-staging-acceptance.json"
       ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending."
+      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending. PR79 preview-demo build flag is implemented; promote the trusted workflow to main before rerunning a PR preview and verifying foundations.html plus the commit marker."
     }
   ]
 }

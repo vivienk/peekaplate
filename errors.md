@@ -1108,3 +1108,21 @@ PR88 reconciliation resolution: the appended allergen note exceeded the diner
 node's 1000-character summary limit. Moved the note to the bounded handoff,
 preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
 pass. Keep node summaries within the existing limit when resolving conflicts.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-31T21:38:10.001Z"},"status":"resolved","cause":"The new scripts/console-preview-demos.test.mjs was not run through the Biome formatter before pnpm check (one over-long line).","prevention":"Run pnpm format (or biome check --write) on new files before pnpm check.","regression":"Formatted the file; pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T21:38:51.084Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T21:38:51.084Z"},"status":"resolved","cause":"Formatting scripts/console-preview-demos.test.mjs after the context refresh changed a source listed in the delivery node, so its fingerprint was stale.","prevention":"Format first, then pnpm context:refresh, then pnpm check.","regression":"pnpm context:refresh followed by pnpm check passes."}
+```
