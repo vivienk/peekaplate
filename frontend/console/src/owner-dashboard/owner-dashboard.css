@@ -236,7 +236,7 @@ h3 {
   background: color-mix(in srgb, var(--pp-color-white) 55%, transparent);
 }
 .nav button[aria-current="page"] {
-  background: var(--panel);
+  background: var(--pp-color-info-100);
   color: var(--nav-ink);
   font-weight: 700;
 }
@@ -1578,7 +1578,7 @@ article.insight {
 }
 @media (min-width: 901px) {
   .app.has-ai {
-    grid-template-columns: 260px minmax(0, 1fr) 300px;
+    grid-template-columns: 260px minmax(0, 1fr) 450px;
   }
   .app.has-ai .aibtn-top {
     display: none;
@@ -1614,7 +1614,7 @@ article.insight {
     grid-template-columns: minmax(0, 1fr);
   }
   .app.has-ai .kpis {
-    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
     gap: 10px;
   }
   .app.has-ai .kpi {
@@ -1644,7 +1644,7 @@ article.insight {
 }
 @media (min-width: 901px) and (max-width: 1200px) {
   .app.has-ai {
-    grid-template-columns: 76px minmax(0, 1fr) 272px;
+    grid-template-columns: 76px minmax(0, 1fr) 380px;
   }
   .app.has-ai .side {
     padding: 16px 10px;
