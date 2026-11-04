@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell stays readable without JavaScript; optional consent-gated PostHog shell views are wired. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (known fields only) and \"Fixture data\"-labelled fixtures. The diner renders the fixture menu (header, category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; Search/Save/Compare are disabled. S3-DIN-01.4 adds local searchMenu(menu, query) (complete-dish IDs, allergy-line flag); search view not wired. S3-DIN-02.1 adds shared Save state (src/save): per-restaurant localStorage of dish IDs, newest first, session-only fallback, reload re-check dropping withdrawn dishes, stale-tab-safe writes; no screen uses it yet. S3-DIN-01.5 adds a console-only track() placeholder with menu_viewed/dish_detail_opened triggers; not called yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Static diner shell stays readable without JavaScript; consent-gated shell views exist. A replaceable menu source and one known-field adapter provide labelled fixtures. The diner renders the fixture menu (header, All and category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; View Portion and Compare are disabled. Screen-free search returns complete-dish IDs and the staff allergy line; search view not wired. Compare helpers pick two different complete dishes, keep comparison_id and build an unsent payload. Shared Save state and Save UI (hearts, badge, Undo toasts) exist but no screen mounts them yet. track() and menu_viewed/dish_detail_opened triggers are console-only and uncalled; PostHog delivery needs integration (docs/posthog.md). Icon lookups map allergens/dietary values and ingredients to Figma assets; not wired.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -101,7 +101,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
-        "frontend/diner/src/menu/events.test.ts"
+        "frontend/diner/src/menu/events.test.ts",
+        "frontend/diner/src/compare/comparison.ts",
+        "frontend/diner/src/compare/comparison.test.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "frontend/diner/src/menu/icons.test.ts",
+        "frontend/diner/src/save/events.ts",
+        "frontend/diner/src/save/feedback.ts",
+        "frontend/diner/src/save/feedback.test.ts",
+        "frontend/diner/src/save/mount.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -110,7 +118,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "35974fef9121b473f8489b458dd8edf43620cf20dc46874df9f087e2c26f4e21"
+      "sourceFingerprint": "41383dc4a9847459244cfb31c700092d1fa0669c746ef03d818351297596629b"
     },
     {
       "id": "console",
@@ -437,6 +445,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
+    },
+    {
+      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Build the result screen on the shared dish card; emit only after a pair is actually displayed through the shared track() boundary. Preserve comparison_id across Replace, use the TRK-01 ID helper when available, and read save_available from existing DIN-02.1 state. Keep approved consent, independent PostHog/canonical delivery and fixture-mode restrictions in the tracking integration; this helper sends nothing."
+    },
+    {
       "summary": "Proposed Bundle v1 correction uses separate nuts and peanut codes. Approved bytes are immutable and strict validation rejects tree nut.",
       "modules": [
         "contracts"
@@ -508,27 +530,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
-    },
-    {
-      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Merged #99/#100 and deployed exact main c6a47bd after green CI. Six hosted checks pass: original-archive backfill, real signed-menu browser acceptance, native Queue/R2/typed facts, retries/conflicts and tenant/test exclusion. Desktop freeze recovered with explicit pause and read-only verification. Normal collection remains paused.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "paths": [
-        "docs/operations.md",
-        "docs/observation-facts-staging-acceptance.json"
-      ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Approved allergen label Nuts replaces Tree nuts; legacy tree nut/tree nuts codes still map to Nuts for published bundles. Compare picker logic uses shared searchMenu, excludes kept/current and incomplete dishes, and supports one valid selection. Picker screen integration remains pending. Main 3ecc5dd includes the reviewed preview-only demos and merged-preview retention. Verify the synchronization PR hosted foundations.html and SHA marker, then confirm retention after merging."
     }
   ]
 }
