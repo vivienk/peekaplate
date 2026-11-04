@@ -429,13 +429,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "Proposed Bundle v1 correction uses separate nuts and peanut codes. Approved bytes are immutable and strict validation rejects tree nut.",
-      "modules": [
-        "contracts"
-      ],
-      "next": "After environment confirmation, reconcile develop and require current-head CI before review. Preserve approved bytes; any future legacy bundle requires an explicit compatibility decision."
-    },
-    {
       "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
       "modules": [
         "diner"
