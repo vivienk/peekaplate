@@ -16,6 +16,7 @@ class GroundingBudgetTest(unittest.TestCase):
     def test_addon_grounding_is_bounded(self) -> None:
         code = (
             "from peekaplate_processing.workflow import ExtractedDish, grounded_draft; "
+            "import time; started = time.perf_counter(); "
             "adversarial = 'addon' * 28 + 'z'; "
             "text = f'# Menu\\nSoup\\n{adversarial} $9.00'; "
             "meta = {'ocr_region_status': 'available', 'ocr_coordinate_space': 'uploaded_image_pixels', "
@@ -27,21 +28,22 @@ class GroundingBudgetTest(unittest.TestCase):
             "subcategory=None, price_text='8.50', price_amount='8.50', price_currency=None, ingredients=None); "
             "grounded, warnings = grounded_draft(soup, text, dish_names=['Soup', adversarial], "
             "section_names=['Menu', adversarial], ocr_metadata=meta); "
-            "assert grounded.price_amount == '8.50', grounded"
+            "assert grounded.price_amount == '8.50', grounded; "
+            "print(time.perf_counter() - started)"
         )
-        started = time.perf_counter()
         try:
             proc = subprocess.run(
                 [sys.executable, "-c", code],
                 capture_output=True,
                 text=True,
-                timeout=5,
+                # Bound startup separately; slow imports must not spend the grounding budget.
+                timeout=30,
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            self.fail(f"grounded_draft timed out after 5s on repeated 'addon' label: {exc}")
-        elapsed = time.perf_counter() - started
+            self.fail(f"grounding subprocess timed out during startup or execution after 30s: {exc}")
         self.assertEqual(proc.returncode, 0, proc.stderr or proc.stdout)
+        elapsed = float(proc.stdout.strip().splitlines()[-1])
         threshold = 5.0 if sys.platform == "win32" else 3.5
         self.assertLess(elapsed, threshold)
 

@@ -1285,3 +1285,16 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
+
+
+## November 5 grounding-budget harness correction
+
+The offline Windows suite repeatedly timed out in the five-second child-process
+guard because that guard also included workflow/dependency imports. An isolated
+probe measured imports at 3.664 seconds and grounding at 0.008 seconds. The test
+now starts its timer inside the child after imports, retaining the unchanged
+five-second Windows / 3.5-second other-platform grounding assertions and a
+30-second startup/hang watchdog. Product extraction code and budgets are unchanged.
+The four focused budget tests pass, followed by all 434 offline Python tests
+with the socket guard and no external provider calls. Keep dependency startup
+cost separate from algorithm-runtime assertions; neither establishes hosted latency.

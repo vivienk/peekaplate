@@ -163,8 +163,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
-        "backend/tsconfig.json",
-        "pnpm-lock.yaml",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
         "backend/src/dish-command.test.ts",
@@ -194,8 +192,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/menu-ingestion-infra.test.mjs",
         "backend/src/extraction-host.ts",
         "backend/src/extraction-host.test.ts",
-        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
-        "processing/tests/fixtures/service-artifacts/README.md",
         "backend/wrangler.extraction.jsonc",
         "backend/src/extraction-capability.ts",
         "backend/tsconfig.json",
@@ -223,19 +219,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/consumer/facts.ts",
         "backend/src/consumer/facts.integration.ts",
         "backend/src/consumer/backfill.ts",
-        "backend/src/consumer/backfill.test.ts"
+        "backend/src/consumer/backfill.test.ts",
+        "pnpm-lock.yaml",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0005-tenancy-and-privacy.md",
-        "docs/adr/0014-team-analytics-access.md"
+        "docs/adr/0014-team-analytics-access.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ad6f548141175221bde83d97adad6c7e8c27a3178eb29eac3c03ac34b89da3e6"
+      "sourceFingerprint": "b50e47b19d25481db784054abb925260c297c129bb72501d9163c62a5cada5e4"
     },
     {
       "id": "database",
@@ -347,7 +347,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "4e67a30fd344ec0c1a3fb3956f6e48c2417eaeb0255d914c2915270f60467d7f"
+      "sourceFingerprint": "6a31f8e3d20c2b756952bf7eaae1ac0a63f7174decd75bf0a23bd0b8e084a558"
     },
     {
       "id": "agents",
@@ -423,8 +423,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/model_cache.py",
         "processing/src/peekaplate_processing/ocr_regions.py",
         "processing/src/peekaplate_processing/ocr_space.py",
-        "processing/src/peekaplate_processing/overlay_review.py",
-        "processing/src/peekaplate_processing/recover_pages.py",
         "processing/src/peekaplate_processing/pdf.py",
         "processing/src/peekaplate_processing/run_pipeline.py",
         "processing/src/peekaplate_processing/schemas.py",
@@ -434,12 +432,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixture_factory.py",
         "processing/tests/test_ocr_regions.py",
         "processing/tests/test_ocr_space.py",
-        "processing/tests/test_overlay_review.py",
-        "processing/tests/test_overlay_saved_inputs.py",
         "processing/tests/test_pdf_images.py",
-        "processing/tests/test_box_evidence.py",
-        "processing/tests/test_box_grounding_safety.py",
-        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
         "processing/tests/test_schemas.py",
         "processing/tests/test_workflow.py",
         "processing/uv.lock",
@@ -452,11 +445,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "test-data/README.md",
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
+        "processing/Dockerfile",
+        "processing/.dockerignore",
+        "processing/src/peekaplate_processing/overlay_review.py",
+        "processing/src/peekaplate_processing/recover_pages.py",
+        "processing/tests/test_overlay_review.py",
+        "processing/tests/test_overlay_saved_inputs.py",
+        "processing/tests/test_box_evidence.py",
+        "processing/tests/test_box_grounding_safety.py",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
         "processing/tests/test_service_artifacts.py",
         "processing/tests/fixtures/service-artifacts/representative-bundle.json",
         "processing/tests/fixtures/service-artifacts/README.md",
-        "processing/Dockerfile",
-        "processing/.dockerignore",
         "processing/src/peekaplate_processing/menu_context.py",
         "processing/src/peekaplate_processing/menu_layout.py",
         "processing/src/peekaplate_processing/vision.py",
@@ -497,6 +497,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
+    {
+      "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
+      "modules": [
+        "contracts",
+        "backend",
+        "processing"
+      ],
+      "next": "Verify the reconciled head and independent tests before merge. Complete #73 artifact/command integrity corrections and #45 retry-exhaustion recovery before hosted upload-to-review acceptance."
+    },
     {
       "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
       "modules": [
@@ -567,22 +576,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
-      "paths": [
-        "backend/src/consumer/facts.ts",
-        "backend/src/consumer/backfill.ts",
-        "backend/src/dish.integration.ts",
-        "docs/observation-infrastructure.md"
-      ],
-      "next": "Finish independent review and exact-main staging acceptance; preserve paused normal delivery. Reconcile frontend tracking/outbox/delivery and report API before pilot activation.",
-      "modules": [
-        "backend",
-        "contracts",
-        "delivery"
-      ]
     }
   ]
 }
