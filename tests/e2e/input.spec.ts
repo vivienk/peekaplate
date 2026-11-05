@@ -153,6 +153,34 @@ test('every input box is 44px tall in every state, with 16px text on a 24px line
   expect(await measure(name)).toEqual(spec);
 });
 
+// Rania's Figma update (5 Nov): 1.5px border, 12px radius, 16px side padding, in every state.
+// Chrome draws borders in whole pixels, so the 1.5px edge is a 1px border plus a 0.5px inset shadow
+// in the same colour, in every state.
+test('every input box has a 1.5px edge, 12px radius and 16px side padding', async ({ page }) => {
+  await page.goto(demo);
+  const edge = (field: import('@playwright/test').Locator) =>
+    field.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const inset = style.boxShadow.match(/(rgba?\([^)]*\)) 0px 0px 0px 0\.5px inset/);
+      return {
+        border: style.borderLeftWidth,
+        inset: inset?.[1] === style.borderLeftColor,
+        radius: style.borderTopLeftRadius,
+        padding: [style.paddingLeft, style.paddingRight],
+      };
+    });
+  const spec = { border: '1px', inset: true, radius: '12px', padding: ['16px', '16px'] };
+  const fields = await page.getByRole('textbox').all();
+  await expect(page.locator('input[aria-invalid="true"]')).not.toHaveCount(0);
+  await expect(page.locator('input:disabled')).not.toHaveCount(0);
+  for (const field of fields) expect(await edge(field)).toEqual(spec);
+  const name = page.getByLabel('Dish name');
+  await name.hover();
+  expect(await edge(name)).toEqual(spec);
+  await name.focus();
+  expect(await edge(name)).toEqual(spec);
+});
+
 test('input demo fits a narrow viewport with usable touch targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto(demo);
