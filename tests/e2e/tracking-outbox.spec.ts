@@ -280,6 +280,8 @@ test('each live event reaches PostHog once with the canonical event_id; fixture 
   await startTracking(page, { live: true, consent: true });
   await connectFakePostHog(page);
   await trackMenuViewed(page, 3);
+  // Hide only once every event is stored, so the hide flush sends them all.
+  await expect.poll(() => storedEvents(page)).toBe(3);
   await hidePage(page);
   await expect.poll(() => delivered(page)).toBe(3);
   const canonicalIds = await page.evaluate(() =>
