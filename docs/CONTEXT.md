@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes. S3-TRK-01.1: track() and its triggers build schema-checked observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) plus the activity clock; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, replace either side keeping comparison_id. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHog) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -129,7 +129,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/activity-clock.ts",
         "frontend/diner/src/tracking/activity-clock.test.ts",
         "frontend/diner/src/tracking/validate.ts",
-        "frontend/diner/src/tracking/validate.test.ts"
+        "frontend/diner/src/tracking/validate.test.ts",
+        "frontend/diner/src/tracking/consent.ts",
+        "frontend/diner/src/tracking/outbox.ts",
+        "frontend/diner/src/tracking/outbox.test.ts",
+        "frontend/diner/src/tracking/batcher.ts",
+        "frontend/diner/src/tracking/batcher.test.ts",
+        "tests/e2e/tracking-outbox.spec.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -138,7 +145,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c85167a8d0c337d6c1fb2a4cb75f39e052a536c79c6c9cd9c11dc98986f89a35"
+      "sourceFingerprint": "7450ecd53f47852327558bebfe87995ddde612877c144a46428392d125d4adf8"
     },
     {
       "id": "console",
@@ -539,6 +546,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-TRK-01 tracking boundary (Sai with Vivien, 3 Nov; details 4 Nov): one UI action calls track() once; after validation and the consent/property checks it delivers independently to PostHog (its SDK, pilot funnels) and POST /observations (canonical owner reports). Retained custom work: strict shared-contract validation, stable IDs, active-time rules, the off-by-default consent gate (P0 for both destinations), and the canonical-only outbox, batching and retry pause. Paused: custom PostHog buffering/retries, extra internal analytics aggregation, autocapture/replay. PostHog gets a separate visit-scoped ID, never session_id; only event_id is shared; nothing in fixture mode; no menu token.",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "next": "Nifemi adds the shared dispatch boundary and reconciles one consent gate (with packages/analytics consent and DNT/GPC) in #77/#80; Jeffin builds the PostHog SDK adapter and approved-property allowlist in packages/analytics; Ehab's #84 delivers canonical batches. Open with Sai: dispatch in #80 or #77, and whether withdrawal clears queued canonical events. Not ready until Sai's acceptance list passes."
+    },
+    {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
       "modules": [
         "contracts",
@@ -584,13 +599,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "next": "After environment confirmation, reconcile develop and require current-head CI before review. Preserve approved bytes; any future legacy bundle requires an explicit compatibility decision."
-    },
-    {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
     },
     {
       "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
