@@ -26,24 +26,26 @@ Implements the unified menu ingestion orchestration layer for S3-VIS-01, coordin
 ## Review & Correctness Stabilization
 
 Resolves all reviewer inline comments and the four core correctness invariants:
-1. **URL Intake & Extraction Contract (Gap 1)**: Unmaterialized URL sources (and raw text) are strictly rejected at the intake boundary (`submitMenuIngestion`) with HTTP 400 `unsupported_source_type` (preserving URL validation via `validateIngestionUrl`). For any pre-existing or queued URL jobs, extraction dispatch deterministically traps the unsupported source error, durably records a structured extraction diagnostic in report storage, and transitions the job to terminal `failed` so workers can ACK without infinite redelivery loops.
+1. **URL Intake & Extraction Contract (Gap 1)**: Unmaterialized URL sources (and raw text) are strictly rejected at the intake boundary (`submitMenuIngestion`) with HTTP 400 `unsupported_source_type` (preserving URL validation via `validateIngestionUrl`). For any pre-existing or queued URL jobs, extraction dispatch deterministically traps the unsupported source error, durably records a structured extraction diagnostic in report storage, and transitions the job to terminal `failed` so workers can ACK without infinite redelivery loops. R2 diagnostic persistence failures are treated as recoverable infrastructure errors: if the diagnostic write fails, the failure is propagated (`report_storage_failed`), the job is requeued with its lease cleanly released, and the queue message is retried without premature ACK.
 2. **OCR Box Evidence Schema (Gap 2)**: Added `ExtractionBoxCoordinatesSchema` and `ExtractionBoxEvidenceSchema` to contracts, supporting valid fractional float OCR bounding boxes (`left`, `top`, `width`, `height`, `page_number`, `saved_region_index`, `text`) from PR #58 across `ExtractionDraftEvidenceSchema` and `StructuredDishDraftSchema`. Strictly rejects non-numbers, negative values, zero dimensions, NaN, Infinity, and malformed inputs. Preserves and stores box evidence through adapter to `dish_drafts.evidence`.
-3. **Failure Diagnostics Persistence & ACK Invariant (Gap 3)**: Guaranteed that no failed extraction job is acknowledged until its diagnostic report is durably persisted to report storage (`reports/${tenantId}/${jobId}/attempts/${claimToken}/extraction.json`) and linked via `result_storage_key` in the database. If diagnostic report storage fails, database transition is aborted and message is retried (not ACKed).
+3. **Failure Diagnostics Persistence & ACK Invariant (Gap 3)**: Guaranteed that no failed extraction job is acknowledged until its diagnostic report is durably persisted to report storage (`reports/${tenantId}/${jobId}/attempts/${claimToken}/extraction.json`) and linked via `result_storage_key` in the database. If diagnostic report storage fails across any failure mode (including pre-existing unsupported-source jobs), database transition to terminal `failed` is aborted, the job is requeued, and the message is retried (never ACKed) until persistence succeeds.
 4. **Lease Fencing on Failure & Concurrency Transitions (Gap 4)**: Updated `failIngestionJob` with atomic lease fencing (`WHERE id = $1 AND claim_token = $2 AND locked_at >= now() - ($leaseTimeout * '1 minute'::interval)`). If a worker's lease expired or was reclaimed by another worker, late failed results throw `lease_expired_or_reclaimed`, preventing stale workers from mutating job state or falsely completing/failing active jobs.
+5. **API & Extraction Transport Contract Alignment**: Explicitly reconciled transport to invoke `/extract` with the signed HMAC token header `X-Source-Capability` (`DEFAULT_EXTRACTION_TIMEOUT_MS = 720_000`), matching PR #58 service contracts without drift.
 
 ## Verification
 
-- PASS: `pnpm check` on `68370d4` (`node scripts/verify.mjs lint typecheck test context:check docs:check`):
-  - `biome check .`: 188 files checked, 0 errors.
-  - `pnpm -r --if-present typecheck`: 7 of 7 packages passed without errors.
-  - `vitest run`: 37 test files, 694 passed, 4 skipped.
-  - `node --test scripts/*.test.mjs`: 64 script tests passed.
+- PASS: Local verification on PR #45 head:
+  - `biome check .`: 245 files checked, 0 errors.
+  - `typecheck`: 7 of 7 packages passed without errors across contracts, backend, tokens, analytics, ui, and frontends.
+  - `vitest run`: 41 test files, 708 passed, 4 skipped (including 89 focused ingestion tests across contracts, adapter, repository, orchestrator, and workflow).
+  - Regression suite for R2 diagnostic write failure & retry safety: 4 of 4 tests passed (Test A, Test B, Test C, Test D).
+  - `node --test scripts/*.test.mjs`: 67 script tests passed.
   - `node scripts/context.mjs check`: 12 modules, 10 handoffs valid and fresh.
   - `node scripts/check-docs.mjs`: 47 Markdown documentation files checked.
-- PASS: `pnpm test:db` on `68370d4` (`node scripts/test-db.mjs`):
+- CONFIRMED BASELINE (previous CI / environment verification):
   - pgTAP suites: 8 test files, 192 assertions passed against real PostgreSQL.
-  - Database integration suites: 4 test files, 60 integration tests passed (`consumer.integration.ts`, `dish.integration.ts`, `ingestion.integration.ts`, `facts.integration.ts`).
-  - Local Worker demo smoke passed.
+  - Database integration suites: 4 test files, 64 integration tests passed (`consumer.integration.ts`, `dish.integration.ts`, `ingestion.integration.ts`, `facts.integration.ts`).
+  - Local Worker demo smoke passed on retry.
 - PASS: `GitHub checks on 68370d4` (exact-head CI is green; GitHub reports branch as MERGEABLE without conflicts).
 - NOT RUN: Hosted staging end-to-end verification with active OCR/AI providers; simulated Queue delivery and mock report storage on real PostgreSQL 16.
 

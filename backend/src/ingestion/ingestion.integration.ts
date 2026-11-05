@@ -1501,6 +1501,101 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(diagnostic.errors.length).toBeGreaterThan(0);
     });
 
+    it('retries existing unsupported-source job when R2 diagnostic write fails and ACKs only after successful retry', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: `idem_url_r2_retry_${jobId}`,
+      });
+
+      const storedReports = new Map<string, string>();
+      let shouldStorageFail = true;
+      const reportStorage = {
+        async put(key: string, data: string): Promise<void> {
+          if (shouldStorageFail) {
+            throw new Error('R2 diagnostic put failed: 500 Internal Server Error');
+          }
+          storedReports.set(key, data);
+        },
+      };
+
+      const configuredExtractor = createHttpPythonExtractor({
+        serviceUrl: 'http://127.0.0.1:9999',
+        authToken: 'secret',
+      });
+
+      // Part A: When R2 diagnostic write fails, error propagates, message is retried, not ACKed
+      let ackedFail = false;
+      let retriedFail = false;
+      const msgFail: QueueMessage<unknown> = {
+        id: 'msg_url_fail',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          ackedFail = true;
+        },
+        retry: () => {
+          retriedFail = true;
+        },
+      };
+
+      const resultFail = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msgFail] },
+        configuredExtractor,
+        { workerId: 'worker_url_fail', reportStorage },
+      );
+
+      expect(resultFail.acknowledged).toBe(0);
+      expect(resultFail.retried).toBe(1);
+      expect(ackedFail).toBe(false);
+      expect(retriedFail).toBe(true);
+
+      const jobAfterFail = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(jobAfterFail?.status).toBe('queued');
+      expect(jobAfterFail?.error_code).toBe('report_storage_failed');
+      expect(jobAfterFail?.result_storage_key).toBeNull();
+
+      // Part B: On retry, R2 diagnostic write succeeds, job transitions to failed, and message is ACKed
+      shouldStorageFail = false;
+      let ackedSuccess = false;
+      let retriedSuccess = false;
+      const msgSuccess: QueueMessage<unknown> = {
+        id: 'msg_url_success',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          ackedSuccess = true;
+        },
+        retry: () => {
+          retriedSuccess = true;
+        },
+      };
+
+      const resultSuccess = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msgSuccess] },
+        configuredExtractor,
+        { workerId: 'worker_url_success', reportStorage },
+      );
+
+      expect(resultSuccess.acknowledged).toBe(1);
+      expect(resultSuccess.retried).toBe(0);
+      expect(ackedSuccess).toBe(true);
+      expect(retriedSuccess).toBe(false);
+
+      const finalJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(finalJob?.status).toBe('failed');
+      expect(finalJob?.error_code).toBe('unsupported_extractor_source_type');
+      expect(finalJob?.result_storage_key).not.toBeNull();
+      expect(storedReports.has(finalJob!.result_storage_key!)).toBe(true);
+
+      const diagnostic = JSON.parse(storedReports.get(finalJob!.result_storage_key!)!);
+      expect(diagnostic.status).toBe('failed');
+      expect(diagnostic.errors.length).toBeGreaterThan(0);
+    });
+
     it('persists failure report diagnostics under attempt key before terminal ACK and retries on storage failure', async () => {
       const jobId = crypto.randomUUID();
       await createIngestionJob(runtimeClient, {

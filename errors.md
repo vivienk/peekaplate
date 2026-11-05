@@ -1183,3 +1183,10 @@ Full verification suite passed: all 33 Vitest suites (577 tests), 64 script test
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T19:58:00.859Z","exitCode":1}
 ```
+
+## November 5 R2 diagnostic persistence & retry safety fix
+
+Fixed R2 diagnostic-write failure swallowing during unsupported-source job processing:
+- Cause: In `backend/src/ingestion/orchestrator.ts`, failure diagnostic persistence in R2 was wrapped in `catch { resultStorageKey = null; }`, swallowing infrastructure errors and marking unsupported-source jobs as terminally failed without diagnostic records, causing premature queue message ACKs.
+- Prevention: Propagate R2 persistence failures as `IngestionError('report_storage_failed')`, abort terminal failure transitions, requeue the job with lease cleanly released (`terminal: false`), and retry the queue message until diagnostic persistence succeeds.
+- Regression: Added focused regression suite in `backend/src/ingestion/orchestrator.test.ts` (Test A, Test B, Test C, Test D) and database integration test in `backend/src/ingestion/ingestion.integration.ts`. All 17 orchestrator tests and 41 vitest suites (708 tests) pass.

@@ -392,7 +392,7 @@ export async function executeIngestionWorkflow(
         error.code === 'ssrf_destination_prohibited');
 
     let resultStorageKey: string | null = null;
-    if (params.reportStorage && claim?.claimToken) {
+    if (params.reportStorage && claim?.claimToken && errorCode !== 'report_storage_failed') {
       resultStorageKey = `reports/${params.tenantId}/${params.jobId}/attempts/${claim.claimToken}/extraction.json`;
       try {
         const failureDiagnostic = {
@@ -416,8 +416,28 @@ export async function executeIngestionWorkflow(
           errors: [errorDetails],
         };
         await params.reportStorage.put(resultStorageKey, JSON.stringify(failureDiagnostic));
-      } catch {
-        resultStorageKey = null;
+      } catch (storageErr) {
+        try {
+          await failIngestionJob(client, {
+            tenantId: params.tenantId,
+            jobId: params.jobId,
+            claimToken: claim.claimToken,
+            errorCode: 'report_storage_failed',
+            errorDetails: `Failed to persist extraction report artifact: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`,
+            resultStorageKey: null,
+            terminal: false,
+            ...(params.leaseTimeoutMinutes !== undefined
+              ? { leaseTimeoutMinutes: params.leaseTimeoutMinutes }
+              : {}),
+          });
+        } catch {
+          // Lease may have expired or been reclaimed
+        }
+        throw new IngestionError(
+          'report_storage_failed',
+          500,
+          `Failed to persist extraction report artifact: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`,
+        );
       }
     }
 

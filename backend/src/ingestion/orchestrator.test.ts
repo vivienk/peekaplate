@@ -103,10 +103,16 @@ function createMockClient() {
 
       if (text.includes('SET status = CASE WHEN')) {
         if (store.job) {
-          store.job.status = 'failed';
+          const isTerminal =
+            values![6] === true || store.job.attempt_count >= store.job.max_attempts;
+          store.job.status = isTerminal ? 'failed' : 'queued';
           store.job.error_code = values![0] as string;
           store.job.error_details = values![1] as string;
-          store.job.result_storage_key = values![2] as string | null;
+          store.job.result_storage_key =
+            (values![2] as string | null) ?? store.job.result_storage_key;
+          store.job.claim_token = null;
+          store.job.locked_at = null;
+          store.job.locked_by = null;
         }
         return { rows: [], rowCount: 1 };
       }
@@ -922,6 +928,376 @@ describe('Ingestion Orchestrator', () => {
             ],
             warnings: [],
             errors: [],
+          }),
+          reportStorage: failingStorage,
+        }),
+      ).rejects.toMatchObject({
+        code: 'report_storage_failed',
+      });
+    });
+  });
+
+  describe('Review Fix: R2 Diagnostic Persistence & Retry Safety for Existing Unsupported-Source Jobs', () => {
+    it('Test A — propagates R2 diagnostic write failure, does NOT ACK queue message, and leaves job non-terminal/re-queued', async () => {
+      const { client, store } = createMockClient();
+      const venueId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+      store.job = {
+        id: jobId,
+        tenant_id: venueId,
+        source_type: 'url',
+        source_url: 'https://example.com/menu',
+        source_hash: null,
+        source_storage_key: null,
+        result_storage_key: null,
+        idempotency_key: 'idem_url_storage_fail',
+        status: 'queued',
+        attempt_count: 0,
+        max_attempts: 3,
+        claim_token: null,
+        lease_generation: '0',
+        locked_at: null,
+        locked_by: null,
+        error_code: null,
+        error_details: null,
+        draft_count: 0,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        finished_at: null,
+      };
+
+      const failingStorage = {
+        async put(_key: string, _data: string) {
+          throw new Error('R2 write error: connection reset by peer');
+        },
+      };
+
+      const extractor = async (job: MenuIngestionJobRow) => {
+        if (job.source_type !== 'pdf' && job.source_type !== 'photo') {
+          throw new IngestionError(
+            'unsupported_extractor_source_type',
+            400,
+            `Python extraction service requires materialized 'pdf' or 'photo' source. Source type "${job.source_type}" must be processed via retrieval handoff or materialized prior to extraction.`,
+          );
+        }
+        return {};
+      };
+
+      const msg: QueueMessage<unknown> = {
+        id: 'msg_test_a',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result = await processIngestionQueueBatch(client, { messages: [msg] }, extractor, {
+        workerId: 'worker_test_a',
+        reportStorage: failingStorage,
+      });
+
+      // 1. Persistence error is propagated through queue consumer retry mechanism
+      expect(result.retried).toBe(1);
+      expect(result.acknowledged).toBe(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]?.error).toContain('Failed to persist extraction report artifact');
+
+      // 2. Queue message is NOT ACKed
+      expect(msg.ack).not.toHaveBeenCalled();
+      expect(msg.retry).toHaveBeenCalledTimes(1);
+
+      // 3. Job is not incorrectly finalized as successfully handled (not 'failed')
+      expect(store.job?.status).toBe('queued');
+      expect(store.job?.error_code).toBe('report_storage_failed');
+
+      // 4. Required archive persistence is not falsely reported as successful
+      expect(store.job?.result_storage_key).toBeNull();
+    });
+
+    it('Test B — retries diagnostic persistence and ACKs only after required R2 persistence succeeds', async () => {
+      const { client, store } = createMockClient();
+      const venueId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+      store.job = {
+        id: jobId,
+        tenant_id: venueId,
+        source_type: 'url',
+        source_url: 'https://example.com/menu',
+        source_hash: null,
+        source_storage_key: null,
+        result_storage_key: null,
+        idempotency_key: 'idem_url_retry_success',
+        status: 'queued',
+        attempt_count: 0,
+        max_attempts: 3,
+        claim_token: null,
+        lease_generation: '0',
+        locked_at: null,
+        locked_by: null,
+        error_code: null,
+        error_details: null,
+        draft_count: 0,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        finished_at: null,
+      };
+
+      const storageMap = new Map<string, string>();
+      let shouldFail = true;
+      const flappyStorage = {
+        async put(key: string, data: string) {
+          if (shouldFail) {
+            throw new Error('R2 write error: 503 Service Unavailable');
+          }
+          storageMap.set(key, data);
+        },
+      };
+
+      const extractor = async (job: MenuIngestionJobRow) => {
+        if (job.source_type !== 'pdf' && job.source_type !== 'photo') {
+          throw new IngestionError(
+            'unsupported_extractor_source_type',
+            400,
+            `Python extraction service requires materialized 'pdf' or 'photo' source. Source type "${job.source_type}" must be processed via retrieval handoff or materialized prior to extraction.`,
+          );
+        }
+        return {};
+      };
+
+      // Attempt 1: R2 write fails
+      const msg1: QueueMessage<unknown> = {
+        id: 'msg_test_b_1',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result1 = await processIngestionQueueBatch(client, { messages: [msg1] }, extractor, {
+        workerId: 'worker_test_b_1',
+        reportStorage: flappyStorage,
+      });
+
+      expect(result1.acknowledged).toBe(0);
+      expect(result1.retried).toBe(1);
+      expect(msg1.ack).not.toHaveBeenCalled();
+      expect(msg1.retry).toHaveBeenCalledTimes(1);
+      expect(store.job?.status).toBe('queued');
+      expect(store.job?.result_storage_key).toBeNull();
+      expect(storageMap.size).toBe(0);
+
+      // Attempt 2: R2 write succeeds on retry
+      shouldFail = false;
+      const msg2: QueueMessage<unknown> = {
+        id: 'msg_test_b_2',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result2 = await processIngestionQueueBatch(client, { messages: [msg2] }, extractor, {
+        workerId: 'worker_test_b_2',
+        reportStorage: flappyStorage,
+      });
+
+      // Assertions
+      expect(result2.acknowledged).toBe(1);
+      expect(result2.retried).toBe(0);
+      expect(msg2.ack).toHaveBeenCalledTimes(1);
+      expect(msg2.retry).not.toHaveBeenCalled();
+
+      // Diagnostic record is eventually persisted
+      expect(store.job?.result_storage_key).not.toBeNull();
+      expect(storageMap.has(store.job!.result_storage_key!)).toBe(true);
+
+      const persistedDiagnostic = JSON.parse(storageMap.get(store.job!.result_storage_key!)!);
+      expect(persistedDiagnostic.status).toBe('failed');
+      expect(persistedDiagnostic.errors[0]).toContain(
+        'Source type "url" must be processed via retrieval handoff',
+      );
+
+      // Existing unsupported-source business outcome is preserved
+      expect(store.job?.status).toBe('failed');
+      expect(store.job?.error_code).toBe('unsupported_extractor_source_type');
+    });
+
+    it('Test C — retrying persistence is deterministic, overwriting identical attempt key without duplicate or corrupted archives', async () => {
+      const { client, store } = createMockClient();
+      const venueId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+      store.job = {
+        id: jobId,
+        tenant_id: venueId,
+        source_type: 'url',
+        source_url: 'https://example.com/menu',
+        source_hash: null,
+        source_storage_key: null,
+        result_storage_key: null,
+        idempotency_key: 'idem_url_idempotency',
+        status: 'queued',
+        attempt_count: 0,
+        max_attempts: 3,
+        claim_token: null,
+        lease_generation: '0',
+        locked_at: null,
+        locked_by: null,
+        error_code: null,
+        error_details: null,
+        draft_count: 0,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        finished_at: null,
+      };
+
+      const storageMap = new Map<string, string>();
+      const putCounts = new Map<string, number>();
+      const spyStorage = {
+        async put(key: string, data: string) {
+          putCounts.set(key, (putCounts.get(key) ?? 0) + 1);
+          storageMap.set(key, data);
+        },
+      };
+
+      const extractor = async (job: MenuIngestionJobRow) => {
+        if (job.source_type !== 'pdf' && job.source_type !== 'photo') {
+          throw new IngestionError(
+            'unsupported_extractor_source_type',
+            400,
+            `Python extraction service requires materialized 'pdf' or 'photo' source. Source type "${job.source_type}" must be processed via retrieval handoff or materialized prior to extraction.`,
+          );
+        }
+        return {};
+      };
+
+      const msg1: QueueMessage<unknown> = {
+        id: 'msg_test_c_1',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result1 = await processIngestionQueueBatch(client, { messages: [msg1] }, extractor, {
+        workerId: 'worker_test_c_1',
+        reportStorage: spyStorage,
+      });
+
+      expect(result1.acknowledged).toBe(1);
+      expect(msg1.ack).toHaveBeenCalledTimes(1);
+      const canonicalKey = store.job!.result_storage_key!;
+      expect(canonicalKey).toBeTruthy();
+      expect(putCounts.get(canonicalKey)).toBe(1);
+
+      // Duplicate delivery for already terminal job: ACKs safely without re-writing or corrupting archive
+      const msg2: QueueMessage<unknown> = {
+        id: 'msg_test_c_2',
+        body: {
+          version: 1,
+          tenantId: venueId,
+          jobId,
+          queuedAt: new Date().toISOString(),
+        },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+
+      const result2 = await processIngestionQueueBatch(client, { messages: [msg2] }, extractor, {
+        workerId: 'worker_test_c_2',
+        reportStorage: spyStorage,
+      });
+
+      expect(result2.acknowledged).toBe(1);
+      expect(msg2.ack).toHaveBeenCalledTimes(1);
+      // No duplicate put was performed for completed job
+      expect(putCounts.get(canonicalKey)).toBe(1);
+      expect(storageMap.size).toBe(1);
+    });
+
+    it('Test D — regression protection preserves raw URL rejection, box evidence, failed-report archival, and lease expiry', async () => {
+      const { client, store } = createMockClient();
+      const venueId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+
+      // 1. Raw URL rejection at intake boundary
+      await expect(
+        submitMenuIngestion(client, {
+          venueId,
+          sourceType: 'url',
+          sourceUrl: 'https://example.com/menu',
+          idempotencyKey: 'idem_regression_url',
+        }),
+      ).rejects.toMatchObject({
+        code: 'unsupported_source_type',
+        status: 400,
+      });
+
+      // 2. Failed-report archival failure propagates and does not ACK
+      store.job = {
+        id: jobId,
+        tenant_id: venueId,
+        source_type: 'pdf',
+        source_hash: 'c'.repeat(64),
+        source_storage_key: 'sources/test.pdf',
+        source_url: null,
+        result_storage_key: null,
+        idempotency_key: 'idem_regression_fail_diag',
+        status: 'queued',
+        attempt_count: 0,
+        max_attempts: 3,
+        claim_token: null,
+        lease_generation: '0',
+        locked_at: null,
+        locked_by: null,
+        error_code: null,
+        error_details: null,
+        draft_count: 0,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        finished_at: null,
+      };
+
+      const failingStorage = {
+        async put(_key: string, _data: string) {
+          throw new Error('R2 write error');
+        },
+      };
+
+      await expect(
+        executeIngestionWorkflow(client, {
+          tenantId: venueId,
+          jobId,
+          workerId: 'worker_regression_fail',
+          extractor: async () => ({
+            schema_version: 1,
+            pipeline_version: '2',
+            status: 'failed',
+            source: null,
+            started_at: '2026-10-27T10:00:00.000Z',
+            finished_at: '2026-10-27T10:00:01.000Z',
+            extraction_mode: 'layout',
+            segments: [],
+            drafts: [],
+            evidence: [],
+            capture_requests: [],
+            warnings: [],
+            errors: ['Model failed'],
           }),
           reportStorage: failingStorage,
         }),
