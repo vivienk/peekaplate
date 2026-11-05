@@ -23,7 +23,7 @@ export async function readOwnerReport(
        WHERE tenant_id = $1 AND actor_id = $2`,
       [venueId, actorId],
     );
-    
+
     if (!REPORT_PERMISSIONS.includes(membership.rows[0]?.permission ?? '')) {
       throw new CommandError('forbidden', 403);
     }
@@ -130,15 +130,15 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
     report_metadata: {
       calculation_version: 'production.v1',
       generated_at: now.toISOString(),
-      date_window: { 
+      date_window: {
         duration_hours: 24,
         start_time: yesterday.toISOString(),
-        end_time: now.toISOString()
+        end_time: now.toISOString(),
       },
       coverage: { data_completeness: 1.0 },
-      freshness: { 
+      freshness: {
         is_stale: false,
-        last_event_ingested_at: now.toISOString()
+        last_event_ingested_at: now.toISOString(),
       },
       report_status: 'NORMAL',
     },
@@ -151,21 +151,21 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
           value: numberOrNull(row.active_sessions_value),
           status: row.active_sessions_status,
         },
-        open_rate: { 
-          value: numberOrNull(row.open_rate_value), 
+        open_rate: {
+          value: numberOrNull(row.open_rate_value),
           status: row.open_rate_status,
-          eligible_sessions: numberOrNull(row.total_sessions)
+          eligible_sessions: numberOrNull(row.total_sessions),
         },
         engagement_rate: {
           value: numberOrNull(row.engagement_rate_value),
           status: row.engagement_rate_status,
           eligible_sessions: numberOrNull(row.open_eligible_sessions),
-          average_active_ms: numberOrNull(row.max_active_time)
+          average_active_ms: numberOrNull(row.max_active_time),
         },
-        save_rate: { 
-          value: numberOrNull(row.save_rate_value), 
+        save_rate: {
+          value: numberOrNull(row.save_rate_value),
           status: row.save_rate_status,
-          eligible_sessions: numberOrNull(row.open_eligible_sessions)
+          eligible_sessions: numberOrNull(row.open_eligible_sessions),
         },
       },
     })),
