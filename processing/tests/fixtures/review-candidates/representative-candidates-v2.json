@@ -1,0 +1,147 @@
+{
+  "schema_version": 2,
+  "extraction_id": "extraction:e1bb4c9c059eb377dc7e92f340e78416",
+  "pipeline_version": "3",
+  "status": "incomplete",
+  "started_at": "2026-10-25T12:00:00Z",
+  "finished_at": "2026-10-25T12:00:00Z",
+  "extraction_model": "synthetic-no-provider-call",
+  "source": {
+    "source_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+    "sha256": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+    "kind": "pdf",
+    "location": "synthetic-review-options.pdf",
+    "retrieved_at": "2026-10-25T12:00:00Z",
+    "size_bytes": 1272
+  },
+  "segments": [
+    {
+      "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-1",
+      "page_number": 1,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "SYNTHETIC MENU\nFOOD\nSOUPS\nGarden Soup - vegetables - 8.50 / 12.50 CAD\nHOT DRINKS\nCoffee\nBAKERY\nBread - 0.00 CAD\n",
+      "native_text": "SYNTHETIC MENU\nFOOD\nSOUPS\nGarden Soup - vegetables - 8.50 / 12.50 CAD\nHOT DRINKS\nCoffee\nBAKERY\nBread - 0.00 CAD\n",
+      "error": null,
+      "warnings": [],
+      "metadata": {
+        "width": 600,
+        "height": 800,
+        "coordinate_space": "page_points"
+      }
+    },
+    {
+      "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-2",
+      "page_number": 2,
+      "method": "ocr_space_engine3",
+      "status": "failed",
+      "text": "",
+      "native_text": null,
+      "error": "Synthetic OCR failure.",
+      "warnings": ["Synthetic failure fixture; no OCR request was made."],
+      "metadata": {}
+    },
+    {
+      "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-3",
+      "page_number": 3,
+      "method": "pdf_native",
+      "status": "skipped",
+      "text": "",
+      "native_text": null,
+      "error": null,
+      "warnings": ["Synthetic skipped page."],
+      "metadata": {}
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_id": "draft:0bbe00087c6841623c76d7b6f9da5ebf",
+      "original": {
+        "name": "Garden Soup",
+        "description": null,
+        "category": "FOOD",
+        "subcategory": "SOUPS",
+        "category_page_number": 1,
+        "price_text": "8.50 / 12.50 CAD",
+        "price_amount": null,
+        "price_currency": "CAD",
+        "ingredients": null,
+        "source_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+        "source_text": "SYNTHETIC MENU\nFOOD\nSOUPS\nGarden Soup - vegetables - 8.50 / 12.50 CAD\nHOT DRINKS\nCoffee\nBAKERY\nBread - 0.00 CAD",
+        "image_id": null,
+        "review_warnings": [
+          "Page-level evidence; dish/price association needs human verification."
+        ],
+        "status": "needs_review"
+      },
+      "evidence": [
+        {
+          "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-1",
+          "start": 0,
+          "end": 111
+        }
+      ],
+      "missing_fields": ["description", "ingredients"]
+    },
+    {
+      "candidate_id": "draft:0ff0863ef48b2db591694fcc3c35fbb0",
+      "original": {
+        "name": "Coffee",
+        "description": null,
+        "category": "HOT DRINKS",
+        "category_page_number": 1,
+        "price_amount": null,
+        "price_currency": null,
+        "ingredients": null,
+        "source_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+        "source_text": "SYNTHETIC MENU\nFOOD\nSOUPS\nGarden Soup - vegetables - 8.50 / 12.50 CAD\nHOT DRINKS\nCoffee\nBAKERY\nBread - 0.00 CAD",
+        "image_id": null,
+        "review_warnings": [
+          "Page-level evidence; dish/price association needs human verification."
+        ],
+        "status": "needs_review"
+      },
+      "evidence": [
+        {
+          "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-1",
+          "start": 0,
+          "end": 111
+        }
+      ],
+      "missing_fields": ["description", "price_amount", "price_currency", "ingredients"]
+    },
+    {
+      "candidate_id": "draft:6dbe8d78dae3c41e819deed5267f8149",
+      "original": {
+        "name": "Bread",
+        "description": null,
+        "category": "BAKERY",
+        "category_page_number": 1,
+        "price_text": "0.00 CAD",
+        "price_amount": "0.00",
+        "price_currency": "CAD",
+        "ingredients": null,
+        "source_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+        "source_text": "SYNTHETIC MENU\nFOOD\nSOUPS\nGarden Soup - vegetables - 8.50 / 12.50 CAD\nHOT DRINKS\nCoffee\nBAKERY\nBread - 0.00 CAD",
+        "image_id": null,
+        "review_warnings": [
+          "Page-level evidence; dish/price association needs human verification."
+        ],
+        "status": "needs_review"
+      },
+      "evidence": [
+        {
+          "segment_id": "sha256:0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c#page-1",
+          "start": 0,
+          "end": 111
+        }
+      ],
+      "missing_fields": ["description", "ingredients"]
+    }
+  ],
+  "warnings": [
+    "Synthetic integration fixture; no OCR or model calls.",
+    "Page-level evidence; dish/price association needs human verification."
+  ],
+  "errors": ["Page 2: Synthetic OCR failure."]
+}
