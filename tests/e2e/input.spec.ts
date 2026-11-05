@@ -20,15 +20,14 @@ test('inputs expose their label, hint and error to assistive technology', async 
 
   const price = page.getByLabel('Price');
   await expect(price).toHaveAttribute('aria-invalid', 'true');
-  await expect(price).toHaveAccessibleDescription(
-    'Numbers only, for example 12.50. Error: Enter a price',
-  );
+  // An error replaces the helper text (Rania, 5 Nov), so only the error is announced.
+  await expect(price).toHaveAccessibleDescription('Error: Enter a price');
 
   // The demo passes whitespace-only hint and error text here; it must be ignored.
   const note = page.getByLabel('Internal note');
   await expect(note).not.toHaveAttribute('aria-describedby');
   await expect(note).not.toHaveAttribute('aria-invalid');
-  await expect(page.locator('.pp-field__hint, .pp-field__error')).toHaveCount(3);
+  await expect(page.locator('.pp-field__hint, .pp-field__error')).toHaveCount(2);
 
   const filled = page.getByLabel('Short name');
   await expect(filled).toHaveValue('Berry pancakes');
@@ -86,6 +85,44 @@ test('keyboard focus skips disabled inputs and stays visible', async ({ page }) 
 
 // Rania's spec (1 Nov): the input box is exactly 44px tall in every state, with 16px text on a 24px
 // line height. Measured on the textbox itself, so the label and helper or error text are excluded.
+// Rania's review (5 Nov): the label sits above the input, the helper or error text below it, and an
+// error replaces the helper. The label is 14px on a 24px line height at weight 600.
+test('helper and error text sit below the input, and an error replaces the helper', async ({
+  page,
+}) => {
+  await page.goto(demo);
+  const below = async (label: string, selector: string) => {
+    const field = page.locator('.pp-field', { has: page.getByLabel(label) });
+    const input = await field.getByRole('textbox').boundingBox();
+    const text = await field.locator(selector).boundingBox();
+    return (text?.y ?? 0) >= (input?.y ?? 0) + (input?.height ?? 0);
+  };
+  expect(await below('Dish name', '.pp-field__hint')).toBe(true);
+  expect(await below('Price', '.pp-field__error')).toBe(true);
+
+  const price = page.locator('.pp-field', { has: page.getByLabel('Price') });
+  await expect(price.locator('.pp-field__error')).toHaveText('Error: Enter a price');
+  await expect(price.locator('.pp-field__hint')).toHaveCount(0);
+  await expect(price).not.toContainText('Numbers only');
+});
+
+test('field labels are 14px on a 24px line height at weight 600', async ({ page }) => {
+  await page.goto(demo);
+  const labels = await page.locator('.pp-field__label').all();
+  expect(labels.length).toBeGreaterThan(0);
+  for (const label of labels) {
+    const style = await label.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return {
+        fontSize: computed.fontSize,
+        lineHeight: computed.lineHeight,
+        fontWeight: computed.fontWeight,
+      };
+    });
+    expect(style).toEqual({ fontSize: '14px', lineHeight: '24px', fontWeight: '600' });
+  }
+});
+
 test('every input box is 44px tall in every state, with 16px text on a 24px line height', async ({
   page,
 }) => {

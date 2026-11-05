@@ -31,26 +31,17 @@ export function TextField({
   const error = rawError?.trim();
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const hintId = hint ? `${inputId}-hint` : undefined;
+  // Rania (5 Nov): the helper and error text sit below the input, and an error replaces the helper,
+  // so only one of them is shown and announced at a time.
+  const hintId = hint && !error ? `${inputId}-hint` : undefined;
   const errorId = error ? `${inputId}-error` : undefined;
-  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+  const describedBy = errorId ?? hintId;
 
   return (
     <div className="pp-field">
       <label className="pp-field__label" htmlFor={inputId}>
         {label}
       </label>
-      {hint && (
-        <p className="pp-field__hint" id={hintId}>
-          {hint}
-        </p>
-      )}
-      {error && (
-        <p className="pp-field__error" id={errorId}>
-          <span className="pp-visually-hidden">Error: </span>
-          {error}
-        </p>
-      )}
       <Input
         {...props}
         {...(ref === undefined ? {} : { ref })}
@@ -59,6 +50,18 @@ export function TextField({
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
       />
+      {error ? (
+        <p className="pp-field__error" id={errorId}>
+          <span className="pp-visually-hidden">Error: </span>
+          {error}
+        </p>
+      ) : (
+        hint && (
+          <p className="pp-field__hint" id={hintId}>
+            {hint}
+          </p>
+        )
+      )}
     </div>
   );
 }

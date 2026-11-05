@@ -1,7 +1,7 @@
 /*
  * Text field structure (S3-TOK-01). The input box itself is the design-system .pp-input from
  * @peekaplate/ui (colors, border, focus ring, error and disabled states); this file only lays out
- * the label, hint and error around it, using shared tokens. Classes use .pp-field so they never
+ * the label above it and the hint or error below it, using shared tokens. Classes use .pp-field so they never
  * collide with the design system's .pp-input.
  */
 .pp-field {
@@ -10,10 +10,12 @@
   font-family: var(--pp-font-family-base);
 }
 
+/* Rania (5 Nov): label Inter 14px on a 24px line height, weight 600. Inter renders once the font
+ * is loaded; until then the system font is used (see --pp-font-family-base). */
 .pp-field__label {
   font-size: var(--pp-font-size-paragraph-2);
-  line-height: var(--pp-line-height-paragraph-2);
-  font-weight: var(--pp-font-weight-medium);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
 }
 
 .pp-field__hint,
