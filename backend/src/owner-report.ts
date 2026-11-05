@@ -32,6 +32,10 @@ export async function readOwnerReport(
     if (!REPORT_PERMISSIONS.includes(membership.rows[0]?.permission ?? '')) {
       throw new CommandError('forbidden', 403);
     }
+    // The observation fact tables behind the owner views are scoped by app.tenant_id
+    // (security_invoker views, tenant RLS). Without it every row is hidden and the report would
+    // look like a restaurant with no activity. Same pattern as dish-command.ts (Jeffin, 5 Nov).
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
     const result = await client.query(OWNER_REPORT_QUERY, [venueId]);
     await client.query('COMMIT');
