@@ -455,6 +455,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-TRK-01 tracking boundary (Sai with Vivien, 3 Nov; details 4 Nov): one UI action calls track() once; after validation and the consent/property checks it delivers independently to PostHog (its SDK, pilot funnels) and POST /observations (canonical owner reports). Retained custom work: strict shared-contract validation, stable IDs, active-time rules, the off-by-default consent gate (P0 for both destinations), and the canonical-only outbox, batching and retry pause. Paused: custom PostHog buffering/retries, extra internal analytics aggregation, autocapture/replay. PostHog gets a separate visit-scoped ID, never session_id; only event_id is shared; nothing in fixture mode; no menu token.",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "next": "Nifemi adds the shared dispatch boundary and reconciles one consent gate (with packages/analytics consent and DNT/GPC) in #77/#80; Jeffin builds the PostHog SDK adapter and approved-property allowlist in packages/analytics; Ehab's #84 delivers canonical batches. Open with Sai: dispatch in #80 or #77, and whether withdrawal clears queued canonical events. Not ready until Sai's acceptance list passes."
+    },
+    {
       "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
       "modules": [
         "diner"
@@ -517,13 +525,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Verify this exact reconciled head, merge PR42, then retarget and recheck PR43 against develop. Promote an approved main candidate before hosted migration, signing configuration and synthetic publication acceptance."
-    },
-    {
-      "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip via the adapter's chipKey, and an approved P0 allergen matches its code, label or alias (egg/Eggs, soya/Soy, sesame seeds/Sesame; nuts also finds Peanuts, old tree nut names kept), so \"gluten\" never finds Gluten-free. allergyNotice is true for any P0 allergen, dietary value, menu allergen or common allergy term (shellfish, gluten, mustard...), even with no results, so no results never reads as free from. Description never searched; incomplete dishes excluded; no API call, events or logging. 20 Vitest cases pass.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
     },
     {
       "date": "2026-11-02",
