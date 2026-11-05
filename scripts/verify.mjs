@@ -28,7 +28,7 @@ function pnpmSpec(check, environment = process.env) {
     } catch {}
   }
   return process.platform === 'win32'
-    ? { command: `pnpm.cmd run ${check}`, args: [], shell: true }
+    ? { command: 'corepack.cmd', args: ['pnpm', 'run', check], shell: true }
     : { command: 'pnpm', args: ['run', check] };
 }
 
@@ -39,9 +39,9 @@ export function checkSpec(check, environment) {
     : pnpmSpec(check, environment);
 }
 
-export function validateChecks(checkNames) {
+export function validateChecks(checkNames, environment = process.env) {
   if (!checkNames.length) throw new Error('Usage: node scripts/verify.mjs <check>...');
-  return checkNames.map(checkSpec);
+  return checkNames.map((check) => checkSpec(check, environment));
 }
 
 export function runProcess(command, args, options = {}) {
@@ -124,10 +124,9 @@ export async function recordFailure(result, options = {}) {
 }
 
 export async function runChecks(checkNames, options = {}) {
-  const specs = validateChecks(checkNames).map((_, index) =>
-    checkSpec(checkNames[index], options.environment),
-  );
+  const specs = validateChecks(checkNames, options.environment);
   const execute = options.execute ?? ((spec) => runProcess(spec.command, spec.args, spec));
+
   for (let index = 0; index < specs.length; index += 1) {
     const result = await execute(specs[index]);
     if (result.exitCode === 0 && !result.signal && !result.spawnError) continue;
