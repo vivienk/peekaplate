@@ -1001,27 +1001,26 @@ describe('real PostgreSQL menu publication commands', () => {
 });
 describe('Multi-Tenant Database RLS Integration (Jeffin Checklist)', () => {
   it('Should strictly isolate owner observations and enforce 403 blocks for unauthorized scopes', async () => {
-    
     const resOwnerA = await testApp.request('/api/v1/venues/venue-A/analytics/dishes', {
       method: 'GET',
-      headers: { 'Authorization': 'Bearer owner-A-token' }
+      headers: { Authorization: 'Bearer owner-A-token' },
     });
-    
+
     expect(resOwnerA.status).toBe(200);
-    const bodyA = await resOwnerA.json() as any;
+    const bodyA = (await resOwnerA.json()) as any;
     expect(bodyA.venue_id).toBe('venue-A');
 
     const resEditor = await testApp.request('/api/v1/venues/venue-A/analytics/dishes', {
       method: 'GET',
-      headers: { 'Authorization': 'Bearer editor-token' }
+      headers: { Authorization: 'Bearer editor-token' },
     });
     expect(resEditor.status).toBe(403);
 
     const resSpy = await testApp.request('/api/v1/venues/venue-A/analytics/dishes', {
       method: 'GET',
-      headers: { 'Authorization': 'Bearer owner-B-token' }
+      headers: { Authorization: 'Bearer owner-B-token' },
     });
-    
+
     expect(resSpy.status).toBe(403);
   });
 });
