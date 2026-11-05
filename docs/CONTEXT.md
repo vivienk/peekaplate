@@ -27,7 +27,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "3c17976293d92da5fd797fc7a3b0a46340ac46540ab6231965021978578b2b0c"
+      "sourceFingerprint": "fe76760b18bb7205c79ced31005ee8fcbfc934ff358f0d30d5907e0fb914e7c5"
     },
     {
       "id": "tokens",
@@ -100,7 +100,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "77575cbc7d964ba6e361d11815dc2d1adb644f7d311184c39317ab84230138f4"
+      "sourceFingerprint": "74015247fac7ce64a0ccd3500c7f1cd10bace892687d670a93f7d681e2fb53dc"
     },
     {
       "id": "console",
@@ -204,7 +204,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "28423fc64e54097639a61ac9b46cceb03906d1b6d0cea1cb749525d0367d1619"
+      "sourceFingerprint": "07f80d8992b1a743db79623bc224a3368c64c38e01e46a90eb43f1278cc04931"
     },
     {
       "id": "database",
@@ -315,7 +315,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c455e7e96487eb8a1233e519c22798a74051df3acbe89edf38ce1c62a22d050b"
+      "sourceFingerprint": "f71dcfcf0a7de9cefddf5e655ab907132051f3f1ccf8841a458b8f857f093da6"
     },
     {
       "id": "agents",
