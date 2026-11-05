@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s); Save events only for committed writes. S3-TRK-01: track() builds observation.v2 envelopes (allowlist, IDs, per-tab identity, never-reused sequence) plus the activity clock. Live mode needs the default-off consent flag, queues in an IndexedDB outbox (500/1 MiB/24 h) and batches 25 events/32 KiB every 5 s with a retry pause; fixture mode only logs. Icons map allergen/dietary values and ingredients to Figma assets; unwired.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs and falls back to memory. Save UI mounts hearts, badge and toasts; Save events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity, never-reused sequence) plus the activity clock. Live mode needs the default-off consent flag, queues in an IndexedDB outbox (500/1 MiB/24 h) and batches 25 events/32 KiB every 5 s with a retry pause; fixture mode only logs. Icons map allergen/dietary values and ingredients to Figma assets; unwired.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -112,6 +112,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking.spec.ts",
         "frontend/diner/src/tracking/activity-clock.ts",
         "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/validate.ts",
+        "frontend/diner/src/tracking/validate.test.ts",
         "frontend/diner/src/tracking/consent.ts",
         "frontend/diner/src/tracking/outbox.ts",
         "frontend/diner/src/tracking/outbox.test.ts",
@@ -126,7 +128,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c17c4c26bcefed0cf1108d18524cfc2ddb551993e6013de4b9dc6a8251b4b1af"
+      "sourceFingerprint": "dea467f01787849e804b16307d44f541ef24fcd0d073a08f10ffacf76573a2ee"
     },
     {
       "id": "console",
@@ -342,7 +344,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9cc729f28f18a905a03c2e2b25602c66f4c4cc777c91c05d4cab964b5bcc3e82"
+      "sourceFingerprint": "741fe07d16cf13600a0deb730ef8b254dd581d683af8cca3ba92c317310fb3fb"
     },
     {
       "id": "agents",

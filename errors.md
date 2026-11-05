@@ -1158,3 +1158,30 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T21:06:43.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-04T21:06:43.047Z"},"status":"resolved","cause":"While re-syncing the S3-TRK-01 strict-validation branch onto the tracking core, the combined diner summary came to 1007 characters, so the resolution script stopped before writing docs/CONTEXT.md; the following commands still staged the file with its conflict markers and ran pnpm check against it.","prevention":"Stop a resolution sequence at the first failed step (set -e) and confirm no conflict markers remain before staging.","regression":"Shortened the diner summary to 1000 characters without dropping facts, added the validation files, refreshed fingerprints; no markers remain and pnpm check passes."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z"},"status":"environment-limited","cause":"The S3-DIN-02.2 toast timing test ('Undo survives moving to another screen') is flaky on branches based on develop: Playwright's installed clock keeps running in real time, so a slow run can expire the 5-second toast before the check. The fix (pausing the clock) is in #76, which has not merged into develop yet.","prevention":"Merge #76, which pauses the clock in both toast timing tests.","regression":"The test passed on rerun; it is stable on #76, where a 6-second real-time probe fails with a running clock and passes with the paused one."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T10:28:01.916Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-05T10:28:01.916Z"},"status":"environment-limited","cause":"The S3-DIN-02.2 toast timing test ('the removed toast disappears after 5 seconds') is flaky on branches based on develop: Playwright's installed clock keeps running in real time, so a slow run expires the toast early. The fix (pausing the clock) is in #76, not yet merged into develop.","prevention":"Merge #76, which pauses the clock in both toast timing tests.","regression":"The rerun passed (34/34 main, 4/4 PostHog)."}
+```
