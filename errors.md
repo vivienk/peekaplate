@@ -1167,3 +1167,8 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 ```json
 {"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-04T17:17:10.334Z"},"status":"resolved","cause":"A local lint run on the S3-RES-03 owner report branch failed before Biome formatting and import ordering were applied to backend/src/index.ts and index.test.ts, the same findings CI reported on b1273e0.","prevention":"Run pnpm check (Biome, typecheck, tests, context) locally before pushing.","regression":"The branch passes Biome and the full pnpm check after the owner report route was rebuilt on the existing verify/service pattern."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-05T12:08:20.919Z","exitCode":1}
+```
