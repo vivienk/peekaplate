@@ -179,6 +179,7 @@ test('workflow executes base deployment code with isolated credential-free PR bu
   const cleanup = workflow.split('  cleanup:')[1];
   assert.doesNotMatch(cleanup, /PREVIEW_DEPLOYMENT_ENABLED/);
   assert.match(cleanup, /ref: \$\{\{ github.sha \}\}/);
+  assert.match(cleanup, /github.event.pull_request.merged != true/);
   const deploy = workflow.split('  deploy:')[1].split('  cleanup:')[0];
   assert.match(deploy, /node scripts\/preview.mjs sanitize preview "\$SHA"/);
   assert.match(deploy, /node scripts\/preview.mjs verify "\$SHA"/);
