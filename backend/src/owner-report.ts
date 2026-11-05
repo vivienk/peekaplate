@@ -63,18 +63,67 @@ export async function readOwnerReport(
 // for every rate and the average. Until then toOwnerReport() rejects the result and the route
 // answers with the generic service_unavailable error.
 const OWNER_REPORT_QUERY = `
+  WITH aggregated_metrics AS (
+    SELECT
+      obs.dish_id,
+      bundle.name AS dish_name,
+      
+      COUNT(DISTINCT obs.session_id) AS total_sessions,
+      
+      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' THEN obs.session_id END) AS open_eligible_sessions,
+      COUNT(CASE WHEN obs.event_type = 'dish_detail_opened' THEN 1 END) AS total_opens,
+      
+      COUNT(DISTINCT act.session_id) AS engaged_sessions,
+      
+      
+      COUNT(DISTINCT CASE WHEN svg.save_origin = 'direct' THEN svg.session_id END) AS saved_dishes
+      
+    FROM app_private.owner_observation_v1 obs
+    
+    LEFT JOIN app_private.published_menu_bundle bundle ON bundle.dish_id = obs.dish_id
+    
+    LEFT JOIN app_private.owner_opening_activity_v1 act ON act.event_id = obs.event_id
+    
+    LEFT JOIN app_private.dish_saved svg ON svg.dish_id = obs.dish_id AND svg.session_id = obs.session_id
+    
+    WHERE obs.tenant_id = $1  
+    GROUP BY obs.dish_id, bundle.name
+  )
   SELECT
-    v.dish_id, v.dish_name, v.total_sessions, v.open_eligible_sessions,
-    CASE WHEN v.total_sessions < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS active_sessions_status,
-    CASE WHEN v.total_sessions < 10 THEN NULL ELSE v.total_sessions END AS active_sessions_value,
-    CASE WHEN v.total_sessions < 10 THEN 'SUPPRESSED' WHEN v.total_sessions = 0 THEN 'NOT_MEASURABLE' ELSE 'NORMAL' END AS open_rate_status,
-    CASE WHEN v.total_sessions < 10 THEN NULL ELSE ROUND(CAST(v.total_opens AS NUMERIC) / v.total_sessions, 3) END AS open_rate_value,
-    CASE WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED' WHEN v.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' WHEN v.engaged_sessions = 0 THEN 'VALID_ZERO' ELSE 'NORMAL' END AS engagement_rate_status,
-    CASE WHEN v.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(v.engaged_sessions AS NUMERIC) / v.open_eligible_sessions, 3) END AS engagement_rate_value,
-    CASE WHEN v.open_eligible_sessions < 10 THEN 'SUPPRESSED' WHEN v.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' WHEN v.saved_dishes = 0 THEN 'VALID_ZERO' ELSE 'NORMAL' END AS save_rate_status,
-    CASE WHEN v.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(v.saved_dishes AS NUMERIC) / v.open_eligible_sessions, 3) END AS save_rate_value
-  FROM app_private.owner_observation_v1 v
-  WHERE v.venue_id = $1
+    am.dish_id,
+    am.dish_name,
+    
+    CASE WHEN am.total_sessions < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS active_sessions_status,
+    CASE WHEN am.total_sessions < 10 THEN NULL ELSE am.total_sessions END AS active_sessions_value,
+    
+    CASE 
+      WHEN am.total_sessions = 0 THEN 'NOT_MEASURABLE' 
+      WHEN am.total_sessions < 10 THEN 'SUPPRESSED' 
+      ELSE 'NORMAL' 
+    END AS open_rate_status,
+    CASE WHEN am.total_sessions < 10 THEN NULL ELSE ROUND(CAST(am.total_opens AS NUMERIC) / am.total_sessions, 3) END AS open_rate_value,
+
+    
+    CASE 
+      WHEN am.total_sessions < 10 THEN 'SUPPRESSED' 
+      WHEN am.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' 
+      WHEN am.open_eligible_sessions < 10 THEN 'SUPPRESSED' 
+      WHEN am.engaged_sessions = 0 THEN 'VALID_ZERO'
+      ELSE 'NORMAL' 
+    END AS engagement_rate_status,
+    CASE WHEN am.total_sessions < 10 OR am.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(am.engaged_sessions AS NUMERIC) / am.open_eligible_sessions, 3) END AS engagement_rate_value,
+
+  
+    CASE 
+      WHEN am.total_sessions < 10 THEN 'SUPPRESSED' 
+      WHEN am.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' 
+      WHEN am.open_eligible_sessions < 10 THEN 'SUPPRESSED' 
+      WHEN am.saved_dishes = 0 THEN 'VALID_ZERO'
+      ELSE 'NORMAL' 
+    END AS save_rate_status,
+    CASE WHEN am.total_sessions < 10 OR am.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(am.saved_dishes AS NUMERIC) / am.open_eligible_sessions, 3) END AS save_rate_value
+
+  FROM aggregated_metrics am;
 `;
 
 type ReportRow = Record<string, unknown>;
