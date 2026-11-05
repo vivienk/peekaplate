@@ -1138,3 +1138,62 @@ environment, then verify the exact pushed merge revision in GitHub CI.
 The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
 
 Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-10-31T21:38:10.001Z"},"status":"resolved","cause":"The new scripts/console-preview-demos.test.mjs was not run through the Biome formatter before pnpm check (one over-long line).","prevention":"Run pnpm format (or biome check --write) on new files before pnpm check.","regression":"Formatted the file; pnpm check passes."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T15:15:48.512Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T15:15:48.512Z"},"status":"resolved","cause":"S3-DIN-02.2 changed tests/e2e/save.spec.ts, which the diner context node lists, without refreshing the node; the first rewrite of the diner summary then exceeded the 1000-character limit, so context:refresh rejected it.","prevention":"Run the full pnpm check (not only lint/typecheck/test) before pushing, and keep node summaries under 1000 characters.","regression":"Condensed the diner summary to 850 characters, added the DIN-02.2 files to the node and refreshed fingerprints; pnpm context:check reports the context valid and fresh."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-31T21:38:51.084Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-10-31T21:38:51.084Z"},"status":"resolved","cause":"Formatting scripts/console-preview-demos.test.mjs after the context refresh changed a source listed in the delivery node, so its fingerprint was stale.","prevention":"Format first, then pnpm context:refresh, then pnpm check.","regression":"pnpm context:refresh followed by pnpm check passes."}
+```
+
+## November 4 Bundle context reconciliation
+
+The develop merge conflicted only in the context handoff list. Preserve the
+new tracking handoff and Bundle correction; retire the superseded pre-merge
+PR43 handoff to retain the ten-entry bound. Context refresh/check and direct
+documentation checks pass. A first refresh failed at eleven handoffs.
+`pnpm verify context:check docs:check` could not start because the Windows
+sandbox denied pnpm's project-store symlink. Source-pinned contract tests
+initially hit a temporary-directory rename denial; using a writable workspace
+TEMP/TMP passed all 58 cases. Biome does not process Markdown, so it is not
+Markdown validation. A first direct context invocation used the parent working
+directory; rerunning in the repository corrected that command-path mistake.
+Full frozen-install workspace validation remains delegated to Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T22:42:55.035Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
+```
+
+## 2026-11-04 — AI stack reconciliation verification
+
+Frozen installation in the Windows agent worktree failed before checks with
+EPERM while pnpm registered its project symlink. A workspace-local store gave
+the same result. Source-pinned Vitest, focused strict TypeScript and Biome,
+plus direct context/docs checks passed. Full workspace, database and browser
+checks require the pushed revision's Linux CI. RTK was unavailable.
