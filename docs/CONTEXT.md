@@ -361,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. posthog.ts adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, per-event property allowlist, separate visit ID, event_id as SDK uuid); unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -372,7 +372,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog-export.md",
         "docs/team-data-access.md",
         "scripts/verify-team-access.mjs",
-        "scripts/verify-team-access.test.mjs"
+        "scripts/verify-team-access.test.mjs",
+        "packages/analytics/src/posthog.ts",
+        "packages/analytics/src/posthog.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -385,7 +387,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "7d6a94d2d5ef8d1baca3ecab72327c2870b9b71ab19de615da0255646d035a3a"
+      "sourceFingerprint": "7c5d5295d7a778d771bcc87feb4fc2bd72afa6cb71516a40cdb1eb85f8a4e423"
     },
     {
       "id": "processing",

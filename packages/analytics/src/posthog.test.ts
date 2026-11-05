@@ -1,6 +1,12 @@
 import type { CaptureResult as PostHogEvent } from 'posthog-js/dist/module.slim.no-external';
 import { describe, expect, it, vi } from 'vitest';
-import { createPostHogAdapter, type PostHogSdk, toPostHogProperties } from './posthog';
+import {
+  createPostHogAdapter,
+  P0_EVENT_NAMES,
+  POSTHOG_PROPERTIES,
+  type PostHogSdk,
+  toPostHogProperties,
+} from './posthog';
 
 const env = {
   MODE: 'staging',
@@ -13,17 +19,7 @@ const env = {
 const origin = 'https://diner.example.test';
 
 const uuid = (n: number) => `11111111-1111-4111-8111-${String(n).padStart(12, '0')}`;
-const menuViewed = (n = 1, session = uuid(100)) => ({
-  schema_version: 'observation.v2',
-  event_id: uuid(n),
-  session_id: session,
-  producer_id: uuid(200),
-  local_sequence: n,
-  occurred_at: '2026-11-03T12:00:00.000Z',
-  publication_revision_id: uuid(300),
-  type: 'menu_viewed',
-  payload: { entry_source: 'direct_link' },
-});
+const menuViewed = { entry_source: 'direct_link' };
 
 type Config = { before_send: (e: PostHogEvent | null) => PostHogEvent | null } & Record<
   string,
@@ -55,72 +51,91 @@ function fakeSdk() {
   };
 }
 
-function setup(overrides: { privacy?: boolean; env?: Record<string, unknown> } = {}) {
+function setup(
+  overrides: { privacy?: boolean; live?: boolean; env?: Record<string, unknown> } = {},
+) {
   const fake = fakeSdk();
   const loadSdk = vi.fn(async () => fake.sdk);
   const adapter = createPostHogAdapter({ ...env, ...overrides.env }, 'diner', {
     origin,
     privacySignal: () => overrides.privacy ?? false,
+    isLive: () => overrides.live ?? true,
     loadSdk,
   });
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
   return { adapter, fake, loadSdk, flush };
 }
 
+const sdkEvent = (properties: Record<string, unknown>) =>
+  ({ uuid: uuid(1), event: 'menu_viewed', properties }) as PostHogEvent;
+
 describe('PostHog SDK adapter', () => {
   it('does nothing, and never downloads the SDK, before consent', async () => {
     const { adapter, loadSdk, flush } = setup();
-    expect(adapter.capture(menuViewed())).toBe('disabled');
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();
     expect(loadSdk).not.toHaveBeenCalled();
   });
 
   it('does not replay events from before consent', async () => {
     const { adapter, fake, flush } = setup();
-    adapter.capture(menuViewed(1));
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     adapter.setConsent(true);
-    expect(adapter.capture(menuViewed(2))).toBe('queued');
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(2) });
     await flush();
     expect(fake.captured.map((c) => c.props.event_id)).toEqual([uuid(2)]);
   });
 
-  it('is off when not configured for staging/production or when the browser asks for privacy', () => {
-    for (const setupResult of [
+  it('is off in fixture mode, when not configured, or when the browser asks for privacy', async () => {
+    for (const s of [
+      setup({ live: false }),
       setup({ env: { VITE_POSTHOG_ENABLED: 'false' } }),
       setup({ env: { VITE_POSTHOG_HOST: 'https://evil.example.test' } }),
       setup({ env: { MODE: 'development' } }),
       setup({ privacy: true }),
     ]) {
-      setupResult.adapter.setConsent(true);
-      expect(setupResult.adapter.capture(menuViewed())).toBe('disabled');
+      s.adapter.setConsent(true);
+      s.adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
+      await s.flush();
+      expect(s.loadSdk).not.toHaveBeenCalled();
+      expect(s.adapter.allowed()).toBe(false);
     }
   });
 
-  it('sends approved properties only, never the canonical envelope', async () => {
+  it('sends only event_id and approved payload fields, with event_id as the PostHog uuid', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
-    adapter.capture(menuViewed());
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();
     const [sent] = fake.captured;
     expect(sent?.name).toBe('menu_viewed');
-    expect(sent?.props).toEqual({
-      entry_source: 'direct_link',
-      publication_revision_id: uuid(300),
-      event_id: uuid(1),
-      schema_version: 'observation.v2',
-    });
-    expect(sent?.props).not.toHaveProperty('producer_id');
-    expect(sent?.props).not.toHaveProperty('local_sequence');
-    expect(sent?.props).not.toHaveProperty('session_id');
-    expect(sent?.options).toEqual({ timestamp: new Date('2026-11-03T12:00:00.000Z') });
+    expect(sent?.props).toEqual({ event_id: uuid(1), entry_source: 'direct_link' });
+    expect(sent?.options).toEqual({ uuid: uuid(1) });
   });
 
-  it('starts the SDK with every automatic collection feature off', async () => {
+  it('rejects payloads outside the shared contract, including envelope fields and the menu token', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
-    adapter.capture(menuViewed());
+    for (const payload of [
+      { entry_source: 'tiktok' },
+      { ...menuViewed, session_id: uuid(5) },
+      { ...menuViewed, menu_token: 'secret' },
+      { ...menuViewed, publication_revision_id: uuid(6) },
+    ]) {
+      adapter.capturePostHog('menu_viewed', payload, { eventId: uuid(1) });
+    }
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: 'not-a-uuid' });
     await flush();
-    expect(fake.config()).toMatchObject({
+    expect(fake.captured).toHaveLength(0);
+  });
+
+  it('starts the SDK with every automatic collection feature off and a separate visit ID', async () => {
+    const { adapter, fake, flush } = setup();
+    adapter.setConsent(true);
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
+    await flush();
+    const config = fake.config();
+    expect(config).toMatchObject({
       api_host: 'https://us.i.posthog.com',
       persistence: 'memory',
       person_profiles: 'never',
@@ -136,18 +151,19 @@ describe('PostHog SDK adapter', () => {
       save_referrer: false,
       save_campaign_params: false,
     });
+    const visit = (config.bootstrap as { distinctID: string }).distinctID;
+    expect(visit).toMatch(/^[0-9a-f-]{36}$/);
     expect(fake.sdk.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
   });
 
-  it('uses event_id as the PostHog uuid, the visit as distinct id, and sends only approved fields', async () => {
+  it('strips SDK defaults and person data, keeping only required SDK fields', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
-    adapter.capture(menuViewed(1, uuid(100)));
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();
+    const visit = (fake.config().bootstrap as { distinctID: string }).distinctID;
     const out = fake.config().before_send({
-      uuid: 'sdk-generated',
-      event: 'menu_viewed',
-      properties: {
+      ...sdkEvent({
         event_id: uuid(1),
         $current_url: 'https://diner.example.test/venues/x?src=qr',
         $referrer: 'https://search.example.test',
@@ -161,16 +177,16 @@ describe('PostHog SDK adapter', () => {
         $lib: 'web',
         $insert_id: 'abc',
         entry_source: 'direct_link',
-      },
+      }),
       $set: { email: 'never@example.test' },
     });
     expect(out?.uuid).toBe(uuid(1));
-    expect(out?.properties.distinct_id).toBe(uuid(100));
+    expect(out?.properties.distinct_id).toBe(visit);
     expect(out?.properties.$geoip_disable).toBe(true);
-    expect(out?.properties).not.toHaveProperty('$current_url');
-    expect(out?.properties).not.toHaveProperty('$referrer');
-    expect(out?.properties).not.toHaveProperty('$pathname');
     for (const leak of [
+      '$current_url',
+      '$referrer',
+      '$pathname',
       '$session_entry_url',
       '$session_entry_referrer',
       '$raw_user_agent',
@@ -190,51 +206,49 @@ describe('PostHog SDK adapter', () => {
   it('captures each event_id at most once, so repeated calls never double count', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
-    adapter.capture(menuViewed(1));
-    expect(adapter.capture(menuViewed(1))).toBe('duplicate');
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();
-    expect(adapter.capture(menuViewed(1))).toBe('duplicate');
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1).toUpperCase() });
     expect(fake.captured).toHaveLength(1);
   });
 
-  it('rejects events that do not match the shared observation contract', () => {
-    const { adapter } = setup();
-    adapter.setConsent(true);
-    expect(adapter.capture({ ...menuViewed(), payload: { entry_source: 'tiktok' } })).toBe(
-      'invalid',
-    );
-    expect(adapter.capture({ ...menuViewed(), menu_token: 'secret' })).toBe('invalid');
-  });
-
-  it('stops and drops queued events when consent is withdrawn', async () => {
+  it('stops, drops queued events and starts a new visit when consent is withdrawn', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
-    adapter.capture(menuViewed(1));
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     adapter.setConsent(false);
     await flush();
     expect(fake.captured).toHaveLength(0);
     expect(fake.sdk.init).not.toHaveBeenCalled();
 
     adapter.setConsent(true);
-    adapter.capture(menuViewed(2));
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(2) });
     await flush();
+    const firstVisit = fake.config().before_send(sdkEvent({}))?.properties.distinct_id;
     adapter.setConsent(false);
     expect(fake.sdk.opt_out_capturing).toHaveBeenCalled();
     expect(fake.sdk.reset).toHaveBeenCalled();
-    expect(adapter.capture(menuViewed(3))).toBe('disabled');
-    expect(
-      fake.config().before_send({ uuid: 'x', event: 'menu_viewed', properties: {} }),
-    ).toBeNull();
+    expect(fake.config().before_send(sdkEvent({}))).toBeNull();
+
+    adapter.setConsent(true);
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(3) });
+    expect(fake.captured.map((c) => c.props.event_id)).toEqual([uuid(2), uuid(3)]);
+    const secondVisit = fake.config().before_send(sdkEvent({}))?.properties.distinct_id;
+    expect(secondVisit).not.toBe(firstVisit);
   });
 
   it('never throws when the SDK fails to load or to capture', async () => {
     const failingLoad = createPostHogAdapter(env, 'diner', {
       origin,
       privacySignal: () => false,
+      isLive: () => true,
       loadSdk: () => Promise.reject(new Error('blocked by an ad blocker')),
     });
     failingLoad.setConsent(true);
-    expect(failingLoad.capture(menuViewed(1))).toBe('queued');
+    expect(() =>
+      failingLoad.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) }),
+    ).not.toThrow();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const { adapter, fake, flush } = setup();
@@ -242,25 +256,25 @@ describe('PostHog SDK adapter', () => {
       throw new Error('SDK error');
     });
     adapter.setConsent(true);
-    adapter.capture(menuViewed(1));
+    adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();
-    expect(adapter.capture(menuViewed(2))).toBe('failed');
+    expect(() =>
+      adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(2) }),
+    ).not.toThrow();
   });
 
-  it('maps every payload field through unchanged', () => {
-    const event = {
-      ...menuViewed(),
-      type: 'dish_saved' as const,
-      payload: {
-        dish_id: uuid(400),
-        dish_revision_id: uuid(401),
-        save_origin: 'undo' as const,
-        save_surface: 'dish_detail' as const,
-        shortlist_size: 2,
-      },
+  it('has an allowlist for every P0 event and keeps only listed fields', () => {
+    expect(Object.keys(POSTHOG_PROPERTIES).sort()).toEqual([...P0_EVENT_NAMES].sort());
+    const saved = {
+      dish_id: uuid(400),
+      dish_revision_id: uuid(401),
+      save_origin: 'undo',
+      save_surface: 'dish_detail',
+      shortlist_size: 2,
     };
-    expect(toPostHogProperties(event as Parameters<typeof toPostHogProperties>[0])).toMatchObject(
-      event.payload,
-    );
+    expect(toPostHogProperties('dish_saved', saved, uuid(1))).toEqual({
+      event_id: uuid(1),
+      ...saved,
+    });
   });
 });
