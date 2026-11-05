@@ -1697,6 +1697,146 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       expect(storedReports.has(failedJob!.result_storage_key!)).toBe(true);
     });
 
+    it('exhausts retries on continuous R2 failure, transitions job to failed, and routes redelivery to recovery/DLQ without premature ACK', async () => {
+      const jobId = crypto.randomUUID();
+      await createIngestionJob(runtimeClient, {
+        id: jobId,
+        tenantId: venueId,
+        sourceType: 'pdf',
+        sourceHash: 'b'.repeat(64),
+        sourceStorageKey: 'sources/test.pdf',
+        idempotencyKey: `idem_r2_exhaustion_${jobId}`,
+      });
+
+      const storedReports = new Map<string, string>();
+      const failingStorage = {
+        async put(_key: string, _data: string): Promise<void> {
+          throw new Error('R2 diagnostic put failed: 500 Internal Server Error');
+        },
+        async get(key: string): Promise<string | null> {
+          return storedReports.get(key) ?? null;
+        },
+      };
+
+      const failingReportExtractor = vi.fn().mockResolvedValue({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'failed',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [],
+        drafts: [],
+        evidence: [],
+        capture_requests: [],
+        warnings: [],
+        errors: ['OCR engine layout parse failure'],
+      });
+
+      // Deliveries 1 & 2: R2 storage fails, attempt_count < max_attempts (3), job is requeued and retried
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        let acked = false;
+        let retried = false;
+        const msg: QueueMessage<unknown> = {
+          id: `msg_r2_fail_${attempt}`,
+          body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+          ack: () => {
+            acked = true;
+          },
+          retry: () => {
+            retried = true;
+          },
+        };
+
+        const batchRes = await processIngestionQueueBatch(
+          runtimeClient,
+          { messages: [msg] },
+          failingReportExtractor,
+          { workerId: `worker_fail_${attempt}`, reportStorage: failingStorage },
+        );
+
+        expect(batchRes.acknowledged).toBe(0);
+        expect(batchRes.retried).toBe(1);
+        expect(acked).toBe(false);
+        expect(retried).toBe(true);
+
+        const currentJob = await getIngestionJob(runtimeClient, venueId, jobId);
+        expect(currentJob?.status).toBe('queued');
+        expect(currentJob?.attempt_count).toBe(attempt);
+        expect(currentJob?.result_storage_key).toBeNull();
+      }
+
+      // Delivery 3: attempt_count reaches max_attempts (3), R2 write fails, job transitions to terminal 'failed'
+      let acked3 = false;
+      let retried3 = false;
+      const msg3: QueueMessage<unknown> = {
+        id: 'msg_r2_fail_3',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          acked3 = true;
+        },
+        retry: () => {
+          retried3 = true;
+        },
+      };
+
+      const batchRes3 = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msg3] },
+        failingReportExtractor,
+        { workerId: 'worker_fail_3', reportStorage: failingStorage },
+      );
+
+      expect(batchRes3.acknowledged).toBe(0);
+      expect(batchRes3.retried).toBe(1);
+      expect(acked3).toBe(false);
+      expect(retried3).toBe(true);
+
+      const jobAtExhaustion = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(jobAtExhaustion?.status).toBe('failed');
+      expect(jobAtExhaustion?.attempt_count).toBe(3);
+      expect(jobAtExhaustion?.error_code).toBe('report_storage_failed');
+      expect(jobAtExhaustion?.result_storage_key).toBeNull();
+      expect(jobAtExhaustion?.finished_at).not.toBeNull();
+
+      // Delivery 4: Redelivery of exhausted message when DB says failed but required archive is absent
+      // Required invariant: Must NOT silently ACK! Must route to retry/recovery toward DLQ!
+      let acked4 = false;
+      let retried4 = false;
+      const msg4: QueueMessage<unknown> = {
+        id: 'msg_r2_fail_4',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: () => {
+          acked4 = true;
+        },
+        retry: () => {
+          retried4 = true;
+        },
+      };
+
+      const batchRes4 = await processIngestionQueueBatch(
+        runtimeClient,
+        { messages: [msg4] },
+        failingReportExtractor,
+        { workerId: 'worker_fail_4', reportStorage: failingStorage },
+      );
+
+      expect(batchRes4.acknowledged).toBe(0);
+      expect(batchRes4.retried).toBe(1);
+      expect(acked4).toBe(false);
+      expect(retried4).toBe(true);
+      expect(batchRes4.errors).toHaveLength(1);
+      expect(batchRes4.errors[0]?.error).toContain('Failed to persist extraction report artifact');
+
+      // Final state: no false archive-success state, result_storage_key remains null, archive absent
+      const finalJob = await getIngestionJob(runtimeClient, venueId, jobId);
+      expect(finalJob?.status).toBe('failed');
+      expect(finalJob?.attempt_count).toBe(3);
+      expect(finalJob?.result_storage_key).toBeNull();
+      expect(storedReports.size).toBe(0);
+    });
+
     it('persists and validates valid OCR box evidence from PR #58 with fractional coordinates in dish_drafts', async () => {
       const jobId = crypto.randomUUID();
       await createIngestionJob(runtimeClient, {

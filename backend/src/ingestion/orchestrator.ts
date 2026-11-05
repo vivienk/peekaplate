@@ -281,6 +281,35 @@ export async function executeIngestionWorkflow(
         activeLeaseRetryDelaySeconds(existing.locked_at, leaseTimeoutMinutes),
       );
     }
+
+    // A report must not be treated as successfully processed/terminally ACKable when the required R2 archive has never been created.
+    if (params.reportStorage) {
+      let archiveMissing = !existing.result_storage_key;
+      if (!archiveMissing && params.reportStorage.get && existing.result_storage_key) {
+        try {
+          const archived = await params.reportStorage.get(existing.result_storage_key);
+          if (!archived) {
+            archiveMissing = true;
+          }
+        } catch {
+          archiveMissing = true;
+        }
+      }
+      if (archiveMissing) {
+        throw new IngestionError(
+          'report_storage_failed',
+          500,
+          `Failed to persist extraction report artifact: required R2 archive is missing for job ${params.jobId}`,
+        );
+      }
+    } else if (existing.status === 'failed' && existing.error_code === 'report_storage_failed') {
+      throw new IngestionError(
+        'report_storage_failed',
+        500,
+        `Failed to persist extraction report artifact: required R2 archive is missing for job ${params.jobId}`,
+      );
+    }
+
     throw new IngestionError(
       'job_already_complete',
       409,
@@ -538,18 +567,19 @@ export async function processIngestionQueueBatch(
       } else if (
         workflowOutcome.job.status === 'complete' ||
         workflowOutcome.job.status === 'incomplete' ||
-        workflowOutcome.job.status === 'failed'
+        (workflowOutcome.job.status === 'failed' &&
+          (!options?.reportStorage || workflowOutcome.job.result_storage_key !== null))
       ) {
         msg.ack();
         acknowledged += 1;
         processed += 1;
       } else {
-        // Any non-terminal state (e.g. 'running' due to lost lease / race condition) must NEVER be ACKed
+        // Any non-terminal or unarchived state must NEVER be ACKed
         msg.retry();
         retried += 1;
         errors.push({
           jobId,
-          error: `Job ${jobId} ended workflow in non-terminal status '${workflowOutcome.job.status}'; retrying queue delivery`,
+          error: `Job ${jobId} ended workflow in unarchived or non-terminal status '${workflowOutcome.job.status}'; retrying queue delivery`,
         });
       }
     } catch (err: unknown) {
@@ -580,7 +610,8 @@ export async function processIngestionQueueBatch(
               existing &&
               (existing.status === 'complete' ||
                 existing.status === 'incomplete' ||
-                existing.status === 'failed')
+                (existing.status === 'failed' &&
+                  (!options?.reportStorage || existing.result_storage_key !== null)))
             ) {
               msg.ack();
               acknowledged += 1;
@@ -611,6 +642,20 @@ export async function processIngestionQueueBatch(
           continue;
         }
         if (err.code === 'job_already_complete' || err.code === 'job_already_locked_or_complete') {
+          if (options?.reportStorage) {
+            try {
+              const existing = await getIngestionJob(client, tenantId, jobId);
+              if (existing && existing.status === 'failed' && !existing.result_storage_key) {
+                msg.retry();
+                retried += 1;
+                errors.push({
+                  jobId,
+                  error: `Failed to persist extraction report artifact: required R2 archive is missing for job ${jobId}`,
+                });
+                continue;
+              }
+            } catch {}
+          }
           // Duplicate queue delivery for completed or terminal job: ACK safely
           msg.ack();
           acknowledged += 1;

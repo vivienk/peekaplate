@@ -63,6 +63,7 @@ function createMockClient() {
         store.job.claim_token = '00000000-0000-0000-0000-000000000999';
         store.job.lease_generation = '1';
         store.job.locked_at = new Date().toISOString();
+        store.job.attempt_count = (store.job.attempt_count ?? 0) + 1;
         return {
           rows: [
             {
@@ -1304,6 +1305,159 @@ describe('Ingestion Orchestrator', () => {
       ).rejects.toMatchObject({
         code: 'report_storage_failed',
       });
+    });
+
+    it('Test E — exhausts retries on continuous R2 archive failure, transitions job to failed, and routes redelivery to recovery/DLQ without silent ACK', async () => {
+      const { client, store } = createMockClient();
+      const venueId = crypto.randomUUID();
+      const jobId = crypto.randomUUID();
+      store.job = {
+        id: jobId,
+        tenant_id: venueId,
+        source_type: 'pdf',
+        source_url: null,
+        source_hash: 'f'.repeat(64),
+        source_storage_key: `menu-ingestion/sources/${venueId}/${jobId}/source`,
+        result_storage_key: null,
+        idempotency_key: 'idem_r2_exhaustion_test',
+        status: 'queued',
+        attempt_count: 0,
+        max_attempts: 3,
+        claim_token: null,
+        lease_generation: '0',
+        locked_at: null,
+        locked_by: null,
+        error_code: null,
+        error_details: null,
+        draft_count: 0,
+        created_at: new Date().toISOString(),
+        started_at: null,
+        finished_at: null,
+      };
+
+      const storageMap = new Map<string, string>();
+      const failingStorage = {
+        async put(_key: string, _data: string) {
+          throw new Error('R2 write error: 500 Internal Server Error');
+        },
+        async get(key: string) {
+          return storageMap.get(key) ?? null;
+        },
+      };
+
+      const extractor = async () => ({
+        schema_version: 1,
+        pipeline_version: '2',
+        status: 'complete',
+        source: null,
+        started_at: '2026-10-24T12:00:00.000Z',
+        finished_at: '2026-10-24T12:00:02.000Z',
+        extraction_mode: 'layout',
+        segments: [],
+        drafts: [
+          {
+            name: 'Pancakes',
+            description: null,
+            category: 'Breakfast',
+            price_amount: '10.00',
+            price_currency: 'USD',
+            ingredients: [],
+            source_id: 'src_1',
+            source_text: 'Pancakes $10.00',
+            image_id: null,
+            review_warnings: [],
+            status: 'needs_review' as const,
+          },
+        ],
+        evidence: [],
+        capture_requests: [],
+        warnings: [],
+        errors: [],
+      });
+
+      // Attempt 1: Initial delivery, R2 archive fails, job retries
+      const msg1: QueueMessage<unknown> = {
+        id: 'msg_exhaust_1',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+      const res1 = await processIngestionQueueBatch(client, { messages: [msg1] }, extractor, {
+        workerId: 'worker_exhaust_1',
+        reportStorage: failingStorage,
+      });
+      expect(res1.acknowledged).toBe(0);
+      expect(res1.retried).toBe(1);
+      expect(msg1.ack).not.toHaveBeenCalled();
+      expect(msg1.retry).toHaveBeenCalledTimes(1);
+      expect(store.job?.status).toBe('queued');
+      expect(store.job?.attempt_count).toBe(1);
+      expect(store.job?.result_storage_key).toBeNull();
+      expect(storageMap.size).toBe(0);
+
+      // Attempt 2: Second delivery, R2 archive fails again, job retries
+      const msg2: QueueMessage<unknown> = {
+        id: 'msg_exhaust_2',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+      const res2 = await processIngestionQueueBatch(client, { messages: [msg2] }, extractor, {
+        workerId: 'worker_exhaust_2',
+        reportStorage: failingStorage,
+      });
+      expect(res2.acknowledged).toBe(0);
+      expect(res2.retried).toBe(1);
+      expect(msg2.ack).not.toHaveBeenCalled();
+      expect(msg2.retry).toHaveBeenCalledTimes(1);
+      expect(store.job?.status).toBe('queued');
+      expect(store.job?.attempt_count).toBe(2);
+      expect(store.job?.result_storage_key).toBeNull();
+
+      // Attempt 3: Max attempts reached (3 of 3), R2 archive fails, job transitions to terminal 'failed'
+      const msg3: QueueMessage<unknown> = {
+        id: 'msg_exhaust_3',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+      const res3 = await processIngestionQueueBatch(client, { messages: [msg3] }, extractor, {
+        workerId: 'worker_exhaust_3',
+        reportStorage: failingStorage,
+      });
+      expect(res3.acknowledged).toBe(0);
+      expect(res3.retried).toBe(1);
+      expect(msg3.ack).not.toHaveBeenCalled();
+      expect(msg3.retry).toHaveBeenCalledTimes(1);
+      expect(store.job?.status).toBe('failed');
+      expect(store.job?.attempt_count).toBe(3);
+      expect(store.job?.error_code).toBe('report_storage_failed');
+      expect(store.job?.result_storage_key).toBeNull();
+
+      // Subsequent delivery (Attempt 4): Consumer sees exhausted/failed state without required archive
+      // Invariant: Must NOT silently ACK! Must route to retry/recovery toward DLQ!
+      const msg4: QueueMessage<unknown> = {
+        id: 'msg_exhaust_4',
+        body: { version: 1, tenantId: venueId, jobId, queuedAt: new Date().toISOString() },
+        ack: vi.fn(),
+        retry: vi.fn(),
+      };
+      const res4 = await processIngestionQueueBatch(client, { messages: [msg4] }, extractor, {
+        workerId: 'worker_exhaust_4',
+        reportStorage: failingStorage,
+      });
+      expect(res4.acknowledged).toBe(0);
+      expect(res4.retried).toBe(1);
+      expect(msg4.ack).not.toHaveBeenCalled();
+      expect(msg4.retry).toHaveBeenCalledTimes(1);
+      expect(res4.errors).toHaveLength(1);
+      expect(res4.errors[0]?.error).toContain('Failed to persist extraction report artifact');
+
+      // Final state invariant check: no false "archived successfully" state
+      expect(store.job?.status).toBe('failed');
+      expect(store.job?.attempt_count).toBe(3);
+      expect(store.job?.result_storage_key).toBeNull();
+      expect(storageMap.size).toBe(0);
     });
   });
 });
