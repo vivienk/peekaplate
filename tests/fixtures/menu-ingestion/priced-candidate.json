@@ -1,0 +1,33 @@
+{
+  "draft_id": "draft:pasta_priced",
+  "candidate_id": "cand:pasta_priced",
+  "draft_index": 0,
+  "name": "Rigatoni Bolognese",
+  "description": "Slow-braised beef ragu with parmigiano",
+  "category": "Pastas",
+  "subcategory": "Fresh Pasta",
+  "category_page_number": 2,
+  "price_text": "22.50 USD",
+  "price_amount": "22.50",
+  "price_currency": "USD",
+  "ingredients": ["rigatoni", "beef", "tomatoes", "parmigiano"],
+  "source_id": "src_doc_single",
+  "source_text": "Rigatoni Bolognese 22.50 USD",
+  "image_id": null,
+  "code_point_spans": [
+    {
+      "segment_id": "seg_pasta",
+      "start": 0,
+      "end": 28
+    }
+  ],
+  "utf16_spans": [
+    {
+      "segment_id": "seg_pasta",
+      "start": 0,
+      "end": 28
+    }
+  ],
+  "review_warnings": [],
+  "status": "needs_review"
+}
