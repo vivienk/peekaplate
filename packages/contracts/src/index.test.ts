@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ApproveDishDraftRequestSchema,
   ApproveMenuRevisionSchema,
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
@@ -7,6 +8,13 @@ import {
   classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  ExtractionBoxCoordinatesSchema,
+  ExtractionBoxEvidenceSchema,
+  ExtractionDishDraftSchema,
+  ExtractionDraftEvidenceSchema,
+  ExtractionSourceRecordSchema,
+  ExtractionSourceSegmentSchema,
+  ExtractionSourceSpanSchema,
   FIVE_MINUTES_MICROS,
   HealthResponseSchema,
   MAX_AGGREGATE_PASSAGE_CHARS,
@@ -14,6 +22,8 @@ import {
   MAX_PASSAGES,
   MENU_TOKEN_AUDIENCE,
   MENU_TOKEN_TTL_SECONDS,
+  MenuExtractionResultSchema,
+  MenuIngestionQueueMessageSchema,
   MenuPublicationSchema,
   ObservationBatchV2Schema,
   ObservationConflictQueueMessageSchema,
@@ -31,6 +41,8 @@ import {
   parseIsoToMicroseconds,
   RetrievalRequestSchema,
   SourceReferenceSchema,
+  StructuredDishDraftSchema,
+  SubmitMenuIngestionRequestSchema,
   sha256,
   TWENTY_FOUR_HOURS_MICROS,
   toCanonicalObservation,
@@ -734,6 +746,498 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       retrieved_at: '2026-10-22T20:00:00.000Z',
     };
     expect(SourceReferenceSchema.safeParse(refWithProvenance).success).toBe(true);
+  });
+
+  describe('S3-VIS-01 / VIS-02 menu extraction and structured draft contracts', () => {
+    const validSpan = {
+      segment_id: 'seg_page_1',
+      start: 0,
+      end: 12,
+    };
+
+    const validEvidence = {
+      draft_id: 'draft:abc123def456',
+      draft_index: 0,
+      spans: [validSpan],
+    };
+
+    const validDishDraft = {
+      name: 'Tomato Soup',
+      description: 'Fresh tomatoes, onion, and basil',
+      category: 'Starters',
+      price_amount: '8.50',
+      price_currency: 'CAD',
+      ingredients: ['tomatoes', 'onion', 'basil'],
+      source_id: 'src_doc_1',
+      source_text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+      image_id: null,
+      review_warnings: ['Verify price grounding.'],
+      status: 'needs_review' as const,
+    };
+
+    const validSourceRecord = {
+      source_id: 'src_doc_1',
+      sha256: 'a'.repeat(64),
+      kind: 'pdf' as const,
+      location: 'https://example.com/menu.pdf',
+      retrieved_at: '2026-10-24T12:00:00.000Z',
+      size_bytes: 1024,
+      snapshot_base64: 'c29tZSBwZGYgY29udGVudA==',
+    };
+
+    const validSegment = {
+      segment_id: 'seg_page_1',
+      page_number: 1,
+      method: 'pdf_native' as const,
+      status: 'ready' as const,
+      text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+      native_text: null,
+      error: null,
+      warnings: [],
+      metadata: {},
+    };
+
+    const validExtractionResult = {
+      schema_version: 1 as const,
+      pipeline_version: '2' as const,
+      status: 'complete' as const,
+      source: validSourceRecord,
+      started_at: '2026-10-24T12:00:00.000Z',
+      finished_at: '2026-10-24T12:00:05.000Z',
+      extraction_mode: 'ai' as const,
+      extraction_model: 'chatgpt-4o-latest',
+      ocr_engine: 3 as const,
+      library_versions: { pymupdf: '1.24.0' },
+      configuration: { batch_pages: 10 },
+      segments: [validSegment],
+      drafts: [validDishDraft],
+      evidence: [validEvidence],
+      capture_requests: [],
+      warnings: [],
+      errors: [],
+    };
+
+    it('validates a complete extraction result from the merged Python producer', () => {
+      const parsed = MenuExtractionResultSchema.parse(validExtractionResult);
+      expect(parsed.schema_version).toBe(1);
+      expect(parsed.pipeline_version).toBe('2');
+      expect(parsed.status).toBe('complete');
+      expect(parsed.drafts).toHaveLength(1);
+      expect(parsed.drafts[0]?.name).toBe('Tomato Soup');
+      expect(parsed.drafts[0]?.price_amount).toBe('8.50');
+      expect(parsed.drafts[0]?.status).toBe('needs_review');
+    });
+
+    it('preserves null and unknown fields on minimal drafts without fabricating values', () => {
+      const minimalDraft = {
+        name: 'Daily Special',
+        source_id: 'src_doc_1',
+        source_text: 'Daily Special — market price',
+      };
+      const parsed = ExtractionDishDraftSchema.parse(minimalDraft);
+      expect(parsed.description).toBeNull();
+      expect(parsed.category).toBeNull();
+      expect(parsed.price_amount).toBeNull();
+      expect(parsed.price_currency).toBeNull();
+      expect(parsed.ingredients).toBeNull();
+      expect(parsed.image_id).toBeNull();
+      expect(parsed.review_warnings).toEqual([]);
+      expect(parsed.status).toBe('needs_review');
+    });
+
+    it('preserves zero-price and large decimal string prices without precision loss', () => {
+      const draftZero = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: '0.00',
+      });
+      expect(draftZero.price_amount).toBe('0.00');
+
+      const draftThousands = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: '1200.50',
+      });
+      expect(draftThousands.price_amount).toBe('1200.50');
+
+      // Numeric input is normalized to string representation
+      const draftNumeric = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: 14.99,
+      });
+      expect(draftNumeric.price_amount).toBe('14.99');
+    });
+
+    it('accepts supported versions (1/2 and 2/3) and rejects unsupported versions', () => {
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 1,
+          pipeline_version: '2',
+        }).success,
+      ).toBe(true);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 2,
+          pipeline_version: '3',
+        }).success,
+      ).toBe(true);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 99,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          pipeline_version: '4',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects unauthorized approval or published status on drafts', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          status: 'approved',
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          status: 'published',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects malformed source spans where start >= end or negative', () => {
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: 5,
+          end: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: 10,
+          end: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: -1,
+          end: 5,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects invalid currency patterns and negative prices', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_currency: 'cad', // must be uppercase
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_currency: '$', // not ISO 3-letter
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_amount: '-5.00',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects extra unexpected fields under strict schema enforcement', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          unexpected_extra_field: 'unsupported',
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          model_confidence: 0.99, // unsupported confidence field
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates persistence-ready StructuredDishDraft structure', () => {
+      const structuredDraft = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        name: 'Tomato Soup',
+        description: 'Fresh tomatoes, onion, and basil',
+        category: 'Starters',
+        price_amount: '8.50',
+        price_currency: 'CAD',
+        ingredients: ['tomatoes', 'onion', 'basil'],
+        source_id: 'src_doc_1',
+        source_text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+        image_id: null,
+        code_point_spans: [validSpan],
+        utf16_spans: [validSpan],
+        review_warnings: ['Verify price grounding.'],
+        status: 'needs_review' as const,
+      };
+
+      const parsed = StructuredDishDraftSchema.parse(structuredDraft);
+      expect(parsed.draft_id).toBe('draft:abc123def456');
+      expect(parsed.price_amount).toBe('8.50');
+      expect(parsed.status).toBe('needs_review');
+    });
+
+    it('validates SubmitMenuIngestionRequestSchema and ApproveDishDraftRequestSchema', () => {
+      const validSubmission = {
+        sourceType: 'url' as const,
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'key_123',
+      };
+      expect(SubmitMenuIngestionRequestSchema.parse(validSubmission)).toEqual(validSubmission);
+
+      expect(
+        SubmitMenuIngestionRequestSchema.safeParse({
+          sourceType: 'url',
+          sourceUrl: 'not-a-url',
+          idempotencyKey: 'key_123',
+        }).success,
+      ).toBe(false);
+
+      const validApproval = {
+        commandId: '0199b409-a700-7000-8000-000000000001',
+        expectedVersion: 0,
+      };
+      expect(ApproveDishDraftRequestSchema.parse(validApproval)).toEqual(validApproval);
+      expect(ApproveDishDraftRequestSchema.safeParse({}).success).toBe(false);
+      expect(ApproveDishDraftRequestSchema.safeParse({ expectedVersion: 0 }).success).toBe(false);
+      expect(
+        ApproveDishDraftRequestSchema.safeParse({
+          commandId: 'not-a-uuid',
+          expectedVersion: 0,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates valid OCR box evidence from PR #58 and retains fractional bounding boxes', () => {
+      const validBox = {
+        left: 10.25,
+        top: 20.0,
+        width: 30.5,
+        height: 12.0,
+      };
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: validBox,
+      };
+
+      // Valid Box Coordinates
+      expect(ExtractionBoxCoordinatesSchema.parse(validBox)).toEqual(validBox);
+
+      // Valid Box Evidence
+      expect(ExtractionBoxEvidenceSchema.parse(validBoxRecord)).toEqual(validBoxRecord);
+
+      // Valid Draft Evidence with box_evidence
+      const evidenceWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        spans: [validSpan],
+        box_evidence: [validBoxRecord],
+      };
+      expect(ExtractionDraftEvidenceSchema.parse(evidenceWithBox)).toEqual(evidenceWithBox);
+
+      // Extraction result with box_evidence parses cleanly
+      const resultWithBox = {
+        ...validExtractionResult,
+        evidence: [evidenceWithBox],
+      };
+      const parsed = MenuExtractionResultSchema.parse(resultWithBox);
+      expect(parsed.evidence[0]?.box_evidence).toHaveLength(1);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.left).toBe(10.25);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.width).toBe(30.5);
+
+      // Persistence StructuredDishDraft with box_evidence
+      const structuredWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        name: 'Tomato Soup',
+        description: null,
+        category: null,
+        price_amount: '8.50',
+        price_currency: 'CAD',
+        ingredients: null,
+        source_id: 'src_doc_1',
+        source_text: 'Tomato Soup 8.50 CAD',
+        image_id: null,
+        code_point_spans: [validSpan],
+        utf16_spans: [validSpan],
+        box_evidence: [validBoxRecord],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      };
+      expect(StructuredDishDraftSchema.parse(structuredWithBox).box_evidence).toEqual([
+        validBoxRecord,
+      ]);
+    });
+
+    it('rejects malformed OCR box evidence according to the strict contract', () => {
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: {
+          left: 10.25,
+          top: 20.0,
+          width: 30.5,
+          height: 12.0,
+        },
+      };
+
+      // Missing required coordinate
+      const missingLeft = { ...validBoxRecord, box: { top: 20, width: 30, height: 12 } };
+      expect(ExtractionBoxEvidenceSchema.safeParse(missingLeft).success).toBe(false);
+
+      // Invalid coordinate types
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: '10.25' },
+        }).success,
+      ).toBe(false);
+
+      // Non-finite coordinates (NaN / Infinity)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: Number.NaN },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: Number.POSITIVE_INFINITY },
+        }).success,
+      ).toBe(false);
+
+      // Negative coordinates
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: -1 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, top: -0.5 },
+        }).success,
+      ).toBe(false);
+
+      // Zero or negative width / height
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: 0 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, height: -5 },
+        }).success,
+      ).toBe(false);
+
+      // Invalid page_number (must be integer >= 1)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 0 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: -1 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 1.5 }).success,
+      ).toBe(false);
+
+      // Invalid saved_region_index (must be integer >= 0)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: -1 })
+          .success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: 0.5 })
+          .success,
+      ).toBe(false);
+
+      // Blank or control characters in text
+      expect(ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '' }).success).toBe(
+        false,
+      );
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '   ' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\n50' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\x7f50' }).success,
+      ).toBe(false);
+
+      // Extra unexpected fields forbidden under strict schema
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, extra_coord: 100 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          unexpected_extra_prop: 'rejected',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates MenuIngestionQueueMessageSchema', () => {
+      const validQueueMessage = {
+        version: 1 as const,
+        tenantId: '0199b409-a700-7000-8000-000000000001',
+        jobId: '0199b409-a700-7000-8000-000000000002',
+        queuedAt: new Date().toISOString(),
+      };
+      expect(MenuIngestionQueueMessageSchema.parse(validQueueMessage)).toEqual(validQueueMessage);
+
+      expect(
+        MenuIngestionQueueMessageSchema.safeParse({
+          ...validQueueMessage,
+          version: 2,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        MenuIngestionQueueMessageSchema.safeParse({
+          ...validQueueMessage,
+          tenantId: 'not-a-uuid',
+        }).success,
+      ).toBe(false);
+    });
   });
 });
 
