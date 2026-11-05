@@ -212,6 +212,200 @@ test('a stale tab never wipes saves made in another tab of the same restaurant',
   ]);
 });
 
+// S3-DIN-02.2: hearts, badge, Undo and toasts on real elements. The page stands in for the screens:
+// two hearts for the same dish (card and detail), the header badge and a toast area.
+async function openSaveUi(page: Page) {
+  await page.goto(DINER);
+  await page.evaluate(async () => {
+    const load = (path: string) => import(/* @vite-ignore */ path);
+    const { createSaveState } = await load('/src/save/save-state.ts');
+    const { mountSaveHeart, mountSaveBadge, mountToastArea } = await load('/src/save/mount.ts');
+    const fixtures = await load('/src/menu/fixtures.ts');
+    const { toMenu } = await load('/src/menu/adapter.ts');
+    const result = toMenu(
+      fixtures.edgeCaseBundle,
+      'fixture',
+      fixtures.FIXTURE_PUBLICATION_REVISION_ID,
+    );
+    const menu = result.menu;
+    const dish = menu.categories
+      .flatMap((c: { dishes: { dishId: string }[] }) => c.dishes)
+      .find((d: { dishId: string }) => d.dishId === fixtures.DISH.avocadoToast);
+    const saveState = createSaveState({ venueId: menu.venueId });
+    saveState.reconcile(menu);
+    document.body.innerHTML = `
+      <header><span class="badge" data-testid="badge"></span></header>
+      <div class="pp-toast-area" aria-live="polite" aria-atomic="true" data-testid="toasts"></div>
+      <button type="button" aria-label="Save Avocado Toast" data-testid="card-heart">♡</button>
+      <button type="button" aria-label="Save Avocado Toast" data-testid="detail-heart">♡</button>
+      <p data-testid="elsewhere">Elsewhere</p>`;
+    const events: [string, Record<string, unknown>][] = [];
+    const send = (name: string, payload: Record<string, unknown>) => events.push([name, payload]);
+    const q = (id: string) => document.querySelector(`[data-testid="${id}"]`);
+    const stopToasts = mountToastArea(q('toasts'), saveState);
+    mountSaveBadge(q('badge'), saveState);
+    mountSaveHeart(q('card-heart'), { saveState, menu, dish, surface: 'menu_card', send });
+    mountSaveHeart(q('detail-heart'), { saveState, menu, dish, surface: 'dish_detail', send });
+    // Navigation for the remount tests: the current screen's toast area goes away and the next
+    // screen mounts its own.
+    const navigate = (firstMountNext: boolean) => {
+      const next = document.createElement('div');
+      next.className = 'pp-toast-area';
+      next.setAttribute('aria-live', 'polite');
+      next.setAttribute('aria-atomic', 'true');
+      next.dataset.testid = 'next-toasts';
+      const old = q('toasts');
+      const mountNext = () => {
+        document.body.append(next);
+        mountToastArea(next, saveState);
+      };
+      if (firstMountNext) mountNext();
+      stopToasts();
+      old?.remove();
+      if (!firstMountNext) mountNext();
+    };
+    Object.assign(window, { saveEvents: events, navigate });
+  });
+}
+
+const navigateTo = (page: Page, firstMountNext = false) =>
+  page.evaluate(
+    (first) => (window as unknown as { navigate(first: boolean): void }).navigate(first),
+    firstMountNext,
+  );
+
+const sentEvents = (page: Page) =>
+  page.evaluate(() =>
+    (window as unknown as { saveEvents: [string, Record<string, unknown>][] }).saveEvents.map(
+      ([name, payload]) => ({ name, ...payload }),
+    ),
+  );
+
+test('a heart saves and unsaves, and every heart and the badge stay in sync', async ({ page }) => {
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  const detail = page.getByTestId('detail-heart');
+  const badge = page.getByTestId('badge');
+  await expect(card).toHaveAttribute('aria-pressed', 'false');
+  await expect(badge).toBeHidden();
+
+  await card.click();
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  await expect(detail).toHaveAttribute('aria-pressed', 'true');
+  await expect(badge).toHaveText('1');
+  await expect(badge).toBeVisible();
+
+  await detail.click();
+  await expect(card).toHaveAttribute('aria-pressed', 'false');
+  await expect(badge).toBeHidden();
+  expect((await sentEvents(page)).map((e) => [e.name, e.save_surface ?? e.unsave_surface])).toEqual(
+    [
+      ['dish_saved', 'menu_card'],
+      ['dish_unsaved', 'dish_detail'],
+    ],
+  );
+});
+
+test('unsave shows the removed toast; Undo by keyboard restores the dish and shows the restored toast', async ({
+  page,
+}) => {
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  const toasts = page.getByTestId('toasts');
+  await card.click();
+  await card.click();
+  await expect(toasts).toContainText('Removed from Saved');
+
+  // Tapping elsewhere does not dismiss it.
+  await page.getByTestId('elsewhere').click();
+  await expect(toasts).toContainText('Removed from Saved');
+
+  const undo = toasts.getByRole('button', { name: 'Undo' });
+  await undo.focus();
+  await page.keyboard.press('Enter');
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  await expect(toasts).toContainText('Added back to Saved');
+  await expect(toasts.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+
+  const events = await sentEvents(page);
+  expect(events.map((e) => [e.name, e.save_origin ?? null])).toEqual([
+    ['dish_saved', 'direct'],
+    ['dish_unsaved', null],
+    ['dish_saved', 'undo'],
+  ]);
+  await expect(toasts).toHaveAttribute('aria-live', 'polite');
+});
+
+// Sai's review (4 Nov): the toast and its Undo follow the diner to the next screen and still
+// expire at the original deadline, with no extra event.
+test('Undo survives moving to another screen and still expires at the original deadline', async ({
+  page,
+}) => {
+  await page.clock.install();
+  // Only runFor advances the expiry clock; navigation/assertion wall time must not consume it.
+  await page.clock.pauseAt(new Date(Date.now() + 60_000));
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  await card.click();
+  await card.click();
+  await page.clock.runFor(2000);
+
+  // The old screen's area unmounts first, then the next screen mounts its own.
+  await navigateTo(page);
+  const next = page.getByTestId('next-toasts');
+  await expect(page.getByTestId('toasts')).toHaveCount(0);
+  await expect(next).toContainText('Removed from Saved');
+  await expect(next.getByRole('button', { name: 'Undo' })).toBeVisible();
+
+  await page.clock.runFor(2900);
+  await expect(next).toContainText('Removed from Saved');
+  await page.clock.runFor(200);
+  await expect(next).toBeEmpty();
+  expect((await sentEvents(page)).map((e) => e.name)).toEqual(['dish_saved', 'dish_unsaved']);
+});
+
+test('Undo still works after moving screens, in either mount order', async ({ page }) => {
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  await card.click();
+  await card.click();
+
+  // The next screen mounts before the old one unmounts.
+  await navigateTo(page, true);
+  const next = page.getByTestId('next-toasts');
+  await next.getByRole('button', { name: 'Undo' }).click();
+  await expect(next).toContainText('Added back to Saved');
+  await expect(card).toHaveAttribute('aria-pressed', 'true');
+  expect((await sentEvents(page)).map((e) => [e.name, e.save_origin ?? null])).toEqual([
+    ['dish_saved', 'direct'],
+    ['dish_unsaved', null],
+    ['dish_saved', 'undo'],
+  ]);
+});
+
+test('the removed toast disappears after 5 seconds and the restored toast after 3', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await openSaveUi(page);
+  const card = page.getByTestId('card-heart');
+  const toasts = page.getByTestId('toasts');
+  await card.click();
+  await card.click();
+  await page.clock.runFor(4900);
+  await expect(toasts).toContainText('Removed from Saved');
+  await page.clock.runFor(200);
+  await expect(toasts).toBeEmpty();
+
+  await card.click();
+  await card.click();
+  await toasts.getByRole('button', { name: 'Undo' }).click();
+  await page.clock.runFor(2900);
+  await expect(toasts).toContainText('Added back to Saved');
+  await page.clock.runFor(200);
+  await expect(toasts).toBeEmpty();
+});
+
 // Sai's review (2 Nov): in a tab where reading storage fails but writing still works, a save must
 // not write that tab's stale list over another tab's saves.
 test("a tab that cannot read storage never overwrites another tab's saves", async ({ context }) => {
