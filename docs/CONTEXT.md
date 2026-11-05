@@ -66,7 +66,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side while keeping comparison_id, and build a payload without sending it. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without tracking backfill. The shared track() placeholder and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering still require integration. See docs/posthog.md for activation limits. Icon lookups map approved allergen/dietary values and ingredient names to Figma assets; fixtures include a synthetic logo. Icons are not wired to screens.",
+      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without backfill. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s) and sends Save events only for committed writes. track() and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering need integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -100,7 +100,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/compare/comparison.ts",
         "frontend/diner/src/compare/comparison.test.ts",
         "frontend/diner/src/menu/icons.ts",
-        "frontend/diner/src/menu/icons.test.ts"
+        "frontend/diner/src/menu/icons.test.ts",
+        "frontend/diner/src/save/events.ts",
+        "frontend/diner/src/save/feedback.ts",
+        "frontend/diner/src/save/feedback.test.ts",
+        "frontend/diner/src/save/mount.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -109,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1cb0e86c52500845326b2d2303d305990e9952a2075d097baef9e930599a63b7"
+      "sourceFingerprint": "41383dc4a9847459244cfb31c700092d1fa0669c746ef03d818351297596629b"
     },
     {
       "id": "console",
