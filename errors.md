@@ -1298,3 +1298,18 @@ five-second Windows / 3.5-second other-platform grounding assertions and a
 The four focused budget tests pass, followed by all 434 offline Python tests
 with the socket guard and no external provider calls. Keep dependency startup
 cost separate from algorithm-runtime assertions; neither establishes hosted latency.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T20:18:04.489Z","exitCode":1}
+```
+
+
+## November 5 deterministic Undo regression clock
+
+The browser suite observed an empty toast at the nominal 4.9-second assertion
+because page.clock.install still lets wall time advance between manual runFor
+steps. The test now pauses the clock before mounting its fixture, then advances
+only the existing 2000/2900/200-ms steps. Toast assertions, expiry deadlines and
+product code are unchanged. All 12 focused Save browser tests pass; retain the
+original failure observation above rather than treating a rerun as its diagnosis.
