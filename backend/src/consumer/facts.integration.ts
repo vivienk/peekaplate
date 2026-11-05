@@ -14,8 +14,8 @@ import { backfillObservationFacts } from './backfill';
 import { PostgresObservationRepository } from './database';
 import { QueueConsumer } from './queue-consumer';
 import { FakeR2ArchiveStorage } from './r2-storage';
-import { buildRawArchiveKey } from './types';
 import type { ObservationRepository } from './types';
+import { buildRawArchiveKey } from './types';
 
 const admin = new Client({ connectionString: process.env.PEEKAPLATE_DB_ADMIN_URL });
 const client = new Client({ connectionString: process.env.PEEKAPLATE_DB_TEST_URL });
@@ -282,7 +282,7 @@ it('uses the greatest cumulative checkpoint regardless of delivery order', async
     [tenantId, openingId, dishId, dishRevisionId],
   );
 
-   expect(result.rows).toHaveLength(1);
+  expect(result.rows).toHaveLength(1);
 
   expect(result.rows[0]).toMatchObject({
     active_ms: 10_000,
@@ -348,9 +348,9 @@ it('blocks a missing archive without creating canonical event or fact rows', asy
   const key = buildRawArchiveKey(isolatedTenant, envelope.eventId);
   expect(isolatedStorage.delete(key)).toBe(true);
 
-  expect(
-    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
-  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+  expect(await backfillObservationFacts(client, isolatedStorage, isolatedTenant)).toEqual([
+    { eventId: envelope.eventId, status: 'blocked' },
+  ]);
 
   expect(
     (
@@ -376,15 +376,11 @@ it('blocks corrupt archive bytes even when the stored checksum metadata matches'
   const key = buildRawArchiveKey(isolatedTenant, envelope.eventId);
   const checksum = await sha256(canonicalJson(toCanonicalObservation(envelope)));
 
-  isolatedStorage.setExisting(
-    key,
-    new TextEncoder().encode('{"corrupt":true}'),
-    checksum,
-  );
+  isolatedStorage.setExisting(key, new TextEncoder().encode('{"corrupt":true}'), checksum);
 
-  expect(
-    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
-  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+  expect(await backfillObservationFacts(client, isolatedStorage, isolatedTenant)).toEqual([
+    { eventId: envelope.eventId, status: 'blocked' },
+  ]);
 
   expect(
     (
@@ -413,9 +409,9 @@ it('blocks a mismatched archive checksum without creating canonical event rows',
 
   isolatedStorage.setExisting(key, archive!.rawBytes, '0'.repeat(64));
 
-  expect(
-    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
-  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+  expect(await backfillObservationFacts(client, isolatedStorage, isolatedTenant)).toEqual([
+    { eventId: envelope.eventId, status: 'blocked' },
+  ]);
 
   expect(
     (

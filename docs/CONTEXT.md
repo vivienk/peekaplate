@@ -130,7 +130,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical index/event/detail/fact persistence. Historical hosted baseline c6a47bd: six synthetic hosted checks passed, three earlier facts were backfilled, and genuine Brave menu/token/bundle requests reached Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 adds synthetic coverage for cumulative checkpoint ordering, missing/corrupt archive recovery, archive-to-facts restoration, retry/redelivery, duplicate replay, and a two-session ingestion-to-canonical-facts flow with owner-view exclusion. These fixtures do not establish live staging acceptance, full DLQ/crash recovery, or end-to-end cross-tenant archive/replay isolation. Normal collection remains paused pending real controls/outbox/privacy and report acceptance.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -190,6 +190,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/backfill-observations.mjs",
         "backend/src/consumer/facts.ts",
         "backend/src/consumer/facts.integration.ts",
+        "backend/src/consumer/owner-synthetic.integration.ts",
         "backend/src/consumer/backfill.ts",
         "backend/src/consumer/backfill.test.ts"
       ],
@@ -203,7 +204,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "761c3ffaf8e85dbbe7308a09a8fbe6a46ea19ab34aeae7d9b66a770b0cdce05e"
+      "sourceFingerprint": "28423fc64e54097639a61ac9b46cceb03906d1b6d0cea1cb749525d0367d1619"
     },
     {
       "id": "database",

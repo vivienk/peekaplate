@@ -586,8 +586,8 @@ describe('QueueConsumer', () => {
     const d2 = await consumer.processMessage(msg);
     expect(d2.status).toBe('acknowledged');
     expect(r2Storage.putCalls).toHaveLength(initialPutCalls + 1);
-expect(r2Storage.putCalls[1]?.key).toBe(expectedKey);
-expect([...r2Storage.keys()]).toHaveLength(1);
+    expect(r2Storage.putCalls[1]?.key).toBe(expectedKey);
+    expect([...r2Storage.keys()]).toHaveLength(1);
     expect(await repository.lookupExisting(T1, E1)).not.toBeNull();
     expect(repository.index.size).toBe(1);
   });
