@@ -1,0 +1,106 @@
+{
+  "task_id": "QA-02.2",
+  "title": "Owner-to-Diner Staging Dish Cases",
+  "fixture_type": "fictional_synthetic",
+  "purpose": "Prepare three dish scenarios for staging validation without claiming live execution.",
+  "source_approval_status": "PENDING",
+  "product_review_status": "PENDING",
+  "staging_execution_status": "NOT RUN",
+  "allergen_terminology": {
+    "current_label": "nuts",
+    "legacy_label": "tree nuts",
+    "note": "Missing ingredients or allergen information must never be interpreted as proof of safety."
+  },
+  "dish_cases": [
+    {
+      "case_id": "QA-DISH-01",
+      "restaurant_id": "restaurant-a-fictional",
+      "dish_id": "qa-dish-01",
+      "scenario": "Complete dish with owner correction and explicit publication",
+      "original_fields": {
+        "name": "Garden Rice Bowl",
+        "description": "Fictional rice bowl with vegetables",
+        "ingredients": ["rice", "carrot", "cucumber"],
+        "price": null,
+        "allergen_status": "UNKNOWN"
+      },
+      "source_page_reference": null,
+      "source_status": "FICTIONAL_NOT_RESTAURANT_APPROVED",
+      "t0_image_reference": null,
+      "t0_image_status": "PENDING_APPROVAL",
+      "draft_revision_id": null,
+      "publication_revision_id": null,
+      "expected_correction": {
+        "field": "description",
+        "new_value": "Fictional rice bowl with rice, carrot, and cucumber",
+        "requires_owner_confirmation": true
+      },
+      "expected_owner_result": "Correction persists after successful save; explicit approval is required before publication.",
+      "expected_diner_result": "Only the approved complete dish and permitted image are displayed.",
+      "execution_status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-DISH-02",
+      "restaurant_id": "restaurant-a-fictional",
+      "dish_id": "qa-dish-02",
+      "scenario": "Incomplete dish with missing ingredients and image",
+      "original_fields": {
+        "name": "Mystery Pasta",
+        "description": "Fictional pasta dish with incomplete source information",
+        "ingredients": null,
+        "price": null,
+        "allergen_status": "UNKNOWN"
+      },
+      "source_page_reference": null,
+      "source_status": "FICTIONAL_NOT_RESTAURANT_APPROVED",
+      "t0_image_reference": null,
+      "t0_image_status": "MISSING_NEGATIVE_TEST",
+      "draft_revision_id": null,
+      "publication_revision_id": null,
+      "expected_correction": {
+        "field": "ingredients",
+        "new_value": null,
+        "note": "Must be supplied and approved by the restaurant; do not infer ingredients."
+      },
+      "expected_owner_result": "Incomplete draft cannot be published as a complete dish.",
+      "expected_diner_result": "Incomplete placeholder cannot open readable detail or comparison and emits no dish_viewed event.",
+      "missing_image_publication_policy": "PENDING_PRODUCT_CONFIRMATION",
+      "execution_status": "NOT RUN"
+    },
+    {
+      "case_id": "QA-DISH-03",
+      "restaurant_id": "restaurant-a-fictional",
+      "dish_id": "qa-dish-03",
+      "scenario": "Changed revision, publication replacement, and withdrawal",
+      "original_fields": {
+        "name": "Roasted Vegetable Plate",
+        "description": "Fictional roasted vegetable dish",
+        "ingredients": ["potato", "carrot"],
+        "price": null,
+        "allergen_status": "UNKNOWN"
+      },
+      "source_page_reference": null,
+      "source_status": "FICTIONAL_NOT_RESTAURANT_APPROVED",
+      "t0_image_reference": null,
+      "t0_image_status": "PENDING_APPROVAL",
+      "draft_revision_id": null,
+      "original_publication_revision_id": null,
+      "replacement_publication_revision_id": null,
+      "expected_correction": {
+        "field": "description",
+        "new_value": "Fictional roasted potato and carrot plate",
+        "requires_owner_confirmation": true
+      },
+      "expected_owner_result": "Unapproved changes do not replace the published revision; replacement requires explicit approval.",
+      "expected_diner_result": "Fresh load displays the approved replacement; after withdrawal, fresh load no longer presents the dish as available.",
+      "execution_status": "NOT RUN"
+    }
+  ],
+  "review_requirements": {
+    "adam": "Review expected product behavior and updated allergen terminology.",
+    "shirley": "Confirm owner dashboard and diner journey expectations.",
+    "jeffin": "Coordinate staging execution after dependencies are ready.",
+    "sai": "Independently validate execution evidence."
+  },
+  "overall_status": "PREPARATION_IN_PROGRESS"
+}
