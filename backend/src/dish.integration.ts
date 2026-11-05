@@ -999,28 +999,28 @@ describe('real PostgreSQL menu publication commands', () => {
     });
   });
 });
-describe('Multi-Tenant Database RLS Integration (Jeffin Checklist)', () => {
-  it('Should strictly isolate owner observations and enforce 403 blocks for unauthorized scopes', async () => {
-    const resOwnerA = await worker.fetch('/api/v1/venues/venue-A/analytics/dishes', {
+describe('Multi-Tenant Database RLS Integration Checks (Sai & Jeffin Alignment)', () => {
+  it('Should securely isolate owner metrics across distinct restaurant scopes via worker.fetch', async () => {
+    const validVenueUuid = '00000000-0000-0000-0000-000000000001';
+    
+    const resOwner = await worker.fetch(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
-      headers: { Authorization: 'Bearer owner-A-token' },
+      headers: { 'Authorization': 'Bearer test-valid-owner-token' }
     });
+    expect(resOwner.status).toBe(200);
+    const bodyOwner = await resOwner.json() as any;
+    expect(bodyOwner.venue_id).toBe(validVenueUuid);
 
-    expect(resOwnerA.status).toBe(200);
-    const bodyA = (await resOwnerA.json()) as any;
-    expect(bodyA.venue_id).toBe('venue-A');
-
-    const resEditor = await worker.fetch('/api/v1/venues/venue-A/analytics/dishes', {
+    const resEditor = await worker.fetch(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
-      headers: { Authorization: 'Bearer editor-token' },
+      headers: { 'Authorization': 'Bearer test-editor-token' }
     });
     expect(resEditor.status).toBe(403);
 
-    const resSpy = await worker.fetch('/api/v1/venues/venue-A/analytics/dishes', {
+    const resSpy = await worker.fetch(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
-      headers: { Authorization: 'Bearer owner-B-token' },
+      headers: { 'Authorization': 'Bearer test-concurrent-owner-token' }
     });
-
     expect(resSpy.status).toBe(403);
   });
 });
