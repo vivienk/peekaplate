@@ -39,10 +39,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
-        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7a7d498f34ae071198520e4604afa4a851da4777b221a26e364762883d6aaabc"
+      "sourceFingerprint": "044bc52ac2f0c0a8aa4d10836866dba6b0fae5e9511fcda1b7198b22e40a26cf"
     },
     {
       "id": "tokens",
@@ -160,16 +161,53 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "status": "foundation",
       "summary": "Observations are archived create-only in R2 before tenant-scoped canonical index/event/detail/fact persistence. Historical hosted baseline c6a47bd: six synthetic hosted checks passed, three earlier facts were backfilled, and genuine Brave menu/token/bundle requests reached Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 adds synthetic coverage for cumulative checkpoint ordering, missing/corrupt archive recovery, archive-to-facts restoration, retry/redelivery, duplicate replay, and a two-session ingestion-to-canonical-facts flow with owner-view exclusion. These fixtures do not establish live staging acceptance, full DLQ/crash recovery, or end-to-end cross-tenant archive/replay isolation. Normal collection remains paused pending real controls/outbox/privacy and report acceptance.",
       "paths": [
+        "backend/backfill-observations.mjs",
         "backend/local.mjs",
         "backend/local.test.mjs",
         "backend/package.json",
         "backend/src/auth.test.ts",
         "backend/src/auth.ts",
+        "backend/src/consumer/backfill.test.ts",
+        "backend/src/consumer/backfill.ts",
+        "backend/src/consumer/canonical-json.test.ts",
+        "backend/src/consumer/canonical-json.ts",
+        "backend/src/consumer/consumer.integration.ts",
+        "backend/src/consumer/database.ts",
+        "backend/src/consumer/facts.integration.ts",
+        "backend/src/consumer/facts.ts",
+        "backend/src/consumer/index.test.ts",
+        "backend/src/consumer/index.ts",
+        "backend/src/consumer/queue-consumer.test.ts",
+        "backend/src/consumer/queue-consumer.ts",
+        "backend/src/consumer/r2-storage.test.ts",
+        "backend/src/consumer/r2-storage.ts",
+        "backend/src/consumer/types.ts",
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/extraction-capability.ts",
+        "backend/src/extraction-host.test.ts",
+        "backend/src/extraction-host.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
+        "backend/src/ingestion/adapter.test.ts",
+        "backend/src/ingestion/adapter.ts",
+        "backend/src/ingestion/contract.test.ts",
+        "backend/src/ingestion/ingestion.integration.ts",
+        "backend/src/ingestion/orchestrator.test.ts",
+        "backend/src/ingestion/orchestrator.ts",
+        "backend/src/ingestion/repository.test.ts",
+        "backend/src/ingestion/repository.ts",
+        "backend/src/ingestion/transport.ts",
+        "backend/src/ingestion/workflow.integration.test.ts",
+        "backend/src/menu-token.test.ts",
+        "backend/src/menu-token.ts",
+        "backend/src/observation-fixtures.test.ts",
+        "backend/src/observation-ingest.ts",
+        "backend/src/public-menu.test.ts",
+        "backend/src/public-menu.ts",
+        "backend/src/publication-command.test.ts",
+        "backend/src/publication-command.ts",
         "backend/src/retrieval/api.test.ts",
         "backend/src/retrieval/fetcher.ts",
         "backend/src/retrieval/fetcher.workerd-harness.ts",
@@ -187,23 +225,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
+        "backend/tsconfig.json",
+        "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
         "docs/menu-ingestion-infrastructure.md",
-        "scripts/menu-ingestion-infra.test.mjs",
-        "backend/src/extraction-host.ts",
-        "backend/src/extraction-host.test.ts",
-        "backend/wrangler.extraction.jsonc",
-        "backend/src/extraction-capability.ts",
-        "backend/tsconfig.json",
-        "backend/src/publication-command.test.ts",
-        "backend/src/publication-command.ts",
-        "backend/src/public-menu.test.ts",
-        "backend/src/public-menu.ts",
         "docs/public-menu.md",
-        "backend/src/menu-token.ts",
-        "backend/src/menu-token.test.ts",
-        "backend/src/observation-fixtures.test.ts",
-        "backend/src/observation-ingest.ts",
+        "scripts/menu-ingestion-infra.test.mjs",
         "backend/src/consumer/canonical-json.test.ts",
         "backend/src/consumer/canonical-json.ts",
         "backend/src/consumer/consumer.integration.ts",
@@ -236,7 +263,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5d2c1a969c74916197b6b2387e05dd2cdfbf8b3b7a35d435ebf2b3f53ed7c5d7"
+      "sourceFingerprint": "e5a9d32626172e7c0f7c72a168cfee3e7031713e066b176e7b864df17ad65233"
     },
     {
       "id": "database",
@@ -244,33 +271,36 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
       "paths": [
         "migrations/202610130001_foundation.sql",
-        "tests/db/foundation.sql",
-        "tests/db/Dockerfile",
+        "migrations/20261014210000_staff_commands.sql",
+        "migrations/20261020070000_posthog_exports.sql",
+        "migrations/20261021130000_team_analytics.sql",
+        "migrations/20261023120000_observation_index.sql",
+        "migrations/20261025120000_menu_publication.sql",
+        "migrations/20261025130000_public_menu_bundle.sql",
+        "migrations/20261026120000_observation_facts.sql",
+        "migrations/20261026220000_menu_ingestion_drafts.sql",
         "scripts/test-db.mjs",
         "scripts/test-db.test.mjs",
-        "migrations/20261014210000_staff_commands.sql",
-        "tests/db/staff.sql",
-        "migrations/20261020070000_posthog_exports.sql",
-        "tests/db/posthog.sql",
-        "migrations/20261021130000_team_analytics.sql",
-        "tests/db/team-analytics.sql",
-        "tests/db/owner_metrics.sql",
-        "migrations/20261023120000_observation_index.sql",
-        "tests/db/observations.sql",
-        "migrations/20261026120000_observation_facts.sql",
+        "tests/db/Dockerfile",
+        "tests/db/foundation.sql",
+        "tests/db/menu_ingestion.sql",
         "tests/db/observation-facts.sql",
-        "migrations/20261025120000_menu_publication.sql",
-        "migrations/20261025130000_public_menu_bundle.sql"
+        "tests/db/observations.sql",
+        "tests/db/owner_metrics.sql",
+        "tests/db/posthog.sql",
+        "tests/db/staff.sql",
+        "tests/db/team-analytics.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0013-posthog-export-boundary.md",
         "docs/adr/0014-team-analytics-access.md",
-        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "b2d0900b635afcccb785528b413805279b7076d0776364fb9886189584d83475"
+      "sourceFingerprint": "5575d401f817de18d01b69a2c93b595835e0575e0e251275757ad6648ec5cc75"
     },
     {
       "id": "measurement",
@@ -348,7 +378,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a4fe68a220f740cce808ce2a404b1640c44825e66278b26630cce111d97de361"
+      "sourceFingerprint": "940c02a23b6b08a141350ba97eb97e42de9ef72fe10b90be2e29c05169bc0200"
     },
     {
       "id": "agents",
@@ -504,6 +534,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
+    },
+    {
       "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
       "modules": [
         "backend",
@@ -573,16 +612,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
-    },
-    {
-      "summary": "November 1 PR42 reconciliation preserves all develop module updates, including DIN-01.1 fixtures/adapter and DIN-01.4 local search, while retaining the reviewed RES-02 command core. Only shared context required conflict resolution; application and migration behavior is unchanged.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "diner"
-      ],
-      "next": "Verify this exact reconciled head, merge PR42, then retarget and recheck PR43 against develop. Promote an approved main candidate before hosted migration, signing configuration and synthetic publication acceptance."
     }
   ]
 }
