@@ -9,7 +9,7 @@ const env = {
 };
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: 'posthog.spec.ts',
+  testMatch: ['posthog.spec.ts', 'posthog-adapter.spec.ts'],
   fullyParallel: true,
   use: { ...devices['Desktop Chrome'], trace: 'retain-on-failure' },
   webServer: [5173, 5174].map((port) => ({

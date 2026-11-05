@@ -10,6 +10,10 @@
 //   is the only reconciliation key; it becomes the PostHog event uuid.
 // - Same gate as canonical: consent first, browser privacy signals respected, nothing in fixture
 //   mode. The SDK is downloaded only after consent; withdrawing consent drops queued events.
+// - Page memory only: the SDK never writes consent or identity to localStorage, sessionStorage or
+//   cookies. Consent lives in this adapter, so the SDK's own opt-in/out storage is never used.
+// - Withdrawal retires the SDK instance, so its retry queue and unload beacons send nothing more.
+//   A later opt-in starts a fresh, separately named instance with a new visit ID.
 // - Deduplication: the SDK and server do not guarantee dedup of resent events, so each event_id is
 //   captured at most once per page. Canonical retries must never call this adapter again.
 // - A PostHog failure never throws into the caller, so it cannot block canonical delivery or
@@ -20,7 +24,7 @@ import type {
   PostHogConfig,
   CaptureResult as PostHogEvent,
 } from 'posthog-js/dist/module.slim.no-external';
-import type { AnalyticsEnvironment, Surface } from './index';
+import type { AnalyticsEnvironment } from './index';
 
 // Same list as frontend/diner/src/tracking/event-names.ts (S3-TRK-01.1).
 export const P0_EVENT_NAMES = [
@@ -68,10 +72,12 @@ const payloadSchemas = new Map(
 );
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export type PostHogSdk = Pick<
-  PostHog,
-  'init' | 'capture' | 'opt_in_capturing' | 'opt_out_capturing' | 'reset'
->;
+// __loaded is the SDK's own send gate: every request path (capture, batch queue, retry queue and
+// unload beacons) is dropped while it is false. Checked against the pinned 1.444.4 SDK in
+// tests/e2e/posthog-adapter.spec.ts, so an upgrade that changes it fails the browser test.
+export type PostHogSdk = Pick<PostHog, 'capture' | '__loaded'> & {
+  init: (...args: Parameters<PostHog['init']>) => PostHogSdk | undefined;
+};
 
 type Runtime = {
   origin: string;
@@ -122,11 +128,7 @@ export function toPostHogProperties(
   return properties;
 }
 
-export function createPostHogAdapter(
-  env: AnalyticsEnvironment,
-  surface: Surface,
-  runtime: Runtime,
-) {
+export function createPostHogAdapter(env: AnalyticsEnvironment, runtime: Runtime) {
   const environment = env.VITE_POSTHOG_ENVIRONMENT;
   const host = env.VITE_POSTHOG_HOST;
   const key = env.VITE_POSTHOG_KEY;
@@ -143,6 +145,8 @@ export function createPostHogAdapter(
   let consent = false;
   let sdk: PostHogSdk | null = null;
   let loading: Promise<void> | null = null;
+  // Bumped on withdrawal; an instance or load from an older generation never sends again.
+  let generation = 0;
   // Visit-scoped PostHog identity: random, memory only, replaced after consent withdrawal.
   let visitId = crypto.randomUUID();
   let pending: Pending[] = [];
@@ -156,7 +160,7 @@ export function createPostHogAdapter(
     }
   }
 
-  function config(): Partial<PostHogConfig> {
+  function config(current: number): Partial<PostHogConfig> {
     return {
       api_host: String(host),
       persistence: 'memory',
@@ -183,8 +187,7 @@ export function createPostHogAdapter(
       mask_all_element_attributes: true,
       // Final guard: only our mapped properties plus the SDK's required fields are sent.
       before_send: (event: PostHogEvent | null) => {
-        if (!event) return null;
-        if (!allowed()) return null;
+        if (!event || !allowed() || generation !== current) return null;
         for (const name of Object.keys(event.properties)) {
           if (name.startsWith('$') && !KEPT_SDK_PROPERTIES.has(name)) delete event.properties[name];
         }
@@ -192,8 +195,8 @@ export function createPostHogAdapter(
         delete event.$set_once;
         event.properties.distinct_id = visitId;
         event.properties.$geoip_disable = true;
+        // The event's own approved `surface` (e.g. menu_list) is kept as sent canonically.
         event.properties.environment = environment;
-        event.properties.surface = surface;
         return event;
       },
     };
@@ -211,43 +214,43 @@ export function createPostHogAdapter(
 
   function start() {
     if (sdk || loading) return;
-    loading = load()
+    const current = generation;
+    const attempt = load()
       .then((client) => {
-        if (!allowed()) return;
-        client.init(String(key), config());
-        client.opt_in_capturing({ captureEventName: false });
-        sdk = client;
+        if (!allowed() || current !== generation) return;
+        // A named instance per visit: a retired instance is never re-initialised or reused.
+        const instance = client.init(String(key), config(current), `peekaplate_${visitId}`);
+        if (!instance) return;
+        sdk = instance;
         const queued = pending;
         pending = [];
         for (const event of queued) send(event);
       })
       .catch(() => {
-        pending = [];
+        if (current === generation) pending = [];
       })
       .finally(() => {
-        loading = null;
+        if (loading === attempt) loading = null;
       });
+    loading = attempt;
   }
 
   function setConsent(value: boolean) {
     consent = value;
-    if (value) {
-      try {
-        sdk?.opt_in_capturing({ captureEventName: false });
-      } catch {
-        // Capture simply stays off if the SDK misbehaves.
-      }
-      return;
-    }
+    if (value) return;
+    generation++;
     pending = [];
+    loading = null;
     visitId = crypto.randomUUID();
+    const retired = sdk;
+    sdk = null;
     try {
-      sdk?.opt_out_capturing();
-      sdk?.reset();
+      // Stops the retired instance's queued retries and unload beacons. opt_out_capturing() and
+      // reset() are not used: they leave the retry queue running and write consent storage.
+      if (retired) retired.__loaded = false;
     } catch {
       // Withdrawal must still succeed locally even if the SDK misbehaves.
     }
-    // before_send stamps the new visit ID, so a later opt-in starts a new PostHog visit.
   }
 
   // Called once per UI action by the shared track() dispatch (connectPostHog in the diner).

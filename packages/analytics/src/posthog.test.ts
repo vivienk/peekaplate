@@ -26,28 +26,37 @@ type Config = { before_send: (e: PostHogEvent | null) => PostHogEvent | null } &
   unknown
 >;
 
+// The real SDK's browser behaviour (retries, storage) is covered in tests/e2e/posthog-adapter.spec.ts.
 function fakeSdk() {
   const captured: { name: string; props: Record<string, unknown>; options: unknown }[] = [];
-  let config: Config | undefined;
+  const instances: { name: string; config: Config; __loaded: boolean }[] = [];
   const sdk = {
-    init: vi.fn((_key: string, c: Config) => {
-      config = c;
+    __loaded: false,
+    init: vi.fn((_key: string, config: Config, name: string) => {
+      const instance = {
+        name,
+        config,
+        __loaded: true,
+        capture: (event: string, props: Record<string, unknown>, options: unknown) => {
+          if (instance.__loaded) captured.push({ name: event, props, options });
+          return undefined;
+        },
+      };
+      instances.push(instance);
+      return instance;
     }),
-    capture: vi.fn((name: string, props: Record<string, unknown>, options: unknown) => {
-      captured.push({ name, props, options });
-      return undefined;
-    }),
-    opt_in_capturing: vi.fn(),
-    opt_out_capturing: vi.fn(),
-    reset: vi.fn(),
+    capture: vi.fn(),
+  };
+  const last = () => {
+    const instance = instances.at(-1);
+    if (!instance) throw new Error('SDK was not initialised');
+    return instance;
   };
   return {
     sdk: sdk as unknown as PostHogSdk & typeof sdk,
     captured,
-    config: () => {
-      if (!config) throw new Error('SDK was not initialised');
-      return config;
-    },
+    instances,
+    config: () => last().config,
   };
 }
 
@@ -56,12 +65,15 @@ function setup(
 ) {
   const fake = fakeSdk();
   const loadSdk = vi.fn(async () => fake.sdk);
-  const adapter = createPostHogAdapter({ ...env, ...overrides.env }, 'diner', {
-    origin,
-    privacySignal: () => overrides.privacy ?? false,
-    isLive: () => overrides.live ?? true,
-    loadSdk,
-  });
+  const adapter = createPostHogAdapter(
+    { ...env, ...overrides.env },
+    {
+      origin,
+      privacySignal: () => overrides.privacy ?? false,
+      isLive: () => overrides.live ?? true,
+      loadSdk,
+    },
+  );
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
   return { adapter, fake, loadSdk, flush };
 }
@@ -153,7 +165,29 @@ describe('PostHog SDK adapter', () => {
     });
     const visit = (config.bootstrap as { distinctID: string }).distinctID;
     expect(visit).toMatch(/^[0-9a-f-]{36}$/);
-    expect(fake.sdk.opt_in_capturing).toHaveBeenCalledWith({ captureEventName: false });
+    expect(fake.instances[0]?.name).toBe(`peekaplate_${visit}`);
+  });
+
+  it("keeps the event's own approved surface after before_send", async () => {
+    const { adapter, fake, flush } = setup();
+    adapter.setConsent(true);
+    const viewed = {
+      dish_id: uuid(400),
+      dish_revision_id: uuid(401),
+      exposure_id: uuid(402),
+      surface: 'menu_list',
+      position: 1,
+      exposure_basis: 'viewport_50pct_1s',
+    };
+    adapter.capturePostHog('dish_viewed', viewed, { eventId: uuid(1) });
+    await flush();
+    const [sent] = fake.captured;
+    const out = fake.config().before_send({
+      uuid: uuid(1),
+      event: 'dish_viewed',
+      properties: { ...sent?.props },
+    } as PostHogEvent);
+    expect(out?.properties).toMatchObject({ ...viewed, environment: 'staging' });
   });
 
   it('strips SDK defaults and person data, keeping only required SDK fields', async () => {
@@ -213,7 +247,7 @@ describe('PostHog SDK adapter', () => {
     expect(fake.captured).toHaveLength(1);
   });
 
-  it('stops, drops queued events and starts a new visit when consent is withdrawn', async () => {
+  it('drops queued events, retires the SDK instance and starts a new visit when consent is withdrawn', async () => {
     const { adapter, fake, flush } = setup();
     adapter.setConsent(true);
     adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
@@ -225,21 +259,26 @@ describe('PostHog SDK adapter', () => {
     adapter.setConsent(true);
     adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(2) });
     await flush();
-    const firstVisit = fake.config().before_send(sdkEvent({}))?.properties.distinct_id;
+    const first = fake.instances[0];
+    const firstVisit = first?.config.before_send(sdkEvent({}))?.properties.distinct_id;
     adapter.setConsent(false);
-    expect(fake.sdk.opt_out_capturing).toHaveBeenCalled();
-    expect(fake.sdk.reset).toHaveBeenCalled();
-    expect(fake.config().before_send(sdkEvent({}))).toBeNull();
+    expect(first?.__loaded).toBe(false);
+    expect(first?.config.before_send(sdkEvent({}))).toBeNull();
 
     adapter.setConsent(true);
+    // The retired instance stays retired even after a new opt-in.
+    expect(first?.config.before_send(sdkEvent({}))).toBeNull();
     adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(3) });
+    await flush();
+    expect(fake.instances).toHaveLength(2);
+    expect(fake.instances[1]?.name).not.toBe(first?.name);
     expect(fake.captured.map((c) => c.props.event_id)).toEqual([uuid(2), uuid(3)]);
     const secondVisit = fake.config().before_send(sdkEvent({}))?.properties.distinct_id;
     expect(secondVisit).not.toBe(firstVisit);
   });
 
   it('never throws when the SDK fails to load or to capture', async () => {
-    const failingLoad = createPostHogAdapter(env, 'diner', {
+    const failingLoad = createPostHogAdapter(env, {
       origin,
       privacySignal: () => false,
       isLive: () => true,
@@ -252,9 +291,14 @@ describe('PostHog SDK adapter', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const { adapter, fake, flush } = setup();
-    fake.sdk.capture.mockImplementation(() => {
-      throw new Error('SDK error');
-    });
+    fake.sdk.init.mockImplementation((_key, config, name) => ({
+      name,
+      config,
+      __loaded: true,
+      capture: () => {
+        throw new Error('SDK error');
+      },
+    }));
     adapter.setConsent(true);
     adapter.capturePostHog('menu_viewed', menuViewed, { eventId: uuid(1) });
     await flush();

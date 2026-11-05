@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./consent": "./src/consent.ts"
+    "./consent": "./src/consent.ts",
+    "./posthog": "./src/posthog.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
