@@ -20,6 +20,17 @@ describe('track()', () => {
     });
   });
 
+  it('logs nothing outside development builds (staging and production)', () => {
+    vi.stubEnv('DEV', false);
+    try {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      track('menu_viewed', { publication_revision_id: PUBLICATION, entry_source: 'qr' });
+      expect(info).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('numbers events in order within the visit', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
     track('menu_viewed', { publication_revision_id: PUBLICATION, entry_source: 'qr' });

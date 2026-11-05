@@ -22,7 +22,11 @@ function createTracker(): Tracker {
     now,
     lifecycle: browserLifecycle(),
   });
-  const output = (envelope: Envelope) => console.info('[track]', envelope);
+  // Development builds only: envelopes carry session IDs and payloads, which must not appear in a
+  // staging or production console. Other builds drop them until delivery (TRK-01.2/.3) replaces this.
+  const output = (envelope: Envelope) => {
+    if (import.meta.env.DEV) console.info('[track]', envelope);
+  };
   return (eventName, payload) => {
     const envelope = buildEnvelope(eventName, payload, { identity, now, uuid });
     if (envelope) {

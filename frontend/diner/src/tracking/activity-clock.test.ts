@@ -6,6 +6,7 @@ import {
   type PageVisibility,
   startOpeningClock,
 } from './activity-clock';
+import { VISIT_TIMEOUT_MS } from './identity';
 
 const opening = {
   publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
@@ -17,7 +18,8 @@ const opening = {
 function fakeVisibility() {
   let visible = true;
   const changes: (() => void)[] = [];
-  const hides: (() => void)[] = [];
+  const hides: ((persisted: boolean) => void)[] = [];
+  const restores: (() => void)[] = [];
   const page: PageVisibility = {
     isVisible: () => visible,
     onChange: (fn) => {
@@ -28,6 +30,10 @@ function fakeVisibility() {
       hides.push(fn);
       return () => hides.splice(hides.indexOf(fn), 1);
     },
+    onPageRestore: (fn) => {
+      restores.push(fn);
+      return () => restores.splice(restores.indexOf(fn), 1);
+    },
   };
   return {
     page,
@@ -36,21 +42,31 @@ function fakeVisibility() {
       for (const fn of [...changes]) fn();
     },
     leavePage() {
-      for (const fn of [...hides]) fn();
+      for (const fn of [...hides]) fn(false);
+    },
+    // The back-forward cache: the page is hidden but kept, and may be restored as it was.
+    enterCache() {
+      visible = false;
+      for (const fn of [...hides]) fn(true);
+    },
+    restoreFromCache() {
+      visible = true;
+      for (const fn of [...restores]) fn();
     },
   };
 }
 
 function start() {
   const send = vi.fn();
+  const onExpired = vi.fn();
   const visibility = fakeVisibility();
-  const clock = startOpeningClock(opening, { send, visibility: visibility.page });
+  const clock = startOpeningClock(opening, { send, visibility: visibility.page, onExpired });
   const checkpoints = () =>
     send.mock.calls.map(([name, payload]) => {
       expect(name).toBe('dish_activity_checkpoint');
       return [payload.active_ms, payload.final];
     });
-  return { clock, send, visibility, checkpoints };
+  return { clock, send, visibility, checkpoints, onExpired };
 }
 
 beforeEach(() => {
@@ -143,6 +159,80 @@ describe('activity clock', () => {
     vi.advanceTimersByTime(1500);
     visibility.leavePage();
     expect(checkpoints()).toEqual([[1500, true]]);
+  });
+
+  it('pauses in the back-forward cache and keeps counting after a restore', () => {
+    const { clock, visibility, checkpoints } = start();
+    vi.advanceTimersByTime(1500);
+    visibility.enterCache();
+    expect(checkpoints()).toEqual([[1500, false]]);
+    vi.advanceTimersByTime(60_000);
+    expect(checkpoints()).toEqual([[1500, false]]);
+    visibility.restoreFromCache();
+    clock.activity();
+    vi.advanceTimersByTime(2000);
+    clock.end();
+    expect(checkpoints()).toEqual([
+      [1500, false],
+      [3500, true],
+    ]);
+  });
+
+  it('never sends into a new visit: after the visit times out the opening closes quietly', () => {
+    const { clock, visibility, checkpoints, onExpired } = start();
+    vi.advanceTimersByTime(2000);
+    visibility.setVisible(false);
+    expect(checkpoints()).toEqual([[2000, false]]);
+    // 40 minutes hidden: the next tracked event would start a new visit.
+    vi.advanceTimersByTime(40 * 60_000);
+    visibility.setVisible(true);
+    expect(onExpired).toHaveBeenCalledOnce();
+    clock.activity();
+    vi.advanceTimersByTime(10_000);
+    clock.end();
+    visibility.leavePage();
+    // The time was already sent in the opening's own visit when the tab was hidden.
+    expect(checkpoints()).toEqual([[2000, false]]);
+    expect(onExpired).toHaveBeenCalledOnce();
+  });
+
+  it('stops a running clock if the visit times out before its next checkpoint', () => {
+    const { clock, visibility, checkpoints, onExpired } = start();
+    vi.advanceTimersByTime(2000);
+    visibility.setVisible(false);
+    vi.advanceTimersByTime(VISIT_TIMEOUT_MS - 1000);
+    visibility.setVisible(true);
+    clock.activity();
+    vi.advanceTimersByTime(10_000);
+    expect(checkpoints()).toEqual([[2000, false]]);
+    expect(onExpired).toHaveBeenCalledOnce();
+  });
+
+  it('closes quietly when the page is left after the visit has timed out', () => {
+    const { visibility, checkpoints, onExpired } = start();
+    vi.advanceTimersByTime(2000);
+    visibility.setVisible(false);
+    vi.advanceTimersByTime(VISIT_TIMEOUT_MS);
+    visibility.leavePage();
+    expect(checkpoints()).toEqual([[2000, false]]);
+    expect(onExpired).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the opening when the diner returns before the visit times out', () => {
+    const { clock, visibility, checkpoints, onExpired } = start();
+    vi.advanceTimersByTime(2000);
+    visibility.setVisible(false);
+    vi.advanceTimersByTime(VISIT_TIMEOUT_MS - 60_000);
+    visibility.setVisible(true);
+    clock.activity();
+    vi.advanceTimersByTime(6000);
+    clock.end();
+    expect(checkpoints()).toEqual([
+      [2000, false],
+      [7000, false],
+      [8000, true],
+    ]);
+    expect(onExpired).not.toHaveBeenCalled();
   });
 
   // Browsers can fire timers late (battery saving, a busy device). The limits must hold even when
