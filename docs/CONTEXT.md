@@ -65,7 +65,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs and falls back to memory. Save UI mounts hearts, badge and toasts; Save events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity, never-reused sequence) plus the activity clock. Live mode needs the default-off consent flag, queues in an IndexedDB outbox (500/1 MiB/24 h) and batches 25 events/32 KiB every 5 s with a retry pause; fixture mode only logs. Icons map allergen/dietary values and ingredients to Figma assets; unwired.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, replace either side keeping comparison_id. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHog) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -119,7 +119,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/outbox.test.ts",
         "frontend/diner/src/tracking/batcher.ts",
         "frontend/diner/src/tracking/batcher.test.ts",
-        "tests/e2e/tracking-outbox.spec.ts"
+        "tests/e2e/tracking-outbox.spec.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -128,7 +129,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "dea467f01787849e804b16307d44f541ef24fcd0d073a08f10ffacf76573a2ee"
+      "sourceFingerprint": "c56d265f84837363b612747b5cfd235534ea138e3e324b3fee862fd957da8377"
     },
     {
       "id": "console",

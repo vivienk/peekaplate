@@ -205,3 +205,97 @@ test('with storage blocked, other events still queue in memory under the normal 
   await hidePage(page);
   await expect.poll(() => delivered(page)).toBe(2);
 });
+
+// Shared dispatch (Sai with Vivien, 3 Nov): one consent gate with the browser privacy signals for
+// both destinations; a stand-in PostHog sink records what the adapter would receive.
+const connectFakePostHog = (page: Page) =>
+  page.evaluate(() => {
+    const { tracking } = window as unknown as {
+      tracking: {
+        connectPostHog(sink: {
+          capturePostHog(type: string, payload: unknown, ids: { eventId: string }): void;
+          setConsent(allowed: boolean): void;
+        }): () => void;
+      };
+    };
+    const captured: string[] = [];
+    const consent: boolean[] = [];
+    tracking.connectPostHog({
+      capturePostHog: (type, _payload, ids) => captured.push(`${type}:${ids.eventId}`),
+      setConsent: (allowed) => consent.push(allowed),
+    });
+    Object.assign(window, { postHog: { captured, consent } });
+  });
+
+const postHogInfo = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { postHog: { captured: string[]; consent: boolean[] } }).postHog,
+  );
+
+test('with Global Privacy Control on, consent given still stores and sends nothing', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true });
+  });
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true });
+  await connectFakePostHog(page);
+  await trackMenuViewed(page, 3);
+  await hidePage(page);
+  await page.waitForTimeout(300);
+  expect(await storedEvents(page)).toBe(0);
+  expect(await delivered(page)).toBe(0);
+  const posthog = await postHogInfo(page);
+  expect(posthog.captured).toEqual([]);
+  expect(posthog.consent).toEqual([false]);
+});
+
+test('withdrawing consent empties the stored outbox and stops both destinations', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true, hold: true });
+  await connectFakePostHog(page);
+  await trackMenuViewed(page, 2);
+  await expect.poll(() => storedEvents(page)).toBe(2);
+  await page.evaluate(() =>
+    (
+      window as unknown as { tracking: { setTrackingAllowed(v: boolean): void } }
+    ).tracking.setTrackingAllowed(false),
+  );
+  await expect.poll(() => storedEvents(page)).toBe(0);
+  await trackMenuViewed(page, 1);
+  await page.waitForTimeout(300);
+  expect(await storedEvents(page)).toBe(0);
+  const posthog = await postHogInfo(page);
+  expect(posthog.captured).toHaveLength(2);
+  expect(posthog.consent.at(-1)).toBe(false);
+});
+
+test('each live event reaches PostHog once with the canonical event_id; fixture mode sends none', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true });
+  await connectFakePostHog(page);
+  await trackMenuViewed(page, 3);
+  await hidePage(page);
+  await expect.poll(() => delivered(page)).toBe(3);
+  const canonicalIds = await page.evaluate(() =>
+    (window as unknown as { delivered: { event_id: string }[][] }).delivered
+      .flat()
+      .map((event) => event.event_id),
+  );
+  const posthog = await postHogInfo(page);
+  expect(posthog.captured).toEqual(canonicalIds.map((id) => `menu_viewed:${id}`));
+
+  // A fresh page in fixture mode: nothing reaches PostHog.
+  await page.reload();
+  await startTracking(page);
+  await connectFakePostHog(page);
+  await trackMenuViewed(page, 2);
+  await hidePage(page);
+  await page.waitForTimeout(300);
+  expect((await postHogInfo(page)).captured).toEqual([]);
+});

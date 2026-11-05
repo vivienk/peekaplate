@@ -6,18 +6,27 @@
 // Modes (S3-TRK-01.2):
 // - Fixture (the default, until a live published menu enables live mode): ignores the consent gate,
 //   keeps events in memory only and logs each event and each would-be batch to the console, labelled
-//   as a test. Nothing is sent and nothing is stored, so fixture events can never be sent later.
-// - Live: only when the consent gate allows it (off by default) is an event queued in the durable
-//   outbox and batched. Sending, receipts and retries are TRK-01.3; until then nothing is sent.
+//   as a test. Nothing is sent and nothing is stored, and nothing goes to PostHog, so fixture events
+//   can never be sent later.
+// - Live: only when the consent gate allows it (off by default; see consent.ts) is an event
+//   delivered, independently, to the canonical outbox (POST /observations, sent by TRK-01.3) and to
+//   PostHog through the adapter connected with connectPostHog (Sai with Vivien, 3 Nov).
 import { browserBatchTriggers, createBatcher, type Deliver } from './batcher';
-import { isTrackingAllowed } from './consent';
+import { isTrackingAllowed, onTrackingAllowedChange } from './consent';
 import { buildEnvelope, type Envelope } from './envelope';
+import type { P0EventName } from './event-names';
 import { browserLifecycle, browserSessionStore, createIdentity, type Identity } from './identity';
 import { browserOutboxStore, createOutbox, memoryOutboxStore, type OutboxStore } from './outbox';
 
 export { startOpeningClock } from './activity-clock';
 export type { Deliver } from './batcher';
-export { isTrackingAllowed, setTrackingAllowed } from './consent';
+export {
+  browserPrivacySignal,
+  isTrackingAllowed,
+  onTrackingAllowedChange,
+  setPrivacySignal,
+  setTrackingAllowed,
+} from './consent';
 export { newComparisonId, newExposureId, newOpeningId } from './ids';
 
 export type TrackPayload = Record<string, unknown>;
@@ -29,7 +38,11 @@ const devWarn = (message: string, detail?: string) => {
   if (import.meta.env.DEV) console.warn(`[track] ${message}`, ...(detail ? [detail] : []));
 };
 
-type Pipeline = { queue(envelope: Envelope): void; pauseUntil(timestampMs: number): void };
+type Pipeline = {
+  queue(envelope: Envelope): void;
+  pauseUntil(timestampMs: number): void;
+  clear(): void;
+};
 
 function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): Pipeline {
   const now = () => Date.now();
@@ -53,12 +66,19 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
     pauseUntil(timestampMs) {
       ready.then(({ batcher }) => batcher.pauseUntil(timestampMs)).catch(() => {});
     },
+    clear() {
+      chain = chain
+        .then(() => ready)
+        .then(({ outbox }) => outbox.clear())
+        .catch(() => {});
+    },
   };
 }
 
-// Fixture batches go only to the console and count as handled.
+// Fixture batches go only to the console (development builds only: envelopes carry session IDs
+// and payloads) and count as handled.
 const consoleDeliver: Deliver = async (batch) => {
-  console.info(TEST_BATCH_LABEL, batch);
+  if (import.meta.env.DEV) console.info(TEST_BATCH_LABEL, batch);
   return batch.map((event) => event.event_id);
 };
 
@@ -69,6 +89,65 @@ let mode: 'fixture' | 'live' = 'fixture';
 let liveDeliver: Deliver = holdDeliver;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
+
+// For the PostHog adapter's isLive check: fixture mode never reaches PostHog.
+export function isLiveTracking(): boolean {
+  return mode === 'live';
+}
+
+// Withdrawal (consent withdrawn or a privacy signal) stops pending canonical sends: the live sender
+// is never called while the gate is closed, and the queued events are dropped. Whether withdrawal
+// should drop events collected while consent was given, or only stop new capture, is open with Sai;
+// change this one switch if he decides to keep them.
+const WITHDRAWAL_CLEARS_QUEUE = true;
+onTrackingAllowedChange((allowed) => {
+  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) pipelines.live?.clear();
+});
+const consentedDeliver: Deliver = async (batch) => (isTrackingAllowed() ? liveDeliver(batch) : []);
+
+// The PostHog side of the shared dispatch. Jeffin's adapter (packages/analytics,
+// createPostHogAdapter) returns exactly this shape. It gets only the event type, the validated
+// payload and the event_id: never the envelope's session or producer IDs, and never the menu token.
+export type PostHogSink = {
+  capturePostHog(
+    type: P0EventName,
+    payload: Readonly<Record<string, unknown>>,
+    ids: { eventId: string },
+  ): void;
+  setConsent(allowed: boolean): void;
+};
+
+let postHog: PostHogSink | null = null;
+let stopPostHogConsent: (() => void) | null = null;
+
+// Connects the PostHog adapter. Its consent follows this gate from now on, so the two destinations
+// can never disagree. Returns a function that disconnects it.
+export function connectPostHog(sink: PostHogSink): () => void {
+  stopPostHogConsent?.();
+  postHog = sink;
+  const sync = (allowed: boolean) => {
+    try {
+      sink.setConsent(allowed);
+    } catch {}
+  };
+  sync(isTrackingAllowed());
+  stopPostHogConsent = onTrackingAllowedChange(sync);
+  return () => {
+    if (postHog !== sink) return;
+    stopPostHogConsent?.();
+    stopPostHogConsent = null;
+    postHog = null;
+  };
+}
+
+// Exactly once per track() call, after validation and consent. Canonical retries, receipts and the
+// Queue never come back here, so they can never send to PostHog again. A PostHog failure never
+// reaches the canonical path or the screens.
+function captureToPostHog(envelope: Envelope) {
+  try {
+    postHog?.capturePostHog(envelope.type, envelope.payload, { eventId: envelope.event_id });
+  } catch {}
+}
 
 // Called once a live published menu is loaded (DIN-03) and, in TRK-01.3, with the token-bound
 // sender. Fixture builds never call it, so they never send.
@@ -92,7 +171,7 @@ function pipeline(): Pipeline {
     pipelines.fixture ??= createPipeline(Promise.resolve(memoryOutboxStore()), consoleDeliver);
     return pipelines.fixture;
   }
-  pipelines.live ??= createPipeline(browserOutboxStore(), (batch) => liveDeliver(batch));
+  pipelines.live ??= createPipeline(browserOutboxStore(), consentedDeliver);
   return pipelines.live;
 }
 
@@ -114,8 +193,14 @@ export function track(eventName: string, payload: TrackPayload): void {
       devWarn('dropped an invalid event:', eventName);
       return;
     }
-    if (mode === 'fixture') console.info(TEST_EVENT_LABEL, envelope);
+    if (mode === 'fixture') {
+      if (import.meta.env.DEV) console.info(TEST_EVENT_LABEL, envelope);
+      pipeline().queue(envelope);
+      return;
+    }
+    // Live: the two destinations are independent; neither can stop the other.
     pipeline().queue(envelope);
+    captureToPostHog(envelope);
   } catch {
     // Fire-and-forget: a tracking failure must never break browsing, Save or Compare.
   }

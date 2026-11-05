@@ -148,6 +148,11 @@ export async function createOutbox(
       return [...events];
     },
     bytes: () => events.reduce((total, event) => total + sizeOf(event), 0),
+    // Consent withdrawn: drop everything still waiting, in memory and in storage.
+    async clear() {
+      events = [];
+      await persist();
+    },
   };
 }
 
