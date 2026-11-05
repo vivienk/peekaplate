@@ -1309,6 +1309,11 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T21:06:43.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-03T15:57:21.681Z","exitCode":2}
 ```
 
@@ -1372,3 +1377,16 @@ steps. The test now pauses the clock before mounting its fixture, then advances
 only the existing 2000/2900/200-ms steps. Toast assertions, expiry deadlines and
 product code are unchanged. All 12 focused Save browser tests pass; retain the
 original failure observation above rather than treating a rerun as its diagnosis.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-04T21:06:43.047Z"},"status":"resolved","cause":"While re-syncing the S3-TRK-01 strict-validation branch onto the tracking core, the combined diner summary came to 1007 characters, so the resolution script stopped before writing docs/CONTEXT.md; the following commands still staged the file with its conflict markers and ran pnpm check against it.","prevention":"Stop a resolution sequence at the first failed step (set -e) and confirm no conflict markers remain before staging.","regression":"Shortened the diner summary to 1000 characters without dropping facts, added the validation files, refreshed fingerprints; no markers remain and pnpm check passes."}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T21:07:05.932Z"},"status":"environment-limited","cause":"The S3-DIN-02.2 toast timing test ('Undo survives moving to another screen') is flaky on branches based on develop: Playwright's installed clock keeps running in real time, so a slow run can expire the 5-second toast before the check. The fix (pausing the clock) is in #76, which has not merged into develop yet.","prevention":"Merge #76, which pauses the clock in both toast timing tests.","regression":"The test passed on rerun; it is stable on #76, where a 6-second real-time probe fails with a running clock and passes with the paused one."}
+```

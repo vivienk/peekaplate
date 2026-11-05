@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without backfill. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s) and sends Save events only for committed writes. track() and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering need integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes. S3-TRK-01.1: track() and its triggers build schema-checked observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) plus the activity clock; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -119,7 +119,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/events.ts",
         "frontend/diner/src/save/feedback.ts",
         "frontend/diner/src/save/feedback.test.ts",
-        "frontend/diner/src/save/mount.ts"
+        "frontend/diner/src/save/mount.ts",
+        "frontend/diner/src/tracking/event-names.ts",
+        "frontend/diner/src/tracking/ids.ts",
+        "frontend/diner/src/tracking/identity.ts",
+        "frontend/diner/src/tracking/envelope.ts",
+        "frontend/diner/src/tracking/core.test.ts",
+        "tests/e2e/tracking.spec.ts",
+        "frontend/diner/src/tracking/activity-clock.ts",
+        "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/validate.ts",
+        "frontend/diner/src/tracking/validate.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -128,7 +138,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7658365146326b20705f1e2cd2074c5ec6defc3dc98d5c697b3e24f6fe1de87a"
+      "sourceFingerprint": "c85167a8d0c337d6c1fb2a4cb75f39e052a536c79c6c9cd9c11dc98986f89a35"
     },
     {
       "id": "console",
@@ -263,7 +273,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b4328547b8fd0212a6b5c7daa82bb6ff4c8cdc032d9747caf7f4776c07fd6941"
+      "sourceFingerprint": "c0cbc7e9d5ba9ccdab727fb2df3a3e2fd056846d733da6fa7ef02d785c98e538"
     },
     {
       "id": "database",
@@ -378,7 +388,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "186382417adfc023db04945e7d8bc9ab1cf908faa996a0fce314b88aa2feb5af"
+      "sourceFingerprint": "851d2170cb88ace589e4c953f625663e9654e961f659a157301e27b1be800bcc"
     },
     {
       "id": "agents",
