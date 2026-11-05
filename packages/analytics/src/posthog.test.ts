@@ -122,7 +122,7 @@ describe('PostHog SDK adapter', () => {
     const [sent] = fake.captured;
     expect(sent?.name).toBe('menu_viewed');
     expect(sent?.props).toEqual({ event_id: uuid(1), entry_source: 'direct_link' });
-    expect(sent?.options).toEqual({ uuid: uuid(1) });
+    expect(sent?.options).toEqual({ uuid: uuid(1), send_instantly: true });
   });
 
   it('rejects payloads outside the shared contract, including envelope fields and the menu token', async () => {

@@ -40,7 +40,12 @@ async function open(page: Page, status: (n: number) => number) {
   await page.clock.install();
   await page.route('https://us.i.posthog.com/**', (route) => {
     requests.push(route.request());
-    return route.fulfill({ status: status(requests.length), body: '{}' });
+    // With the CORS header a 200 is a real success for the SDK, not a network failure it retries.
+    return route.fulfill({
+      status: status(requests.length),
+      headers: { 'access-control-allow-origin': '*' },
+      body: '{}',
+    });
   });
   await page.goto(diner);
   const before = await storage(page);
@@ -75,7 +80,11 @@ test('a retry the SDK scheduled is never sent after withdrawal', async ({ page }
   );
   await expect.poll(() => requests.length).toBe(1);
   await call(page, 'a.setConsent(false);');
-  await page.clock.runFor(30 * 60 * 1000);
+  // Same 5-second steps as the control, so a retry would really reach the network.
+  for (let step = 0; step < 360; step++) {
+    await page.clock.runFor(5_000);
+    await page.waitForTimeout(10);
+  }
   expect(requests).toHaveLength(1);
 });
 
@@ -88,9 +97,45 @@ test('control: without withdrawal the SDK does retry, so the check above can fai
     `a.setConsent(true); a.capturePostHog('menu_viewed', { entry_source: 'qr' }, { eventId: '${eventId(1)}' });`,
   );
   await expect.poll(() => requests.length).toBe(1);
-  await page.clock.runFor(30 * 60 * 1000);
-  await expect.poll(() => requests.length).toBe(2);
+  // Small steps: one 30-minute jump would also fire the SDK's 60 s request timeout and abort the
+  // retry in flight before it reaches the network.
+  for (let step = 0; step < 360 && requests.length < 2; step++) {
+    await page.clock.runFor(5_000);
+    await page.waitForTimeout(10);
+  }
+  expect(requests).toHaveLength(2);
   expect(requests[1]?.url()).toContain('retry_count=1');
+});
+
+test('no request starts after a withdrawal made in the same turn as a capture', async ({
+  page,
+}) => {
+  // Records, in page order, each PostHog request the SDK starts and the moment of withdrawal.
+  await page.addInitScript(() => {
+    const log: string[] = [];
+    const send = window.fetch.bind(window);
+    Object.assign(window, { __log: log });
+    window.fetch = (input, init) => {
+      if (String(input instanceof Request ? input.url : input).includes('i.posthog.com'))
+        log.push('request');
+      return send(input, init);
+    };
+  });
+  const { requests } = await open(page, () => 200);
+  await call(
+    page,
+    `a.setConsent(true); a.capturePostHog('menu_viewed', { entry_source: 'qr' }, { eventId: '${eventId(1)}' });`,
+  );
+  await expect.poll(() => requests.length).toBe(1);
+  await call(
+    page,
+    `a.capturePostHog('menu_viewed', { entry_source: 'qr' }, { eventId: '${eventId(2)}' }); a.setConsent(false); window.__log.push('withdrawn');`,
+  );
+  await page.clock.runFor(60 * 1000);
+  await page.waitForTimeout(500);
+  const log = (await page.evaluate('window.__log')) as string[];
+  expect(log.slice(log.indexOf('withdrawn') + 1)).toEqual([]);
+  expect(log.filter((entry) => entry === 'request').length).toBe(requests.length);
 });
 
 test('opt-in, capture and withdrawal leave browser storage untouched; the event surface is kept', async ({

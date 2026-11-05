@@ -14,6 +14,8 @@
 //   cookies. Consent lives in this adapter, so the SDK's own opt-in/out storage is never used.
 // - Withdrawal retires the SDK instance, so its retry queue and unload beacons send nothing more.
 //   A later opt-in starts a fresh, separately named instance with a new visit ID.
+//   Each capture compresses and starts its request synchronously (send_instantly), so no request
+//   can start after a withdrawal made in the same turn.
 // - Deduplication: the SDK and server do not guarantee dedup of resent events, so each event_id is
 //   captured at most once per page. Canonical retries must never call this adapter again.
 // - A PostHog failure never throws into the caller, so it cannot block canonical delivery or
@@ -196,8 +198,11 @@ export function createPostHogAdapter(env: AnalyticsEnvironment, runtime: Runtime
   function send(event: Pending) {
     if (!sdk || !allowed()) return;
     try {
-      // The SDK's documented cross-source idempotency key: PostHog event uuid = event_id.
-      sdk.capture(event.type, event.properties, { uuid: event.eventId });
+      // uuid: the SDK's documented cross-source idempotency key, PostHog event uuid = event_id.
+      // send_instantly: synchronous gzip. In 1.444.4 native async gzip finishes after the SDK's own
+      // send check, so a request could still start after a withdrawal in the same turn. These
+      // captures are already unbatched (uuid), so batching is unchanged.
+      sdk.capture(event.type, event.properties, { uuid: event.eventId, send_instantly: true });
     } catch {
       // PostHog must never block canonical delivery or browsing.
     }
