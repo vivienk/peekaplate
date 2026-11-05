@@ -413,10 +413,16 @@ test('the removed toast disappears after 5 seconds and the restored toast after 
 });
 
 // S3-DIN-02.5: the Saved screen in a real page. `blockWrites` simulates storage that refuses writes.
-async function openSavedScreen(page: Page, preSaved: string[], blockWrites = false) {
+// `missingFromMenu` renders with a menu that no longer has that dish, before reconcile has run.
+async function openSavedScreen(
+  page: Page,
+  preSaved: string[],
+  blockWrites = false,
+  missingFromMenu?: string,
+) {
   await page.goto(DINER);
   await page.evaluate(
-    async ({ preSaved, blockWrites }) => {
+    async ({ preSaved, blockWrites, missingFromMenu }) => {
       const load = (path: string) => import(/* @vite-ignore */ path);
       const { createSaveState } = await load('/src/save/save-state.ts');
       const { renderSavedScreen } = await load('/src/save/saved-screen.ts');
@@ -435,6 +441,14 @@ async function openSavedScreen(page: Page, preSaved: string[], blockWrites = fal
       const saveState = createSaveState({ venueId: menu.venueId });
       saveState.reconcile(menu);
       for (const key of preSaved) saveState.save(fixtures.DISH[key]);
+      const missingId = missingFromMenu ? fixtures.DISH[missingFromMenu] : undefined;
+      const shownMenu = {
+        ...menu,
+        categories: menu.categories.map((category: { dishes: { dishId: string }[] }) => ({
+          ...category,
+          dishes: category.dishes.filter((dish) => dish.dishId !== missingId),
+        })),
+      };
       const events: [string, Record<string, unknown>][] = [];
       const opened: string[] = [];
       let backs = 0;
@@ -443,7 +457,7 @@ async function openSavedScreen(page: Page, preSaved: string[], blockWrites = fal
       const show = () =>
         renderSavedScreen(container, {
           saveState,
-          menu,
+          menu: shownMenu,
           onOpenDish: (dish: { dishId: string }) => opened.push(dish.dishId),
           onBack: () => {
             backs += 1;
@@ -465,7 +479,7 @@ async function openSavedScreen(page: Page, preSaved: string[], blockWrites = fal
         },
       });
     },
-    { preSaved, blockWrites },
+    { preSaved, blockWrites, missingFromMenu },
   );
 }
 
@@ -504,6 +518,15 @@ test('Saved screen lists saved dishes newest first, opens a complete dish and sh
   await items.nth(0).locator('.pp-saved__open').click();
   const info = await savedInfo(page);
   expect(info.opened).toEqual([info.dish.harvestPowerBowl]);
+});
+
+test('shortlist_size counts only the dishes shown, not a saved dish missing from the menu', async ({
+  page,
+}) => {
+  await openSavedScreen(page, ['avocadoToast', 'harvestPowerBowl'], false, 'avocadoToast');
+  await expect(page.locator('.pp-saved__item')).toHaveCount(1);
+  const views = (await savedInfo(page)).events.filter((e) => e.name === 'shortlist_viewed');
+  expect(views).toEqual([expect.objectContaining({ shortlist_size: 1 })]);
 });
 
 test('shortlist_viewed fires once per display, not for changes while the screen is shown', async ({

@@ -113,7 +113,8 @@ export function renderSavedScreen(
     return row;
   }
 
-  function draw() {
+  // Returns how many dishes are shown, so shortlist_viewed reports the list the diner sees.
+  function draw(): number {
     for (const stop of stopHearts) stop();
     stopHearts = [];
     notice.hidden = saveState.mode() !== 'session-only';
@@ -125,22 +126,25 @@ export function renderSavedScreen(
       browse.addEventListener('click', onBack);
       empty.append(el('p', 'pp-saved__empty-text', 'No saved dishes yet'), browse);
       content.replaceChildren(empty);
-      return;
+      return 0;
     }
     const list = el('ul', 'pp-saved__list');
     list.append(...items.map(card));
     content.replaceChildren(list);
+    return items.length;
   }
 
-  draw();
+  const shown = draw();
   const stop = saveState.subscribe(draw);
 
+  // shortlist_size is the number of dishes drawn, not savedCount(): a saved dish missing from this
+  // menu (before reconcile has run) is not shown, so it is not counted.
   // Not counted in session-only mode (confirmed by Adam, matrix v0.1h): unavailable-storage states
   // emit nothing, saves there fire no dish_saved, so a view would describe a list with no matching
   // events and skew the numbers.
   if (saveState.mode() === 'persistent') {
     try {
-      send('shortlist_viewed', shortlistViewedPayload(menu, saveState.savedCount()));
+      send('shortlist_viewed', shortlistViewedPayload(menu, shown));
     } catch {}
   }
 
