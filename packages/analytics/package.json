@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./consent": "./src/consent.ts",
+    "./event-names": "./src/event-names.ts",
     "./posthog": "./src/posthog.ts"
   },
   "scripts": {

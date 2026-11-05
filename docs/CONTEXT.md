@@ -361,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. posthog.ts adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, per-event property allowlist, separate visit ID, event_id as SDK uuid); unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -374,7 +374,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/verify-team-access.mjs",
         "scripts/verify-team-access.test.mjs",
         "packages/analytics/src/posthog.ts",
-        "packages/analytics/src/posthog.test.ts"
+        "packages/analytics/src/posthog.test.ts",
+        "packages/analytics/src/event-names.ts",
+        "packages/analytics/src/event-names.test.ts",
+        "tests/e2e/posthog-adapter.spec.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -387,7 +390,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a4b1e36c8e369f5275a8477148e3c9d7d5f64173ccc9a8bee89a74e7223c3746"
+      "sourceFingerprint": "7c20899171207206ecc3bfd3777534edf1487db2384711290d807d2c4549ff36"
     },
     {
       "id": "processing",

@@ -24,20 +24,11 @@ import type {
   PostHogConfig,
   CaptureResult as PostHogEvent,
 } from 'posthog-js/dist/module.slim.no-external';
+import { P0_EVENT_NAMES, type P0EventName } from './event-names';
 import type { AnalyticsEnvironment } from './index';
 
-// Same list as frontend/diner/src/tracking/event-names.ts (S3-TRK-01.1).
-export const P0_EVENT_NAMES = [
-  'menu_viewed',
-  'dish_viewed',
-  'dish_detail_opened',
-  'dish_activity_checkpoint',
-  'dish_compared',
-  'dish_saved',
-  'dish_unsaved',
-  'shortlist_viewed',
-] as const;
-export type P0EventName = (typeof P0_EVENT_NAMES)[number];
+// Re-exported so existing imports from this module keep working; new code imports './event-names'.
+export { P0_EVENT_NAMES, type P0EventName };
 
 const dish = ['dish_id', 'dish_revision_id'] as const;
 // The only payload fields that may reach PostHog, per event. A new contract field stays local
