@@ -15,6 +15,7 @@ import { PostgresObservationRepository } from './database';
 import { QueueConsumer } from './queue-consumer';
 import { FakeR2ArchiveStorage } from './r2-storage';
 import { buildRawArchiveKey } from './types';
+import type { ObservationRepository } from './types';
 
 const admin = new Client({ connectionString: process.env.PEEKAPLATE_DB_ADMIN_URL });
 const client = new Client({ connectionString: process.env.PEEKAPLATE_DB_TEST_URL });
@@ -63,12 +64,22 @@ async function message(type = 'menu_viewed', trafficClass: 'live' | 'test' | 'de
   return messages[0]!;
 }
 
-async function historic(envelope: ObservationQueueMessage) {
+async function historic(
+  envelope: ObservationQueueMessage,
+  tenant: string = tenantId,
+  archiveStorage: FakeR2ArchiveStorage = storage,
+) {
   const checksum = await sha256(canonicalJson(toCanonicalObservation(envelope)));
-  const key = buildRawArchiveKey(tenantId, envelope.eventId);
-  await storage.putRawPayload(key, new TextEncoder().encode(JSON.stringify(envelope)), checksum);
+  const key = buildRawArchiveKey(tenant, envelope.eventId);
+
+  await archiveStorage.putRawPayload(
+    key,
+    new TextEncoder().encode(JSON.stringify(envelope)),
+    checksum,
+  );
+
   await new PostgresObservationRepository(client).persistCanonical({
-    tenantId,
+    tenantId: tenant,
     eventId: envelope.eventId,
     schemaVersion: envelope.schemaVersion,
     eventType: envelope.type,
@@ -225,6 +236,61 @@ it('persists live facts once under concurrent deliveries and keeps tenant contex
   }
 });
 
+it('uses the greatest cumulative checkpoint regardless of delivery order', async () => {
+  const first = await message('dish_activity_checkpoint', 'live');
+  const openingId = crypto.randomUUID();
+  const dishId = first.payload.dish_id;
+  const dishRevisionId = first.payload.dish_revision_id;
+
+  const highCheckpoint = {
+    ...first,
+    payload: {
+      ...first.payload,
+      opening_id: openingId,
+      dish_id: dishId,
+      dish_revision_id: dishRevisionId,
+      active_ms: 10_000,
+      final: false,
+    },
+  };
+
+  const lowFinalCheckpoint = {
+    ...first,
+    eventId: crypto.randomUUID(),
+    localSequence: first.localSequence + 1,
+    payload: {
+      ...first.payload,
+      opening_id: openingId,
+      dish_id: dishId,
+      dish_revision_id: dishRevisionId,
+      active_ms: 5_000,
+      final: true,
+    },
+  };
+
+  // Deliver the larger cumulative checkpoint first, then the smaller final one.
+  expect((await consumer.processMessage(highCheckpoint)).status).toBe('acknowledged');
+  expect((await consumer.processMessage(lowFinalCheckpoint)).status).toBe('acknowledged');
+
+  const result = await admin.query(
+    `SELECT active_ms, has_final_checkpoint, checkpoint_count
+     FROM app_private.owner_opening_activity_v1
+     WHERE tenant_id = $1
+       AND opening_id = $2
+       AND dish_id = $3
+       AND dish_revision_id = $4`,
+    [tenantId, openingId, dishId, dishRevisionId],
+  );
+
+   expect(result.rows).toHaveLength(1);
+
+  expect(result.rows[0]).toMatchObject({
+    active_ms: 10_000,
+    has_final_checkpoint: true,
+    checkpoint_count: '2',
+  });
+});
+
 it('does not ACK a semantic detail collision as a transport duplicate', async () => {
   const first = await message('dish_viewed');
   first.payload.exposure_id = crypto.randomUUID();
@@ -267,4 +333,136 @@ it('blocks historic archives with missing classification and never reclassifies 
       ])
     ).rowCount,
   ).toBe(0);
+});
+it('blocks a missing archive without creating canonical event or fact rows', async () => {
+  const isolatedTenant = crypto.randomUUID();
+  const isolatedStorage = new FakeR2ArchiveStorage();
+  const envelope = await message();
+
+  await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+    isolatedTenant,
+    'Missing archive test',
+  ]);
+  await historic(envelope, isolatedTenant, isolatedStorage);
+
+  const key = buildRawArchiveKey(isolatedTenant, envelope.eventId);
+  expect(isolatedStorage.delete(key)).toBe(true);
+
+  expect(
+    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
+  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+
+  expect(
+    (
+      await admin.query(
+        'SELECT * FROM app_private.observation_event WHERE tenant_id=$1 AND event_id=$2',
+        [isolatedTenant, envelope.eventId],
+      )
+    ).rowCount,
+  ).toBe(0);
+});
+
+it('blocks corrupt archive bytes even when the stored checksum metadata matches', async () => {
+  const isolatedTenant = crypto.randomUUID();
+  const isolatedStorage = new FakeR2ArchiveStorage();
+  const envelope = await message();
+
+  await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+    isolatedTenant,
+    'Corrupt archive test',
+  ]);
+  await historic(envelope, isolatedTenant, isolatedStorage);
+
+  const key = buildRawArchiveKey(isolatedTenant, envelope.eventId);
+  const checksum = await sha256(canonicalJson(toCanonicalObservation(envelope)));
+
+  isolatedStorage.setExisting(
+    key,
+    new TextEncoder().encode('{"corrupt":true}'),
+    checksum,
+  );
+
+  expect(
+    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
+  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+
+  expect(
+    (
+      await admin.query(
+        'SELECT * FROM app_private.observation_event WHERE tenant_id=$1 AND event_id=$2',
+        [isolatedTenant, envelope.eventId],
+      )
+    ).rowCount,
+  ).toBe(0);
+});
+
+it('blocks a mismatched archive checksum without creating canonical event rows', async () => {
+  const isolatedTenant = crypto.randomUUID();
+  const isolatedStorage = new FakeR2ArchiveStorage();
+  const envelope = await message();
+
+  await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+    isolatedTenant,
+    'Checksum mismatch test',
+  ]);
+  await historic(envelope, isolatedTenant, isolatedStorage);
+
+  const key = buildRawArchiveKey(isolatedTenant, envelope.eventId);
+  const archive = await isolatedStorage.getRawPayload(key);
+  expect(archive).not.toBeNull();
+
+  isolatedStorage.setExisting(key, archive!.rawBytes, '0'.repeat(64));
+
+  expect(
+    await backfillObservationFacts(client, isolatedStorage, isolatedTenant),
+  ).toEqual([{ eventId: envelope.eventId, status: 'blocked' }]);
+
+  expect(
+    (
+      await admin.query(
+        'SELECT * FROM app_private.observation_event WHERE tenant_id=$1 AND event_id=$2',
+        [isolatedTenant, envelope.eventId],
+      )
+    ).rowCount,
+  ).toBe(0);
+});
+
+it('keeps database-failed backfill work eligible for a later successful retry', async () => {
+  const envelope = await message();
+  await historic(envelope);
+
+  const repository = new PostgresObservationRepository(client);
+  let failOnce = true;
+
+  const failingRepository: ObservationRepository = {
+    lookupExisting: (...args) => repository.lookupExisting(...args),
+    persistCanonical: async (...args) => {
+      if (failOnce) {
+        failOnce = false;
+        throw new Error('Synthetic database failure');
+      }
+      return repository.persistCanonical(...args);
+    },
+    recordConflict: (...args) => repository.recordConflict(...args),
+  };
+
+  const failingConsumer = new QueueConsumer({
+    r2Storage: storage,
+    repository: failingRepository,
+  });
+
+  // Use a temporary consumer through the same backfill path.
+  const key = buildRawArchiveKey(tenantId, envelope.eventId);
+  const archive = await storage.getRawPayload(key);
+  expect(archive).not.toBeNull();
+
+  // First verify the injected persistence failure is returned as blocked.
+  const outcome = await failingConsumer.processMessage(envelope);
+  expect(outcome.status).toBe('retry');
+
+  // The normal backfill can then safely retry the same archived observation.
+  expect(await backfillObservationFacts(client, storage, tenantId)).toContainEqual({
+    eventId: envelope.eventId,
+    status: 'restored',
+  });
 });
