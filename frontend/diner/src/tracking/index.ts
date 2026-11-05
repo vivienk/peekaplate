@@ -96,9 +96,9 @@ export function isLiveTracking(): boolean {
 }
 
 // Withdrawal (consent withdrawn or a privacy signal) stops pending canonical sends: the live sender
-// is never called while the gate is closed, and the queued events are dropped. Whether withdrawal
-// should drop events collected while consent was given, or only stop new capture, is open with Sai;
-// change this one switch if he decides to keep them.
+// is never called while the gate is closed, and unsent events are discarded, including a batch whose
+// send was in flight. Nothing collected before withdrawal is sent after opting in again. Decided by
+// Sai (5 Nov), matching the PostHog adapter, which drops its own queued events.
 const WITHDRAWAL_CLEARS_QUEUE = true;
 onTrackingAllowedChange((allowed) => {
   if (!allowed && WITHDRAWAL_CLEARS_QUEUE) pipelines.live?.clear();

@@ -152,6 +152,36 @@ describe('shared dispatch', () => {
     expect(sink.capturePostHog).toHaveBeenCalledTimes(3);
   });
 
+  it('a send in flight at withdrawal is never retried, even if it fails', async () => {
+    const tracking = await fresh();
+    const sink = fakeSink();
+    let fail: (error: Error) => void = () => {};
+    const sent: string[] = [];
+    let calls = 0;
+    tracking.enableLiveTracking(async (batch: Envelope[]) => {
+      calls += 1;
+      if (calls === 1) return new Promise<string[]>((_, reject) => (fail = reject));
+      sent.push(...batch.map((event) => event.event_id));
+      return batch.map((event) => event.event_id);
+    });
+    tracking.connectPostHog(sink);
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    expect(calls).toBe(1);
+    // Withdrawn while the first send is still in flight; then that send fails.
+    tracking.setTrackingAllowed(false);
+    fail(new Error('503'));
+    await flush();
+    // Opting in again sends only the new event: the failed one is gone, not retried or backfilled.
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    await flush();
+    expect(sent).toHaveLength(1);
+    expect(sink.capturePostHog).toHaveBeenCalledTimes(2);
+  });
+
   it('canonical retries never capture to PostHog again', async () => {
     const tracking = await fresh();
     const sink = fakeSink();
