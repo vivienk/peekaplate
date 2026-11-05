@@ -1185,3 +1185,12 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-05T10:28:01.916Z"},"status":"environment-limited","cause":"The S3-DIN-02.2 toast timing test ('the removed toast disappears after 5 seconds') is flaky on branches based on develop: Playwright's installed clock keeps running in real time, so a slow run expires the toast early. The fix (pausing the clock) is in #76, not yet merged into develop.","prevention":"Merge #76, which pauses the clock in both toast timing tests.","regression":"The rerun passed (34/34 main, 4/4 PostHog)."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-05T20:21:43.060Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-05T20:21:43.060Z"},"status":"resolved","cause":"tests/e2e/tracking-outbox.spec.ts (a diner context path) changed in the PostHog dispatch test fix without running pnpm context:refresh, so the diner fingerprint was stale. The diner summary still describes the module correctly.","prevention":"Run pnpm context:refresh after every change to a file listed in a context node, including tests, before pnpm check.","regression":"After the refresh, pnpm context:check and pnpm check pass."}
+```
