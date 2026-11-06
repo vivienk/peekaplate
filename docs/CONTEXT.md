@@ -548,13 +548,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-06",
-      "summary": "S3-RES-01.2 PR #73 rebased linearly onto develop d6e5a16 after #58 merged (net change of the c005b0f merge plus d341c86 replayed as one commit). INGESTION_REPORTS_BUCKET is one binding type: put() for ingestion reports and an optional get() returning ReviewArtifactObject | null for the review verifier. Staff review sessions stay bound to the producer's private attempt artifact; command receipts store a compact reference; originals stay append-only under forced RLS; nothing is approved or published.",
+      "summary": "S3-RES-01.2 PR #73 rebased onto develop d6e5a16 and the three review findings fixed: verifyReviewArtifact binds every report segment, warnings, errors and exporter-derived box links to the stored producer bundle; the candidate command hash records field presence (omitted vs null) via canonicalStringify; mark_incomplete withdraws corrections for incomplete fields and rejects corrected/incomplete overlap with 400 before any write. INGESTION_REPORTS_BUCKET is one binding type (put for ingestion, optional get for review). QA: 828 Vitest, 75 DB integration, 213 pgTAP, 13/13 live API cases (qa-reports/S3-RES-01.2-test-report.md).",
       "modules": [
         "contracts",
         "backend",
         "database"
       ],
-      "next": "Fix Sai's and Teeyansh's three P2 findings (segment/diagnostic binding, omitted-vs-null command hash, mark_incomplete pruning) with regression tests, then Sai/Teeyansh re-review. RES-01.3 UI and RES-01.4 integration consume docs/review-api.md; staging save/reload must pass jobId plus private_review_artifact."
+      "next": "Sai/Teeyansh re-review. RES-01.3 UI and RES-01.4 integration consume docs/review-api.md; staging save/reload must pass jobId plus private_review_artifact. Receipts stored before the hash change do not replay; nothing is deployed."
     },
     {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
