@@ -1012,7 +1012,7 @@ describe('Multi-Tenant Database RLS Integration Checks (Sai & Jeffin Alignment)'
     });
     expect(resOwner.status).toBe(200);
     const bodyOwner = (await resOwner.json()) as any;
-    expect(bodyOwner.venue_id).toBe(validVenueUuid);
+    expect(bodyOwner.venue_id).toBe(validVenueUuid); 
 
     
     const resEditor = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
