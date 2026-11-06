@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
-import type { ReviewCandidate } from '@peekaplate/contracts';
+import type { ReviewCandidate, ReviewCandidateCommand } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,6 +11,7 @@ import {
   ReplayError,
   replayCandidateReview,
   resolveEffectiveFields,
+  saveCandidateReviewCommand,
   upsertExtractionReviewSession,
 } from './review-command';
 
@@ -466,5 +467,193 @@ describe('upsertExtractionReviewSession idempotency', () => {
     const receipt = [...db.commands.values()][0]?.result as Record<string, unknown>;
     expect(Object.keys(receipt).sort()).toEqual(['extractionId', 'payloadSha256', 'schemaVersion']);
     expect(JSON.stringify(receipt).length).toBeLessThan(200);
+  });
+});
+
+type FakeCandidateDatabase = {
+  client: Client;
+  current: Map<string, Record<string, unknown>>;
+  events: CandidateReviewEvent[];
+  writes: string[];
+};
+
+/**
+ * In-memory stand-in for the queries saveCandidateReviewCommand issues: one registered v2
+ * session, the candidate projection, the event stream and command receipts.
+ */
+function fakeCandidateDatabase(venueId: string, extractionId: string): FakeCandidateDatabase {
+  const commands = new Map<string, { request_hash: string; result: unknown }>();
+  const current = new Map<string, Record<string, unknown>>();
+  const events: CandidateReviewEvent[] = [];
+  const writes: string[] = [];
+  const session = {
+    tenant_id: venueId,
+    extraction_id: extractionId,
+    schema_version: fixtureV2.schema_version,
+    pipeline_version: fixtureV2.pipeline_version,
+    extraction_status: fixtureV2.status,
+    source_id: fixtureV2.source.source_id,
+    source_sha256: fixtureV2.source.sha256,
+    job_id: null,
+    private_artifact_key: null,
+    private_artifact_sha256: null,
+    payload: fixtureV2,
+    created_by: 'a11ac10b-58cc-4372-a567-0e02b2c3d479',
+    created_at: new Date('2026-11-03T00:00:00Z'),
+  };
+  const client = {
+    async query(sql: string, params: unknown[] = []) {
+      const text = sql.replace(/\s+/g, ' ').trim();
+      if (/^(BEGIN|COMMIT|ROLLBACK|SET LOCAL)/.test(text) || text.includes('set_config'))
+        return { rows: [] };
+      if (text.includes('pg_advisory_xact_lock')) return { rows: [] };
+      if (text.includes('FROM app_private.staff_membership'))
+        return { rows: [{ permission: 'owner' }] };
+      if (text.startsWith('SELECT request_hash, result FROM app_private.es_command')) {
+        const found = commands.get(`${params[0]}:${params[1]}:${params[2]}`);
+        return { rows: found ? [structuredClone(found)] : [] };
+      }
+      if (text.startsWith('INSERT INTO app_private.es_command')) {
+        writes.push('es_command');
+        commands.set(`${params[1]}:${params[2]}:${params[3]}`, {
+          request_hash: params[5] as string,
+          result: JSON.parse(params[6] as string),
+        });
+        return { rows: [] };
+      }
+      if (text.includes('FROM app_private.extraction_review_session')) {
+        return { rows: params[1] === extractionId ? [session] : [] };
+      }
+      if (text.includes('FROM app_private.candidate_review_current')) {
+        const row = current.get(params[2] as string);
+        return { rows: row ? [structuredClone(row)] : [] };
+      }
+      if (text.startsWith('INSERT INTO app_private.es_event')) {
+        writes.push('es_event');
+        events.push({
+          id: params[0] as string,
+          tenantId: params[1] as string,
+          streamType: 'candidate_review',
+          streamId: params[2] as string,
+          version: params[3] as number,
+          schemaVersion: 1,
+          eventType: 'candidate.review.saved',
+          payload: JSON.parse(params[4] as string),
+          metadata: JSON.parse(params[5] as string),
+        });
+        return { rows: [] };
+      }
+      if (text.startsWith('INSERT INTO app_private.candidate_review_current')) {
+        writes.push('current');
+        current.set(params[2] as string, {
+          candidate_id: params[2],
+          stream_id: params[3],
+          version: params[4],
+          revision_id: params[5],
+          review_status: params[6],
+          corrected_fields: JSON.parse(params[7] as string),
+          edited_fields: params[8],
+          incomplete_fields: params[9],
+          review_note: params[10],
+          reviewed_by: params[11],
+          reviewed_at: params[12],
+        });
+        return { rows: [] };
+      }
+      if (text.startsWith('UPDATE app_private.candidate_review_current')) {
+        writes.push('current');
+        const row = current.get(params[2] as string) ?? {};
+        current.set(params[2] as string, {
+          ...row,
+          version: params[3],
+          revision_id: params[4],
+          review_status: params[5],
+          corrected_fields: JSON.parse(params[6] as string),
+          edited_fields: params[7],
+          incomplete_fields: params[8],
+          review_note: params[9],
+          reviewed_by: params[10],
+          reviewed_at: params[11],
+        });
+        return { rows: [] };
+      }
+      if (text.startsWith('INSERT INTO app_private.outbox')) {
+        writes.push('outbox');
+        return { rows: [] };
+      }
+      throw new Error(`unexpected query: ${text.slice(0, 80)}`);
+    },
+  };
+  return { client: client as unknown as Client, current, events, writes };
+}
+
+describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
+  const venueId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+  const actorId = 'a11ac10b-58cc-4372-a567-0e02b2c3d479';
+  const extractionId = fixtureV2.extraction_id as string;
+  const candidateId = 'draft:0bbe00087c6841623c76d7b6f9da5ebf';
+  const save = (db: FakeCandidateDatabase, input: ReviewCandidateCommand) =>
+    saveCandidateReviewCommand(db.client, actorId, venueId, extractionId, candidateId, input);
+  const id = (n: number) => `c11ac10b-58cc-4372-a567-0e02b2c3d4${String(n).padStart(2, '0')}`;
+
+  async function withRetainedNote() {
+    const db = fakeCandidateDatabase(venueId, extractionId);
+    await save(db, {
+      commandId: id(1),
+      expectedVersion: 0,
+      action: 'correct',
+      corrected: { name: 'Organic Garden Soup' },
+      reviewNote: 'Retained note',
+    });
+    const omitted = await save(db, {
+      commandId: id(2),
+      expectedVersion: 1,
+      action: 'correct',
+      corrected: { price_amount: '9.50' },
+    });
+    return { db, omitted };
+  }
+
+  it('T-B1 conflicts when an omitted-note commandId is reused with an explicit null note', async () => {
+    const { db, omitted } = await withRetainedNote();
+    expect(omitted.review.reviewNote).toBe('Retained note');
+    const writesBefore = db.writes.length;
+    await expect(
+      save(db, {
+        commandId: id(2),
+        expectedVersion: 1,
+        action: 'correct',
+        corrected: { price_amount: '9.50' },
+        reviewNote: null,
+      }),
+    ).rejects.toMatchObject({ code: 'command_conflict', status: 409 });
+    expect(db.writes.length).toBe(writesBefore);
+    expect(db.current.get(candidateId)?.review_note).toBe('Retained note');
+  });
+
+  it('T-B2 replays the stored receipt for an identical retry with the same field presence', async () => {
+    const { db, omitted } = await withRetainedNote();
+    const writesBefore = db.writes.length;
+    const retry = await save(db, {
+      commandId: id(2),
+      expectedVersion: 1,
+      action: 'correct',
+      corrected: { price_amount: '9.50' },
+    });
+    expect(retry).toEqual(omitted);
+    expect(db.writes.length).toBe(writesBefore);
+  });
+
+  it('T-B3 clears the note for a new commandId with an explicit null note', async () => {
+    const { db } = await withRetainedNote();
+    const cleared = await save(db, {
+      commandId: id(3),
+      expectedVersion: 2,
+      action: 'correct',
+      corrected: { price_amount: '9.50' },
+      reviewNote: null,
+    });
+    expect(cleared.review.reviewNote).toBeNull();
+    expect(db.current.get(candidateId)?.review_note).toBeNull();
   });
 });

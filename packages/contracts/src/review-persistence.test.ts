@@ -225,6 +225,20 @@ describe('S3-RES-01.2 review persistence contracts', () => {
         }).success,
       ).toBe(false);
     });
+
+    it('T-B4 keeps an omitted optional field absent and an explicit null reviewNote present', () => {
+      const base = { commandId: validCommandId, expectedVersion: 1, action: 'correct' as const };
+      const omitted = ReviewCandidateCommandSchema.parse({ ...base, corrected: { name: 'Soup' } });
+      const explicit = ReviewCandidateCommandSchema.parse({
+        ...base,
+        corrected: { name: 'Soup' },
+        reviewNote: null,
+      });
+      expect('reviewNote' in omitted).toBe(false);
+      expect('incompleteFields' in omitted).toBe(false);
+      expect('reviewNote' in explicit).toBe(true);
+      expect(explicit.reviewNote).toBeNull();
+    });
   });
 
   describe('ResolvedCandidateFieldsSchema & CandidateReviewRecordSchema', () => {

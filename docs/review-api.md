@@ -93,6 +93,8 @@ Response (`200 OK`): Returns `ExtractionReviewSessionResponse` as shown above.
 
 Applies reviewer actions (`correct`, `reject`, or `mark_incomplete`) with optimistic concurrency (`expectedVersion`) and idempotency (`commandId`). Maximum request size is 16 KB.
 
+Omitting an optional field keeps its previous value; an explicit value replaces it, and `"reviewNote": null` clears the note. The command identity is a canonical hash that records whether each of `corrected`, `incompleteFields` and `reviewNote` was supplied. Reusing a `commandId` with different field presence (for example, omitted note vs. `null`) therefore returns `409 command_conflict`; only an identical retry replays the stored receipt.
+
 #### Example A: Correction Command
 ```bash
 curl -X POST "$API_ORIGIN/venues/f47ac10b-58cc-4372-a567-0e02b2c3d479/extractions/extraction:e1bb4c9c059eb377dc7e92f340e78416/candidates/draft:0bbe00087c6841623c76d7b6f9da5ebf/review" \

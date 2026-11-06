@@ -525,17 +525,22 @@ export async function saveCandidateReviewCommand(
 
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
+    // Execution distinguishes an omitted optional field (keep the previous value) from an explicit
+    // value, including `reviewNote: null` (clear it). The command identity must too, otherwise a
+    // reused commandId with different field presence would replay the wrong receipt.
+    const field = (value: unknown) =>
+      value === undefined ? { present: false } : { present: true, value };
     const commandHash = createHash('sha256')
       .update(
-        JSON.stringify({
+        canonicalStringify({
           commandType: 'candidate.review.save',
           extractionId,
           candidateId,
           expectedVersion: input.expectedVersion,
           action: input.action,
-          corrected: input.corrected ?? null,
-          incompleteFields: input.incompleteFields ?? null,
-          reviewNote: input.reviewNote ?? null,
+          corrected: field(input.corrected),
+          incompleteFields: field(input.incompleteFields),
+          reviewNote: field(input.reviewNote),
         }),
       )
       .digest('hex');
