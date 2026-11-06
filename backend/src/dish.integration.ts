@@ -1134,6 +1134,56 @@ describe('real PostgreSQL staff command', () => {
       );
       expect(events.rows[0]?.count).toBe(2);
     });
+
+    it('T-DB-2 keeps an omitted note, conflicts on null reuse of the same commandId, and clears on a new null command', async () => {
+      const reviewVenue = await registeredReviewVenue();
+      const save = (body: Record<string, unknown>) =>
+        requestCandidateReview(reviewExtractionId, soupCandidateId, body, reviewVenue, actor);
+      expect(
+        (
+          await save({
+            commandId: crypto.randomUUID(),
+            expectedVersion: 0,
+            action: 'correct',
+            corrected: { name: 'Organic Garden Soup' },
+            reviewNote: 'Retained note',
+          })
+        ).status,
+      ).toBe(200);
+      const omittedCommand = {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 1,
+        action: 'correct',
+        corrected: { price_amount: '9.50' },
+      };
+      const omitted = await save(omittedCommand);
+      expect(omitted.status).toBe(200);
+      const omittedBody = ReviewCandidateItemResponseSchema.parse(await omitted.json());
+      expect(omittedBody.review.reviewNote).toBe('Retained note');
+
+      const reusedWithNull = await save({ ...omittedCommand, reviewNote: null });
+      expect(reusedWithNull.status).toBe(409);
+      expect(await reusedWithNull.json()).toEqual({ error: 'command_conflict' });
+
+      const retry = await save(omittedCommand);
+      expect(retry.status).toBe(200);
+      expect(ReviewCandidateItemResponseSchema.parse(await retry.json())).toEqual(omittedBody);
+
+      const cleared = await save({
+        commandId: crypto.randomUUID(),
+        expectedVersion: 2,
+        action: 'correct',
+        corrected: { price_amount: '9.50' },
+        reviewNote: null,
+      });
+      expect(cleared.status).toBe(200);
+      const reload = ExtractionReviewSessionResponseSchema.parse(
+        await (await requestGetCandidates(reviewExtractionId, reviewVenue, actor)).json(),
+      );
+      const soup = reload.items.find((item) => item.candidate.candidate_id === soupCandidateId);
+      expect(soup?.review.version).toBe(3);
+      expect(soup?.review.reviewNote).toBeNull();
+    });
   });
 });
 
