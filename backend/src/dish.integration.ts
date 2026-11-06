@@ -18,7 +18,6 @@ import type { Bindings } from './index';
 import { createApp } from './index';
 import { replayPublication, replayReview } from './publication-command';
 import { readTeamAnalytics } from './team-analytics';
-import { createApp } from "./index";
 
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
