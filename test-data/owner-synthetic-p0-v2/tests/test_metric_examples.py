@@ -11,10 +11,17 @@ def considered_dishes(events):
 
     A dish qualifies when:
     - A linked opening has >= 10,000 ms of checkpointed active time, OR
-    - A valid linked opening has a displayed comparison.
+    - It was opened in a session containing a qualifying displayed comparison.
 
-    Comparison attribution is provisional:
-    only the linked opening's dish qualifies.
+    A displayed Start or Replace comparison qualifies only when at least
+    one dish in the compared pair was opened earlier in the same session.
+
+    Once the comparison qualifies, each dish in the compared pair is
+    credited once if it was opened anywhere in that same session.
+    The second dish may be opened after the comparison.
+
+    A dish never opened in that session receives no comparison credit.
+    Comparisons before either dish opens do not qualify.
     """
     openings = {}
     checkpointed_active_ms = {}
