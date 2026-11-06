@@ -202,3 +202,153 @@ describe('verifyReviewArtifact', () => {
     ).toBe('503 artifact_unavailable');
   });
 });
+
+describe('verifyReviewArtifact page coverage and diagnostics (PR #73 finding A)', () => {
+  const read = reader({ [key]: storedBundle() });
+  const verify = (extractionResult: unknown) =>
+    codeOf(
+      verifyReviewArtifact({ appEnv: 'staging', venueId, input: request(extractionResult), read }),
+    );
+
+  it('T-A1 rejects a request that drops failed or skipped segments from the stored report', async () => {
+    expect(candidates.segments.map((s: { status: string }) => s.status)).toEqual([
+      'ready',
+      'failed',
+      'skipped',
+    ]);
+    const onlyReady = structuredClone(candidates);
+    onlyReady.segments = onlyReady.segments.filter((s: { status: string }) => s.status === 'ready');
+    const noSkipped = structuredClone(candidates);
+    noSkipped.segments = noSkipped.segments.filter(
+      (s: { status: string }) => s.status !== 'skipped',
+    );
+    expect(await verify(onlyReady)).toBe('409 artifact_mismatch');
+    expect(await verify(noSkipped)).toBe('409 artifact_mismatch');
+  });
+
+  it('T-A2 rejects a request whose errors were cleared', async () => {
+    const cleared = structuredClone(candidates);
+    expect(cleared.errors.length).toBeGreaterThan(0);
+    cleared.errors = [];
+    expect(await verify(cleared)).toBe('409 artifact_mismatch');
+  });
+
+  it('T-A3 rejects a request whose warnings were cleared', async () => {
+    const cleared = structuredClone(candidates);
+    expect(cleared.warnings.length).toBeGreaterThan(0);
+    cleared.warnings = [];
+    expect(await verify(cleared)).toBe('409 artifact_mismatch');
+  });
+
+  it('T-A4 rejects a request that rewrites a failed segment as ready', async () => {
+    const rewritten = structuredClone(candidates);
+    const failed = rewritten.segments.find((s: { status: string }) => s.status === 'failed');
+    failed.status = 'ready';
+    failed.error = null;
+    expect(await verify(rewritten)).toBe('409 artifact_mismatch');
+  });
+
+  it('T-A5 accepts the untouched exporter output, including exporter-added box links', async () => {
+    expect(await verify(candidates)).toBe('ok');
+
+    // Exporter-equivalent pair: the report carries box evidence on its evidence records and no
+    // public map; the export adds metadata.candidate_box_evidence to the cited OCR segment.
+    const boxed = boxEvidencePair();
+    expect(await boxed.verify(boxed.exported)).toBe('ok');
+  });
+
+  it('T-A6 rejects forged or re-pointed box links while every other field still matches', async () => {
+    const boxed = boxEvidencePair();
+    const linked = boxed.exported.segments[0].metadata.candidate_box_evidence;
+    const [owner = ''] = Object.keys(linked);
+    expect(owner).toMatch(/^draft:/);
+    const other = boxed.exported.candidates.find(
+      (c: { candidate_id: string }) => c.candidate_id !== owner,
+    ).candidate_id;
+
+    const repointed = structuredClone(boxed.exported);
+    repointed.segments[0].metadata.candidate_box_evidence = { [other]: linked[owner] };
+    const injected = structuredClone(boxed.exported);
+    injected.segments[0].metadata.candidate_box_evidence[owner][0].text = '9.99';
+    const dropped = structuredClone(boxed.exported);
+    delete dropped.segments[0].metadata.candidate_box_evidence;
+    const outcomes: string[] = [];
+    for (const forged of [repointed, injected, dropped]) {
+      const parsed = UpsertExtractionReviewSessionRequestSchema.safeParse({
+        commandId: 'c11ac10b-58cc-4372-a567-0e02b2c3d479',
+        extractionResult: forged,
+        jobId,
+        privateArtifactRef: { schema_version: 1, key, sha256: boxed.sha },
+      });
+      // Each forged map still passes the contract, so the verifier is the guard under test.
+      outcomes.push(
+        parsed.success
+          ? await codeOf(
+              verifyReviewArtifact({
+                appEnv: 'staging',
+                venueId,
+                input: parsed.data,
+                read: boxed.read,
+              }),
+            )
+          : 'contract rejected',
+      );
+    }
+    expect(outcomes).toEqual(Array(3).fill('409 artifact_mismatch'));
+  });
+});
+
+/**
+ * Builds the producer report that the box-evidence export fixture was derived from, mirroring
+ * review_candidates.export: drafts[i] pairs with evidence[draft_index=i], segments are copied and
+ * only the cited OCR segment gains metadata.candidate_box_evidence.
+ */
+function boxEvidencePair() {
+  const exported = fixture('box-evidence-candidates.json');
+  const segments = structuredClone(exported.segments).map(
+    (segment: { metadata: Record<string, unknown> }) => {
+      delete segment.metadata.candidate_box_evidence;
+      return segment;
+    },
+  );
+  const links = exported.segments[0].metadata.candidate_box_evidence as Record<string, unknown[]>;
+  const boxedReport = {
+    schema_version: exported.schema_version,
+    pipeline_version: exported.pipeline_version,
+    status: exported.status,
+    source: exported.source,
+    started_at: exported.started_at,
+    finished_at: exported.finished_at,
+    segments,
+    drafts: exported.candidates.map((c: { original: unknown }) => c.original),
+    evidence: exported.candidates.map(
+      (c: { candidate_id: string; evidence: unknown }, index: number) => ({
+        draft_id: c.candidate_id,
+        draft_index: index,
+        spans: c.evidence,
+        box_evidence: links[c.candidate_id] ?? [],
+      }),
+    ),
+    warnings: exported.warnings,
+    errors: exported.errors,
+  };
+  const text = storedBundle({
+    report: boxedReport,
+    scope: { source_hash: exported.source.sha256 },
+  });
+  const boxedRead = reader({ [key]: text });
+  return {
+    exported,
+    sha: sha(text),
+    read: boxedRead,
+    verify: (extractionResult: unknown) =>
+      codeOf(
+        verifyReviewArtifact({
+          appEnv: 'staging',
+          venueId,
+          input: request(extractionResult, { key, sha256: sha(text) }),
+          read: boxedRead,
+        }),
+      ),
+  };
+}

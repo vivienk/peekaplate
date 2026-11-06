@@ -15,8 +15,12 @@ carry `jobId` and `privateArtifactRef` (the `private_review_artifact` the extrac
 The server reads `menu-ingestion/review-artifacts/{venueId}/{jobId}/{attempt}/bundle.json` from the
 private `INGESTION_REPORTS_BUCKET`, checks its SHA-256 and stored scope, and requires the source,
 versions, status, start time and every candidate's `original` and `evidence` to equal the bundle
-report's `drafts`/`evidence` (a report `null` equals an omitted exported field). A reviewer therefore
-cannot register originals the producer never emitted. Locally the reference stays optional for
+report's `drafts`/`evidence` (a report `null` equals an omitted exported field). Page coverage and
+diagnostics are bound too: every report segment in order (status, error, text, metadata), and the
+report's `warnings` and `errors`. The only permitted difference is the exporter-added
+`metadata.candidate_box_evidence`, which must equal the links the exporter derives from the report's
+evidence box records. A reviewer therefore cannot register originals the producer never emitted or
+hide failed and skipped pages. Locally the reference stays optional for
 fixture journeys; a supplied reference is still verified.
 
 The command identity includes the canonical extraction SHA-256, so reusing a `commandId` with a
@@ -172,7 +176,7 @@ curl -X POST ".../candidates/draft:6dbe8d78dae3c41e819deed5267f8149/review" \
 | 400 | `invalid_candidate` | Artifact key outside `{venueId}/{jobId}`, or a v1 session corrected with v2-only fields. |
 | 401 / 403 | `unauthorized` / `forbidden` | No valid staff token, or not an `owner`/`editor` of the venue. |
 | 404 | `not_found` / `artifact_not_found` | Unknown session or candidate; or no stored bundle under the key. |
-| 409 | `artifact_mismatch` | Stored bundle hash, scope, source or any candidate original/evidence differs. |
+| 409 | `artifact_mismatch` | Stored bundle hash, scope, source, any candidate original/evidence, any segment (count, order, status, error, text, metadata, box links) or the warnings/errors differ. |
 | 409 | `version_conflict` / `command_conflict` / `extraction_conflict` | Stale `expectedVersion`; reused `commandId` with a different request; same extraction id with different content. |
 | 413 / 415 | `body_too_large` / `unsupported_media_type` | Over 512 KB (session) or 16 KB (review); non-JSON body. |
 | 503 | `artifact_unavailable` / `service_unavailable` | Bucket binding or database configuration missing. |
