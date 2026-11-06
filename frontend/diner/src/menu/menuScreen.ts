@@ -282,12 +282,17 @@ export function mountMenuScreen(container: HTMLElement): void {
     window.scrollTo(0, 0);
   };
 
-  void source.load().then((result: MenuLoadResult) => {
-    if (result.status !== 'ready') {
-      renderFailure(container, result.status);
-      return;
-    }
-    currentMenu = result.menu;
-    renderMenu(container, currentMenu, showDetail);
-  });
+  void source
+    .load()
+    .then((result: MenuLoadResult) => {
+      if (result.status !== 'ready') {
+        renderFailure(container, result.status);
+        return;
+      }
+      currentMenu = result.menu;
+      renderMenu(container, currentMenu, showDetail);
+    })
+    .catch(() => {
+      renderFailure(container, 'error');
+    });
 }

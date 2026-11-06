@@ -4,6 +4,7 @@ The authenticated Worker owns job authorization/leases; this process never write
 application records. URL/text inputs must be materialized by the Worker first.
 """
 import hashlib
+import base64
 import hmac
 import httpx
 import json
@@ -28,6 +29,15 @@ from peekaplate_processing.sources import MAX_SOURCE_BYTES, detect_kind
 MAX_REQUEST_BYTES = 8192
 MAX_REPORT_BYTES = 24_000_000  # Includes the bounded source's base64 snapshot.
 JOB_TIMEOUT_SECONDS = 700
+MAX_BUNDLE_BYTES = 32_000_000
+
+
+def read_result(path, limit):
+    with path.open("rb") as handle:
+        content=handle.read(limit+1)
+    if len(content)>limit:
+        raise ValueError("Extraction artifact exceeds limit.")
+    return json.loads(content)
 
 
 @dataclass(frozen=True)
@@ -79,7 +89,7 @@ def read_source(job, settings, capability):
         return bytes(data) if len(data) == length else None
 
 
-def run_extraction(data, kind, timeout):
+def run_extraction(data, kind, timeout, *, include_artifacts=False):
     # A child process gives the complete pipeline a killable wall-clock deadline.
     with tempfile.TemporaryDirectory(prefix="peekaplate-extract-") as directory:
         root = Path(directory)
@@ -91,18 +101,20 @@ def run_extraction(data, kind, timeout):
         completed = subprocess.run(
             [sys.executable, "-m", "peekaplate_processing.run_pipeline",
              "--input", str(source), "--run-dir", str(root / "result"),
-             "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache"],
+             "--input-mode", "ocr_image", "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache"],
             cwd=root, env=env, timeout=timeout, check=False,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
-        # The CLI writes usable incomplete/failed reports before its expected exit 2.
-        if completed.returncode not in (0, 2):
+        if completed.returncode not in (0, 1, 2):
             raise subprocess.CalledProcessError(completed.returncode, "extraction")
-        with (root / "result" / "extraction.json").open("rb") as output:
-            report = output.read(MAX_REPORT_BYTES + 1)
-        if len(report) > MAX_REPORT_BYTES:
-            raise ValueError("Extraction report exceeds limit.")
-        return json.loads(report)
+        report=read_result(root/"result/extraction.json",MAX_REPORT_BYTES)
+        if completed.returncode==1 and report.get("status")!="failed":
+            raise subprocess.CalledProcessError(completed.returncode,"extraction")
+        if not include_artifacts:
+            return report
+        return {"schema_version":1,"report":report,
+                "review_suggestions":read_result(root/"result/review-suggestions.json",8_000_000),
+                "timings":read_result(root/"result/timings.json",1_000_000)}
 
 
 def create_app(settings=None, *, source_reader=None, runner=run_extraction):
@@ -125,6 +137,9 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
         expected = ("Bearer " + settings.secret).encode("ascii")
         if not hmac.compare_digest(credential, expected):
             return reply({"error": "unauthorized"}, 401)
+        artifact_version=request.headers.get("x-extraction-artifact-bundle")
+        if artifact_version not in (None,"1"):
+            return reply({"error":"unsupported_artifact_version"},400)
         body = bytearray()
         async for chunk in request.stream():
             body.extend(chunk)
@@ -147,11 +162,11 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
         try:
             # Run blocking SDK/process work off the event loop so health stays responsive.
             from starlette.concurrency import run_in_threadpool
-            return await run_in_threadpool(process, job, capability)
+            return await run_in_threadpool(process, job, capability, artifact_version=="1")
         finally:
             slot.release()
 
-    def process(job, capability):
+    def process(job, capability, include_artifacts):
         try:
             data = source_reader(job, capability)
             if data is None or not 0 < len(data) <= MAX_SOURCE_BYTES:
@@ -164,12 +179,35 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
                 return reply({"error": "unsupported_source"}, 422)
             if kind != ("pdf" if job.source_type == "pdf" else "image"):
                 return reply({"error": "source_kind_mismatch"}, 422)
-            report = MenuExtractionResult.model_validate(runner(data, kind, JOB_TIMEOUT_SECONDS))
-            if not report.source or report.source.sha256 != job.source_hash:
+            result=runner(data,kind,JOB_TIMEOUT_SECONDS,include_artifacts=True) if include_artifacts and runner is run_extraction else runner(data,kind,JOB_TIMEOUT_SECONDS)
+            bundle=result if isinstance(result,dict) and "report" in result else None
+            report = MenuExtractionResult.model_validate(bundle["report"] if bundle else result)
+            if (not report.source or report.source.sha256 != job.source_hash
+                    or report.source.source_id!="sha256:"+job.source_hash
+                    or report.source.size_bytes!=len(data)
+                    or base64.b64decode(report.source.snapshot_base64,validate=True)!=data):
                 return reply({"error": "invalid_extraction_report"}, 502)
             encoded = report.model_dump(mode="json")
             if len(json.dumps(encoded).encode("utf-8")) > MAX_REPORT_BYTES:
                 return reply({"error": "report_too_large"}, 502)
+            if include_artifacts:
+                if not bundle or set(bundle)!={"schema_version","report","review_suggestions","timings"} or type(bundle["schema_version"]) is not int or bundle["schema_version"]!=1:
+                    raise ValueError("Missing private artifact bundle.")
+                private,timings=bundle["review_suggestions"],bundle["timings"]
+                if (not isinstance(private,dict) or not isinstance(timings,dict)
+                        or type(private.get("schema_version")) is not int or private["schema_version"]!=1
+                        or private.get("source_id")!=report.source.source_id or private.get("input_mode")!="ocr_image"
+                        or private.get("status") not in {"complete","incomplete","failed"}
+                        or not isinstance(private.get("suggestions"),list)
+                        or any(not isinstance(item,dict) or item.get("status")!="unvalidated" for item in private["suggestions"])
+                        or type(timings.get("schema_version")) is not int or timings["schema_version"]!=1
+                        or timings.get("input_mode")!="ocr_image" or timings.get("status")!=report.status
+                        or not isinstance(timings.get("timings_seconds"),dict)):
+                    raise ValueError("Invalid private artifact scope or version.")
+                bundle={**bundle,"report":encoded}
+                if len(json.dumps(bundle).encode("utf-8"))>MAX_BUNDLE_BYTES:
+                    return reply({"error":"bundle_too_large"},502)
+                return reply(bundle,**{"X-Extraction-Artifact-Bundle":"1"})
             return reply(encoded)
         except subprocess.TimeoutExpired:
             return reply({"error": "extraction_timeout"}, 504)

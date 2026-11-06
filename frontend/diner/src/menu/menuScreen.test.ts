@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createFixtureMenuSource } from './fixtures';
 import { mountMenuScreen } from './menuScreen';
 
 const mockObserve = vi.fn();
@@ -82,6 +83,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+vi.mock('./fixtures', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./fixtures')>();
+  return {
+    ...actual,
+    // Real behavior by default; the two error tests override one call.
+    createFixtureMenuSource: vi.fn(actual.createFixtureMenuSource),
+  };
+});
+
 async function mountAndWait(container: FakeContainer): Promise<void> {
   mountMenuScreen(container as unknown as HTMLElement);
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -132,14 +142,40 @@ describe('menu screen observer lifecycle', () => {
     await mountAndWait(container);
     expect(mockDisconnect).toHaveBeenCalledTimes(disconnectsAfterFirst + 1);
   });
+});
 
-  it('calls observe on the IntersectionObserver for cards', async () => {
-    const container = new FakeContainer();
+it('calls observe on the IntersectionObserver for cards', async () => {
+  const container = new FakeContainer();
 
-    await mountAndWait(container);
+  await mountAndWait(container);
 
-    const cards = container.querySelectorAll('.pp-card--dim');
-    expect(mockObserve).toHaveBeenCalled();
-    expect(mockObserve.mock.calls.length).toBeGreaterThanOrEqual(cards.length);
+  const cards = container.querySelectorAll('.pp-card--dim');
+  expect(mockObserve).toHaveBeenCalled();
+  expect(mockObserve.mock.calls.length).toBeGreaterThanOrEqual(cards.length);
+});
+
+it('displays error state when load rejects', async () => {
+  vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+    load: () => Promise.reject(new Error('boom')),
   });
+  const container = new FakeContainer();
+
+  await mountAndWait(container);
+
+  expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+});
+
+it('displays error state when renderMenu throws after ready', async () => {
+  vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+    load: () =>
+      Promise.resolve({
+        status: 'ready',
+        menu: { categories: null, restaurant: { name: 'Test Restaurant' } },
+      } as never),
+  });
+  const container = new FakeContainer();
+
+  await mountAndWait(container);
+
+  expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
 });
