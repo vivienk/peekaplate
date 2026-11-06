@@ -64,8 +64,27 @@ def considered_dishes(events):
                 set(event.get("dish_ids", []))
                 & previously_opened.get(session, set())
             )
-            qualifying_comparisons.update(linked_dishes)
-    considered = set(qualifying_comparisons)
+            if linked_dishes:
+                qualifying_comparisons.add(
+                    (session, tuple(event.get("dish_ids", [])))
+                )
+    # Collect dishes opened anywhere in each session.
+    opened_in_session = {}
+
+    for event in events:
+        if event["event_type"] == "dish_detail_opened":
+            session = event.get("session_id", "example-session")
+            opened_in_session.setdefault(session, set()).add(
+                event["dish_id"]
+        )
+
+    # Count both compared dishes, including one opened later.
+    considered = set()
+
+    for session, dish_pair in qualifying_comparisons:
+        considered.update(
+            set(dish_pair) & opened_in_session.get(session, set())
+    )
 
     for opening_id, active_ms in checkpointed_active_ms.items():
         if active_ms >= 10000:
