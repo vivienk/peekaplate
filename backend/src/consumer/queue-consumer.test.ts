@@ -576,14 +576,20 @@ describe('QueueConsumer', () => {
     // R2 archive already created
     const expectedKey = `raw/observations/${T1}/${E1}.json`;
     expect(r2Storage.has(expectedKey)).toBe(true);
+    const initialPutCalls = r2Storage.putCalls.length;
+    expect(initialPutCalls).toBe(1);
 
     // DB was not persisted
     expect(await repository.lookupExisting(T1, E1)).toBeNull();
 
-    // On retry, R2 sees existing key without error, and DB write succeeds
+    // On retry, R2 confirms the existing key and DB write succeeds
     const d2 = await consumer.processMessage(msg);
     expect(d2.status).toBe('acknowledged');
+    expect(r2Storage.putCalls).toHaveLength(initialPutCalls + 1);
+    expect(r2Storage.putCalls[1]?.key).toBe(expectedKey);
+    expect([...r2Storage.keys()]).toHaveLength(1);
     expect(await repository.lookupExisting(T1, E1)).not.toBeNull();
+    expect(repository.index.size).toBe(1);
   });
 
   describe('Malformed envelope regressions and safe DLQ handling (Findings B & C / Section 5 & 8.B)', () => {

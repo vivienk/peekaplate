@@ -342,6 +342,8 @@ test('Undo survives moving to another screen and still expires at the original d
   page,
 }) => {
   await page.clock.install();
+  // Only runFor advances the expiry clock; navigation/assertion wall time must not consume it.
+  await page.clock.pauseAt(new Date(Date.now() + 60_000));
   await openSaveUi(page);
   const card = page.getByTestId('card-heart');
   await card.click();
