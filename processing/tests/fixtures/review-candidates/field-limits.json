@@ -1,0 +1,5 @@
+[
+  { "field": "name", "limit": 160, "character": "🍜" },
+  { "field": "description", "limit": 4000, "character": "🍜" },
+  { "field": "price_text", "limit": 160, "character": "🍜" }
+]

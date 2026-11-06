@@ -98,16 +98,24 @@ export function replayDish(events: readonly DishEvent[]): DishProjection | null 
   return projection;
 }
 
+export type CreateDishRevisionOptions = {
+  inTransaction?: boolean;
+};
+
 export async function createDishRevision(
   client: Client,
   actorId: string,
   venueId: string,
   input: CreateDishRevisionInput,
+  options?: CreateDishRevisionOptions,
 ): Promise<DishRevisionResult> {
+  const inTx = options?.inTransaction === true;
   let started = false;
   try {
-    await client.query('BEGIN');
-    started = true;
+    if (!inTx) {
+      await client.query('BEGIN');
+      started = true;
+    }
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -138,8 +146,10 @@ export async function createDishRevision(
     const existing = receipt.rows[0];
     if (existing) {
       if (existing.request_hash !== hash) throw new CommandError('command_conflict', 409);
-      await client.query('COMMIT');
-      started = false;
+      if (!inTx) {
+        await client.query('COMMIT');
+        started = false;
+      }
       return resultFrom(existing.result);
     }
 
@@ -216,8 +226,10 @@ export async function createDishRevision(
        VALUES ($1, $2, $3, 'dish.revision.created', $4::jsonb)`,
       [randomUUID(), venueId, eventId, JSON.stringify({ eventId, dishId: input.dishId })],
     );
-    await client.query('COMMIT');
-    started = false;
+    if (!inTx) {
+      await client.query('COMMIT');
+      started = false;
+    }
     return commandResult;
   } catch (error) {
     if (started) await client.query('ROLLBACK');
