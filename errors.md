@@ -1372,3 +1372,39 @@ steps. The test now pauses the clock before mounting its fixture, then advances
 only the existing 2000/2900/200-ms steps. Toast assertions, expiry deadlines and
 product code are unchanged. All 12 focused Save browser tests pass; retain the
 original failure observation above rather than treating a rerun as its diagnosis.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:02.888Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:39.709Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:23:21.522Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:25:08.929Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:29:32.539Z","exitCode":1}
+```
+
+## November 6 owner-report route verification
+
+The initial owner-report request returned 503 because its query referenced
+`menu_dish` and `dish_saved`, and joined opening activity through columns absent
+from the applied fact-view schema. The query now joins tenant-scoped
+`dish_current` and `owner_opening_activity_v1` and derives direct saves from
+`owner_observation_v1`; the multi-tenant integration test covers owner, editor,
+and cross-tenant access. After installing the missing local Playwright system
+libraries, `pnpm verify test:db` passed all 73 tests and pgTAP assertions.
+Backend typecheck and Biome checks pass.

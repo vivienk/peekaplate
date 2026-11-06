@@ -159,7 +159,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical index/event/detail/fact persistence. Historical hosted baseline c6a47bd: six synthetic hosted checks passed, three earlier facts were backfilled, and genuine Brave menu/token/bundle requests reached Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 adds synthetic coverage for cumulative checkpoint ordering, missing/corrupt archive recovery, archive-to-facts restoration, retry/redelivery, duplicate replay, and a two-session ingestion-to-canonical-facts flow with owner-view exclusion. These fixtures do not establish live staging acceptance, full DLQ/crash recovery, or end-to-end cross-tenant archive/replay isolation. Normal collection remains paused pending real controls/outbox/privacy and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Hosted synthetic and genuine-token transport/backfill checks passed; retries store one fact and changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042. S4-DATA-04 adds synthetic checkpoint, archive recovery, replay and owner-exclusion coverage. The owner dish-report API verifies staff identity and owner membership, then queries tenant-scoped fact views over 24 hours; report contract and hosted/production acceptance remain unverified. Normal collection remains paused pending real controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -185,6 +185,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
@@ -263,7 +265,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "9bf6ad56ed83170b8790554d6c9d1d71d2bbeafba14f220ebbbf4360d5631064"
+      "sourceFingerprint": "3c6e87ad6c97d768a1e1031d99c2be1e5a11831330e1a3ecadb454a011c703a9"
     },
     {
       "id": "database",
@@ -543,12 +545,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
+      "summary": "November 6 follow-up to S4-DATA-04: adds GET /api/v1/venues/:venueId/analytics/dishes with signed staff identity, owner-only membership and a read-only tenant report query. Corrects the query to use dish_current and the current owner fact views. API/integration coverage remains synthetic and does not establish report-contract, hosted recovery or production acceptance.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
+      "next": "Rerun the disposable-database suite in an environment with Playwright's browser libraries installed; continue to keep collection paused for remaining screen, consent, report-contract, native recovery and hosted acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",

@@ -31,7 +31,10 @@ export async function readOwnerReport(
     // Configuration du tenant_id pour activer correctement les politiques RLS de la base
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
-    const result = await client.query(OWNER_REPORT_QUERY, [venueId]);
+    const result = await client.query(OWNER_REPORT_QUERY, [
+      venueId,
+      new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    ]);
     await client.query('COMMIT');
     started = false;
     return buildInternalReport(result.rows, venueId, now);
@@ -52,27 +55,24 @@ const OWNER_REPORT_QUERY = `
   WITH raw_metrics AS (
     SELECT
       obs.dish_id,
-      MIN(menu.name) AS dish_name,
-      
-      -- Calculs distincts par cellule (Sessions de dîneurs uniques)
-      COUNT(DISTINCT obs.session_id) AS total_sessions,
+      MIN(dish.name) AS dish_name,
+      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_viewed' THEN obs.session_id END) AS total_sessions,
       COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' THEN obs.session_id END) AS open_eligible_sessions,
-      COUNT(CASE WHEN obs.event_type = 'dish_detail_opened' THEN 1 END) AS total_opens,
-      
-      -- Engagement : sessions avec durée active >= 10 secondes (ADR 0015 D7)
-      COUNT(DISTINCT CASE WHEN act.active_ms >= 10000 THEN act.session_id END) AS engaged_sessions,
+      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' THEN obs.session_id END) AS total_opens,
+      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' AND act.active_ms >= 10000
+        THEN obs.session_id END) AS engaged_sessions,
       MAX(act.active_ms) AS max_active_time,
-      
-      -- Sauvegardes directes filtrées sur l'origine d'exposition (Checklist Jeffin)
-      COUNT(DISTINCT CASE WHEN svg.save_origin = 'direct' THEN svg.session_id END) AS saved_dishes
-      
+      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_saved' AND obs.save_origin = 'direct'
+        THEN obs.session_id END) AS saved_dishes
     FROM app_private.owner_observation_v1 obs
-    -- Jointures sur les relations valides de la branche develop
-    LEFT JOIN app_private.menu_dish menu ON menu.id = obs.dish_id
-    LEFT JOIN app_private.owner_opening_activity_v1 act ON act.event_id = obs.event_id
-    LEFT JOIN app_private.dish_saved svg ON svg.dish_id = obs.dish_id AND svg.session_id = obs.session_id
-    
-    WHERE obs.tenant_id = $1 -- Filtrage par identifiant d'établissement (tenant RLS)
+    LEFT JOIN app_private.dish_current dish
+      ON dish.tenant_id = obs.tenant_id AND dish.dish_id = obs.dish_id
+    LEFT JOIN app_private.owner_opening_activity_v1 act
+      ON act.tenant_id = obs.tenant_id
+      AND act.opening_id = obs.opening_id
+      AND act.dish_id = obs.dish_id
+    WHERE obs.tenant_id = $1
+      AND obs.occurred_at >= $2
     GROUP BY obs.dish_id
   )
   SELECT

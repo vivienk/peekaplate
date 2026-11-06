@@ -15,10 +15,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createDishRevision, replayDish } from './dish-command';
 import type { Bindings } from './index';
-import { createApp } from './index';
 import { replayPublication, replayReview } from './publication-command';
 import { readTeamAnalytics } from './team-analytics';
-
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
@@ -30,6 +28,7 @@ const otherVenue = crypto.randomUUID();
 const actor = crypto.randomUUID();
 const otherActor = crypto.randomUUID();
 const viewer = crypto.randomUUID();
+const otherVenueOwner = crypto.randomUUID();
 let server: Server;
 let env: Bindings;
 let signingKey: CryptoKey;
@@ -53,12 +52,12 @@ function command(patch = {}) {
   };
 }
 
-async function token(subject: string) {
+async function token({ sub }: { sub: string }) {
   return new SignJWT({ role: 'authenticated', is_anonymous: false })
     .setProtectedHeader({ alg: 'ES256', kid: 'integration' })
     .setIssuer(env.AUTH_ISSUER!)
     .setAudience('authenticated')
-    .setSubject(subject)
+    .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(signingKey);
@@ -68,7 +67,7 @@ async function request(dishId: string, body = command(), tenant = venue, subject
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/dishes/${dishId}/revisions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -83,7 +82,7 @@ async function requestEvidence(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menu-evidence`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -100,7 +99,7 @@ async function requestPublication(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menus/${menuId}/${action}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -187,8 +186,8 @@ beforeAll(async () => {
   ]);
   await admin.query(
     `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission)
-    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner')`,
-    [venue, otherVenue, actor, otherActor, viewer],
+    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner'),($2,$6,'owner')`,
+    [venue, otherVenue, actor, otherActor, viewer, otherVenueOwner],
   );
   const keys = await generateKeyPair('ES256');
   signingKey = keys.privateKey;
@@ -1001,32 +1000,25 @@ describe('real PostgreSQL menu publication commands', () => {
     });
   });
 });
-describe('Multi-Tenant Database RLS Integration Checks (Sai & Jeffin Alignment)', () => {
-  it('Should securely isolate owner metrics across distinct restaurant scopes via local router request', async () => {
-    const validVenueUuid = '00000000-0000-0000-0000-000000000001';
-    const app = createApp();
+describe('Multi-tenant owner report isolation', () => {
+  it('isolates reports to the signed-in tenant owner', async () => {
+    const requestReport = async (tenant: string, subject: string) =>
+      fetch(`http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes`, {
+        headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
+      });
 
-    
-    const resOwner = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
-      method: 'GET',
-      headers: { Authorization: 'Bearer test-valid-owner-token' },
-    });
-    expect(resOwner.status).toBe(200);
-    const bodyOwner = (await resOwner.json()) as any;
-    expect(bodyOwner.venue_id).toBe(validVenueUuid); 
+    const ownerResponse = await requestReport(venue, actor);
+    expect(ownerResponse.status).toBe(200);
+    expect(await ownerResponse.json()).toMatchObject({ venue_id: venue });
 
-    
-    const resEditor = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
-      method: 'GET',
-      headers: { Authorization: 'Bearer test-editor-token' },
-    });
-    expect(resEditor.status).toBe(403);
+    const editorResponse = await requestReport(venue, otherActor);
+    expect(editorResponse.status).toBe(403);
 
-    
-    const resSpy = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
-      method: 'GET',
-      headers: { Authorization: 'Bearer test-concurrent-owner-token' },
-    });
-    expect(resSpy.status).toBe(403);
+    const otherTenantResponse = await requestReport(venue, otherVenueOwner);
+    expect(otherTenantResponse.status).toBe(403);
+
+    const otherOwnerResponse = await requestReport(otherVenue, otherVenueOwner);
+    expect(otherOwnerResponse.status).toBe(200);
+    expect(await otherOwnerResponse.json()).toMatchObject({ venue_id: otherVenue });
   });
 });
