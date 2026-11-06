@@ -123,6 +123,43 @@ test('field labels are 14px on a 24px line height at weight 600', async ({ page 
   }
 });
 
+// Rania's review (6 Nov): helper and error text 12px/16px at weight 400, indented 8px and 6px below
+// the input; helper in on-surface-variant, error and the error border in color/error; label in
+// on-surface.
+test('helper, error and label text match the Figma colours, sizes and spacing', async ({
+  page,
+}) => {
+  await page.goto(demo);
+  const text = (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((element) => {
+        const style = getComputedStyle(element);
+        const input = element.parentElement?.querySelector('.pp-input');
+        const gap = input
+          ? Math.round(element.getBoundingClientRect().top - input.getBoundingClientRect().bottom)
+          : null;
+        return {
+          color: style.color,
+          size: style.fontSize,
+          lineHeight: style.lineHeight,
+          weight: style.fontWeight,
+          indent: style.paddingInlineStart,
+          gap,
+        };
+      });
+  const small = { size: '12px', lineHeight: '16px', weight: '400', indent: '8px', gap: 6 };
+  expect(await text('.pp-field__hint')).toEqual({ ...small, color: 'rgb(87, 85, 78)' });
+  expect(await text('.pp-field__error')).toEqual({ ...small, color: 'rgb(185, 28, 28)' });
+  expect((await text('.pp-field__label')).color).toBe('rgb(28, 26, 23)');
+  const errorBorder = await page
+    .locator('input[aria-invalid="true"]')
+    .first()
+    .evaluate((element) => getComputedStyle(element).borderTopColor);
+  expect(errorBorder).toBe('rgb(185, 28, 28)');
+});
+
 test('every input box is 44px tall in every state, with 16px text on a 24px line height', async ({
   page,
 }) => {

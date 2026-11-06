@@ -472,7 +472,7 @@ describe('design tokens', () => {
       '--pp-role-input-placeholder': 'var(--pp-color-gray-500)',
       '--pp-role-input-border': 'var(--pp-color-gray-500)',
       '--pp-role-input-border-focus': 'var(--pp-color-info-700)',
-      '--pp-role-input-border-error': 'var(--pp-color-error-400)',
+      '--pp-role-input-border-error': 'var(--pp-color-error-700)',
       '--pp-role-input-text-error': 'var(--pp-color-error-700)',
       '--pp-role-input-bg-disabled': 'var(--pp-color-gray-200)',
       '--pp-role-input-text-disabled': 'var(--pp-color-gray-500)',
