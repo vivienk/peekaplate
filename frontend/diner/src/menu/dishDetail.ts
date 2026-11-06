@@ -61,7 +61,7 @@ export function renderDishDetail(
 
   const hasAllergens = dish.allergens.length > 0;
   const hasDietary = dish.dietary.length > 0;
-  const showAllergenSection = true; // the staff note always shows
+  const allergyNote = `<p class="pp-allergy-note">For allergy questions, please ask the restaurant staff.</p>`;
 
   container.innerHTML = `
     <div class="pp-detail">
@@ -89,36 +89,35 @@ export function renderDishDetail(
           <p class="pp-detail__description">${escapeHtml(dish.description)}</p>
         </div>
 
-        ${
-          showAllergenSection
-            ? `
-              <div class="pp-allergen-section">
-                <p class="pp-allergen-section__title">Allergens &amp; dietary info</p>
-                ${
-                  hasAllergens
-                    ? `
-                      <div class="pp-allergen-row">
-                        <span class="pp-allergen-row__label">Contains</span>
-                        <div class="pp-chip-group">${allergenChips(dish)}</div>
-                      </div>
-                    `
-                    : ''
-                }
-                ${
-                  hasDietary
-                    ? `
-                      <div class="pp-allergen-row">
-                        <span class="pp-allergen-row__label">Dietary info</span>
-                        <div class="pp-chip-group">${dietaryChips(dish)}</div>
-                      </div>
-                    `
-                    : ''
-                }
-                <p class="pp-allergy-note">For allergy questions, please ask the restaurant staff.</p>
-              </div>
-            `
-            : ''
-        }
+        <div class="pp-allergen-section">
+          <p class="pp-allergen-section__title">Allergens &amp; dietary info</p>
+          ${
+            hasAllergens
+              ? `
+                <div class="pp-allergen-row">
+                  <span class="pp-allergen-row__label">Contains</span>
+                  <div class="pp-chip-group">${allergenChips(dish)}</div>
+                </div>
+              `
+              : `
+                <div class="pp-allergen-row">
+                  <span class="pp-allergen-row__label">Contains</span>
+                  ${allergyNote}
+                </div>
+              `
+          }
+          ${
+            hasDietary
+              ? `
+                <div class="pp-allergen-row">
+                  <span class="pp-allergen-row__label">Dietary info</span>
+                  <div class="pp-chip-group">${dietaryChips(dish)}</div>
+                </div>
+              `
+              : ''
+          }
+          ${hasAllergens ? allergyNote : ''}
+        </div>
 
         <div class="pp-ingredients">
           <p class="pp-ingredients__title">Ingredients</p>

@@ -97,7 +97,7 @@ describe('fixture menu source', () => {
     expect(dish.dietary).toEqual(['Vegan', 'Vegetarian']);
   });
 
-  it('has a complete dish with no allergen or dietary data, so the section can be hidden', async () => {
+  it('has a complete dish with no allergen or dietary data, so the note shows under Contains', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.noAllergenData);
     expect(dish.allergens).toEqual([]);
     expect(dish.dietary).toEqual([]);
