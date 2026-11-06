@@ -1001,11 +1001,12 @@ describe('real PostgreSQL menu publication commands', () => {
   });
 });
 describe('Multi-Tenant Database RLS Integration Checks (Sai & Jeffin Alignment)', () => {
-  const app = createApp();
   it('Should securely isolate owner metrics across distinct restaurant scopes via local router request', async () => {
     const validVenueUuid = '00000000-0000-0000-0000-000000000001';
+    const app = createApp();
 
-    const resOwner = await app.request(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
+    
+    const resOwner = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
       headers: { Authorization: 'Bearer test-valid-owner-token' },
     });
@@ -1013,13 +1014,15 @@ describe('Multi-Tenant Database RLS Integration Checks (Sai & Jeffin Alignment)'
     const bodyOwner = (await resOwner.json()) as any;
     expect(bodyOwner.venue_id).toBe(validVenueUuid);
 
-    const resEditor = await app.request(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
+    
+    const resEditor = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
       headers: { Authorization: 'Bearer test-editor-token' },
     });
     expect(resEditor.status).toBe(403);
 
-    const resSpy = await app.request(`/api/v1/venues/${validVenueUuid}/analytics/dishes`, {
+    
+    const resSpy = await app.request(`/venues/${validVenueUuid}/analytics/dishes`, {
       method: 'GET',
       headers: { Authorization: 'Bearer test-concurrent-owner-token' },
     });
