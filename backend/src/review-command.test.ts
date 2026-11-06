@@ -656,4 +656,59 @@ describe('saveCandidateReviewCommand (PR #73 findings B and C)', () => {
     expect(cleared.review.reviewNote).toBeNull();
     expect(db.current.get(candidateId)?.review_note).toBeNull();
   });
+
+  async function correctedThenIncomplete() {
+    const db = fakeCandidateDatabase(venueId, extractionId);
+    await save(db, {
+      commandId: id(10),
+      expectedVersion: 0,
+      action: 'correct',
+      corrected: { price_amount: '9.50', name: 'Organic Garden Soup' },
+    });
+    const incomplete = await save(db, {
+      commandId: id(11),
+      expectedVersion: 1,
+      action: 'mark_incomplete',
+      incompleteFields: ['price_amount'],
+    });
+    return { db, incomplete };
+  }
+
+  it('T-C1 removes a field marked incomplete from the active corrections', async () => {
+    const { incomplete } = await correctedThenIncomplete();
+    expect(incomplete.review.reviewStatus).toBe('incomplete');
+    expect(incomplete.review.incompleteFields).toEqual(['price_amount']);
+    expect(incomplete.review.corrected).toEqual({ name: 'Organic Garden Soup' });
+    expect(incomplete.review.editedFields).toEqual(['name']);
+    expect(incomplete.effective.price_amount).toBe(
+      fixtureV2.candidates.find((c: { candidate_id: string }) => c.candidate_id === candidateId)
+        .original.price_amount ?? null,
+    );
+  });
+
+  it('T-C2 reloads the same pruned state from the projection and the event stream', async () => {
+    const { db, incomplete } = await correctedThenIncomplete();
+    const row = db.current.get(candidateId);
+    expect(row?.corrected_fields).toEqual({ name: 'Organic Garden Soup' });
+    expect(row?.edited_fields).toEqual(['name']);
+    expect(row?.incomplete_fields).toEqual(['price_amount']);
+    expect(replayCandidateReview(db.events)).toEqual(incomplete.review);
+  });
+
+  it('T-C3 rejects a field listed as both corrected and incomplete before any write', async () => {
+    const db = fakeCandidateDatabase(venueId, extractionId);
+    for (const action of ['mark_incomplete', 'correct'] as const) {
+      await expect(
+        save(db, {
+          commandId: id(action === 'correct' ? 20 : 21),
+          expectedVersion: 0,
+          action,
+          corrected: { price_amount: '9.50' },
+          incompleteFields: ['price_amount'],
+        }),
+      ).rejects.toMatchObject({ code: 'invalid_candidate', status: 400 });
+    }
+    expect(db.writes).toEqual([]);
+    expect(db.current.size).toBe(0);
+  });
 });

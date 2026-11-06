@@ -504,6 +504,10 @@ export async function saveCandidateReviewCommand(
   candidateId: string,
   input: ReviewCandidateCommand,
 ): Promise<ReviewCandidateItemResponse> {
+  // One request cannot both correct a field and mark it incomplete; reject before any write.
+  if (input.incompleteFields?.some((field) => input.corrected?.[field] !== undefined)) {
+    throw new ReviewCommandError('invalid_candidate', 400);
+  }
   let started = false;
   try {
     await client.query('BEGIN');
@@ -619,41 +623,35 @@ export async function saveCandidateReviewCommand(
     const reviewNote =
       input.reviewNote !== undefined ? input.reviewNote : (currentRow?.review_note ?? null);
 
-    if (input.action === 'correct') {
-      reviewStatus = 'corrected';
-      const priorCorrected =
-        currentRow?.review_status === 'corrected' || currentRow?.review_status === 'incomplete'
-          ? (currentRow.corrected_fields ?? {})
-          : {};
-      correctedFields = { ...priorCorrected, ...input.corrected };
-      editedFields = (Object.keys(correctedFields) as ReviewEditableField[])
-        .filter((k) => correctedFields[k] !== undefined)
-        .sort();
-      const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
-      incompleteFields =
-        input.incompleteFields ?? priorIncomplete.filter((f) => !(f in (input.corrected ?? {})));
-    } else if (input.action === 'mark_incomplete') {
-      reviewStatus = 'incomplete';
-      incompleteFields = input.incompleteFields ?? [];
-      const priorCorrected =
-        currentRow?.review_status === 'corrected' || currentRow?.review_status === 'incomplete'
-          ? (currentRow.corrected_fields ?? {})
-          : {};
-      if (input.corrected) {
-        correctedFields = { ...priorCorrected, ...input.corrected };
-        editedFields = (Object.keys(correctedFields) as ReviewEditableField[])
-          .filter((k) => correctedFields[k] !== undefined)
-          .sort();
-      } else {
-        correctedFields = priorCorrected;
-        editedFields = (currentRow?.edited_fields ?? []) as ReviewEditableField[];
-      }
-    } else {
-      // reject
+    if (input.action === 'reject') {
       reviewStatus = 'rejected';
       correctedFields = {};
       editedFields = [];
       incompleteFields = [];
+    } else {
+      const priorCorrected =
+        currentRow?.review_status === 'corrected' || currentRow?.review_status === 'incomplete'
+          ? (currentRow.corrected_fields ?? {})
+          : {};
+      if (input.action === 'correct') {
+        reviewStatus = 'corrected';
+        const priorIncomplete = (currentRow?.incomplete_fields ?? []) as ReviewEditableField[];
+        incompleteFields =
+          input.incompleteFields ?? priorIncomplete.filter((f) => !(f in (input.corrected ?? {})));
+      } else {
+        reviewStatus = 'incomplete';
+        incompleteFields = input.incompleteFields ?? [];
+      }
+      // A field is either an active correction or incomplete, never both: marking a previously
+      // corrected field incomplete withdraws its correction, and editedFields always follows the
+      // final corrections rather than the previous row.
+      correctedFields = Object.fromEntries(
+        Object.entries({ ...priorCorrected, ...input.corrected }).filter(
+          ([key, value]) =>
+            value !== undefined && !incompleteFields.includes(key as ReviewEditableField),
+        ),
+      );
+      editedFields = (Object.keys(correctedFields) as ReviewEditableField[]).sort();
     }
 
     const reviewedAt = new Date().toISOString();

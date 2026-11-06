@@ -175,7 +175,7 @@ curl -X POST ".../candidates/draft:6dbe8d78dae3c41e819deed5267f8149/review" \
 | --- | --- | --- |
 | 400 | `invalid_request` / `invalid_json` | Body or path fails the contract, or `extraction_id` differs from the path. |
 | 400 | `artifact_required` | Outside local, `jobId` and `privateArtifactRef` are missing. |
-| 400 | `invalid_candidate` | Artifact key outside `{venueId}/{jobId}`, or a v1 session corrected with v2-only fields. |
+| 400 | `invalid_candidate` | Artifact key outside `{venueId}/{jobId}`, a v1 session corrected with v2-only fields, or one review request listing a field in both `corrected` and `incompleteFields`. |
 | 401 / 403 | `unauthorized` / `forbidden` | No valid staff token, or not an `owner`/`editor` of the venue. |
 | 404 | `not_found` / `artifact_not_found` | Unknown session or candidate; or no stored bundle under the key. |
 | 409 | `artifact_mismatch` | Stored bundle hash, scope, source, any candidate original/evidence, any segment (count, order, status, error, text, metadata, box links) or the warnings/errors differ. |
@@ -188,6 +188,10 @@ curl -X POST ".../candidates/draft:6dbe8d78dae3c41e819deed5267f8149/review" \
 - `GET …/candidates` is limited to `owner` and `editor`; viewers are denied by design.
 - Corrections merge into earlier corrections; a field cannot be cleared back to its original in this
   version. Re-correct it to the original value if needed.
+- A field is never both corrected and incomplete. Marking a previously corrected field incomplete
+  (`correct` or `mark_incomplete` with `incompleteFields`) withdraws that correction, so its
+  effective value falls back to the original; `editedFields` always equals the sorted keys of
+  `corrected`.
 - `streamId` is a deterministic UUID-shaped id derived from SHA-256 of the tenant, extraction and
   candidate (version and variant nibbles set), not an RFC 4122 v5 UUID.
 - Saving or reloading review state never approves or publishes; publication remains RES-02.

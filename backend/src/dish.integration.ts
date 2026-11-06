@@ -4,10 +4,12 @@ import { createServer, type Server } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
 import {
   DishRevisionSchema,
+  ExtractionReviewSessionResponseSchema,
   MenuApprovalSchema,
   MenuPublicationSchema,
   ObservationReceiptBatchSchema,
   PublicMenuResponseSchema,
+  ReviewCandidateItemResponseSchema,
 } from '@peekaplate/contracts';
 import { chromium } from '@playwright/test';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
@@ -1044,6 +1046,93 @@ describe('real PostgreSQL staff command', () => {
         [reviewVenue],
       );
       expect(Number(candidateReviewEvents.rows[0]?.count)).toBe(4);
+    });
+
+    async function registeredReviewVenue() {
+      const reviewVenue = crypto.randomUUID();
+      await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+        reviewVenue,
+        'Review Venue',
+      ]);
+      await admin.query(
+        "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner')",
+        [reviewVenue, actor],
+      );
+      const put = await requestPutSession(
+        reviewExtractionId,
+        { commandId: crypto.randomUUID(), extractionResult: fixtureV2 },
+        reviewVenue,
+        actor,
+      );
+      expect(put.status).toBe(200);
+      return reviewVenue;
+    }
+
+    it('T-DB-1 withdraws a correction when its field is marked incomplete and reloads the same state', async () => {
+      const reviewVenue = await registeredReviewVenue();
+      const corrected = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          action: 'correct',
+          corrected: { price_amount: '9.50', name: 'Organic Garden Soup' },
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(corrected.status).toBe(200);
+      const incomplete = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 1,
+          action: 'mark_incomplete',
+          incompleteFields: ['price_amount'],
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(incomplete.status).toBe(200);
+      const saved = ReviewCandidateItemResponseSchema.parse(await incomplete.json());
+      expect(saved.review).toMatchObject({
+        version: 2,
+        reviewStatus: 'incomplete',
+        corrected: { name: 'Organic Garden Soup' },
+        editedFields: ['name'],
+        incompleteFields: ['price_amount'],
+      });
+      expect(saved.review.corrected).toEqual({ name: 'Organic Garden Soup' });
+      expect(saved.effective.price_amount).toBeNull();
+
+      const reload = await requestGetCandidates(reviewExtractionId, reviewVenue, actor);
+      const { items } = ExtractionReviewSessionResponseSchema.parse(await reload.json());
+      const soup = items.find((item) => item.candidate.candidate_id === soupCandidateId);
+      expect(soup?.review).toEqual(saved.review);
+      expect(soup?.effective).toEqual(saved.effective);
+
+      const overlap = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 2,
+          action: 'mark_incomplete',
+          corrected: { price_amount: '9.50' },
+          incompleteFields: ['price_amount'],
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(overlap.status).toBe(400);
+      expect(await overlap.json()).toEqual({ error: 'invalid_candidate' });
+      const events = await admin.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM app_private.es_event WHERE tenant_id = $1 AND stream_type = 'candidate_review'",
+        [reviewVenue],
+      );
+      expect(events.rows[0]?.count).toBe(2);
     });
   });
 });
