@@ -1408,3 +1408,13 @@ from the applied fact-view schema. The query now joins tenant-scoped
 and cross-tenant access. After installing the missing local Playwright system
 libraries, `pnpm verify test:db` passed all 73 tests and pgTAP assertions.
 Backend typecheck and Biome checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
+```
+
+<!-- resolution of the test:e2e observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
+```
