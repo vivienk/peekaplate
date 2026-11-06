@@ -161,7 +161,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -240,7 +240,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/index.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
-        "docs/owner-ai.md"
+        "docs/owner-ai.md",
+        "backend/src/owner-ai/evaluation.test.ts",
+        "scripts/evaluate-owner-ai.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -253,7 +255,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "65fa036c38396f2b3fd833509004a350b92c1a1095d7c679f1da3e456d10b621"
+      "sourceFingerprint": "f245e854a0d56b2c57098f3ec2ddaa67dfa6c0664705151f4cfeb798e9832f02"
     },
     {
       "id": "database",
@@ -368,7 +370,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "940c02a23b6b08a141350ba97eb97e42de9ef72fe10b90be2e29c05169bc0200"
+      "sourceFingerprint": "331e7c9ac4872686dcc3fa568f7153e5a2c16e2284fd8be35855e3b910b8112f"
     },
     {
       "id": "agents",
@@ -525,6 +527,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-05",
+      "summary": "AI-01 offline evaluation synchronized with the reconciled core and develop d5365bd. Existing synthetic evaluation cases and entrypoint are preserved.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Verify this stacked revision before review. Reporting identity and internal handoff require agreement before live AI integration."
+    },
+    {
+      "date": "2026-11-05",
       "summary": "AI-01 core reconciled with develop d5365bd after the extraction, ingestion, recovery coverage and PostHog SDK merges. Shared code merged automatically; context and the append-only error ledger retain both branches.",
       "modules": [
         "backend",
@@ -596,16 +607,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
-    },
-    {
-      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
     }
   ]
 }

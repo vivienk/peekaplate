@@ -1280,6 +1280,23 @@ The shell could not locate the repository-requested RTK wrapper; native commands
 
 Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
 
+## 2026-10-31 — Offline AI evaluation verification boundary
+
+The existing verification-runner test that invokes real pnpm failed before its
+check because automatic installation again hit the Windows store-symlink EPERM.
+The other seven runner tests passed. This is the previously recorded environment
+limit, not an AI case failure; do not disable the test. The source-pinned Vitest
+run passed all 46 AI tests, including 21 new synthetic development evaluation
+cases, and the focused strict TypeScript check passed. Full frozen installation,
+the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
 
 <!-- automatic observation; not root cause -->
 ```json
