@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell stays readable without JavaScript; consent-gated shell views exist. A replaceable menu source and one known-field adapter provide labelled fixtures. The diner renders the fixture menu (header, All and category tabs, cards, loading/empty/error/offline/unavailable states, incomplete placeholders) and dish detail with back, focus restore and fixture label; View Portion and Compare are disabled. Screen-free search returns complete-dish IDs and the staff allergy line; search view not wired. Compare helpers pick two different complete dishes, keep comparison_id and build an unsent payload. Shared Save state and Save UI (hearts, badge, Undo toasts) exist but no screen mounts them yet. track() and menu_viewed/dish_detail_opened triggers are console-only and uncalled; PostHog delivery needs integration (docs/posthog.md). Icon lookups map allergens/dietary values and ingredients to Figma assets; not wired.",
+      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes; renderSavedScreen lists saved dishes (no shortlist_viewed in session-only mode). track() and its triggers are console-only; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -126,7 +126,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/events.ts",
         "frontend/diner/src/save/feedback.ts",
         "frontend/diner/src/save/feedback.test.ts",
-        "frontend/diner/src/save/mount.ts"
+        "frontend/diner/src/save/mount.ts",
+        "frontend/diner/src/save/saved-screen.ts",
+        "frontend/diner/src/save/saved-screen-model.ts",
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -135,7 +139,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "59d649aa35b0af957f6fe62907c99123d9341bca541d3fea2e1fb2880dd23b7c"
+      "sourceFingerprint": "443207fab0064e6d469bc51da876f75c93243756b671074a188e68e0154bcbbe"
     },
     {
       "id": "console",
