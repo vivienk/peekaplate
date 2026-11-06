@@ -291,3 +291,47 @@ A separate read-only `reviewer` agent reviewed the complete working diff before 
 - Follow-up PR inline review replies: [r4372231047](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231047), [r4372231101](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231101), [r4372231219](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231219), [r4372231319](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231319)
 - Follow-up PR verification comment: https://github.com/vivienk/peekaplate/pull/25#issuecomment-6402612252
 - Follow-up ClickUp comment on `86bcnfw7r`: `90140273180794`
+
+
+## Rebase QA — 2026-11-06
+
+This section was written and committed **before** any test suite or CLI was run on the rebased head. Actual/Status columns are filled in by a later commit. Status values: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
+
+- Base: `origin/develop` `d6e5a16` (PR #76). Rebased from `a9bcdb5`; backup `backup/feat/s3-vis-03-asset-delivery-pre-rebase-2026-11-06`.
+- Conflicts resolved: `schemas.py` (develop's `field_validator`, `validate_version` → `validate_box_evidence`, `_typed_equal`, `_box_evidence_links` kept; #25's `UUID` import and asset/spatial/presentation models added), `docs/CONTEXT.md`, `errors.md` (both histories kept).
+- Context: develop's `processing` node is unchanged (its summary was already at 942/1000 characters). #25's asset files now sit in a new `assets` node (`dependsOn: processing`, ADR 0004/0005). The #25 handoff replaced the oldest develop handoff (November 1 RES-02 hosted acceptance) to stay within the ten-entry cap.
+- Data: synthetic fixtures from `processing/tests/fixture_factory.py` only (`food_photo`, `layered_photo`, `cutout_photo`, `presentation_photo`). No restaurant photo, phone or screen reader.
+- Evidence directory (not committed): `processing/work/qa-vis03-20261106/`.
+
+### Acceptance criteria (rebase)
+
+| ID | Criterion |
+|---|---|
+| AC-V1 | Full Python suite passes on the rebased head; count ≥ develop-only count + #25's 3 test modules |
+| AC-V2 | Develop's schema/box-evidence tests pass on the rebased head (validator not lost in the merge) |
+| AC-V3 | `pnpm verify lint typecheck test build context:check docs:check pr:check` passes |
+| AC-V4 | Every V-CLI and V-BR case below is `PASS` (or `BLOCKED` with evidence); any `FAIL` gets a `D-n` entry, failing test, fix and re-run |
+| AC-V5 | PR #25 `MERGEABLE`, every non-skipped check on the new head `SUCCESS` |
+
+### Test cases
+
+| ID | Traces to | Layer | Preconditions / steps | Expected | Actual | Status |
+|---|---|---|---|---|---|---|
+| V-AUTO-1 | AC-V1 | unit | `uv run --project processing --frozen --extra service python -m unittest discover -s processing/tests` | All pass; count recorded | | |
+| V-AUTO-2 | AC-V2 | unit | `… unittest processing.tests.test_box_evidence processing.tests.test_box_grounding_safety processing.tests.test_review_candidates` (develop modules) | All pass | | |
+| V-AUTO-3 | AC-V3 | repo | `pnpm verify lint typecheck test build context:check docs:check pr:check` | All checks PASS; Vitest and script counts recorded | | |
+| V-CLI-1 | T0 processing | CLI | `prepare_assets` on a 2000×1500 synthetic JPEG, `--budget-bytes 400000` | exit 0; four variants (`card-480`, `detail-1280` × WebP/JPEG); `review.status=needs_review`; `publication.eligible=false`; total ≤ 400,000 B; source copy byte-identical | | |
+| V-CLI-2 | immutability | CLI | Rerun V-CLI-1 into the same output root | exit 2; existing `manifest.json` SHA-256 unchanged | | |
+| V-CLI-3 | validation | CLI | (a) `--budget-bytes 1000`; (b) a text file renamed `.jpg`; (c) `--captured-at` without timezone | each exit 2; no new bundle directory | | |
+| V-CLI-4 | 2.5D sample | CLI | `prepare_spatial` with synthetic `layered_photo` layers against the V-CLI-1 manifest, `--budget-bytes 400000` | exit 0; `measurements.total_asset_bytes` == byte sum of all delivered files | | |
+| V-CLI-5 | fallback integrity | CLI | Copy of the T0 bundle whose `detail-1280.jpg` is replaced by non-JPEG bytes and the manifest hash/size patched to match | exit 2; no spatial output | | |
+| V-CLI-6 | Sai's ID finding (`a9bcdb5`) | CLI | `prepare_presentation` into separate roots: (a) 512² PNG, (b) 768² PNG, (c) 512² PNG with `--model-version model-b`; (a) uses `model-a` | three different `pres_` ids; each `needs_review`, `eligible=false` | | |
+| V-CLI-7 | T0 fallback retention | CLI | `prepare_presentation` with an opaque (no alpha) candidate | exit 2; `fallback_retained=true`; `fallback.jpg` SHA-256 == T0 `detail-1280.jpg` | | |
+| V-BR-1 | delivery | browser | Serve the V-CLI-4 bundle with `python -m http.server`; open `harness.html` in Chromium with `prefers-reduced-motion: no-preference` | `layersLoaded=3`; `spatialVisible=true`; `fallbackVisible=true`; `totalAssetBytes` == delivered bytes | | |
+| V-BR-2 | no-JS fallback | browser | Same URL, JavaScript disabled | `#fallback` `naturalWidth > 0` | | |
+| V-BR-3 | motion clamp | browser | Focus stage; Home; ArrowRight ×40; ArrowLeft ×1 | transform ends `rotateY(2.5deg)` | | |
+| V-BR-4 | reduced motion | browser | ArrowRight once, then emulate `prefers-reduced-motion: reduce` without reload | `#layers` transform cleared; `metrics.reducedMotion=true` | | |
+| V-BR-5 | failure retention | browser | Serve with one layer file removed; then with `spatial-manifest.json` removed | layer: `layerRetries[name]=1`, fallback visible; manifest: `manifestRetries=1`, fallback visible | | |
+| V-BR-6 | `file://` | browser | Open `harness.html` via `file://` | "Preview unavailable" shown; fallback visible | | |
+
+Out of scope: real permitted photos, real-phone timing, VoiceOver/TalkBack and PM/restaurant/diner acceptance. These stay `BLOCKED` as in the earlier sections.
