@@ -142,40 +142,40 @@ describe('menu screen observer lifecycle', () => {
     await mountAndWait(container);
     expect(mockDisconnect).toHaveBeenCalledTimes(disconnectsAfterFirst + 1);
   });
-});
 
-it('calls observe on the IntersectionObserver for cards', async () => {
-  const container = new FakeContainer();
+  it('calls observe on the IntersectionObserver for cards', async () => {
+    const container = new FakeContainer();
 
-  await mountAndWait(container);
+    await mountAndWait(container);
 
-  const cards = container.querySelectorAll('.pp-card--dim');
-  expect(mockObserve).toHaveBeenCalled();
-  expect(mockObserve.mock.calls.length).toBeGreaterThanOrEqual(cards.length);
-});
-
-it('displays error state when load rejects', async () => {
-  vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
-    load: () => Promise.reject(new Error('boom')),
+    const cards = container.querySelectorAll('.pp-card--dim');
+    expect(mockObserve).toHaveBeenCalled();
+    expect(mockObserve.mock.calls.length).toBeGreaterThanOrEqual(cards.length);
   });
-  const container = new FakeContainer();
 
-  await mountAndWait(container);
+  it('displays error state when load rejects', async () => {
+    vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+      load: () => Promise.reject(new Error('boom')),
+    });
+    const container = new FakeContainer();
 
-  expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
-});
+    await mountAndWait(container);
 
-it('displays error state when renderMenu throws after ready', async () => {
-  vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
-    load: () =>
-      Promise.resolve({
-        status: 'ready',
-        menu: { categories: null, restaurant: { name: 'Test Restaurant' } },
-      } as never),
+    expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
   });
-  const container = new FakeContainer();
 
-  await mountAndWait(container);
+  it('displays error state when renderMenu throws after ready', async () => {
+    vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+      load: () =>
+        Promise.resolve({
+          status: 'ready',
+          menu: { categories: null, restaurant: { name: 'Test Restaurant' } },
+        } as never),
+    });
+    const container = new FakeContainer();
 
-  expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+    await mountAndWait(container);
+
+    expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+  });
 });
