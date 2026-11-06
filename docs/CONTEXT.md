@@ -35,7 +35,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
-        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "packages/contracts/src/review-persistence.ts",
+        "packages/contracts/src/review-persistence.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -43,7 +45,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "044bc52ac2f0c0a8aa4d10836866dba6b0fae5e9511fcda1b7198b22e40a26cf"
+      "sourceFingerprint": "801389392a40af22398443538130ef28b1a07fcd814d296a0cad9ea7b1552a31"
     },
     {
       "id": "tokens",
@@ -254,7 +256,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "pnpm-lock.yaml",
         "processing/tests/fixtures/service-artifacts/representative-bundle.json",
         "processing/tests/fixtures/service-artifacts/README.md",
-        "backend/src/consumer/owner-synthetic.integration.ts"
+        "backend/src/consumer/owner-synthetic.integration.ts",
+        "backend/src/review-command.ts",
+        "backend/src/review-command.test.ts",
+        "backend/src/review-artifact.ts",
+        "backend/src/review-artifact.test.ts",
+        "docs/review-api.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -267,7 +274,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e5a9d32626172e7c0f7c72a168cfee3e7031713e066b176e7b864df17ad65233"
+      "sourceFingerprint": "b8c45b435551fc6ba64fa6406e1433ec23424644c755db10b361c3c8f577a877"
     },
     {
       "id": "database",
@@ -293,7 +300,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_metrics.sql",
         "tests/db/posthog.sql",
         "tests/db/staff.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261030120000_review_candidate_persistence.sql",
+        "tests/db/review_persistence.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -304,7 +313,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5575d401f817de18d01b69a2c93b595835e0575e0e251275757ad6648ec5cc75"
+      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
     },
     {
       "id": "measurement",
@@ -538,6 +547,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-06",
+      "summary": "S3-RES-01.2 PR #73 rebased onto develop d6e5a16 and the three review findings fixed: verifyReviewArtifact binds every report segment, warnings, errors and exporter-derived box links to the stored producer bundle; the candidate command hash records field presence (omitted vs null) via canonicalStringify; mark_incomplete withdraws corrections for incomplete fields and rejects corrected/incomplete overlap with 400 before any write. INGESTION_REPORTS_BUCKET is one binding type (put for ingestion, optional get for review). QA: 828 Vitest, 75 DB integration, 213 pgTAP, 13/13 live API cases (qa-reports/S3-RES-01.2-test-report.md).",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "Sai/Teeyansh re-review. RES-01.3 UI and RES-01.4 integration consume docs/review-api.md; staging save/reload must pass jobId plus private_review_artifact. Receipts stored before the hash change do not replay; nothing is deployed."
+    },
+    {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
       "modules": [
         "contracts",
@@ -606,16 +625,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
-    },
-    {
-      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
     }
   ]
 }
