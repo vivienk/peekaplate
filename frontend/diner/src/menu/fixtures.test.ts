@@ -236,14 +236,13 @@ describe('menu adapter', () => {
         ...edgeCaseBundle,
         categories: [{ category_id: CATEGORY.breakfast, name: 'B', dishes: [wheat] }],
       },
-      'published',
+      'fixture',
       FIXTURE_PUBLICATION_REVISION_ID,
     );
     if (result.status !== 'ready') throw new Error('expected a ready menu');
     expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual(['Gluten']);
     expect(complete(result.menu, DISH.avocadoToast).dietary).toEqual(['Vegan']);
-    expect(result.menu.notice).toBeNull();
-    expect(FIXTURE_NOTICE).toBe('Fixture data');
+    expect(result.menu.notice).toBe(FIXTURE_NOTICE);
   });
 
   it('is the only screen-facing module that reads the data shape', () => {

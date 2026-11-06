@@ -61,7 +61,7 @@ export function renderDishDetail(
 
   const hasAllergens = dish.allergens.length > 0;
   const hasDietary = dish.dietary.length > 0;
-  const showAllergenSection = hasAllergens || hasDietary;
+  const showAllergenSection = true; // the staff note always shows
 
   container.innerHTML = `
     <div class="pp-detail">
