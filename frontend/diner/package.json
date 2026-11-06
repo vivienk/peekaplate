@@ -15,6 +15,7 @@
   "dependencies": {
     "@peekaplate/analytics": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
-    "@peekaplate/ui": "workspace:*"
+    "@peekaplate/ui": "workspace:*",
+    "@peekaplate/contracts": "workspace:*"
   }
 }
