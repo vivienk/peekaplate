@@ -1249,6 +1249,37 @@ PR88 reconciliation resolution: the appended allergen note exceeded the diner
 node's 1000-character summary limit. Moved the note to the bounded handoff,
 preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
 pass. Keep node summaries within the existing limit when resolving conflicts.
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T19:27:42.930Z","exitCode":1}
+```
+
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T19:38:40.134Z","exitCode":1}
+```
+
+## 2026-10-30 — AI-01 develop-sync verification environment limit
+
+`pnpm verify context:check docs:check` could not start the checks in the fresh
+Windows agent worktree: pnpm's automatic dependency installation failed with
+EPERM while registering the project through a store symlink. No application
+test failed in this attempt. Direct `node scripts/context.mjs check` and
+`node scripts/check-docs.mjs` passed after context refresh; they do not replace
+the complete CI run. Run frozen installation and `pnpm check` in a capable
+environment, then verify the exact pushed merge revision in GitHub CI.
+
+<!-- automatic observation; not root cause -->
+```json
+
+## 2026-10-31 — AI-01 reconciliation verification limits
+
+The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
+
+Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
+
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -1301,6 +1332,14 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 ```json
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
+
+## 2026-11-04 — AI stack reconciliation verification
+
+Frozen installation in the Windows agent worktree failed before checks with
+EPERM while pnpm registered its project symlink. A workspace-local store gave
+the same result. Source-pinned Vitest, focused strict TypeScript and Biome,
+plus direct context/docs checks passed. Full workspace, database and browser
+checks require the pushed revision's Linux CI. RTK was unavailable.
 
 <!-- automatic observation; not root cause -->
 ```json
