@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Hosted synthetic and genuine-token transport/backfill checks passed; retries store one fact and changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042. S4-DATA-04 adds synthetic checkpoint, archive recovery, replay and owner-exclusion coverage. The owner dish-report API verifies staff identity and owner membership, aggregates distinct 24-hour session sets, suppresses all values below ten sessions, and validates/strips the owner_report.v1 envelope. Seven focused unit regressions and 73 disposable database integration tests pass, including database-backed duplicate-session/rate assertions; hosted report acceptance remains unverified. Normal collection remains paused pending real controls/outbox/privacy, recovery and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Hosted synthetic and genuine-token transport/backfill checks passed; retries store one fact and changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042. S4-DATA-04 adds synthetic checkpoint, archive recovery, replay and owner-exclusion coverage. The owner dish-report API verifies staff identity and owner membership, aggregates distinct 24-hour session sets, suppresses all values below ten sessions, validates/strips the owner_report.v1 envelope, reports production provenance, and derives stale status from the latest ingestion (missing or older than one hour). Eight focused unit regressions and 73 disposable database integration tests pass, including database-backed duplicate-session/rate assertions; hosted report acceptance remains unverified. Normal collection remains paused pending real controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -269,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "149bbcbf76bc4bdb6517b9f8352c16f4145217218d5c4fdf29be75792ce4af00"
+      "sourceFingerprint": "5d340894ecd492d2042afb18266f68223dc2201137b330a553e2bdfd37079e8a"
     },
     {
       "id": "database",
@@ -549,7 +549,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 6 owner-report follow-up: GET /api/v1/venues/:venueId/analytics/dishes uses a read-only owner-scoped query with distinct exposed/open/saved session cohorts; engagement includes long-active openings or same-session v2 dish_compared events. All metric values are null below the ten-session floor. Internal cohort counts are stripped through the shared owner_report.v1 transformer. Seven focused unit regressions and 73 disposable database integration tests pass, including duplicate click/session, direct-entry and comparison-engagement fixtures; hosted acceptance remains unverified.",
+      "summary": "November 6 owner-report follow-up: GET /api/v1/venues/:venueId/analytics/dishes uses a read-only owner-scoped query with distinct exposed/open/saved session cohorts; engagement includes long-active openings or same-session v2 dish_compared events. All metric values are null below the ten-session floor. Internal cohort counts are stripped through the shared owner_report.v1 transformer; provenance is production and freshness is stale when ingestion is missing or over one hour old. Eight focused unit regressions and 73 disposable database integration tests pass, including duplicate click/session, direct-entry and comparison-engagement fixtures; hosted acceptance remains unverified.",
       "modules": [
         "backend",
         "delivery"

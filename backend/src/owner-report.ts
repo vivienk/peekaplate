@@ -204,11 +204,12 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
   }, null);
+  const lastEventTime = lastEventIngestedAt ? new Date(lastEventIngestedAt) : null;
 
   return {
     schema_version: 'owner_report.v1',
     venue_id: venueId,
-    source: 'synthetic',
+    source: 'production',
     report_metadata: {
       calculation_version: 'production.v1',
       generated_at: now.toISOString(),
@@ -222,7 +223,7 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
         measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
       },
       freshness: {
-        is_stale: false,
+        is_stale: !lastEventTime || now.getTime() - lastEventTime.getTime() > 3600000,
         last_event_ingested_at: lastEventIngestedAt,
       },
       report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',

@@ -1428,3 +1428,41 @@ Backend typecheck and Biome checks pass.
 ```json
 {"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T18:22:03.506Z"},"status":"resolved","cause":"The first disposable-database run timed out at 15 seconds in the existing browser-backed publication test; the precise trigger was not reproduced. That test runs before the owner-report integration case, so it did not exercise the changed report query.","prevention":"Do not change the unrelated timeout without a repeatable cause; rerun the full disposable-database check when this failure occurs.","regression":"A full pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions. The owner-report integration fixture asserts 12 exposed sessions, duplicate interactions, 14 unique open sessions, linked comparisons, and bounded computed rates; the focused owner-report suite passes all 7 tests."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T20:07:27.669Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above with final-adjustment validation -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-06T20:07:27.669Z"
+  },
+  "status": "resolved",
+  "area": "owner-report-final-validation",
+  "cause": "The first database verification exceeded the existing 15-second timeout in the browser-backed publication test; no reproducible trigger was established.",
+  "prevention": "Keep the timeout unchanged unless a reproducible cause is found; retry the full database verification after a transient timeout.",
+  "regression": {
+    "lint": {
+      "command": "pnpm exec biome check --write backend/src",
+      "result": "passed"
+    },
+    "ownerReportUnit": {
+      "command": "pnpm exec vitest run backend/src/owner-report.test.ts",
+      "result": "passed",
+      "tests": 8
+    },
+    "database": {
+      "command": "pnpm verify test:db",
+      "firstAttempt": "timed out in the publication integration test",
+      "retry": "passed",
+      "integrationTests": 73,
+      "pgTapAssertions": 192
+    }
+  }
+}
+```

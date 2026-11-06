@@ -135,10 +135,14 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(report).toMatchObject({
       schema_version: 'owner_report.v1',
       venue_id: venueId,
-      source: 'synthetic',
+      source: 'production',
       report_metadata: {
         date_window: { duration_hours: 24 },
         coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
+        freshness: {
+          is_stale: false,
+          last_event_ingested_at: '2026-11-06T09:00:00.000Z',
+        },
         report_status: 'NORMAL',
       },
       dishes: [
@@ -157,6 +161,33 @@ describe('readOwnerReport report contract and session metrics', () => {
       ],
     });
     expect(JSON.stringify(report)).not.toContain('eligible_sessions');
+  });
+
+  it('marks freshness stale when the latest event is over one hour old or unavailable', async () => {
+    const now = new Date('2026-11-06T10:00:00Z');
+    const staleClient = fakeClient('owner', [
+      reportRow({ last_event_ingested_at: new Date('2026-11-06T08:59:59Z') }),
+    ]);
+    const staleReport = await readOwnerReport(staleClient.client, 'actor-1', venueId, now);
+    expect(staleReport).toMatchObject({
+      report_metadata: {
+        freshness: {
+          is_stale: true,
+          last_event_ingested_at: '2026-11-06T08:59:59.000Z',
+        },
+      },
+    });
+
+    const emptyClient = fakeClient('owner');
+    const emptyReport = await readOwnerReport(emptyClient.client, 'actor-1', venueId, now);
+    expect(emptyReport).toMatchObject({
+      report_metadata: {
+        freshness: {
+          is_stale: true,
+          last_event_ingested_at: null,
+        },
+      },
+    });
   });
 
   it('counts unique sessions and the canonical linked-comparison event in SQL', async () => {
