@@ -1,4 +1,5 @@
 // Owner dish report (S3-RES-03 / S3-DATA-02).
+import { toOwnerReport } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { CommandError } from './dish-command';
 
@@ -28,7 +29,7 @@ export async function readOwnerReport(
       throw new CommandError('forbidden', 403);
     }
 
-    // Configuration du tenant_id pour activer correctement les politiques RLS de la base
+    // Tenant scope is set only after the owner permission is confirmed.
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
     const result = await client.query(OWNER_REPORT_QUERY, [
@@ -37,92 +38,173 @@ export async function readOwnerReport(
     ]);
     await client.query('COMMIT');
     started = false;
-    return buildInternalReport(result.rows, venueId, now);
+    return toOwnerReport(buildInternalReport(result.rows, venueId, now));
   } catch (error) {
     if (started) {
       try {
         await client.query('ROLLBACK');
       } catch {
-        // Ignorer l'erreur latente du rollback
+        // Ignore a secondary rollback failure.
       }
     }
     throw error;
   }
 }
 
-// Requête d'agrégation d'interactions et d'achats alignée sur l'ADR 0015 D7 et le schéma de develop
+// D7 rates are formed from distinct session sets, not event counts.
 const OWNER_REPORT_QUERY = `
-  WITH raw_metrics AS (
+  WITH filtered_observations AS (
     SELECT
-      obs.dish_id,
-      MIN(dish.name) AS dish_name,
-      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_viewed' THEN obs.session_id END) AS total_sessions,
-      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' THEN obs.session_id END) AS open_eligible_sessions,
-      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' THEN obs.session_id END) AS total_opens,
-      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_detail_opened' AND act.active_ms >= 10000
-        THEN obs.session_id END) AS engaged_sessions,
-      MAX(act.active_ms) AS max_active_time,
-      COUNT(DISTINCT CASE WHEN obs.event_type = 'dish_saved' AND obs.save_origin = 'direct'
-        THEN obs.session_id END) AS saved_dishes
+      obs.*,
+      dish.name AS dish_name
     FROM app_private.owner_observation_v1 obs
     LEFT JOIN app_private.dish_current dish
       ON dish.tenant_id = obs.tenant_id AND dish.dish_id = obs.dish_id
+    WHERE obs.tenant_id = $1
+      AND obs.occurred_at >= $2
+      AND obs.dish_id IS NOT NULL
+  ),
+  dish_sessions AS (
+    SELECT
+      obs.dish_id,
+      MIN(obs.dish_name) AS dish_name,
+      obs.session_id,
+      BOOL_OR(obs.event_type = 'dish_viewed') AS is_exposed,
+      BOOL_OR(obs.event_type = 'dish_detail_opened') AS is_opened,
+      BOOL_OR(obs.event_type = 'dish_compared' AND obs.comparison_id IS NOT NULL) AS has_comparison,
+      BOOL_OR(obs.event_type = 'dish_saved' AND obs.save_origin = 'direct') AS has_direct_save,
+      MAX(obs.first_received_at) AS last_event_ingested_at
+    FROM filtered_observations obs
+    GROUP BY obs.dish_id, obs.session_id
+  ),
+  opening_metrics AS (
+    SELECT
+      obs.dish_id,
+      obs.session_id,
+      obs.opening_id,
+      MAX(act.active_ms) AS active_ms,
+      COALESCE(BOOL_OR(act.has_final_checkpoint), false) AS has_final_checkpoint
+    FROM filtered_observations obs
     LEFT JOIN app_private.owner_opening_activity_v1 act
       ON act.tenant_id = obs.tenant_id
       AND act.opening_id = obs.opening_id
       AND act.dish_id = obs.dish_id
-    WHERE obs.tenant_id = $1
-      AND obs.occurred_at >= $2
-    GROUP BY obs.dish_id
+    WHERE obs.event_type = 'dish_detail_opened'
+    GROUP BY obs.dish_id, obs.session_id, obs.opening_id
+  ),
+  session_metrics AS (
+    SELECT
+      sessions.dish_id,
+      sessions.dish_name,
+      sessions.session_id,
+      sessions.is_exposed,
+      sessions.is_opened,
+      sessions.has_direct_save,
+      sessions.has_comparison,
+      sessions.last_event_ingested_at,
+      COALESCE(BOOL_OR(openings.active_ms >= 10000), false) AS has_active_engagement,
+      COALESCE(BOOL_OR(openings.has_final_checkpoint), false) AS has_timing
+    FROM dish_sessions sessions
+    LEFT JOIN opening_metrics openings
+      ON openings.dish_id = sessions.dish_id
+      AND openings.session_id = sessions.session_id
+    GROUP BY
+      sessions.dish_id,
+      sessions.dish_name,
+      sessions.session_id,
+      sessions.is_exposed,
+      sessions.is_opened,
+      sessions.has_direct_save,
+      sessions.has_comparison,
+      sessions.last_event_ingested_at
+  ),
+  dish_metrics AS (
+    SELECT
+      sessions.dish_id,
+      MIN(sessions.dish_name) AS dish_name,
+      COUNT(DISTINCT sessions.session_id) FILTER (WHERE sessions.is_exposed) AS total_sessions,
+      COUNT(DISTINCT sessions.session_id) FILTER (
+        WHERE sessions.is_exposed AND sessions.is_opened
+      ) AS exposed_open_sessions,
+      COUNT(DISTINCT sessions.session_id) FILTER (WHERE sessions.is_opened) AS open_eligible_sessions,
+      COUNT(DISTINCT sessions.session_id) FILTER (
+        WHERE sessions.is_opened AND (sessions.has_active_engagement OR sessions.has_comparison)
+      ) AS engaged_sessions,
+      COUNT(DISTINCT sessions.session_id) FILTER (
+        WHERE sessions.is_opened AND sessions.has_direct_save
+      ) AS saved_sessions,
+      COUNT(DISTINCT sessions.session_id) FILTER (
+        WHERE sessions.is_opened AND sessions.has_timing
+      ) AS timed_sessions,
+      MAX(sessions.last_event_ingested_at) AS last_event_ingested_at
+    FROM session_metrics sessions
+    GROUP BY sessions.dish_id
+  ),
+  timing_metrics AS (
+    SELECT
+      openings.dish_id,
+      AVG(openings.active_ms) FILTER (WHERE openings.has_final_checkpoint) / 1000.0
+        AS average_active_seconds
+    FROM opening_metrics openings
+    GROUP BY openings.dish_id
   )
   SELECT
-    rm.dish_id,
-    rm.dish_name,
-    rm.open_eligible_sessions,
-    rm.engaged_sessions,
-    rm.saved_dishes,
-    rm.max_active_time,
-    
-    -- Plancher de confidentialité global (10 sessions uniques d'exposition)
-    CASE WHEN rm.total_sessions < 10 THEN 'SUPPRESSED' ELSE 'NORMAL' END AS active_sessions_status,
-    CASE WHEN rm.total_sessions < 10 THEN NULL ELSE rm.total_sessions END AS active_sessions_value,
-    
-    -- Open Rate (Priorité de Wang : Évaluation du zéro avant le plancher)
-    CASE 
-      WHEN rm.total_sessions = 0 THEN 'NOT_MEASURABLE' 
-      WHEN rm.total_sessions < 10 THEN 'SUPPRESSED' 
-      ELSE 'NORMAL' 
-    END AS open_rate_status,
-    CASE WHEN rm.total_sessions < 10 THEN NULL ELSE ROUND(CAST(rm.total_opens AS NUMERIC) / rm.total_sessions, 3) END AS open_rate_value,
-
-    -- Engagement Rate (Dénominateur basé sur open_eligible_sessions)
-    CASE 
-      WHEN rm.total_sessions < 10 THEN 'SUPPRESSED' 
-      WHEN rm.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' 
-      WHEN rm.open_eligible_sessions < 10 THEN 'SUPPRESSED' 
-      WHEN rm.engaged_sessions = 0 THEN 'VALID_ZERO'
-      ELSE 'NORMAL' 
-    END AS engagement_rate_status,
-    CASE WHEN rm.total_sessions < 10 OR rm.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(rm.engaged_sessions AS NUMERIC) / rm.open_eligible_sessions, 3) END AS engagement_rate_value,
-
-    -- Save Rate (Dénominateur basé sur open_eligible_sessions)
-    CASE 
-      WHEN rm.total_sessions < 10 THEN 'SUPPRESSED' 
-      WHEN rm.open_eligible_sessions = 0 THEN 'NOT_MEASURABLE' 
-      WHEN rm.open_eligible_sessions < 10 THEN 'SUPPRESSED' 
-      WHEN rm.saved_dishes = 0 THEN 'VALID_ZERO'
-      ELSE 'NORMAL' 
-    END AS save_rate_status,
-    CASE WHEN rm.total_sessions < 10 OR rm.open_eligible_sessions < 10 THEN NULL ELSE ROUND(CAST(rm.saved_dishes AS NUMERIC) / rm.open_eligible_sessions, 3) END AS save_rate_value
-
-  FROM raw_metrics rm;
+    metrics.*,
+    timing.average_active_seconds
+  FROM dish_metrics metrics
+  LEFT JOIN timing_metrics timing USING (dish_id);
 `;
 
 type ReportRow = Record<string, unknown>;
 const numberOrNull = (value: unknown) => (value === null ? null : Number(value));
 
+function rateMetric(
+  numerator: number,
+  denominator: number,
+  belowDishFloor: boolean,
+  eligibleSessions: number,
+) {
+  if (belowDishFloor)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (denominator === 0)
+    return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
+  if (denominator < 10)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (numerator === 0)
+    return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
+  return {
+    value: Math.round((numerator / denominator) * 1000) / 1000,
+    status: 'NORMAL',
+    eligible_sessions: eligibleSessions,
+  };
+}
+
+function averageMetric(value: number | null, eligibleSessions: number, belowDishFloor: boolean) {
+  if (belowDishFloor)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (eligibleSessions === 0)
+    return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
+  if (eligibleSessions < 10)
+    return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
+  if (value === null) throw new Error('Timed sessions have no average active time');
+  if (value === 0) return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
+  return { value, status: 'NORMAL', eligible_sessions: eligibleSessions };
+}
+
+function timestampOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const timestamp = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(timestamp.getTime())) throw new Error('Invalid last event ingestion timestamp');
+  return timestamp.toISOString();
+}
+
 function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
+    const timestamp = timestampOrNull(row.last_event_ingested_at);
+    return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
+  }, null);
+
   return {
     schema_version: 'owner_report.v1',
     venue_id: venueId,
@@ -135,39 +217,62 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
         start_time: yesterday.toISOString(),
         end_time: now.toISOString(),
       },
-      coverage: { data_completeness: 1.0 },
+      coverage: {
+        total_dishes_monitored: rows.length,
+        measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
+      },
       freshness: {
         is_stale: false,
-        last_event_ingested_at: now.toISOString(),
+        last_event_ingested_at: lastEventIngestedAt,
       },
-      report_status: 'NORMAL',
+      report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',
     },
-    dishes: rows.map((row) => ({
-      dish_id: row.dish_id,
-      name: row.dish_name,
-      evidence_state: row.active_sessions_status,
-      metrics: {
-        active_sessions: {
-          value: numberOrNull(row.active_sessions_value),
-          status: row.active_sessions_status,
+    dishes: rows.map((row) => {
+      const totalSessions = Number(row.total_sessions);
+      const openEligibleSessions = Number(row.open_eligible_sessions);
+      const timedSessions = Number(row.timed_sessions);
+      const belowDishFloor = totalSessions < 10;
+
+      return {
+        dish_id: row.dish_id,
+        name: row.dish_name,
+        evidence_state: belowDishFloor ? 'SUPPRESSED' : 'NORMAL',
+        metrics: {
+          active_sessions: {
+            value: belowDishFloor ? null : totalSessions,
+            status: belowDishFloor ? 'SUPPRESSED' : 'NORMAL',
+          },
+          avg_interaction_time_seconds: averageMetric(
+            numberOrNull(row.average_active_seconds),
+            timedSessions,
+            belowDishFloor,
+          ),
+          timing_coverage: rateMetric(
+            timedSessions,
+            openEligibleSessions,
+            belowDishFloor,
+            openEligibleSessions,
+          ),
+          open_rate: rateMetric(
+            Number(row.exposed_open_sessions),
+            totalSessions,
+            belowDishFloor,
+            totalSessions,
+          ),
+          engagement_rate: rateMetric(
+            Number(row.engaged_sessions),
+            openEligibleSessions,
+            belowDishFloor,
+            openEligibleSessions,
+          ),
+          save_rate: rateMetric(
+            Number(row.saved_sessions),
+            openEligibleSessions,
+            belowDishFloor,
+            openEligibleSessions,
+          ),
         },
-        open_rate: {
-          value: numberOrNull(row.open_rate_value),
-          status: row.open_rate_status,
-          eligible_sessions: numberOrNull(row.total_sessions),
-        },
-        engagement_rate: {
-          value: numberOrNull(row.engagement_rate_value),
-          status: row.engagement_rate_status,
-          eligible_sessions: numberOrNull(row.open_eligible_sessions),
-          average_active_ms: numberOrNull(row.max_active_time),
-        },
-        save_rate: {
-          value: numberOrNull(row.save_rate_value),
-          status: row.save_rate_status,
-          eligible_sessions: numberOrNull(row.open_eligible_sessions),
-        },
-      },
-    })),
+      };
+    }),
   };
 }

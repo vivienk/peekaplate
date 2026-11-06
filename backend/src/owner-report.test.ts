@@ -1,12 +1,14 @@
+import { OwnerDishReportSchema } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandError } from './dish-command';
 import { readOwnerReport } from './owner-report';
 
 const venueId = 'e2a66159-bd14-44cb-8217-36d001a12676';
+const dishId = '45806808-4376-46ff-912b-ab8a5519881a';
 
 // A stand-in for pg's Client: records every statement and answers the membership lookup.
-function fakeClient(permission: string | null) {
+function fakeClient(permission: string | null, reportRows: Record<string, unknown>[] = []) {
   const statements: string[] = [];
   const query = vi.fn(async (text: string) => {
     // Keep the whole statement on one line so later checks can find any part of it.
@@ -14,9 +16,26 @@ function fakeClient(permission: string | null) {
     if (text.includes('app_private.staff_membership')) {
       return { rows: permission === null ? [] : [{ permission }] };
     }
+    if (text.includes('app_private.owner_observation_v1')) return { rows: reportRows };
     return { rows: [] };
   });
   return { client: { query } as unknown as Client, statements, query };
+}
+
+function reportRow(overrides: Record<string, unknown> = {}) {
+  return {
+    dish_id: dishId,
+    dish_name: 'Synthetic dish',
+    total_sessions: 9,
+    exposed_open_sessions: 8,
+    open_eligible_sessions: 8,
+    engaged_sessions: 7,
+    saved_sessions: 6,
+    timed_sessions: 5,
+    average_active_seconds: 18,
+    last_event_ingested_at: new Date('2026-11-06T09:00:00Z'),
+    ...overrides,
+  };
 }
 
 describe('readOwnerReport ownership check', () => {
@@ -47,4 +66,111 @@ describe('readOwnerReport ownership check', () => {
       expect(statements.at(-1)).toBe('ROLLBACK');
     });
   }
+});
+
+describe('readOwnerReport report contract and session metrics', () => {
+  it('suppresses every behavioral value below ten sessions and serializes the owner schema', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        active_sessions_value: 9,
+        open_rate_value: 0.8,
+        engagement_rate_value: 0.875,
+        save_rate_value: 0.75,
+      }),
+    ]);
+
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+    );
+    const json = JSON.parse(JSON.stringify(report)) as {
+      dishes: Array<{
+        evidence_state: string;
+        metrics: Record<string, { value: number | null; status: string }>;
+      }>;
+      report_metadata: unknown;
+    };
+
+    expect(OwnerDishReportSchema.safeParse(json).success).toBe(true);
+    expect(json.dishes[0]?.evidence_state).toBe('SUPPRESSED');
+    for (const metric of [
+      'active_sessions',
+      'open_rate',
+      'engagement_rate',
+      'save_rate',
+      'avg_interaction_time_seconds',
+      'timing_coverage',
+    ]) {
+      expect(json.dishes[0]?.metrics[metric]).toMatchObject({
+        value: null,
+        status: 'SUPPRESSED',
+      });
+    }
+    expect(JSON.stringify(json)).not.toContain('eligible_sessions');
+  });
+
+  it('uses the owner_report.v1 envelope and strips internal cohort counts', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        total_sessions: 12,
+        exposed_open_sessions: 10,
+        open_eligible_sessions: 10,
+        engaged_sessions: 10,
+        saved_sessions: 2,
+        timed_sessions: 10,
+        average_active_seconds: 18,
+      }),
+    ]);
+
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+    );
+
+    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    expect(report).toMatchObject({
+      schema_version: 'owner_report.v1',
+      venue_id: venueId,
+      source: 'synthetic',
+      report_metadata: {
+        date_window: { duration_hours: 24 },
+        coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
+        report_status: 'NORMAL',
+      },
+      dishes: [
+        {
+          dish_id: dishId,
+          name: 'Synthetic dish',
+          metrics: {
+            active_sessions: { value: 12, status: 'NORMAL' },
+            open_rate: { value: 0.833, status: 'NORMAL' },
+            engagement_rate: { value: 1, status: 'NORMAL' },
+            save_rate: { value: 0.2, status: 'NORMAL' },
+            avg_interaction_time_seconds: { value: 18, status: 'NORMAL' },
+            timing_coverage: { value: 1, status: 'NORMAL' },
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(report)).not.toContain('eligible_sessions');
+  });
+
+  it('counts unique sessions and the canonical linked-comparison event in SQL', async () => {
+    const { client, statements } = fakeClient('owner', [reportRow()]);
+    await readOwnerReport(client, 'actor-1', venueId, new Date('2026-11-06T10:00:00Z'));
+    const sql = statements.find((statement) =>
+      statement.includes('app_private.owner_observation_v1'),
+    );
+
+    expect(sql).toContain("obs.event_type = 'dish_compared'");
+    expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
+    expect(sql).toContain('COUNT(DISTINCT');
+    expect(sql).toContain('sessions.is_opened AND sessions.has_direct_save');
+    expect(sql).toContain('sessions.has_active_engagement OR sessions.has_comparison');
+    expect(sql).not.toContain("obs.event_type = 'portion_compare'");
+  });
 });

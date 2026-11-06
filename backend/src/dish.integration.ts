@@ -6,6 +6,7 @@ import {
   MenuApprovalSchema,
   MenuPublicationSchema,
   ObservationReceiptBatchSchema,
+  OwnerDishReportSchema,
   PublicMenuResponseSchema,
 } from '@peekaplate/contracts';
 import { chromium } from '@playwright/test';
@@ -1001,7 +1002,128 @@ describe('real PostgreSQL menu publication commands', () => {
   });
 });
 describe('Multi-tenant owner report isolation', () => {
-  it('isolates reports to the signed-in tenant owner', async () => {
+  it('isolates reports and counts distinct reportable sessions', async () => {
+    const dishId = crypto.randomUUID();
+    const dishResponse = await request(dishId);
+    expect(dishResponse.status).toBe(200);
+    const dish = (await dishResponse.json()) as { revisionId: string };
+    const publicationId = crypto.randomUUID();
+    const producerId = crypto.randomUUID();
+    let sequence = 0;
+
+    const insertEvent = async (eventType: string, sessionId: string) => {
+      const eventId = crypto.randomUUID();
+      const occurredAt = new Date();
+      await admin.query(
+        `INSERT INTO app_private.observation_index
+          (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
+           authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition)
+         VALUES ($1, $2, $3, 'observation.v2', $4, $5, $6, $6, $7, 'accepted')`,
+        [venue, eventId, 'a'.repeat(64), eventType, publicationId, occurredAt, `test/${eventId}`],
+      );
+      await admin.query(
+        `INSERT INTO app_private.observation_event
+          (tenant_id, event_id, event_type, session_id, producer_id, local_sequence,
+           publication_revision_id, traffic_class)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'live')`,
+        [venue, eventId, eventType, sessionId, producerId, ++sequence, publicationId],
+      );
+      return eventId;
+    };
+
+    const addExposure = async (sessionId: string) => {
+      const eventId = await insertEvent('dish_viewed', sessionId);
+      const exposureId = crypto.randomUUID();
+      await admin.query(
+        `INSERT INTO app_private.observation_exposure
+          (tenant_id, event_id, dish_id, dish_revision_id, exposure_id, surface, position, exposure_basis)
+         VALUES ($1, $2, $3, $4, $5, 'menu_list', 1, 'viewport_50pct_1s')`,
+        [venue, eventId, dishId, dish.revisionId, exposureId],
+      );
+      return exposureId;
+    };
+
+    const addOpening = async (
+      sessionId: string,
+      source: 'menu_card' | 'direct',
+      fromExposureId: string | null,
+      activeMs?: number,
+    ) => {
+      const openingId = crypto.randomUUID();
+      const eventId = await insertEvent('dish_detail_opened', sessionId);
+      await admin.query(
+        `INSERT INTO app_private.observation_opening
+          (tenant_id, event_id, dish_id, dish_revision_id, opening_id, source, from_exposure_id, save_available)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
+        [venue, eventId, dishId, dish.revisionId, openingId, source, fromExposureId],
+      );
+      if (activeMs === undefined) return;
+      const checkpointId = await insertEvent('dish_activity_checkpoint', sessionId);
+      await admin.query(
+        `INSERT INTO app_private.observation_activity
+          (tenant_id, event_id, dish_id, dish_revision_id, opening_id, active_ms, final)
+         VALUES ($1, $2, $3, $4, $5, $6, true)`,
+        [venue, checkpointId, dishId, dish.revisionId, openingId, activeMs],
+      );
+    };
+
+    const addComparison = async (sessionId: string) => {
+      const eventId = await insertEvent('dish_compared', sessionId);
+      await admin.query(
+        `INSERT INTO app_private.observation_comparison
+          (tenant_id, event_id, dish_id, dish_revision_id, other_dish_id,
+           other_dish_revision_id, comparison_id, compare_action, save_available)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'start', true)`,
+        [
+          venue,
+          eventId,
+          dishId,
+          dish.revisionId,
+          crypto.randomUUID(),
+          crypto.randomUUID(),
+          crypto.randomUUID(),
+        ],
+      );
+    };
+
+    const addDirectSave = async (sessionId: string) => {
+      const eventId = await insertEvent('dish_saved', sessionId);
+      await admin.query(
+        `INSERT INTO app_private.observation_save
+          (tenant_id, event_id, event_type, dish_id, dish_revision_id, save_origin, surface, shortlist_size)
+         VALUES ($1, $2, 'dish_saved', $3, $4, 'direct', 'menu_card', 1)`,
+        [venue, eventId, dishId, dish.revisionId],
+      );
+    };
+
+    const exposedSessions = Array.from({ length: 12 }, () => crypto.randomUUID());
+    const exposures = new Map<string, string>();
+    for (const sessionId of exposedSessions) {
+      exposures.set(sessionId, await addExposure(sessionId));
+    }
+    await addExposure(exposedSessions[0]!);
+
+    for (const [index, sessionId] of exposedSessions.slice(0, 10).entries()) {
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposures.get(sessionId)!,
+        index < 3 ? 10_000 : 5_000,
+      );
+    }
+    await addOpening(exposedSessions[0]!, 'menu_card', exposures.get(exposedSessions[0]!)!);
+
+    const directSessions = Array.from({ length: 4 }, () => crypto.randomUUID());
+    for (const sessionId of directSessions) await addOpening(sessionId, 'direct', null);
+
+    await addComparison(directSessions[0]!);
+    await addComparison(directSessions[0]!);
+    await addComparison(directSessions[1]!);
+    await addDirectSave(exposedSessions[0]!);
+    await addDirectSave(exposedSessions[0]!);
+    await addDirectSave(directSessions[0]!);
+    await addDirectSave(exposedSessions[10]!);
+
     const requestReport = async (tenant: string, subject: string) =>
       fetch(`http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes`, {
         headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
@@ -1009,7 +1131,18 @@ describe('Multi-tenant owner report isolation', () => {
 
     const ownerResponse = await requestReport(venue, actor);
     expect(ownerResponse.status).toBe(200);
-    expect(await ownerResponse.json()).toMatchObject({ venue_id: venue });
+    const ownerReport = OwnerDishReportSchema.parse(await ownerResponse.json());
+    expect(ownerReport.venue_id).toBe(venue);
+    expect(ownerReport.dishes).toHaveLength(1);
+    expect(ownerReport.dishes[0]?.metrics).toMatchObject({
+      active_sessions: { value: 12, status: 'NORMAL' },
+      open_rate: { value: 0.833, status: 'NORMAL' },
+      engagement_rate: { value: 0.357, status: 'NORMAL' },
+      save_rate: { value: 0.143, status: 'NORMAL' },
+      avg_interaction_time_seconds: { value: 6.5, status: 'NORMAL' },
+      timing_coverage: { value: 0.714, status: 'NORMAL' },
+    });
+    expect(JSON.stringify(ownerReport)).not.toContain('eligible_sessions');
 
     const editorResponse = await requestReport(venue, otherActor);
     expect(editorResponse.status).toBe(403);
@@ -1019,6 +1152,8 @@ describe('Multi-tenant owner report isolation', () => {
 
     const otherOwnerResponse = await requestReport(otherVenue, otherVenueOwner);
     expect(otherOwnerResponse.status).toBe(200);
-    expect(await otherOwnerResponse.json()).toMatchObject({ venue_id: otherVenue });
+    const otherOwnerReport = OwnerDishReportSchema.parse(await otherOwnerResponse.json());
+    expect(otherOwnerReport.venue_id).toBe(otherVenue);
+    expect(otherOwnerReport.report_metadata.report_status).toBe('EMPTY');
   });
 });

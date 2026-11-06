@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Hosted synthetic and genuine-token transport/backfill checks passed; retries store one fact and changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042. S4-DATA-04 adds synthetic checkpoint, archive recovery, replay and owner-exclusion coverage. The owner dish-report API verifies staff identity and owner membership, then queries tenant-scoped fact views over 24 hours; report contract and hosted/production acceptance remain unverified. Normal collection remains paused pending real controls/outbox/privacy, recovery and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Hosted synthetic and genuine-token transport/backfill checks passed; retries store one fact and changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042. S4-DATA-04 adds synthetic checkpoint, archive recovery, replay and owner-exclusion coverage. The owner dish-report API verifies staff identity and owner membership, aggregates distinct 24-hour session sets, suppresses all values below ten sessions, and validates/strips the owner_report.v1 envelope. Seven focused unit regressions and 73 disposable database integration tests pass, including database-backed duplicate-session/rate assertions; hosted report acceptance remains unverified. Normal collection remains paused pending real controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -269,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3c6e87ad6c97d768a1e1031d99c2be1e5a11831330e1a3ecadb454a011c703a9"
+      "sourceFingerprint": "149bbcbf76bc4bdb6517b9f8352c16f4145217218d5c4fdf29be75792ce4af00"
     },
     {
       "id": "database",
@@ -549,12 +549,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 6 follow-up to S4-DATA-04: adds GET /api/v1/venues/:venueId/analytics/dishes with signed staff identity, owner-only membership and a read-only tenant report query. Corrects the query to use dish_current and the current owner fact views. API/integration coverage remains synthetic and does not establish report-contract, hosted recovery or production acceptance.",
+      "summary": "November 6 owner-report follow-up: GET /api/v1/venues/:venueId/analytics/dishes uses a read-only owner-scoped query with distinct exposed/open/saved session cohorts; engagement includes long-active openings or same-session v2 dish_compared events. All metric values are null below the ten-session floor. Internal cohort counts are stripped through the shared owner_report.v1 transformer. Seven focused unit regressions and 73 disposable database integration tests pass, including duplicate click/session, direct-entry and comparison-engagement fixtures; hosted acceptance remains unverified.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Rerun the disposable-database suite in an environment with Playwright's browser libraries installed; continue to keep collection paused for remaining screen, consent, report-contract, native recovery and hosted acceptance gates."
+      "next": "Keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
