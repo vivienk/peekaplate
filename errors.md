@@ -1433,3 +1433,68 @@ original failure observation above rather than treating a rerun as its diagnosis
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-06T08:18:01.285Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:32.645Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:52.513Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:39:56.081Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T11:40:53.389Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:31:49.201Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:32:48.778Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:35:56.806Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:41:36.877Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:02.683Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:33.755Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:03.544Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:31.076Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
+```
