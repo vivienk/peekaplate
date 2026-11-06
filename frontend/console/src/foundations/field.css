@@ -1,0 +1,58 @@
+/*
+ * Text field structure (S3-TOK-01). The input box itself is the design-system .pp-input from
+ * @peekaplate/ui (colors, border, focus ring, error and disabled states); this file only lays out
+ * the label above it and the hint or error below it, using shared tokens. Classes use .pp-field so they never
+ * collide with the design system's .pp-input.
+ */
+.pp-field {
+  display: grid;
+  gap: var(--pp-space-4);
+  font-family: var(--pp-font-family-base);
+}
+
+/* Rania (5 Nov): label Inter 14px on a 24px line height, weight 600, in on-surface (#1C1A17, 6 Nov).
+ * Inter renders once the font is loaded; until then the system font is used
+ * (see --pp-font-family-base). */
+.pp-field__label {
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* Rania (6 Nov): helper and error text are 12px on a 16px line height at weight 400, indented 8px,
+ * 6px below the input (the field's 4px gap plus 2px). The error replaces the helper in the same
+ * place. Helper is on-surface-variant (#57554E); error is color/error (#B91C1C). */
+.pp-field__hint,
+.pp-field__error {
+  margin: var(--pp-space-2) 0 0;
+  padding-inline-start: var(--pp-space-8);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-regular);
+}
+
+.pp-field__hint {
+  color: var(--pp-role-on-surface-variant);
+}
+
+.pp-field__error {
+  color: var(--pp-role-input-text-error);
+}
+
+/* Rania (1 Nov): the input box is 44px tall in every state (default, hover, focus, filled, error,
+ * disabled), measured on the box only, not the label, hint or error. Text is 16px on a 24px line
+ * height (paragraph-1 tokens in ui/Input). */
+.pp-field__control {
+  box-sizing: border-box;
+  block-size: 2.75rem;
+}
+
+.pp-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

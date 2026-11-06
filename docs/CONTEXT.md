@@ -59,7 +59,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "657afec34a4f9c2da845e614be17fc732469c7d06154242955706c31d8c372b1"
+      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
     },
     {
       "id": "ui",
@@ -76,7 +76,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
+      "sourceFingerprint": "47dab9f880785c702ea0e48b478feb40c4188517d7003bae1ca92b7776b9673e"
     },
     {
       "id": "diner",
@@ -137,18 +137,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
         "frontend/console/package.json",
         "frontend/console/foundations.html",
-        "frontend/console/src/foundations/Input.tsx",
-        "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
         "tests/e2e/input.spec.ts",
-        "frontend/console/vite.config.ts"
+        "frontend/console/vite.config.ts",
+        "frontend/console/src/foundations/TextField.tsx",
+        "frontend/console/src/foundations/field.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -158,7 +158,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
+      "sourceFingerprint": "59bccc07ff622714516d94db6393f45760846db68ff5ae12eb1e5d09d53dc522"
     },
     {
       "id": "backend",
@@ -538,6 +538,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "summary": "S3-TOK-01 Input follow-up: one console Input. The PR #30 foundation becomes TextField, which renders the design-system ui/Input from PR #53 for the box and keeps the label, hint and error wiring (aria-describedby, aria-invalid, hidden Error prefix, blank text ignored). Its classes move from .pp-input* to .pp-field*, ending the clash with @peekaplate/ui's .pp-input, and the demo page now uses the console's light theme. Agreed with Harshita (owner of ui/Input) and suggested by Jeffin. The field keeps a 44px touch target over the design system's 40px stopgap until Rania confirms the height. Six Playwright cases, including axe, pass on fixtures.",
+      "modules": [
+        "console"
+      ],
+      "next": "Rania confirms the field height and the Input visual roles (ClickUp 86bcuawtr); then drop or keep the 44px override and get visual sign-off. Use TextField for the restaurant review form once its scope is confirmed."
+    },
+    {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
       "modules": [
         "contracts",
@@ -583,13 +590,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "next": "After environment confirmation, reconcile develop and require current-head CI before review. Preserve approved bytes; any future legacy bundle requires an explicit compatibility decision."
-    },
-    {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
     },
     {
       "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
