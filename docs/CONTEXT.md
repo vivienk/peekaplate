@@ -161,7 +161,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases. The server-only report-input validator selects an authorized dish, preserves valid zero and withholds unusable metrics.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -242,7 +242,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/recommendation.test.ts",
         "docs/owner-ai.md",
         "backend/src/owner-ai/evaluation.test.ts",
-        "scripts/evaluate-owner-ai.mjs"
+        "scripts/evaluate-owner-ai.mjs",
+        "backend/src/owner-ai/report-input.ts",
+        "backend/src/owner-ai/report-input.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -255,7 +257,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f245e854a0d56b2c57098f3ec2ddaa67dfa6c0664705151f4cfeb798e9832f02"
+      "sourceFingerprint": "74420551401fe62384b3d92daea455703b8d8e0372c4d84b9160d7cd410d6840"
     },
     {
       "id": "database",
@@ -527,6 +529,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-05",
+      "summary": "AI-01 report-input validator synchronized with the reconciled evaluation stack and develop d5365bd. Existing dish selection, zero/withheld handling and 20 input cases are preserved.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Verify this stacked revision before review. Reporting identity and internal handoff require agreement before live AI integration."
+    },
+    {
+      "date": "2026-11-05",
       "summary": "AI-01 offline evaluation synchronized with the reconciled core and develop d5365bd. Existing synthetic evaluation cases and entrypoint are preserved.",
       "modules": [
         "backend",
@@ -598,15 +609,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
-    },
-    {
-      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "delivery"
-      ],
-      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
     }
   ]
 }
