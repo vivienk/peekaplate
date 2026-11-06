@@ -249,6 +249,8 @@ describe('design tokens', () => {
       '--pp-role-input-text': 'var(--pp-color-neutral-50)',
       '--pp-role-input-placeholder': 'var(--pp-color-neutral-400)',
       '--pp-role-input-border': 'var(--pp-color-neutral-400)',
+      '--pp-role-input-border-hover': 'var(--pp-color-neutral-400)',
+      '--pp-role-input-border-disabled': 'var(--pp-color-neutral-400)',
       '--pp-role-input-border-focus': 'var(--pp-color-info-400)',
       '--pp-role-input-border-error': 'var(--pp-color-error-400)',
       '--pp-role-input-text-error': 'var(--pp-color-error-400)',
@@ -469,13 +471,15 @@ describe('design tokens', () => {
       '--pp-role-nav-disabled-bg': 'var(--pp-color-gray-200)',
       '--pp-role-input-bg': 'var(--pp-color-gray-50)',
       '--pp-role-input-text': 'var(--pp-color-gray-900)',
-      '--pp-role-input-placeholder': 'var(--pp-color-gray-500)',
-      '--pp-role-input-border': 'var(--pp-color-gray-500)',
-      '--pp-role-input-border-focus': 'var(--pp-color-info-700)',
+      '--pp-role-input-placeholder': 'var(--pp-color-gray-600)',
+      '--pp-role-input-border': 'color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent)',
+      '--pp-role-input-border-hover': 'var(--pp-color-neutral-500)',
+      '--pp-role-input-border-focus': 'var(--pp-color-info-600)',
       '--pp-role-input-border-error': 'var(--pp-color-error-700)',
       '--pp-role-input-text-error': 'var(--pp-color-error-700)',
-      '--pp-role-input-bg-disabled': 'var(--pp-color-gray-200)',
-      '--pp-role-input-text-disabled': 'var(--pp-color-gray-500)',
+      '--pp-role-input-bg-disabled': 'var(--pp-color-neutral-200)',
+      '--pp-role-input-border-disabled': 'var(--pp-color-neutral-300)',
+      '--pp-role-input-text-disabled': 'var(--pp-color-neutral-400)',
     });
   });
 
@@ -548,11 +552,34 @@ describe('design tokens', () => {
     for (const [fg, bg, min] of pairs) {
       expect(ratio(hexOf(fg), hexOf(bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(min);
     }
-    // Non-text UI pairs.
-    expect(
-      ratio(hexOf(r('input-border')), hexOf(r('input-bg'))),
-      'input-border on input-bg',
-    ).toBeGreaterThanOrEqual(3);
+    // Non-text UI pairs. The light default border is a partly transparent colour
+    // (color-mix(in srgb, <colour> N%, transparent)), so it is measured as drawn over the input fill.
+    const drawnOver = (name: string, under: string): string => {
+      const mix = /^color-mix\(in srgb, var\((--pp-[\w-]+)\) (\d+)%, transparent\)$/.exec(
+        (light[name] ?? '').trim(),
+      );
+      if (!mix) return hexOf(name);
+      const [, colour = '', percent = '100'] = mix;
+      const top = /^#[0-9a-f]{6}$/i.test(light[colour] ?? base[colour] ?? '')
+        ? (light[colour] ?? base[colour] ?? '')
+        : hexOf(colour);
+      const bottom = hexOf(under);
+      const alpha = Number(percent) / 100;
+      const channel = (hex: string, i: number) => Number.parseInt(hex.slice(i, i + 2), 16);
+      return `#${[1, 3, 5]
+        .map((i) =>
+          Math.round(channel(top, i) * alpha + channel(bottom, i) * (1 - alpha))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('')}`;
+    };
+    for (const border of ['input-border', 'input-border-hover', 'input-border-focus']) {
+      expect(
+        ratio(drawnOver(r(border), r('input-bg')), hexOf(r('input-bg'))),
+        `${border} on input-bg`,
+      ).toBeGreaterThanOrEqual(3);
+    }
     expect(
       ratio(hexOf(r('focus-ring')), hexOf(r('surface'))),
       'focus-ring on surface',

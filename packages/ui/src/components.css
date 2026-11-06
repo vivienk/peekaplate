@@ -186,18 +186,21 @@
 .pp-input::placeholder {
   color: var(--pp-role-input-placeholder);
 }
+/* Hover sits before focus, error and disabled, which share its specificity and so win over it. */
+.pp-input:hover {
+  --pp-input-edge: var(--pp-role-input-border-hover);
+}
 .pp-input:focus-visible {
+  /* Rania (6 Nov): focus is the 1.5px edge in the focus colour, with no extra halo. */
   outline: none;
   --pp-input-edge: var(--pp-role-input-border-focus);
-  box-shadow:
-    inset 0 0 0 0.5px var(--pp-input-edge),
-    0 0 0 2px color-mix(in srgb, var(--pp-role-input-border-focus) 30%, transparent);
 }
 .pp-input[aria-invalid="true"] {
   --pp-input-edge: var(--pp-role-input-border-error);
   color: var(--pp-role-input-text-error);
 }
 .pp-input:disabled {
+  --pp-input-edge: var(--pp-role-input-border-disabled);
   background-color: var(--pp-role-input-bg-disabled);
   color: var(--pp-role-input-text-disabled);
   cursor: not-allowed;

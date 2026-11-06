@@ -64,6 +64,8 @@ test('the error border does not move the input text', async ({ page }) => {
 });
 
 test('keyboard focus skips disabled inputs and stays visible', async ({ page }) => {
+  // Transitions off, so colours are read at their final value.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(demo);
   const order = ['Dish name', 'Price', 'Short name', 'Internal note'];
   await page.getByLabel(order[0] ?? '').focus();
@@ -71,15 +73,14 @@ test('keyboard focus skips disabled inputs and stays visible', async ({ page }) 
     if (index > 0) await page.keyboard.press('Tab');
     const field = page.getByLabel(label);
     await expect(field).toBeFocused();
-    // Visible focus: either an outline or the design system's focus ring (a box-shadow).
+    // Visible focus (Rania, 6 Nov): the 1.5px edge turns Information/600 (#0B77BE), about 4.7:1
+    // on the fill, with no extra halo. An invalid field keeps its error colour.
     const focus = await field.evaluate((element) => {
       const style = getComputedStyle(element);
-      return {
-        outline: style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0,
-        ring: style.boxShadow !== 'none',
-      };
+      return { border: style.borderTopColor, shadow: style.boxShadow };
     });
-    expect(focus.outline || focus.ring).toBe(true);
+    const colour = label === 'Price' ? 'rgb(185, 28, 28)' : 'rgb(11, 119, 190)';
+    expect(focus).toEqual({ border: colour, shadow: `${colour} 0px 0px 0px 0.5px inset` });
   }
 });
 
@@ -160,6 +161,35 @@ test('helper, error and label text match the Figma colours, sizes and spacing', 
   expect(errorBorder).toBe('rgb(185, 28, 28)');
 });
 
+// Rania's review (6 Nov), Figma Input / Text (Light): default border Neutral/500 at 80%, hover
+// Neutral/500, focus Information/600 (focus wins over hover), disabled fill, border and text.
+test('input border, fill and text colours follow each state', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(demo);
+  const look = (field: import('@playwright/test').Locator) =>
+    field.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { border: style.borderTopColor, fill: style.backgroundColor, text: style.color };
+    });
+  const name = page.getByLabel('Dish name');
+  const fill = 'rgb(250, 250, 249)';
+  const text = 'rgb(28, 26, 23)';
+  expect(await look(name)).toEqual({
+    border: 'color(srgb 0.443137 0.45098 0.478431 / 0.8)',
+    fill,
+    text,
+  });
+  await name.hover();
+  expect(await look(name)).toEqual({ border: 'rgb(113, 115, 122)', fill, text });
+  await name.focus();
+  expect(await look(name)).toEqual({ border: 'rgb(11, 119, 190)', fill, text });
+  expect(await look(page.locator('input:disabled').first())).toEqual({
+    border: 'rgb(212, 213, 216)',
+    fill: 'rgb(231, 231, 233)',
+    text: 'rgb(161, 163, 170)',
+  });
+});
+
 test('every input box is 44px tall in every state, with 16px text on a 24px line height', async ({
   page,
 }) => {
@@ -198,10 +228,9 @@ test('every input box has a 1.5px edge, 12px radius and 16px side padding', asyn
   const edge = (field: import('@playwright/test').Locator) =>
     field.evaluate((element) => {
       const style = getComputedStyle(element);
-      const inset = style.boxShadow.match(/(rgba?\([^)]*\)) 0px 0px 0px 0\.5px inset/);
       return {
         border: style.borderLeftWidth,
-        inset: inset?.[1] === style.borderLeftColor,
+        inset: style.boxShadow === `${style.borderLeftColor} 0px 0px 0px 0.5px inset`,
         radius: style.borderTopLeftRadius,
         padding: [style.paddingLeft, style.paddingRight],
       };
