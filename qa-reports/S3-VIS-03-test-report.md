@@ -295,7 +295,7 @@ A separate read-only `reviewer` agent reviewed the complete working diff before 
 
 ## Rebase QA — 2026-11-06
 
-This section was written and committed **before** any test suite or CLI was run on the rebased head. Actual/Status columns are filled in by a later commit. Status values: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
+This section was written and committed **before** any test suite or CLI was run on the rebased head. Actual/Status columns were filled in by the follow-up results commit after execution. Status values: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
 
 - Base: `origin/develop` `d6e5a16` (PR #76). Rebased from `a9bcdb5`; backup `backup/feat/s3-vis-03-asset-delivery-pre-rebase-2026-11-06`.
 - Conflicts resolved: `schemas.py` (develop's `field_validator`, `validate_version` → `validate_box_evidence`, `_typed_equal`, `_box_evidence_links` kept; #25's `UUID` import and asset/spatial/presentation models added), `docs/CONTEXT.md`, `errors.md` (both histories kept).
@@ -317,21 +317,36 @@ This section was written and committed **before** any test suite or CLI was run 
 
 | ID | Traces to | Layer | Preconditions / steps | Expected | Actual | Status |
 |---|---|---|---|---|---|---|
-| V-AUTO-1 | AC-V1 | unit | `uv run --project processing --frozen --extra service python -m unittest discover -s processing/tests` | All pass; count recorded | | |
-| V-AUTO-2 | AC-V2 | unit | `… unittest processing.tests.test_box_evidence processing.tests.test_box_grounding_safety processing.tests.test_review_candidates` (develop modules) | All pass | | |
-| V-AUTO-3 | AC-V3 | repo | `pnpm verify lint typecheck test build context:check docs:check pr:check` | All checks PASS; Vitest and script counts recorded | | |
-| V-CLI-1 | T0 processing | CLI | `prepare_assets` on a 2000×1500 synthetic JPEG, `--budget-bytes 400000` | exit 0; four variants (`card-480`, `detail-1280` × WebP/JPEG); `review.status=needs_review`; `publication.eligible=false`; total ≤ 400,000 B; source copy byte-identical | | |
-| V-CLI-2 | immutability | CLI | Rerun V-CLI-1 into the same output root | exit 2; existing `manifest.json` SHA-256 unchanged | | |
-| V-CLI-3 | validation | CLI | (a) `--budget-bytes 1000`; (b) a text file renamed `.jpg`; (c) `--captured-at` without timezone | each exit 2; no new bundle directory | | |
-| V-CLI-4 | 2.5D sample | CLI | `prepare_spatial` with synthetic `layered_photo` layers against the V-CLI-1 manifest, `--budget-bytes 400000` | exit 0; `measurements.total_asset_bytes` == byte sum of all delivered files | | |
-| V-CLI-5 | fallback integrity | CLI | Copy of the T0 bundle whose `detail-1280.jpg` is replaced by non-JPEG bytes and the manifest hash/size patched to match | exit 2; no spatial output | | |
-| V-CLI-6 | Sai's ID finding (`a9bcdb5`) | CLI | `prepare_presentation` into separate roots: (a) 512² PNG, (b) 768² PNG, (c) 512² PNG with `--model-version model-b`; (a) uses `model-a` | three different `pres_` ids; each `needs_review`, `eligible=false` | | |
-| V-CLI-7 | T0 fallback retention | CLI | `prepare_presentation` with an opaque (no alpha) candidate | exit 2; `fallback_retained=true`; `fallback.jpg` SHA-256 == T0 `detail-1280.jpg` | | |
-| V-BR-1 | delivery | browser | Serve the V-CLI-4 bundle with `python -m http.server`; open `harness.html` in Chromium with `prefers-reduced-motion: no-preference` | `layersLoaded=3`; `spatialVisible=true`; `fallbackVisible=true`; `totalAssetBytes` == delivered bytes | | |
-| V-BR-2 | no-JS fallback | browser | Same URL, JavaScript disabled | `#fallback` `naturalWidth > 0` | | |
-| V-BR-3 | motion clamp | browser | Focus stage; Home; ArrowRight ×40; ArrowLeft ×1 | transform ends `rotateY(2.5deg)` | | |
-| V-BR-4 | reduced motion | browser | ArrowRight once, then emulate `prefers-reduced-motion: reduce` without reload | `#layers` transform cleared; `metrics.reducedMotion=true` | | |
-| V-BR-5 | failure retention | browser | Serve with one layer file removed; then with `spatial-manifest.json` removed | layer: `layerRetries[name]=1`, fallback visible; manifest: `manifestRetries=1`, fallback visible | | |
-| V-BR-6 | `file://` | browser | Open `harness.html` via `file://` | "Preview unavailable" shown; fallback visible | | |
+| V-AUTO-1 | AC-V1 | unit | `uv run --project processing --frozen --extra service python -m unittest discover -s processing/tests` | All pass; count recorded | Ran 465 tests, OK (develop-only baseline at d6e5a16: 434 discovered; +31 from #25's test_assets/test_spatial/test_presentation) | `PASS` |
+| V-AUTO-2 | AC-V2 | unit | `… unittest processing.tests.test_box_evidence processing.tests.test_box_grounding_safety processing.tests.test_review_candidates` (develop modules) | All pass | test_box_evidence + test_box_grounding_safety + test_review_candidates: Ran 34 tests, OK | `PASS` |
+| V-AUTO-3 | AC-V3 | repo | `pnpm verify lint typecheck test build context:check docs:check pr:check` | All checks PASS; Vitest and script counts recorded | exit 0. Biome checked 274 files; typecheck; Vitest 46 files, 767 passed / 4 skipped (pre-existing skips on develop); node --test 67/67; build; context 13 modules/10 handoffs; docs 54 files; pr:check not applicable locally | `PASS` |
+| V-CLI-1 | T0 processing | CLI | `prepare_assets` on a 2000×1500 synthetic JPEG, `--budget-bytes 400000` | exit 0; four variants (`card-480`, `detail-1280` × WebP/JPEG); `review.status=needs_review`; `publication.eligible=false`; total ≤ 400,000 B; source copy byte-identical | exit 0; asset ['t0_47d5c89419fee335933a1b3523bad850']; variants [('card-480', 'jpeg'), ('card-480', 'webp'), ('detail-1280', 'jpeg'), ('detail-1280', 'webp')]; review needs_review; eligible False; total_variant_bytes 37254; source identical True | `PASS` |
+| V-CLI-2 | immutability | CLI | Rerun V-CLI-1 into the same output root | exit 2; existing `manifest.json` SHA-256 unchanged | exit 2; manifest 530740d14c16… -> 530740d14c16…; bundles 1 | `PASS` |
+| V-CLI-3 | validation | CLI | (a) `--budget-bytes 1000`; (b) a text file renamed `.jpg`; (c) `--captured-at` without timezone | each exit 2; no new bundle directory | a budget 1000: exit 2, bundles []; b text as .jpg: exit 2, bundles []; c naive captured-at: exit 2, bundles [] | `PASS` |
+| V-CLI-4 | 2.5D sample | CLI | `prepare_spatial` with synthetic `layered_photo` layers against the V-CLI-1 manifest, `--budget-bytes 400000` | exit 0; `measurements.total_asset_bytes` == byte sum of all delivered files | exit 0; ['t1_bdc58c596574b29c65cc762e144aa113']; total_asset_bytes 65188; delivered 65188 | `PASS` |
+| V-CLI-5 | fallback integrity | CLI | Copy of the T0 bundle whose `detail-1280.jpg` is replaced by non-JPEG bytes and the manifest hash/size patched to match | exit 2; no spatial output | exit 2; output []; msg {"status": "failed", "errors": ["Unable to decode a valid T0 fallback JPEG."]} | `PASS` |
+| V-CLI-6 | Sai's ID finding (`a9bcdb5`) | CLI | `prepare_presentation` into separate roots: (a) 512² PNG, (b) 768² PNG, (c) 512² PNG with `--model-version model-b`; (a) uses `model-a` | three different `pres_` ids; each `needs_review`, `eligible=false` | a 512 model-a: exit 0, pres_ed1bfde039239f0564a0a31da807ad08, needs_review, eligible=False; b 768 model-a: exit 0, pres_ca2923f9f692b731d463c1f6a57771ba, needs_review, eligible=False; c 512 model-b: exit 0, pres_e2863f05896398a77ccba17c8faaa57e, needs_review, eligible=False | `PASS` |
+| V-CLI-7 | T0 fallback retention | CLI | `prepare_presentation` with an opaque (no alpha) candidate | exit 2; `fallback_retained=true`; `fallback.jpg` SHA-256 == T0 `detail-1280.jpg` | exit 2; status None; fallback_retained True; active fallback.jpg; fallback identical True | `PASS` |
+| V-BR-1 | delivery | browser | Serve the V-CLI-4 bundle with `python -m http.server`; open `harness.html` in Chromium with `prefers-reduced-motion: no-preference` | `layersLoaded=3`; `spatialVisible=true`; `fallbackVisible=true`; `totalAssetBytes` == delivered bytes | layersLoaded=3; spatialVisible=true; fallbackVisible=true; totalAssetBytes=65188; spatialError=null | `PASS` |
+| V-BR-2 | no-JS fallback | browser | Same URL, JavaScript disabled | `#fallback` `naturalWidth > 0` | naturalWidth=1280 naturalHeight=960 src=./fallback.jpg | `PASS` |
+| V-BR-3 | motion clamp | browser | Focus stage; Home; ArrowRight ×40; ArrowLeft ×1 | transform ends `rotateY(2.5deg)` | perspective(900px) rotateX(0deg) rotateY(3deg) -> perspective(900px) rotateX(0deg) rotateY(2.5deg) | `PASS` |
+| V-BR-4 | reduced motion | browser | ArrowRight once, then emulate `prefers-reduced-motion: reduce` without reload | `#layers` transform cleared; `metrics.reducedMotion=true` | before "perspective(900px) rotateX(0deg) rotateY(0.5deg)"; after ""; reducedMotion=true; after key "" | `PASS` |
+| V-BR-5 | failure retention | browser | Serve with one layer file removed; then with `spatial-manifest.json` removed | layer: `layerRetries[name]=1`, fallback visible; manifest: `manifestRetries=1`, fallback visible | layer: retries={"subject":1} spatialError=layer_load_failed fallbackVisible=true; manifest: manifestRetries=1 spatialError=null fallbackVisible=true | `PASS` |
+| V-BR-6 | `file://` | browser | Open `harness.html` via `file://` | "Preview unavailable" shown; fallback visible | status="Preview unavailable â€” showing the approved dish photo."; spatialError=null; fallback rendered=true | `PASS` |
 
 Out of scope: real permitted photos, real-phone timing, VoiceOver/TalkBack and PM/restaurant/diner acceptance. These stay `BLOCKED` as in the earlier sections.
+
+### Execution summary — 2026-11-06
+
+Environment: Windows 10.0.26200 x64, Python 3.12.13 via `uv`, Node.js 24.16.0, pnpm 11.25.0, Playwright Chromium (headless, 390×844, `reducedMotion: no-preference` unless stated). Drivers: `processing/work/qa-vis03-20261106/qa_cli.py` (runs each CLI as a separate process) and `qa_browser.mjs` (bundle served with `python -m http.server`). Neither is committed.
+
+| Result | Count |
+|---|---|
+| `PASS` | 16 |
+| `FAIL` | 0 |
+| `BLOCKED` | 0 (real-photo, device and accessibility gates remain blocked as listed above) |
+| `NOT RUN` | 0 |
+
+The rebase changed no #25 source or test file: `git diff a9bcdb5 HEAD` on every #25-owned module, test and doc is empty. Develop's `schemas.py` and `fixture_factory.py` lines are preserved (`git diff origin/develop HEAD` contains no removed lines in either file).
+
+Observation O-1 (not a defect against an acceptance criterion): when the manifest fetch fails twice, the harness shows "Preview unavailable" and keeps the fallback, but `metrics.spatialError` stays `null`; only `manifestRetries=1` records the failure. Layer failures set `spatialError=layer_load_failed`. This can be raised as a diagnostics follow-up if wanted. It was not changed here.

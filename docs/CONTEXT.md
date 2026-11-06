@@ -564,8 +564,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-03",
-      "summary": "S3-VIS-03 PR #25 reconciled with develop c005b0f. Presentation asset ids are now derived after candidate validation from the T0 id, dish/revision, cutout/reference hashes, prompt version and hash, effective model version and the candidate PNG hash (or a distinct fallback identity), so different candidates or models no longer collide and identical content stays create-only. Earlier viewer, fallback, budget and reduced-motion findings remain resolved.",
+      "date": "2026-11-06",
+      "summary": "S3-VIS-03 PR #25 rebased linearly onto develop d6e5a16 (was c005b0f merge). schemas.py keeps develop's box-evidence validator and adds the asset/spatial/presentation models; asset files moved to their own assets context node because the processing summary is at its cap. Presentation asset ids derive after candidate validation from the candidate PNG hash and effective model version. Rebase QA: 465 Python tests, pnpm verify, 7 CLI and 6 Chromium harness cases passed on synthetic data (qa-reports/S3-VIS-03-test-report.md).",
       "modules": [
         "processing",
         "assets",
