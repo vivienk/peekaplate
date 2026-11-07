@@ -1,3 +1,4 @@
+import { PublicMenuContentBundleSchema } from '@peekaplate/contracts';
 import {
   ALLERGENS,
   type CompleteDish,
@@ -51,6 +52,7 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       categoryId,
     };
   }
+  // null and [] both mean "not confirmed"; the detail screen then shows the staff note under Contains.
   const labels = (dish.allergens ?? []).map(allergenLabel);
   const allergens = [...new Map(labels.map((a) => [chipKey(a), a])).values()];
   const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));
@@ -86,6 +88,11 @@ export function toMenu(
   source: Menu['source'],
   publicationRevisionId: string,
 ): MenuLoadResult {
+  // Published data must match the shared contract. Any invalid record rejects the whole menu,
+  // so nothing is repaired or invented. Fixtures are demo data and skip this check.
+  if (source === 'published' && !PublicMenuContentBundleSchema.safeParse(bundle).success) {
+    return { status: 'error' };
+  }
   const categories = bundle.categories.map((c) => ({
     categoryId: c.category_id,
     name: c.name,
