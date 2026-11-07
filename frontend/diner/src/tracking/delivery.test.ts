@@ -6,6 +6,7 @@ import {
   createRetryPause,
   type DeliveryResult,
   deliver,
+  logTerminalCounts,
   MAX_BATCH_BYTES,
   MAX_BATCH_EVENTS,
   type MenuToken,
@@ -371,6 +372,51 @@ describe('createRetryPause', () => {
       },
     });
     expect(() => onResult(result({ retry: [id(1)] }))).not.toThrow();
+  });
+});
+
+describe('development log of terminal counts', () => {
+  it('logs counts only, including events discarded unsent, never IDs or the token', async () => {
+    const logs: Array<[string, unknown]> = [];
+    const server = fakeServer(accepted);
+    const send = createLiveDeliver(options(server.fetch), {
+      pause: () => {},
+      log: (label, counts) => logs.push([label, counts]),
+    });
+    await send([envelope(1), envelope(2, {}, OTHER_PUBLICATION)]);
+    expect(logs).toEqual([
+      [
+        '[track] delivery counts',
+        {
+          accepted: 1,
+          rejected: 0,
+          expired: 1,
+          unauthorized: 0,
+          clientInvalid: 0,
+          payloadTooLarge: 0,
+        },
+      ],
+    ]);
+    const text = JSON.stringify(logs);
+    expect(text).not.toContain(TOKEN.value);
+    expect(text).not.toContain(id(1));
+    expect(text).not.toContain(PUBLICATION);
+  });
+
+  it('stays silent when nothing left the outbox', () => {
+    const logs: unknown[] = [];
+    logTerminalCounts(result({ retry: [id(1)] }), (...args) => logs.push(args));
+    expect(logs).toEqual([]);
+  });
+
+  it('a failing log never fails delivery', async () => {
+    const send = createLiveDeliver(options(fakeServer(accepted).fetch), {
+      pause: () => {},
+      log: () => {
+        throw new Error('console unavailable');
+      },
+    });
+    expect(await send([envelope(1)])).toEqual([id(1)]);
   });
 });
 

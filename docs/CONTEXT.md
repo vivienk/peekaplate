@@ -138,7 +138,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-outbox.spec.ts",
         "frontend/diner/src/tracking/dispatch.test.ts",
         "frontend/diner/src/tracking/delivery.ts",
-        "frontend/diner/src/tracking/delivery.test.ts"
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -147,7 +148,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "fc0ced673b65db3a4174ea0c52157fe7eb9ef591bb05de75bfe0d9f4d48162be"
+      "sourceFingerprint": "90f2f8cbb00d14ce3e8ccbb00a77d1b061e7851fb82aa5a6fcfaadce9a528b62"
     },
     {
       "id": "console",
@@ -549,15 +550,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-07",
-      "summary": "S3-TRK-01.3 delivery (#84), rebased onto the TRK-01.2 outbox (#80). frontend/diner/src/tracking/delivery.ts: deliver() posts batches with the menu token in the header only, drops wrong-publication or expired-token events unsent, halves on 413 and maps receipts/statuses to done or retry. Batch limits and the request wrapper now come from batcher.ts. createRetryPause() calls pauseDeliveryUntil(now + retryDelayMs(attempt, Retry-After)) after a send that left retries (1 s doubling, 60 s cap, reset on a clean send, ignored when no request was made); createLiveDeliver() wires it for enableLiveTracking(). Vitest covers a 429 holding every batcher trigger until Retry-After ends.",
+      "summary": "S3-TRK-01.3 delivery (#84), rebased onto the TRK-01.2 outbox (#80). frontend/diner/src/tracking/delivery.ts: deliver() posts batches with the menu token in the header only, drops wrong-publication or expired-token events unsent, halves on 413 and maps receipts/statuses to done or retry. Batch limits and the request wrapper now come from batcher.ts. createRetryPause() calls pauseDeliveryUntil(now + retryDelayMs(attempt, Retry-After)) after a send that left retries (1 s doubling, 60 s cap, reset on a clean send, ignored when no request was made); createLiveDeliver() wires it for enableLiveTracking(). A development-only log records aggregate terminal counts (including discarded expired events), never IDs or the token. Vitest covers a 429 holding every batcher trigger and all five shared delivery_cases fixtures, with receipts checked against ObservationReceiptBatchSchema.",
       "modules": [
         "diner"
       ],
       "paths": [
         "frontend/diner/src/tracking/delivery.ts",
-        "frontend/diner/src/tracking/delivery.test.ts"
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts"
       ],
-      "next": "Retarget #84 to develop once #77 and #80 merge. Call enableLiveTracking(createLiveDeliver(...)) from DIN-03 with the per-environment endpoint and the RES-02 menu token; integration tests against the contract fixtures and same-publication token refresh remain open."
+      "next": "Retarget #84 to develop once #77 and #80 merge. Call enableLiveTracking(createLiveDeliver(...)) from DIN-03 with the per-environment endpoint and the RES-02 menu token. Browser tests (token expiry, storage failure, fixture mode with no network) and DATA-01 evidence remain; same-publication token refresh is open."
     },
     {
       "summary": "S3-TRK-01 tracking boundary (Sai with Vivien, 3 Nov; details 4 Nov): one UI action calls track() once; after validation and the consent/property checks it delivers independently to PostHog (its SDK, pilot funnels) and POST /observations (canonical owner reports). Retained custom work: strict shared-contract validation, stable IDs, active-time rules, the off-by-default consent gate (P0 for both destinations), and the canonical-only outbox, batching and retry pause. Paused: custom PostHog buffering/retries, extra internal analytics aggregation, autocapture/replay. PostHog gets a separate visit-scoped ID, never session_id; only event_id is shared; nothing in fixture mode; no menu token.",

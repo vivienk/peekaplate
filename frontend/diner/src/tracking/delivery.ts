@@ -1,7 +1,8 @@
 // Delivery of queued observation.v2 events (S3-TRK-01.3; ADR 0015; matrix v0.1h §7). Sends a batch
 // to POST /observations with the menu token in the Authorization header only, reads the per-event
 // receipts and says which events leave the outbox and which stay for a retry. The outbox, batching
-// and flush timing belong to TRK-01.2; this module never stores, logs or relabels anything.
+// and flush timing belong to TRK-01.2. This module never stores or relabels anything; development
+// builds log only aggregate terminal counts, never event contents or the token.
 import { BATCH_MAX_BYTES, BATCH_MAX_ITEMS, batchBody, type Deliver } from './batcher';
 import type { Envelope } from './envelope';
 import { pauseDeliveryUntil } from './index';
@@ -294,18 +295,36 @@ export function createRetryPause({
   };
 }
 
-// The live sender for enableLiveTracking(): token-bound delivery with the retry pause wired in.
-// `onResult` still sees every result (e.g. the development log of terminal counts).
+const DEV_LOG_LABEL = '[track] delivery counts';
+
+// The local development log (AC 6): counts of events that left the outbox, by outcome, including
+// those discarded unsent after a publication change or token expiry. Counts only: never event_ids,
+// payloads, session IDs or the token. Silent in production builds and when nothing ended.
+export function logTerminalCounts(
+  result: DeliveryResult,
+  log: (label: string, counts: TerminalCounts) => void = (label, counts) => {
+    if (import.meta.env.DEV) console.info(label, counts);
+  },
+): void {
+  if (Object.values(result.counts).some((n) => n > 0)) log(DEV_LOG_LABEL, { ...result.counts });
+}
+
+export type LiveDeliverOptions = RetryPauseOptions & {
+  // Replaces the development log of terminal counts (for tests).
+  log?: (label: string, counts: TerminalCounts) => void;
+  onResult?: (result: DeliveryResult) => void;
+};
+
+// The live sender for enableLiveTracking(): token-bound delivery with the retry pause and the
+// development log of terminal counts wired in. `onResult` still sees every result.
 export function createLiveDeliver(
   options: DeliveryOptions,
-  {
-    onResult,
-    ...pauseOptions
-  }: RetryPauseOptions & { onResult?: (r: DeliveryResult) => void } = {},
+  { onResult, log, ...pauseOptions }: LiveDeliverOptions = {},
 ): Deliver {
   const backOff = createRetryPause(pauseOptions);
   return createDeliver(options, (result) => {
     backOff(result);
+    logTerminalCounts(result, log);
     onResult?.(result);
   });
 }
