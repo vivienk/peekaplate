@@ -1372,3 +1372,21 @@ steps. The test now pauses the clock before mounting its fixture, then advances
 only the existing 2000/2900/200-ms steps. Toast assertions, expiry deadlines and
 product code are unchanged. All 12 focused Save browser tests pass; retain the
 original failure observation above rather than treating a rerun as its diagnosis.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-07T16:24:15.985Z"},"status":"resolved","cause":"While merging develop into S3-TOK-01 (#74), the docs/CONTEXT.md conflict (source fingerprints only) was first resolved by taking develop's whole file, which dropped the branch's module path changes (foundations Input.tsx and input.css renamed to TextField.tsx and field.css), so the context check could not read the old paths.","prevention":"Resolve CONTEXT.md conflicts hunk by hunk, keeping both sides' non-conflicting changes, then run context:refresh; never replace the whole file with one side.","regression":"Re-resolved only the three conflicting fingerprint hunks; context:refresh and context:check then passed (12 modules, 10 handoffs)."}
+```
