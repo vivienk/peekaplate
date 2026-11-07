@@ -114,6 +114,31 @@ describe('foundation API', () => {
   });
 });
 
+describe('owner report HTTP boundary', () => {
+  it('derives the actor from the verified token and passes the venue and current time to the reader', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const now = new Date('2026-11-06T12:00:00.000Z');
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const app = createApp({
+      verify,
+      execute: vi.fn(),
+      readOwnerReport,
+      now: () => now,
+    });
+
+    const response = await app.request(`/api/v1/venues/${venueId}/analytics/dishes`, {
+      headers: { Authorization: 'Bearer test-token' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
+    expect(verify).toHaveBeenCalledWith('Bearer test-token', {});
+    expect(readOwnerReport).toHaveBeenCalledWith(actorId, venueId, now, {});
+  });
+});
+
 describe('dish HTTP boundary', () => {
   const venueId = '00000000-0000-4000-8000-000000000001';
   const dishId = '00000000-0000-4000-8000-000000000002';
