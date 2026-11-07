@@ -667,6 +667,20 @@ both aliases and markers 404 at 2026-10-26T20:13:56Z. Provider deletion success
 alone does not establish instantaneous edge retirement. Staging deployment
 IDs and app data were unchanged; detailed evidence is in docs/previews.md.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T11:12:33.369Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T11:12:53.304Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-27T11:14:04.370Z","exitCode":1}
+```
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -1239,6 +1253,8 @@ pass. Keep node summaries within the existing limit when resolving conflicts.
 
 <!-- automatic observation; not root cause -->
 ```json
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
 ```
 
@@ -1287,6 +1303,49 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T15:55:44.603Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-03T15:57:21.681Z","exitCode":2}
+```
+
+## November 3 PR45 menu-ingestion merge reconciliation
+
+Merging `develop` into `feat/s3-vis-01-menu-ingestion` produced lint and typecheck observations:
+1. `biome check` flagged import ordering and trailing formatting in `backend/src/index.test.ts` and `packages/contracts/src/index.test.ts`. Fixed via `biome check --write .`.
+2. `tsc` flagged missing observation/public-menu handlers in `Dependencies` in `backend/src/index.ts` (`verifyMenu`, `consumeObservationRateLimit`, `enqueueObservation`, `now`, `readPublicMenu`, `issuePublicMenu`, `readMenuJwks`) that were temporarily dropped during merge conflict resolution. Restored the canonical `Dependencies` interface.
+Full verification suite passed: all 33 Vitest suites (577 tests), 64 script tests, `tsc` across all 7 packages, Biome checks, context graph validation, and real PostgreSQL pgTAP + DB integration tests (60 assertions).
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-04T19:53:00.867Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T19:58:00.859Z","exitCode":1}
+```
+
+## November 5 R2 diagnostic persistence & retry safety fix
+
+Fixed R2 diagnostic-write failure swallowing during unsupported-source job processing:
+- Cause: In `backend/src/ingestion/orchestrator.ts`, failure diagnostic persistence in R2 was wrapped in `catch { resultStorageKey = null; }`, swallowing infrastructure errors and marking unsupported-source jobs as terminally failed without diagnostic records, causing premature queue message ACKs.
+- Prevention: Propagate R2 persistence failures as `IngestionError('report_storage_failed')`, abort terminal failure transitions, requeue the job with lease cleanly released (`terminal: false`), and retry the queue message until diagnostic persistence succeeds.
+- Regression: Added focused regression suite in `backend/src/ingestion/orchestrator.test.ts` (Test A, Test B, Test C, Test D) and database integration test in `backend/src/ingestion/ingestion.integration.ts`. All 17 orchestrator tests and 41 vitest suites (708 tests) pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-05T18:25:08.608Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-05T18:26:00.808Z","exitCode":1}
+```
 
 ## November 5 grounding-budget harness correction
 
