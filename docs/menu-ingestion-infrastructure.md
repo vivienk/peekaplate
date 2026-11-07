@@ -73,11 +73,13 @@ Use separate keys in the existing bucket:
 
 ```text
 menu-ingestion/sources/<server-set tenant UUID>/<server-set job UUID>/source
-reports/<server-set tenant UUID>/<server-set job UUID>/extraction.json
+reports/<server-set tenant UUID>/<server-set job UUID>/attempts/<claim token>/extraction.json
 ```
 
-The first is the service's required input location; the second matches PR #45's
-proposed report location. The Worker must authorize the venue, materialize the
+The first is the service's required input location. The second is the immutable
+per-attempt report location used by PR #45. Each durable job claim writes to its
+own claim-token-scoped key, preventing a retry or reclaimed lease from replacing
+another attempt's evidence. The Worker must authorize the venue, materialize the
 source, compute its SHA-256, then enqueue the job. A prefix is an organization
 rule, not an access-control boundary. Bucket credentials can read across its
 prefixes; keep them server-side and limit them to the staging bucket.
