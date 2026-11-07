@@ -2,7 +2,7 @@
 // payload fields plus publication_revision_id; the layer lifts publication_revision_id into the
 // envelope (agreed with Jeffin) and adds the rest. Validation runs before a sequence number is
 // assigned, so a dropped event never uses one (Zhiliang). Clients never send venue authority.
-import { isAllowedEvent, type P0EventName } from './event-names';
+import { isAllowedEvent, type P0EventName } from '@peekaplate/analytics/event-names';
 import type { Identity } from './identity';
 import { isValidObservation } from './validate';
 

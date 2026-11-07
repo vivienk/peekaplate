@@ -1,7 +1,7 @@
+import { isAllowedEvent, type P0EventName } from '@peekaplate/analytics/event-names';
 import { describe, expect, it } from 'vitest';
 import fixtures from '../../../../packages/contracts/fixtures/observation.v2/fixtures.json';
 import { buildEnvelope } from './envelope';
-import { isAllowedEvent, type P0EventName } from './event-names';
 import type { Identity } from './identity';
 import { isValidObservation } from './validate';
 

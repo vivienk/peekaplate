@@ -2,8 +2,9 @@
 // checked against the shared ObservationV2Schema from @peekaplate/contracts, the same schema the
 // ingestion endpoint uses, so the diner never queues an event the server would reject as invalid.
 // It runs before a sequence number is assigned, so a rejected event never uses one.
+
+import type { P0EventName } from '@peekaplate/analytics/event-names';
 import { ObservationV2Schema } from '@peekaplate/contracts';
-import type { P0EventName } from './event-names';
 
 // Placeholders for the fields the layer fills in after validation. They are valid by construction,
 // so only the caller's type, publication and payload can make the check fail.

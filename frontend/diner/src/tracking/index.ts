@@ -11,10 +11,11 @@
 // - Live: only when the consent gate allows it (off by default; see consent.ts) is an event
 //   delivered, independently, to the canonical outbox (POST /observations, sent by TRK-01.3) and to
 //   PostHog through the adapter connected with connectPostHog (Sai with Vivien, 3 Nov).
+
+import type { P0EventName } from '@peekaplate/analytics/event-names';
 import { browserBatchTriggers, createBatcher, type Deliver } from './batcher';
 import { isTrackingAllowed, onTrackingAllowedChange } from './consent';
 import { buildEnvelope, type Envelope } from './envelope';
-import type { P0EventName } from './event-names';
 import { browserLifecycle, browserSessionStore, createIdentity, type Identity } from './identity';
 import { browserOutboxStore, createOutbox, memoryOutboxStore, type OutboxStore } from './outbox';
 

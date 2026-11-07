@@ -5,12 +5,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./consent": "./src/consent.ts"
+    "./consent": "./src/consent.ts",
+    "./event-names": "./src/event-names.ts",
+    "./posthog": "./src/posthog.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@peekaplate/contracts": "workspace:*"
+    "@peekaplate/contracts": "workspace:*",
+    "posthog-js": "1.444.4"
   }
 }
