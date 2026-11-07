@@ -35,6 +35,7 @@ export async function readOwnerReport(
     const result = await client.query(OWNER_REPORT_QUERY, [
       venueId,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      now,
     ]);
     await client.query('COMMIT');
     started = false;
@@ -62,7 +63,21 @@ const OWNER_REPORT_QUERY = `
       ON dish.tenant_id = obs.tenant_id AND dish.dish_id = obs.dish_id
     WHERE obs.tenant_id = $1
       AND obs.occurred_at >= $2
+      AND obs.occurred_at <= $3
       AND obs.dish_id IS NOT NULL
+  ),
+  opening_activity AS (
+    SELECT
+      act.tenant_id,
+      act.dish_id,
+      act.session_id,
+      act.opening_id,
+      act.active_ms,
+      act.activity_final
+    FROM filtered_observations act
+    WHERE act.event_type = 'dish_activity_checkpoint'
+      AND act.occurred_at >= $2
+      AND act.occurred_at <= $3
   ),
   dish_sessions AS (
     SELECT
@@ -83,10 +98,11 @@ const OWNER_REPORT_QUERY = `
       obs.session_id,
       obs.opening_id,
       MAX(act.active_ms) AS active_ms,
-      COALESCE(BOOL_OR(act.has_final_checkpoint), false) AS has_final_checkpoint
+      COALESCE(BOOL_OR(act.activity_final), false) AS has_final_checkpoint
     FROM filtered_observations obs
-    LEFT JOIN app_private.owner_opening_activity_v1 act
+    LEFT JOIN opening_activity act
       ON act.tenant_id = obs.tenant_id
+      AND act.session_id = obs.session_id
       AND act.opening_id = obs.opening_id
       AND act.dish_id = obs.dish_id
     WHERE obs.event_type = 'dish_detail_opened'

@@ -1011,9 +1011,8 @@ describe('Multi-tenant owner report isolation', () => {
     const producerId = crypto.randomUUID();
     let sequence = 0;
 
-    const insertEvent = async (eventType: string, sessionId: string) => {
+    const insertEvent = async (eventType: string, sessionId: string, occurredAt = new Date()) => {
       const eventId = crypto.randomUUID();
-      const occurredAt = new Date();
       await admin.query(
         `INSERT INTO app_private.observation_index
           (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
@@ -1048,9 +1047,11 @@ describe('Multi-tenant owner report isolation', () => {
       source: 'menu_card' | 'direct',
       fromExposureId: string | null,
       activeMs?: number,
+      activityOccurredAt?: Date,
+      openingOccurredAt?: Date,
     ) => {
       const openingId = crypto.randomUUID();
-      const eventId = await insertEvent('dish_detail_opened', sessionId);
+      const eventId = await insertEvent('dish_detail_opened', sessionId, openingOccurredAt);
       await admin.query(
         `INSERT INTO app_private.observation_opening
           (tenant_id, event_id, dish_id, dish_revision_id, opening_id, source, from_exposure_id, save_available)
@@ -1058,7 +1059,11 @@ describe('Multi-tenant owner report isolation', () => {
         [venue, eventId, dishId, dish.revisionId, openingId, source, fromExposureId],
       );
       if (activeMs === undefined) return;
-      const checkpointId = await insertEvent('dish_activity_checkpoint', sessionId);
+      const checkpointId = await insertEvent(
+        'dish_activity_checkpoint',
+        sessionId,
+        activityOccurredAt,
+      );
       await admin.query(
         `INSERT INTO app_private.observation_activity
           (tenant_id, event_id, dish_id, dish_revision_id, opening_id, active_ms, final)
@@ -1115,10 +1120,26 @@ describe('Multi-tenant owner report isolation', () => {
 
     const directSessions = Array.from({ length: 4 }, () => crypto.randomUUID());
     for (const sessionId of directSessions) await addOpening(sessionId, 'direct', null);
+    await addOpening(
+      directSessions[2]!,
+      'direct',
+      null,
+      100_000,
+      new Date(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    await addOpening(
+      exposedSessions[10]!,
+      'menu_card',
+      exposures.get(exposedSessions[10]!)!,
+      undefined,
+      undefined,
+      new Date(Date.now() + 2 * 60 * 1000),
+    );
 
     await addComparison(directSessions[0]!);
     await addComparison(directSessions[0]!);
     await addComparison(directSessions[1]!);
+    await addComparison(crypto.randomUUID());
     await addDirectSave(exposedSessions[0]!);
     await addDirectSave(exposedSessions[0]!);
     await addDirectSave(directSessions[0]!);

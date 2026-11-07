@@ -10,7 +10,7 @@ const dishId = '45806808-4376-46ff-912b-ab8a5519881a';
 // A stand-in for pg's Client: records every statement and answers the membership lookup.
 function fakeClient(permission: string | null, reportRows: Record<string, unknown>[] = []) {
   const statements: string[] = [];
-  const query = vi.fn(async (text: string) => {
+  const query = vi.fn(async (text: string, values?: unknown[]) => {
     // Keep the whole statement on one line so later checks can find any part of it.
     statements.push(text.trim().replace(/\s+/g, ' '));
     if (text.includes('app_private.staff_membership')) {
@@ -191,13 +191,20 @@ describe('readOwnerReport report contract and session metrics', () => {
   });
 
   it('counts unique sessions and the canonical linked-comparison event in SQL', async () => {
-    const { client, statements } = fakeClient('owner', [reportRow()]);
-    await readOwnerReport(client, 'actor-1', venueId, new Date('2026-11-06T10:00:00Z'));
+    const { client, statements, query } = fakeClient('owner', [reportRow()]);
+    const now = new Date('2026-11-06T10:00:00Z');
+    await readOwnerReport(client, 'actor-1', venueId, now);
     const sql = statements.find((statement) =>
+      statement.includes('app_private.owner_observation_v1'),
+    );
+    const reportQuery = query.mock.calls.find(([statement]) =>
       statement.includes('app_private.owner_observation_v1'),
     );
 
     expect(sql).toContain("obs.event_type = 'dish_compared'");
+    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at <= $3');
+    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at <= $3');
+    expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
     expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
     expect(sql).toContain('COUNT(DISTINCT');
     expect(sql).toContain('sessions.is_opened AND sessions.has_direct_save');
