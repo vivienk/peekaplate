@@ -36,8 +36,19 @@
         {
           "binding": "INGESTION_REPORTS_BUCKET",
           "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "ORDER_OUTCOME_ARCHIVE_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "ORDER_IMPORT_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
         }
       ],
+      "triggers": {
+        "crons": ["0 */6 * * *"]
+      },
       "ratelimits": [
         {
           "name": "OBSERVATION_RATE_LIMITER_MINUTE",

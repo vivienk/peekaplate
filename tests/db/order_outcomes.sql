@@ -1,0 +1,417 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap;
+SELECT plan(65);
+
+-- Setup test venues and staff memberships
+INSERT INTO app_private.venues (id, name) VALUES
+  ('00000000-0000-0000-0000-000000000801', 'Order Test Venue A'),
+  ('00000000-0000-0000-0000-000000000802', 'Order Test Venue B');
+
+INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', 'owner'),
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000002', 'viewer'),
+  ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000003', 'editor');
+
+-- 1. Table existence & Forced RLS
+SELECT has_table('app_private', 'order_outcome_import_batches', 'order_outcome_import_batches exists');
+SELECT has_table('app_private', 'order_outcome_lines', 'order_outcome_lines exists');
+SELECT has_table('app_private', 'order_outcome_quarantine', 'order_outcome_quarantine exists');
+SELECT has_table('app_private', 'order_outcome_conflicts', 'order_outcome_conflicts exists');
+SELECT has_table('app_private', 'pos_dish_mappings', 'pos_dish_mappings exists');
+SELECT has_table('app_private', 'venue_tracking_activations', 'venue_tracking_activations exists');
+
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.order_outcome_import_batches'::regclass), true, 'batches RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.order_outcome_lines'::regclass), true, 'lines RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.order_outcome_quarantine'::regclass), true, 'quarantine RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.order_outcome_conflicts'::regclass), true, 'conflicts RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.pos_dish_mappings'::regclass), true, 'pos_dish_mappings RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.venue_tracking_activations'::regclass), true, 'venue_tracking_activations RLS is forced');
+
+-- 2. Privileges
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_outcome_import_batches', 'insert, update, select')), true, 'runtime has batch insert/update/select');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_outcome_import_batches', 'delete')), false, 'runtime cannot delete batches');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_outcome_lines', 'insert, select')), true, 'runtime has lines insert/select');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_outcome_lines', 'update')), false, 'runtime cannot update lines');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_outcome_lines', 'delete')), false, 'runtime cannot delete lines');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.venue_tracking_activations', 'insert, select')), true, 'runtime has venue_tracking_activations insert/select');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.venue_tracking_activations', 'update')), false, 'runtime cannot update venue_tracking_activations');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.venue_tracking_activations', 'delete')), false, 'runtime cannot delete venue_tracking_activations');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.pos_dish_mappings', 'select')), true, 'runtime has pos_dish_mappings select');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.pos_dish_mappings', 'insert')), false, 'runtime cannot insert pos_dish_mappings');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.pos_dish_mappings', 'update')), false, 'runtime cannot update pos_dish_mappings');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.pos_dish_mappings', 'delete')), false, 'runtime cannot delete pos_dish_mappings');
+
+-- 3. Execution under peekaplate_runtime without tenant context fails closed
+SET ROLE peekaplate_runtime;
+
+SELECT throws_like(
+  $$INSERT INTO app_private.order_outcome_import_batches
+      (id, tenant_id, schema_version, source_filename, file_sha256, storage_key, created_by)
+    VALUES
+      ('00000000-0000-0000-0000-000000000901', '00000000-0000-0000-0000-000000000801',
+       'pilot_order_outcome.v1', 'orders.csv', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+       'order-imports/801/901/source.csv', '00000000-0000-0000-0000-000000000001')$$,
+  'new row violates row-level security policy for table "order_outcome_import_batches"%',
+  'runtime cannot insert batch without app.tenant_id'
+);
+
+-- 4. Establish Venue A context
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_import_batches
+      (id, tenant_id, schema_version, source_filename, file_sha256, storage_key, status, created_by)
+    VALUES
+      ('00000000-0000-0000-0000-000000000901', '00000000-0000-0000-0000-000000000801',
+       'pilot_order_outcome.v1', 'orders.csv', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+       'order-imports/801/901/source.csv', 'processing', '00000000-0000-0000-0000-000000000001')$$,
+  'runtime can insert batch for own tenant'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO app_private.venue_tracking_activations
+      (tenant_id, activated_at, activated_by, source)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', now(), '00000000-0000-0000-0000-000000000001', 'menu_publication')$$,
+  'runtime can insert server-controlled venue tracking activation'
+);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.venue_tracking_activations
+      (tenant_id, activated_at, activated_by, source)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', now() - interval '10 days', '00000000-0000-0000-0000-000000000001', 'administrative')$$,
+  '%Client-supplied activation timestamp is prohibited%',
+  'trigger rejects client backdated activation timestamp'
+);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.venue_tracking_activations
+      (tenant_id, activated_at, activated_by, source)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', now() - interval '2 seconds', '00000000-0000-0000-0000-000000000001', 'administrative')$$,
+  '%Client-supplied activation timestamp is prohibited%',
+  'trigger rejects client arbitrary timestamp even within seconds'
+);
+
+-- Unique (tenant_id, file_sha256) enforcement
+SELECT throws_like(
+  $$INSERT INTO app_private.order_outcome_import_batches
+      (id, tenant_id, schema_version, source_filename, file_sha256, storage_key, created_by)
+    VALUES
+      ('00000000-0000-0000-0000-000000000902', '00000000-0000-0000-0000-000000000801',
+       'pilot_order_outcome.v1', 'orders_copy.csv', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+       'order-imports/801/902/source.csv', '00000000-0000-0000-0000-000000000001')$$,
+  '%order_outcome_import_batches_tenant_id_file_sha256_key%',
+  'cannot insert duplicate file_sha256 for same tenant'
+);
+
+-- Permitted batch lifecycle transition: processing -> completed
+SELECT lives_ok(
+  $$UPDATE app_private.order_outcome_import_batches
+    SET status = 'completed', finished_at = now(), accepted_rows = 1
+    WHERE id = '00000000-0000-0000-0000-000000000901'$$,
+  'lifecycle trigger permits processing -> completed batch transition'
+);
+
+-- Prohibited batch status transition: modifying terminal completed batch
+SELECT throws_like(
+  $$UPDATE app_private.order_outcome_import_batches
+    SET status = 'processing'
+    WHERE id = '00000000-0000-0000-0000-000000000901'$$,
+  '%Cannot modify status of terminal import batch%',
+  'lifecycle trigger rejects modifying terminal completed batch'
+);
+
+-- Prohibited provenance column mutation
+SELECT throws_like(
+  $$UPDATE app_private.order_outcome_import_batches
+    SET file_sha256 = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    WHERE id = '00000000-0000-0000-0000-000000000901'$$,
+  '%Mutation of immutable import batch provenance fields is prohibited%',
+  'lifecycle trigger rejects mutating file_sha256 provenance'
+);
+
+-- Prohibited batch deletion
+RESET ROLE;
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_import_batches
+    WHERE id = '00000000-0000-0000-0000-000000000901'$$,
+  '%Deleting or truncating order outcome import batches is prohibited%',
+  'lifecycle trigger rejects deleting batch'
+);
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+
+-- Insert accepted line
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_lines
+      (tenant_id, order_id, order_line_id, batch_id, ordered_at, menu_revision_id, dish_id, dish_revision_id,
+       outcome_type, quantity, unit_price, currency, payload_checksum)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'ORD-101', 'LINE-1', '00000000-0000-0000-0000-000000000901',
+       now(), '00000000-0000-4000-8000-000000000101', '11111111-1111-4000-8000-000000000001',
+       '22222222-2222-4000-8000-000000000002', 'ordered', 1, 12.50, 'USD',
+       'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')$$,
+  'runtime can insert valid order outcome line'
+);
+
+-- Distinct outcome_type (refunded) coexists on the same order_id and order_line_id append-only
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_lines
+      (tenant_id, order_id, order_line_id, batch_id, ordered_at, menu_revision_id, dish_id, dish_revision_id,
+       outcome_type, quantity, unit_price, currency, payload_checksum)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'ORD-101', 'LINE-1', '00000000-0000-0000-0000-000000000901',
+       now(), '00000000-0000-4000-8000-000000000101', '11111111-1111-4000-8000-000000000001',
+       '22222222-2222-4000-8000-000000000002', 'refunded', 1, 12.50, 'USD',
+       'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')$$,
+  'refunded outcome coexists append-only with ordered outcome on same order line'
+);
+
+-- Mutual price and currency constraint check
+SELECT throws_like(
+  $$INSERT INTO app_private.order_outcome_lines
+      (tenant_id, order_id, order_line_id, batch_id, ordered_at, menu_revision_id, dish_id, dish_revision_id,
+       outcome_type, quantity, unit_price, currency, payload_checksum)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'ORD-102', 'LINE-1', '00000000-0000-0000-0000-000000000901',
+       now(), '00000000-0000-4000-8000-000000000101', '11111111-1111-4000-8000-000000000001',
+       '22222222-2222-4000-8000-000000000002', 'ordered', 1, 12.50, NULL,
+       'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc')$$,
+  '%order_outcome_lines_check%',
+  'price without currency violates check constraint'
+);
+
+-- Insert quarantine row
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_quarantine
+      (id, tenant_id, batch_id, row_index, reason_code, field_name, diagnostic_message)
+    VALUES
+      ('00000000-0000-0000-0000-000000000903', '00000000-0000-0000-0000-000000000801',
+       '00000000-0000-0000-0000-000000000901', 3, 'unmatched_dish', 'dish_id',
+       'Dish not found in published menu bundle')$$,
+  'runtime can insert quarantine record'
+);
+
+-- Insert quarantine row with before_tracking_start
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_quarantine
+      (id, tenant_id, batch_id, row_index, reason_code, field_name, diagnostic_message)
+    VALUES
+      ('00000000-0000-0000-0000-000000000904', '00000000-0000-0000-0000-000000000801',
+       '00000000-0000-0000-0000-000000000901', 4, 'before_tracking_start', 'ordered_at',
+       'Order timestamp is before restaurant tracking start date')$$,
+  'runtime can insert quarantine record for before_tracking_start'
+);
+
+-- Insert quarantine row with missing_tracking_start_evidence
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_quarantine
+      (id, tenant_id, batch_id, row_index, reason_code, field_name, diagnostic_message)
+    VALUES
+      ('00000000-0000-0000-0000-000000000905', '00000000-0000-0000-0000-000000000801',
+       '00000000-0000-0000-0000-000000000901', 5, 'missing_tracking_start_evidence', 'ordered_at',
+       'Venue tracking start evidence is not established')$$,
+  'runtime can insert quarantine record for missing_tracking_start_evidence'
+);
+
+-- Security Trust Boundary: peekaplate_runtime cannot insert into pos_dish_mappings
+-- Even if a runtime caller attempts to forge app.actor_id to an authorized owner UUID,
+-- table-level permissions strictly deny INSERT to peekaplate_runtime
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000001', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status, reviewed_by, reviewed_at)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001',
+       'approved', '00000000-0000-0000-0000-000000000001', now())$$,
+  '%permission denied for table pos_dish_mappings%',
+  'runtime caller cannot insert POS dish mapping even with forged app.actor_id'
+);
+
+-- Administrative POS dish mapping workflow (executed via administrative role / migration runner)
+RESET ROLE;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+
+-- POS dish mapping: missing app.actor_id is rejected
+SELECT set_config('app.actor_id', '', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001', 'pending')$$,
+  '%Trusted session actor context (app.actor_id) is required%',
+  'mapping insertion with missing app.actor_id is rejected'
+);
+
+-- POS dish mapping: empty/whitespace app.actor_id is rejected
+SELECT set_config('app.actor_id', '   ', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001', 'pending')$$,
+  '%Trusted session actor context (app.actor_id) is required%',
+  'mapping insertion with empty actor is rejected'
+);
+
+-- POS dish mapping: invalid non-UUID app.actor_id is rejected
+SELECT set_config('app.actor_id', 'invalid-non-uuid-actor', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001', 'pending')$$,
+  '%Invalid actor context (app.actor_id must be a valid UUID)%',
+  'mapping insertion with non-UUID actor is rejected'
+);
+
+-- POS dish mapping: viewer cannot create or modify mappings
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000002', true); -- Actor 2 is viewer
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001', 'pending')$$,
+  '%Current actor is not authorized to create or modify POS dish mappings%',
+  'authenticated session viewer cannot insert POS dish mapping'
+);
+
+-- POS dish mapping: approved status requires reviewed_by and reviewed_at
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000001', true); -- Actor 1 is owner
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status, reviewed_by, reviewed_at)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001',
+       'approved', NULL, NULL)$$,
+  '%Approved POS dish mapping requires reviewed_by and reviewed_at%',
+  'approved POS mapping requires reviewed_by and reviewed_at'
+);
+
+-- POS dish mapping: impersonation prevention (reviewed_by must match authenticated session actor)
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status, reviewed_by, reviewed_at)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001',
+       'approved', '00000000-0000-0000-0000-000000000003', now())$$, -- Actor 3 is editor
+  '%Reviewer identity must match the authenticated session actor%',
+  'actor cannot impersonate another authorized reviewer'
+);
+
+-- Valid approved POS mapping by staff owner
+SELECT lives_ok(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status, reviewed_by, reviewed_at)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-01', '11111111-1111-4000-8000-000000000001',
+       'approved', '00000000-0000-0000-0000-000000000001', now())$$,
+  'authenticated staff owner can insert reviewed approved POS dish mapping'
+);
+
+-- Modifying mapped dish without re-review is rejected
+SELECT throws_like(
+  $$UPDATE app_private.pos_dish_mappings
+    SET dish_id = '22222222-2222-4000-8000-000000000002'
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801' AND pos_item_code = 'POS-ITEM-01'$$,
+  '%Modifying mapped dish requires re-review; cannot silently retain approved status%',
+  'trigger rejects silently modifying dish_id of approved mapping without re-review'
+);
+
+-- Verify runtime can SELECT approved mapping for ingestion resolution, but cannot UPDATE
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+
+SELECT is(
+  (SELECT count(*)::int FROM app_private.pos_dish_mappings WHERE review_status = 'approved'),
+  1,
+  'runtime caller can select approved POS dish mappings for ingestion resolution'
+);
+
+SELECT throws_like(
+  $$UPDATE app_private.pos_dish_mappings
+    SET dish_name = 'Tampered Dish Name'
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801' AND pos_item_code = 'POS-ITEM-01'$$,
+  '%permission denied for table pos_dish_mappings%',
+  'runtime caller cannot update POS dish mappings'
+);
+
+-- Insert conflict row
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_outcome_conflicts
+      (tenant_id, order_id, order_line_id, outcome_type, batch_id, existing_checksum, incoming_checksum)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'ORD-101', 'LINE-1', 'ordered', '00000000-0000-0000-0000-000000000901',
+       'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+       'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd')$$,
+  'runtime can insert conflict record'
+);
+
+-- Reset to superuser to test append-only trigger rejection
+RESET ROLE;
+
+SELECT throws_like(
+  $$UPDATE app_private.order_outcome_lines
+    SET quantity = 5
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801' AND order_id = 'ORD-101'$$,
+  '%append-only table order_outcome_lines rejects UPDATE%',
+  'append-only trigger rejects UPDATE on order_outcome_lines'
+);
+
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_lines
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%append-only table order_outcome_lines rejects DELETE%',
+  'append-only trigger rejects DELETE on order_outcome_lines'
+);
+
+SELECT throws_like(
+  $$UPDATE app_private.order_outcome_quarantine
+    SET diagnostic_message = 'edited'
+    WHERE id = '00000000-0000-0000-0000-000000000903'$$,
+  '%append-only table order_outcome_quarantine rejects UPDATE%',
+  'append-only trigger rejects UPDATE on order_outcome_quarantine'
+);
+
+SELECT throws_like(
+  $$UPDATE app_private.order_outcome_conflicts
+    SET incoming_checksum = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+    WHERE order_id = 'ORD-101'$$,
+  '%append-only table order_outcome_conflicts rejects UPDATE%',
+  'append-only trigger rejects UPDATE on order_outcome_conflicts'
+);
+
+SELECT throws_like(
+  $$UPDATE app_private.venue_tracking_activations
+    SET activated_at = now()
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%Modifying venue tracking activation timestamp is prohibited%',
+  'trigger rejects modifying venue tracking activation'
+);
+
+SELECT throws_like(
+  $$DELETE FROM app_private.venue_tracking_activations
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%Deleting venue tracking activation record is prohibited%',
+  'trigger rejects deleting venue tracking activation'
+);
+
+-- Cross-tenant RLS isolation: Venue B context cannot see Venue A records
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000802', true);
+
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches), 0, 'Venue B sees 0 batches from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_lines), 0, 'Venue B sees 0 lines from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_quarantine), 0, 'Venue B sees 0 quarantine rows from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_conflicts), 0, 'Venue B sees 0 conflict rows from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.venue_tracking_activations), 0, 'Venue B sees 0 activations from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.pos_dish_mappings), 0, 'Venue B sees 0 POS mappings from Venue A');
+
+-- 5. Reporting isolation check: owner_observation_v1 remains completely unaffected
+SELECT is((SELECT count(*)::int FROM app_private.owner_observation_v1 WHERE tenant_id = '00000000-0000-0000-0000-000000000801'), 0, 'owner_observation_v1 is unaffected by order outcomes');
+
+RESET ROLE;
+SELECT * FROM finish();
+ROLLBACK;

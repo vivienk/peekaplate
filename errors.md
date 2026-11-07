@@ -1381,3 +1381,7 @@ original failure observation above rather than treating a rerun as its diagnosis
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
+
+## November 7 S5-DATA-07 order-outcome import verification
+
+Implemented restricted CSV ingestion path (pilot_order_outcome.v1) for venue owners, tenant-scoped RLS persistence across order_outcome_import_batches, order_outcome_lines, order_outcome_quarantine, and order_outcome_conflicts with append-only triggers, immutable published menu bundle revision verification, and strict isolation from diner observations and owner reports. All 188 contracts tests, 61 backend service and HTTP tests, and 29 pgTAP database assertions pass.

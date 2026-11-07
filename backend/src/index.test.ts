@@ -14,7 +14,10 @@ import app, {
   createApp,
   createWorker,
   handleQueueBatch,
+  handleScheduled,
+  OrderImportError,
   queue,
+  scheduled,
 } from './index';
 import { ingestObservations } from './observation-ingest';
 
@@ -86,6 +89,27 @@ describe('worker queue consumer wiring', () => {
     await worker.queue(batch, {});
     expect(processBatchCalled).toBe(true);
     expect(cleanupCalled).toBe(true);
+  });
+
+  it('exports scheduled cron handler on default app and as named export', () => {
+    expect(typeof scheduled).toBe('function');
+    expect(typeof (app as any).scheduled).toBe('function');
+    expect((app as any).scheduled).toBe(scheduled);
+  });
+
+  it('safely completes scheduled invocation when bucket or database binding is missing', async () => {
+    // Missing storage
+    await expect(handleScheduled({}, {})).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_IMPORT_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_IMPORT_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_OUTCOME_ARCHIVE_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_OUTCOME_ARCHIVE_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -1340,6 +1364,194 @@ describe('menu ingestion HTTP boundary', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'invalid_request' });
     expect(approveDraft).not.toHaveBeenCalled();
+  });
+
+  describe('order outcome import route', () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const actorId = '00000000-0000-4000-8000-000000000002';
+    const validCsv =
+      'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-1,L-1,2026-11-01T12:00:00Z,00000000-0000-4000-8000-000000000010,00000000-0000-4000-8000-000000000020,00000000-0000-4000-8000-000000000030,ordered,1';
+
+    const mockSuccessResult = {
+      batchId: '00000000-0000-4000-8000-000000000099',
+      venueId,
+      status: 'completed',
+      totalRows: 1,
+      acceptedRows: 1,
+      duplicateRows: 0,
+      quarantinedRows: 0,
+      conflictRows: 0,
+      isDuplicateFile: false,
+      fileSha256: 'abc123hash',
+      diagnostics: [],
+      createdAt: '2026-11-07T12:00:00.000Z',
+      finishedAt: '2026-11-07T12:00:01.000Z',
+    };
+
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('rejects invalid venueId UUID with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request('/venues/invalid-uuid/orders/import', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('rejects unsupported Content-Type with 415', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'unsupported_media_type' });
+    });
+
+    it('successfully processes text/csv upload and sets security headers', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Request-ID')).toMatch(/^[0-9a-f-]{36}$/);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'orders.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('successfully processes multipart/form-data upload', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const formData = new FormData();
+      const fileBlob = new Blob([validCsv], { type: 'text/csv' });
+      formData.append('file', fileBlob, 'pos_export_2026.csv');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'pos_export_2026.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('rejects multipart/form-data with missing file field with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const formData = new FormData();
+      formData.append('unrelated', 'hello');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'missing_file' });
+    });
+
+    it('returns 403 when user is not owner', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError('forbidden', 403, 'Order outcome import requires owner permission'),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'forbidden',
+        message: 'Order outcome import requires owner permission',
+      });
+    });
+
+    it('returns 413 when import fails with payload_too_large', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError(
+            'payload_too_large',
+            413,
+            'File exceeds maximum allowed rows (1000)',
+          ),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({
+        error: 'payload_too_large',
+        message: 'File exceeds maximum allowed rows (1000)',
+      });
+    });
+
+    it('returns 503 when database connection is unavailable in default importFn', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    });
   });
 
   describe('Cloudflare Queue Worker Handler', () => {

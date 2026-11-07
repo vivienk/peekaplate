@@ -414,6 +414,14 @@ export async function publishMenu(
         availabilityVersion,
       ],
     );
+    // Record explicit server-controlled venue tracking activation upon live menu publication
+    await client.query(
+      `INSERT INTO app_private.venue_tracking_activations
+        (tenant_id, activated_at, activated_by, source)
+       VALUES ($1, now(), $2, 'menu_publication')
+       ON CONFLICT (tenant_id) DO NOTHING`,
+      [venueId, actorId],
+    );
     await recordCommandAndOutbox(client, {
       venueId,
       actorId,

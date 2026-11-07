@@ -10,10 +10,12 @@ import {
   DraftScopeSchema,
   type HealthResponse,
   JobScopeSchema,
+  MAX_ORDER_OUTCOME_FILE_BYTES,
   MenuScopeSchema,
   ObservationBatchV2Schema,
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
+  type OrderOutcomeImportResponse,
   type PublicMenuResponse,
   PublishMenuSchema,
   type SubmitMenuIngestionRequest,
@@ -59,6 +61,12 @@ import {
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
 import {
+  cleanupOrphanedOrderImports,
+  importOrderOutcomes as importOrderOutcomesService,
+  OrderImportError,
+  type OrderOutcomeStorage,
+} from './order-ingestion/service';
+import {
   createPublicMenuResponse,
   menuJwks,
   type PublicMenuRecord,
@@ -96,6 +104,11 @@ export type Bindings = {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<unknown>;
   };
+  ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
+  ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
+  ORDER_IMPORT_HISTORICAL_DAYS?: string;
+  ORDER_IMPORT_RETENTION_DAYS?: string;
+  ORDER_IMPORT_GRACE_PERIOD_MS?: string;
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
@@ -182,6 +195,13 @@ type Dependencies = {
   extractor?: PythonExtractor;
   reportStorage?: ReportStorage;
   processQueueBatch?: typeof processIngestionQueueBatch;
+  importOrderOutcomes?: (
+    actorId: string,
+    venueId: string,
+    csvText: string,
+    sourceFilename: string,
+    env: Bindings,
+  ) => Promise<OrderOutcomeImportResponse>;
 };
 
 export async function authorizeStaffVenue(
@@ -554,10 +574,18 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
-  app.use(
-    '/venues/*',
-    bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
-  );
+  app.use('/venues/*', async (c, next) => {
+    if (c.req.path.includes('/orders/import')) {
+      return bodyLimit({
+        maxSize: MAX_ORDER_OUTCOME_FILE_BYTES,
+        onError: (ctx) => ctx.json({ error: 'payload_too_large' }, 413),
+      })(c, next);
+    }
+    return bodyLimit({
+      maxSize: 16_384,
+      onError: (ctx) => ctx.json({ error: 'body_too_large' }, 413),
+    })(c, next);
+  });
   app.use(
     '/public/venues/*',
     cors({
@@ -939,6 +967,97 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result);
   });
 
+  app.post('/venues/:venueId/orders/import', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const contentType = c.req.header('Content-Type') ?? '';
+    let csvText = '';
+    let sourceFilename = 'orders.csv';
+
+    if (contentType.includes('multipart/form-data')) {
+      let formData: FormData;
+      try {
+        formData = await c.req.formData();
+      } catch {
+        return c.json({ error: 'invalid_form_data' }, 400);
+      }
+      const file = formData.get('file');
+      if (!file) {
+        return c.json({ error: 'missing_file' }, 400);
+      }
+      if (typeof file === 'object' && 'text' in file) {
+        csvText = await (file as Blob).text();
+        sourceFilename = (file as File).name || 'orders.csv';
+      } else if (typeof file === 'string') {
+        csvText = file;
+      }
+    } else if (
+      contentType.includes('text/csv') ||
+      contentType.includes('text/plain') ||
+      contentType.includes('application/csv') ||
+      contentType === ''
+    ) {
+      csvText = await c.req.text();
+    } else {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    const importFn =
+      services.importOrderOutcomes ??
+      (async (actorId, venueId, csvText, sourceFilename, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          const maxHistoricalDays = env.ORDER_IMPORT_HISTORICAL_DAYS
+            ? Number.parseInt(env.ORDER_IMPORT_HISTORICAL_DAYS, 10)
+            : undefined;
+
+          // Retrieve authoritative tracking-start evidence (explicit server-controlled venue tracking activation)
+          const trackingRes = await client.query<{ activated_at: Date | null }>(
+            `SELECT activated_at
+             FROM app_private.venue_tracking_activations
+             WHERE tenant_id = $1`,
+            [venueId],
+          );
+          const trackingStartedAt = trackingRes.rows[0]?.activated_at ?? undefined;
+
+          return await importOrderOutcomesService({
+            client,
+            actorId,
+            venueId,
+            csvText,
+            sourceFilename,
+            trackingStartedAt,
+            maxHistoricalDays,
+            storage:
+              env.ORDER_OUTCOME_ARCHIVE_BUCKET ??
+              env.ORDER_IMPORT_BUCKET ??
+              env.INGESTION_REPORTS_BUCKET,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await importFn(
+      actorId,
+      scope.data.venueId,
+      csvText,
+      sourceFilename,
+      c.env ?? {},
+    );
+    return c.json(result, 200);
+  });
+
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
     if (error instanceof MenuTokenAuthenticationError)
@@ -951,6 +1070,8 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof PublicationCommandError)
       return c.json({ error: error.code }, error.status);
     if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
+    if (error instanceof OrderImportError)
+      return c.json({ error: error.code, message: error.message }, error.status as any);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
       JSON.stringify({ event: 'command_failed', requestId: c.res.headers.get('X-Request-ID') }),
@@ -1058,14 +1179,67 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue });
+  return Object.assign(app, { queue, scheduled: handleScheduled });
 }
 
 export {
   type ConsumerBindings,
   createObservationQueueHandler as createQueueHandler,
+  OrderImportError,
   type QueueHandlerServices,
 };
+
+export const handleScheduled = async (event: any, env: any) => {
+  const storage =
+    env.ORDER_OUTCOME_ARCHIVE_BUCKET ?? env.ORDER_IMPORT_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+  if (!storage || typeof storage.list !== 'function' || typeof storage.delete !== 'function') {
+    return;
+  }
+  const connectionString =
+    env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return;
+  }
+
+  const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
+    ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
+    : undefined;
+  const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
+    ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
+    : undefined;
+
+  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  try {
+    await client.connect();
+    const result = await cleanupOrphanedOrderImports({
+      storage,
+      client,
+      retentionConfig: {
+        rawCsvRetentionDays,
+        orphanGracePeriodMs,
+      },
+    });
+    if (result.deleted > 0) {
+      console.log(
+        JSON.stringify({
+          event: 'order_import_orphan_cleanup',
+          scanned: result.scanned,
+          deleted: result.deleted,
+          deletedOrphans: result.deletedOrphans,
+          deletedAgedRawCsv: result.deletedAgedRawCsv,
+          skippedActive: result.skippedActive,
+          retained: result.retained,
+        }),
+      );
+    }
+  } catch {
+    console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+  } finally {
+    await client.end().catch(() => {});
+  }
+};
+
+export const scheduled = handleScheduled;
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();
@@ -1083,4 +1257,4 @@ export const queue = async (batch: any, env: any) => {
     await defaultObservationQueue(batch, env);
   }
 };
-export default Object.assign(defaultApp, { queue });
+export default Object.assign(defaultApp, { queue, scheduled });

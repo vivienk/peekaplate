@@ -17,6 +17,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/order-outcome.ts",
+        "packages/contracts/src/order-outcome.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
         "packages/contracts/fixtures/observation.v2/README.md",
         "packages/contracts/src/owner-report.ts",
@@ -43,7 +45,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "044bc52ac2f0c0a8aa4d10836866dba6b0fae5e9511fcda1b7198b22e40a26cf"
+      "sourceFingerprint": "36ef66105adac33863588618001117a27930afc18d1525d9fa8a306462521c10"
     },
     {
       "id": "tokens",
@@ -229,6 +231,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-analytics.ts",
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/order-ingestion/service.test.ts",
         "backend/tsconfig.json",
         "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
@@ -267,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e5a9d32626172e7c0f7c72a168cfee3e7031713e066b176e7b864df17ad65233"
+      "sourceFingerprint": "1ed17e9375c4784923febb8d138eaa110ce208b3eb34fd92ebdc85f321681645"
     },
     {
       "id": "database",
@@ -283,6 +287,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261025130000_public_menu_bundle.sql",
         "migrations/20261026120000_observation_facts.sql",
         "migrations/20261026220000_menu_ingestion_drafts.sql",
+        "migrations/20261107120000_order_outcomes.sql",
         "scripts/test-db.mjs",
         "scripts/test-db.test.mjs",
         "tests/db/Dockerfile",
@@ -290,6 +295,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/menu_ingestion.sql",
         "tests/db/observation-facts.sql",
         "tests/db/observations.sql",
+        "tests/db/order_outcomes.sql",
         "tests/db/owner_metrics.sql",
         "tests/db/posthog.sql",
         "tests/db/staff.sql",
@@ -304,24 +310,31 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5575d401f817de18d01b69a2c93b595835e0575e0e251275757ad6648ec5cc75"
+      "sourceFingerprint": "2fbb1d87829a6935824e1ab69f09871f8661ce2a406c3526f8a09fda0f8646a9"
     },
     {
       "id": "measurement",
-      "status": "planned",
-      "summary": "Venue-bound redeem codes will link sessions to POS tickets. Unknown linkage stays unknown. Planned owner readout reports coverage and suppresses cells under ten sessions; frozen blocked-switchback assignment precedes causal claims. No POS or experiment implementation exists.",
+      "status": "foundation",
+      "summary": "S5-DATA-07 adds controlled pilot order-outcome import via pilot_order_outcome.v1 CSV schema, tenant RLS persistence, deduplication, conflict detection and sanitized diagnostics. Resolves POS item codes via reviewed administrative mapping (app_private.pos_dish_mappings with enforced owner/editor reviewer authorization) and links to immutable published menu bundles active at order time. Enforces explicit server-controlled venue tracking activation timestamps in app_private.venue_tracking_activations upon live menu publication or administrative enablement; client overrides and observation inferences are strictly rejected. Separates activation eligibility from visit matching (unmatched orders remain strictly unlinked without synthetic observations). Enforces 90-day historical window and independent raw CSV retention with scheduled orphan recovery. Outcomes are strictly isolated from diner behavioral observations and owner reports until metric contracts are approved.",
       "paths": [
         "docs/delivery.md",
-        "docs/implementation_plan.md"
+        "docs/implementation_plan.md",
+        "docs/pos-mapping-and-tracking-activation.md",
+        "packages/contracts/src/order-outcome.ts",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/order-ingestion/tracking-activation.ts",
+        "migrations/20261107120000_order_outcomes.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
         "docs/adr/0015-integration-contracts-and-owner-evidence.md"
       ],
       "dependsOn": [
-        "backend"
+        "backend",
+        "contracts",
+        "database"
       ],
-      "sourceFingerprint": "5fc2bb2fddca8d87f6d03aab9cf8e1922e1d921d9c66d2eee027e5cba8fdf853"
+      "sourceFingerprint": "5d27f33ec9c6c2489c02b9fbe67cb4e246737afcfce9b42f53495557adae3a3c"
     },
     {
       "id": "delivery",
@@ -538,15 +551,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
-    },
-    {
       "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
       "modules": [
         "backend",
@@ -616,6 +620,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
+    },
+    {
+      "summary": "November 7-8: S5-DATA-07 implements controlled pilot order-outcome import with reviewed administrative POS mapping and explicit server-controlled venue tracking activation. Resolves POS item codes via reviewed mapping in app_private.pos_dish_mappings (enforces owner/editor permission, records reviewer provenance, and blocks silent dish modifications). Venue live tracking activation is recorded in app_private.venue_tracking_activations upon live publication or administrative enablement; client backdating and inference from first observation are forbidden. Activation eligibility strictly decoupled from diner visit matching (orders without matching observations remain explicitly unlinked). Full Docker pgTAP (52 assertions across order outcomes) and database integration test suites pass.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "measurement"
+      ],
+      "next": "Await explicit stakeholder sign-off on visit-matching and metric contracts before connecting outcomes to owner reports or causal attribution. No owner/editor mapping API or UI to be built for pilot."
     }
   ]
 }
