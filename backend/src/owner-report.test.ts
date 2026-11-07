@@ -153,7 +153,7 @@ describe('readOwnerReport report contract and session metrics', () => {
             active_sessions: { value: 12, status: 'NORMAL' },
             open_rate: { value: 0.833, status: 'NORMAL' },
             engagement_rate: { value: 1, status: 'NORMAL' },
-            save_rate: { value: 0.2, status: 'NORMAL' },
+            save_rate: { value: 0.167, status: 'NORMAL' },
             avg_interaction_time_seconds: { value: 18, status: 'NORMAL' },
             timing_coverage: { value: 1, status: 'NORMAL' },
           },
@@ -207,8 +207,9 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
     expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
     expect(sql).toContain('COUNT(DISTINCT');
-    expect(sql).toContain('sessions.is_opened AND sessions.has_direct_save');
-    expect(sql).toContain('sessions.has_active_engagement OR sessions.has_comparison');
+    expect(sql).toContain('sessions.has_comparison AND sessions.is_exposed');
+    expect(sql).toContain('sessions.is_exposed AND sessions.has_direct_save');
+    expect(sql).not.toContain('sessions.is_opened AND sessions.has_direct_save');
     expect(sql).not.toContain("obs.event_type = 'portion_compare'");
   });
 });

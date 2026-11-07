@@ -1140,6 +1140,7 @@ describe('Multi-tenant owner report isolation', () => {
     await addComparison(directSessions[0]!);
     await addComparison(directSessions[1]!);
     await addComparison(crypto.randomUUID());
+    await addComparison(exposedSessions[3]!);
     await addDirectSave(exposedSessions[0]!);
     await addDirectSave(exposedSessions[0]!);
     await addDirectSave(directSessions[0]!);
@@ -1158,8 +1159,8 @@ describe('Multi-tenant owner report isolation', () => {
     expect(ownerReport.dishes[0]?.metrics).toMatchObject({
       active_sessions: { value: 12, status: 'NORMAL' },
       open_rate: { value: 0.833, status: 'NORMAL' },
-      engagement_rate: { value: 0.357, status: 'NORMAL' },
-      save_rate: { value: 0.143, status: 'NORMAL' },
+      engagement_rate: { value: 0.286, status: 'NORMAL' },
+      save_rate: { value: 0.167, status: 'NORMAL' },
       avg_interaction_time_seconds: { value: 6.5, status: 'NORMAL' },
       timing_coverage: { value: 0.714, status: 'NORMAL' },
     });

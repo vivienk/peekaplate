@@ -144,10 +144,13 @@ const OWNER_REPORT_QUERY = `
       ) AS exposed_open_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (WHERE sessions.is_opened) AS open_eligible_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (
-        WHERE sessions.is_opened AND (sessions.has_active_engagement OR sessions.has_comparison)
+        WHERE sessions.is_opened AND (
+          sessions.has_active_engagement
+          OR (sessions.has_comparison AND sessions.is_exposed)
+        )
       ) AS engaged_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (
-        WHERE sessions.is_opened AND sessions.has_direct_save
+        WHERE sessions.is_exposed AND sessions.has_direct_save
       ) AS saved_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (
         WHERE sessions.is_opened AND sessions.has_timing
@@ -284,9 +287,9 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
           ),
           save_rate: rateMetric(
             Number(row.saved_sessions),
-            openEligibleSessions,
+            totalSessions,
             belowDishFloor,
-            openEligibleSessions,
+            totalSessions,
           ),
         },
       };

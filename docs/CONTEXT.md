@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped facts. Hosted synthetic/genuine-token transport and backfill pass; retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API verifies membership, bounds occurred_at for events and activity to the supplied 24-hour window, requires same-dish opens for comparison engagement, suppresses values below ten sessions, validates/strips owner_report.v1 and reports production provenance/freshness. Eight unit regressions and 73 disposable DB integration tests pass; hosted report acceptance is unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped facts. Hosted synthetic/genuine-token transport and backfill pass; retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API verifies membership, bounds occurred_at for events and activity to the supplied 24-hour window, requires same-dish opens and a displayed dish event for comparison engagement, calculates direct-save rate over exposed sessions, suppresses values below ten sessions, validates/strips owner_report.v1 and reports production provenance/freshness. Eight unit regressions and 73 disposable DB integration tests pass; hosted report acceptance is unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -269,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "879a185ba1dace437c25421c2507f39284e111cdf58c4cf0afd89b47adcad60b"
+      "sourceFingerprint": "4c7d0a78fa64636a62bd16941a83248e040c073590b15f8a752acafcf74802c9"
     },
     {
       "id": "database",
