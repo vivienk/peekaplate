@@ -1,6 +1,6 @@
+import { isAllowedEvent, P0_EVENT_NAMES } from '@peekaplate/analytics/event-names';
 import { describe, expect, it } from 'vitest';
 import { buildEnvelope } from './envelope';
-import { isAllowedEvent, P0_EVENT_NAMES } from './event-names';
 import { createIdentity, IDENTITY_KEY, type SessionStore, VISIT_TIMEOUT_MS } from './identity';
 import { newComparisonId, newExposureId, newOpeningId } from './ids';
 

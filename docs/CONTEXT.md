@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes. S3-TRK-01.1: track() and its triggers build schema-checked observation.v2 envelopes (allowlist, ID helpers, per-tab identity, never-reused sequence) plus the activity clock; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (Undo, 5s/3s), sending Save events only for committed writes; renderSavedScreen lists saved dishes. S3-TRK-01.1: track() builds schema-checked observation.v2 envelopes (shared P0 allowlist, ID helpers, per-tab identity, unique sequence) plus the activity clock; consented delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -120,7 +120,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/feedback.ts",
         "frontend/diner/src/save/feedback.test.ts",
         "frontend/diner/src/save/mount.ts",
-        "frontend/diner/src/tracking/event-names.ts",
+        "frontend/diner/src/save/saved-screen.ts",
+        "frontend/diner/src/save/saved-screen-model.ts",
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css",
         "frontend/diner/src/tracking/ids.ts",
         "frontend/diner/src/tracking/identity.ts",
         "frontend/diner/src/tracking/envelope.ts",
@@ -138,7 +141,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c85167a8d0c337d6c1fb2a4cb75f39e052a536c79c6c9cd9c11dc98986f89a35"
+      "sourceFingerprint": "d3517a0eabcec738aa60ce1c2c99080e9bc958957bf623092dbc662c887df3ab"
     },
     {
       "id": "console",
@@ -273,7 +276,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c0cbc7e9d5ba9ccdab727fb2df3a3e2fd056846d733da6fa7ef02d785c98e538"
+      "sourceFingerprint": "ec30c69b58ef0ae4b7fd103264a4c69528ad8b046bf2c59eaa15593adb141c3d"
     },
     {
       "id": "database",
@@ -388,7 +391,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "851d2170cb88ace589e4c953f625663e9654e961f659a157301e27b1be800bcc"
+      "sourceFingerprint": "3312f9ba819fd19c6ba84e9b8d74b8912b6483c1cb4ac58a00a6f3eb0677c0b0"
     },
     {
       "id": "agents",
@@ -421,7 +424,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -432,7 +435,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog-export.md",
         "docs/team-data-access.md",
         "scripts/verify-team-access.mjs",
-        "scripts/verify-team-access.test.mjs"
+        "scripts/verify-team-access.test.mjs",
+        "packages/analytics/src/posthog.ts",
+        "packages/analytics/src/posthog.test.ts",
+        "packages/analytics/src/event-names.ts",
+        "packages/analytics/src/event-names.test.ts",
+        "tests/e2e/posthog-adapter.spec.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -445,7 +453,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "1dd5e77257b699965de953a06b67cae41efa432a18b804d92f6e69d68988d8e0"
+      "sourceFingerprint": "b03cbc12dc1c2055a85f48276b3a53970385ebab8441c1224c28324bcd30be3b"
     },
     {
       "id": "processing",
