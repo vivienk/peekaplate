@@ -83,7 +83,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers select two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Shared Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory without backfill. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s) and sends Save events only for committed writes. track() and menu_viewed/dish_detail_opened triggers are console-only; real controls, consented PostHog/canonical delivery and comparison rendering need integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
+      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes; renderSavedScreen lists saved dishes (no shortlist_viewed in session-only mode). track() and its triggers are console-only; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -98,8 +98,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/menuScreen.test.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "tests/e2e/menu-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -110,6 +115,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save.spec.ts",
         "frontend/diner/src/compare/picker.ts",
         "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/price.ts",
+        "frontend/diner/src/menu/price.test.ts",
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
@@ -121,7 +128,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/events.ts",
         "frontend/diner/src/save/feedback.ts",
         "frontend/diner/src/save/feedback.test.ts",
-        "frontend/diner/src/save/mount.ts"
+        "frontend/diner/src/save/mount.ts",
+        "frontend/diner/src/save/saved-screen.ts",
+        "frontend/diner/src/save/saved-screen-model.ts",
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -130,7 +141,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7658365146326b20705f1e2cd2074c5ec6defc3dc98d5c697b3e24f6fe1de87a"
+      "sourceFingerprint": "acd75c3bef3d12a118c633cefa772d187b0f4b022f0a67fd6af51431b1875197"
     },
     {
       "id": "console",
@@ -255,7 +266,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f245e854a0d56b2c57098f3ec2ddaa67dfa6c0664705151f4cfeb798e9832f02"
+      "sourceFingerprint": "757d8c34435fd0df1dd263ac3d4a398059417316918d7acf56df2431c7c55ace"
     },
     {
       "id": "database",
@@ -370,7 +381,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "331e7c9ac4872686dcc3fa568f7153e5a2c16e2284fd8be35855e3b910b8112f"
+      "sourceFingerprint": "2e790e5b7dcc5b004ce450035e348f6c9aa1d857b6024678904e05fa27258a91"
     },
     {
       "id": "agents",
@@ -526,24 +537,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-05",
-      "summary": "AI-01 offline evaluation synchronized with the reconciled core and develop d5365bd. Existing synthetic evaluation cases and entrypoint are preserved.",
+      "date": "2026-11-07",
+      "summary": "AI-01 offline evaluation synchronized with the reconciled core and develop 5bfaa94 after #69/#116. Existing synthetic evaluation cases and standard entrypoint are preserved; no policy or oracle is changed.",
       "modules": [
         "backend",
         "contracts"
       ],
-      "next": "Verify this stacked revision before review. Reporting identity and internal handoff require agreement before live AI integration."
+      "next": "Verify this stacked revision before human review. Producer comparison attribution, freshness evidence, pinned internal handoff and report-version compatibility remain integration dependencies."
     },
     {
-      "date": "2026-11-05",
-      "summary": "AI-01 core reconciled with develop d5365bd after the extraction, ingestion, recovery coverage and PostHog SDK merges. Shared code merged automatically; context and the append-only error ledger retain both branches.",
+      "date": "2026-11-07",
+      "summary": "AI-01 core reconciled with develop 5bfaa94 after the menu/detail foundation (#69) and comparison-attribution correction (#116). Product sources merge without conflict; the backend context fingerprint is recomputed from the combined source. Existing producer/reporting boundaries remain unchanged.",
       "modules": [
         "backend",
         "contracts",
-        "analytics",
-        "processing"
+        "diner"
       ],
-      "next": "Verify the core, then synchronize the stacked evaluation and report-input validator. Request human review on the resulting revisions; reporting identity and live integration remain pending."
+      "next": "Verify this reconciliation and synchronize the stacked offline evaluation and report-input validator. Request human review on the new heads; report producer handoff, identity and live integration remain pending."
     },
     {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
