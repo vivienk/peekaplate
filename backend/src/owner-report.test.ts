@@ -178,7 +178,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(report.source).toBe('synthetic');
   });
 
-  it('marks freshness stale when the latest event is over one hour old or unavailable', async () => {
+  it('defers stale-state detection while preserving the latest ingestion timestamp', async () => {
     const now = new Date('2026-11-06T10:00:00Z');
     const staleClient = fakeClient('owner', [
       reportRow({ last_event_ingested_at: new Date('2026-11-06T08:59:59Z') }),
@@ -187,7 +187,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(staleReport).toMatchObject({
       report_metadata: {
         freshness: {
-          is_stale: true,
+          is_stale: false,
           last_event_ingested_at: '2026-11-06T08:59:59.000Z',
         },
       },
@@ -198,7 +198,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(emptyReport).toMatchObject({
       report_metadata: {
         freshness: {
-          is_stale: true,
+          is_stale: false,
           last_event_ingested_at: null,
         },
       },

@@ -248,7 +248,7 @@ function buildInternalReport(
         measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
       },
       freshness: {
-        // TODO: Implement true acceptance-to-report delay freshness tracking (5-minute target) under S5 flow
+        // TODO: Awaiting Sai's confirmation on PR thread to either implement the 5-minute pipeline acceptance delay validation or officially defer to S5 pipeline tracking
         is_stale: false,
         last_event_ingested_at: lastEventIngestedAt,
       },

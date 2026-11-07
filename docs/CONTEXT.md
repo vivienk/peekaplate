@@ -170,7 +170,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped facts. Hosted synthetic/genuine-token transport and backfill pass; retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API verifies membership, bounds occurred_at for events and activity to the supplied 24-hour window, requires same-dish opens and a displayed dish event for comparison engagement, calculates direct-save rate over exposed sessions, suppresses values below ten sessions, validates/strips owner_report.v1 and reports configurable provenance (default production) and freshness. Database integration covers 9/10/11 cohorts, test-traffic exclusion and owner revocation. Nine unit regressions and 73 disposable DB integration tests pass; hosted report acceptance is unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
+      "summary": "Canonical observations are archived create-only in R2 before tenant-scoped facts; hosted synthetic/genuine-token transport and backfill pass, retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API checks membership, bounds events/activity to 24h, computes same-dish comparison and direct-save metrics, suppresses below ten sessions, and validates/strips owner_report.v1. Provenance defaults to production; latest ingestion time is shown but is_stale is fixed false pending Sai's decision on five-minute acceptance-delay validation vs S5 tracking. Database tests cover cohorts, test-traffic exclusion and owner revocation. Nine unit tests and 73 disposable DB integration tests pass; hosted acceptance remains unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -276,7 +276,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "72be527fdb04aa56207f6ea6b34f17522e970c936c616f96d9d93fd4a7a7ab2e"
+      "sourceFingerprint": "4a653986cd1c91690e00b48b5689edaa758c03564cecf69a1beafb79c424de18"
     },
     {
       "id": "database",
@@ -556,12 +556,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 7 owner-report precision follow-up: the owner-scoped report bounds event and activity timestamps to the supplied 24-hour window, and comparison engagement requires an opened same-dish session. Integration fixtures cover a future opening, an out-of-window activity checkpoint and a comparison-only session. All metric values remain suppressed below ten sessions; internal cohorts are stripped by owner_report.v1. Hosted acceptance remains unverified.",
+      "summary": "November 7 owner-report precision follow-up: the owner-scoped report bounds event and activity timestamps to the supplied 24-hour window, and comparison engagement requires an opened same-dish session. Integration fixtures cover a future opening, an out-of-window activity checkpoint and a comparison-only session. All metric values remain suppressed below ten sessions; internal cohorts are stripped by owner_report.v1. Freshness currently exposes the latest ingestion timestamp but hard-codes is_stale=false pending Sai's policy confirmation. Hosted acceptance remains unverified.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
+      "next": "Obtain Sai's confirmation to implement the five-minute acceptance-to-report delay check or defer freshness to S5; keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",

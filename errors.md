@@ -1708,3 +1708,13 @@ Backend typecheck and Biome checks pass.
 ```json
 {"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T20:12:12.443Z"},"status":"resolved","cause":"The publication integration test exceeded its 15-second timeout; the precise trigger was not established.","prevention":"Keep the timeout unchanged unless a reproducible cause is found; retain diagnostics and rerun the full database verification after a timeout.","regression":"The immediate pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions."}
 ```
+
+<!-- manual observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z","result":"failed"}
+```
+
+<!-- resolution of the context refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z"},"status":"resolved","cause":"The backend context summary exceeded the 1000-character validation limit after documenting the deferred freshness state.","prevention":"Keep module summaries within the context validator's 1000-character limit.","regression":"Shortened the backend summary; pnpm context:refresh and pnpm context:check pass."}
+```
