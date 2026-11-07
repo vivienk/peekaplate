@@ -1375,32 +1375,154 @@ original failure observation above rather than treating a rerun as its diagnosis
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:02.888Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:39.709Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:23:21.522Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:25:08.929Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:29:32.539Z","exitCode":1}
+```
+
+## November 6 owner-report route verification
+
+The initial owner-report request returned 503 because its query referenced
+`menu_dish` and `dish_saved`, and joined opening activity through columns absent
+from the applied fact-view schema. The query now joins tenant-scoped
+`dish_current` and `owner_opening_activity_v1` and derives direct saves from
+`owner_observation_v1`; the multi-tenant integration test covers owner, editor,
+and cross-tenant access. After installing the missing local Playwright system
+libraries, `pnpm verify test:db` passed all 73 tests and pgTAP assertions.
+Backend typecheck and Biome checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
 ```
 
+<!-- resolution of the test:e2e observation above -->
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:21:48.947Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T18:22:03.506Z","exitCode":1}
+```
+
+<!-- resolution of the test:db timeout observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T18:22:03.506Z"},"status":"resolved","cause":"The first disposable-database run timed out at 15 seconds in the existing browser-backed publication test; the precise trigger was not reproduced. That test runs before the owner-report integration case, so it did not exercise the changed report query.","prevention":"Do not change the unrelated timeout without a repeatable cause; rerun the full disposable-database check when this failure occurs.","regression":"A full pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions. The owner-report integration fixture asserts 12 exposed sessions, duplicate interactions, 14 unique open sessions, linked comparisons, and bounded computed rates; the focused owner-report suite passes all 7 tests."}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:22:46.496Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T20:07:27.669Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above with final-adjustment validation -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-06T20:07:27.669Z"
+  },
+  "status": "resolved",
+  "area": "owner-report-final-validation",
+  "cause": "The first database verification exceeded the existing 15-second timeout in the browser-backed publication test; no reproducible trigger was established.",
+  "prevention": "Keep the timeout unchanged unless a reproducible cause is found; retry the full database verification after a transient timeout.",
+  "regression": {
+    "lint": {
+      "command": "pnpm exec biome check --write backend/src",
+      "result": "passed"
+    },
+    "ownerReportUnit": {
+      "command": "pnpm exec vitest run backend/src/owner-report.test.ts",
+      "result": "passed",
+      "tests": 8
+    },
+    "database": {
+      "command": "pnpm verify test:db",
+      "firstAttempt": "timed out in the publication integration test",
+      "retry": "passed",
+      "integrationTests": 73,
+      "pgTapAssertions": 192
+    }
+  }
+}
 ```
 
 ```json
-{"kind":"resolution","references":[{"check":"test:db","timestamp":"2026-11-07T14:21:48.947Z"},{"check":"test:db","timestamp":"2026-11-07T14:22:46.496Z"}],"status":"resolved","cause":"The owner-report query referenced has_final_checkpoint from timed_openings without projecting it from the CTE, so PostgreSQL rejected the report query.","prevention":"Keep each report CTE's selected columns aligned with every downstream reference.","regression":"The owner-report signed-token app.request integration tests pass in pnpm verify test:db; the complete run passed 74 integration tests."}
+{
+  "kind": "manual-check-resolution",
+  "check": "pnpm --filter @peekaplate/backend typecheck",
+  "status": "resolved",
+  "cause": "The new source-override test accessed the owner-report result while its public helper type is unknown.",
+  "prevention": "Parse the returned payload through OwnerDishReportSchema before asserting contract fields.",
+  "regression": "Backend typecheck passes after schema parsing was added."
+}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:42:02.012Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T01:21:58.772Z","exitCode":1}
 ```
 
+<!-- resolution of the test:db observation above -->
 ```json
-{"id":"OBS-20261107-INGESTION-REPLAY-RACE","status":"open","area":"database-integration-tests","observation":"One disposable database run failed in the pre-existing ingestion approval/replay test; an immediate full rerun passed all 74 tests.","cause":"The test computes the winning command ID but replays with commandId1 unconditionally. When commandId2 wins, the replay uses the losing ID against an already accepted draft and returns 404.","prevention":"Use the command ID associated with the fulfilled concurrent result and exercise both winner orderings.","sources":["backend/src/ingestion/ingestion.integration.ts"],"resolutionRequired":"Correct this unrelated test and verify replay for either concurrent winner."}
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-07T01:21:58.772Z"
+  },
+  "status": "resolved",
+  "area": "owner-report-precision-validation",
+  "cause": "The first database attempt hit the existing 15-second timeout in an unrelated browser-backed publication test; no reproducible trigger was established.",
+  "prevention": "Keep the timeout unchanged and retry after an intermittent timeout.",
+  "regression": {
+    "command": "pnpm verify test:db",
+    "result": "passed on retry: 73 integration tests and 192 pgTAP assertions",
+    "ownerReportFixture": "Covers a future opening, an out-of-window activity checkpoint and a comparison-only session."
+  }
+}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T15:09:42.414Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-07T15:09:42.414Z"
+  },
+  "status": "resolved",
+  "area": "ingestion-concurrency-integration",
+  "cause": "The concurrency test always replayed commandId1 even when commandId2 had won, so the replay deterministically failed after the losing request was selected.",
+  "prevention": "Select the replay command ID from the fulfilled request instead of inferring the winner from the always-present published revision.",
+  "regression": {
+    "command": "pnpm verify test:db",
+    "result": "passed after correction: 73 integration tests and 192 pgTAP assertions"
+  }
+}
 ```

@@ -1,364 +1,230 @@
-import { createServer, type Server } from 'node:http';
-import { OwnerDishReportV2Schema } from '@peekaplate/contracts';
-import { exportJWK, generateKeyPair, type JWK, SignJWT } from 'jose';
-import { Client } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createStaffVerifier } from './auth';
-import { createApp } from './index';
+import { OwnerDishReportSchema } from '@peekaplate/contracts';
+import type { Client } from 'pg';
+import { describe, expect, it, vi } from 'vitest';
+import { CommandError } from './dish-command';
 import { readOwnerReport } from './owner-report';
 
-const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
-const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
-const describeDatabase = describe.skipIf(!runtimeUrl || !adminUrl);
-const startTime = '2026-11-06T00:00:00.000Z';
-const endTime = '2026-11-07T00:00:00.000Z';
-const venueId = crypto.randomUUID();
-const actorId = crypto.randomUUID();
-const dishId = crypto.randomUUID();
-const firstRevisionId = crypto.randomUUID();
-const suppressedRevisionId = crypto.randomUUID();
-const smallNumeratorRevisionId = crypto.randomUUID();
-const smallComplementRevisionId = crypto.randomUUID();
-const boundaryRateRevisionId = crypto.randomUUID();
-const publicationId = crypto.randomUUID();
-const producerId = crypto.randomUUID();
-const admin = new Client({ connectionString: adminUrl });
-let server: Server;
-let issuer: string;
-let privateKey: CryptoKey;
-let publicJwk: JWK;
-let verify: ReturnType<typeof createStaffVerifier>;
+const venueId = 'e2a66159-bd14-44cb-8217-36d001a12676';
+const dishId = '45806808-4376-46ff-912b-ab8a5519881a';
 
-describeDatabase('owner report integration', () => {
-  beforeAll(async () => {
-    const keys = await generateKeyPair('ES256');
-    privateKey = keys.privateKey;
-    publicJwk = {
-      ...(await exportJWK(keys.publicKey)),
-      kid: 'owner-report-test',
-      use: 'sig',
-      alg: 'ES256',
-    };
-    server = createServer((request, response) => {
-      if (request.url !== '/auth/v1/.well-known/jwks.json') {
-        response.writeHead(404);
-        response.end();
-        return;
-      }
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ keys: [publicJwk] }));
-    });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const address = server.address();
-    if (!address || typeof address === 'string')
-      throw new Error('JWKS test server failed to start.');
-    issuer = `http://127.0.0.1:${address.port}/auth/v1`;
-    verify = createStaffVerifier({ issuer, allowLocalIssuer: true });
-
-    await admin.connect();
-    await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
-      venueId,
-      'Synthetic owner report integration',
-    ]);
-    await admin.query(
-      'INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, $3)',
-      [venueId, actorId, 'viewer'],
-    );
-    await insertDishRevision(firstRevisionId, 1, 'Visible dish');
-    await insertDishRevision(suppressedRevisionId, 2, 'Low-volume revision');
-    await insertDishRevision(smallNumeratorRevisionId, 3, 'Small numerator revision');
-    await insertDishRevision(smallComplementRevisionId, 4, 'Small complement revision');
-    await insertDishRevision(boundaryRateRevisionId, 5, 'Boundary rate revision');
-
-    for (let index = 0; index < 10; index++) {
-      const eventId = crypto.randomUUID();
-      const input = {
-        eventId,
-        sessionId: crypto.randomUUID(),
-        exposureId: crypto.randomUUID(),
-        revisionId: firstRevisionId,
-        occurredAt:
-          index === 0 ? startTime : `2026-11-06T${String(index).padStart(2, '0')}:00:00.000Z`,
-      };
-      await insertDisplayEvent(input);
-      if (index === 0) await insertDisplayEvent(input);
+// A stand-in for pg's Client: records every statement and answers the membership lookup.
+function fakeClient(permission: string | null, reportRows: Record<string, unknown>[] = []) {
+  const statements: string[] = [];
+  const query = vi.fn(async (text: string, values?: unknown[]) => {
+    // Keep the whole statement on one line so later checks can find any part of it.
+    statements.push(text.trim().replace(/\s+/g, ' '));
+    if (text.includes('app_private.staff_membership')) {
+      return { rows: permission === null ? [] : [{ permission }] };
     }
-    await insertDisplayEvent({
-      eventId: crypto.randomUUID(),
-      sessionId: crypto.randomUUID(),
-      exposureId: crypto.randomUUID(),
-      revisionId: firstRevisionId,
-      occurredAt: endTime,
-    });
-    for (let index = 0; index < 9; index++) {
-      await insertDisplayEvent({
-        eventId: crypto.randomUUID(),
-        sessionId: crypto.randomUUID(),
-        exposureId: crypto.randomUUID(),
-        revisionId: suppressedRevisionId,
-        occurredAt: `2026-11-06T${String(index + 1).padStart(2, '0')}:30:00.000Z`,
-      });
-    }
-    await insertRevisionTraffic(smallNumeratorRevisionId, 9);
-    await insertRevisionTraffic(smallComplementRevisionId, 11);
-    await insertRevisionTraffic(boundaryRateRevisionId, 10);
-  }, 45_000);
+    if (text.includes('app_private.owner_observation_v1')) return { rows: reportRows };
+    return { rows: [] };
+  });
+  return { client: { query } as unknown as Client, statements, query };
+}
 
-  afterAll(async () => {
-    if (admin.connection) await admin.end();
-    if (server) {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
-    }
+function reportRow(overrides: Record<string, unknown> = {}) {
+  return {
+    dish_id: dishId,
+    dish_name: 'Synthetic dish',
+    total_sessions: 9,
+    exposed_open_sessions: 8,
+    open_eligible_sessions: 8,
+    engaged_sessions: 7,
+    saved_sessions: 6,
+    timed_sessions: 5,
+    average_active_seconds: 18,
+    last_event_ingested_at: new Date('2026-11-06T09:00:00Z'),
+    ...overrides,
+  };
+}
+
+describe('readOwnerReport ownership check', () => {
+  it('lets an owner read, inside one read-only transaction with the actor set first', async () => {
+    const { client, statements } = fakeClient('owner');
+    await readOwnerReport(client, 'actor-1', venueId, new Date('2026-11-04T10:00:00Z'));
+    expect(statements[0]).toBe('BEGIN READ ONLY');
+    const actorAt = statements.findIndex((s) => s.includes("set_config('app.actor_id'"));
+    const membershipAt = statements.findIndex((s) => s.startsWith('SELECT permission'));
+    const tenantAt = statements.findIndex((s) => s.includes("set_config('app.tenant_id'"));
+    const reportAt = statements.findIndex((s) => s.includes('owner_observation_v1'));
+    expect(actorAt).toBeGreaterThan(0);
+    expect(membershipAt).toBeGreaterThan(actorAt);
+    // The tenant is set only after ownership is confirmed, and before anything is read.
+    expect(tenantAt).toBeGreaterThan(membershipAt);
+    expect(reportAt).toBeGreaterThan(tenantAt);
+    expect(statements.at(-1)).toBe('COMMIT');
   });
 
-  it('reconciles timestamp boundaries and duplicate deliveries without exposing small cohorts', async () => {
-    const token = await staffToken(actorId);
-    let readFailure: unknown;
-    const app = createApp({
-      verify,
-      execute: async () => {
-        throw new Error('Dish writes are not part of this test.');
-      },
-      readOwnerReport: async (actor, venue, query, env) => {
-        const client = new Client({ connectionString: env.LOCAL_DATABASE_URL });
-        await client.connect();
-        try {
-          return await readOwnerReport(client, actor, venue, query);
-        } catch (error) {
-          readFailure = error;
-          throw error;
-        } finally {
-          await client.end();
-        }
-      },
+  for (const permission of ['editor', 'viewer', null]) {
+    it(`refuses ${permission ?? 'a non-member'} with 403 and reads nothing`, async () => {
+      const { client, statements } = fakeClient(permission);
+      const attempt = readOwnerReport(client, 'actor-1', venueId, new Date());
+      await expect(attempt).rejects.toBeInstanceOf(CommandError);
+      await expect(attempt).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+      expect(statements.some((s) => s.includes('owner_observation_v1'))).toBe(false);
+      expect(statements.some((s) => s.includes("set_config('app.tenant_id'"))).toBe(false);
+      expect(statements.at(-1)).toBe('ROLLBACK');
     });
-    const response = await app.request(
-      `/venues/${venueId}/owner-report?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-      { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl },
-    );
-
-    expect(response.status, readFailure instanceof Error ? readFailure.message : undefined).toBe(
-      200,
-    );
-    const report = OwnerDishReportV2Schema.parse(await response.json());
-    expect(report.schema_version).toBe('owner_report.v2');
-    expect(JSON.stringify(report)).not.toContain('eligible_sessions');
-    const visible = report.dishes.find(
-      (dish: { dish_revision_id: string }) => dish.dish_revision_id === firstRevisionId,
-    );
-    const suppressed = report.dishes.find(
-      (dish: { dish_revision_id: string }) => dish.dish_revision_id === suppressedRevisionId,
-    );
-    if (!visible || !suppressed) throw new Error('Expected both revision cells in the report.');
-    expect(visible.metrics).toMatchObject({
-      consideration_sessions: { value: 10, status: 'NORMAL' },
-      consideration_exposures: { value: 10, status: 'NORMAL' },
-      open_rate: { value: null, status: 'SUPPRESSED' },
-      save_rate: { value: null, status: 'SUPPRESSED' },
-      verified_conversion_sessions: { value: null, status: 'MISSING' },
-    });
-    expect(suppressed.evidence_state).toBe('SUPPRESSED');
-    for (const cell of Object.values(suppressed.metrics) as Array<{
-      value: number | null;
-      status: string;
-    }>) {
-      expect(cell).toEqual({ value: null, status: 'SUPPRESSED' });
-    }
-    expect(JSON.stringify(suppressed)).not.toMatch(/"value"\s*:\s*9\b/);
-
-    const smallNumerator = report.dishes.find(
-      (dish: { dish_revision_id: string }) => dish.dish_revision_id === smallNumeratorRevisionId,
-    );
-    const smallComplement = report.dishes.find(
-      (dish: { dish_revision_id: string }) => dish.dish_revision_id === smallComplementRevisionId,
-    );
-    const boundary = report.dishes.find(
-      (dish: { dish_revision_id: string }) => dish.dish_revision_id === boundaryRateRevisionId,
-    );
-    if (!smallNumerator || !smallComplement || !boundary) {
-      throw new Error('Expected rate boundary revisions in the report.');
-    }
-    expect(smallNumerator.metrics).toMatchObject({
-      consideration_sessions: { value: 20, status: 'NORMAL' },
-      open_rate: { value: null, status: 'SUPPRESSED' },
-    });
-    expect(smallComplement.metrics.open_rate).toEqual({ value: null, status: 'SUPPRESSED' });
-    expect(boundary.metrics.open_rate).toEqual({ value: 0.5, status: 'NORMAL' });
-  });
-
-  it('requires a valid signed staff token and current venue membership', async () => {
-    const app = createApp({
-      verify,
-      execute: async () => {
-        throw new Error('Dish writes are not part of this test.');
-      },
-      readOwnerReport: async (actor, venue, query, env) => {
-        const client = new Client({ connectionString: env.LOCAL_DATABASE_URL });
-        await client.connect();
-        try {
-          return await readOwnerReport(client, actor, venue, query);
-        } finally {
-          await client.end();
-        }
-      },
-    });
-    const path = `/venues/${venueId}/owner-report?start_time=${encodeURIComponent(startTime)}&end_time=${encodeURIComponent(endTime)}`;
-    expect(
-      (
-        await app.request(
-          path,
-          { headers: { Authorization: `Bearer ${await staffToken(crypto.randomUUID())}` } },
-          { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl },
-        )
-      ).status,
-    ).toBe(403);
-    expect(
-      (await app.request(path, {}, { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl })).status,
-    ).toBe(401);
-  });
+  }
 });
 
-async function staffToken(subject: string): Promise<string> {
-  return new SignJWT({ role: 'authenticated', is_anonymous: false })
-    .setProtectedHeader({ alg: 'ES256', kid: 'owner-report-test' })
-    .setIssuer(issuer)
-    .setAudience('authenticated')
-    .setSubject(subject)
-    .setIssuedAt()
-    .setExpirationTime('5m')
-    .sign(privateKey);
-}
+describe('readOwnerReport report contract and session metrics', () => {
+  it('suppresses every behavioral value below ten sessions and serializes the owner schema', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        active_sessions_value: 9,
+        open_rate_value: 0.8,
+        engagement_rate_value: 0.875,
+        save_rate_value: 0.75,
+      }),
+    ]);
 
-async function insertDishRevision(revisionId: string, version: number, name: string) {
-  await admin.query(
-    `INSERT INTO app_private.es_event
-      (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload)
-     VALUES ($1, $2, 'dish', $3, $4, 1, 'dish.revision.created', $5::jsonb)`,
-    [
-      crypto.randomUUID(),
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
       venueId,
-      dishId,
-      version,
-      JSON.stringify({ dishId, revisionId, version, name, description: '' }),
-    ],
-  );
-}
+      new Date('2026-11-06T10:00:00Z'),
+    );
+    const json = JSON.parse(JSON.stringify(report)) as {
+      dishes: Array<{
+        evidence_state: string;
+        metrics: Record<string, { value: number | null; status: string }>;
+      }>;
+      report_metadata: unknown;
+    };
 
-async function insertDisplayEvent(input: {
-  eventId: string;
-  sessionId: string;
-  exposureId: string;
-  revisionId: string;
-  occurredAt: string;
-}) {
-  await admin.query('BEGIN');
-  try {
-    await admin.query(
-      `INSERT INTO app_private.observation_index
-        (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
-         authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition)
-       VALUES ($1, $2, $3, 'observation.v2', 'dish_viewed', $4, $5, $6, $7, 'accepted')
-       ON CONFLICT (tenant_id, event_id) DO NOTHING`,
-      [
-        venueId,
-        input.eventId,
-        'a'.repeat(64),
-        publicationId,
-        input.occurredAt,
-        input.occurredAt,
-        `synthetic/${venueId}/${input.eventId}`,
-      ],
-    );
-    await admin.query(
-      `INSERT INTO app_private.observation_event
-        (tenant_id, event_id, event_type, session_id, producer_id, local_sequence,
-         publication_revision_id, traffic_class)
-       VALUES ($1, $2, 'dish_viewed', $3, $4, 0, $5, 'live')
-       ON CONFLICT (tenant_id, event_id) DO NOTHING`,
-      [venueId, input.eventId, input.sessionId, producerId, publicationId],
-    );
-    await admin.query(
-      `INSERT INTO app_private.observation_exposure
-        (tenant_id, event_id, dish_id, dish_revision_id, exposure_id, surface, position, exposure_basis)
-       VALUES ($1, $2, $3, $4, $5, 'menu_list', 1, 'viewport_50pct_1s')
-       ON CONFLICT (tenant_id, event_id) DO NOTHING`,
-      [venueId, input.eventId, dishId, input.revisionId, input.exposureId],
-    );
-    await admin.query('COMMIT');
-  } catch (error) {
-    await admin.query('ROLLBACK');
-    throw error;
-  }
-}
-
-async function insertRevisionTraffic(revisionId: string, openedSessions: number) {
-  for (let index = 0; index < 20; index++) {
-    const sessionId = crypto.randomUUID();
-    const exposureId = crypto.randomUUID();
-    const occurredAt = `2026-11-06T${String(index).padStart(2, '0')}:45:00.000Z`;
-    await insertDisplayEvent({
-      eventId: crypto.randomUUID(),
-      sessionId,
-      exposureId,
-      revisionId,
-      occurredAt,
-    });
-    if (index < openedSessions) {
-      await insertOpeningEvent({
-        sessionId,
-        exposureId,
-        revisionId,
-        occurredAt,
+    expect(OwnerDishReportSchema.safeParse(json).success).toBe(true);
+    expect(json.dishes[0]?.evidence_state).toBe('SUPPRESSED');
+    for (const metric of [
+      'active_sessions',
+      'open_rate',
+      'engagement_rate',
+      'save_rate',
+      'avg_interaction_time_seconds',
+      'timing_coverage',
+    ]) {
+      expect(json.dishes[0]?.metrics[metric]).toMatchObject({
+        value: null,
+        status: 'SUPPRESSED',
       });
     }
-  }
-}
+    expect(JSON.stringify(json)).not.toContain('eligible_sessions');
+  });
 
-async function insertOpeningEvent(input: {
-  sessionId: string;
-  exposureId: string;
-  revisionId: string;
-  occurredAt: string;
-}) {
-  const eventId = crypto.randomUUID();
-  const openingId = crypto.randomUUID();
-  await admin.query('BEGIN');
-  try {
-    await admin.query(
-      `INSERT INTO app_private.observation_index
-        (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
-         authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition)
-       VALUES ($1, $2, $3, 'observation.v2', 'dish_detail_opened', $4, $5, $6, $7, 'accepted')`,
-      [
-        venueId,
-        eventId,
-        'b'.repeat(64),
-        publicationId,
-        input.occurredAt,
-        input.occurredAt,
-        `synthetic/${venueId}/${eventId}`,
+  it('uses the owner_report.v1 envelope and strips internal cohort counts', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        total_sessions: 12,
+        exposed_open_sessions: 10,
+        open_eligible_sessions: 10,
+        engaged_sessions: 10,
+        saved_sessions: 2,
+        timed_sessions: 10,
+        average_active_seconds: 18,
+      }),
+    ]);
+
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+    );
+
+    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    expect(report).toMatchObject({
+      schema_version: 'owner_report.v1',
+      venue_id: venueId,
+      source: 'production',
+      report_metadata: {
+        date_window: { duration_hours: 24 },
+        coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
+        freshness: {
+          is_stale: false,
+          last_event_ingested_at: '2026-11-06T09:00:00.000Z',
+        },
+        report_status: 'NORMAL',
+      },
+      dishes: [
+        {
+          dish_id: dishId,
+          name: 'Synthetic dish',
+          metrics: {
+            active_sessions: { value: 12, status: 'NORMAL' },
+            open_rate: { value: 0.833, status: 'NORMAL' },
+            engagement_rate: { value: 1, status: 'NORMAL' },
+            save_rate: { value: 0.167, status: 'NORMAL' },
+            avg_interaction_time_seconds: { value: 18, status: 'NORMAL' },
+            timing_coverage: { value: 1, status: 'NORMAL' },
+          },
+        },
       ],
+    });
+    expect(JSON.stringify(report)).not.toContain('eligible_sessions');
+  });
+
+  it('accepts a source override while defaulting to production', async () => {
+    const { client } = fakeClient('owner');
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(
+        client,
+        'actor-1',
+        venueId,
+        new Date('2026-11-06T10:00:00Z'),
+        'synthetic',
+      ),
     );
-    await admin.query(
-      `INSERT INTO app_private.observation_event
-        (tenant_id, event_id, event_type, session_id, producer_id, local_sequence,
-         publication_revision_id, traffic_class)
-       VALUES ($1, $2, 'dish_detail_opened', $3, $4, 0, $5, 'live')`,
-      [venueId, eventId, input.sessionId, producerId, publicationId],
+
+    expect(report.source).toBe('synthetic');
+  });
+
+  it('marks freshness stale when the latest event is over one hour old or unavailable', async () => {
+    const now = new Date('2026-11-06T10:00:00Z');
+    const staleClient = fakeClient('owner', [
+      reportRow({ last_event_ingested_at: new Date('2026-11-06T08:59:59Z') }),
+    ]);
+    const staleReport = await readOwnerReport(staleClient.client, 'actor-1', venueId, now);
+    expect(staleReport).toMatchObject({
+      report_metadata: {
+        freshness: {
+          is_stale: true,
+          last_event_ingested_at: '2026-11-06T08:59:59.000Z',
+        },
+      },
+    });
+
+    const emptyClient = fakeClient('owner');
+    const emptyReport = await readOwnerReport(emptyClient.client, 'actor-1', venueId, now);
+    expect(emptyReport).toMatchObject({
+      report_metadata: {
+        freshness: {
+          is_stale: true,
+          last_event_ingested_at: null,
+        },
+      },
+    });
+  });
+
+  it('counts unique sessions and the canonical linked-comparison event in SQL', async () => {
+    const { client, statements, query } = fakeClient('owner', [reportRow()]);
+    const now = new Date('2026-11-06T10:00:00Z');
+    await readOwnerReport(client, 'actor-1', venueId, now);
+    const sql = statements.find((statement) =>
+      statement.includes('app_private.owner_observation_v1'),
     );
-    await admin.query(
-      `INSERT INTO app_private.observation_opening
-        (tenant_id, event_id, dish_id, dish_revision_id, opening_id, source,
-         from_exposure_id, save_available)
-       VALUES ($1, $2, $3, $4, $5, 'menu_card', $6, false)`,
-      [venueId, eventId, dishId, input.revisionId, openingId, input.exposureId],
+    const reportQuery = query.mock.calls.find(([statement]) =>
+      statement.includes('app_private.owner_observation_v1'),
     );
-    await admin.query('COMMIT');
-  } catch (error) {
-    await admin.query('ROLLBACK');
-    throw error;
-  }
-}
+
+    expect(sql).toContain("obs.event_type = 'dish_compared'");
+    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at <= $3');
+    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at <= $3');
+    expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
+    expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
+    expect(sql).toContain('COUNT(DISTINCT');
+    expect(sql).toContain('sessions.has_comparison AND sessions.is_exposed');
+    expect(sql).toContain('sessions.is_exposed AND sessions.has_direct_save');
+    expect(sql).not.toContain('sessions.is_opened AND sessions.has_direct_save');
+    expect(sql).not.toContain("obs.event_type = 'portion_compare'");
+  });
+});

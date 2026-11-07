@@ -14,10 +14,6 @@ import {
   ObservationBatchV2Schema,
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
-  type OwnerDishReportV2,
-  OwnerDishReportV2Schema,
-  type OwnerReportQuery,
-  OwnerReportQuerySchema,
   type PublicMenuResponse,
   PublishMenuSchema,
   type SubmitMenuIngestionRequest,
@@ -62,7 +58,7 @@ import {
   MenuTokenUnavailableError,
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
-import { readOwnerReport } from './owner-report';
+import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -144,9 +140,9 @@ type Dependencies = {
   readOwnerReport?: (
     actorId: string,
     venueId: string,
-    query: OwnerReportQuery,
+    now: Date,
     env: Bindings,
-  ) => Promise<OwnerDishReportV2>;
+  ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
   consumeObservationRateLimit?: (
@@ -393,14 +389,14 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
-  async readOwnerReport(actorId, venueId, query, env) {
+  async readOwnerReport(actorId, venueId, now, env) {
     const connectionString =
       env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
     if (!connectionString) throw new AuthUnavailableError();
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await readOwnerReport(client, actorId, venueId, query);
+      return await queryOwnerReport(client, actorId, venueId, now);
     } finally {
       await client.end();
     }
@@ -638,33 +634,22 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
   });
-  app.get('/venues/:venueId/owner-report', async (c) => {
+  app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
     const authorization = c.req.header('Authorization');
-    if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
+    if (!authorization || !/^Bearer /.test(authorization)) {
       return c.json({ error: 'unauthorized' }, 401);
     }
     const actorId = await services.verify(authorization, c.env ?? {});
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
-    const params = new URL(c.req.url).searchParams;
-    if (
-      [...params.keys()].some((key) => key !== 'start_time' && key !== 'end_time') ||
-      [...params.keys()].length !== new Set(params.keys()).size
-    ) {
-      return c.json({ error: 'invalid_request' }, 400);
-    }
-    const query = OwnerReportQuerySchema.safeParse(Object.fromEntries(params));
-    if (!query.success || !services.readOwnerReport) {
-      if (!query.success) return c.json({ error: 'invalid_request' }, 400);
-      throw new AuthUnavailableError();
-    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,
       scope.data.venueId,
-      query.data,
+      services.now?.() ?? new Date(),
       c.env ?? {},
     );
-    return c.json(OwnerDishReportV2Schema.parse(report));
+    return c.json(report);
   });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');

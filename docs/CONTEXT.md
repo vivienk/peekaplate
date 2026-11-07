@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. Owner report v1 remains stable; v2 identifies each dish revision, separates raw consideration exposures from verified conversion sessions, and hides internal per-metric cohorts. A readonly snapshot identity tuple binds venue_id to report_metadata.generated_at. RES-01.1 review candidates.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -163,7 +163,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical facts. Historical hosted baseline c6a47bd: six synthetic checks passed and genuine menu/token/bundle requests reached Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. S4-DATA-04 adds checkpoint and archive recovery coverage. S5-DATA-08 adds a staff-membership report route, repeatable-read revision aggregation, ten-session per-metric suppression, and signed-token integration tests. Conversion outcomes remain MISSING until verified linked-order facts exist; no hosted report acceptance is claimed. Full DLQ/crash recovery and cross-tenant archive/replay isolation remain unverified. Normal collection remains paused pending real controls/outbox/privacy and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant-scoped facts. Hosted synthetic/genuine-token transport and backfill pass; retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API verifies membership, bounds occurred_at for events and activity to the supplied 24-hour window, requires same-dish opens and a displayed dish event for comparison engagement, calculates direct-save rate over exposed sessions, suppresses values below ten sessions, validates/strips owner_report.v1 and reports configurable provenance (default production) and freshness. Database integration covers 9/10/11 cohorts, test-traffic exclusion and owner revocation. Nine unit regressions and 73 disposable DB integration tests pass; hosted report acceptance is unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -189,13 +189,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
         "backend/src/index.test.ts",
         "backend/src/index.ts",
-        "backend/src/owner-report.test.ts",
-        "backend/src/owner-report.ts",
         "backend/src/ingestion/adapter.test.ts",
         "backend/src/ingestion/adapter.ts",
         "backend/src/ingestion/contract.test.ts",
@@ -232,7 +232,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-auth.test.ts",
         "backend/src/team-auth.ts",
         "backend/tsconfig.json",
-        "vitest.db.config.ts",
         "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
         "docs/menu-ingestion-infrastructure.md",
@@ -270,7 +269,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "800deb49098f298c8b03d9fc4c93b9aad0c4838ea6898a4af237cd00ed848e48"
+      "sourceFingerprint": "baa632442c6f7658ae2da05751511bae378aeed829664bfb24a1974793509d82"
     },
     {
       "id": "database",
@@ -550,12 +549,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
+      "summary": "November 7 owner-report precision follow-up: the owner-scoped report bounds event and activity timestamps to the supplied 24-hour window, and comparison engagement requires an opened same-dish session. Integration fixtures cover a future opening, an out-of-window activity checkpoint and a comparison-only session. All metric values remain suppressed below ten sessions; internal cohorts are stripped by owner_report.v1. Hosted acceptance remains unverified.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
+      "next": "Keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
@@ -595,6 +594,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
     },
     {
+      "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
+    },
+    {
       "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
       "modules": [
         "contracts",
@@ -612,14 +618,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
-    },
-    {
-      "summary": "November 7 S5-DATA-08: owner_report.v2 adds revision-level consideration exposures and an explicitly MISSING verified-conversion cell until linked-order facts exist. Repeatable-read tenant/member aggregation uses half-open windows and complementary ten-session suppression; signed-token app.request tests cover boundary timestamps, duplicate persistence and small rate cohorts. Biome, pnpm verify test:db (74 tests) and pnpm check (772 Vitest, 67 script tests) pass.",
-      "modules": [
-        "contracts",
-        "backend"
-      ],
-      "next": "Hosted report authorization/data acceptance and verified order linkage remain separate gates; conversions stay MISSING until linked-order facts exist. The unrelated concurrent ingestion replay-test race remains open as OBS-20261107-INGESTION-REPLAY-RACE."
     }
   ]
 }
