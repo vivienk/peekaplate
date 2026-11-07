@@ -70,3 +70,13 @@ test('extraction host is staging-only, single-instance and contains no secret va
   assert.deepEqual(Object.keys(host.vars).sort(), ['APP_ENV', 'EXTRACTION_SOURCE_ORIGIN']);
   assert.equal(host.vars.APP_ENV, 'staging');
 });
+
+test('extraction deployment resolves the locked backend CLI and guards main SHA', async () => {
+  const workflow = readFileSync(
+    new URL('../.github/workflows/deploy-extraction-staging.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(workflow, /working-directory: backend/);
+  assert.match(workflow, /pnpm exec wrangler deploy --config wrangler\.extraction\.jsonc/);
+  assert.match(workflow, /test "\$GITHUB_SHA" = "\$EXPECTED_SHA"/);
+});

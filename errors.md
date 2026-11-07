@@ -1387,3 +1387,14 @@ with loopback access passed610 Vitest cases (4 optional skips) and67 script case
 no product test was disabled. The isolated Intel macOS Python install cannot
 resolve a wheel for locked onnxruntime1.31.0; retain the dependency and require
 the existing Linux CI Python and Docker database lanes before release.
+
+## November 7 staging release review corrections
+
+Review found that a root-level pnpm exec could not resolve backend-owned Wrangler;
+the extraction workflow now runs from backend with its local config, guarded by
+a regression in menu-ingestion-infra.test.mjs. Membership verification previously
+committed before ingestion job creation. Both upload and JSON job submission now
+hold the membership lock through idempotent job creation in a single transaction.
+The database suite adds a real HTTP upload case and a two-connection revocation
+lock test. The first Linux CI run passed code/Python/database/browser checks but
+failed the required exact-command formatting in the PR body; that body was corrected.

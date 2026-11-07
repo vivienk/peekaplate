@@ -185,15 +185,45 @@ type Dependencies = {
   processQueueBatch?: typeof processIngestionQueueBatch;
 };
 
+export async function submitAuthorizedMenuIngestion(
+  client: Client,
+  actorId: string,
+  venueId: string,
+  request: Parameters<typeof submitMenuIngestion>[1],
+  queue?: { send(message: unknown): Promise<void> },
+) {
+  await client.query('BEGIN');
+  let job: MenuIngestionJobRow;
+  try {
+    await authorizeStaffVenue(client, actorId, venueId, true);
+    job = await submitMenuIngestion(client, request, undefined, { inTransaction: true });
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  }
+  if (queue)
+    await queue.send({
+      version: 1,
+      tenantId: venueId,
+      jobId: job.id,
+      queuedAt: new Date().toISOString(),
+    });
+  return job;
+}
+
 export async function authorizeStaffVenue(
   client: Client,
   actorId: string,
   venueId: string,
+  inTransaction = false,
 ): Promise<void> {
   let started = false;
   try {
-    await client.query('BEGIN');
-    started = true;
+    if (!inTransaction) {
+      await client.query('BEGIN');
+      started = true;
+    }
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -210,7 +240,7 @@ export async function authorizeStaffVenue(
       throw new CommandError('forbidden', 403);
     }
 
-    await client.query('COMMIT');
+    if (!inTransaction) await client.query('COMMIT');
     started = false;
   } catch (error) {
     if (started) {
@@ -808,8 +838,7 @@ export function createApp(services: Dependencies = dependencies) {
       const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
       try {
         await client.connect();
-        await authorizeStaffVenue(client, actorId, scope.data.venueId);
-        return await submitMenuIngestion(client, {
+        return await submitAuthorizedMenuIngestion(client, actorId, scope.data.venueId, {
           venueId: scope.data.venueId,
           sourceType: upload.sourceType,
           sourceHash: upload.sourceHash,
@@ -853,11 +882,16 @@ export function createApp(services: Dependencies = dependencies) {
         const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
         try {
           await client.connect();
-          await authorizeStaffVenue(client, actorId, venueId);
           const queueProducer = env.INGESTION_QUEUE
             ? { send: (msg: unknown) => env.INGESTION_QUEUE!.send(msg) }
             : undefined;
-          return await submitMenuIngestion(client, { venueId, ...req }, queueProducer);
+          return await submitAuthorizedMenuIngestion(
+            client,
+            actorId,
+            venueId,
+            { venueId, ...req },
+            queueProducer,
+          );
         } finally {
           await client.end();
         }

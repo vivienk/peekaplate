@@ -37,10 +37,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - name: Deploy paired extraction host and container
+        working-directory: backend
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           test "$CLOUDFLARE_ACCOUNT_ID" = '51eda1917fd22a9478808a82d2980741'
           test -n "$CLOUDFLARE_API_TOKEN"
-          pnpm exec wrangler deploy --config backend/wrangler.extraction.jsonc
+          pnpm exec wrangler deploy --config wrangler.extraction.jsonc
