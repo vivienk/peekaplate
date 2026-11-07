@@ -104,6 +104,7 @@ export function isLiveTracking(): boolean {
 const WITHDRAWAL_CLEARS_QUEUE = true;
 onTrackingAllowedChange((allowed) => {
   if (!allowed && WITHDRAWAL_CLEARS_QUEUE) pipelines.live?.clear();
+  else if (allowed) resumeLiveDelivery();
 });
 const consentedDeliver: Deliver = async (batch) => (isTrackingAllowed() ? liveDeliver(batch) : []);
 
@@ -179,6 +180,16 @@ function captureToPostHog(envelope: Envelope) {
 export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
   mode = 'live';
   liveDeliver = deliver;
+  resumeLiveDelivery();
+}
+
+// Opens the durable outbox once live tracking is on and allowed, so events kept from an earlier
+// page (for example after a failed send and a reload) are sent without waiting for a new event.
+// Everything stored was collected with consent: withdrawal empties the outbox.
+function resumeLiveDelivery(): void {
+  try {
+    if (mode === 'live' && isTrackingAllowed()) pipeline();
+  } catch {}
 }
 
 // For TRK-01.3 delivery: after a failed send, pause live delivery until timestampMs (Date.now()
