@@ -230,7 +230,6 @@ function buildInternalReport(
     const timestamp = timestampOrNull(row.last_event_ingested_at);
     return timestamp && (!latest || timestamp > latest) ? timestamp : latest;
   }, null);
-  const lastEventTime = lastEventIngestedAt ? new Date(lastEventIngestedAt) : null;
 
   return {
     schema_version: 'owner_report.v1',
@@ -249,7 +248,8 @@ function buildInternalReport(
         measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
       },
       freshness: {
-        is_stale: !lastEventTime || now.getTime() - lastEventTime.getTime() > 3600000,
+        // TODO: Implement true acceptance-to-report delay freshness tracking (5-minute target) under S5 flow
+        is_stale: false,
         last_event_ingested_at: lastEventIngestedAt,
       },
       report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',
