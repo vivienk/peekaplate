@@ -166,7 +166,7 @@ const longName = dish(8, {
   dietary: ['Vegetarian'],
   images: images('Heirloom Tomato and Burrata Salad'),
 });
-// No validated allergen or dietary data, so the detail screen hides the whole section.
+// No validated allergen or dietary data, so the detail screen shows the staff note under Contains.
 const noAllergenData = dish(11, {
   name: 'Fresh Fruit Cup',
   description: 'Seasonal melon, pineapple and berries.',

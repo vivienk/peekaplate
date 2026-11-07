@@ -96,8 +96,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/menuScreen.test.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "tests/e2e/menu-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -108,6 +113,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save.spec.ts",
         "frontend/diner/src/compare/picker.ts",
         "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/price.ts",
+        "frontend/diner/src/menu/price.test.ts",
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
@@ -132,7 +139,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2689203387d1429b2fc77435cb9ab5c63729240885434a50be1900171bab9ea0"
+      "sourceFingerprint": "acd75c3bef3d12a118c633cefa772d187b0f4b022f0a67fd6af51431b1875197"
     },
     {
       "id": "console",
@@ -269,7 +276,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "fa3bdea1cfdb6149ebb71911da434959366e5c8a8700b3f5a698ba85cb59a8ac"
+      "sourceFingerprint": "72be527fdb04aa56207f6ea6b34f17522e970c936c616f96d9d93fd4a7a7ab2e"
     },
     {
       "id": "database",
@@ -384,7 +391,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "940c02a23b6b08a141350ba97eb97e42de9ef72fe10b90be2e29c05169bc0200"
+      "sourceFingerprint": "3312f9ba819fd19c6ba84e9b8d74b8912b6483c1cb4ac58a00a6f3eb0677c0b0"
     },
     {
       "id": "agents",
