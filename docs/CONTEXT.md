@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, replace either side keeping comparison_id. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHog) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
+      "summary": "Static diner shell, readable without JavaScript; published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, replace either side keeping comparison_id. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHog) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; createLiveDeliver sends token-bound batches, backing off via pauseDeliveryUntil; withdrawal empties it; fixture mode only logs. Unwired Figma icons map allergen/dietary values.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -136,7 +136,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/batcher.ts",
         "frontend/diner/src/tracking/batcher.test.ts",
         "tests/e2e/tracking-outbox.spec.ts",
-        "frontend/diner/src/tracking/dispatch.test.ts"
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "frontend/diner/src/tracking/delivery.ts",
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -145,7 +148,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7450ecd53f47852327558bebfe87995ddde612877c144a46428392d125d4adf8"
+      "sourceFingerprint": "90f2f8cbb00d14ce3e8ccbb00a77d1b061e7851fb82aa5a6fcfaadce9a528b62"
     },
     {
       "id": "console",
@@ -546,6 +549,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-07",
+      "summary": "S3-TRK-01.3 delivery (#84), rebased onto the TRK-01.2 outbox (#80). frontend/diner/src/tracking/delivery.ts: deliver() posts batches with the menu token in the header only, drops wrong-publication or expired-token events unsent, halves on 413 and maps receipts/statuses to done or retry. Batch limits and the request wrapper now come from batcher.ts. createRetryPause() calls pauseDeliveryUntil(now + retryDelayMs(attempt, Retry-After)) after a send that left retries (1 s doubling, 60 s cap, reset on a clean send, ignored when no request was made); createLiveDeliver() wires it for enableLiveTracking(). A development-only log records aggregate terminal counts (including discarded expired events), never IDs or the token. Vitest covers a 429 holding every batcher trigger and all five shared delivery_cases fixtures, with receipts checked against ObservationReceiptBatchSchema.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/tracking/delivery.ts",
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts"
+      ],
+      "next": "Retarget #84 to develop once #77 and #80 merge. Call enableLiveTracking(createLiveDeliver(...)) from DIN-03 with the per-environment endpoint and the RES-02 menu token. Browser tests (token expiry, storage failure, fixture mode with no network) and DATA-01 evidence remain; same-publication token refresh is open."
+    },
+    {
       "summary": "S3-TRK-01 tracking boundary (Sai with Vivien, 3 Nov; details 4 Nov): one UI action calls track() once; after validation and the consent/property checks it delivers independently to PostHog (its SDK, pilot funnels) and POST /observations (canonical owner reports). Retained custom work: strict shared-contract validation, stable IDs, active-time rules, the off-by-default consent gate (P0 for both destinations), and the canonical-only outbox, batching and retry pause. Paused: custom PostHog buffering/retries, extra internal analytics aggregation, autocapture/replay. PostHog gets a separate visit-scoped ID, never session_id; only event_id is shared; nothing in fixture mode; no menu token.",
       "modules": [
         "diner",
@@ -615,16 +631,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
-    },
-    {
-      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
     }
   ]
 }
