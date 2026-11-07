@@ -135,7 +135,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staff JWT and venue membership protect commands, retrieval and ingestion. PR45 job/attempt leases, private report persistence and draft writes compose with PR58 extraction. A staging/local-only raw PDF/PNG/JPEG upload route computes the source hash and stores canonical venue/job bytes before queue dispatch; retries retain the idempotent job. No owner upload UI is supplied. Menu queue activation, hosted migration and full authenticated upload-to-database acceptance remain pending. Observation and publication behavior retain main release semantics.",
+      "summary": "Staff JWT and venue membership protect commands, retrieval and ingestion. PR45 job/attempt leases, private report persistence and draft writes compose with PR58 extraction. A staging/local-only raw PDF/PNG/JPEG upload route computes the source hash and stores canonical venue/job bytes before queue dispatch; retries retain the idempotent job. No owner upload UI is supplied. The staging menu consumer is configured for single-message/concurrency delivery with its own retry/DLQ policy. Live activation, hosted migration and full authenticated upload-to-database acceptance remain pending. Observation and publication behavior retain main release semantics.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c12e4796ab1aa024c04f14da1335cb7fe0b1049972f363ec9933441bb4e9fef3"
+      "sourceFingerprint": "bac1362557f88a8a404bdae9c60f2bce7aeb007b5d527f5cdc1008a36c683b7b"
     },
     {
       "id": "database",
@@ -339,7 +339,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "f631706835d82bcf29c89e32fb67175eeba1688c3c615e4746ec43e241768868"
+      "sourceFingerprint": "64c5ccdbc6b4fe7138008abd11228e9cf86194bf3b94926da0dc0dea25a22a50"
     },
     {
       "id": "agents",

@@ -30,11 +30,16 @@ Extraction drafts remain unapproved; this endpoint cannot publish.
 4. Run **Deploy staging extraction** from main with `expected_sha` equal to that
    reviewed main SHA. Existing Cloudflare runtime secrets are preserved. Confirm
    the host and container versions and artifact-storage acceptance together.
-5. Deploy the API from the same main SHA. Keep menu queue delivery paused until
+5. While delivery is paused, remove the old HTTP pull consumer and deploy the API
+   from the same main SHA with its checked-in menu Worker consumer. Keep menu queue delivery paused until
    the migration, service, signed source access and staff identity are verified.
-6. Attach the menu Worker consumer with separately reviewed delivery settings:
-   single-message batches/concurrency, retry budget, lease-aware retry delay and
-   the existing menu DLQ. The checked-in producer alone does not do this.
+6. Read back the configured menu consumer: batch size1, concurrency1, batch
+   timeout1s, three retries, default retry delay60s and the existing menu DLQ.
+   Lease-aware per-message retry may delay through the15-minute fence. Verify
+   no unexpected backlog, then resume only the menu queue for controlled acceptance.
+   Observation queue state must remain unchanged. The existing720s extraction
+   transport timeout is a bounded happy-path budget, not proof all700s model runs
+   plus startup/source/archive overhead fit; timeout/retry testing remains required.
 7. With a real staging staff session for a disposable test venue, upload the
    synthetic two-dish PDF, poll the authenticated job endpoint and read its drafts.
    Verify source/report hashes, immutable artifact identity, database job/draft

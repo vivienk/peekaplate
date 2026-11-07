@@ -47,16 +47,26 @@ test('private ingestion reports reuse the staging bucket with an explicit bindin
   assert.equal(observations?.bucket_name, reports.bucket_name);
 });
 
-test('binding-only setup does not attach an unimplemented menu consumer or invent a service URL', () => {
-  // Replace this setup guard when the reviewed consumer and real service are released together.
-  assert.equal(
-    (staging.queues.consumers ?? []).some(
-      (item) => item.queue === 'peekaplate-staging-menu-ingestion',
-    ),
-    false,
+test('menu consumer is bounded separately from observations and has its own DLQ', () => {
+  const menu = staging.queues.consumers.find(
+    (item) => item.queue === 'peekaplate-staging-menu-ingestion',
   );
+  assert.deepEqual(menu, {
+    queue: 'peekaplate-staging-menu-ingestion',
+    max_batch_size: 1,
+    max_batch_timeout: 1,
+    max_concurrency: 1,
+    max_retries: 3,
+    dead_letter_queue: 'peekaplate-staging-menu-ingestion-dlq',
+    retry_delay: 60,
+  });
   assert.equal(staging.vars.EXTRACTION_SERVICE_URL, undefined);
   assert.equal(staging.vars.EXTRACTION_SERVICE_SECRET, undefined);
+  assert.equal(
+    staging.queues.consumers.find((item) => item.queue === 'peekaplate-staging-observations')
+      .max_batch_size,
+    10,
+  );
 });
 
 test('extraction host is staging-only, single-instance and contains no secret values', () => {
