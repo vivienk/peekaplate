@@ -41,7 +41,15 @@ import {
   Thumb,
 } from './ui';
 
-export type Page = 'welcome' | 'overview' | 'report' | 'perf' | 'menu' | 'actions' | 'dish';
+export type Page =
+  | 'welcome'
+  | 'overview'
+  | 'report'
+  | 'perf'
+  | 'data'
+  | 'menu'
+  | 'actions'
+  | 'dish';
 export type Acts = Record<string, ActionState>;
 export type SetAct = (id: string, v: ActionState) => void;
 

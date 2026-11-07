@@ -25,6 +25,7 @@ import {
   Report,
   Welcome,
 } from './pages';
+import { ReportData } from './report-data';
 import { BackChevron, Icon, type IconName } from './ui';
 
 function Controls({
@@ -91,6 +92,7 @@ const NAV: [Page, string, IconName][] = [
   ['overview', 'Overview', 'home'],
   ['report', 'AI Insight Report', 'report'],
   ['perf', 'Dish performance', 'chart'],
+  ['data', 'Report data', 'report'],
   ['menu', 'Menu', 'menu'],
   ['actions', 'Actions', 'action'],
 ];
@@ -229,6 +231,7 @@ export function App() {
   else if (page === 'report') body = <Report go={go} acts={acts} setAct={setAct} />;
   else if (page === 'perf')
     body = <Perf sim={sim} openDish={openDish} chat={chat} openChat={openChat} />;
+  else if (page === 'data') body = <ReportData />;
   else if (page === 'dish' && dishId)
     body = <DishDetail id={dishId} go={go} editDish={editDish} chat={chat} openChat={openChat} />;
   else if (page === 'actions')
