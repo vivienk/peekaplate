@@ -50,6 +50,7 @@ import {
   type MenuIngestionJobRow,
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
+import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -554,10 +555,14 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
-  app.use(
-    '/venues/*',
-    bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) }),
-  );
+  app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/menus\/uploads$/.test(c.req.path))
+      return next();
+    return bodyLimit({ maxSize: 16_384, onError: (c) => c.json({ error: 'body_too_large' }, 413) })(
+      c,
+      next,
+    );
+  });
   app.use(
     '/public/venues/*',
     cors({
@@ -775,6 +780,47 @@ export function createApp(services: Dependencies = dependencies) {
     const retrieverFn = services.retrieve ?? retrieveMenuEvidence;
     const result = await retrieverFn(retrievalRequest);
     return c.json(result);
+  });
+
+  app.post('/venues/:venueId/menus/uploads', async (c) => {
+    if (c.env?.APP_ENV !== 'staging' && c.env?.APP_ENV !== 'local')
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    await (services.authorizeVenue ?? dependencies.authorizeVenue!)(
+      actorId,
+      scope.data.venueId,
+      c.env,
+    );
+    const storage = c.env.INGESTION_REPORTS_BUCKET;
+    const queue = c.env.INGESTION_QUEUE;
+    if (!storage || !queue) throw new AuthUnavailableError();
+    const upload = await readMenuUpload(c.req.raw);
+    const createJob = async () => {
+      const env = c.env;
+      const connectionString =
+        env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+      if (!connectionString) throw new AuthUnavailableError();
+      const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+      try {
+        await client.connect();
+        await authorizeStaffVenue(client, actorId, scope.data.venueId);
+        return await submitMenuIngestion(client, {
+          venueId: scope.data.venueId,
+          sourceType: upload.sourceType,
+          sourceHash: upload.sourceHash,
+          idempotencyKey: upload.idempotencyKey,
+        });
+      } finally {
+        await client.end();
+      }
+    };
+    const job = await storeAndDispatchUpload(scope.data.venueId, upload, createJob, storage, queue);
+    return c.json({ job }, 202);
   });
 
   app.post('/venues/:venueId/menus/jobs', async (c) => {

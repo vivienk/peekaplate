@@ -1373,3 +1373,17 @@ steps. The test now pauses the clock before mounting its fixture, then advances
 only the existing 2000/2900/200-ms steps. Toast assertions, expiry deadlines and
 product code are unchanged. All 12 focused Save browser tests pass; retain the
 original failure observation above rather than treating a rerun as its diagnosis.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-07T17:47:21.301Z","exitCode":1}
+```
+
+## November 7 staging release validation environment
+
+The first unit run could not bind the loopback authentication server (EPERM),
+and its local-session cleanup test stopped before session setup. The same suite
+with loopback access passed610 Vitest cases (4 optional skips) and67 script cases;
+no product test was disabled. The isolated Intel macOS Python install cannot
+resolve a wheel for locked onnxruntime1.31.0; retain the dependency and require
+the existing Linux CI Python and Docker database lanes before release.
