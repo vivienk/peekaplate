@@ -3,6 +3,29 @@ import { z } from 'zod';
 // ADR 0015 (D1): suppress behavioral cells below ten eligible sessions.
 export const PRIVACY_FLOOR_SESSIONS = 10;
 
+export const OwnerReportSnapshotIdentitySchema = z.tuple([z.uuid(), z.iso.datetime()]).readonly();
+export type OwnerReportSnapshotIdentity = z.infer<typeof OwnerReportSnapshotIdentitySchema>;
+
+export function ownerReportSnapshotIdentity(report: {
+  venue_id: string;
+  report_metadata: { generated_at: string };
+}): OwnerReportSnapshotIdentity {
+  return OwnerReportSnapshotIdentitySchema.parse([
+    report.venue_id,
+    report.report_metadata.generated_at,
+  ]);
+}
+
+export const OwnerReportQuerySchema = z
+  .strictObject({
+    start_time: z.iso.datetime(),
+    end_time: z.iso.datetime(),
+  })
+  .refine((query) => new Date(query.end_time).getTime() >= new Date(query.start_time).getTime(), {
+    message: 'End time cannot be before start time',
+  });
+export type OwnerReportQuery = z.infer<typeof OwnerReportQuerySchema>;
+
 const MetricStatusSchema = z.enum([
   'NORMAL',
   'VALID_ZERO',
@@ -54,6 +77,7 @@ const cohortMetric = (value: z.ZodNumber) =>
 
 // Whole-number counts.
 const count = () => metric(z.number().int().nonnegative());
+const cohortCount = () => cohortMetric(z.number().int().nonnegative());
 // Fractions from 0 to 1.
 const rateValue = () => z.number().min(0).max(1);
 
@@ -64,6 +88,39 @@ const rateValue = () => z.number().min(0).max(1);
 export const MAX_AVERAGE_ACTIVE_SECONDS = 300;
 const averageValue = () => z.number().min(0).max(MAX_AVERAGE_ACTIVE_SECONDS);
 
+export const OwnerReportMetadataSchema = z
+  .strictObject({
+    calculation_version: z.string(),
+    generated_at: z.iso.datetime(),
+    date_window: z
+      .strictObject({
+        start_time: z.iso.datetime(),
+        end_time: z.iso.datetime(),
+        duration_hours: z.number().int().nonnegative(),
+      })
+      .refine(
+        (window) => new Date(window.end_time).getTime() >= new Date(window.start_time).getTime(),
+        { message: 'End time cannot be before start time' },
+      ),
+    coverage: z
+      .strictObject({
+        total_dishes_monitored: z.number().int().nonnegative(),
+        measurable_dishes_count: z.number().int().nonnegative(),
+      })
+      .refine((cov) => cov.measurable_dishes_count <= cov.total_dishes_monitored, {
+        message: 'Measurable count cannot exceed total monitored dishes',
+      }),
+    freshness: z.strictObject({
+      last_event_ingested_at: z.iso.datetime().nullable(),
+      is_stale: z.boolean(),
+    }),
+    report_status: z.enum(['NORMAL', 'EMPTY', 'STALE', 'ERROR']),
+  })
+  .refine(
+    (meta) => meta.report_status === 'EMPTY' || meta.freshness.last_event_ingested_at !== null,
+    { message: 'Last event timestamp required unless report is empty' },
+  );
+
 // The rates and the average: the metrics whose own cohort is checked against the floor.
 export const COHORT_METRICS = [
   'avg_interaction_time_seconds',
@@ -71,6 +128,12 @@ export const COHORT_METRICS = [
   'open_rate',
   'engagement_rate',
   'save_rate',
+] as const;
+
+const REVISION_COHORT_METRICS = [
+  ...COHORT_METRICS,
+  'consideration_exposures',
+  'verified_conversion_sessions',
 ] as const;
 
 function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.ZodType<MetricValue>>(
@@ -82,42 +145,7 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
     schema_version: z.literal('owner_report.v1'),
     venue_id: z.uuid(),
     source: z.enum(['synthetic', 'production']),
-    report_metadata: z
-      .strictObject({
-        calculation_version: z.string(),
-        generated_at: z.iso.datetime(),
-        date_window: z
-          .strictObject({
-            start_time: z.iso.datetime(),
-            end_time: z.iso.datetime(),
-            duration_hours: z.number().int().nonnegative(),
-          })
-          .refine(
-            (window) =>
-              new Date(window.end_time).getTime() >= new Date(window.start_time).getTime(),
-            { message: 'End time cannot be before start time' },
-          ),
-        coverage: z
-          .strictObject({
-            total_dishes_monitored: z.number().int().nonnegative(),
-            measurable_dishes_count: z.number().int().nonnegative(),
-          })
-          .refine((cov) => cov.measurable_dishes_count <= cov.total_dishes_monitored, {
-            message: 'Measurable count cannot exceed total monitored dishes',
-          }),
-        freshness: z.strictObject({
-          last_event_ingested_at: z.iso.datetime().nullable(),
-          is_stale: z.boolean(),
-        }),
-        report_status: z.enum(['NORMAL', 'EMPTY', 'STALE', 'ERROR']),
-      })
-      .refine(
-        (meta) => {
-          if (meta.report_status === 'EMPTY') return true;
-          return meta.freshness.last_event_ingested_at !== null;
-        },
-        { message: 'Last event timestamp required unless report is empty' },
-      ),
+    report_metadata: OwnerReportMetadataSchema,
     dishes: z
       .array(
         z
@@ -208,6 +236,137 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
   });
 }
 
+function revisionReportSchema<
+  CountCell extends z.ZodTypeAny,
+  RateCell extends z.ZodTypeAny,
+  AverageCell extends z.ZodTypeAny,
+>(
+  countCell: () => CountCell,
+  rateCell: () => RateCell,
+  averageCell: () => AverageCell,
+  checkCohorts: boolean,
+) {
+  return z.strictObject({
+    schema_version: z.literal('owner_report.v2'),
+    venue_id: z.uuid(),
+    source: z.enum(['synthetic', 'production']),
+    report_metadata: OwnerReportMetadataSchema,
+    dishes: z
+      .array(
+        z
+          .strictObject({
+            dish_id: z.uuid(),
+            dish_revision_id: z.uuid(),
+            name: z.string().min(1),
+            evidence_state: z.enum(['NORMAL', 'SUPPRESSED', 'NOT_MEASURABLE']),
+            metrics: z.strictObject({
+              consideration_sessions: count(),
+              consideration_exposures: countCell(),
+              // Observation facts cannot establish a linked order outcome.
+              verified_conversion_sessions: countCell(),
+              avg_interaction_time_seconds: averageCell(),
+              timing_coverage: rateCell(),
+              open_rate: rateCell(),
+              engagement_rate: rateCell(),
+              save_rate: rateCell(),
+            }),
+          })
+          .superRefine((dish, ctx) => {
+            const sessions = dish.metrics.consideration_sessions;
+            if (sessions.status === 'NORMAL' && (sessions.value ?? 0) < PRIVACY_FLOOR_SESSIONS) {
+              ctx.addIssue({
+                code: 'custom',
+                path: ['metrics', 'consideration_sessions', 'value'],
+                message: `NORMAL needs at least ${PRIVACY_FLOOR_SESSIONS} eligible sessions; suppress below that`,
+              });
+            }
+            if (sessions.status === 'VALID_ZERO') {
+              ctx.addIssue({
+                code: 'custom',
+                path: ['metrics', 'consideration_sessions', 'status'],
+                message: 'Zero active sessions is below the privacy floor',
+              });
+            }
+            if (sessions.status !== 'NORMAL') {
+              for (const [name, value] of Object.entries(dish.metrics)) {
+                if (shows(value.status)) {
+                  ctx.addIssue({
+                    code: 'custom',
+                    path: ['metrics', name, 'status'],
+                    message:
+                      'Metrics cannot show values unless consideration sessions meet the privacy floor',
+                  });
+                }
+              }
+            }
+            const cells = dish.metrics as Record<
+              string,
+              MetricValue & { eligible_sessions?: number }
+            >;
+            if (sessions.status === 'NORMAL') {
+              const exposures = cells.consideration_exposures;
+              if (
+                !exposures ||
+                !shows(exposures.status) ||
+                (exposures.value ?? 0) < (sessions.value ?? 0)
+              ) {
+                ctx.addIssue({
+                  code: 'custom',
+                  path: ['metrics', 'consideration_exposures'],
+                  message: 'Displayed exposures cannot be fewer than their unique sessions',
+                });
+              }
+            }
+            if (checkCohorts && sessions.status === 'NORMAL') {
+              if (cells.consideration_exposures?.eligible_sessions !== sessions.value) {
+                ctx.addIssue({
+                  code: 'custom',
+                  path: ['metrics', 'consideration_exposures', 'eligible_sessions'],
+                  message: 'Exposure and consideration-session cohorts must match',
+                });
+              }
+              for (const name of REVISION_COHORT_METRICS) {
+                const cell = cells[name];
+                if (!cell) continue;
+                if (
+                  cell.eligible_sessions === 0 &&
+                  (shows(cell.status) || cell.status === 'SUPPRESSED')
+                ) {
+                  ctx.addIssue({
+                    code: 'custom',
+                    path: ['metrics', name, 'status'],
+                    message: 'No eligible sessions: a zero denominator is NOT_MEASURABLE',
+                  });
+                }
+              }
+            }
+            if (
+              dish.evidence_state === 'SUPPRESSED' &&
+              Object.values(dish.metrics).some(
+                (cell) => cell.status !== 'SUPPRESSED' || cell.value !== null,
+              )
+            ) {
+              ctx.addIssue({
+                code: 'custom',
+                path: ['evidence_state'],
+                message: 'Suppressed revisions must mask every metric',
+              });
+            }
+          }),
+      )
+      .refine(
+        (dishes) =>
+          dishes.every((dish) => {
+            const revisions = dishes.filter((item) => item.dish_id === dish.dish_id);
+            return (
+              revisions.length === new Set(revisions.map((item) => item.dish_revision_id)).size
+            );
+          }),
+        { message: 'A dish revision may appear only once' },
+      ),
+  });
+}
+
 // What owners receive. It carries no cohort counts: a payload containing eligible_sessions is
 // rejected as an unknown field.
 export const OwnerDishReportSchema = reportSchema(
@@ -226,14 +385,43 @@ export const InternalOwnerDishReportSchema = reportSchema(
   true,
 );
 
+export const OwnerDishReportV2Schema = revisionReportSchema(
+  () => count(),
+  () => metric(rateValue()),
+  () => metric(averageValue()),
+  false,
+);
+
+export const InternalOwnerDishReportV2Schema = revisionReportSchema(
+  () => cohortCount(),
+  () => cohortMetric(rateValue()),
+  () => cohortMetric(averageValue()),
+  true,
+);
+
 export type OwnerDishReport = z.infer<typeof OwnerDishReportSchema>;
 export type InternalOwnerDishReport = z.infer<typeof InternalOwnerDishReportSchema>;
+export type OwnerDishReportV2 = z.infer<typeof OwnerDishReportV2Schema>;
+export type InternalOwnerDishReportV2 = z.infer<typeof InternalOwnerDishReportV2Schema>;
 
 // Checks the internal report, removes every eligible_sessions and checks the owner payload, so
 // cohort counts can never be sent to an owner.
 export function toOwnerReport(internal: unknown): OwnerDishReport {
   const report = InternalOwnerDishReportSchema.parse(internal);
   return OwnerDishReportSchema.parse({
+    ...report,
+    dishes: report.dishes.map((dish) => ({
+      ...dish,
+      metrics: Object.fromEntries(
+        Object.entries(dish.metrics).map(([name, { value, status }]) => [name, { value, status }]),
+      ),
+    })),
+  });
+}
+
+export function toOwnerReportV2(internal: unknown): OwnerDishReportV2 {
+  const report = InternalOwnerDishReportV2Schema.parse(internal);
+  return OwnerDishReportV2Schema.parse({
     ...report,
     dishes: report.dishes.map((dish) => ({
       ...dish,

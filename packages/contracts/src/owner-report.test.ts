@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   COHORT_METRICS,
   InternalOwnerDishReportSchema,
+  InternalOwnerDishReportV2Schema,
   MAX_AVERAGE_ACTIVE_SECONDS,
   OwnerDishReportSchema,
+  OwnerDishReportV2Schema,
+  OwnerReportSnapshotIdentitySchema,
+  ownerReportSnapshotIdentity,
   PRIVACY_FLOOR_SESSIONS,
   toOwnerReport,
+  toOwnerReportV2,
 } from './owner-report';
 
 // One valid synthetic report; each test changes a single field, so a rejection can only come
@@ -343,5 +348,92 @@ describe('per-metric cohort floor (internal report)', () => {
 
   it('the owner schema rejects cohort counts, so they cannot be sent to owners', () => {
     expect(OwnerDishReportSchema.safeParse(internal()).success).toBe(false);
+  });
+});
+
+describe('owner_report.v2 revision cells and snapshot identity', () => {
+  const revisionId = 'c32ab620-602a-4457-a9a7-c4df9202e7f0';
+  const revisionMetric = (value: number | null, status: string, eligible_sessions: number) => ({
+    value,
+    status,
+    eligible_sessions,
+  });
+  const v2Internal = (patches: Record<string, ReturnType<typeof revisionMetric>> = {}) => {
+    const base = report();
+    return {
+      ...base,
+      schema_version: 'owner_report.v2',
+      dishes: [
+        {
+          ...base.dishes[0],
+          dish_revision_id: revisionId,
+          metrics: {
+            consideration_sessions: metric(20),
+            consideration_exposures: revisionMetric(25, 'NORMAL', 20),
+            verified_conversion_sessions: revisionMetric(null, 'MISSING', 0),
+            avg_interaction_time_seconds: revisionMetric(30, 'NORMAL', 20),
+            timing_coverage: revisionMetric(0.8, 'NORMAL', 20),
+            open_rate: revisionMetric(0.5, 'NORMAL', 20),
+            engagement_rate: revisionMetric(0.25, 'NORMAL', 20),
+            save_rate: revisionMetric(0.1, 'NORMAL', 20),
+            ...patches,
+          },
+        },
+      ],
+    };
+  };
+
+  it('extracts a readonly immutable identity tuple without changing owner_report.v1', () => {
+    const snapshot = report();
+    const first = ownerReportSnapshotIdentity(snapshot);
+    const repeated = ownerReportSnapshotIdentity(snapshot);
+    expect(first).toEqual([snapshot.venue_id, snapshot.report_metadata.generated_at]);
+    expect(repeated).toEqual(first);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(
+      OwnerReportSnapshotIdentitySchema.safeParse([snapshot.venue_id, 'not-a-date']).success,
+    ).toBe(false);
+    expect(OwnerDishReportSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('keeps observed consideration and verified conversions as separate revision metrics', () => {
+    const parsed = InternalOwnerDishReportV2Schema.parse(v2Internal());
+    expect(parsed.dishes[0]?.metrics.consideration_exposures).toEqual({
+      value: 25,
+      status: 'NORMAL',
+      eligible_sessions: 20,
+    });
+    expect(parsed.dishes[0]?.metrics.verified_conversion_sessions).toEqual({
+      value: null,
+      status: 'MISSING',
+      eligible_sessions: 0,
+    });
+    const owner = toOwnerReportV2(parsed);
+    expect(OwnerDishReportV2Schema.safeParse(owner).success).toBe(true);
+    expect(JSON.stringify(owner)).not.toContain('eligible_sessions');
+  });
+
+  it('masks only the revision metric whose own cohort is below ten', () => {
+    const internal = v2Internal({
+      avg_interaction_time_seconds: revisionMetric(null, 'SUPPRESSED', 9),
+    });
+    expect(InternalOwnerDishReportV2Schema.safeParse(internal).success).toBe(true);
+    expect(toOwnerReportV2(internal).dishes[0]?.metrics.avg_interaction_time_seconds).toEqual({
+      value: null,
+      status: 'SUPPRESSED',
+    });
+  });
+
+  it('rejects an exposure count that conflicts with its unique-session cohort', () => {
+    const inconsistent = v2Internal({
+      consideration_exposures: revisionMetric(10, 'NORMAL', 9),
+    });
+    expect(InternalOwnerDishReportV2Schema.safeParse(inconsistent).success).toBe(false);
+  });
+
+  it('rejects duplicate dish revision cells', () => {
+    const duplicate = v2Internal();
+    duplicate.dishes.push({ ...duplicate.dishes[0]! });
+    expect(OwnerDishReportV2Schema.safeParse(duplicate).success).toBe(false);
   });
 });

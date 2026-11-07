@@ -1381,3 +1381,26 @@ original failure observation above rather than treating a rerun as its diagnosis
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:21:48.947Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:22:46.496Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":[{"check":"test:db","timestamp":"2026-11-07T14:21:48.947Z"},{"check":"test:db","timestamp":"2026-11-07T14:22:46.496Z"}],"status":"resolved","cause":"The owner-report query referenced has_final_checkpoint from timed_openings without projecting it from the CTE, so PostgreSQL rejected the report query.","prevention":"Keep each report CTE's selected columns aligned with every downstream reference.","regression":"The owner-report signed-token app.request integration tests pass in pnpm verify test:db; the complete run passed 74 integration tests."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T14:42:02.012Z","exitCode":1}
+```
+
+```json
+{"id":"OBS-20261107-INGESTION-REPLAY-RACE","status":"open","area":"database-integration-tests","observation":"One disposable database run failed in the pre-existing ingestion approval/replay test; an immediate full rerun passed all 74 tests.","cause":"The test computes the winning command ID but replays with commandId1 unconditionally. When commandId2 wins, the replay uses the losing ID against an already accepted draft and returns 404.","prevention":"Use the command ID associated with the fulfilled concurrent result and exercise both winner orderings.","sources":["backend/src/ingestion/ingestion.integration.ts"],"resolutionRequired":"Correct this unrelated test and verify replay for either concurrent winner."}
+```
