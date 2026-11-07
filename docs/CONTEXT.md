@@ -81,7 +81,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, keeping comparison_id on replace. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes; renderSavedScreen lists saved dishes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (shared P0 allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHog) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
+      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, keeping comparison_id on replace. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes; renderSavedScreen lists saved dishes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (shared P0 allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHogFromEnv) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -148,7 +148,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d11a0caae509020a5a52a912b9b65084dfbc5d84db933aa15d8efd0770df9383"
+      "sourceFingerprint": "2bc2a3ddfc4d8b49a85810c74cbddfec78ec4b32da84a96d5bf48bfeb0a28bf1"
     },
     {
       "id": "console",
@@ -431,7 +431,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Diner wiring: connectPostHogFromEnv. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",

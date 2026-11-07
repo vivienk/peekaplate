@@ -10,11 +10,12 @@
 //   can never be sent later.
 // - Live: only when the consent gate allows it (off by default; see consent.ts) is an event
 //   delivered, independently, to the canonical outbox (POST /observations, sent by TRK-01.3) and to
-//   PostHog through the adapter connected with connectPostHog (Sai with Vivien, 3 Nov).
-
+//   PostHog through Jeffin's adapter, connected by connectPostHogFromEnv (Sai with Vivien, 3 Nov).
+import type { AnalyticsEnvironment } from '@peekaplate/analytics';
 import type { P0EventName } from '@peekaplate/analytics/event-names';
+import { createPostHogAdapter, type PostHogSdk } from '@peekaplate/analytics/posthog';
 import { browserBatchTriggers, createBatcher, type Deliver } from './batcher';
-import { isTrackingAllowed, onTrackingAllowedChange } from './consent';
+import { isTrackingAllowed, onTrackingAllowedChange, readPrivacySignal } from './consent';
 import { buildEnvelope, type Envelope } from './envelope';
 import { browserLifecycle, browserSessionStore, createIdentity, type Identity } from './identity';
 import { browserOutboxStore, createOutbox, memoryOutboxStore, type OutboxStore } from './outbox';
@@ -139,6 +140,29 @@ export function connectPostHog(sink: PostHogSink): () => void {
     stopPostHogConsent = null;
     postHog = null;
   };
+}
+
+// Builds Jeffin's PostHog adapter (packages/analytics, #113) from the build's PostHog settings and
+// connects it to this gate, with the same privacy signal and fixture-mode check. Does nothing unless
+// PostHog is configured for this build and origin; even then the SDK downloads only after consent,
+// in live mode, on the first event. Returns a function that disconnects it.
+export function connectPostHogFromEnv(
+  env: AnalyticsEnvironment,
+  options: { origin?: string; loadSdk?: () => Promise<PostHogSdk> } = {},
+): () => void {
+  try {
+    const adapter = createPostHogAdapter(env, {
+      origin: options.origin ?? location.origin,
+      privacySignal: readPrivacySignal,
+      isLive: isLiveTracking,
+      ...(options.loadSdk ? { loadSdk: options.loadSdk } : {}),
+    });
+    if (!adapter.configured) return () => {};
+    return connectPostHog(adapter);
+  } catch {
+    // PostHog must never break browsing.
+    return () => {};
+  }
 }
 
 // Exactly once per track() call, after validation and consent. Canonical retries, receipts and the
