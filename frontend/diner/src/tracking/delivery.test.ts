@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BATCH_MAX_BYTES, BATCH_MAX_ITEMS, createBatcher } from './batcher';
 import {
   createDeliver,
+  createLiveDeliver,
+  createRetryPause,
   type DeliveryResult,
   deliver,
+  MAX_BATCH_BYTES,
   MAX_BATCH_EVENTS,
   type MenuToken,
   RETRY_CAP_MS,
@@ -100,6 +104,7 @@ describe('deliver', () => {
       done: [id(1)],
       retry: [],
       retryAfterMs: null,
+      requests: 1,
       counts: expect.objectContaining({ accepted: 1 }),
     });
     expect(server.calls).toHaveLength(1);
@@ -295,6 +300,130 @@ describe('createDeliver', () => {
       throw new Error('dev log failed');
     });
     expect(await send([envelope(1)])).toEqual([id(1)]);
+  });
+});
+
+describe('shared limits', () => {
+  it('uses the batcher limits, so a batch it builds always passes the size check here', () => {
+    expect(MAX_BATCH_EVENTS).toBe(BATCH_MAX_ITEMS);
+    expect(MAX_BATCH_BYTES).toBe(BATCH_MAX_BYTES);
+  });
+});
+
+function result(over: Partial<DeliveryResult>): DeliveryResult {
+  return {
+    done: [],
+    retry: [],
+    retryAfterMs: null,
+    requests: 1,
+    counts: {
+      accepted: 0,
+      rejected: 0,
+      expired: 0,
+      unauthorized: 0,
+      clientInvalid: 0,
+      payloadTooLarge: 0,
+    },
+    ...over,
+  };
+}
+
+describe('createRetryPause', () => {
+  const setup = () => {
+    const pauses: number[] = [];
+    const onResult = createRetryPause({
+      pause: (t) => pauses.push(t - NOW),
+      now: () => NOW,
+      random: () => 1,
+    });
+    return { pauses, onResult };
+  };
+
+  it('backs off 1, 2, 4 s on repeated failed sends and resets after a clean send', () => {
+    const { pauses, onResult } = setup();
+    onResult(result({ retry: [id(1)] }));
+    onResult(result({ retry: [id(1)] }));
+    onResult(result({ retry: [id(1)] }));
+    onResult(result({ done: [id(1)] }));
+    onResult(result({ retry: [id(2)] }));
+    expect(pauses).toEqual([1000, 2000, 4000, 1000]);
+  });
+
+  it('honours a longer Retry-After and caps the backoff at 60 seconds', () => {
+    const { pauses, onResult } = setup();
+    onResult(result({ retry: [id(1)], retryAfterMs: 30_000 }));
+    for (let n = 0; n < 10; n++) onResult(result({ retry: [id(1)] }));
+    expect(pauses[0]).toBe(30_000);
+    expect(pauses.at(-1)).toBe(RETRY_CAP_MS);
+  });
+
+  it('does not pause when nothing was sent (no token yet) or nothing is left to retry', () => {
+    const { pauses, onResult } = setup();
+    onResult(result({ retry: [id(1)], requests: 0 }));
+    onResult(result({ done: [id(1)] }));
+    expect(pauses).toEqual([]);
+  });
+
+  it('never throws, even when pausing fails', () => {
+    const onResult = createRetryPause({
+      pause: () => {
+        throw new Error('boom');
+      },
+    });
+    expect(() => onResult(result({ retry: [id(1)] }))).not.toThrow();
+  });
+});
+
+describe('createLiveDeliver with the TRK-01.2 batcher', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a 429 pauses every trigger for its Retry-After, then one flush delivers', async () => {
+    vi.useFakeTimers({
+      toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+    });
+    vi.setSystemTime(NOW);
+    const { createOutbox, memoryOutboxStore } = await import('./outbox');
+    const outbox = await createOutbox(memoryOutboxStore(), { now: () => Date.now() });
+    await outbox.add(envelope(1) as never);
+
+    const server = fakeServer((events, call) =>
+      call === 1 ? { status: 429, headers: { 'Retry-After': '20' } } : accepted(events),
+    );
+    let hidden: () => void = () => {};
+    let batcher: ReturnType<typeof createBatcher> | undefined;
+    const send = createLiveDeliver(
+      { endpoint: ENDPOINT, fetch: server.fetch, now: () => Date.now(), token: () => TOKEN },
+      { pause: (t) => batcher?.pauseUntil(t), random: () => 0 },
+    );
+    batcher = createBatcher(outbox, {
+      deliver: send,
+      triggers: {
+        isOnline: () => true,
+        onHidden: (fn) => {
+          hidden = fn;
+          return () => {};
+        },
+        onOnline: () => () => {},
+      },
+    });
+
+    await batcher.flush();
+    expect(server.calls).toHaveLength(1);
+    expect(outbox.pending()).toHaveLength(1);
+
+    // Timer and page-hide triggers during the pause do not resend.
+    await vi.advanceTimersByTimeAsync(19_999);
+    hidden();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(server.calls).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(server.calls).toHaveLength(2);
+    expect(server.calls[1]?.events.map((e) => e.event_id)).toEqual([id(1)]);
+    expect(outbox.pending()).toHaveLength(0);
+    batcher.stop();
   });
 });
 

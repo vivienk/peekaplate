@@ -2,10 +2,14 @@
 // to POST /observations with the menu token in the Authorization header only, reads the per-event
 // receipts and says which events leave the outbox and which stay for a retry. The outbox, batching
 // and flush timing belong to TRK-01.2; this module never stores, logs or relabels anything.
+import { BATCH_MAX_BYTES, BATCH_MAX_ITEMS, batchBody, type Deliver } from './batcher';
+import type { Envelope } from './envelope';
+import { pauseDeliveryUntil } from './index';
 
-// Request limits (matrix v0.1h §7): at most 25 events and 32 KiB per request.
-export const MAX_BATCH_EVENTS = 25;
-export const MAX_BATCH_BYTES = 32 * 1024;
+// Request limits (matrix v0.1h §7; ObservationBatchV2Schema): one shared source with the TRK-01.2
+// batcher, so the batches it builds and the ones sent here are always measured the same way.
+export const MAX_BATCH_EVENTS = BATCH_MAX_ITEMS;
+export const MAX_BATCH_BYTES = BATCH_MAX_BYTES;
 // Retry backoff starts at 1 second, doubles and is capped at 60 seconds.
 export const RETRY_BASE_MS = 1_000;
 export const RETRY_CAP_MS = 60_000;
@@ -41,6 +45,9 @@ export type DeliveryResult = {
   retry: string[];
   // Server-requested wait from Retry-After (429), when given.
   retryAfterMs: number | null;
+  // HTTP requests made. Zero means nothing reached the network (no token yet, or every event was
+  // dropped unsent), so a retry left over is not a failed send.
+  requests: number;
   counts: TerminalCounts;
 };
 
@@ -65,8 +72,9 @@ function emptyCounts(): TerminalCounts {
   };
 }
 
+// The same wrapper the batcher measures, so a batch it built never fails the size check here.
 function requestBody(batch: QueuedEnvelope[]): string {
-  return JSON.stringify({ contract: 'observation.v2', events: batch });
+  return JSON.stringify(batchBody(batch as unknown as Envelope[]));
 }
 
 function bodyBytes(body: string): number {
@@ -114,6 +122,7 @@ async function sendBatch(
   }
 
   let response: Response;
+  result.requests++;
   try {
     response = await options.fetch(options.endpoint, {
       method: 'POST',
@@ -196,7 +205,13 @@ export async function deliver(
   events: readonly QueuedEnvelope[],
   options: DeliveryOptions,
 ): Promise<DeliveryResult> {
-  const result: DeliveryResult = { done: [], retry: [], retryAfterMs: null, counts: emptyCounts() };
+  const result: DeliveryResult = {
+    done: [],
+    retry: [],
+    retryAfterMs: null,
+    requests: 0,
+    counts: emptyCounts(),
+  };
   const token = options.token();
   if (!token) {
     result.retry.push(...events.map((e) => e.event_id));
@@ -245,4 +260,52 @@ export function retryDelayMs(
   const exponential = Math.min(RETRY_CAP_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1));
   const jittered = Math.round(exponential / 2 + (exponential / 2) * random());
   return Math.max(jittered, retryAfter ?? 0);
+}
+
+export type RetryPauseOptions = {
+  // Pauses every batcher trigger until the given Date.now() time; defaults to the shared layer's.
+  pause?: (timestampMs: number) => void;
+  now?: () => number;
+  random?: () => number;
+};
+
+// The onResult handler that backs delivery off (agreed with Nifemi and Jeffin, 3 Nov). After a send
+// that left events to retry (offline, 503, 429, unreadable answer or a retry receipt) it pauses the
+// batcher for retryDelayMs(attempt, Retry-After), so the timer, page-hide and reconnect triggers
+// cannot retry early and a 429 is honoured. The attempt count grows with each failed send and
+// resets once a send leaves nothing to retry. A result with no request (no token yet) is not a
+// failure and changes nothing. In memory only, per tab; never throws.
+export function createRetryPause({
+  pause = pauseDeliveryUntil,
+  now = () => Date.now(),
+  random = Math.random,
+}: RetryPauseOptions = {}): (result: DeliveryResult) => void {
+  let attempt = 0;
+  return (result) => {
+    try {
+      if (result.requests === 0) return;
+      if (result.retry.length === 0) {
+        attempt = 0;
+        return;
+      }
+      attempt++;
+      pause(now() + retryDelayMs(attempt, result.retryAfterMs, random));
+    } catch {}
+  };
+}
+
+// The live sender for enableLiveTracking(): token-bound delivery with the retry pause wired in.
+// `onResult` still sees every result (e.g. the development log of terminal counts).
+export function createLiveDeliver(
+  options: DeliveryOptions,
+  {
+    onResult,
+    ...pauseOptions
+  }: RetryPauseOptions & { onResult?: (r: DeliveryResult) => void } = {},
+): Deliver {
+  const backOff = createRetryPause(pauseOptions);
+  return createDeliver(options, (result) => {
+    backOff(result);
+    onResult?.(result);
+  });
 }
