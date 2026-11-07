@@ -350,3 +350,26 @@ Environment: Windows 10.0.26200 x64, Python 3.12.13 via `uv`, Node.js 24.16.0, p
 The rebase changed no #25 source or test file: `git diff a9bcdb5 HEAD` on every #25-owned module, test and doc is empty. Develop's `schemas.py` and `fixture_factory.py` lines are preserved (`git diff origin/develop HEAD` contains no removed lines in either file).
 
 Observation O-1 (not a defect against an acceptance criterion): when the manifest fetch fails twice, the harness shows "Preview unavailable" and keeps the fallback, but `metrics.spatialError` stays `null`; only `manifestRetries=1` records the failure. Layer failures set `spatialError=layer_load_failed`. This can be raised as a diagnostics follow-up if wanted. It was not changed here.
+
+## November 4 attachment integration — November 7 verification
+
+Applied the two supplied review-preview commits on top of `9b69910`, preserving
+develop's context and the separate assets node. No production routes, database,
+provider calls or diner integration were added. Local environment: Intel macOS,
+Python 3.12.14, Pillow 12.3.0, Pydantic 2.14.1, Node 24.16.0, pnpm 11.25.0.
+
+| Result | Command / evidence |
+| --- | --- |
+| PASS | `PYTHONPATH=processing/src:processing/tests ../pr25-audit-20261107/focused-venv/bin/python -m unittest test_assets test_spatial test_presentation test_review_preview`: 38 tests, 27.958 seconds. Isolated minimal environment, not the full locked environment. |
+| PASS | `pnpm exec playwright test --config playwright.review-preview.config.ts`: six Chromium cases, including synthetic touch, live reduced motion, failed candidate, no JavaScript and missing original. |
+| PASS | `pnpm check`: lint, typechecks, 767 Vitest tests (four optional skips), 67 script tests, context and documentation. Initial loopback restriction and successful retry are recorded in errors.md. |
+| PASS | `pnpm verify build`: application builds and Worker dry run only. |
+| PASS | `UV_CACHE_DIR=../pr25-audit-20261107/uv-cache uv build --project processing`: wheel and source distribution. |
+| PASS | Previously supplied photo/cutout-alpha/generated PNG rebuilt into both review modes. Original and prompt hashes match the earlier attachment. Chromium verified load, keyboard tilt, original comparison and reset for both. No input images or generated outputs committed. |
+| PASS | Independent read-only architecture and correctness reviews found no actionable blockers in the added review-preview slice at `e5b6b4e`. Subsequent changes are documentation/evidence only. |
+| NOT RUN | Full frozen Python suite locally: the existing locked ONNX runtime has no Intel macOS wheel. Prior-head CI is not evidence for the new head; new hosted CI must complete after push. |
+| NOT RUN | Physical-phone, screen-reader and human food-fidelity/rights acceptance; production contract and diner integration remain separate. |
+
+The pre-existing presentation-helper rights-confirmation, rejected-provider
+provenance and unbounded candidate-file-read findings are not fixed by this
+addition. This verification does not approve the whole PR for merge or publication.

@@ -227,3 +227,32 @@ pnpm exec playwright test --config playwright.review-preview.config.ts
 Browser tests include synthetic pointer events for touch logic. Real-device
 scrolling, performance, screen readers and restaurant fidelity remain manual
 acceptance gates. No restaurant photos or generated dish assets are committed.
+
+### November 4 request and remaining handoff
+
+The supplied patch is integrated on top of the November 6 PR head. The implemented
+path is T0 photograph + supplied grayscale mask -> pixel-preserving cutout ->
+optional externally generated PNG validation -> comparison/download review page.
+Pointer, keyboard, horizontal touch, return-to-center and live reduced motion
+are included. This closes the offline review-page gap; automatic layer extraction
+and a production multi-layer viewer remain separate.
+
+- This offline preparation and review flow stays in
+  [S3-VIS-03](https://app.clickup.com/t/86bcnfw7r), implemented in this PR.
+- Production manifest agreement remains
+  [S3-ARC-01](https://app.clickup.com/t/86bcnfuur); the review manifest is not that contract.
+- Production diner consumption remains
+  [S3-DIN-03](https://app.clickup.com/t/86bcnfvdy).
+- A mask must be supplied by the operator; no automatic segmentation owner or
+  delivery is established by this change. Current ticket assignees could not be
+  refreshed on November 7 because ClickUp's daily API allowance was exhausted;
+  ownership must be confirmed in those existing tickets rather than inferred.
+
+The November 7 local demonstration rebuilt both cutout and generated modes with
+the previously supplied photo and attachment assets. The mask was recovered from
+the supplied cutout's alpha channel. Original-photo and generation-prompt hashes
+matched the earlier review record; the model identifier remains explicitly
+unspecified as recorded by the original tool. Both pages loaded, tilted, compared
+against the original and reset in Chromium. This is runtime evidence, not a human
+food-fidelity, rights or publication approval. Inputs and generated bundles are
+excluded from Git.

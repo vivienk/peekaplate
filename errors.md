@@ -1451,3 +1451,16 @@ including the November 2 allergen-label note, are preserved.
 - The added processing context summary exceeded the 1000-character limit.
   Independent review identified the cause; shortened the summary and refreshed
   the context fingerprint. The required context check is the regression gate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-07T17:44:26.682Z","exitCode":1}
+```
+
+## November 7 review-preview integration verification
+
+The initial repository test run could not bind its loopback authentication test
+server (EPERM). Re-running with local networking permitted passed 767 Vitest
+tests (four optional skips) and 67 script tests. No application-code fix was
+needed. The first install also correctly rejected Node 24.14.0; verification
+uses the repository-required isolated Node 24.16.0 and pnpm 11.25.0.
