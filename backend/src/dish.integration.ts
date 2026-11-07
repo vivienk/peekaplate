@@ -6,6 +6,7 @@ import {
   MenuApprovalSchema,
   MenuPublicationSchema,
   ObservationReceiptBatchSchema,
+  OwnerDishReportSchema,
   PublicMenuResponseSchema,
 } from '@peekaplate/contracts';
 import { chromium } from '@playwright/test';
@@ -28,6 +29,7 @@ const otherVenue = crypto.randomUUID();
 const actor = crypto.randomUUID();
 const otherActor = crypto.randomUUID();
 const viewer = crypto.randomUUID();
+const otherVenueOwner = crypto.randomUUID();
 let server: Server;
 let env: Bindings;
 let signingKey: CryptoKey;
@@ -51,12 +53,12 @@ function command(patch = {}) {
   };
 }
 
-async function token(subject: string) {
+async function token({ sub }: { sub: string }) {
   return new SignJWT({ role: 'authenticated', is_anonymous: false })
     .setProtectedHeader({ alg: 'ES256', kid: 'integration' })
     .setIssuer(env.AUTH_ISSUER!)
     .setAudience('authenticated')
-    .setSubject(subject)
+    .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(signingKey);
@@ -66,7 +68,7 @@ async function request(dishId: string, body = command(), tenant = venue, subject
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/dishes/${dishId}/revisions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -81,7 +83,7 @@ async function requestEvidence(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menu-evidence`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -98,7 +100,7 @@ async function requestPublication(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menus/${menuId}/${action}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -185,8 +187,8 @@ beforeAll(async () => {
   ]);
   await admin.query(
     `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission)
-    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner')`,
-    [venue, otherVenue, actor, otherActor, viewer],
+    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner'),($2,$6,'owner')`,
+    [venue, otherVenue, actor, otherActor, viewer, otherVenueOwner],
   );
   const keys = await generateKeyPair('ES256');
   signingKey = keys.privateKey;
@@ -997,5 +999,292 @@ describe('real PostgreSQL menu publication commands', () => {
       receipts: 0,
       outbox: 0,
     });
+  });
+});
+describe('Multi-tenant owner report isolation', () => {
+  it('isolates reports and counts distinct reportable sessions', async () => {
+    const dishId = crypto.randomUUID();
+    const dishResponse = await request(dishId);
+    expect(dishResponse.status).toBe(200);
+    const dish = (await dishResponse.json()) as { revisionId: string };
+    const publicationId = crypto.randomUUID();
+    const producerId = crypto.randomUUID();
+    let sequence = 0;
+
+    const insertEvent = async (
+      eventType: string,
+      sessionId: string,
+      occurredAt = new Date(),
+      trafficClass: 'live' | 'test' = 'live',
+    ) => {
+      const eventId = crypto.randomUUID();
+      await admin.query(
+        `INSERT INTO app_private.observation_index
+          (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
+           authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition)
+         VALUES ($1, $2, $3, 'observation.v2', $4, $5, $6, $6, $7, 'accepted')`,
+        [venue, eventId, 'a'.repeat(64), eventType, publicationId, occurredAt, `test/${eventId}`],
+      );
+      await admin.query(
+        `INSERT INTO app_private.observation_event
+          (tenant_id, event_id, event_type, session_id, producer_id, local_sequence,
+           publication_revision_id, traffic_class)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [venue, eventId, eventType, sessionId, producerId, ++sequence, publicationId, trafficClass],
+      );
+      return eventId;
+    };
+
+    const addExposure = async (
+      sessionId: string,
+      targetDishId = dishId,
+      targetRevisionId = dish.revisionId,
+      trafficClass: 'live' | 'test' = 'live',
+    ) => {
+      const eventId = await insertEvent('dish_viewed', sessionId, new Date(), trafficClass);
+      const exposureId = crypto.randomUUID();
+      await admin.query(
+        `INSERT INTO app_private.observation_exposure
+          (tenant_id, event_id, dish_id, dish_revision_id, exposure_id, surface, position, exposure_basis)
+         VALUES ($1, $2, $3, $4, $5, 'menu_list', 1, 'viewport_50pct_1s')`,
+        [venue, eventId, targetDishId, targetRevisionId, exposureId],
+      );
+      return exposureId;
+    };
+
+    const addOpening = async (
+      sessionId: string,
+      source: 'menu_card' | 'direct',
+      fromExposureId: string | null,
+      activeMs?: number,
+      activityOccurredAt?: Date,
+      openingOccurredAt?: Date,
+      targetDishId = dishId,
+      targetRevisionId = dish.revisionId,
+      trafficClass: 'live' | 'test' = 'live',
+    ) => {
+      const openingId = crypto.randomUUID();
+      const eventId = await insertEvent(
+        'dish_detail_opened',
+        sessionId,
+        openingOccurredAt,
+        trafficClass,
+      );
+      await admin.query(
+        `INSERT INTO app_private.observation_opening
+          (tenant_id, event_id, dish_id, dish_revision_id, opening_id, source, from_exposure_id, save_available)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
+        [venue, eventId, targetDishId, targetRevisionId, openingId, source, fromExposureId],
+      );
+      if (activeMs === undefined) return;
+      const checkpointId = await insertEvent(
+        'dish_activity_checkpoint',
+        sessionId,
+        activityOccurredAt,
+        trafficClass,
+      );
+      await admin.query(
+        `INSERT INTO app_private.observation_activity
+          (tenant_id, event_id, dish_id, dish_revision_id, opening_id, active_ms, final)
+         VALUES ($1, $2, $3, $4, $5, $6, true)`,
+        [venue, checkpointId, targetDishId, targetRevisionId, openingId, activeMs],
+      );
+    };
+
+    const addComparison = async (sessionId: string) => {
+      const eventId = await insertEvent('dish_compared', sessionId);
+      await admin.query(
+        `INSERT INTO app_private.observation_comparison
+          (tenant_id, event_id, dish_id, dish_revision_id, other_dish_id,
+           other_dish_revision_id, comparison_id, compare_action, save_available)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'start', true)`,
+        [
+          venue,
+          eventId,
+          dishId,
+          dish.revisionId,
+          crypto.randomUUID(),
+          crypto.randomUUID(),
+          crypto.randomUUID(),
+        ],
+      );
+    };
+
+    const addDirectSave = async (
+      sessionId: string,
+      targetDishId = dishId,
+      targetRevisionId = dish.revisionId,
+      trafficClass: 'live' | 'test' = 'live',
+    ) => {
+      const eventId = await insertEvent('dish_saved', sessionId, new Date(), trafficClass);
+      await admin.query(
+        `INSERT INTO app_private.observation_save
+          (tenant_id, event_id, event_type, dish_id, dish_revision_id, save_origin, surface, shortlist_size)
+         VALUES ($1, $2, 'dish_saved', $3, $4, 'direct', 'menu_card', 1)`,
+        [venue, eventId, targetDishId, targetRevisionId],
+      );
+    };
+
+    const exposedSessions = Array.from({ length: 12 }, () => crypto.randomUUID());
+    const exposures = new Map<string, string>();
+    for (const sessionId of exposedSessions) {
+      exposures.set(sessionId, await addExposure(sessionId));
+    }
+    await addExposure(exposedSessions[0]!);
+
+    for (const [index, sessionId] of exposedSessions.slice(0, 10).entries()) {
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposures.get(sessionId)!,
+        index < 3 ? 10_000 : 5_000,
+      );
+    }
+    await addOpening(exposedSessions[0]!, 'menu_card', exposures.get(exposedSessions[0]!)!);
+
+    const directSessions = Array.from({ length: 4 }, () => crypto.randomUUID());
+    for (const sessionId of directSessions) await addOpening(sessionId, 'direct', null);
+    await addOpening(
+      directSessions[2]!,
+      'direct',
+      null,
+      100_000,
+      new Date(Date.now() - 25 * 60 * 60 * 1000),
+    );
+    await addOpening(
+      exposedSessions[10]!,
+      'menu_card',
+      exposures.get(exposedSessions[10]!)!,
+      undefined,
+      undefined,
+      new Date(Date.now() + 2 * 60 * 1000),
+    );
+
+    await addComparison(directSessions[0]!);
+    await addComparison(directSessions[0]!);
+    await addComparison(directSessions[1]!);
+    await addComparison(crypto.randomUUID());
+    await addComparison(exposedSessions[3]!);
+    await addDirectSave(exposedSessions[0]!);
+    await addDirectSave(exposedSessions[0]!);
+    await addDirectSave(directSessions[0]!);
+    await addDirectSave(exposedSessions[10]!);
+
+    const requestReport = async (tenant: string, subject: string) =>
+      fetch(`http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes`, {
+        headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
+      });
+
+    const ownerResponse = await requestReport(venue, actor);
+    expect(ownerResponse.status).toBe(200);
+    const ownerReport = OwnerDishReportSchema.parse(await ownerResponse.json());
+    expect(ownerReport.venue_id).toBe(venue);
+    expect(ownerReport.dishes).toHaveLength(1);
+    expect(ownerReport.dishes[0]?.metrics).toMatchObject({
+      active_sessions: { value: 12, status: 'NORMAL' },
+      open_rate: { value: 0.833, status: 'NORMAL' },
+      engagement_rate: { value: 0.286, status: 'NORMAL' },
+      save_rate: { value: 0.167, status: 'NORMAL' },
+      avg_interaction_time_seconds: { value: 6.5, status: 'NORMAL' },
+      timing_coverage: { value: 0.714, status: 'NORMAL' },
+    });
+    expect(JSON.stringify(ownerReport)).not.toContain('eligible_sessions');
+
+    const liveDishMetrics = structuredClone(ownerReport.dishes[0]?.metrics);
+    const testOnlySessions = Array.from({ length: 12 }, () => crypto.randomUUID());
+    for (const sessionId of testOnlySessions) {
+      const exposureId = await addExposure(sessionId, dishId, dish.revisionId, 'test');
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposureId,
+        20_000,
+        undefined,
+        undefined,
+        dishId,
+        dish.revisionId,
+        'test',
+      );
+      await addDirectSave(sessionId, dishId, dish.revisionId, 'test');
+    }
+    const afterTestTraffic = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    expect(afterTestTraffic.dishes).toHaveLength(1);
+    expect(afterTestTraffic.dishes[0]?.metrics).toEqual(liveDishMetrics);
+    expect(JSON.stringify(afterTestTraffic)).not.toContain('test');
+
+    const cohortCases: Array<{ sessions: number; dishId: string; revisionId: string }> = [];
+    for (const sessions of [9, 10, 11]) {
+      const cohortDishId = crypto.randomUUID();
+      const created = await request(cohortDishId, command({ name: `Cohort ${sessions} dish` }));
+      expect(created.status).toBe(200);
+      const createdDish = (await created.json()) as { revisionId: string };
+      cohortCases.push({
+        sessions,
+        dishId: cohortDishId,
+        revisionId: createdDish.revisionId,
+      });
+      for (let index = 0; index < sessions; index++) {
+        const sessionId = crypto.randomUUID();
+        const exposureId = await addExposure(sessionId, cohortDishId, createdDish.revisionId);
+        await addOpening(
+          sessionId,
+          'menu_card',
+          exposureId,
+          undefined,
+          undefined,
+          undefined,
+          cohortDishId,
+          createdDish.revisionId,
+        );
+      }
+    }
+    const boundaryReport = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    for (const cohortCase of cohortCases) {
+      const row = boundaryReport.dishes.find((item) => item.dish_id === cohortCase.dishId);
+      expect(row).toBeDefined();
+      if (cohortCase.sessions === 9) {
+        expect(row?.evidence_state).toBe('SUPPRESSED');
+        for (const metric of Object.values(row?.metrics ?? {})) {
+          expect(metric.value).toBeNull();
+        }
+      } else {
+        expect(row?.metrics.active_sessions).toEqual({
+          value: cohortCase.sessions,
+          status: 'NORMAL',
+        });
+        expect(row?.metrics.open_rate).toEqual({ value: 1, status: 'NORMAL' });
+      }
+    }
+
+    const editorResponse = await requestReport(venue, otherActor);
+    expect(editorResponse.status).toBe(403);
+
+    const otherTenantResponse = await requestReport(venue, otherVenueOwner);
+    expect(otherTenantResponse.status).toBe(403);
+
+    const otherOwnerResponse = await requestReport(otherVenue, otherVenueOwner);
+    expect(otherOwnerResponse.status).toBe(200);
+    const otherOwnerReport = OwnerDishReportSchema.parse(await otherOwnerResponse.json());
+    expect(otherOwnerReport.venue_id).toBe(otherVenue);
+    expect(otherOwnerReport.report_metadata.report_status).toBe('EMPTY');
+
+    const revokedActor = crypto.randomUUID();
+    await admin.query(
+      `INSERT INTO app_private.staff_membership(tenant_id, actor_id, permission)
+       VALUES ($1, $2, 'owner')`,
+      [venue, revokedActor],
+    );
+    expect((await requestReport(venue, revokedActor)).status).toBe(200);
+    await admin.query(
+      'DELETE FROM app_private.staff_membership WHERE tenant_id=$1 AND actor_id=$2',
+      [venue, revokedActor],
+    );
+    const revokedResponse = await requestReport(venue, revokedActor);
+    expect(revokedResponse.status).toBe(403);
+    expect(await revokedResponse.json()).toEqual({ error: 'forbidden' });
   });
 });
