@@ -96,8 +96,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/menuScreen.test.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "tests/e2e/menu-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -108,6 +113,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save.spec.ts",
         "frontend/diner/src/compare/picker.ts",
         "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/price.ts",
+        "frontend/diner/src/menu/price.test.ts",
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
@@ -141,7 +148,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d3517a0eabcec738aa60ce1c2c99080e9bc958957bf623092dbc662c887df3ab"
+      "sourceFingerprint": "9c79ee0c6aefba917944ad8c9994e63ac5913a352d3d3a6360d457921ec2c8e2"
     },
     {
       "id": "console",
