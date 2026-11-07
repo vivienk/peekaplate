@@ -11,8 +11,7 @@
 }
 
 /* Rania (5 Nov): label Inter 14px on a 24px line height, weight 600, in on-surface (#1C1A17, 6 Nov).
- * Inter renders once the font is loaded; until then the system font is used
- * (see --pp-font-family-base). */
+ * Inter is self-hosted in style.css; the system font shows until it loads (font-display: swap). */
 .pp-field__label {
   color: var(--pp-role-on-surface);
   font-size: var(--pp-font-size-paragraph-2);

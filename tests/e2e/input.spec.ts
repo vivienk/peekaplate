@@ -247,6 +247,32 @@ test('every input box has a 1.5px edge, 12px radius and 16px side padding', asyn
   expect(await edge(name)).toEqual(spec);
 });
 
+test('Inter loads from the console itself in 400, 500 and 600, Latin only', async ({ page }) => {
+  const fonts: string[] = [];
+  page.on('request', (request) => {
+    if (request.resourceType() === 'font') fonts.push(request.url());
+  });
+  await page.goto(demo);
+  await page.evaluate(() => document.fonts.ready);
+  const loaded = await page.evaluate(() =>
+    [...document.fonts]
+      .filter((face) => face.family.replace(/["']/g, '') === 'Inter' && face.status === 'loaded')
+      .map((face) => face.weight)
+      .sort(),
+  );
+  // The demo shows input text (400) and labels (600); 500 loads when a page uses it.
+  expect(loaded).toEqual(expect.arrayContaining(['400', '600']));
+  expect(fonts.length).toBeGreaterThan(0);
+  for (const url of fonts) {
+    expect(new URL(url).origin).toBe(new URL(demo).origin);
+    expect(url).toMatch(/inter-latin-(400|500|600)-normal/);
+  }
+  const declared = await page.evaluate(
+    () => [...document.fonts].filter((face) => face.family.replace(/["']/g, '') === 'Inter').length,
+  );
+  expect(declared).toBe(3);
+});
+
 test('input demo fits a narrow viewport with usable touch targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto(demo);
