@@ -1381,3 +1381,28 @@ original failure observation above rather than treating a rerun as its diagnosis
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T12:54:08.912Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T13:02:37.677Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T13:05:10.083Z","exitCode":1}
+```
+
+The comparison PostgreSQL fixture initially seeded fewer than ten opening
+sessions in the baseline period. The aggregator correctly suppressed the
+engagement cell; the fixture was expanded to 10 baseline and 12 current
+openings, with expected rates recalculated. The disposable database suite
+passed afterward, including the report query's rate and delta assertions.
+
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T13:05:10.083Z"},"status":"resolved","cause":"The initial synthetic PostgreSQL fixture had only five baseline openings, below the per-metric ten-session denominator floor, so the expected comparable engagement result was invalid.","prevention":"Seed at least ten unique sessions in each period's denominator before asserting an unmasked rate.","regression":"backend/src/comparison-report.integration.ts seeds 12 current and 10 baseline openings and asserts the resulting open, engagement, save rates and deltas; pnpm verify test:db passes."}
+```
