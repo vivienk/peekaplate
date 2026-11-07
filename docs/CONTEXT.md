@@ -13,12 +13,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. PR58 review-candidate schemas preserve original evidence and needs_review state.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
-        "packages/contracts/fixtures/observation.v2/README.md"
+        "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/review-candidates.ts",
+        "packages/contracts/src/review-candidates.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -120,7 +122,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations archive create-only R2 before atomic tenant-scoped index/event/detail writes. Main c6a47bd is deployed: six synthetic hosted checks pass, three earlier facts backfilled and genuine Brave menu/token/bundle requests reach Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. All four test facts are excluded from owner views; cross-tenant/no-context reads return zero. Normal collection remains paused for real controls/outbox/privacy and report acceptance.",
+      "summary": "Staging extraction host retains the existing direct Durable Object lifecycle and source-grant isolation. PR58 negotiates the Python artifact bundle, validates source/version/mode and stores create-only private artifacts in R2 before returning the report. Existing main API behavior is preserved. This release preparation does not establish live extraction, archive durability or publication acceptance.",
       "paths": [
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -249,7 +251,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Earlier acceptance records remain historical.",
+      "summary": "Main remains the release source. A separate manual staging extraction workflow tests processing, builds its image on the GitHub runner, and deploys only peekaplate-extraction-staging. It requires the existing staging approval flag and staging environment credentials. Production and API deployment workflows are unchanged; hosted extraction acceptance must be recorded after release.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -294,7 +296,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/res02-staging-acceptance.json",
         "docs/observation-staging-acceptance.json",
         "docs/observation-facts-staging-acceptance.json",
-        "scripts/console-preview-demos.test.mjs"
+        "scripts/console-preview-demos.test.mjs",
+        ".github/workflows/deploy-extraction-staging.yml"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -367,7 +370,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Python PDF/image acquisition validates Engine3-compatible OCR, preserves later native pages after failures and retains evidence-linked needs_review drafts. Staging FastAPI/Uvicorn runs in the protected Cloudflare Container. October28 fresh operator-side OCR read three synthetic names/prices in4.654s without cache; key stored in GitHub staging and host bindings. This was not hosted full extraction or accuracy acceptance. Expected CLI exit2 preserves partial/failed reports. Full AI provider configuration and VIS01 feature acceptance remain pending. Python gets no source-signing/database credentials or publication permission.",
+      "summary": "PDF/photo modes keep ocr, default ocr_image and ungrounded image-only; pipeline3/schema2 and legacy1/2 remain compatible. Bounded wrapped titles/columns and corroborated text/geometry sections permit only complete price groups; conflicts, crossing/unclaimed cells and unresolved repeats abstain. Whole-entry guards and narrow name/footer views never rewrite source. Atomic assembly preserves exact fractional page/index/literal joins in existing candidate-ID segment metadata; SourceSpan/TS schemas and legacy empty-field omission stay unchanged. Originals stay unvalidated. Opt-in OCR recovery validates failed Engine3 pages and caps1\u20134 single attempts, stopping on failure. Selected-page model recovery preflights1\u20134 requests, retains history/incomplete coverage and never merges old candidates. Defaults/queues stay unchanged. Measured gains are modest; broad layout recall, fresh-provider, consumer and human acceptance remain unverified.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -404,17 +407,67 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/service.py",
         "processing/tests/test_service.py",
         "processing/Dockerfile",
-        "processing/.dockerignore"
+        "processing/.dockerignore",
+        "processing/src/peekaplate_processing/overlay_review.py",
+        "processing/src/peekaplate_processing/recover_pages.py",
+        "processing/tests/test_overlay_review.py",
+        "processing/tests/test_overlay_saved_inputs.py",
+        "processing/tests/test_box_evidence.py",
+        "processing/tests/test_box_grounding_safety.py",
+        "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
+        "processing/tests/test_service_artifacts.py",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
+        "processing/src/peekaplate_processing/menu_context.py",
+        "processing/src/peekaplate_processing/menu_layout.py",
+        "processing/src/peekaplate_processing/vision.py",
+        "processing/src/peekaplate_processing/review_suggestions.py",
+        "processing/src/peekaplate_processing/review_candidates.py",
+        "processing/src/peekaplate_processing/timing.py",
+        "processing/tests/test_menu_context.py",
+        "processing/tests/test_menu_layout.py",
+        "processing/tests/test_layout_reconstruction.py",
+        "processing/tests/test_source_entry_recovery.py",
+        "processing/tests/test_recover_pages.py",
+        "processing/tests/test_targeted_model_recovery.py",
+        "processing/tests/test_menu_duplicates.py",
+        "processing/tests/test_input_modes.py",
+        "processing/tests/test_pipeline_timing.py",
+        "processing/tests/test_review_candidates.py",
+        "docs/processing-v3.md",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/review-candidates/README.md",
+        "processing/tests/fixtures/review-candidates/field-limits.json",
+        "processing/tests/fixtures/review-candidates/invalid-extraction.json",
+        "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
+        "processing/tests/fixtures/review-candidates/priced-candidate.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
         "docs/adr/0005-tenancy-and-privacy.md"
       ],
-      "dependsOn": [],
-      "sourceFingerprint": "9a915eb9ef0fd34234e116710436f4798e0be3ecc84e9b06cc034b0dfb4c88d1"
+      "dependsOn": [
+        "contracts"
+      ],
+      "sourceFingerprint": "e1f5dd6026943495b4f53235515dad797a4727285dc1c5267ede6d1c329deb2e"
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-07",
+      "modules": [
+        "processing",
+        "backend",
+        "delivery"
+      ],
+      "summary": "Prepare the merged PR58 extraction implementation for current main without importing unrelated develop features. Preserve failed CLI reports and private review artifacts; add a manual staging-only extraction build/deploy workflow because the API workflow does not release Python.",
+      "next": "Complete release checks and review, replace exposed Gemini credentials, then run the full signed staging extraction and verify private archive retention. Production is out of scope."
+    },
     {
       "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
       "modules": [
@@ -501,19 +554,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Merged #99/#100 and deployed exact main c6a47bd after green CI. Six hosted checks pass: original-archive backfill, real signed-menu browser acceptance, native Queue/R2/typed facts, retries/conflicts and tenant/test exclusion. Desktop freeze recovered with explicit pause and read-only verification. Normal collection remains paused.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "paths": [
-        "docs/operations.md",
-        "docs/observation-facts-staging-acceptance.json"
-      ],
-      "next": "Synthetic cleanup passed: viewer restored, menu withdrawn, session ended, temporary host removed. Reconcile #44 decisions → #58 → #45 and #73 review persistence. Report contract #72 needs SQL/API before #46 integration; real diner tracking/outbox remains separate. Focused PR79/PR104 main promotion enables preview-only demo build inputs and retention of merged PRs last successful preview; verify a fresh hosted foundations.html and SHA marker after merging the trusted workflow."
     }
   ]
 }
