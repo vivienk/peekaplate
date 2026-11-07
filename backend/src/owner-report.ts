@@ -4,12 +4,14 @@ import type { Client } from 'pg';
 import { CommandError } from './dish-command';
 
 const REPORT_PERMISSIONS = ['owner'];
+type OwnerReportSource = 'production' | 'synthetic';
 
 export async function readOwnerReport(
   client: Client,
   actorId: string,
   venueId: string,
   now: Date,
+  source: OwnerReportSource = 'production',
 ): Promise<unknown> {
   let started = false;
   try {
@@ -39,7 +41,7 @@ export async function readOwnerReport(
     ]);
     await client.query('COMMIT');
     started = false;
-    return toOwnerReport(buildInternalReport(result.rows, venueId, now));
+    return toOwnerReport(buildInternalReport(result.rows, venueId, now, source));
   } catch (error) {
     if (started) {
       try {
@@ -217,7 +219,12 @@ function timestampOrNull(value: unknown): string | null {
   return timestamp.toISOString();
 }
 
-function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
+function buildInternalReport(
+  rows: ReportRow[],
+  venueId: string,
+  now: Date,
+  source: OwnerReportSource = 'production',
+) {
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const lastEventIngestedAt = rows.reduce<string | null>((latest, row) => {
     const timestamp = timestampOrNull(row.last_event_ingested_at);
@@ -228,7 +235,7 @@ function buildInternalReport(rows: ReportRow[], venueId: string, now: Date) {
   return {
     schema_version: 'owner_report.v1',
     venue_id: venueId,
-    source: 'production',
+    source,
     report_metadata: {
       calculation_version: 'production.v1',
       generated_at: now.toISOString(),

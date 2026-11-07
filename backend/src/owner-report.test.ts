@@ -163,6 +163,21 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(JSON.stringify(report)).not.toContain('eligible_sessions');
   });
 
+  it('accepts a source override while defaulting to production', async () => {
+    const { client } = fakeClient('owner');
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(
+        client,
+        'actor-1',
+        venueId,
+        new Date('2026-11-06T10:00:00Z'),
+        'synthetic',
+      ),
+    );
+
+    expect(report.source).toBe('synthetic');
+  });
+
   it('marks freshness stale when the latest event is over one hour old or unavailable', async () => {
     const now = new Date('2026-11-06T10:00:00Z');
     const staleClient = fakeClient('owner', [
