@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { checkPullRequest } from './check-pr.mjs';
+import { checkPullRequest, isPullRequestCheckApplicable } from './check-pr.mjs';
 
 const body = `## Outcome
 Reject stale publication commands.
@@ -31,4 +31,10 @@ test('accepts a populated PR and rejects missing evidence, empty fields and unto
     'utf8',
   );
   assert.throws(() => checkPullRequest(template));
+});
+
+test('PR body check is required only for non-draft pull_request events', () => {
+  assert.equal(isPullRequestCheckApplicable('push', { draft: false }), false);
+  assert.equal(isPullRequestCheckApplicable('pull_request', { draft: true }), false);
+  assert.equal(isPullRequestCheckApplicable('pull_request', { draft: false }), true);
 });
