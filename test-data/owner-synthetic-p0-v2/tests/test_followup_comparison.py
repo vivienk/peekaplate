@@ -36,7 +36,7 @@ class TestFollowupComparison(unittest.TestCase):
             },
         ]
 
-        self.assertEqual(considered_dishes(events), {"soup"})
+        self.assertEqual(considered_dishes(events), {"soup", "salad"})
 
 
 if __name__ == "__main__":
