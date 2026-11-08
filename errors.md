@@ -919,6 +919,8 @@ the PR records verification of the reconciled canonical tree separately.
 
 ```json
 {"id":"OBS-VIS02-TARGETED-RECOVERY-BUDGET-001","status":"resolved","area":"explicit-provider-request-budget","observation":"A selected-page count does not bound paid transport attempts when the legacy OCR client internally retries. Failed-page recovery also must not silently reacquire the whole PDF, erase earlier failures or reuse old candidate links.","correction":"Add opt-in selective PDF acquisition and an explicit single-attempt OCR setting without changing ordinary defaults. Recovery validates source snapshot/hash/coverage and selected failed Engine3 pages before client construction, bypasses cache, enforces a small explicit cap, stops on first failure including429 and preserves unattempted pages/history in private create-only output. Model-only recovery separately preflights the exact selected-page batch plan and keeps unprocessed coverage incomplete without merging drafts.","regression":"Socket-blocked synthetic tests cover caps, exact source/coverage preflight, selection-only rendering/acquisition, cache bypass, one-attempt transport,429 stop, failed/unattempted manifest records, old-error preservation and model-budget rejection before invocation. Full381-test discovery passes with no socket attempts. Six independent write-mocked retry/budget controls pass. No recovery was invoked against a live provider; fresh reliability and hosted budgets remain unverified.","sources":["processing/src/peekaplate_processing/recover_pages.py","processing/src/peekaplate_processing/pdf.py","processing/src/peekaplate_processing/ocr_space.py","processing/src/peekaplate_processing/run_pipeline.py","processing/src/peekaplate_processing/vision.py","processing/tests/test_recover_pages.py","processing/tests/test_targeted_model_recovery.py","docs/processing-v3.md"]}
+```
+
 ```json
 {"kind":"deployment-followup","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"timestamp":"2026-10-27T20:25:05.885Z","status":"pending-external-activation","observation":"Actual deploy of main58838e1 uploaded a partial extraction Worker, then failed at /containers/me with HTTP401 requiring Workers Paid. workers.dev remains disabled and health/extract return404; settings readback returned provider500. Protected API run40577213391 awaits independent approval; existing API health200 at prior version.","next":"Owner activates planned Paid subscription, then retry the same Worker name and verify service configuration. Independently approve existing API run and verify its new aliases. Local integration can continue; do not enable real submissions before full acceptance.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
 ```
@@ -960,8 +962,37 @@ develop's retrieval implementation to make a release merge compile.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-10-28T18:20:27.547Z","exitCode":2}
+```json
+{"id":"OBS-20261022-VIS03-ASSET-001","status":"observation","area":"local-processing-verification","observation":"The local Windows session cannot satisfy three pre-existing processing assertions that compare st_mode against the POSIX private mode 0o600: test_evaluation.test_private_output_preserves_existing_result, test_ingestion.test_private_report_cli_returns_incomplete_exit_code and test_ocr_space.test_valid_engine3_cache_avoids_another_request_even_without_key. NTFS does not store POSIX permission bits, so the comparison cannot hold locally; the same assertions pass in the Linux CI job. The failures exist on the untouched base commit and are not caused by this change.","prevention":"Run the processing suite in the hosted CI job for the authoritative result and treat the local Windows mode assertions as a known platform limit. Do not weaken the shared private-output assertions to satisfy a Windows-only run.","followup":"Confirm the three assertions pass in the hosted CI job before marking the pull request ready.","sources":["processing/tests/test_evaluation.py","processing/tests/test_ingestion.py","processing/tests/test_ocr_space.py"]}
 ```
 
+```json
+{"id":"OBS-20261022-VIS03-HARNESS-001","status":"resolved","area":"visual-asset-verification","observation":"The first harness implementation fetched every layer twice (once to decode and once to display), never initialized the parallax offsets before the first pointer move, and left the fallback image empty when the manifest itself failed to load.","prevention":"Decode and display each layer with a single image element, hold pointer state in one place that the transform reads, and load the fallback independently of the manifest so a manifest failure still shows the approved photo.","regression":"The harness was exercised in Chromium at a 390x844 viewport with device pixel ratio 3. Layers loaded, the fallback stayed visible, pointer and arrow-key movement stayed within 3 degrees, Home reset the movement, reduced motion applied no transform, a deleted layer produced layer_load_failed with the photo still visible, a missing manifest produced one retry, a missing fallback produced fallback_load_failed, and unsupported 3D CSS produced css_3d_unsupported.","limit":"Chromium device emulation is not a phone measurement. p75 startup, p95 frame time and assistive-technology checks remain manual gates.","sources":["processing/src/peekaplate_processing/harness.py","docs/asset-delivery.md"]}
+```
+
+```json
+{"id":"OBS-20261022-VIS03-ASSET-002","status":"observation","area":"visual-asset-verification","observation":"A failed preparation left the newly created output root on disk after the temporary bundle directory was cleaned, so a rejected run left an empty directory behind instead of no output root at all.","prevention":"Record whether the output root existed before preparation and remove it again when the run fails and the caller did not supply an existing root.","regression":"The asset and spatial tests assert that a rejected corrupt source, an exceeded budget, blank capture evidence and a future capture date all leave no output root behind, and the create-only tests assert that an existing bundle manifest is byte-identical after a refused second run.","sources":["processing/src/peekaplate_processing/assets.py","processing/src/peekaplate_processing/spatial.py","processing/tests/test_assets.py","processing/tests/test_spatial.py"]}
+```
+
+```json
+{"id":"OBS-20261022-VIS03-ASSET-003","status":"resolved","area":"visual-asset-verification","references":["OBS-20261022-VIS03-ASSET-002"],"observation":"Independent review found that the spatial fallback reader applied the 100,000-byte manifest bound to the T0 detail JPEG instead of the 12 MB image bound, so any realistic 1280px photo would have been rejected as an invalid T0 manifest. Synthetic fixtures masked it because flat geometry compresses below the manifest limit.","prevention":"Bound JSON manifests and image payloads separately. Read the fallback and layer images through the image bound, and require the T0 variant path to be a bare filename before joining it to the bundle directory.","regression":"test_spatial.test_fallback_larger_than_manifest_limit_is_accepted writes a detail variant above 100,000 bytes and asserts it is accepted and copied byte-identically; test_spatial.test_detail_path_traversal_is_rejected asserts a manifest pointing outside the bundle is refused. Both fail against the pre-fix code.","sources":["processing/src/peekaplate_processing/spatial.py","processing/tests/test_spatial.py"]}
+```
+
+```json
+{"id":"OBS-20261022-VIS03-HARNESS-002","status":"resolved","area":"visual-asset-verification","observation":"Independent review found three harness defects: layers were appended in decode-completion order with no z-index, so a slower opaque background painted over the foreground layers; keyboard input changed rotation without moving the layers; and a later pointer move discarded the keyboard offset instead of combining with it.","prevention":"Derive paint order from layer depth rather than load order, and derive layer parallax from the combined rotation so pointer and keyboard both contribute and remain clamped to the manifest limits.","regression":"With background.png delayed by 1.2 s the DOM order becomes subject, accent, background while z-index stays 1, 401, 701, and the foreground pixels remain painted. Four ArrowRight presses move the subject layer 2.13 px at 2 degrees, a pointer move to the stage centre keeps that 2 degree offset, 30 presses clamp at 3 degrees, and Home resets to 0.","sources":["processing/src/peekaplate_processing/harness.py","docs/asset-delivery.md"]}
+```
+
+```json
+{"id":"ERR-20261024-VIS03-001","status":"resolved","area":"spatial-asset-provenance","observation":"QA reproduced two spatial defects. D1: the asset id hashed only layer bytes, motion limits and recipe version, so changing a layer depth or name kept the same id and collided on the create-only directory; three different manifests produced the same synthetic id t1_3dc672d50cc06e4178260637a0b3c3b2. D2: the spatial manifest validated mandatory capture_evidence and rights_confirmed but persisted neither, unlike the T0 manifest. Separately, Windows-only Python tests assert 0o600 while os.chmod returns 0o666 on this NTFS volume; those tests belong to the stacked OCR change and remain unmodified.","cause":"The spatial id preimage omitted layer name and depth even though both affect the delivered path and paint order, and SpatialManifest lacked fields for the validated provenance.","prevention":"Address a spatial bundle by the T0 id, every layer name, depth and SHA-256, the motion limits and the recipe version, and persist capture_evidence and rights_confirmed in the spatial manifest. Treat POSIX permission assertions as non-portable on NTFS.","regression":"test_asset_id_tracks_layer_names_and_depths and test_manifest_records_capture_evidence_and_rights failed before the fix and pass after it; the spatial test module passes 10 tests.","sources":["processing/src/peekaplate_processing/spatial.py","processing/src/peekaplate_processing/schemas.py","processing/tests/test_spatial.py"]}
+```
+
+```json
+{"id":"ERR-20261025-VIS03-002","status":"resolved","area":"spatial-asset-review-and-rebase","references":["OBS-20261022-VIS03-ASSET-001","ERR-20261024-VIS03-001"],"observation":"Rebasing S3-VIS-03 onto merged develop (5c0cb3f, after #23 and #24) removed the older stacked OCR commit and exposed that sources.check_size had been inlined into sources.read_file. Independently, PR review reproduced four P2 issues: (1) read_detail_bytes checked fallback SHA-256 without decoding the JPEG or verifying its dimensions; (2) harness.py clamped only the rendered rotation while keyboard.yaw and keyboard.pitch accumulated unbounded saturation; (3) read_bounded called Path.read_bytes() before applying MAX_MANIFEST_BYTES; and (4) spatial total_asset_bytes excluded the delivered harness.html and spatial-manifest.json overhead.","cause":"Fallback validation stopped at hash comparison, keyboard state was updated before clamping against the combined limits, manifest reads used unbounded read_bytes(), and budget accounting summed only image files.","prevention":"Decode fallback.jpg with Pillow and verify opaque JPEG format plus exact detail dimensions; clamp stored keyboard offsets against the combined pointer+keyboard limits on every keydown; read manifests with source.read(MAX_MANIFEST_BYTES + 1); and converge total_asset_bytes over layers, fallback, harness.html and spatial-manifest.json before checking budget_bytes.","regression":"All 109 Python tests (including 6 T0 and 14 spatial tests) pass on Windows after the rebase and fixes, covering corrupt/dimension-mismatched fallbacks with matching hashes, immediate keyboard reversal after 40-step saturation, bounded 100,001-byte manifest reads, and exact image-only vs delivered-bundle budget boundaries.","sources":["processing/src/peekaplate_processing/assets.py","processing/src/peekaplate_processing/spatial.py","processing/src/peekaplate_processing/harness.py","processing/tests/test_spatial.py"]}
+```
+
+```json
+{"id":"ERR-20261025-VIS03-003","status":"resolved","area":"spatial-harness-review-fixes","references":["OBS-20261022-VIS03-HARNESS-002","ERR-20261025-VIS03-002"],"observation":"Follow-up PR review on 388f66d reproduced three viewer issues and one regression-test gap: (1) <img id=\"fallback\"> omitted a static src attribute, leaving naturalWidth=0 when JavaScript was disabled; (2) moving the pointer after saturating keyboard.yaw left excess keyboard offset until two reverse presses; (3) Math.round(layer.depth * 1000) + 1 gave z-index 1 to both 0 and 0.0001, allowing a delayed background to paint over the foreground; and (4) the Node harness test supplied window.CSS without globalThis.CSS, hitting the fallback catch before layers loaded.","cause":"The static img relied on script assignment, pointer updates did not reconcile stored keyboard offsets against combined limits, z-index rounded continuous depth values instead of ranking sorted layers, and the test environment lacked a bare CSS global.","prevention":"Include src=\"./fallback.jpg\" in static markup, reconcile keyboard.yaw and keyboard.pitch on both pointermove and render, assign 1..N z-index ranks from stable (depth, index) ordering, and expose globalThis.CSS in Node harness tests while asserting layersLoaded, spatialVisible, layer parallax and delayed close-depth z-index order.","regression":"All 110 Python tests (6 T0, 15 spatial, 89 OCR/workflow) and local Chromium checks pass, including JavaScript-disabled fallback rendering, Home -> 40x ArrowRight -> pointer right edge -> 1x ArrowLeft -> 2.5deg, and delayed background with depths 0 / 0.0001 / 0.0002.","sources":["processing/src/peekaplate_processing/harness.py","processing/tests/test_spatial.py"]}
+```
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-30T06:15:32.706Z","exitCode":1}
@@ -977,7 +1008,9 @@ develop's retrieval implementation to make a release merge compile.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-02T12:28:12.431Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+```
 
 ## RES-02 October 31 local reconciliation checks
 
@@ -1000,6 +1033,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T12:30:37.551Z","exitCode":2}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
 
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
@@ -1011,6 +1045,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T12:32:43.882Z","exitCode":2}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
 ```
 
@@ -1022,6 +1057,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 {"kind":"resolution","references":{"id":"ERR-20261031-CONSUMER-SANDBOX-PNPM"},"status":"resolved","evidence":"Direct verification via node scripts/check-docs.mjs confirmed passing on 44 markdown files."}
 ```
 
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T20:41:29.007Z","exitCode":1}
 ```
 
@@ -1031,6 +1067,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T12:43:21.030Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
 ```
 
@@ -1040,6 +1077,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-02T12:44:38.329Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
 ```
 
@@ -1049,6 +1087,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-02T12:56:41.943Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
 ```
 
@@ -1132,6 +1171,14 @@ known valid reporting window when checking authenticated read availability.
 ```
 
 <!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T13:06:00.751Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":[{"check":"lint","timestamp":"2026-10-29T14:41:51.693Z"},{"check":"typecheck","timestamp":"2026-11-02T12:30:37.551Z"},{"check":"typecheck","timestamp":"2026-11-02T12:32:43.882Z"},{"check":"test:e2e","timestamp":"2026-11-02T12:44:38.329Z"},{"check":"test:e2e","timestamp":"2026-11-02T12:56:41.943Z"}],"status":"resolved","cause":"PR #69 review-fix iterations: unchecked indexed access in a new unit test failed typecheck, and new e2e locators matched dishes in categories that are now correctly hidden, plus an allergen label failed contrast once the detail CSS applied.","prevention":"Guard indexed access in tests and scope e2e locators to the visible category.","regression":"pnpm check and pnpm verify test:e2e pass after the fixes."}
+```
+
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:28:30.719Z","exitCode":2}
 ```
@@ -1249,6 +1296,37 @@ PR88 reconciliation resolution: the appended allergen note exceeded the diner
 node's 1000-character summary limit. Moved the note to the bounded handoff,
 preserving the current develop graph. `pnpm context:refresh` and `pnpm check`
 pass. Keep node summaries within the existing limit when resolving conflicts.
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-26T19:27:42.930Z","exitCode":1}
+```
+
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T19:38:40.134Z","exitCode":1}
+```
+
+## 2026-10-30 — AI-01 develop-sync verification environment limit
+
+`pnpm verify context:check docs:check` could not start the checks in the fresh
+Windows agent worktree: pnpm's automatic dependency installation failed with
+EPERM while registering the project through a store symlink. No application
+test failed in this attempt. Direct `node scripts/context.mjs check` and
+`node scripts/check-docs.mjs` passed after context refresh; they do not replace
+the complete CI run. Run frozen installation and `pnpm check` in a capable
+environment, then verify the exact pushed merge revision in GitHub CI.
+
+<!-- automatic observation; not root cause -->
+```json
+
+## 2026-10-31 — AI-01 reconciliation verification limits
+
+The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
+
+Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
+
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -1302,6 +1380,14 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
 
+## 2026-11-04 — AI stack reconciliation verification
+
+Frozen installation in the Windows agent worktree failed before checks with
+EPERM while pnpm registered its project symlink. A workspace-local store gave
+the same result. Source-pinned Vitest, focused strict TypeScript and Biome,
+plus direct context/docs checks passed. Full workspace, database and browser
+checks require the pushed revision's Linux CI. RTK was unavailable.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T15:55:44.603Z","exitCode":1}
@@ -1327,6 +1413,36 @@ Full verification suite passed: all 33 Vitest suites (577 tests), 64 script test
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T19:58:00.859Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:00:23.874Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-05T05:06:38.092Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:07:42.043Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:33:29.149Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:42:39.767Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T13:29:45.452Z","exitCode":1}
 ```
 
 ## November 5 R2 diagnostic persistence & retry safety fix
@@ -1375,6 +1491,16 @@ original failure observation above rather than treating a rerun as its diagnosis
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T22:28:30.144Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-05T23:56:16.390Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:02.888Z","exitCode":1}
 ```
 
@@ -1385,12 +1511,27 @@ original failure observation above rather than treating a rerun as its diagnosis
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-06T08:18:01.285Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:23:21.522Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:32.645Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:25:08.929Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:52.513Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -1408,6 +1549,61 @@ from the applied fact-view schema. The query now joins tenant-scoped
 and cross-tenant access. After installing the missing local Playwright system
 libraries, `pnpm verify test:db` passed all 73 tests and pgTAP assertions.
 Backend typecheck and Biome checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:39:56.081Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T11:40:53.389Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:31:49.201Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:32:48.778Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:35:56.806Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:41:36.877Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:02.683Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:33.755Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:03.544Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:31.076Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
+```
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -1501,6 +1697,51 @@ Backend typecheck and Biome checks pass.
     "ownerReportFixture": "Covers a future opening, an out-of-window activity checkpoint and a comparison-only session."
   }
 }
+## November 3 S3-RES-01.2 review persistence hardening
+
+```json
+{"id":"OBS-20261103-RES012-TRUST-001","status":"resolved","area":"review-persistence","observation":"PUT review-session on PR #73 at 4d2c7c2 stored a caller-supplied extraction payload as the immutable original. The private artifact reference was only prefix-checked; its SHA-256 was never compared and the object was never read, so an editor could register originals the producer never emitted.","cause":"Session registration trusted client input instead of the extraction host's stored attempt bundle.","prevention":"Outside local, require jobId and privateArtifactRef; read the bundle from INGESTION_REPORTS_BUCKET, check its SHA-256, stored tenant/job/attempt scope, source, versions, status and start time, and require every candidate original and evidence to equal the report drafts/evidence (report null equals an omitted exported field).","regression":"review-artifact.test.ts covers acceptance, required reference/job, fabricated original, added/removed candidates, altered spans, wrong hash, foreign venue/job/extra key segments, scope/source mismatch, missing object and missing binding. An offline round trip of 106 real menu items exported by the PR #58 exporter verified, and a single fabricated price or name was rejected.","sources":["backend/src/review-artifact.ts","backend/src/review-artifact.test.ts","backend/src/index.ts","docs/review-api.md"]}
+```
+
+```json
+{"id":"OBS-20261103-RES012-IDEMP-001","status":"resolved","area":"review-persistence","observation":"Reusing a register commandId with a different extraction payload returned the first payload's cached response instead of a command conflict, and every register receipt stored the full session response (up to about twice the 512 KB payload).","cause":"The register request hash omitted the extraction payload, and receipts duplicated the stored session.","prevention":"Include the canonical payload SHA-256 in every command request hash; store compact receipts and rebuild identical retries from the append-only session.","regression":"review-command.test.ts: changed payload with the same commandId returns 409 command_conflict with no writes; an identical retry replays from the session with a compact receipt. Both failed before the change and pass after it.","sources":["backend/src/review-command.ts","backend/src/review-command.test.ts"]}
+```
+
+The first offline real-item round trip rejected genuine exporter output: the PR #58 exporter
+omits optional fields that are null in the report (`subcategory`, `price_text`). The verifier now
+treats a report null and an omitted exported field as equal while still rejecting any non-null
+difference. PR #73's copies of the RES-01.1 docs were aligned byte-for-byte with PR #58 and its
+endpoint documentation moved to `docs/review-api.md`, so the later #58 merge does not conflict there.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-03T17:06:05.492Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261029-VIS03-004","status":"resolved","area":"spatial-harness-review-fixes","references":["OBS-20261022-VIS03-HARNESS-002","ERR-20261025-VIS03-003"],"observation":"PR #25 review findings by @vivienk (commit 921b32d) identified two issues: [P2] prefers-reduced-motion was captured once on startup so live OS/browser media query changes had no effect on already active transforms or event listeners; and [P3] metrics.layerRetries and ranks used plain object literals ({}), so a layer named 'constructor' read the inherited Object.prototype function and produced string concatenation ('function Object() { [native code] }1') instead of an integer count.","cause":"One-time Boolean matchMedia capture without change listeners, and unconstrained object keys accessing prototype properties.","prevention":"Retain MediaQueryList, register live change listeners, call syncReducedMotion() in render/pointer/keyboard handlers to zero offsets and clear layer transforms immediately, and use Object.create(null) plus Object.prototype.hasOwnProperty for metric and rank maps.","regression":"test_spatial.test_harness_responds_to_live_reduced_motion_changes verifies that toggling reduced-motion live clears transforms immediately and blocks subsequent pointer/keyboard input; test_spatial.test_harness_counts_numeric_retry_for_constructor_named_layer verifies that a layer named 'constructor' records integer retry count 1 in metrics.layerRetries.constructor.","sources":["processing/src/peekaplate_processing/harness.py","processing/tests/test_spatial.py"]}
+```
+
+## November 3 S3-VIS-03 presentation identity
+
+```json
+{"id":"OBS-20261103-VIS03-PRES-ID-001","status":"resolved","area":"asset-delivery","observation":"Sai reproduced on PR #25 at 965abc7 that two different valid presentation candidates (512x512 and 768x768), or the same candidate from model-a and model-b, received the same pres_ asset id; in one output root the create-only check prevented retaining the second candidate under its own identity.","cause":"prepare_presentation_bundle derived the presentation asset id before generation from the T0 id, dish/revision ids, cutout/reference hashes and recipe version only, so the candidate SHA-256, effective model version, prompt version/hash and success-versus-fallback outcome were not part of the identity.","prevention":"Derive content-addressed ids after validation from every input that changes the delivered bytes or their provenance, and run the create-only check against that final id. A retained fallback carries its own identity, including the rejected candidate hash when one was returned.","regression":"test_asset_id_identifies_the_validated_candidate_and_its_provenance failed before the change and passes after it: different candidates, model versions, and success/fallback outcomes get distinct ids, also within one output root. test_identical_presentation_content_remains_create_only keeps identical content create-only with a byte-identical first manifest and no leftover temporary directory.","sources":["processing/src/peekaplate_processing/presentation.py","processing/tests/test_presentation.py","docs/asset-delivery.md","processing/README.md"]}
+```
+
+The develop reconciliation for PR #25 conflicted only in `docs/CONTEXT.md`. It was
+resolved from current develop: the processing node keeps develop's paths plus the
+asset/presentation paths, and the VIS-03 handoff replaces the oldest (October 28
+DIN-01.4 search) entry to stay within ten handoffs. Develop's newer handoffs,
+including the November 2 allergen-label note, are preserved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -1525,4 +1766,212 @@ Backend typecheck and Biome checks pass.
     "result": "passed after correction: 73 integration tests and 192 pgTAP assertions"
   }
 }
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T18:18:19.716Z","exitCode":1}
+```
+
+<!-- resolution of the lint observation above -->
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-06T02:49:02.888Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the diagnostic from failed checks and rerun the recorded check after correcting any reported issue.","regression":"pnpm exec biome check --write backend/src passed; Biome checked 63 files with no fixes needed."}
+```
+
+<!-- resolution of the lint observation above -->
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-06T02:49:39.709Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the diagnostic from failed checks and rerun the recorded check after correcting any reported issue.","regression":"pnpm exec biome check --write backend/src passed; Biome checked 63 files with no fixes needed."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:23:21.522Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:25:08.929Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:29:32.539Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T18:18:19.716Z"},"status":"resolved","cause":"The observation does not preserve the failing diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. A first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T19:04:39.841Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T20:12:12.443Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T19:04:39.841Z"},"status":"resolved","cause":"The automatic observation records a nonzero exit but no failing-test diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain full failure output for failed database checks and rerun the complete verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: all 73 integration tests and 192 pgTAP assertions passed. A separate first attempt during this task hit a 15-second timeout in the menu-publication integration test; the retry passed."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T20:12:12.443Z"},"status":"resolved","cause":"The publication integration test exceeded its 15-second timeout; the precise trigger was not established.","prevention":"Keep the timeout unchanged unless a reproducible cause is found; retain diagnostics and rerun the full database verification after a timeout.","regression":"The immediate pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions."}
+```
+
+<!-- manual observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z","result":"failed"}
+```
+
+<!-- resolution of the context refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z"},"status":"resolved","cause":"The backend context summary exceeded the 1000-character validation limit after documenting the deferred freshness state.","prevention":"Keep module summaries within the context validator's 1000-character limit.","regression":"Shortened the backend summary; pnpm context:refresh and pnpm context:check pass."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:36:28.688Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:38:33.628Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:39:30.614Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"pnpm verify test:db","timestamp":"2026-11-08T12:40:55.000Z"},"status":"resolved","cause":"The new integration fixtures exposed stale expectations: the existing sample has ten timed openings, additional report fixtures make the report contain multiple dishes, and 10/11-session boundary fixtures without timing correctly triggered complementary suppression. The initial unrelated menu-publication timeout did not recur.","prevention":"Assert report rows by dish ID, seed timing when testing the active-session floor independently, and keep the mixed 10-active/9-timed case separate.","regression":"pnpm verify test:db passes all 73 integration tests, including ordered pair attribution, premature comparisons, duplicate pair events and complementary timing suppression."}
+```
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T07:52:52.132Z","exitCode":1}
+```
+
+## PR25 local review-preview packaging checks
+
+- Initial repository tests could not bind the local authentication test server
+  (`EPERM` on loopback). Re-running with local test networking permitted passed
+  the unit/script suites; this was an execution restriction, not a product fix.
+- The added processing context summary exceeded the 1000-character limit.
+  Independent review identified the cause; shortened the summary and refreshed
+  the context fingerprint. The required context check is the regression gate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-07T17:44:26.682Z","exitCode":1}
+```
+
+## November 7 review-preview integration verification
+
+The initial repository test run could not bind its loopback authentication test
+server (EPERM). Re-running with local networking permitted passed 767 Vitest
+tests (four optional skips) and 67 script tests. No application-code fix was
+needed. The first install also correctly rejected Node 24.14.0; verification
+uses the repository-required isolated Node 24.16.0 and pnpm 11.25.0.
+
+
+## November 8 PR25 final review corrections
+
+Four presentation regressions reproduced locally before correction: omitted rights
+silently produced `rights_confirmed=true`; oversized candidate files were fully
+read; oversized pixel buffers decoded before rejection; rejected PNGs discarded
+the provider's actual model and fidelity disclosures. The minimal correction
+requires explicit API/CLI confirmation, bounds file reads, checks image headers
+before decoding, closes rejected image resources and captures returned provenance
+before validating the image. `processing/tests/test_presentation.py` contains the
+four regression cases; all twelve presentation tests and 476 offline Python tests
+pass. No source captures, credentials or provider calls were used.
+
+The existing hosted quality failure was PR metadata (`Complete PR section: Changes`),
+not a Python failure. The rewritten PR description uses the repository's required
+sections and records fresh evidence separately from historical results.
+
+The first remote fetch used the upstream repository for a fork-owned feature
+branch and failed without changing files; fetching `pull/25/head` pinned the
+correct source. Future pushes target the verified head repository explicitly.
+
+Final-head CI then caught a stale assets fingerprint because an unused test import
+was removed after the last refresh. Database and browser jobs passed. Refreshed
+context after that final source edit and reran `pnpm verify context:check docs:check`;
+these checks pass. Keep fingerprint refresh after every final referenced-file edit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T07:50:20.164Z","exitCode":1}
+```
+
+
+## November 8 PR73 re-review
+
+Confirmed the earlier three corrections, then reproduced a source-provenance gap:
+four valid-shaped requests changed kind/location/retrieval instant/size while
+retaining the genuine bundle/hash and were accepted. The five-line verifier
+guard now rejects them before persistence; four red/green unit cases plus one
+real-JWT/route/Postgres integration case cover rejection with zero session writes,
+honest registration and Worker reload. Equivalent timestamp representations are
+accepted. No provider, hosted database or private source data was used.
+
+An intermediate local DB run failed for test setup, not this guard: the added
+in-process route lacked required dependency services (503), and the browser suite
+occupied port5173 during the DB publication browser test (EADDRINUSE/timeout).
+The fixture now supplies the actual verifier; browser/DB suites run separately.
+Final serialized verification passed all213SQL assertions and76integration tests.
+Preserve shared-port exclusivity when coordinating local suites.
+
+
+## November 8 PR46 owner-output privacy correction
+
+Re-review confirmed that recommendation rationale exposed exact eligible-session
+counts although the existing owner-report contract keeps those counts internal.
+The new regression compared otherwise identical requests with cohorts of 23 and 97:
+it failed before the fix because the owner text changed, then passed after the
+one-line template correction. The count still enforces the ten-session floor;
+it is absent from the result. All 26 focused AI tests and 888 unit + 67 script tests pass.
+
+Develop reconciliation preserved both context path sets and the current review
+API/asset nodes; fingerprints are regenerated after final source/doc edits.
+The dependent #82 evaluation still expects the earlier count-bearing rationale;
+its branch must update that expectation when synchronized, then rerun evidence.
+No live model, provider or production call was made.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T13:10:53.709Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T13:11:24.309Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T13:13:25.120Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T13:15:04.455Z","exitCode":2}
+```
+
+<!-- resolution of the typecheck observation above -->
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-08T13:10:53.709Z"},"status":"resolved","cause":"The generic reportSchema callback accessed named metric fields that are not exposed by the generic Zod-inferred metrics type.","prevention":"Validate the named complementary-suppression cells by iterating the metric entries and an explicit required-name list rather than direct generic property access.","regression":"pnpm verify typecheck passes across all workspace projects; focused owner-report tests pass 48/48."}
+```
+
+<!-- resolution of the typecheck observation above -->
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-08T13:15:04.455Z"},"status":"resolved","cause":"The generic reportSchema callback accessed named metric fields that are not exposed by the generic Zod-inferred metrics type.","prevention":"Validate the named complementary-suppression cells by iterating the metric entries and an explicit required-name list rather than direct generic property access.","regression":"pnpm verify typecheck passes across all workspace projects; focused owner-report tests pass 48/48."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-08T13:13:25.120Z"},"status":"resolved","cause":"The merged review-persistence integration helpers passed a string to token(), whose argument is an object containing a string sub claim; jose rejected the undefined subject.","prevention":"Pass { sub: subject } to token() in every integration request helper and direct token fixture.","regression":"pnpm verify test:db passes all 77 integration tests and 213 pgTAP assertions."}
 ```
