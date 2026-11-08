@@ -111,3 +111,66 @@ test('without Web Locks the localStorage fallback stays in visit memory', async 
   }, event());
   expect(state).toEqual({ pending: 1, stored: null });
 });
+
+test('failed withdrawal survives reload and clears both recovered storage backends before delivery', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto(DINER);
+  await page.evaluate(async (value) => {
+    const source = await import(/* @vite-ignore */ '/src/tracking/outbox.ts');
+    await (await source.indexedDbOutboxStore(indexedDB)).update(() => [value]);
+    await source.localStorageOutboxStore(localStorage).update(() => [value]);
+    IDBFactory.prototype.open = () => {
+      throw new Error('temporary IndexedDB failure');
+    };
+    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    tracking.setTrackingAllowed(false);
+  }, event());
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('peekaplate:tracking:outbox:v1')))
+    .toBeNull();
+  await page.reload();
+  await page.evaluate(async () => {
+    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    const deliveries: Envelope[] = [];
+    Object.assign(window, { reviewDeliveries: deliveries });
+    tracking.enableLiveTracking(async (batch) => {
+      deliveries.push(...batch);
+      return batch.map((event) => event.event_id);
+    });
+    tracking.setTrackingAllowed(true);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const requested = sessionStorage.getItem('peekaplate:tracking:withdrawal:v1');
+        return (
+          requested !== null &&
+          requested === sessionStorage.getItem('peekaplate:tracking:withdrawal-completed:v1')
+        );
+      }),
+    )
+    .toBe(true);
+  await page.clock.runFor(10_000);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewDeliveries: Envelope[] }).reviewDeliveries,
+    ),
+  ).toEqual([]);
+  await page.evaluate(async () => {
+    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    tracking.track('menu_viewed', {
+      publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+      entry_source: 'qr',
+    });
+  });
+  await page.clock.runFor(5_000);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { reviewDeliveries: Envelope[] }).reviewDeliveries.length,
+      ),
+    )
+    .toBe(1);
+});

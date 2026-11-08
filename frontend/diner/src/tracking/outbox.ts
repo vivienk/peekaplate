@@ -112,6 +112,29 @@ export async function browserOutboxStore(): Promise<OutboxStore> {
   return memoryOutboxStore();
 }
 
+// A fallback opening successfully says nothing about records left in the other backend.
+export async function clearBrowserOutboxes(): Promise<void> {
+  let failed = false;
+  try {
+    if (globalThis.indexedDB) {
+      await (await indexedDbOutboxStore(globalThis.indexedDB)).update(() => []);
+    }
+  } catch {
+    failed = true;
+  }
+  try {
+    const local = globalThis.localStorage;
+    if (local) {
+      const locks = globalThis.navigator?.locks;
+      if (locks) await locks.request(LOCK_NAME, () => local.removeItem(LOCAL_KEY));
+      else if (local.getItem(LOCAL_KEY) !== null) failed = true;
+    }
+  } catch {
+    failed = true;
+  }
+  if (failed) throw new Error('Tracking outbox clearance is incomplete');
+}
+
 export async function createOutbox(
   store: OutboxStore,
   { now, warn = () => {} }: { now: () => number; warn?: (message: string) => void },

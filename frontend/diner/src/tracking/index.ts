@@ -19,6 +19,7 @@ import { isTrackingAllowed, onTrackingAllowedChange, readPrivacySignal } from '.
 import { buildEnvelope, type Envelope } from './envelope';
 import { browserLifecycle, browserSessionStore, createIdentity, type Identity } from './identity';
 import { browserOutboxStore, createOutbox, memoryOutboxStore, type OutboxStore } from './outbox';
+import { clearPendingWithdrawal, hasPendingWithdrawal, markWithdrawal } from './withdrawal';
 
 export { startOpeningClock } from './activity-clock';
 export type { Deliver } from './batcher';
@@ -100,8 +101,6 @@ let liveDeliver: Deliver = holdDeliver;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
 let clearing: Promise<void> = Promise.resolve();
-let withdrawalGeneration = 0;
-let clearedGeneration = 0;
 
 // For the PostHog adapter's isLive check: fixture mode never reaches PostHog.
 export function isLiveTracking(): boolean {
@@ -110,21 +109,21 @@ export function isLiveTracking(): boolean {
 
 // Withdrawal (consent withdrawn or a privacy signal) stops pending canonical sends: the live sender
 // is never called while the gate is closed, and unsent events are discarded, including a batch whose
-// send was in flight. Nothing collected before withdrawal is sent after opting in again. Decided by
-// Sai (5 Nov), matching the PostHog adapter, which drops its own queued events.
+// send was in flight. Persistent deletion markers retry failed clearing across reloads. Complete
+// storage failure cannot guarantee erasure (docs/posthog.md). Decided by Sai (5 Nov), matching the
+// PostHog adapter, which drops its own queued events.
 const WITHDRAWAL_CLEARS_QUEUE = true;
 onTrackingAllowedChange((allowed) => {
   if (!allowed && WITHDRAWAL_CLEARS_QUEUE) {
-    const generation = ++withdrawalGeneration;
+    markWithdrawal();
     const old = pipelines.live;
     delete pipelines.live;
     const retired = old?.clear();
     void retired?.catch(() => {});
     clearing = clearing
       .then(async () => {
-        if (retired) await retired;
-        else await (await browserOutboxStore()).update(() => []);
-        clearedGeneration = Math.max(clearedGeneration, generation);
+        await retired?.catch(() => {});
+        await clearPendingWithdrawal();
       })
       .catch(() => {});
   } else if (allowed) resumeLiveDelivery();
@@ -232,18 +231,16 @@ function pipeline(): Pipeline {
   }
   pipelines.live ??= createPipeline(
     clearing.then(async () => {
-      const store = await browserOutboxStore();
-      if (clearedGeneration < withdrawalGeneration) {
-        const generation = withdrawalGeneration;
+      if (hasPendingWithdrawal()) {
         try {
-          await store.update(() => []);
-          clearedGeneration = Math.max(clearedGeneration, generation);
+          await clearPendingWithdrawal();
         } catch {
           // New work stays in memory rather than reopening records whose withdrawal failed.
           return memoryOutboxStore();
         }
+        if (hasPendingWithdrawal()) return memoryOutboxStore();
       }
-      return store;
+      return browserOutboxStore();
     }),
     consentedDeliver,
   );
