@@ -19,6 +19,9 @@ import {
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 
+const CANONICAL_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CONSECUTIVE_DIGITS_PATTERN = /\d{10,}/;
+
 export class OrderImportError extends Error {
   constructor(
     public readonly code: string,
@@ -237,6 +240,7 @@ export async function importOrderOutcomes(
 
   // 7. Begin atomic processing transaction
   let inTx = false;
+  let commitAttempted = false;
   try {
     await client.query('BEGIN');
     inTx = true;
@@ -339,14 +343,29 @@ export async function importOrderOutcomes(
     );
 
     // 8. Resolve Menu Revisions and Tracking Start Boundary
+    // Preload only valid canonical UUIDs into PostgreSQL; malformed revision IDs fail closed as row-level quarantine
     const distinctMenuRevisionIds = new Set<string>();
+    const invalidMenuRevisionIds = new Set<string>();
     for (const r of parseResult.rows) {
       if (r.data.menu_revision_id) {
-        distinctMenuRevisionIds.add(r.data.menu_revision_id);
+        const trimmed = r.data.menu_revision_id.trim();
+        if (CANONICAL_UUID_PATTERN.test(trimmed)) {
+          distinctMenuRevisionIds.add(trimmed);
+        } else {
+          invalidMenuRevisionIds.add(r.data.menu_revision_id);
+        }
       }
     }
 
     const revisionResolutions = new Map<string, MenuRevisionResolution>();
+    for (const invalidId of invalidMenuRevisionIds) {
+      revisionResolutions.set(invalidId, {
+        valid: false,
+        reasonCode: 'invalid_format',
+        message: 'menu_revision_id must be a valid canonical UUID',
+      });
+    }
+
     for (const menuRevId of distinctMenuRevisionIds) {
       const resolution = await resolveMenuRevision(
         client,
@@ -497,6 +516,20 @@ export async function importOrderOutcomes(
         continue;
       }
 
+      // Validate canonical menu_revision_id format before resolution
+      if (data.menu_revision_id && !CANONICAL_UUID_PATTERN.test(data.menu_revision_id.trim())) {
+        const diagnostic: SanitizedRowDiagnostic = {
+          rowIndex,
+          fieldName: 'menu_revision_id',
+          reasonCode: 'invalid_format',
+          diagnosticMessage: 'menu_revision_id must be a valid canonical UUID',
+        };
+        await insertQuarantine(client, venueId, batchId, diagnostic);
+        diagnostics.push(diagnostic);
+        quarantinedRows++;
+        continue;
+      }
+
       // Resolve Menu Revision & Dish Mapping
       let canonicalMenuRevId: string;
       let canonicalDishId: string;
@@ -580,6 +613,25 @@ export async function importOrderOutcomes(
       } else if (posItemCode && posItemCode.trim().length > 0) {
         const cleanCode = posItemCode.trim();
 
+        // Validate POS item identifier before database lookup (no raw values leaked, bounded length)
+        const posIdentifierParse = OrderTokenIdentifierSchema.safeParse(cleanCode);
+        if (!posIdentifierParse.success) {
+          const isProhibited =
+            cleanCode.includes('@') || CONSECUTIVE_DIGITS_PATTERN.test(cleanCode);
+          const diagnostic: SanitizedRowDiagnostic = {
+            rowIndex,
+            fieldName: data.pos_item_id ? 'pos_item_id' : 'pos_item_code',
+            reasonCode: isProhibited ? 'prohibited_identifier' : 'invalid_format',
+            diagnosticMessage: isProhibited
+              ? 'Identifier contains disallowed characters or patterns'
+              : 'POS item identifier must contain only safe ASCII characters up to 128 bytes',
+          };
+          await insertQuarantine(client, venueId, batchId, diagnostic);
+          diagnostics.push(diagnostic);
+          quarantinedRows++;
+          continue;
+        }
+
         // Query reviewed POS mapping from app_private.pos_dish_mappings
         const mappingRes = await client.query<{
           dish_id: string;
@@ -600,7 +652,7 @@ export async function importOrderOutcomes(
             rowIndex,
             fieldName: 'pos_item_id',
             reasonCode: 'missing_pos_mapping',
-            diagnosticMessage: `POS item code "${cleanCode}" has no registered mapping in PeekaPlate`,
+            diagnosticMessage: 'POS item code has no registered mapping in PeekaPlate',
           };
           await insertQuarantine(client, venueId, batchId, diagnostic);
           diagnostics.push(diagnostic);
@@ -613,7 +665,8 @@ export async function importOrderOutcomes(
             rowIndex,
             fieldName: 'pos_item_id',
             reasonCode: 'unreviewed_pos_mapping',
-            diagnosticMessage: `POS item code "${cleanCode}" mapping has status "${mapping.review_status}" (reviewed approval required)`,
+            diagnosticMessage:
+              'POS item mapping has not been approved (reviewed approval required)',
           };
           await insertQuarantine(client, venueId, batchId, diagnostic);
           diagnostics.push(diagnostic);
@@ -649,7 +702,8 @@ export async function importOrderOutcomes(
             rowIndex,
             fieldName: 'pos_item_id',
             reasonCode: 'unmatched_dish',
-            diagnosticMessage: `Dish mapped from POS code "${cleanCode}" is not present in the published menu revision active at order timestamp`,
+            diagnosticMessage:
+              'Dish mapped from POS code is not present in the published menu revision active at order timestamp',
           };
           await insertQuarantine(client, venueId, batchId, diagnostic);
           diagnostics.push(diagnostic);
@@ -822,6 +876,7 @@ export async function importOrderOutcomes(
       ],
     );
 
+    commitAttempted = true;
     await client.query('COMMIT');
     inTx = false;
 
@@ -848,7 +903,11 @@ export async function importOrderOutcomes(
         // Rollback failure preserved
       }
     }
-    if (options.storage && typeof options.storage.delete === 'function') {
+    // Only perform compensating archive deletion on confirmed transaction failure BEFORE commit.
+    // If COMMIT was already attempted, the outcome is uncertain (PostgreSQL may have committed the transaction
+    // before the client lost the connection/acknowledgement). In that case, preserve the archive
+    // so committed batches retain their source archive, leaving orphan cleanup / retry to reconcile safely.
+    if (!commitAttempted && options.storage && typeof options.storage.delete === 'function') {
       try {
         await options.storage.delete(storageKey);
       } catch {
@@ -865,6 +924,16 @@ async function insertQuarantine(
   batchId: string,
   diagnostic: SanitizedRowDiagnostic,
 ): Promise<void> {
+  const boundedMessage =
+    diagnostic.diagnosticMessage.length > 500
+      ? diagnostic.diagnosticMessage.slice(0, 500)
+      : diagnostic.diagnosticMessage;
+  const boundedFieldName = diagnostic.fieldName
+    ? diagnostic.fieldName.length > 64
+      ? diagnostic.fieldName.slice(0, 64)
+      : diagnostic.fieldName
+    : null;
+
   await client.query(
     `INSERT INTO app_private.order_outcome_quarantine
       (id, tenant_id, batch_id, row_index, reason_code, field_name, diagnostic_message)
@@ -875,8 +944,8 @@ async function insertQuarantine(
       batchId,
       diagnostic.rowIndex,
       diagnostic.reasonCode,
-      diagnostic.fieldName ?? null,
-      diagnostic.diagnosticMessage,
+      boundedFieldName,
+      boundedMessage,
     ],
   );
 }
@@ -1023,7 +1092,7 @@ async function getActiveMenuPublicationsAtTimestamp(
      WHERE e.tenant_id = $1
        AND e.stream_type = 'menu_publication'
        AND e.occurred_at <= $2
-     ORDER BY e.stream_id, e.occurred_at DESC, e.version DESC`,
+     ORDER BY e.stream_id, e.version DESC, e.occurred_at DESC`,
     [venueId, orderedAtIso],
   );
 

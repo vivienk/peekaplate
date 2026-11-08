@@ -671,4 +671,524 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
       await client.end().catch(() => {});
     }
   });
+
+  // Probe 6: Malformed UUID resolution does not raise PostgreSQL 22P02 or abort transaction
+  it('prevents PostgreSQL 22P02 on malformed UUID and commits valid row beside quarantined row', async () => {
+    const { venueId, ownerId } = await createTestVenue();
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+
+    try {
+      await recordVenueTrackingActivation(adminClient, ownerId, venueId, 'administrative');
+      const menuId = randomUUID();
+      const menuRevisionId = randomUUID();
+      const dishId = randomUUID();
+      const dishRevisionId = randomUUID();
+      const approvalId = randomUUID();
+      const contentApprovalId = randomUUID();
+      const assetApprovalId = randomUUID();
+
+      const bundleJson = {
+        schema_version: 1,
+        venue_id: venueId,
+        menu_id: menuId,
+        menu_revision_id: menuRevisionId,
+        restaurant: { name: 'Test Restaurant', logo: null },
+        categories: [
+          {
+            category_id: randomUUID(),
+            name: 'Cat',
+            dishes: [
+              {
+                dish_id: dishId,
+                dish_revision_id: dishRevisionId,
+                complete: true,
+                name: 'Dish',
+                description: 'A delicious dish',
+                price: { amount: '12.00', currency: 'USD' },
+                ingredients: [],
+                allergens: null,
+                dietary: [],
+                images: {
+                  card: {
+                    url: 'https://cdn.example.com/card.jpg',
+                    width: 400,
+                    height: 300,
+                    alt: 'Dish',
+                  },
+                  detail: {
+                    url: 'https://cdn.example.com/detail.jpg',
+                    width: 800,
+                    height: 600,
+                    alt: 'Dish detail',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const bundleString = JSON.stringify(bundleJson);
+      const contentHash = sha256Hex(bundleString);
+      const assetHash = 'c'.repeat(64);
+      const bundleUrl = `https://assets.peekaplate.example/${venueId}/${menuRevisionId}/bundle.json`;
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_review_subject
+          (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          venueId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_approval
+          (tenant_id, approval_id, menu_id, review_version, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash, approved_by)
+         VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8, $9)`,
+        [
+          venueId,
+          approvalId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+          ownerId,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.public_menu_bundle (tenant_id, menu_id, menu_revision_id, bundle_url)
+         VALUES ($1, $2, $3, $4)`,
+        [venueId, menuId, menuRevisionId, bundleUrl],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.es_event
+          (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload, metadata, occurred_at)
+         VALUES ($1, $2, 'menu_publication', $3, 1, 1, 'menu.published', $4::jsonb, '{}'::jsonb, now() - interval '1 hour')`,
+        [
+          randomUUID(),
+          venueId,
+          menuId,
+          JSON.stringify({
+            menuId,
+            publicationId: randomUUID(),
+            version: 1,
+            approvalId,
+            status: 'published',
+          }),
+        ],
+      );
+
+      const actRow = await adminClient.query<{ activated_at: Date }>(
+        `SELECT activated_at FROM app_private.venue_tracking_activations WHERE tenant_id = $1`,
+        [venueId],
+      );
+      const orderTimestamp = new Date(actRow.rows[0]!.activated_at.getTime() + 2000).toISOString();
+
+      const csv = [
+        'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+        `pilot_order_outcome.v1,ORD-VALID-ROW,LINE-1,${orderTimestamp},${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+        `pilot_order_outcome.v1,ORD-BAD-UUID,LINE-2,${orderTimestamp},not-a-uuid,${dishId},${dishRevisionId},ordered,1`,
+      ].join('\n');
+
+      const result = await importOrderOutcomes({
+        client,
+        actorId: ownerId,
+        venueId,
+        csvText: csv,
+        bundleLoader: async () => bundleJson,
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.totalRows).toBe(2);
+      expect(result.acceptedRows).toBe(1);
+      expect(result.quarantinedRows).toBe(1);
+
+      // Verify PostgreSQL state
+      const lines = await adminClient.query(
+        `SELECT order_id FROM app_private.order_outcome_lines WHERE tenant_id = $1`,
+        [venueId],
+      );
+      expect(lines.rows).toHaveLength(1);
+      expect(lines.rows[0].order_id).toBe('ORD-VALID-ROW');
+
+      const quarantine = await adminClient.query(
+        `SELECT reason_code, field_name, diagnostic_message FROM app_private.order_outcome_quarantine WHERE tenant_id = $1`,
+        [venueId],
+      );
+      expect(quarantine.rows).toHaveLength(1);
+      expect(quarantine.rows[0].reason_code).toBe('invalid_format');
+      expect(quarantine.rows[0].field_name).toBe('menu_revision_id');
+      expect(quarantine.rows[0].diagnostic_message).toBe(
+        'menu_revision_id must be a valid canonical UUID',
+      );
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
+
+  // Probe 7: Sensitive and oversized POS identifiers are quarantined without violating PostgreSQL length constraints
+  it('quarantines email-like and 600-character POS identifiers in real PostgreSQL without constraint violation', async () => {
+    const { venueId, ownerId } = await createTestVenue();
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+
+    try {
+      await recordVenueTrackingActivation(adminClient, ownerId, venueId, 'administrative');
+      const menuId = randomUUID();
+      const menuRevisionId = randomUUID();
+      const dishId = randomUUID();
+      const dishRevisionId = randomUUID();
+      const approvalId = randomUUID();
+      const contentApprovalId = randomUUID();
+      const assetApprovalId = randomUUID();
+
+      const bundleJson = {
+        schema_version: 1,
+        venue_id: venueId,
+        menu_id: menuId,
+        menu_revision_id: menuRevisionId,
+        restaurant: { name: 'Test Restaurant', logo: null },
+        categories: [
+          {
+            category_id: randomUUID(),
+            name: 'Cat',
+            dishes: [
+              {
+                dish_id: dishId,
+                dish_revision_id: dishRevisionId,
+                complete: true,
+                name: 'Pizza',
+                description: 'A delicious pizza',
+                price: { amount: '14.00', currency: 'USD' },
+                ingredients: [],
+                allergens: null,
+                dietary: [],
+                images: {
+                  card: {
+                    url: 'https://cdn.example.com/card.jpg',
+                    width: 400,
+                    height: 300,
+                    alt: 'Pizza',
+                  },
+                  detail: {
+                    url: 'https://cdn.example.com/detail.jpg',
+                    width: 800,
+                    height: 600,
+                    alt: 'Pizza detail',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const bundleString = JSON.stringify(bundleJson);
+      const contentHash = sha256Hex(bundleString);
+      const assetHash = 'd'.repeat(64);
+      const bundleUrl = `https://assets.peekaplate.example/${venueId}/${menuRevisionId}/bundle.json`;
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_review_subject
+          (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          venueId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_approval
+          (tenant_id, approval_id, menu_id, review_version, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash, approved_by)
+         VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8, $9)`,
+        [
+          venueId,
+          approvalId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+          ownerId,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.public_menu_bundle (tenant_id, menu_id, menu_revision_id, bundle_url)
+         VALUES ($1, $2, $3, $4)`,
+        [venueId, menuId, menuRevisionId, bundleUrl],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.es_event
+          (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload, metadata, occurred_at)
+         VALUES ($1, $2, 'menu_publication', $3, 1, 1, 'menu.published', $4::jsonb, '{}'::jsonb, now() - interval '1 hour')`,
+        [
+          randomUUID(),
+          venueId,
+          menuId,
+          JSON.stringify({
+            menuId,
+            publicationId: randomUUID(),
+            version: 1,
+            approvalId,
+            status: 'published',
+          }),
+        ],
+      );
+
+      await adminClient.query('BEGIN');
+      await adminClient.query(`SELECT set_config('app.actor_id', $1, true)`, [ownerId]);
+      await adminClient.query(`SELECT set_config('app.tenant_id', $1, true)`, [venueId]);
+      await adminClient.query(
+        `INSERT INTO app_private.pos_dish_mappings
+          (tenant_id, pos_item_code, dish_id, dish_name, review_status, reviewed_by, reviewed_at)
+         VALUES ($1, 'POS-VALID', $2, 'Pizza', 'approved', $3, now())`,
+        [venueId, dishId, ownerId],
+      );
+      await adminClient.query('COMMIT');
+
+      const actRow = await adminClient.query<{ activated_at: Date }>(
+        `SELECT activated_at FROM app_private.venue_tracking_activations WHERE tenant_id = $1`,
+        [venueId],
+      );
+      const orderTimestamp = new Date(actRow.rows[0]!.activated_at.getTime() + 2000).toISOString();
+
+      const sensitiveEmail = 'waiter@private-restaurant.example';
+      const oversized600 = 'X'.repeat(600);
+
+      const csv = [
+        'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+        `pilot_order_outcome.v1,ORD-VALID,LINE-1,${orderTimestamp},POS-VALID,ordered,1`,
+        `pilot_order_outcome.v1,ORD-EMAIL,LINE-2,${orderTimestamp},${sensitiveEmail},ordered,1`,
+        `pilot_order_outcome.v1,ORD-BIG,LINE-3,${orderTimestamp},${oversized600},ordered,1`,
+      ].join('\n');
+
+      const result = await importOrderOutcomes({
+        client,
+        actorId: ownerId,
+        venueId,
+        csvText: csv,
+        bundleLoader: async () => bundleJson,
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.totalRows).toBe(3);
+      expect(result.acceptedRows).toBe(1);
+      expect(result.quarantinedRows).toBe(2);
+
+      // Verify PostgreSQL lines
+      const lines = await adminClient.query(
+        `SELECT order_id FROM app_private.order_outcome_lines WHERE tenant_id = $1`,
+        [venueId],
+      );
+      expect(lines.rows).toHaveLength(1);
+      expect(lines.rows[0].order_id).toBe('ORD-VALID');
+
+      // Verify PostgreSQL quarantine records: length constraints strictly respected and no leaked values
+      const quarantine = await adminClient.query<{
+        reason_code: string;
+        diagnostic_message: string;
+      }>(
+        `SELECT reason_code, diagnostic_message FROM app_private.order_outcome_quarantine WHERE tenant_id = $1 ORDER BY created_at`,
+        [venueId],
+      );
+      expect(quarantine.rows).toHaveLength(2);
+      for (const row of quarantine.rows) {
+        expect(row.diagnostic_message.length).toBeLessThanOrEqual(500);
+        expect(row.diagnostic_message).not.toContain(sensitiveEmail);
+        expect(row.diagnostic_message).not.toContain(oversized600);
+      }
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
+
+  // Probe 8: Inverted transaction timestamps in real PostgreSQL es_event: highest version withdrawal wins
+  it('selects highest stream version in real PostgreSQL even when transaction timestamps are inverted', async () => {
+    const { venueId, ownerId } = await createTestVenue();
+    const client = new Client({ connectionString: runtimeUrl });
+    await client.connect();
+
+    try {
+      await recordVenueTrackingActivation(adminClient, ownerId, venueId, 'administrative');
+      const menuId = randomUUID();
+      const menuRevisionId = randomUUID();
+      const dishId = randomUUID();
+      const dishRevisionId = randomUUID();
+      const approvalId = randomUUID();
+      const contentApprovalId = randomUUID();
+      const assetApprovalId = randomUUID();
+
+      const bundleJson = {
+        schema_version: 1,
+        venue_id: venueId,
+        menu_id: menuId,
+        menu_revision_id: menuRevisionId,
+        restaurant: { name: 'Test Restaurant', logo: null },
+        categories: [
+          {
+            category_id: randomUUID(),
+            name: 'Cat',
+            dishes: [
+              {
+                dish_id: dishId,
+                dish_revision_id: dishRevisionId,
+                complete: true,
+                name: 'Salad',
+                description: 'Fresh salad',
+                price: { amount: '10.00', currency: 'USD' },
+                ingredients: [],
+                allergens: null,
+                dietary: [],
+                images: {
+                  card: {
+                    url: 'https://cdn.example.com/card.jpg',
+                    width: 400,
+                    height: 300,
+                    alt: 'Salad',
+                  },
+                  detail: {
+                    url: 'https://cdn.example.com/detail.jpg',
+                    width: 800,
+                    height: 600,
+                    alt: 'Salad detail',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const bundleString = JSON.stringify(bundleJson);
+      const contentHash = sha256Hex(bundleString);
+      const assetHash = 'e'.repeat(64);
+      const bundleUrl = `https://assets.peekaplate.example/${venueId}/${menuRevisionId}/bundle.json`;
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_review_subject
+          (tenant_id, menu_id, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          venueId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.menu_approval
+          (tenant_id, approval_id, menu_id, review_version, menu_revision_id, content_approval_id, content_hash, asset_approval_id, asset_manifest_hash, approved_by)
+         VALUES ($1, $2, $3, 1, $4, $5, $6, $7, $8, $9)`,
+        [
+          venueId,
+          approvalId,
+          menuId,
+          menuRevisionId,
+          contentApprovalId,
+          contentHash,
+          assetApprovalId,
+          assetHash,
+          ownerId,
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.public_menu_bundle (tenant_id, menu_id, menu_revision_id, bundle_url)
+         VALUES ($1, $2, $3, $4)`,
+        [venueId, menuId, menuRevisionId, bundleUrl],
+      );
+
+      const actRow = await adminClient.query<{ activated_at: Date }>(
+        `SELECT activated_at FROM app_private.venue_tracking_activations WHERE tenant_id = $1`,
+        [venueId],
+      );
+      const actDate = actRow.rows[0]!.activated_at;
+      const v2OccurredAt = new Date(actDate.getTime()).toISOString();
+      const v1OccurredAt = new Date(actDate.getTime() + 1000).toISOString();
+      const orderTimestamp = new Date(actDate.getTime() + 2000).toISOString();
+
+      // v1 published has LATER occurred_at (actDate + 1s)
+      await adminClient.query(
+        `INSERT INTO app_private.es_event
+          (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload, metadata, occurred_at)
+         VALUES ($1, $2, 'menu_publication', $3, 1, 1, 'menu.published', $4::jsonb, '{}'::jsonb, $5)`,
+        [
+          randomUUID(),
+          venueId,
+          menuId,
+          JSON.stringify({
+            menuId,
+            publicationId: randomUUID(),
+            version: 1,
+            approvalId,
+            status: 'published',
+          }),
+          v1OccurredAt,
+        ],
+      );
+
+      // v2 withdrawn has EARLIER occurred_at (actDate) due to transaction timestamp inversion
+      await adminClient.query(
+        `INSERT INTO app_private.es_event
+          (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload, metadata, occurred_at)
+         VALUES ($1, $2, 'menu_publication', $3, 2, 1, 'menu.withdrawn', $4::jsonb, '{}'::jsonb, $5)`,
+        [
+          randomUUID(),
+          venueId,
+          menuId,
+          JSON.stringify({ menuId, publicationId: randomUUID(), version: 2, status: 'withdrawn' }),
+          v2OccurredAt,
+        ],
+      );
+
+      const csv = [
+        'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+        `pilot_order_outcome.v1,ORD-INVERT-TS,LINE-1,${orderTimestamp},${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+      ].join('\n');
+
+      const result = await importOrderOutcomes({
+        client,
+        actorId: ownerId,
+        venueId,
+        csvText: csv,
+        bundleLoader: async () => bundleJson,
+      });
+
+      // v2 withdrawal wins: row is quarantined, 0 accepted
+      expect(result.status).toBe('completed');
+      expect(result.acceptedRows).toBe(0);
+      expect(result.quarantinedRows).toBe(1);
+      expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+
+      const lines = await adminClient.query(
+        `SELECT count(*)::int as count FROM app_private.order_outcome_lines WHERE tenant_id = $1`,
+        [venueId],
+      );
+      expect(lines.rows[0].count).toBe(0);
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
 });

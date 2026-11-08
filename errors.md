@@ -1754,3 +1754,19 @@ During review remediation verification:
 2. `lint`: Import sorting and line wraps in `order-ingestion.integration.ts` and `service.ts` resolved via Biome format.
 3. `typecheck`: `noUncheckedIndexedAccess` required safe indexing for `publishedActive[0]` in `service.ts`, and test `createApp` stubs required `execute` dummy property. Resolved in `service.ts` and `order-ingestion.integration.ts`.
 4. `context:check`: Context module fingerprints updated for new contracts handoff fixtures and integration paths via `pnpm context:refresh`. All checks pass clean.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:09:59.298Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:11:32.256Z","exitCode":1}
+```
+
+## November 9 PR #120 Four Review Findings Resolution & Verification
+
+During integration test expansion for PR #120 review findings:
+1. `test:db`: Draft integration probe for inverted publication timestamps initially attempted an `UPDATE` on `app_private.venue_tracking_activations`, which failed due to the immutable activation trigger `enforce_venue_tracking_activation` (`Modifying venue tracking activation timestamp is prohibited`). Resolved by deriving relative monotonic event timestamps forward from the initial activation timestamp (`actDate`) without mutating historical activation records. All 10 pgTAP suites (281 assertions) and all 6 integration suites (84 tests) pass cleanly.
+

@@ -234,9 +234,8 @@ function createMockClient(state: MockDbState) {
           const current = latestByMenu.get(ev.menuId);
           if (
             !current ||
-            ev.occurredAt > current.occurredAt ||
-            (ev.occurredAt.getTime() === current.occurredAt.getTime() &&
-              (ev.version ?? 1) > (current.version ?? 1))
+            (ev.version ?? 1) > (current.version ?? 1) ||
+            ((ev.version ?? 1) === (current.version ?? 1) && ev.occurredAt > current.occurredAt)
           ) {
             latestByMenu.set(ev.menuId, ev);
           }
@@ -273,6 +272,12 @@ function createMockClient(state: MockDbState) {
         normalizedSql.includes('app_private.public_menu_bundle bundle')
       ) {
         const [tenantId, menuRevId] = params!;
+        if (
+          menuRevId &&
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(menuRevId)
+        ) {
+          throw new Error(`invalid input syntax for type uuid: "${menuRevId}"`);
+        }
         if (
           tenantId === state.venueId &&
           state.menuApproval &&
@@ -345,6 +350,12 @@ function createMockClient(state: MockDbState) {
       if (normalizedSql.includes('INSERT INTO app_private.order_outcome_quarantine')) {
         const [id, tenant_id, batch_id, row_index, reason_code, field_name, diagnostic_message] =
           params!;
+        if (diagnostic_message && diagnostic_message.length > 500) {
+          throw new Error('check constraint violation: length(diagnostic_message) <= 500');
+        }
+        if (field_name && field_name.length > 64) {
+          throw new Error('check constraint violation: length(field_name) <= 64');
+        }
         state.quarantine.push({
           id,
           tenant_id,
@@ -2320,6 +2331,232 @@ describe('importOrderOutcomes service', () => {
         expect(result.isDuplicateFile).toBe(true);
         // Redundant storage file deleted
         expect(mockStorage.delete).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('PR #120 Review Fixes Regressions', () => {
+      describe('1. Preserve source archive when COMMIT outcome is uncertain', () => {
+        it('preserves archive when COMMIT may have succeeded and lost acknowledgement on client', async () => {
+          const state = defaultState();
+          const client = createMockClient(state);
+
+          const mockPut = vi.fn().mockResolvedValue(undefined);
+          const mockDelete = vi.fn().mockResolvedValue(undefined);
+          const mockStorage = { put: mockPut, delete: mockDelete };
+
+          const csvText = [
+            'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+            `pilot_order_outcome.v1,TICK-1,LINE-1,2026-11-01T12:00:00Z,${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+          ].join('\n');
+
+          let commitFailedOnClient = false;
+          let commitSucceededOnDb = false;
+          const originalQuery = client.query;
+          client.query = vi.fn(async (sql: string, params?: any[]) => {
+            const normalized = sql.trim().toUpperCase();
+            if (normalized === 'COMMIT' && !commitFailedOnClient) {
+              const batches = [...state.batches.values()];
+              if (batches.length > 0 && batches[0]?.status === 'completed') {
+                commitFailedOnClient = true;
+                // PostgreSQL commits on the server
+                await originalQuery(sql, params);
+                commitSucceededOnDb = true;
+                // Client loses acknowledgement
+                throw new Error('Connection terminated unexpectedly during COMMIT acknowledgement');
+              }
+            }
+            return originalQuery(sql, params);
+          });
+
+          // 1. Initial attempt fails on lost COMMIT acknowledgement
+          await expect(
+            importOrderOutcomes({
+              client: client as any,
+              actorId,
+              venueId,
+              csvText,
+              bundleLoader,
+              storage: mockStorage,
+              trackingStartedAt: defaultTrackingStartedAt,
+              now: () => new Date('2026-11-07T12:00:00Z'),
+            }),
+          ).rejects.toThrow('Connection terminated unexpectedly during COMMIT acknowledgement');
+
+          // 2. Batch remains completed and facts remain stored
+          expect(commitSucceededOnDb).toBe(true);
+          const batches = [...state.batches.values()];
+          expect(batches).toHaveLength(1);
+          expect(batches[0]?.status).toBe('completed');
+          expect(batches[0]?.accepted_rows).toBe(1);
+          expect(state.lines.size).toBe(1);
+
+          // 3. Source archive is NOT deleted
+          expect(mockPut).toHaveBeenCalledTimes(1);
+          expect(mockDelete).not.toHaveBeenCalled();
+
+          // 4. Retrying the same file still behaves correctly
+          const retryResult = await importOrderOutcomes({
+            client: client as any,
+            actorId,
+            venueId,
+            csvText,
+            bundleLoader,
+            storage: mockStorage,
+            trackingStartedAt: defaultTrackingStartedAt,
+            now: () => new Date('2026-11-07T12:00:00Z'),
+          });
+
+          expect(retryResult.status).toBe('completed');
+          expect(retryResult.isDuplicateFile).toBe(true);
+          expect(retryResult.batchId).toBe(batches[0]?.id);
+          expect(mockDelete).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('2. Select publication state using highest stream version', () => {
+        it('selects highest version when transaction timestamps are inverted so v2 withdrawal remains authoritative', async () => {
+          const state = defaultState();
+          // v1 published has later timestamp (2026-10-05) due to transaction timestamp inversion
+          // v2 withdrawn has earlier timestamp (2026-10-01) but higher version
+          state.publicationEvents = [
+            {
+              menuId: '00000000-0000-0000-0000-000000000001',
+              menuRevisionId,
+              eventType: 'menu.published',
+              occurredAt: new Date('2026-10-05T00:00:00Z'),
+              version: 1,
+            },
+            {
+              menuId: '00000000-0000-0000-0000-000000000001',
+              menuRevisionId,
+              eventType: 'menu.withdrawn',
+              occurredAt: new Date('2026-10-01T00:00:00Z'),
+              version: 2,
+            },
+          ];
+          const client = createMockClient(state);
+
+          // Order occurs after both events (2026-10-10)
+          const csv = [
+            'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+            'pilot_order_outcome.v1,ORD-INVERTED-TS,LINE-1,2026-10-10T12:00:00Z,POS-PIZZA-1,ordered,1',
+          ].join('\n');
+
+          const result = await importOrderOutcomes({
+            client: client as any,
+            actorId,
+            venueId,
+            csvText: csv,
+            bundleLoader,
+            now: () => new Date('2026-10-15T12:00:00Z'),
+          });
+
+          // The v2 withdrawal must remain authoritative despite earlier occurred_at
+          expect(result.acceptedRows).toBe(0);
+          expect(result.quarantinedRows).toBe(1);
+          expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+          expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+            /No published menu revision was active at order timestamp/,
+          );
+        });
+      });
+
+      describe('3. Validate revision IDs before PostgreSQL UUID resolution', () => {
+        it('quarantines malformed menu_revision_id row without rolling back valid neighboring row', async () => {
+          const state = defaultState();
+          const client = createMockClient(state);
+
+          const csvText = [
+            'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+            `pilot_order_outcome.v1,ORD-VALID,LINE-1,2026-11-01T12:00:00Z,${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+            `pilot_order_outcome.v1,ORD-MALFORMED,LINE-2,2026-11-01T12:00:00Z,not-a-uuid,${dishId},${dishRevisionId},ordered,1`,
+          ].join('\n');
+
+          const result = await importOrderOutcomes({
+            client: client as any,
+            actorId,
+            venueId,
+            csvText,
+            bundleLoader,
+            trackingStartedAt: defaultTrackingStartedAt,
+            now: () => new Date('2026-11-07T12:00:00Z'),
+          });
+
+          expect(result.status).toBe('completed');
+          expect(result.totalRows).toBe(2);
+          expect(result.acceptedRows).toBe(1);
+          expect(result.quarantinedRows).toBe(1);
+
+          // Valid row stored
+          expect(state.lines.has(`${venueId}:ORD-VALID:LINE-1:ordered`)).toBe(true);
+
+          // Malformed row quarantined with row/field/reason and no raw input exposed
+          const diag = result.diagnostics.find((d) => d.rowIndex === 3);
+          expect(diag).toBeDefined();
+          expect(diag?.fieldName).toBe('menu_revision_id');
+          expect(diag?.reasonCode).toBe('invalid_format');
+          expect(diag?.diagnosticMessage).toBe('menu_revision_id must be a valid canonical UUID');
+          expect(diag?.diagnosticMessage).not.toContain('not-a-uuid');
+        });
+      });
+
+      describe('4. Sanitize and bound quarantine diagnostics', () => {
+        it('quarantines sensitive-looking and oversized POS values without leaking raw values or failing transaction', async () => {
+          const state = defaultState();
+          state.menuApproval!.approvedAt = new Date('2026-10-01T00:00:00Z');
+          const client = createMockClient(state);
+
+          const sensitivePosId = 'manager@restaurant.com';
+          const oversizedPosId = 'A'.repeat(600);
+
+          const csv = [
+            'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+            'pilot_order_outcome.v1,ORD-VALID,LINE-1,2026-11-05T12:00:00Z,POS-PIZZA-1,ordered,1',
+            `pilot_order_outcome.v1,ORD-SENSITIVE,LINE-2,2026-11-05T12:00:00Z,${sensitivePosId},ordered,1`,
+            `pilot_order_outcome.v1,ORD-OVERSIZED,LINE-3,2026-11-05T12:00:00Z,${oversizedPosId},ordered,1`,
+          ].join('\n');
+
+          const result = await importOrderOutcomes({
+            client: client as any,
+            actorId,
+            venueId,
+            csvText: csv,
+            bundleLoader,
+            trackingStartedAt: '2026-10-01T00:00:00Z',
+            now: () => new Date('2026-11-07T12:00:00Z'),
+          });
+
+          expect(result.status).toBe('completed');
+          expect(result.totalRows).toBe(3);
+          expect(result.acceptedRows).toBe(1);
+          expect(result.quarantinedRows).toBe(2);
+
+          // Valid neighboring row accepted
+          expect(state.lines.has(`${venueId}:ORD-VALID:LINE-1:ordered`)).toBe(true);
+
+          // Diagnostics check
+          expect(result.diagnostics).toHaveLength(2);
+          for (const diag of result.diagnostics) {
+            expect(diag.fieldName).toBe('pos_item_id');
+            expect(diag.diagnosticMessage.length).toBeLessThanOrEqual(500);
+            expect(diag.diagnosticMessage).not.toContain(sensitivePosId);
+            expect(diag.diagnosticMessage).not.toContain('@');
+            expect(diag.diagnosticMessage).not.toContain(oversizedPosId);
+          }
+
+          // Entire serialized response contains no sensitive or oversized raw input
+          const serialized = JSON.stringify(result);
+          expect(serialized).not.toContain(sensitivePosId);
+          expect(serialized).not.toContain(oversizedPosId);
+
+          // Quarantine table check
+          expect(state.quarantine).toHaveLength(2);
+          for (const row of state.quarantine) {
+            expect(row.diagnostic_message.length).toBeLessThanOrEqual(500);
+            expect(row.diagnostic_message).not.toContain(sensitivePosId);
+            expect(row.diagnostic_message).not.toContain(oversizedPosId);
+          }
+        });
       });
     });
   });
