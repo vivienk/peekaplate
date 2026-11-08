@@ -91,7 +91,6 @@ export function Welcome({ go }: { go: (p: Page) => void }) {
             <h3>Your menu</h3>
             <div className="sub">Numbers appear once diners start using the menu.</div>
           </div>
-          <span className="chip sample">Illustrative sample menu</span>
         </div>
         <div className="dishgrid">
           {DISH.map((d) => (
