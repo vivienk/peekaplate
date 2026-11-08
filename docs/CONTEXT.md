@@ -35,7 +35,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
-        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "packages/contracts/src/review-persistence.ts",
+        "packages/contracts/src/review-persistence.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -43,7 +45,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "044bc52ac2f0c0a8aa4d10836866dba6b0fae5e9511fcda1b7198b22e40a26cf"
+      "sourceFingerprint": "801389392a40af22398443538130ef28b1a07fcd814d296a0cad9ea7b1552a31"
     },
     {
       "id": "tokens",
@@ -242,26 +244,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/menu-ingestion-infrastructure.md",
         "docs/public-menu.md",
         "scripts/menu-ingestion-infra.test.mjs",
-        "backend/src/consumer/canonical-json.test.ts",
-        "backend/src/consumer/canonical-json.ts",
-        "backend/src/consumer/consumer.integration.ts",
-        "backend/src/consumer/database.ts",
-        "backend/src/consumer/index.test.ts",
-        "backend/src/consumer/index.ts",
-        "backend/src/consumer/queue-consumer.test.ts",
-        "backend/src/consumer/queue-consumer.ts",
-        "backend/src/consumer/r2-storage.test.ts",
-        "backend/src/consumer/r2-storage.ts",
-        "backend/src/consumer/types.ts",
-        "backend/backfill-observations.mjs",
-        "backend/src/consumer/facts.ts",
-        "backend/src/consumer/facts.integration.ts",
-        "backend/src/consumer/backfill.ts",
-        "backend/src/consumer/backfill.test.ts",
         "pnpm-lock.yaml",
         "processing/tests/fixtures/service-artifacts/representative-bundle.json",
         "processing/tests/fixtures/service-artifacts/README.md",
-        "backend/src/consumer/owner-synthetic.integration.ts"
+        "backend/src/consumer/owner-synthetic.integration.ts",
+        "backend/src/review-command.ts",
+        "backend/src/review-command.test.ts",
+        "backend/src/review-artifact.ts",
+        "backend/src/review-artifact.test.ts",
+        "docs/review-api.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -274,7 +265,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "ec30c69b58ef0ae4b7fd103264a4c69528ad8b046bf2c59eaa15593adb141c3d"
+      "sourceFingerprint": "b02e0f0f361be52b4594d4a4acc3bafea4c8bad4330f1f03a7c66a32e2b7fe69"
     },
     {
       "id": "database",
@@ -300,7 +291,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_metrics.sql",
         "tests/db/posthog.sql",
         "tests/db/staff.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261030120000_review_candidate_persistence.sql",
+        "tests/db/review_persistence.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -311,7 +304,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5575d401f817de18d01b69a2c93b595835e0575e0e251275757ad6648ec5cc75"
+      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
     },
     {
       "id": "measurement",
@@ -577,6 +570,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
+      "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
+    },
+    {
+      "date": "2026-11-08",
       "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
       "modules": [
         "assets",
@@ -648,13 +651,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
-    },
-    {
-      "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
     }
   ]
 }

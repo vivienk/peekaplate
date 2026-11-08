@@ -1534,6 +1534,27 @@ original failure observation above rather than treating a rerun as its diagnosis
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
 
+## November 3 S3-RES-01.2 review persistence hardening
+
+```json
+{"id":"OBS-20261103-RES012-TRUST-001","status":"resolved","area":"review-persistence","observation":"PUT review-session on PR #73 at 4d2c7c2 stored a caller-supplied extraction payload as the immutable original. The private artifact reference was only prefix-checked; its SHA-256 was never compared and the object was never read, so an editor could register originals the producer never emitted.","cause":"Session registration trusted client input instead of the extraction host's stored attempt bundle.","prevention":"Outside local, require jobId and privateArtifactRef; read the bundle from INGESTION_REPORTS_BUCKET, check its SHA-256, stored tenant/job/attempt scope, source, versions, status and start time, and require every candidate original and evidence to equal the report drafts/evidence (report null equals an omitted exported field).","regression":"review-artifact.test.ts covers acceptance, required reference/job, fabricated original, added/removed candidates, altered spans, wrong hash, foreign venue/job/extra key segments, scope/source mismatch, missing object and missing binding. An offline round trip of 106 real menu items exported by the PR #58 exporter verified, and a single fabricated price or name was rejected.","sources":["backend/src/review-artifact.ts","backend/src/review-artifact.test.ts","backend/src/index.ts","docs/review-api.md"]}
+```
+
+```json
+{"id":"OBS-20261103-RES012-IDEMP-001","status":"resolved","area":"review-persistence","observation":"Reusing a register commandId with a different extraction payload returned the first payload's cached response instead of a command conflict, and every register receipt stored the full session response (up to about twice the 512 KB payload).","cause":"The register request hash omitted the extraction payload, and receipts duplicated the stored session.","prevention":"Include the canonical payload SHA-256 in every command request hash; store compact receipts and rebuild identical retries from the append-only session.","regression":"review-command.test.ts: changed payload with the same commandId returns 409 command_conflict with no writes; an identical retry replays from the session with a compact receipt. Both failed before the change and pass after it.","sources":["backend/src/review-command.ts","backend/src/review-command.test.ts"]}
+```
+
+The first offline real-item round trip rejected genuine exporter output: the PR #58 exporter
+omits optional fields that are null in the report (`subcategory`, `price_text`). The verifier now
+treats a report null and an omitted exported field as equal while still rejecting any non-null
+difference. PR #73's copies of the RES-01.1 docs were aligned byte-for-byte with PR #58 and its
+endpoint documentation moved to `docs/review-api.md`, so the later #58 merge does not conflict there.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-03T17:06:05.492Z","exitCode":1}
+```
+
 ```json
 {"id":"ERR-20261029-VIS03-004","status":"resolved","area":"spatial-harness-review-fixes","references":["OBS-20261022-VIS03-HARNESS-002","ERR-20261025-VIS03-003"],"observation":"PR #25 review findings by @vivienk (commit 921b32d) identified two issues: [P2] prefers-reduced-motion was captured once on startup so live OS/browser media query changes had no effect on already active transforms or event listeners; and [P3] metrics.layerRetries and ranks used plain object literals ({}), so a layer named 'constructor' read the inherited Object.prototype function and produced string concatenation ('function Object() { [native code] }1') instead of an integer count.","cause":"One-time Boolean matchMedia capture without change listeners, and unconstrained object keys accessing prototype properties.","prevention":"Retain MediaQueryList, register live change listeners, call syncReducedMotion() in render/pointer/keyboard handlers to zero offsets and clear layer transforms immediately, and use Object.create(null) plus Object.prototype.hasOwnProperty for metric and rank maps.","regression":"test_spatial.test_harness_responds_to_live_reduced_motion_changes verifies that toggling reduced-motion live clears transforms immediately and blocks subsequent pointer/keyboard input; test_spatial.test_harness_counts_numeric_retry_for_constructor_named_layer verifies that a layer named 'constructor' records integer retry count 1 in metrics.layerRetries.constructor.","sources":["processing/src/peekaplate_processing/harness.py","processing/tests/test_spatial.py"]}
 ```
@@ -1612,3 +1633,26 @@ Final-head CI then caught a stale assets fingerprint because an unused test impo
 was removed after the last refresh. Database and browser jobs passed. Refreshed
 context after that final source edit and reran `pnpm verify context:check docs:check`;
 these checks pass. Keep fingerprint refresh after every final referenced-file edit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T07:50:20.164Z","exitCode":1}
+```
+
+
+## November 8 PR73 re-review
+
+Confirmed the earlier three corrections, then reproduced a source-provenance gap:
+four valid-shaped requests changed kind/location/retrieval instant/size while
+retaining the genuine bundle/hash and were accepted. The five-line verifier
+guard now rejects them before persistence; four red/green unit cases plus one
+real-JWT/route/Postgres integration case cover rejection with zero session writes,
+honest registration and Worker reload. Equivalent timestamp representations are
+accepted. No provider, hosted database or private source data was used.
+
+An intermediate local DB run failed for test setup, not this guard: the added
+in-process route lacked required dependency services (503), and the browser suite
+occupied port5173 during the DB publication browser test (EADDRINUSE/timeout).
+The fixture now supplies the actual verifier; browser/DB suites run separately.
+Final serialized verification passed all213SQL assertions and76integration tests.
+Preserve shared-port exclusivity when coordinating local suites.
