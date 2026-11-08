@@ -144,7 +144,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -165,7 +165,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
+      "sourceFingerprint": "6ea7734290be6732634938e2fc3d7ad5b615f50b9ef366e314f49d1a12741e01"
     },
     {
       "id": "backend",
@@ -389,7 +389,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3312f9ba819fd19c6ba84e9b8d74b8912b6483c1cb4ac58a00a6f3eb0677c0b0"
+      "sourceFingerprint": "62f79990e8fbce3cb8855f129d8b36c6e43984032a83c1c1928fa1018a59f178"
     },
     {
       "id": "agents",
