@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import tempfile
@@ -39,6 +40,47 @@ class OCRSpaceTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://api.ocr.space/parse/image")
         self.assertEqual(result["text"], "Soup  8.50 CAD")
         self.assertEqual(result["settings"]["OCREngine"], 3)
+
+    def test_table_opt_out_serializes_false_without_changing_other_settings(self):
+        opener=self.transport(self.payload())
+        with patch("peekaplate_processing.ocr_space.build_opener", return_value=opener):
+            client=OCRSpaceClient("synthetic-key", is_table=False)
+            result=client.extract(b"synthetic-image")
+        fields=parse_qs(opener.open.call_args.args[0].data.decode())
+        self.assertIs(client.is_table, False)
+        self.assertEqual(fields["isTable"], ["false"])
+        self.assertEqual(fields["OCREngine"], ["3"])
+        self.assertEqual(fields["language"], ["auto"])
+        self.assertEqual(fields["isOverlayRequired"], ["true"])
+        self.assertEqual(result["settings"], {"OCREngine":3, "language":"auto", "isTable":False, "isOverlayRequired":True})
+
+    def test_table_setting_is_normalized_to_bool(self):
+        for value,expected in [(0,False),(1,True)]:
+            with self.subTest(value=value):
+                self.assertIs(OCRSpaceClient("synthetic-key", is_table=value).is_table, expected)
+
+    def test_table_cache_identity_preserves_default_key_and_separates_opt_out(self):
+        image=b"synthetic-image"
+        settings={"OCREngine":3, "language":"auto", "isTable":True, "isOverlayRequired":True}
+        legacy_key=hashlib.sha256(json.dumps({"image":hashlib.sha256(image).hexdigest(), "settings":settings}, sort_keys=True).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            opener=self.transport(self.payload())
+            with patch("peekaplate_processing.ocr_space.build_opener", return_value=opener):
+                default=OCRSpaceClient("synthetic-key", cache_dir=directory).extract(image)
+                self.assertEqual(default["settings"], settings)
+                self.assertTrue((Path(directory)/f"{legacy_key}.json").is_file())
+                opted_out=OCRSpaceClient("synthetic-key", cache_dir=directory, is_table=False).extract(image)
+                repeated=OCRSpaceClient(None, cache_dir=directory, is_table=False).extract(image)
+                default_again=OCRSpaceClient(None, cache_dir=directory).extract(image)
+            self.assertFalse(default["cache_hit"])
+            self.assertFalse(opted_out["cache_hit"])
+            self.assertIs(opted_out["settings"]["isTable"], False)
+            self.assertTrue(repeated["cache_hit"])
+            self.assertIs(repeated["settings"]["isTable"], False)
+            self.assertTrue(default_again["cache_hit"])
+            self.assertEqual(default_again["settings"], settings)
+            self.assertEqual(opener.open.call_count, 2)
+            self.assertEqual(len(list(Path(directory).glob("*.json"))), 2)
 
     def test_response_keeps_word_boxes_bound_to_uploaded_bytes(self):
         page={"FileParseExitCode":1, "ParsedText":"Soup 8.50 CAD", "TextOverlay":{"HasOverlay":True, "Lines":[{"Words":[{"WordText":"Soup", "Left":10, "Top":20, "Width":50, "Height":12}]}]}}

@@ -112,6 +112,30 @@ describe('published adapter', () => {
     expect(() => parsePublishedDelivery(invalid)).toThrow();
   });
 
+  it('rejects a missing price', () => {
+    const invalid = structuredClone(validDelivery) as any;
+    delete invalid.content.categories[0].dishes[1].price;
+    expect(() => parsePublishedDelivery(invalid)).toThrow();
+  });
+
+  it('rejects a missing currency', () => {
+    const invalid = structuredClone(validDelivery) as any;
+    delete invalid.content.categories[0].dishes[1].price.currency;
+    expect(() => parsePublishedDelivery(invalid)).toThrow();
+  });
+
+  it('rejects a missing ingredients array', () => {
+    const invalid = structuredClone(validDelivery) as any;
+    delete invalid.content.categories[0].dishes[1].ingredients;
+    expect(() => parsePublishedDelivery(invalid)).toThrow();
+  });
+
+  it('rejects an invalid currency', () => {
+    const invalid = structuredClone(validDelivery) as any;
+    invalid.content.categories[0].dishes[1].price.currency = 'usd';
+    expect(() => parsePublishedDelivery(invalid)).toThrow();
+  });
+
   it('maps allergens null to an omitted allergen list', () => {
     const delivery = parsePublishedDelivery(validDelivery);
     const result = deliveryToMenu(delivery);

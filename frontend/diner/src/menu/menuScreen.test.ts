@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createFixtureMenuSource } from './fixtures';
 import { mountMenuScreen } from './menuScreen';
 
 const mockObserve = vi.fn();
@@ -45,6 +46,9 @@ class FakeContainer {
     }
     return elements;
   }
+  querySelector(): HTMLElement | null {
+    return null;
+  }
   appendChild() {}
   addEventListener() {}
 }
@@ -82,13 +86,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+vi.mock('./fixtures', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./fixtures')>();
+  return {
+    ...actual,
+    // Real behavior by default; the two error tests override one call.
+    createFixtureMenuSource: vi.fn(actual.createFixtureMenuSource),
+  };
+});
+
 async function mountAndWait(container: FakeContainer): Promise<void> {
   mountMenuScreen(container as unknown as HTMLElement);
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('menu screen category visibility', () => {
-  it('shows only the first category, hiding the rest with the hidden attribute', async () => {
+  it('shows only the All block first, hiding every category block', async () => {
     const container = new FakeContainer();
 
     await mountAndWait(container);
@@ -96,25 +109,27 @@ describe('menu screen category visibility', () => {
     const tags = extractCategoryTags(container.innerHTML);
     expect(tags.length).toBeGreaterThan(1);
 
-    // First category should not have hidden
+    // The first block is All, and it is visible.
+    expect(tags[0]).toContain('data-category-id="all"');
     expect(tags[0]).not.toContain('hidden');
 
-    // All other categories should have hidden
+    // Every category block after it is hidden.
     for (let i = 1; i < tags.length; i++) {
       expect(tags[i]).toContain('hidden');
     }
   });
 
-  it('renders category tabs matching each category', async () => {
+  it('renders an All tab first, then one tab per category', async () => {
     const container = new FakeContainer();
 
     await mountAndWait(container);
 
-    // Count tab buttons (one per category)
-    const tabs = (container.innerHTML.match(/<button[^>]*data-category-id/g) ?? []).length;
-    const categories = extractCategoryTags(container.innerHTML).length;
+    const tabs =
+      container.innerHTML.match(/<button class="pp-tab[^>]*data-category-id="[^"]*"/g) ?? [];
+    const blocks = extractCategoryTags(container.innerHTML).length;
 
-    expect(tabs).toBe(categories);
+    expect(tabs.length).toBe(blocks);
+    expect(tabs[0]).toContain('data-category-id="all"');
   });
 });
 
@@ -139,5 +154,31 @@ describe('menu screen observer lifecycle', () => {
     const cards = container.querySelectorAll('.pp-card--dim');
     expect(mockObserve).toHaveBeenCalled();
     expect(mockObserve.mock.calls.length).toBeGreaterThanOrEqual(cards.length);
+  });
+
+  it('displays error state when load rejects', async () => {
+    vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+      load: () => Promise.reject(new Error('boom')),
+    });
+    const container = new FakeContainer();
+
+    await mountAndWait(container);
+
+    expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+  });
+
+  it('displays error state when renderMenu throws after ready', async () => {
+    vi.mocked(createFixtureMenuSource).mockReturnValueOnce({
+      load: () =>
+        Promise.resolve({
+          status: 'ready',
+          menu: { categories: null, restaurant: { name: 'Test Restaurant' } },
+        } as never),
+    });
+    const container = new FakeContainer();
+
+    await mountAndWait(container);
+
+    expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
   });
 });
