@@ -425,6 +425,119 @@ main:has(> .pp-detail) {
   font-size: 12px;
 }
 
+/* Menu search (S3-DIN-01.4, Figma "Search State"). */
+.pp-search[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px #f89537;
+}
+
+.pp-search-panel {
+  padding: 4px 0 0;
+}
+
+.pp-search-panel .pp-search-bar {
+  position: relative;
+}
+
+.pp-search-bar__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #71737a;
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.pp-search-panel .pp-search-input {
+  height: 36px;
+  padding: 6px 12px 6px 34px;
+  border: 1px solid transparent;
+  font-size: 14px;
+}
+
+.pp-search-panel .pp-search-input:focus {
+  outline: none;
+  border-color: #f89537;
+  box-shadow: 0 0 0 2px rgba(248, 149, 55, 0.35);
+}
+
+.pp-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.pp-search-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: #2d3038;
+  color: #fafafa;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pp-search-close:focus-visible,
+.pp-search:focus-visible,
+.pp-search-empty__clear:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+.pp-search-staff {
+  margin: 8px 0 0;
+  color: #fafafa;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pp-card[hidden],
+.pp-search-panel[hidden],
+.pp-search-empty[hidden],
+.pp-search-staff[hidden] {
+  display: none;
+}
+
+.pp-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px 24px;
+  text-align: center;
+}
+
+.pp-search-empty__icon {
+  width: 72px;
+  height: 72px;
+  border: 6px solid #f89537;
+  border-radius: 999px;
+  box-sizing: border-box;
+}
+
+.pp-search-empty__title {
+  margin: 12px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fafafa;
+}
+
+.pp-search-empty__text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #a8a59e;
+}
+
+.pp-search-empty__clear {
+  flex: none;
+  margin-top: 8px;
+  padding: 8px 20px;
+  border-radius: 999px;
+}
+
 .pp-search-clear,
 .pp-search-back {
   border: 0;
@@ -752,17 +865,17 @@ main:has(> .pp-detail) {
 }
 
 @media (min-width: 361px) {
-  .pp-category > .pp-card:nth-child(even) {
+  .pp-category > .pp-card:nth-child(even of :not([hidden])) {
     flex-direction: row-reverse;
   }
-  .pp-category > .pp-card:nth-child(even) .pp-card__body {
+  .pp-category > .pp-card:nth-child(even of :not([hidden])) .pp-card__body {
     align-items: flex-end;
     text-align: right;
   }
-  .pp-category > .pp-card:nth-child(even) .pp-card__open {
+  .pp-category > .pp-card:nth-child(even of :not([hidden])) .pp-card__open {
     text-align: right;
   }
-  .pp-category > .pp-card:nth-child(even) .pp-card__save {
+  .pp-category > .pp-card:nth-child(even of :not([hidden])) .pp-card__save {
     flex-direction: row-reverse;
   }
 }
