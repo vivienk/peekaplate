@@ -373,3 +373,41 @@ Python 3.12.14, Pillow 12.3.0, Pydantic 2.14.1, Node 24.16.0, pnpm 11.25.0.
 The pre-existing presentation-helper rights-confirmation, rejected-provider
 provenance and unbounded candidate-file-read findings are not fixed by this
 addition. This verification does not approve the whole PR for merge or publication.
+
+
+## November 8 final reconciliation and verification
+
+Preserved develop `5bfaa94`, including #69's menu/detail foundation and #116's
+comparison correction. The only merge conflict was the delivery fingerprint in
+`docs/CONTEXT.md`; refreshed it from the combined sources.
+
+Four regressions failed before correction and passed afterward:
+- Omitted presentation rights must fail before output; CLI now requires
+  `--rights-confirmed`, and direct callers explicitly pass `rights_confirmed=True`.
+- A rejected PNG retains the returned model and fidelity flags/notes. Different
+  returned models keep separate fallback identities even for identical rejected bytes.
+- Candidate file reads request at most `MAX_SOURCE_BYTES + 1`; oversized inputs fail.
+- Oversized image headers fail before `image.load()`, with resources closed.
+
+Fresh Windows validation (synthetic inputs; no provider calls):
+- PASS: `uv run --project processing --frozen --extra service python processing/tests/run_offline.py`
+  — 476 tests; 38.721s test time, 61.747s command time. Socket guard active.
+- PASS: `uv run --project processing --frozen --extra service python processing/tests/run_offline.py -p test_presentation.py`
+  — 12 tests, including the strengthened bounded-read assertion; 9.401s command time.
+- PASS: `pnpm check` — 796 Vitest + 67 script tests, types/lint/context/docs; 26.164s.
+- PASS: `pnpm verify build` — apps and Worker dry-run; 6.757s. Diner initial JS 39,965 bytes gzip.
+- PASS: `uv build --project processing` — wheel and source distribution.
+- PASS: `pnpm exec playwright test --config playwright.review-preview.config.ts --workers=1`
+  — 6 Chromium checks; 3.854s command time.
+- PASS: `pnpm exec playwright test --workers=1` — 51 Chromium checks across the
+  current diner/console foundations, menu/detail, Save and SDK behavior; 59.673s.
+- PASS: private local HTTP spatial harness — 12 Chromium checks; 4.586s command time.
+  Covers decoded photo/three layers, no JavaScript, keyboard/reversal, mixed input,
+  reduced motion, missing layer/manifest/photo, unsupported CSS, depth ordering,
+  live reduced-motion toggles and a layer named `constructor` retry. Test code was
+  reused from the earlier review with current generated bundles; historical head
+  labels in that helper are not current-commit evidence.
+
+Physical-phone scrolling/performance, VoiceOver/TalkBack, permitted captured-food
+fidelity review and production asset/publication integration are NOT RUN here.
+This is an offline preparation foundation; every output remains non-publishable.

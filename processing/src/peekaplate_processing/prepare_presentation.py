@@ -30,6 +30,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--candidate-png", required=True, type=Path, help="Generated presentation candidate PNG to validate.")
     parser.add_argument("--output-root", required=True, type=Path, help="Directory that receives the new presentation bundle.")
     parser.add_argument("--capture-evidence", required=True, type=str, help="Evidence identifying the source capture.")
+    parser.add_argument("--rights-confirmed", required=True, action="store_true", help="Confirm rights to use the supplied images.")
     parser.add_argument("--draft-id", required=False, type=str, default=None, help="Optional draft ID link.")
     parser.add_argument("--model-version", required=False, type=str, default="offline-candidate-v1", help="Model version identifier.")
     parser.add_argument("--budget-bytes", required=False, type=positive_int, default=None, help="Optional presentation PNG byte budget.")
@@ -53,7 +54,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             reference_path=args.reference,
             output_root=args.output_root,
             capture_evidence=args.capture_evidence,
-            rights_confirmed=True,
+            rights_confirmed=args.rights_confirmed,
             draft_id=args.draft_id,
             budget_bytes=args.budget_bytes,
             provider=provider,

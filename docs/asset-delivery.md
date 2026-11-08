@@ -76,12 +76,16 @@ uv run --project processing --frozen python -m peekaplate_processing.prepare_pre
   --candidate-png work/vis03/candidate-2048.png \
   --output-root work/vis03/<revision-id>/presentation \
   --capture-evidence "Permitted studio capture; see the private capture log." \
+  --rights-confirmed \
   --draft-id "draft-dish-42" \
   --model-version "offline-candidate-v1" \
   --budget-bytes 5000000
 ```
 
 Key architecture and safety invariants:
+- **Explicit rights confirmation:** the CLI requires `--rights-confirmed`; direct
+  callers must pass `rights_confirmed=True`. Capture evidence alone is not consent
+  to use an image. This assertion still needs human verification before publication.
 - **Prompt & Multimodal Request:** Uses Vivien Kong's verbatim presentation prompt
   (`presentation-prompt-v1`, SHA-256 tracked in the manifest). `build_multimodal_messages`
   assembles Image 1 (source dish cutout data URL) and Image 2 (reference framing data URL)
@@ -95,6 +99,7 @@ Key architecture and safety invariants:
   carry genuine alpha transparency, and have all four corner pixels `(0, 0)`, `(w-1, 0)`,
   `(0, h-1)`, `(w-1, h-1)` fully transparent (`alpha == 0`), rejecting opaque
   checkerboards, gray rectangles, or baked-in edges.
+  Candidate files are read with a 12 MB bound, and pixel limits are checked before decoding.
 - **Provenance Manifest (`PresentationManifest`):** The output `presentation-manifest.json`
   links the source T0 `asset_id` and manifest SHA-256, source JPEG SHA-256, cutout
   SHA-256, reference SHA-256, prompt SHA-256, model version, dish and revision UUIDs,
@@ -109,6 +114,8 @@ Key architecture and safety invariants:
   `publication.eligible = False`). Fidelity requirements (`preserved_original_viewpoint`,
   `reconstructed_details_flagged`, `fidelity_notes`) persist on `manifest.prompt` and
   emit explicit review warnings flagging reconstructed unseen food or cropped details.
+  Returned model identifiers and fidelity disclosures remain in the fallback record
+  when a supplied candidate fails validation; the requested model never replaces them.
 - **Automatic Fallback Retention:** If generation fails, the provider returns an error,
   candidate dimensions/alpha/corners are invalid, or byte budget is exceeded, the pipeline
   preserves the approved original-photo T0 `fallback.jpg`, sets `fallback_retained = True`,

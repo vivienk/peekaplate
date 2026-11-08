@@ -419,12 +419,17 @@ uv run --project processing --frozen python -m peekaplate_processing.prepare_pre
   --candidate-png work/vis03/candidate-2048.png \
   --output-root work/vis03/<revision-id>/presentation \
   --capture-evidence "Permitted studio capture; see the private capture log." \
+  --rights-confirmed \
   --draft-id "draft-dish-42" \
   --model-version "offline-candidate-v1" \
   --budget-bytes 5000000
 ```
 
 Inputs and outputs:
+- The CLI requires `--rights-confirmed`; Python callers must explicitly pass
+  `rights_confirmed=True`. Human review still verifies the assertion.
+- Candidate reads are bounded to 12 MB; pixel limits are checked before decoding.
+- Failed candidates retain their returned model identifier and fidelity notes in the fallback manifest.
 - Cutout input must be PNG or WEBP with transparent background (`min_a == 0, max_a > 0`).
 - Reference image can be PNG, WEBP, or JPEG.
 - Candidate presentation image must be a square PNG with an alpha channel and transparent corners

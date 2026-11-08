@@ -96,8 +96,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/menuScreen.test.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "tests/e2e/menu-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -108,6 +113,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save.spec.ts",
         "frontend/diner/src/compare/picker.ts",
         "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/price.ts",
+        "frontend/diner/src/menu/price.test.ts",
         "frontend/diner/src/tracking/index.ts",
         "frontend/diner/src/tracking/index.test.ts",
         "frontend/diner/src/menu/events.ts",
@@ -132,7 +139,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2689203387d1429b2fc77435cb9ab5c63729240885434a50be1900171bab9ea0"
+      "sourceFingerprint": "acd75c3bef3d12a118c633cefa772d187b0f4b022f0a67fd6af51431b1875197"
     },
     {
       "id": "console",
@@ -267,7 +274,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e5a9d32626172e7c0f7c72a168cfee3e7031713e066b176e7b864df17ad65233"
+      "sourceFingerprint": "ec30c69b58ef0ae4b7fd103264a4c69528ad8b046bf2c59eaa15593adb141c3d"
     },
     {
       "id": "database",
@@ -382,7 +389,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c0efacba7ec1fdc949cb831b91c329a4ab779b7e8b28a58ea73a5d59c3e15ee7"
+      "sourceFingerprint": "a8ca18b7a307027c48cb91df461a50a8460ca541a70179aa7038b654fe9de08d"
     },
     {
       "id": "agents",
@@ -533,12 +540,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "1050c1cce96c851d1bfbe75346ae950254c2a5f729f5642e55f6e87f0c69544a"
+      "sourceFingerprint": "afa65c7c4e5294a5ed18c6b93b782ae654cff17a5bdf1ccfd5cab2db55efc288"
     },
     {
       "id": "assets",
       "status": "foundation",
-      "summary": "T0 asset preparation emits create-only hash-addressed bundles with four variants, immutable source/revision references and processing state; spatial validation checks human-prepared layered samples against the T0 detail variant with a dependency-free fallback harness; optional presentation preparation pairs dish cutouts and reference images with the frozen presentation prompt, validates square transparent PNGs and retains the T0 fallback on failure. Manifests never self-approve (needs_review, publication.eligible=false), and Python gets no signing/database credentials. Offline review_preview accepts a supplied grayscale mask and optional provenance-linked PNG, creates a non-publishable comparison/download page with bounded shallow-card motion. No automatic segmentation, provider calls or diner integration.",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Bundles are create-only, needs_review and publication.eligible=false. No automatic segmentation, image-provider calls, backend signing or diner integration; captured-food fidelity, rights and real-device acceptance remain manual.",
       "paths": [
         "processing/src/peekaplate_processing/assets.py",
         "processing/src/peekaplate_processing/harness.py",
@@ -564,10 +571,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "c26b5d4ec0f3021cc85910a51e7f4321a91a90f887b602ae2292d16a0c67bf84"
+      "sourceFingerprint": "8091799a6537ba83fe0c8c62875d02a910cd9d3f11c066a1be741a65489b9b4b"
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-08",
+      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
+      "modules": [
+        "assets",
+        "processing",
+        "delivery"
+      ],
+      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
+    },
     {
       "date": "2026-11-06",
       "summary": "S3-VIS-03 PR #25 rebased linearly onto develop d6e5a16 (was c005b0f merge). schemas.py keeps develop's box-evidence validator and adds the asset/spatial/presentation models; asset files moved to their own assets context node because the processing summary is at its cap. Presentation asset ids derive after candidate validation from the candidate PNG hash and effective model version. Rebase QA: 465 Python tests, pnpm verify, 7 CLI and 6 Chromium harness cases passed on synthetic data (qa-reports/S3-VIS-03-test-report.md).",
@@ -638,15 +655,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
-    },
-    {
-      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "delivery"
-      ],
-      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
     }
   ]
 }

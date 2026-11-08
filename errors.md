@@ -919,6 +919,8 @@ the PR records verification of the reconciled canonical tree separately.
 
 ```json
 {"id":"OBS-VIS02-TARGETED-RECOVERY-BUDGET-001","status":"resolved","area":"explicit-provider-request-budget","observation":"A selected-page count does not bound paid transport attempts when the legacy OCR client internally retries. Failed-page recovery also must not silently reacquire the whole PDF, erase earlier failures or reuse old candidate links.","correction":"Add opt-in selective PDF acquisition and an explicit single-attempt OCR setting without changing ordinary defaults. Recovery validates source snapshot/hash/coverage and selected failed Engine3 pages before client construction, bypasses cache, enforces a small explicit cap, stops on first failure including429 and preserves unattempted pages/history in private create-only output. Model-only recovery separately preflights the exact selected-page batch plan and keeps unprocessed coverage incomplete without merging drafts.","regression":"Socket-blocked synthetic tests cover caps, exact source/coverage preflight, selection-only rendering/acquisition, cache bypass, one-attempt transport,429 stop, failed/unattempted manifest records, old-error preservation and model-budget rejection before invocation. Full381-test discovery passes with no socket attempts. Six independent write-mocked retry/budget controls pass. No recovery was invoked against a live provider; fresh reliability and hosted budgets remain unverified.","sources":["processing/src/peekaplate_processing/recover_pages.py","processing/src/peekaplate_processing/pdf.py","processing/src/peekaplate_processing/ocr_space.py","processing/src/peekaplate_processing/run_pipeline.py","processing/src/peekaplate_processing/vision.py","processing/tests/test_recover_pages.py","processing/tests/test_targeted_model_recovery.py","docs/processing-v3.md"]}
+```
+
 ```json
 {"kind":"deployment-followup","references":{"id":"OBS-20261027-CONTAINER-ELIGIBILITY"},"timestamp":"2026-10-27T20:25:05.885Z","status":"pending-external-activation","observation":"Actual deploy of main58838e1 uploaded a partial extraction Worker, then failed at /containers/me with HTTP401 requiring Workers Paid. workers.dev remains disabled and health/extract return404; settings readback returned provider500. Protected API run40577213391 awaits independent approval; existing API health200 at prior version.","next":"Owner activates planned Paid subscription, then retry the same Worker name and verify service configuration. Independently approve existing API run and verify its new aliases. Local integration can continue; do not enable real submissions before full acceptance.","sources":["backend/wrangler.extraction.jsonc","docs/menu-ingestion-infrastructure.md"]}
 ```
@@ -991,7 +993,6 @@ develop's retrieval implementation to make a release merge compile.
 ```json
 {"id":"ERR-20261025-VIS03-003","status":"resolved","area":"spatial-harness-review-fixes","references":["OBS-20261022-VIS03-HARNESS-002","ERR-20261025-VIS03-002"],"observation":"Follow-up PR review on 388f66d reproduced three viewer issues and one regression-test gap: (1) <img id=\"fallback\"> omitted a static src attribute, leaving naturalWidth=0 when JavaScript was disabled; (2) moving the pointer after saturating keyboard.yaw left excess keyboard offset until two reverse presses; (3) Math.round(layer.depth * 1000) + 1 gave z-index 1 to both 0 and 0.0001, allowing a delayed background to paint over the foreground; and (4) the Node harness test supplied window.CSS without globalThis.CSS, hitting the fallback catch before layers loaded.","cause":"The static img relied on script assignment, pointer updates did not reconcile stored keyboard offsets against combined limits, z-index rounded continuous depth values instead of ranking sorted layers, and the test environment lacked a bare CSS global.","prevention":"Include src=\"./fallback.jpg\" in static markup, reconcile keyboard.yaw and keyboard.pitch on both pointermove and render, assign 1..N z-index ranks from stable (depth, index) ordering, and expose globalThis.CSS in Node harness tests while asserting layersLoaded, spatialVisible, layer parallax and delayed close-depth z-index order.","regression":"All 110 Python tests (6 T0, 15 spatial, 89 OCR/workflow) and local Chromium checks pass, including JavaScript-disabled fallback rendering, Home -> 40x ArrowRight -> pointer right edge -> 1x ArrowLeft -> 2.5deg, and delayed background with depths 0 / 0.0001 / 0.0002.","sources":["processing/src/peekaplate_processing/harness.py","processing/tests/test_spatial.py"]}
 ```
-
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-30T06:15:32.706Z","exitCode":1}
@@ -1007,7 +1008,9 @@ develop's retrieval implementation to make a release merge compile.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-02T12:28:12.431Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+```
 
 ## RES-02 October 31 local reconciliation checks
 
@@ -1030,6 +1033,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T12:30:37.551Z","exitCode":2}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
 
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
@@ -1041,6 +1045,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T12:32:43.882Z","exitCode":2}
 {"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
 ```
 
@@ -1052,6 +1057,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 {"kind":"resolution","references":{"id":"ERR-20261031-CONSUMER-SANDBOX-PNPM"},"status":"resolved","evidence":"Direct verification via node scripts/check-docs.mjs confirmed passing on 44 markdown files."}
 ```
 
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T20:41:29.007Z","exitCode":1}
 ```
 
@@ -1061,6 +1067,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T12:43:21.030Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
 ```
 
@@ -1070,6 +1077,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-02T12:44:38.329Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
 ```
 
@@ -1079,6 +1087,7 @@ Automatic check runner `docs:check` invoked via `scripts/verify.mjs` recorded ex
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-02T12:56:41.943Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
 ```
 
@@ -1162,6 +1171,14 @@ known valid reporting window when checking authenticated read availability.
 ```
 
 <!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-02T13:06:00.751Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":[{"check":"lint","timestamp":"2026-10-29T14:41:51.693Z"},{"check":"typecheck","timestamp":"2026-11-02T12:30:37.551Z"},{"check":"typecheck","timestamp":"2026-11-02T12:32:43.882Z"},{"check":"test:e2e","timestamp":"2026-11-02T12:44:38.329Z"},{"check":"test:e2e","timestamp":"2026-11-02T12:56:41.943Z"}],"status":"resolved","cause":"PR #69 review-fix iterations: unchecked indexed access in a new unit test failed typecheck, and new e2e locators matched dishes in categories that are now correctly hidden, plus an allergen label failed contrast once the detail CSS applied.","prevention":"Guard indexed access in tests and scope e2e locators to the visible category.","regression":"pnpm check and pnpm verify test:e2e pass after the fixes."}
+```
+
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-02T07:28:30.719Z","exitCode":2}
 ```
@@ -1359,6 +1376,36 @@ Full verification suite passed: all 33 Vitest suites (577 tests), 64 script test
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-04T19:58:00.859Z","exitCode":1}
 ```
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:00:23.874Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-05T05:06:38.092Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:07:42.043Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:33:29.149Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T05:42:39.767Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T13:29:45.452Z","exitCode":1}
+```
+
 ## November 5 R2 diagnostic persistence & retry safety fix
 
 Fixed R2 diagnostic-write failure swallowing during unsupported-source job processing:
@@ -1405,6 +1452,81 @@ original failure observation above rather than treating a rerun as its diagnosis
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T22:28:30.144Z","exitCode":1}
+```
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-05T23:56:16.390Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-06T08:18:01.285Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:32.645Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:52.513Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:39:56.081Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T11:40:53.389Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:31:49.201Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:32:48.778Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:35:56.806Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:41:36.877Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:02.683Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T12:42:33.755Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:03.544Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-06T14:23:31.076Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
 ```
 
@@ -1464,3 +1586,24 @@ server (EPERM). Re-running with local networking permitted passed 767 Vitest
 tests (four optional skips) and 67 script tests. No application-code fix was
 needed. The first install also correctly rejected Node 24.14.0; verification
 uses the repository-required isolated Node 24.16.0 and pnpm 11.25.0.
+
+
+## November 8 PR25 final review corrections
+
+Four presentation regressions reproduced locally before correction: omitted rights
+silently produced `rights_confirmed=true`; oversized candidate files were fully
+read; oversized pixel buffers decoded before rejection; rejected PNGs discarded
+the provider's actual model and fidelity disclosures. The minimal correction
+requires explicit API/CLI confirmation, bounds file reads, checks image headers
+before decoding, closes rejected image resources and captures returned provenance
+before validating the image. `processing/tests/test_presentation.py` contains the
+four regression cases; all twelve presentation tests and 476 offline Python tests
+pass. No source captures, credentials or provider calls were used.
+
+The existing hosted quality failure was PR metadata (`Complete PR section: Changes`),
+not a Python failure. The rewritten PR description uses the repository's required
+sections and records fresh evidence separately from historical results.
+
+The first remote fetch used the upstream repository for a fork-owned feature
+branch and failed without changing files; fetching `pull/25/head` pinned the
+correct source. Future pushes target the verified head repository explicitly.

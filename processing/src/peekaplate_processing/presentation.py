@@ -128,11 +128,14 @@ class FilePresentationProvider(PresentationProvider):
             if path.is_dir():
                 raise ExtractionError("Supply an actual candidate PNG image file, not a directory path.")
             try:
-                self.bytes = path.read_bytes()
+                with path.open("rb") as source:
+                    self.bytes = source.read(MAX_SOURCE_BYTES + 1)
             except OSError as err:
                 raise ExtractionError(f"Unable to read candidate PNG: {err}") from None
         else:
             raise ExtractionError("Either candidate_path or candidate_bytes must be supplied.")
+        if not self.bytes or len(self.bytes) > MAX_SOURCE_BYTES:
+            raise ExtractionError("Candidate PNG is empty or exceeds maximum size.")
         self.model_version = model_version
         self.preserved_original_viewpoint = preserved_original_viewpoint
         self.reconstructed_details_flagged = reconstructed_details_flagged
@@ -283,30 +286,30 @@ def validate_presentation_png(data: bytes, budget_bytes: int | None = None) -> P
     if budget_bytes is not None and len(data) > budget_bytes:
         raise ExtractionError(f"Presentation PNG size {len(data)} exceeds configured budget {budget_bytes}.")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", Image.DecompressionBombWarning)
-        try:
-            image = Image.open(io.BytesIO(data))
-            image.load()
-        except (UnidentifiedImageError, OSError, ValueError):
-            raise ExtractionError("Presentation image is not a valid image.") from None
-
-    if image.format != "PNG":
-        raise ExtractionError("Presentation image must be a PNG.")
-    if getattr(image, "n_frames", 1) > 1:
-        raise ExtractionError("Multi-frame images are not supported.")
-    if (image.width * image.height) > MAX_IMAGE_PIXELS:
-        raise ExtractionError("Presentation image exceeds maximum pixel bounds.")
-    if image.width < MIN_EDGE or image.height < MIN_EDGE:
-        raise ExtractionError(f"Presentation image dimensions must be at least {MIN_EDGE}x{MIN_EDGE}.")
-    if image.width != image.height:
-        raise ExtractionError(f"Presentation image must be square, got {image.width}x{image.height}.")
-
-    oriented = ImageOps.exif_transpose(image)
-    if oriented is None:
-        oriented = image
-
+    image = None
+    oriented = None
     try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            try:
+                image = Image.open(io.BytesIO(data))
+                if image.format != "PNG":
+                    raise ExtractionError("Presentation image must be a PNG.")
+                if getattr(image, "n_frames", 1) > 1:
+                    raise ExtractionError("Multi-frame images are not supported.")
+                if image.width * image.height > MAX_IMAGE_PIXELS:
+                    raise ExtractionError("Presentation image exceeds maximum pixel bounds.")
+                if image.width < MIN_EDGE or image.height < MIN_EDGE:
+                    raise ExtractionError(f"Presentation image dimensions must be at least {MIN_EDGE}x{MIN_EDGE}.")
+                if image.width != image.height:
+                    raise ExtractionError(f"Presentation image must be square, got {image.width}x{image.height}.")
+                image.load()
+            except ExtractionError:
+                raise
+            except (UnidentifiedImageError, OSError, ValueError,
+                    Image.DecompressionBombError, Image.DecompressionBombWarning):
+                raise ExtractionError("Presentation image is not a valid bounded image.") from None
+        oriented = ImageOps.exif_transpose(image)
         has_alpha = oriented.mode in ("RGBA", "LA") or (
             oriented.mode == "P" and "transparency" in oriented.info
         )
@@ -340,8 +343,10 @@ def validate_presentation_png(data: bytes, budget_bytes: int | None = None) -> P
             transparent_corners=True,
         )
     finally:
-        oriented.close()
-        image.close()
+        if oriented is not None:
+            oriented.close()
+        if image is not None:
+            image.close()
 
 
 def read_t0_manifest(path: Path) -> tuple[AssetManifest, bytes]:
@@ -393,7 +398,7 @@ def prepare_presentation_bundle(
     reference_path: Path,
     output_root: Path,
     capture_evidence: str,
-    rights_confirmed: bool = True,
+    rights_confirmed: bool = False,
     draft_id: str | None = None,
     budget_bytes: int | None = None,
     provider: PresentationProvider,
@@ -447,32 +452,28 @@ def prepare_presentation_bundle(
             budget_bytes=budget_bytes,
         )
 
+        effective_model_version = model_version
+        effective_preserved_vp = preserved_original_viewpoint
+        effective_reconstructed = reconstructed_details_flagged
+        effective_notes = list(fidelity_notes or [])
         try:
             result = provider.generate(request)
-            if isinstance(result.png_bytes, (bytes, bytearray)):
-                rejected_candidate_sha256 = hashlib.sha256(result.png_bytes).hexdigest()
-            presentation_asset = validate_presentation_png(result.png_bytes, budget_bytes)
-            presentation_png_bytes = result.png_bytes
             effective_model_version = result.model_version or model_version
             effective_preserved_vp = result.preserved_original_viewpoint or preserved_original_viewpoint
             effective_reconstructed = result.reconstructed_details_flagged or reconstructed_details_flagged
             effective_notes = list(result.fidelity_notes) + list(fidelity_notes or [])
+            if isinstance(result.png_bytes, (bytes, bytearray)):
+                rejected_candidate_sha256 = hashlib.sha256(result.png_bytes).hexdigest()
+            presentation_asset = validate_presentation_png(result.png_bytes, budget_bytes)
+            presentation_png_bytes = result.png_bytes
         except ExtractionError as err:
             status = "fallback_retained"
             fallback_retained = True
             validation_errors.append(str(err))
-            effective_model_version = model_version
-            effective_preserved_vp = preserved_original_viewpoint
-            effective_reconstructed = reconstructed_details_flagged
-            effective_notes = list(fidelity_notes or [])
         except Exception as err:
             status = "fallback_retained"
             fallback_retained = True
             validation_errors.append(f"Provider generation failed: {err}")
-            effective_model_version = model_version
-            effective_preserved_vp = preserved_original_viewpoint
-            effective_reconstructed = reconstructed_details_flagged
-            effective_notes = list(fidelity_notes or [])
 
         # Derive the id only after validation, so it identifies the delivered candidate and its
         # provenance rather than the source recipe alone. A retained fallback has its own identity.

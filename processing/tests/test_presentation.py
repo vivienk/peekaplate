@@ -4,6 +4,7 @@ import json
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch, Mock
 from pathlib import Path
 from uuid import UUID
 
@@ -23,6 +24,7 @@ from peekaplate_processing.presentation import (
     prepare_presentation_bundle,
     validate_presentation_png,
 )
+from peekaplate_processing.sources import MAX_SOURCE_BYTES
 
 DISH_ID = UUID("11111111-1111-4111-8111-111111111111")
 REVISION_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -64,6 +66,80 @@ class PresentationTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def test_rights_confirmation_is_required_by_api_and_cli(self):
+        output_root = self.root / "no-rights"
+        with self.assertRaisesRegex(ExtractionError, "Rights must be explicitly confirmed"):
+            prepare_presentation_bundle(
+                t0_manifest_path=self.t0_manifest_path,
+                cutout_path=self.cutout_path,
+                reference_path=self.ref_path,
+                output_root=output_root,
+                capture_evidence="Capture identity is not rights approval.",
+                provider=FilePresentationProvider(candidate_bytes=self.valid_png_bytes),
+            )
+        self.assertFalse(output_root.exists())
+        with self.assertRaises(SystemExit) as error:
+            prepare_presentation_main([
+                "--t0-manifest", str(self.t0_manifest_path),
+                "--cutout", str(self.cutout_path), "--reference", str(self.ref_path),
+                "--candidate-png", str(self.valid_candidate),
+                "--output-root", str(output_root), "--capture-evidence", "Capture identity only.",
+            ])
+        self.assertEqual(error.exception.code, 2)
+        self.assertFalse(output_root.exists())
+
+    def test_rejected_candidate_keeps_returned_provenance(self):
+        rejected = presentation_photo(512, 768, transparent_corners=True, has_alpha=True)
+        ids = []
+        for model in ("actual-model-a", "actual-model-b"):
+            prepared = prepare_presentation_bundle(
+                t0_manifest_path=self.t0_manifest_path,
+                cutout_path=self.cutout_path, reference_path=self.ref_path,
+                output_root=self.root / model, capture_evidence="Permitted synthetic capture.",
+                rights_confirmed=True,
+                provider=FilePresentationProvider(
+                    candidate_bytes=rejected, model_version=model,
+                    preserved_original_viewpoint=True, reconstructed_details_flagged=True,
+                    fidelity_notes=["Provider reported cropped plate."],
+                ),
+                model_version="requested-model",
+            )
+            saved = PresentationManifest.model_validate_json(
+                (prepared.directory / "presentation-manifest.json").read_bytes()
+            )
+            self.assertTrue(saved.fallback_retained)
+            self.assertEqual(saved.prompt.model_version, model)
+            self.assertTrue(saved.prompt.preserved_original_viewpoint)
+            self.assertTrue(saved.prompt.reconstructed_details_flagged)
+            self.assertEqual(saved.prompt.fidelity_notes, ["Provider reported cropped plate."])
+            self.assertIn("Reconstructed details flagged", " ".join(saved.review.warnings))
+            ids.append(prepared.asset_id)
+        self.assertNotEqual(*ids)
+
+    def test_candidate_file_read_is_bounded(self):
+        oversized = self.root / "oversized.png"
+        with oversized.open("wb") as stream:
+            stream.truncate(MAX_SOURCE_BYTES + 1)
+        with self.assertRaisesRegex(ExtractionError, "exceeds maximum size"):
+            FilePresentationProvider(candidate_path=oversized)
+        stream = Mock()
+        stream.read.return_value = b"x"
+        context = Mock()
+        context.__enter__ = Mock(return_value=stream)
+        context.__exit__ = Mock(return_value=False)
+        with patch.object(Path, "open", return_value=context):
+            FilePresentationProvider(candidate_path=oversized)
+        stream.read.assert_called_once_with(MAX_SOURCE_BYTES + 1)
+
+    def test_pixel_limit_is_checked_before_decode(self):
+        image = Mock(width=8000, height=8000, format="PNG", n_frames=1)
+        image.load.side_effect = AssertionError("Oversized image was decoded")
+        with patch("peekaplate_processing.presentation.Image.open", return_value=image):
+            with self.assertRaisesRegex(ExtractionError, "maximum pixel bounds"):
+                validate_presentation_png(b"synthetic-header")
+        image.load.assert_not_called()
+        image.close.assert_called_once()
 
     def test_valid_2048_transparent_presentation_bundle_links_provenance_and_stays_needs_review(self):
         provider = FilePresentationProvider(
@@ -118,6 +194,7 @@ class PresentationTests(unittest.TestCase):
             reference_path=self.ref_path,
             output_root=output_root,
             capture_evidence="Permitted studio capture.",
+            rights_confirmed=True,
             budget_bytes=budget_bytes,
             provider=FilePresentationProvider(candidate_bytes=candidate_bytes, model_version=model_version),
             model_version=model_version,
@@ -220,6 +297,7 @@ class PresentationTests(unittest.TestCase):
             reference_path=self.ref_path,
             output_root=self.root / "pres-nonsquare",
             capture_evidence="Permitted studio capture.",
+            rights_confirmed=True,
             provider=provider,
         )
         self.assertEqual(prepared.manifest.processing.status, "fallback_retained")
@@ -248,6 +326,7 @@ class PresentationTests(unittest.TestCase):
             reference_path=self.ref_path,
             output_root=self.root / "pres-opaque",
             capture_evidence="Permitted studio capture.",
+            rights_confirmed=True,
             provider=provider_opaque,
         )
         self.assertEqual(prepared_opaque.manifest.processing.status, "fallback_retained")
@@ -263,6 +342,7 @@ class PresentationTests(unittest.TestCase):
             reference_path=self.ref_path,
             output_root=self.root / "pres-budget",
             capture_evidence="Permitted studio capture.",
+            rights_confirmed=True,
             budget_bytes=10,  # 10 bytes budget is exceeded
             provider=provider_valid,
         )
@@ -283,6 +363,7 @@ class PresentationTests(unittest.TestCase):
             reference_path=self.ref_path,
             output_root=self.root / "pres-fidelity",
             capture_evidence="Permitted studio capture.",
+            rights_confirmed=True,
             provider=provider,
         )
         self.assertTrue(prepared.manifest.prompt.reconstructed_details_flagged)
@@ -309,6 +390,7 @@ class PresentationTests(unittest.TestCase):
                 reference_path=self.ref_path,
                 output_root=output_root,
                 capture_evidence="Permitted studio capture.",
+                rights_confirmed=True,
                 provider=provider,
             )
         self.assertFalse(output_root.exists())
@@ -321,6 +403,7 @@ class PresentationTests(unittest.TestCase):
                 reference_path=self.root,  # Directory reference!
                 output_root=output_root_dir,
                 capture_evidence="Permitted studio capture.",
+                rights_confirmed=True,
                 provider=provider,
             )
         self.assertFalse(output_root_dir.exists())
@@ -340,6 +423,7 @@ class PresentationTests(unittest.TestCase):
                 str(self.valid_candidate),
                 "--output-root",
                 str(output_root),
+                "--rights-confirmed",
                 "--capture-evidence",
                 "Permitted studio capture for CLI test.",
                 "--reconstructed-details-flagged",
@@ -362,6 +446,7 @@ class PresentationTests(unittest.TestCase):
                 str(self.valid_candidate),
                 "--output-root",
                 str(output_root),
+                "--rights-confirmed",
                 "--capture-evidence",
                 "Permitted studio capture for CLI test.",
             ]
@@ -383,6 +468,7 @@ class PresentationTests(unittest.TestCase):
                 str(opaque_candidate),
                 "--output-root",
                 str(self.root / "cli-fallback"),
+                "--rights-confirmed",
                 "--capture-evidence",
                 "Permitted studio capture for fallback test.",
             ]
