@@ -1718,3 +1718,8 @@ API/asset nodes; fingerprints are regenerated after final source/doc edits.
 The dependent #82 evaluation still expects the earlier count-bearing rationale;
 its branch must update that expectation when synchronized, then rerun evidence.
 No live model, provider or production call was made.
+
+
+## November 8 PR77 cached-page identity correction
+
+Three new core.test.ts cases reproduced cached-page sequence reuse, resurrection of an expired visit and reuse after stored state disappeared. identity.ts now reconciles the persisted identity before saving on pageshow, preserves the maximum sequence for the same producer, adopts a newer visit and starts fresh when persistent state cannot be recovered. All 44 tracking tests and four Chromium lifecycle/fixture tests pass. The first context handoff exceeded the 1000-character summary cap; its guard prevented any write. The summary was shortened and fingerprints refreshed without dropping either side of the append-only merge ledger.
