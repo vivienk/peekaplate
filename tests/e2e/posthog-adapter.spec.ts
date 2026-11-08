@@ -72,6 +72,70 @@ async function open(page: Page, status: (n: number) => number) {
 const call = (page: Page, script: string) =>
   page.evaluate(`(() => { const a = window.__posthog; ${script} })()`);
 
+test('the actual diner banner dispatches one live event to the real SDK and canonical sender', async ({
+  page,
+}) => {
+  const { requests } = await open(page, () => 200);
+  await page.evaluate(async () => {
+    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    tracking.connectPostHogFromEnv({
+      MODE: 'staging',
+      VITE_POSTHOG_ENABLED: 'true',
+      VITE_POSTHOG_ENVIRONMENT: 'staging',
+      VITE_POSTHOG_HOST: 'https://us.i.posthog.com',
+      VITE_POSTHOG_KEY: 'phc_browser_test_fixture',
+      VITE_POSTHOG_ALLOWED_ORIGIN: location.origin,
+    });
+    const canonical: { event_id: string; session_id: string; producer_id: string }[] = [];
+    Object.assign(window, { reviewCanonical: canonical });
+    tracking.enableLiveTracking(
+      async (batch: { event_id: string; session_id: string; producer_id: string }[]) => {
+        canonical.push(...batch);
+        return batch.map((event) => event.event_id);
+      },
+    );
+  });
+  expect(requests).toHaveLength(0);
+  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  const emit = () =>
+    page.evaluate(async () => {
+      const { track } = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+      track('menu_viewed', {
+        publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+        entry_source: 'qr',
+      });
+    });
+  await emit();
+  await expect.poll(() => requests.length).toBe(1);
+  await page.clock.runFor(5000);
+  const canonical = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            reviewCanonical: { event_id: string; session_id: string; producer_id: string }[];
+          }
+        ).reviewCanonical,
+    );
+  await expect.poll(async () => (await canonical()).length).toBe(1);
+  const observation = (await canonical())[0]!;
+  const sent = body(requests[0]!) as {
+    batch: { uuid: string; event: string; properties: object }[];
+  };
+  expect(sent.batch[0]).toMatchObject({
+    uuid: observation.event_id,
+    event: 'menu_viewed',
+    properties: { event_id: observation.event_id, entry_source: 'qr' },
+  });
+  expect(JSON.stringify(sent)).not.toContain(observation.session_id);
+  expect(JSON.stringify(sent)).not.toContain(observation.producer_id);
+  await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
+  await emit();
+  await page.clock.runFor(5000);
+  expect(requests).toHaveLength(1);
+  expect(await canonical()).toHaveLength(1);
+});
+
 test('a retry the SDK scheduled is never sent after withdrawal', async ({ page }) => {
   const { requests } = await open(page, (n) => (n === 1 ? 500 : 200));
   await call(
