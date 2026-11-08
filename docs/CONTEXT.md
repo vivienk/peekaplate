@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell, readable without JavaScript; consent-gated shell views exist, published screens pending. A replaceable menu source and known-field adapter give labelled synthetic fixtures. Search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different dishes, keeping comparison_id on replace. Save state keeps per-restaurant dish IDs newest first, rechecks withdrawn dishes, survives stale tabs. Save UI mounts hearts, badge and toasts; events only for committed writes; renderSavedScreen lists saved dishes. S3-TRK-01: track() builds schema-checked observation.v2 envelopes (shared P0 allowlist, IDs, per-tab identity) plus the activity clock. One consent gate (opt-in, DNT/GPC) covers both destinations: live events go once to PostHog (connectPostHogFromEnv) and to an IndexedDB outbox (500/1 MiB/24 h) batching 25/32 KiB every 5 s with a retry pause; withdrawal empties it; fixture mode only logs. Icons map allergen/dietary values to Figma assets; unwired.",
+      "summary": "Diner fixture menu, detail, search helpers, Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work synchronously and clears durable state before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -150,7 +150,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/batcher.ts",
         "frontend/diner/src/tracking/batcher.test.ts",
         "tests/e2e/tracking-outbox.spec.ts",
-        "frontend/diner/src/tracking/dispatch.test.ts"
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "frontend/diner/src/tracking/withdrawal.test.ts",
+        "tests/e2e/tracking-storage.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -159,7 +161,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "bc7c3cb6dfe2f80ce14fe364b61de14353a3f57a60ec03d4c7fb56891fb4cc94"
+      "sourceFingerprint": "3faf72ae2dfd83b307e46532c8a2829515a0e5bfe39f27f6d6af597f08f0f1a4"
     },
     {
       "id": "console",
@@ -404,7 +406,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a8ca18b7a307027c48cb91df461a50a8460ca541a70179aa7038b654fe9de08d"
+      "sourceFingerprint": "6402306233c31b02c71f333e80b9b58be51d9b46d0a301f710429e16074cd12f"
     },
     {
       "id": "agents",
@@ -437,7 +439,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Diner uses TRK-01's gate. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -466,7 +468,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b03cbc12dc1c2055a85f48276b3a53970385ebab8441c1224c28324bcd30be3b"
+      "sourceFingerprint": "93337c5394e61bbd04633458334363bce07d3ab0fceae3ad3e401b75775d5cc3"
     },
     {
       "id": "processing",
@@ -592,6 +594,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
+      "summary": "PR80 incorporates the PR77 cached-restore correction and current develop. Fixes cold-page withdrawal, delayed queued additions crossing re-opt-in, and stale-tab outbox snapshot replacement. The reused consent UI now controls the shared diner gate even without PostHog configuration; it no longer creates the separate legacy diner capture path. Console defaults are preserved. Atomic stores and generation retirement preserve canonical-only retries and independent PostHog capture.",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
+    },
+    {
+      "date": "2026-11-08",
       "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
       "modules": [
         "diner"
@@ -669,13 +680,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
-    },
-    {
-      "summary": "S3-DIN-02.4 compare logic: frontend/diner/src/compare/comparison.ts. startComparison(menu, kept, picked, newId) needs two different complete dishes and takes the ID maker as input until the TRK-01 newComparisonId() helper lands. replaceSide swaps either side, keeps comparison_id and ignores shown or incomplete dishes; replaceExclusions feeds the picker. dishComparedPayload builds the matrix v0.1h fields plus publication_revision_id for the TRK-01 layer (start/replace) or null for a failed comparison, e.g. a withdrawn dish; the screen sends it via track(). 8 Vitest cases.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Build the result screen on the shared dish card; emit only after a pair is actually displayed through the shared track() boundary. Preserve comparison_id across Replace, use the TRK-01 ID helper when available, and read save_available from existing DIN-02.1 state. Keep approved consent, independent PostHog/canonical delivery and fixture-mode restrictions in the tracking integration; this helper sends nothing."
     }
   ]
 }

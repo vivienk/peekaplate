@@ -1,88 +1,101 @@
-// The durable outbox (S3-TRK-01.2): events are stored before any send, so a reload, crash or
-// offline spell does not lose them. Limits follow matrix v0.1h (Adam, 31 Oct): at most 500 events
-// and 1 MiB, and nothing older than 24 hours. Overflow drops the oldest events, with a warning in
-// developer builds only. Records are stored unchanged, so each keeps its original session_id,
-// producer_id and event_id for retries. Storage failures never reach the UI.
+// Canonical-only outbox. Shared stores mutate the latest record atomically, never a tab snapshot.
 import type { Envelope } from './envelope';
 
 export const OUTBOX_MAX_EVENTS = 500;
 export const OUTBOX_MAX_BYTES = 1024 * 1024;
 export const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000;
 
-// The whole list is read and written at once: at most 500 events, so each save stays small.
-export type OutboxStore = { load(): Promise<Envelope[]>; save(events: Envelope[]): Promise<void> };
+type Change = (events: Envelope[]) => Envelope[];
+export type OutboxStore = {
+  load(): Promise<Envelope[]>;
+  update(change: Change): Promise<Envelope[]>;
+};
 
 const encoder = new TextEncoder();
 const sizeOf = (event: Envelope) => encoder.encode(JSON.stringify(event)).length;
-
 const isEnvelopeList = (value: unknown): value is Envelope[] =>
   Array.isArray(value) &&
   value.every(
     (item) =>
       typeof item === 'object' &&
       item !== null &&
-      typeof (item as Envelope).event_id === 'string' &&
-      typeof (item as Envelope).occurred_at === 'string',
+      typeof item.event_id === 'string' &&
+      typeof item.occurred_at === 'string',
   );
 
 export function memoryOutboxStore(): OutboxStore {
   let saved: Envelope[] = [];
   return {
     load: async () => [...saved],
-    save: async (events) => {
-      saved = [...events];
+    async update(change) {
+      saved = change([...saved]);
+      return [...saved];
     },
   };
 }
 
 const LOCAL_KEY = 'peekaplate:tracking:outbox:v1';
+const LOCK_NAME = 'peekaplate:tracking:outbox';
 
 export function localStorageOutboxStore(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>,
+  locks: Pick<LockManager, 'request'> | undefined = globalThis.navigator?.locks,
 ): OutboxStore {
+  // Without cross-tab locking, memory is safer than silently overwriting another tab's events.
+  if (!locks) return memoryOutboxStore();
+  const read = () => {
+    const raw = storage.getItem(LOCAL_KEY);
+    try {
+      const value: unknown = JSON.parse(raw ?? '[]');
+      return isEnvelopeList(value) ? value : [];
+    } catch {
+      return [];
+    }
+  };
   return {
-    async load() {
-      try {
-        const value: unknown = JSON.parse(storage.getItem(LOCAL_KEY) ?? '[]');
-        return isEnvelopeList(value) ? value : [];
-      } catch {
-        return [];
-      }
-    },
-    async save(events) {
-      storage.setItem(LOCAL_KEY, JSON.stringify(events));
-    },
+    load: async () => locks.request(LOCK_NAME, () => read()),
+    update: async (change) =>
+      locks.request(LOCK_NAME, () => {
+        const next = change(read());
+        storage.setItem(LOCAL_KEY, JSON.stringify(next));
+        return next;
+      }),
   };
 }
 
 const DB_NAME = 'peekaplate-tracking';
 const DB_STORE = 'outbox';
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
 export async function indexedDbOutboxStore(factory: IDBFactory): Promise<OutboxStore> {
-  const open = factory.open(DB_NAME, 1);
-  open.onupgradeneeded = () => open.result.createObjectStore(DB_STORE);
-  const db = await request(open);
-  const run = <T>(mode: IDBTransactionMode, use: (store: IDBObjectStore) => IDBRequest<T>) =>
-    request(use(db.transaction(DB_STORE, mode).objectStore(DB_STORE)));
-  return {
-    async load() {
-      const value: unknown = await run('readonly', (store) => store.get('events'));
-      return isEnvelopeList(value) ? value : [];
-    },
-    async save(events) {
-      await run('readwrite', (store) => store.put(events, 'events'));
-    },
-  };
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const open = factory.open(DB_NAME, 1);
+    open.onupgradeneeded = () => open.result.createObjectStore(DB_STORE);
+    open.onsuccess = () => resolve(open.result);
+    open.onerror = () => reject(open.error);
+  });
+  db.onversionchange = () => db.close();
+  const run = (change?: Change) =>
+    new Promise<Envelope[]>((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, change ? 'readwrite' : 'readonly');
+      const store = tx.objectStore(DB_STORE);
+      let result: Envelope[] = [];
+      tx.oncomplete = () => resolve(result);
+      tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Outbox transaction aborted'));
+      const get = store.get('events');
+      get.onsuccess = () => {
+        try {
+          const latest = isEnvelopeList(get.result) ? get.result : [];
+          result = change ? change(latest) : latest;
+          if (change) store.put(result, 'events');
+        } catch (error) {
+          tx.abort();
+          reject(error);
+        }
+      };
+    });
+  return { load: () => run(), update: (change) => run(change) };
 }
 
-// IndexedDB first, then localStorage, then memory (events kept for the visit only).
 export async function browserOutboxStore(): Promise<OutboxStore> {
   try {
     if (globalThis.indexedDB) return await indexedDbOutboxStore(globalThis.indexedDB);
@@ -104,54 +117,53 @@ export async function createOutbox(
   { now, warn = () => {} }: { now: () => number; warn?: (message: string) => void },
 ) {
   let events: Envelope[] = [];
-  try {
-    events = await store.load();
-  } catch {}
-
+  let durable = true;
   const fresh = (event: Envelope) => now() - Date.parse(event.occurred_at) <= MAX_EVENT_AGE_MS;
-
-  function enforceLimits() {
-    events = events.filter(fresh);
-    let bytes = events.reduce((total, event) => total + sizeOf(event), 0);
-    while (events.length > OUTBOX_MAX_EVENTS || (bytes > OUTBOX_MAX_BYTES && events.length > 0)) {
-      const dropped = events.shift();
+  function enforceLimits(latest: Envelope[]): Envelope[] {
+    const kept = latest.filter(fresh);
+    let bytes = kept.reduce((total, event) => total + sizeOf(event), 0);
+    while (kept.length > OUTBOX_MAX_EVENTS || (bytes > OUTBOX_MAX_BYTES && kept.length > 0)) {
+      const dropped = kept.shift();
       if (dropped) bytes -= sizeOf(dropped);
       warn('Tracking outbox full: dropped the oldest event');
     }
+    return kept;
   }
-
-  // A failed save keeps the events in memory for this visit; it never throws to the caller.
-  async function persist() {
-    try {
-      await store.save(events);
-    } catch {}
+  async function mutate(change: Change): Promise<Envelope[]> {
+    if (durable) {
+      try {
+        events = await store.update((latest) => enforceLimits(change(latest)));
+        return [...events];
+      } catch {
+        durable = false;
+        events = [];
+      }
+    }
+    // Do not revive a stale shared snapshot when storage fails; retain only this visit's new work.
+    events = enforceLimits(change(events));
+    return [...events];
   }
-
-  enforceLimits();
-
+  await mutate((latest) => latest);
   return {
-    async add(event: Envelope) {
+    async add(event: Envelope, allowed: () => boolean = () => true) {
       if (!fresh(event)) return;
-      events.push(event);
-      enforceLimits();
-      await persist();
+      await mutate((latest) =>
+        allowed() && !latest.some((item) => item.event_id === event.event_id)
+          ? [...latest, event]
+          : latest,
+      );
     },
-    // Called once an event has been handled (sent and receipted, or console-only in fixture mode).
     async remove(eventIds: string[]) {
       const done = new Set(eventIds);
-      events = events.filter((event) => !done.has(event.event_id));
-      await persist();
+      await mutate((latest) => latest.filter((event) => !done.has(event.event_id)));
     },
-    // Events still waiting, oldest first; anything that has aged past 24 hours is dropped first.
-    pending(): Envelope[] {
-      events = events.filter(fresh);
-      return [...events];
-    },
+    // Re-read shared state before sending so another tab's receipt or withdrawal takes effect.
+    pending: () => mutate((latest) => latest),
     bytes: () => events.reduce((total, event) => total + sizeOf(event), 0),
-    // Consent withdrawn: drop everything still waiting, in memory and in storage.
     async clear() {
       events = [];
-      await persist();
+      // Reopening must know if the durable withdrawal failed, even after a memory fallback.
+      await store.update(() => []);
     },
   };
 }

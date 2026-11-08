@@ -43,14 +43,21 @@ const devWarn = (message: string, detail?: string) => {
 type Pipeline = {
   queue(envelope: Envelope): void;
   pauseUntil(timestampMs: number): void;
-  clear(): void;
+  clear(): Promise<void>;
 };
 
 function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): Pipeline {
   const now = () => Date.now();
+  let retired = false;
+  let activeBatcher: ReturnType<typeof createBatcher> | undefined;
   const ready = storePromise.then(async (store) => {
     const outbox = await createOutbox(store, { now, warn: (message) => devWarn(message) });
-    const batcher = createBatcher(outbox, { deliver, triggers: browserBatchTriggers() });
+    const batcher = createBatcher(outbox, {
+      deliver: (batch) => (retired ? Promise.resolve([]) : deliver(batch)),
+      triggers: browserBatchTriggers(),
+    });
+    activeBatcher = batcher;
+    if (retired) batcher.stop();
     return { outbox, batcher };
   });
   // Adds run in order, even while the store is still opening.
@@ -60,8 +67,9 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
       chain = chain
         .then(() => ready)
         .then(async ({ outbox, batcher }) => {
-          await outbox.add(envelope);
-          batcher.added();
+          if (retired) return;
+          await outbox.add(envelope, () => !retired);
+          if (!retired) batcher.added();
         })
         .catch(() => {});
     },
@@ -69,10 +77,10 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
       ready.then(({ batcher }) => batcher.pauseUntil(timestampMs)).catch(() => {});
     },
     clear() {
-      chain = chain
-        .then(() => ready)
-        .then(({ outbox }) => outbox.clear())
-        .catch(() => {});
+      retired = true;
+      activeBatcher?.stop();
+      chain = chain.then(() => ready).then(({ outbox }) => outbox.clear());
+      return chain.then(() => {});
     },
   };
 }
@@ -91,6 +99,9 @@ let mode: 'fixture' | 'live' = 'fixture';
 let liveDeliver: Deliver = holdDeliver;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
+let clearing: Promise<void> = Promise.resolve();
+let withdrawalGeneration = 0;
+let clearedGeneration = 0;
 
 // For the PostHog adapter's isLive check: fixture mode never reaches PostHog.
 export function isLiveTracking(): boolean {
@@ -103,8 +114,20 @@ export function isLiveTracking(): boolean {
 // Sai (5 Nov), matching the PostHog adapter, which drops its own queued events.
 const WITHDRAWAL_CLEARS_QUEUE = true;
 onTrackingAllowedChange((allowed) => {
-  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) pipelines.live?.clear();
-  else if (allowed) resumeLiveDelivery();
+  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) {
+    const generation = ++withdrawalGeneration;
+    const old = pipelines.live;
+    delete pipelines.live;
+    const retired = old?.clear();
+    void retired?.catch(() => {});
+    clearing = clearing
+      .then(async () => {
+        if (retired) await retired;
+        else await (await browserOutboxStore()).update(() => []);
+        clearedGeneration = Math.max(clearedGeneration, generation);
+      })
+      .catch(() => {});
+  } else if (allowed) resumeLiveDelivery();
 });
 const consentedDeliver: Deliver = async (batch) => (isTrackingAllowed() ? liveDeliver(batch) : []);
 
@@ -207,7 +230,23 @@ function pipeline(): Pipeline {
     pipelines.fixture ??= createPipeline(Promise.resolve(memoryOutboxStore()), consoleDeliver);
     return pipelines.fixture;
   }
-  pipelines.live ??= createPipeline(browserOutboxStore(), consentedDeliver);
+  pipelines.live ??= createPipeline(
+    clearing.then(async () => {
+      const store = await browserOutboxStore();
+      if (clearedGeneration < withdrawalGeneration) {
+        const generation = withdrawalGeneration;
+        try {
+          await store.update(() => []);
+          clearedGeneration = Math.max(clearedGeneration, generation);
+        } catch {
+          // New work stays in memory rather than reopening records whose withdrawal failed.
+          return memoryOutboxStore();
+        }
+      }
+      return store;
+    }),
+    consentedDeliver,
+  );
   return pipelines.live;
 }
 

@@ -74,6 +74,7 @@ export function createBatcher(
   }: { deliver: Deliver; triggers: BatchTriggers; now?: () => number },
 ) {
   let flushing = false;
+  let stopped = false;
   // Retry pause (agreed with Ehab and Jeffin, 3 Nov): TRK-01.3 delivery calls pauseUntil after a
   // failed send, e.g. Date.now() + retryDelayMs(attempt, retryAfterMs), so a 429's Retry-After is
   // honoured. While paused, every trigger skips sending; events keep queuing in the outbox.
@@ -81,13 +82,15 @@ export function createBatcher(
   let resumeTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function flush() {
-    if (flushing || !triggers.isOnline() || now() < pausedUntil) return;
-    const batch = nextBatch(outbox.pending());
-    if (batch.length === 0) return;
+    if (stopped || flushing || !triggers.isOnline() || now() < pausedUntil) return;
     flushing = true;
     try {
+      const batch = nextBatch(await outbox.pending());
+      if (stopped || !triggers.isOnline() || now() < pausedUntil || batch.length === 0) return;
       const handled = await deliver(batch);
-      await outbox.remove(handled);
+      if (stopped) return;
+      const submitted = new Set(batch.map((event) => event.event_id));
+      await outbox.remove(handled.filter((id) => submitted.has(id)));
     } catch {
       // Kept for the next flush; the diner never sees a delivery failure.
     } finally {
@@ -106,20 +109,28 @@ export function createBatcher(
     flush,
     // Call after each event is queued: a full batch goes now instead of waiting for the timer.
     added() {
-      if (isFull(outbox.pending())) run();
+      if (stopped) return;
+      void outbox
+        .pending()
+        .then((pending) => {
+          if (!stopped && isFull(pending)) run();
+        })
+        .catch(() => {});
     },
     // Pauses every flush until timestampMs (Date.now() clock). The later time wins, so a shorter
     // pause never cuts an existing one short, and one flush runs when the pause ends. In memory
     // only; never throws.
     pauseUntil(timestampMs: number) {
       try {
-        if (!Number.isFinite(timestampMs) || timestampMs <= Math.max(pausedUntil, now())) return;
+        if (stopped || !Number.isFinite(timestampMs) || timestampMs <= Math.max(pausedUntil, now()))
+          return;
         pausedUntil = timestampMs;
         clearTimeout(resumeTimer);
         resumeTimer = setTimeout(run, timestampMs - now());
       } catch {}
     },
     stop() {
+      stopped = true;
       clearTimeout(resumeTimer);
       clearInterval(timer);
       stopHidden();

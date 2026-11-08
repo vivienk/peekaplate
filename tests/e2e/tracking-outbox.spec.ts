@@ -5,6 +5,70 @@ import { expect, type Page, test } from '@playwright/test';
 const DINER = 'http://127.0.0.1:5173/';
 const PUBLICATION = 'a5000000-0000-4000-8000-000000000001';
 
+test('the existing consent control gates both destinations even without PostHog configuration', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true });
+  await page.evaluate(() => {
+    const holder = window as unknown as {
+      tracking: { connectPostHog(sink: unknown): void };
+      reviewCaptures: unknown[];
+    };
+    holder.reviewCaptures = [];
+    holder.tracking.connectPostHog({
+      capturePostHog: (...args: unknown[]) => holder.reviewCaptures.push(args),
+      setConsent: () => {},
+    });
+  });
+  await trackMenuViewed(page);
+  await hidePage(page);
+  expect(await delivered(page)).toBe(0);
+  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Turn off optional analytics' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await trackMenuViewed(page);
+  await expect.poll(() => storedEvents(page)).toBe(1);
+  await hidePage(page);
+  await expect.poll(() => delivered(page)).toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewCaptures: unknown[] }).reviewCaptures.length,
+    ),
+  ).toBe(1);
+  await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
+  await trackMenuViewed(page);
+  await hidePage(page);
+  await expect.poll(() => storedEvents(page)).toBe(0);
+  expect(await delivered(page)).toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewCaptures: unknown[] }).reviewCaptures.length,
+    ),
+  ).toBe(1);
+});
+
+test('the consent control stays off when a browser privacy signal blocks the shared gate', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true });
+  await page.evaluate(() =>
+    (
+      window as unknown as { tracking: { setPrivacySignal(signal: () => boolean): void } }
+    ).tracking.setPrivacySignal(() => true),
+  );
+  const button = page.getByRole('button', { name: 'Allow optional analytics', exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await trackMenuViewed(page);
+  await hidePage(page);
+  expect(await delivered(page)).toBe(0);
+  await expect.poll(() => storedEvents(page)).toBe(0);
+});
+
 // `hold`: live mode without a sender, as in TRK-01.2 before delivery exists; events stay queued.
 type Options = { live?: boolean; consent?: boolean; hold?: boolean };
 
