@@ -1,0 +1,33 @@
+{
+  "draft_id": "draft:daily_special",
+  "candidate_id": "cand:daily_special",
+  "draft_index": 1,
+  "name": "Daily Chef Catch",
+  "description": "Ask server for today's market catch and preparation",
+  "category": "Specials",
+  "subcategory": null,
+  "category_page_number": 3,
+  "price_text": null,
+  "price_amount": null,
+  "price_currency": null,
+  "ingredients": null,
+  "source_id": "src_doc_single",
+  "source_text": "Daily Chef Catch - Market Price",
+  "image_id": null,
+  "code_point_spans": [
+    {
+      "segment_id": "seg_catch",
+      "start": 0,
+      "end": 31
+    }
+  ],
+  "utf16_spans": [
+    {
+      "segment_id": "seg_catch",
+      "start": 0,
+      "end": 31
+    }
+  ],
+  "review_warnings": ["Market price unlisted; requires manual pricing."],
+  "status": "needs_review"
+}
