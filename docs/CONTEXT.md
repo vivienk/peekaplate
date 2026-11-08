@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates.",
+      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 validates scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -37,7 +37,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
         "packages/contracts/src/review-persistence.ts",
-        "packages/contracts/src/review-persistence.test.ts"
+        "packages/contracts/src/review-persistence.test.ts",
+        "packages/contracts/src/owner-ai.ts",
+        "packages/contracts/src/owner-ai.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -45,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "801389392a40af22398443538130ef28b1a07fcd814d296a0cad9ea7b1552a31"
+      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
     },
     {
       "id": "tokens",
@@ -172,7 +174,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Observations are archived create-only in R2 before tenant-scoped canonical index/event/detail/fact persistence. Historical hosted baseline c6a47bd: six synthetic hosted checks passed, three earlier facts were backfilled, and genuine Brave menu/token/bundle requests reached Queue/R2/PostgreSQL. Retries store one fact; changed reuse is quarantined. Own tokens use the configured public JWK locally after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 adds synthetic coverage for cumulative checkpoint ordering, missing/corrupt archive recovery, archive-to-facts restoration, retry/redelivery, duplicate replay, and a two-session ingestion-to-canonical-facts flow with owner-view exclusion. These fixtures do not establish live staging acceptance, full DLQ/crash recovery, or end-to-end cross-tenant archive/replay isolation. Normal collection remains paused pending real controls/outbox/privacy and report acceptance.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -252,7 +254,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/review-command.test.ts",
         "backend/src/review-artifact.ts",
         "backend/src/review-artifact.test.ts",
-        "docs/review-api.md"
+        "docs/review-api.md",
+        "backend/src/owner-ai/index.ts",
+        "backend/src/owner-ai/recommendation.ts",
+        "backend/src/owner-ai/recommendation.test.ts",
+        "docs/owner-ai.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -265,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b02e0f0f361be52b4594d4a4acc3bafea4c8bad4330f1f03a7c66a32e2b7fe69"
+      "sourceFingerprint": "cf3deed9ce38c1652c19f5d12fc1b1306176e297a11927f63dbdf20bcb14ca3c"
     },
     {
       "id": "database",
@@ -570,6 +576,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
+      "summary": "PR46 safe recommendation core reconciled with develop e725b24, preserving PR25 assets and PR73 review/provenance behavior. Deterministic rules consume bounded, same-venue/report/window evidence and abstain on withheld input; no HTTP/model/effect execution. Re-review found internal eligible-session counts in owner rationale. A red/green regression proves output no longer changes for cohorts23vs97 while the ten-session input floor remains.26 focusedAI,888unit+67script,213SQL+76integration and build pass; timings and downstream handoff in docs/owner-ai.md. No deployment/provider calls.",
+      "modules": [
+        "contracts",
+        "backend"
+      ],
+      "next": "After merge synchronize #82 and update its evaluation.test.ts expected rationale to omit cohort counts, regenerate evidence, then review #112. Exact ISO-string window identity, real report provenance/privacy, API membership, production policy, model/UI and hosted acceptance remain integration gates."
+    },
+    {
+      "date": "2026-11-08",
       "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
       "modules": [
         "contracts",
@@ -644,13 +659,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "next": "After environment confirmation, reconcile develop and require current-head CI before review. Preserve approved bytes; any future legacy bundle requires an explicit compatibility decision."
-    },
-    {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
     }
   ]
 }
