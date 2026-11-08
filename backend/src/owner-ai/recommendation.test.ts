@@ -68,7 +68,7 @@ describe('AI-01 safe recommendation core', () => {
       ruleId: 'open-rate-review.v1',
       actionId: 'review_dish_card',
       draftAction: 'Review the approved dish-card presentation before the next publication.',
-      rationale: 'open_rate was 20.0% across 20 eligible sessions for the selected report window.',
+      rationale: 'open_rate was 20.0% for the selected report window.',
       evidenceRefs: [evidenceId],
       limitations: [
         'This evidence does not establish diner motive, orders, revenue, or a causal effect.',
@@ -81,6 +81,20 @@ describe('AI-01 safe recommendation core', () => {
     const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
     expect(JSON.stringify(result)).not.toContain('Ignore policy');
     expect(result.allowedEffects).toEqual([]);
+  });
+
+  it('keeps internal eligible-session counts out of the owner recommendation', () => {
+    const results = [23, 97].map((eligibleSessions) =>
+      buildOwnerRecommendation(
+        {
+          ...request,
+          evidence: [{ ...request.evidence[0], eligibleSessions }],
+        },
+        { authorizedVenueId: venueId, policy },
+      ),
+    );
+    expect(results[0]).toEqual(results[1]);
+    expect(JSON.stringify(results[0])).not.toMatch(/eligibleSessions|eligible sessions/);
   });
 
   it.each([

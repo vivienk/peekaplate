@@ -36,6 +36,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "packages/contracts/src/review-persistence.ts",
+        "packages/contracts/src/review-persistence.test.ts",
         "packages/contracts/src/owner-ai.ts",
         "packages/contracts/src/owner-ai.test.ts"
       ],
@@ -45,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "158112ca7250e53d42cfbe6cdd250a51571261b4edb5287a9699c080ca6dbabb"
+      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
     },
     {
       "id": "tokens",
@@ -172,7 +174,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases with count-free owner rationale; internal cohorts still enforce the ten-session floor.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -248,6 +250,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/service-artifacts/representative-bundle.json",
         "processing/tests/fixtures/service-artifacts/README.md",
         "backend/src/consumer/owner-synthetic.integration.ts",
+        "backend/src/review-command.ts",
+        "backend/src/review-command.test.ts",
+        "backend/src/review-artifact.ts",
+        "backend/src/review-artifact.test.ts",
+        "docs/review-api.md",
         "backend/src/owner-ai/index.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
@@ -266,7 +273,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "757d8c34435fd0df1dd263ac3d4a398059417316918d7acf56df2431c7c55ace"
+      "sourceFingerprint": "3147904d32f70a807b9d7ca5c4321b14bcbcf8c960255a76fb38721032c9eda0"
     },
     {
       "id": "database",
@@ -292,7 +299,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_metrics.sql",
         "tests/db/posthog.sql",
         "tests/db/staff.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261030120000_review_candidate_persistence.sql",
+        "tests/db/review_persistence.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -303,7 +312,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5575d401f817de18d01b69a2c93b595835e0575e0e251275757ad6648ec5cc75"
+      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
     },
     {
       "id": "measurement",
@@ -381,7 +390,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2e790e5b7dcc5b004ce450035e348f6c9aa1d857b6024678904e05fa27258a91"
+      "sourceFingerprint": "9cd810019c302435d3b4ad6fc7767a852e76932cb6186729f0a23c2943df5297"
     },
     {
       "id": "agents",
@@ -532,28 +541,88 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "e1f5dd6026943495b4f53235515dad797a4727285dc1c5267ede6d1c329deb2e"
+      "sourceFingerprint": "afa65c7c4e5294a5ed18c6b93b782ae654cff17a5bdf1ccfd5cab2db55efc288"
+    },
+    {
+      "id": "assets",
+      "status": "foundation",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Bundles are create-only, needs_review and publication.eligible=false. No automatic segmentation, image-provider calls, backend signing or diner integration; captured-food fidelity, rights and real-device acceptance remain manual.",
+      "paths": [
+        "processing/src/peekaplate_processing/assets.py",
+        "processing/src/peekaplate_processing/harness.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/prepare_spatial.py",
+        "processing/src/peekaplate_processing/spatial.py",
+        "processing/tests/test_assets.py",
+        "processing/tests/test_spatial.py",
+        "docs/asset-delivery.md",
+        "processing/src/peekaplate_processing/prepare_presentation.py",
+        "processing/src/peekaplate_processing/presentation.py",
+        "processing/tests/test_presentation.py",
+        "processing/src/peekaplate_processing/review_preview.py",
+        "processing/src/peekaplate_processing/review_preview_html.py",
+        "processing/tests/test_review_preview.py",
+        "playwright.review-preview.config.ts",
+        "tests/review-preview/review-preview.spec.ts"
+      ],
+      "adrs": [
+        "docs/adr/0004-visual-tiers.md",
+        "docs/adr/0005-tenancy-and-privacy.md"
+      ],
+      "dependsOn": [
+        "processing"
+      ],
+      "sourceFingerprint": "cb75092bc3c9bd83c2a463f6c050694aecb4cf4613a507f4698d5d90fbbe27a2"
     }
   ],
   "handoffs": [
     {
-      "date": "2026-11-07",
-      "summary": "AI-01 offline evaluation synchronized with the reconciled core and develop 5bfaa94 after #69/#116. Existing synthetic evaluation cases and standard entrypoint are preserved; no policy or oracle is changed.",
+      "date": "2026-11-08",
+      "summary": "AI-01 offline evaluation reconciled with merged core #46 and develop 95fedc5, preserving #25/#73. The expected rationale now omits internal cohort counts; the 9/10/11 input cases and synthetic policy are unchanged. Existing standard entrypoint and source/dirty provenance remain intact.",
       "modules": [
         "backend",
         "contracts"
       ],
-      "next": "Verify this stacked revision before human review. Producer comparison attribution, freshness evidence, pinned internal handoff and report-version compatibility remain integration dependencies."
+      "next": "Regenerate clean-commit development evidence, then synchronize #112. Human review, actual report producer handoff, independent rubric/model evaluation and hosted acceptance remain separate gates."
     },
     {
-      "date": "2026-11-07",
-      "summary": "AI-01 core reconciled with develop 5bfaa94 after the menu/detail foundation (#69) and comparison-attribution correction (#116). Product sources merge without conflict; the backend context fingerprint is recomputed from the combined source. Existing producer/reporting boundaries remain unchanged.",
+      "date": "2026-11-08",
+      "summary": "PR46 safe recommendation core reconciled with develop e725b24, preserving PR25 assets and PR73 review/provenance behavior. Deterministic rules consume bounded, same-venue/report/window evidence and abstain on withheld input; no HTTP/model/effect execution. Re-review found internal eligible-session counts in owner rationale. A red/green regression proves output no longer changes for cohorts23vs97 while the ten-session input floor remains.26 focusedAI,888unit+67script,213SQL+76integration and build pass; timings and downstream handoff in docs/owner-ai.md. No deployment/provider calls.",
       "modules": [
-        "backend",
         "contracts",
-        "diner"
+        "backend"
       ],
-      "next": "Verify this reconciliation and synchronize the stacked offline evaluation and report-input validator. Request human review on the new heads; report producer handoff, identity and live integration remain pending."
+      "next": "After merge synchronize #82 and update its evaluation.test.ts expected rationale to omit cohort counts, regenerate evidence, then review #112. Exact ISO-string window identity, real report provenance/privacy, API membership, production policy, model/UI and hosted acceptance remain integration gates."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
+      "modules": [
+        "assets",
+        "processing",
+        "delivery"
+      ],
+      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
+    },
+    {
+      "date": "2026-11-06",
+      "summary": "S3-VIS-03 PR #25 rebased linearly onto develop d6e5a16 (was c005b0f merge). schemas.py keeps develop's box-evidence validator and adds the asset/spatial/presentation models; asset files moved to their own assets context node because the processing summary is at its cap. Presentation asset ids derive after candidate validation from the candidate PNG hash and effective model version. Rebase QA: 465 Python tests, pnpm verify, 7 CLI and 6 Chromium harness cases passed on synthetic data (qa-reports/S3-VIS-03-test-report.md).",
+      "modules": [
+        "processing",
+        "assets",
+        "delivery"
+      ],
+      "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
     },
     {
       "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
@@ -594,29 +663,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Build the result screen on the shared dish card; emit only after a pair is actually displayed through the shared track() boundary. Preserve comparison_id across Replace, use the TRK-01 ID helper when available, and read save_available from existing DIN-02.1 state. Keep approved consent, independent PostHog/canonical delivery and fixture-mode restrictions in the tracking integration; this helper sends nothing."
-    },
-    {
-      "summary": "S3-DIN-01 event triggers: track(eventName, payload) in frontend/diner/src/tracking/index.ts (the S3-TRK-01 module folder, owned by Nifemi) is the shared console-only placeholder that TRK-01 replaces in place (fire-and-forget, never throws; Nifemi's Save events import the same file). menu/events.ts adds createMenuViewedTrigger (publication_revision_id + entry_source qr/direct_link/unknown, once per publication revision per page) and trackDishDetailOpened (dish ids, new opening_id, source menu_card/compare_view/direct/saved_screen, optional from_exposure_id/nav_relation, save_available; nothing for incomplete dishes). No envelope, consent or delivery; no screen calls them yet.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Harshita's menu and detail screens call the triggers when content is readable (not on tap or loading). save_available comes from DIN-02 saveState?.isSaveAvailable() ?? false. Confirm how a QR link sets entry_source. S3-TRK-01 replaces the console body without changing callers."
-    },
-    {
-      "summary": "S3-DIN-02.1 shared Save state: createSaveState({ venueId }) with isSaved, savedDishIds (newest first), savedCount, isSaveAvailable, mode, save, unsave, reconcile and subscribe, as agreed in the S3-DIN-02 thread. Saves are dish IDs in localStorage under peekaplate:saved:v1:<venueId>. A change writes, updates state, notifies and returns { changed, persisted, savedCount }, so Save events can fire only on committed writes. Blocked or full storage switches to in-memory session-only with no backfill; damaged data starts empty. reconcile runs only after a successful load, removes withdrawn dishes without an unsave and keeps incomplete ones. Per Adam (30 Oct) there is no live tab sync in P0, but each change re-reads storage and applies only its own change, so a stale tab cannot wipe another tab's saves. 50 Vitest and 6 Playwright cases pass on fixtures.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Wire the heart and badge (S3-DIN-02.2) once Harshita confirms mountSaveHeart/mountSaveBadge, then the Save events through track() and the Saved screen (.5) with the session-only notice. Two tabs saving in the same instant can still race (no cross-tab locking); accepted for P0. Live tab sync is P1."
-    },
-    {
-      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "delivery"
-      ],
-      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
     }
   ]
 }

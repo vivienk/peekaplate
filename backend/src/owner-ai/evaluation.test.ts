@@ -51,14 +51,14 @@ const baseResult = {
   approvalRequired: true,
   allowedEffects: [],
 };
-function recommendation(value = 0.2, sessions = 10) {
+function recommendation(value = 0.2) {
   return {
     ...baseResult,
     status: 'recommendation',
     ruleId: 'open-review.v1',
     actionId: 'review_dish_card',
     draftAction: 'Review the approved dish-card presentation before the next publication.',
-    rationale: `open_rate was ${(value * 100).toFixed(1)}% across ${sessions} eligible sessions for the selected report window.`,
+    rationale: `open_rate was ${(value * 100).toFixed(1)}% for the selected report window.`,
     evidenceRefs: [evidenceId],
     confidence: 'low',
     limitations: [
@@ -86,7 +86,7 @@ const cases: Case[] = [
     id: 'normal-11',
     criterion: 'privacy-floor',
     input: withEvidence({ eligibleSessions: 11 }),
-    expected: recommendation(0.2, 11),
+    expected: recommendation(0.2),
   },
   {
     id: 'valid-zero',

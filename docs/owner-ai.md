@@ -6,6 +6,13 @@ Status: local foundation for S3-AI-01. It is not an owner API, model integration
 
 `OwnerRecommendationRequestSchema` accepts only a bounded `owner-recommendation.v1` request tied to one venue, report version and exact time window. Available rate evidence requires at least ten eligible sessions. Missing, suppressed, stale, conflicting and unsupported evidence use value-free variants so a caller cannot reconstruct withheld cells. Unknown fields, duplicate evidence IDs and unsupported metrics are rejected.
 
+Eligible-session counts stay internal, matching `toOwnerReport()`. They enforce the
+privacy floor but never appear in recommendation text or the result payload.
+
+Window identity currently uses exact ISO strings. A future report adapter must
+reuse the request's window representation; a differently formatted but equivalent
+instant fails closed. This foundation does not normalize reporting windows.
+
 `buildOwnerRecommendation` receives the server-authorized venue separately and fails closed when the request or any evidence belongs to another venue, report version or time window. At most three unique report metrics and 1,000 context characters are admitted. Untrusted summaries are counted for the budget but are never copied into instructions or output. This slice permits one deterministic attempt, zero tool calls and zero executable effects.
 
 The result is either one review-only draft action with exact evidence references and limitations, or an explicit abstention. Every result is bound to the request venue, report version, window and a versioned policy; recommendation results also expose the selected rule and approved action ID. A contextual validator rejects fabricated evidence references or crossed request identities. Every result requires owner approval and carries an empty `allowedEffects` tuple. The implementation never publishes a menu, mutates data, sends a message, runs SQL or claims orders, revenue, diner motive or causality.
@@ -46,3 +53,40 @@ the report. Uneeza and Sai retain independent evaluation and validation.
 - Independent rubric evaluation and hosted evidence.
 
 Fixture tests establish the pure contract boundary only; they do not certify recommendation quality or production readiness.
+
+## November 8 core review handoff (merged #46)
+
+Reconciled with develop after #25 and #73. Their asset preparation, review API and
+source-provenance guard are preserved. The additional privacy regression failed
+before the template fix and passes afterward: changing only an internal cohort
+from 23 to 97 sessions no longer changes the owner-facing result. The ten-session
+input floor remains enforced.
+
+Recorded on the reviewed #46 core candidate `413f79e`: 26 focused AI tests (1.787s command time); `pnpm check`,
+888 unit and 67 script tests (24.237s); `pnpm verify test:db`, 213 SQL assertions
+and 76 integration tests (48.165s); `pnpm verify build` (7.254s).
+`pnpm exec playwright test --workers=1` passed all 51 Chromium checks (62.067s).
+These are synthetic/local checks, not live recommendation or model acceptance.
+
+#46 is merged. The synchronized #82 evaluation now expects the count-free
+rationale while retaining the internal 9/10/11-session boundary cases. Regenerate
+its clean-commit evaluation evidence before review, then synchronize #112. Do not
+restore internal counts to satisfy older fixtures. Producer/report privacy,
+freshness and live integration remain separately reviewed work.
+
+## November 8 evaluation synchronization (#82)
+
+The 21-case oracle now expects count-free recommendation text from the merged
+core. Ten- and eleven-session inputs yield the same public explanation; the
+nine-session input remains invalid. Five old expectations failed before this
+oracle update and all 21 pass afterward. The combined core/contract/evaluation
+suite passes 47 cases. Backend and contract strict TypeScript checks pass.
+
+These local checks reuse the existing Node 24.22.1 / pnpm 11.25.0 installation.
+Frozen installation is blocked by Windows link permissions; pnpm's dependency
+status action was set to warn for these runs, without changing engine or
+lockfile requirements. Full `pnpm check` is not green: the diner lacks its new
+workspace contract link, so type checking and broader test loading need a fresh
+installation. Clean-source evaluation reports are retained outside Git, with
+their actual commit and validation limits. No model, hosted API or independent
+rubric acceptance is established by this synchronization.
