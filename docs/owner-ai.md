@@ -82,14 +82,19 @@ nine-session input remains invalid. Five old expectations failed before this
 oracle update and all 21 pass afterward. The combined core/contract/evaluation
 suite passes 47 cases. Backend and contract strict TypeScript checks pass.
 
-These local checks reuse the existing Node 24.22.1 / pnpm 11.25.0 installation.
-Frozen installation is blocked by Windows link permissions; pnpm's dependency
-status action was set to warn for these runs, without changing engine or
-lockfile requirements. Full `pnpm check` is not green: the diner lacks its new
-workspace contract link, so type checking and broader test loading need a fresh
-installation. Clean-source evaluation reports are retained outside Git, with
-their actual commit and validation limits. No model, hosted API or independent
-rubric acceptance is established by this synchronization.
+Initial local checks reused the existing Node 24.22.1 / pnpm 11.25.0 installation
+with the dependency-status action set to warn because agent-side installation
+could not create Windows links. The contributor subsequently completed normal
+frozen installation (213 checked lock entries), resolving the missing workspace
+link without changing engine or lockfile policy.
+
+Normal #82 validation now passes lint, all seven package typechecks and 905
+application tests (four skipped). Of 67 script tests, 66 pass; the preview
+artifact-symlink regression cannot create its junction in the agent sandbox.
+Keep that security test intact and verify the aggregate check in a normal
+terminal or Linux CI. Context/docs checks pass. Clean-source evaluation reports
+are retained outside Git with their actual commit and limits. No model, hosted
+API or independent rubric acceptance is established by this synchronization.
 
 ## Internal report input validation
 
@@ -122,6 +127,8 @@ report version, production policy, live model or owner UI is added.
 
 Local validation passes 67 focused cases (26 core/contracts, 21 evaluation and
 20 internal report inputs), backend/contracts strict types and context/docs
-checks. The existing-installation and full-workspace limitations recorded above
-also apply here. This is not evidence for the unmerged nullable-freshness report
-producer, actual SQL cohorts or live owner integration.
+checks. After normal frozen installation, all seven package typechecks and 925
+application tests pass (four skipped); build/context/docs checks pass. The same
+preview-junction setup limitation prevents the agent aggregate check from being
+green. This is not evidence for the unmerged nullable-freshness report producer,
+actual SQL cohorts or live owner integration.

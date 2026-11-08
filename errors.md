@@ -1818,3 +1818,21 @@ needed to test artifact-symlink rejection. The other 66 script tests pass. This
 is a test-setup permission failure before the rejection assertion; retain that
 security regression and verify it in a normal terminal or Linux CI. Do not
 claim the aggregate check passed in this agent environment.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T19:03:06.421Z","exitCode":1}
+```
+
+## November 8 PR82 normal-install recheck
+
+Normal frozen installation completed in the contributor's terminal with 213
+policy-checked lock entries. The prior missing diner workspace dependency is
+resolved. With normal pnpm settings, #82 passes lint, all seven package strict
+typechecks and all 56 application test files (905 passed, four skipped).
+The remaining aggregate-check failure is observation
+2026-11-08T19:03:06.421Z: the preview security test cannot create its junction
+inside the agent sandbox; the other 66 script tests pass. Do not skip or alter
+that rejection test. Normal-terminal/Linux verification remains necessary for
+the aggregate check. Initial installation/temporary-path failures above remain
+historical observations; they are not failures in the corrected AI oracle.
