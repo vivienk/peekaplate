@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing, open-rate and active-session cells when the timed cohort is below ten, retaining independently safe metrics. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. Comparison report contract permits null eligible-session counts when privacy-floor cohorts are masked. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing, open-rate and active-session cells when the timed cohort is below ten, retaining independently safe metrics. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -39,7 +39,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/review-persistence.ts",
         "packages/contracts/src/review-persistence.test.ts",
         "packages/contracts/src/owner-ai.ts",
-        "packages/contracts/src/owner-ai.test.ts"
+        "packages/contracts/src/owner-ai.test.ts",
+        "packages/contracts/src/comparison-report.ts",
+        "packages/contracts/src/comparison-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -47,7 +49,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7e06aee83cb43f65a187aca8eb8e2c5616a0b70bf70c5a68e4a6e03312b28226"
+      "sourceFingerprint": "aa58ed7843b0aac1150f3d42b7d389555142eebd3b4b4fe8c56e72a90220f76f"
     },
     {
       "id": "tokens",
@@ -174,7 +176,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened pair dishes once, with same-producer local sequence breaking timestamp ties. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness is unverified until pipeline evidence confirms it. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical observation persistence; retries deduplicate and conflicts quarantine. Synthetic transport/backfill and local S4-DATA-04 archive, recovery, replay and owner-exclusion tests pass; hosted acceptance remains pending. Own-token verification uses configured public JWK with ES256/claim checks. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened pair dishes once per session, using same-producer local sequence to order timestamp ties. Small/complementary timing cohorts and insufficient periodic-comparison counts are masked; owner_report.v1 is validated and stripped. Freshness is unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Collection remains paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -260,7 +262,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/index.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
-        "docs/owner-ai.md"
+        "docs/owner-ai.md",
+        "backend/src/comparison-report.ts",
+        "backend/src/comparison-report.test.ts",
+        "backend/src/comparison-report.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -273,7 +278,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "198316f173ae235e18d93679e1f56166444b46e53f586d87ce1fa54bc49d8c91"
+      "sourceFingerprint": "8f2e2f11f2521635edd8c17ae80409136489d2f08d1468686d85d3db1ab200d7"
     },
     {
       "id": "database",

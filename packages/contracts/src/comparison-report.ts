@@ -21,7 +21,7 @@ const comparisonMetric = z.strictObject({
   current_value: z.number().nullable(),
   baseline_value: z.number().nullable(),
   delta: z.number().nullable(),
-  eligible_sessions: z.number().int().nonnegative(),
+  eligible_sessions: z.number().int().nonnegative().nullable(),
 });
 
 export const ComparisonReportSchema = z.strictObject({

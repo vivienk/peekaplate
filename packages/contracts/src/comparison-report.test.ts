@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { ComparisonReportSchema, ComparisonStatus } from './comparison-report';
 
-const metric = {
+const metric: {
+  metric_version: string;
+  status: string;
+  current_value: number | null;
+  baseline_value: number | null;
+  delta: number | null;
+  eligible_sessions: number | null;
+} = {
   metric_version: 'rate.v1',
   status: 'COMPARABLE',
   current_value: 0.4,
@@ -46,6 +53,12 @@ const report = () => ({
 describe('ComparisonReportSchema', () => {
   it('accepts a versioned comparison report', () => {
     expect(ComparisonReportSchema.safeParse(report()).success).toBe(true);
+  });
+
+  it('accepts a null eligible-session count when cohort size is suppressed', () => {
+    const suppressed = report();
+    suppressed.dishes[0]!.metrics.open_rate.eligible_sessions = null;
+    expect(ComparisonReportSchema.safeParse(suppressed).success).toBe(true);
   });
 
   it('exports the supported comparison statuses', () => {

@@ -26,7 +26,7 @@ type MetricValues = {
   current: number | null;
   baseline: number | null;
   delta: number | null;
-  eligibleSessions: number;
+  eligibleSessions: number | null;
   insufficient: boolean;
 };
 
@@ -69,7 +69,13 @@ function metric(
     baselineDenominator < 10;
 
   if (insufficient) {
-    return { current: null, baseline: null, delta: null, eligibleSessions: 0, insufficient: true };
+    return {
+      current: null,
+      baseline: null,
+      delta: null,
+      eligibleSessions: null,
+      insufficient: true,
+    };
   }
 
   return {

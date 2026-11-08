@@ -99,13 +99,15 @@ describe('readComparisonReport', () => {
     );
 
     expect(report.dishes[0]?.comparison_status).toBe('INSUFFICIENT');
-    expect(report.dishes[0]?.metrics.open_rate).toMatchObject({
-      status: 'INSUFFICIENT',
-      current_value: null,
-      baseline_value: null,
-      delta: null,
-      eligible_sessions: 0,
-    });
+    for (const comparisonMetric of Object.values(report.dishes[0]!.metrics)) {
+      expect(comparisonMetric).toMatchObject({
+        status: 'INSUFFICIENT',
+        current_value: null,
+        baseline_value: null,
+        delta: null,
+        eligible_sessions: null,
+      });
+    }
     expect(report.comparison_eligibility).toBe('INSUFFICIENT');
   });
 
