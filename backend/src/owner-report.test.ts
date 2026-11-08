@@ -140,7 +140,7 @@ describe('readOwnerReport report contract and session metrics', () => {
         date_window: { duration_hours: 24 },
         coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
         freshness: {
-          is_stale: false,
+          is_stale: null,
           last_event_ingested_at: '2026-11-06T09:00:00.000Z',
         },
         report_status: 'NORMAL',
@@ -163,6 +163,43 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(JSON.stringify(report)).not.toContain('eligible_sessions');
   });
 
+  it('masks timing-related indicators when nine of ten sessions have valid timing', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        total_sessions: 10,
+        exposed_open_sessions: 10,
+        open_eligible_sessions: 10,
+        engaged_sessions: 8,
+        saved_sessions: 3,
+        timed_sessions: 9,
+      }),
+    ]);
+
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+    );
+
+    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    expect(report).toMatchObject({
+      dishes: [
+        {
+          evidence_state: 'NORMAL',
+          metrics: {
+            active_sessions: { value: null, status: 'SUPPRESSED' },
+            avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+            timing_coverage: { value: null, status: 'SUPPRESSED' },
+            open_rate: { value: null, status: 'SUPPRESSED' },
+            engagement_rate: { value: 0.8, status: 'NORMAL' },
+            save_rate: { value: 0.3, status: 'NORMAL' },
+          },
+        },
+      ],
+    });
+  });
+
   it('accepts a source override while defaulting to production', async () => {
     const { client } = fakeClient('owner');
     const report = OwnerDishReportSchema.parse(
@@ -178,7 +215,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(report.source).toBe('synthetic');
   });
 
-  it('defers stale-state detection while preserving the latest ingestion timestamp', async () => {
+  it('marks freshness unavailable while preserving the latest ingestion timestamp', async () => {
     const now = new Date('2026-11-06T10:00:00Z');
     const staleClient = fakeClient('owner', [
       reportRow({ last_event_ingested_at: new Date('2026-11-06T08:59:59Z') }),
@@ -187,7 +224,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(staleReport).toMatchObject({
       report_metadata: {
         freshness: {
-          is_stale: false,
+          is_stale: null,
           last_event_ingested_at: '2026-11-06T08:59:59.000Z',
         },
       },
@@ -198,7 +235,7 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(emptyReport).toMatchObject({
       report_metadata: {
         freshness: {
-          is_stale: false,
+          is_stale: null,
           last_event_ingested_at: null,
         },
       },
@@ -216,13 +253,22 @@ describe('readOwnerReport report contract and session metrics', () => {
       statement.includes('app_private.owner_observation_v1'),
     );
 
-    expect(sql).toContain("obs.event_type = 'dish_compared'");
+    expect(sql).toContain("comp.event_type = 'dish_compared'");
+    expect(sql).toContain('qualified_comparisons');
+    expect(sql).toContain('comparison_engagement');
+    expect(sql).toContain('opened.occurred_at < comp.occurred_at');
+    expect(sql).toContain('opened.occurred_at = comp.occurred_at');
+    expect(sql).toContain('opened.producer_id = comp_order.producer_id');
+    expect(sql).toContain('opened.local_sequence < comp_order.local_sequence');
+    expect(sql).toContain('FROM app_private.observation_event event');
+    expect(sql).toContain('participant.dish_id');
     expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at <= $3');
     expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at <= $3');
     expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
     expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
     expect(sql).toContain('COUNT(DISTINCT');
-    expect(sql).toContain('sessions.has_comparison AND sessions.is_exposed');
+    expect(sql).toContain('sessions.has_active_engagement OR sessions.has_comparison');
+    expect(sql).not.toContain('sessions.has_comparison AND sessions.is_exposed');
     expect(sql).toContain('sessions.is_exposed AND sessions.has_direct_save');
     expect(sql).not.toContain('sessions.is_opened AND sessions.has_direct_save');
     expect(sql).not.toContain("obs.event_type = 'portion_compare'");

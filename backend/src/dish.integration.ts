@@ -1040,8 +1040,9 @@ describe('Multi-tenant owner report isolation', () => {
       targetDishId = dishId,
       targetRevisionId = dish.revisionId,
       trafficClass: 'live' | 'test' = 'live',
+      occurredAt = new Date(),
     ) => {
-      const eventId = await insertEvent('dish_viewed', sessionId, new Date(), trafficClass);
+      const eventId = await insertEvent('dish_viewed', sessionId, occurredAt, trafficClass);
       const exposureId = crypto.randomUUID();
       await admin.query(
         `INSERT INTO app_private.observation_exposure
@@ -1091,8 +1092,16 @@ describe('Multi-tenant owner report isolation', () => {
       );
     };
 
-    const addComparison = async (sessionId: string) => {
-      const eventId = await insertEvent('dish_compared', sessionId);
+    const addComparison = async (
+      sessionId: string,
+      comparedDishId = dishId,
+      comparedRevisionId = dish.revisionId,
+      otherDishId = crypto.randomUUID(),
+      otherRevisionId = crypto.randomUUID(),
+      occurredAt = new Date(),
+      comparisonId = crypto.randomUUID(),
+    ) => {
+      const eventId = await insertEvent('dish_compared', sessionId, occurredAt);
       await admin.query(
         `INSERT INTO app_private.observation_comparison
           (tenant_id, event_id, dish_id, dish_revision_id, other_dish_id,
@@ -1101,11 +1110,11 @@ describe('Multi-tenant owner report isolation', () => {
         [
           venue,
           eventId,
-          dishId,
-          dish.revisionId,
-          crypto.randomUUID(),
-          crypto.randomUUID(),
-          crypto.randomUUID(),
+          comparedDishId,
+          comparedRevisionId,
+          otherDishId,
+          otherRevisionId,
+          comparisonId,
         ],
       );
     };
@@ -1183,7 +1192,7 @@ describe('Multi-tenant owner report isolation', () => {
     expect(ownerReport.dishes[0]?.metrics).toMatchObject({
       active_sessions: { value: 12, status: 'NORMAL' },
       open_rate: { value: 0.833, status: 'NORMAL' },
-      engagement_rate: { value: 0.286, status: 'NORMAL' },
+      engagement_rate: { value: 0.429, status: 'NORMAL' },
       save_rate: { value: 0.167, status: 'NORMAL' },
       avg_interaction_time_seconds: { value: 6.5, status: 'NORMAL' },
       timing_coverage: { value: 0.714, status: 'NORMAL' },
@@ -1191,6 +1200,166 @@ describe('Multi-tenant owner report isolation', () => {
     expect(JSON.stringify(ownerReport)).not.toContain('eligible_sessions');
 
     const liveDishMetrics = structuredClone(ownerReport.dishes[0]?.metrics);
+    const firstPairDishId = crypto.randomUUID();
+    const firstPairDishResponse = await request(
+      firstPairDishId,
+      command({ name: 'Comparison soup' }),
+    );
+    expect(firstPairDishResponse.status).toBe(200);
+    const firstPairDish = (await firstPairDishResponse.json()) as { revisionId: string };
+    const secondPairDishId = crypto.randomUUID();
+    const secondPairDishResponse = await request(
+      secondPairDishId,
+      command({ name: 'Comparison salad' }),
+    );
+    expect(secondPairDishResponse.status).toBe(200);
+    const secondPairDish = (await secondPairDishResponse.json()) as { revisionId: string };
+    const pairStart = Date.now() - 2 * 60_000;
+
+    for (let index = 0; index < 11; index++) {
+      const sessionId = crypto.randomUUID();
+      const sessionStart = new Date(pairStart + index * 1_000);
+      const firstExposure = await addExposure(
+        sessionId,
+        firstPairDishId,
+        firstPairDish.revisionId,
+        'live',
+        sessionStart,
+      );
+      const secondExposure = await addExposure(
+        sessionId,
+        secondPairDishId,
+        secondPairDish.revisionId,
+        'live',
+        sessionStart,
+      );
+      const comparisonId = crypto.randomUUID();
+
+      if (index < 10) {
+        const openingAt = new Date(sessionStart.getTime() + 100);
+        await addOpening(
+          sessionId,
+          'menu_card',
+          firstExposure,
+          undefined,
+          undefined,
+          openingAt,
+          firstPairDishId,
+          firstPairDish.revisionId,
+        );
+        await addComparison(
+          sessionId,
+          firstPairDishId,
+          firstPairDish.revisionId,
+          secondPairDishId,
+          secondPairDish.revisionId,
+          index === 0 ? openingAt : new Date(sessionStart.getTime() + 200),
+          comparisonId,
+        );
+        if (index === 0) {
+          await addComparison(
+            sessionId,
+            firstPairDishId,
+            firstPairDish.revisionId,
+            secondPairDishId,
+            secondPairDish.revisionId,
+            new Date(sessionStart.getTime() + 250),
+            comparisonId,
+          );
+        }
+        await addOpening(
+          sessionId,
+          'menu_card',
+          secondExposure,
+          undefined,
+          undefined,
+          new Date(sessionStart.getTime() + 300),
+          secondPairDishId,
+          secondPairDish.revisionId,
+        );
+      } else {
+        await addComparison(
+          sessionId,
+          firstPairDishId,
+          firstPairDish.revisionId,
+          secondPairDishId,
+          secondPairDish.revisionId,
+          new Date(sessionStart.getTime() + 100),
+          comparisonId,
+        );
+        await addOpening(
+          sessionId,
+          'menu_card',
+          firstExposure,
+          undefined,
+          undefined,
+          new Date(sessionStart.getTime() + 100),
+          firstPairDishId,
+          firstPairDish.revisionId,
+        );
+        await addOpening(
+          sessionId,
+          'menu_card',
+          secondExposure,
+          undefined,
+          undefined,
+          new Date(sessionStart.getTime() + 300),
+          secondPairDishId,
+          secondPairDish.revisionId,
+        );
+      }
+    }
+
+    const pairReport = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    for (const pairDishId of [firstPairDishId, secondPairDishId]) {
+      const pairDishReport = pairReport.dishes.find((item) => item.dish_id === pairDishId);
+      expect(pairDishReport?.metrics.engagement_rate).toEqual({
+        value: 0.909,
+        status: 'NORMAL',
+      });
+    }
+
+    const timingDishId = crypto.randomUUID();
+    const timingDishResponse = await request(timingDishId, command({ name: 'Timing cohort dish' }));
+    expect(timingDishResponse.status).toBe(200);
+    const timingDish = (await timingDishResponse.json()) as { revisionId: string };
+    const timingStart = Date.now() - 60_000;
+    for (let index = 0; index < 10; index++) {
+      const sessionId = crypto.randomUUID();
+      const sessionStart = new Date(timingStart + index * 1_000);
+      const exposureId = await addExposure(
+        sessionId,
+        timingDishId,
+        timingDish.revisionId,
+        'live',
+        sessionStart,
+      );
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposureId,
+        index < 9 ? 5_000 : undefined,
+        new Date(sessionStart.getTime() + 200),
+        new Date(sessionStart.getTime() + 100),
+        timingDishId,
+        timingDish.revisionId,
+      );
+    }
+    const timingReport = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    const timingDishReport = timingReport.dishes.find((item) => item.dish_id === timingDishId);
+    expect(timingDishReport?.metrics).toMatchObject({
+      active_sessions: { value: null, status: 'SUPPRESSED' },
+      avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+      timing_coverage: { value: null, status: 'SUPPRESSED' },
+      open_rate: { value: null, status: 'SUPPRESSED' },
+      engagement_rate: { value: 0, status: 'VALID_ZERO' },
+      save_rate: { value: 0, status: 'VALID_ZERO' },
+    });
+
     const testOnlySessions = Array.from({ length: 12 }, () => crypto.randomUUID());
     for (const sessionId of testOnlySessions) {
       const exposureId = await addExposure(sessionId, dishId, dish.revisionId, 'test');
@@ -1210,8 +1379,9 @@ describe('Multi-tenant owner report isolation', () => {
     const afterTestTraffic = OwnerDishReportSchema.parse(
       await (await requestReport(venue, actor)).json(),
     );
-    expect(afterTestTraffic.dishes).toHaveLength(1);
-    expect(afterTestTraffic.dishes[0]?.metrics).toEqual(liveDishMetrics);
+    expect(afterTestTraffic.dishes.find((item) => item.dish_id === dishId)?.metrics).toEqual(
+      liveDishMetrics,
+    );
     expect(JSON.stringify(afterTestTraffic)).not.toContain('test');
 
     const cohortCases: Array<{ sessions: number; dishId: string; revisionId: string }> = [];
@@ -1232,7 +1402,7 @@ describe('Multi-tenant owner report isolation', () => {
           sessionId,
           'menu_card',
           exposureId,
-          undefined,
+          5_000,
           undefined,
           undefined,
           cohortDishId,

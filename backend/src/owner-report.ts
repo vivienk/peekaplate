@@ -81,6 +81,82 @@ const OWNER_REPORT_QUERY = `
       AND act.occurred_at >= $2
       AND act.occurred_at <= $3
   ),
+  event_order AS (
+    SELECT
+      event.tenant_id,
+      event.event_id,
+      event.session_id,
+      event.producer_id,
+      event.local_sequence
+    FROM app_private.observation_event event
+    JOIN filtered_observations obs
+      ON obs.tenant_id = event.tenant_id
+      AND obs.event_id = event.event_id
+    WHERE event.tenant_id = $1
+  ),
+  dish_openings AS (
+    SELECT
+      obs.tenant_id,
+      obs.session_id,
+      obs.dish_id,
+      obs.occurred_at,
+      event_order.producer_id,
+      event_order.local_sequence
+    FROM filtered_observations obs
+    JOIN event_order
+      ON event_order.tenant_id = obs.tenant_id
+      AND event_order.event_id = obs.event_id
+      AND event_order.session_id = obs.session_id
+    WHERE obs.event_type = 'dish_detail_opened'
+  ),
+  qualified_comparisons AS (
+    SELECT
+      comp.tenant_id,
+      comp.session_id,
+      comp.comparison_id,
+      comp.occurred_at,
+      comp.dish_id,
+      comp.other_dish_id,
+      comp_order.producer_id,
+      comp_order.local_sequence
+    FROM filtered_observations comp
+    JOIN event_order comp_order
+      ON comp_order.tenant_id = comp.tenant_id
+      AND comp_order.event_id = comp.event_id
+      AND comp_order.session_id = comp.session_id
+    WHERE comp.event_type = 'dish_compared'
+      AND comp.comparison_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM dish_openings opened
+        WHERE opened.tenant_id = comp.tenant_id
+          AND opened.session_id = comp.session_id
+          AND opened.dish_id IN (comp.dish_id, comp.other_dish_id)
+          AND (
+            opened.occurred_at < comp.occurred_at
+            OR (
+              opened.occurred_at = comp.occurred_at
+              AND opened.producer_id = comp_order.producer_id
+              AND opened.local_sequence < comp_order.local_sequence
+            )
+          )
+      )
+  ),
+  comparison_engagement AS (
+    SELECT DISTINCT
+      comp.tenant_id,
+      comp.session_id,
+      participant.dish_id
+    FROM qualified_comparisons comp
+    CROSS JOIN LATERAL (VALUES (comp.dish_id), (comp.other_dish_id)) participant(dish_id)
+    WHERE EXISTS (
+      SELECT 1
+      FROM dish_openings opened
+      WHERE opened.tenant_id = comp.tenant_id
+        AND opened.session_id = comp.session_id
+        AND opened.dish_id = participant.dish_id
+    )
+  ),
   dish_sessions AS (
     SELECT
       obs.dish_id,
@@ -88,7 +164,6 @@ const OWNER_REPORT_QUERY = `
       obs.session_id,
       BOOL_OR(obs.event_type = 'dish_viewed') AS is_exposed,
       BOOL_OR(obs.event_type = 'dish_detail_opened') AS is_opened,
-      BOOL_OR(obs.event_type = 'dish_compared' AND obs.comparison_id IS NOT NULL) AS has_comparison,
       BOOL_OR(obs.event_type = 'dish_saved' AND obs.save_origin = 'direct') AS has_direct_save,
       MAX(obs.first_received_at) AS last_event_ingested_at
     FROM filtered_observations obs
@@ -118,7 +193,7 @@ const OWNER_REPORT_QUERY = `
       sessions.is_exposed,
       sessions.is_opened,
       sessions.has_direct_save,
-      sessions.has_comparison,
+      COALESCE(BOOL_OR(comparisons.dish_id IS NOT NULL), false) AS has_comparison,
       sessions.last_event_ingested_at,
       COALESCE(BOOL_OR(openings.active_ms >= 10000), false) AS has_active_engagement,
       COALESCE(BOOL_OR(openings.has_final_checkpoint), false) AS has_timing
@@ -126,6 +201,10 @@ const OWNER_REPORT_QUERY = `
     LEFT JOIN opening_metrics openings
       ON openings.dish_id = sessions.dish_id
       AND openings.session_id = sessions.session_id
+    LEFT JOIN comparison_engagement comparisons
+      ON comparisons.tenant_id = $1
+      AND comparisons.dish_id = sessions.dish_id
+      AND comparisons.session_id = sessions.session_id
     GROUP BY
       sessions.dish_id,
       sessions.dish_name,
@@ -133,7 +212,6 @@ const OWNER_REPORT_QUERY = `
       sessions.is_exposed,
       sessions.is_opened,
       sessions.has_direct_save,
-      sessions.has_comparison,
       sessions.last_event_ingested_at
   ),
   dish_metrics AS (
@@ -146,10 +224,7 @@ const OWNER_REPORT_QUERY = `
       ) AS exposed_open_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (WHERE sessions.is_opened) AS open_eligible_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (
-        WHERE sessions.is_opened AND (
-          sessions.has_active_engagement
-          OR (sessions.has_comparison AND sessions.is_exposed)
-        )
+        WHERE sessions.is_opened AND (sessions.has_active_engagement OR sessions.has_comparison)
       ) AS engaged_sessions,
       COUNT(DISTINCT sessions.session_id) FILTER (
         WHERE sessions.is_exposed AND sessions.has_direct_save
@@ -248,8 +323,7 @@ function buildInternalReport(
         measurable_dishes_count: rows.filter((row) => Number(row.total_sessions) >= 10).length,
       },
       freshness: {
-        // TODO: Awaiting Sai's confirmation on PR thread to either implement the 5-minute pipeline acceptance delay validation or officially defer to S5 pipeline tracking
-        is_stale: false,
+        is_stale: null,
         last_event_ingested_at: lastEventIngestedAt,
       },
       report_status: rows.length === 0 ? 'EMPTY' : 'NORMAL',

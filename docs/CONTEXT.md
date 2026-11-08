@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates.",
+      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observations, receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing, open-rate and active-session cells when the timed cohort is below ten, retaining independently safe metrics. Null is_stale means freshness is unverified. RES-01.1 review candidates.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -43,7 +43,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "044bc52ac2f0c0a8aa4d10836866dba6b0fae5e9511fcda1b7198b22e40a26cf"
+      "sourceFingerprint": "f2271166fbbfed07cb2d4376fb183f6ce06ddc5801eac390cf054b1e2cbc453f"
     },
     {
       "id": "tokens",
@@ -170,7 +170,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Canonical observations are archived create-only in R2 before tenant-scoped facts; hosted synthetic/genuine-token transport and backfill pass, retries persist one fact and changed reuse is quarantined. S4-DATA-04 covers synthetic checkpoint, archive recovery, replay and owner exclusion. The owner dish-report API checks membership, bounds events/activity to 24h, computes same-dish comparison and direct-save metrics, suppresses below ten sessions, and validates/strips owner_report.v1. Provenance defaults to production; latest ingestion time is shown but is_stale is fixed false pending Sai's decision on five-minute acceptance-delay validation vs S5 tracking. Database tests cover cohorts, test-traffic exclusion and owner revocation. Nine unit tests and 73 disposable DB integration tests pass; hosted acceptance remains unverified. Collection remains paused pending controls/outbox/privacy, recovery and report acceptance.",
+      "summary": "Observations are archived create-only in R2 before tenant facts; synthetic/genuine-token transport and backfill pass, retries are idempotent and changed reuse is quarantined. S4-DATA-04 tests checkpoints, recovery, replay and owner exclusion. Owner reports authorize membership and bound event/activity/comparison evidence to 24h; comparison credits both opened pair dishes once per session, using same-producer local sequence to order timestamp ties. Small and complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Source defaults to production; actual latest ingestion time is shown but is_stale is null until pipeline evidence verifies freshness. Database tests cover chronology, cohorts, test-traffic exclusion and owner revocation. Hosted acceptance remains unverified. Collection awaits controls/outbox/privacy, recovery and report gates.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -276,7 +276,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4a653986cd1c91690e00b48b5689edaa758c03564cecf69a1beafb79c424de18"
+      "sourceFingerprint": "94e108c2e0d11464b52de89031eb3fa641eb34a9d1a3e91e11922de7b72348dc"
     },
     {
       "id": "database",
@@ -556,12 +556,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 7 owner-report precision follow-up: the owner-scoped report bounds event and activity timestamps to the supplied 24-hour window, and comparison engagement requires an opened same-dish session. Integration fixtures cover a future opening, an out-of-window activity checkpoint and a comparison-only session. All metric values remain suppressed below ten sessions; internal cohorts are stripped by owner_report.v1. Freshness currently exposes the latest ingestion timestamp but hard-codes is_stale=false pending Sai's policy confirmation. Hosted acceptance remains unverified.",
+      "summary": "November 8 owner-report follow-up: the owner-scoped report bounds event, timing and comparison evidence to the supplied 24-hour window. A comparison qualifies only after either participant opens; each participant opened in that session receives one engagement credit, including a later second opening. Real-PostgreSQL fixtures cover ordered and premature comparisons, duplicate pair events and a 10-active/9-timed complementary-suppression case. Owner serialization hides timing-derived indicators while retaining independently safe metric cohorts. The actual latest ingestion timestamp remains visible, but is_stale is null until target pipeline evidence verifies freshness. Hosted acceptance remains unverified.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Obtain Sai's confirmation to implement the five-minute acceptance-to-report delay check or defer freshness to S5; keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
+      "next": "Keep freshness unavailable until accepted-online observation-to-summary evidence and its agreed delay policy are verified; do not infer staleness from a quiet venue. Keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",

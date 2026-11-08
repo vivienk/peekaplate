@@ -107,7 +107,8 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
           }),
         freshness: z.strictObject({
           last_event_ingested_at: z.iso.datetime().nullable(),
-          is_stale: z.boolean(),
+          // Null means pipeline evidence is insufficient to verify freshness.
+          is_stale: z.boolean().nullable(),
         }),
         report_status: z.enum(['NORMAL', 'EMPTY', 'STALE', 'ERROR']),
       })
@@ -156,7 +157,15 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
             }
             // Until the floor is shown to be met, nothing may reveal behavior, including the
             // other metrics.
-            if (sessions.status !== 'NORMAL') {
+            const complementarySuppression =
+              !checkCohorts &&
+              sessions.status === 'SUPPRESSED' &&
+              dish.evidence_state === 'NORMAL' &&
+              dish.metrics.avg_interaction_time_seconds.status === 'SUPPRESSED' &&
+              dish.metrics.timing_coverage.status === 'SUPPRESSED' &&
+              dish.metrics.open_rate.status === 'SUPPRESSED';
+            // The serializer may hide these cells while retaining independently safe cohorts.
+            if (sessions.status !== 'NORMAL' && !complementarySuppression) {
               for (const [name, value] of Object.entries(dish.metrics)) {
                 if (shows(value.status)) {
                   ctx.addIssue({
@@ -235,11 +244,27 @@ export function toOwnerReport(internal: unknown): OwnerDishReport {
   const report = InternalOwnerDishReportSchema.parse(internal);
   return OwnerDishReportSchema.parse({
     ...report,
-    dishes: report.dishes.map((dish) => ({
-      ...dish,
-      metrics: Object.fromEntries(
-        Object.entries(dish.metrics).map(([name, { value, status }]) => [name, { value, status }]),
-      ),
-    })),
+    dishes: report.dishes.map((dish) => {
+      const hideTimingRelatedMetrics =
+        dish.metrics.avg_interaction_time_seconds.eligible_sessions < PRIVACY_FLOOR_SESSIONS;
+      const timingRelatedMetrics = new Set([
+        'active_sessions',
+        'avg_interaction_time_seconds',
+        'timing_coverage',
+        'open_rate',
+      ]);
+
+      return {
+        ...dish,
+        metrics: Object.fromEntries(
+          Object.entries(dish.metrics).map(([name, { value, status }]) => [
+            name,
+            hideTimingRelatedMetrics && timingRelatedMetrics.has(name)
+              ? { value: null, status: 'SUPPRESSED' }
+              : { value, status },
+          ]),
+        ),
+      };
+    }),
   });
 }
