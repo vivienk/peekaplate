@@ -211,7 +211,7 @@ export function buildOwnerRecommendation(
       ruleId: match.rule.ruleId,
       actionId: match.rule.actionId,
       draftAction: actionText[match.rule.actionId],
-      rationale: `${match.evidence.metricKey} was ${percentage}% across ${match.evidence.eligibleSessions} eligible sessions for the selected report window.`,
+      rationale: `${match.evidence.metricKey} was ${percentage}% for the selected report window.`,
       evidenceRefs: [match.evidence.evidenceId],
       limitations: [noCausalClaims],
       confidence: match.rule.confidence,
