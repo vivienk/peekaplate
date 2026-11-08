@@ -149,6 +149,46 @@ describe('per-tab, per-visit identity', () => {
     expect(page.identity.next()).toMatchObject({ producerId: a.producerId, localSequence: 2 });
   });
 
+  it('continues the latest same-tab sequence after another page and Back', () => {
+    const store = new FakeSession();
+    const a = tab(store);
+    const first = a.identity.next();
+    a.pagehide();
+    const b = tab(store);
+    expect(b.identity.next().localSequence).toBe(2);
+    b.pagehide();
+    a.pageshow();
+    expect(a.identity.next()).toEqual({ ...first, localSequence: 3 });
+    a.pagehide();
+    b.pageshow();
+    expect(b.identity.next()).toEqual({ ...first, localSequence: 4 });
+  });
+
+  it('adopts a newer visit created by the intervening page', () => {
+    const store = new FakeSession();
+    const clock = { t: 0 };
+    const a = tab(store, clock);
+    const old = a.identity.next();
+    a.pagehide();
+    clock.t = VISIT_TIMEOUT_MS + 1;
+    const b = tab(store, clock);
+    const newer = b.identity.next();
+    expect(newer.producerId).not.toBe(old.producerId);
+    b.pagehide();
+    a.pageshow();
+    expect(a.identity.next()).toEqual({ ...newer, localSequence: 2 });
+  });
+
+  it('starts fresh if persisted identity vanished while a cached page was away', () => {
+    const store = new FakeSession();
+    const page = tab(store);
+    const old = page.identity.next();
+    page.pagehide();
+    store.removeItem(IDENTITY_KEY);
+    page.pageshow();
+    expect(page.identity.next().producerId).not.toBe(old.producerId);
+  });
+
   it('starts a new visit after 30 minutes without activity: new IDs and sequence together', () => {
     const clock = { t: 0 };
     const { identity } = tab(new FakeSession(), clock);
