@@ -4,7 +4,7 @@
 Add regression coverage for the product clarifications relayed by Adam and Zhiliang.
 
 ## Locally verified
-- Comparison ordering: Soup opened before a displayed Soup/Salad comparison qualifies; Salad opened only afterward does not retroactively qualify under the current metric helper.
+- Comparison ordering: Soup opened before a displayed Soup/Salad comparison qualifies. Salad opened afterward in the same session also qualifies. Both Soup and Salad are considered, consistent with matrix v0.1h §5.
 - Privacy boundary: 9 eligible sessions are SUPPRESSED, while 10 and 11 are ELIGIBLE, evaluated independently per publication revision.
 - Soup and Salad: both previously opened dishes count once when included in a qualifying displayed comparison, even when Salad has only 5 seconds of active time.
 - Late arrival: an event received after a newer visit remains in its original visit when grouped by occurrence timestamp.

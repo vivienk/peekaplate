@@ -122,3 +122,43 @@ QA note Q-1 (test design, not a product defect): the first draft of R-API-12 tam
 - Staging save/reload with a real `jobId` + `private_review_artifact` from the extraction host (RES-01.3/01.4).
 - S3-ARC-01 contract alignment and independent re-review by `@hemu77` / `@TeeyanshShukla`.
 - Command receipts stored before `c4f6bc8` hash differently and will not replay. Acceptable because nothing is deployed.
+
+
+## November 8 independent re-review and reconciliation
+
+Reconciled with develop `95fbe1a` after PR25. Context and append-only error-ledger
+conflicts preserve both branches' entries; the assets node and existing source
+paths remain. No applied migration was changed or run against hosted staging.
+
+The three earlier findings are covered by the current tests. Re-review also found
+that the producer source hash/ID were bound but kind/location/retrieval time/size
+could be changed. Four real-validator tests failed on `09f6577` (accepted instead
+of `409 artifact_mismatch`). The verifier now checks all exported source fields;
+equivalent ISO representations of the same retrieval instant remain accepted.
+
+The added database integration case uses the real route, signed test JWT and
+PostgreSQL, with a supplied private-artifact reader seam. Each of four altered
+sources returns 409 and creates zero session rows; the honest source then saves,
+and the actual local Worker GET reloads the same source. This is local evidence,
+not a hosted R2/Supabase acceptance claim.
+
+Fresh Windows checks, synthetic fixtures only:
+- PASS: `pnpm exec vitest run backend/src/review-artifact.test.ts backend/src/review-command.test.ts packages/contracts/src/review-persistence.test.ts backend/src/index.test.ts`
+  — 108 tests, 2.313s command time, including all three previous fixes.
+- PASS: `pnpm verify test:db` — 213 SQL assertions across nine pgTAP suites and
+  76 integration tests; 45.978s command time on the final serialized run.
+- PASS: `pnpm exec playwright test --workers=1` — 51 Chromium tests, 62.101s command time.
+- PASS: `pnpm verify build` — frontend builds and Worker dry-run, 6.508s command time.
+- PASS: `pnpm check` before the additional guard — 857 unit and 67 script tests,
+  lint/types/context/docs; 28.174s. Final-code check recorded in the PR review.
+- PASS: final-code `pnpm check` — 862 unit and 67 script tests, lint/types/context/docs;
+  25.908s command time. Final documentation/context checks passed after evidence updates.
+
+One intermediate DB run was invalidated by test setup: the new in-process route
+fixture omitted required services, and simultaneous browser/DB tests competed for
+port 5173. The fixture now uses the actual staff verifier and an explicit unused
+command guard; rerunning after browser teardown passed all checks. No runtime
+timeout, server binding or authorization rule was relaxed to obtain a pass.
+
+NOT RUN: hosted staging migration, real private R2 job-artifact registration,
+reviewer UI, and production behavior. Those remain release/integration gates.

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
@@ -16,9 +17,12 @@ import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, Si
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
+import { createStaffVerifier } from './auth';
 import { createDishRevision, replayDish } from './dish-command';
-import type { Bindings } from './index';
+import { type Bindings, createApp } from './index';
 import { replayPublication, replayReview } from './publication-command';
+import { verifyReviewArtifact } from './review-artifact';
+import { upsertExtractionReviewSession } from './review-command';
 import { readTeamAnalytics } from './team-analytics';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -715,6 +719,112 @@ describe('real PostgreSQL staff command', () => {
     const soupCandidateId = 'draft:0bbe00087c6841623c76d7b6f9da5ebf';
     const coffeeCandidateId = 'draft:0ff0863ef48b2db591694fcc3c35fbb0';
     const breadCandidateId = 'draft:6dbe8d78dae3c41e819deed5267f8149';
+
+    it('rejects changed source provenance before persistence and reloads the honest producer source', async () => {
+      const report = JSON.parse(
+        readFileSync(
+          new URL(
+            '../../processing/tests/fixtures/review-candidates/representative-extraction-v2.json',
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      );
+      for (const [field, value] of [
+        ['location', 'invented-other-menu.pdf'],
+        ['kind', 'website'],
+        ['retrieved_at', '2026-10-26T12:00:00Z'],
+        ['size_bytes', 999],
+      ] as const) {
+        const reviewVenue = crypto.randomUUID();
+        const jobId = crypto.randomUUID();
+        const attemptId = crypto.randomUUID();
+        await admin.query('INSERT INTO app_private.venues(id,name) VALUES ($1,$2)', [
+          reviewVenue,
+          'Synthetic provenance check',
+        ]);
+        await admin.query(
+          "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'owner')",
+          [reviewVenue, actor],
+        );
+        const key = `menu-ingestion/review-artifacts/${reviewVenue}/${jobId}/${attemptId}/bundle.json`;
+        const bytes = new TextEncoder().encode(
+          JSON.stringify({
+            report,
+            scope: {
+              tenant_id: reviewVenue,
+              job_id: jobId,
+              attempt_id: attemptId,
+              source_hash: report.source.sha256,
+            },
+          }),
+        );
+        const app = createApp({
+          verify: createStaffVerifier({ issuer: env.AUTH_ISSUER!, allowLocalIssuer: true }),
+          execute: async () => {
+            throw new Error('Unexpected dish command in provenance test');
+          },
+          async upsertReviewSession(actorId, venueId, input) {
+            await verifyReviewArtifact({
+              appEnv: 'staging',
+              venueId,
+              input,
+              read: async (requested) =>
+                requested === key
+                  ? { size: bytes.length, arrayBuffer: async () => bytes.slice().buffer }
+                  : null,
+            });
+            const client = new Client({ connectionString: runtimeUrl });
+            try {
+              await client.connect();
+              return await upsertExtractionReviewSession(client, actorId, venueId, input);
+            } finally {
+              await client.end();
+            }
+          },
+        });
+        const authorization = `Bearer ${await token(actor)}`;
+        const url = `http://localhost/venues/${reviewVenue}/extractions/${fixtureV2.extraction_id}/review-session`;
+        const put = (extractionResult: unknown) =>
+          app.request(
+            url,
+            {
+              method: 'PUT',
+              headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                commandId: crypto.randomUUID(),
+                extractionResult,
+                jobId,
+                privateArtifactRef: {
+                  schema_version: 1,
+                  key,
+                  sha256: createHash('sha256').update(bytes).digest('hex'),
+                },
+              }),
+            },
+            env,
+          );
+        const altered = structuredClone(fixtureV2);
+        altered.source[field] = value;
+        const denied = await put(altered);
+        expect(denied.status).toBe(409);
+        expect(await denied.json()).toEqual({ error: 'artifact_mismatch' });
+        expect(
+          (
+            await admin.query(
+              'SELECT count(*)::int AS count FROM app_private.extraction_review_session WHERE tenant_id=$1',
+              [reviewVenue],
+            )
+          ).rows[0].count,
+        ).toBe(0);
+        expect((await put(fixtureV2)).status).toBe(200);
+        const reload = await requestGetCandidates(fixtureV2.extraction_id, reviewVenue, actor);
+        expect(reload.status).toBe(200);
+        expect(
+          ((await reload.json()) as { extractionResult: typeof fixtureV2 }).extractionResult.source,
+        ).toEqual(fixtureV2.source);
+      }
+    });
 
     it('registers review session, reloads pending state, corrects, marks incomplete, rejects, and verifies persistence and publication isolation', async () => {
       const reviewVenue = crypto.randomUUID();

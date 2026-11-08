@@ -157,6 +157,11 @@ export async function verifyReviewArtifact(options: {
     report.status !== result.status ||
     report.source.source_id !== result.source.source_id ||
     report.source.sha256 !== result.source.sha256 ||
+    report.source.kind !== result.source.kind ||
+    report.source.location !== result.source.location ||
+    report.source.size_bytes !== result.source.size_bytes ||
+    typeof report.source.retrieved_at !== 'string' ||
+    Date.parse(report.source.retrieved_at) !== Date.parse(result.source.retrieved_at) ||
     scope.source_hash !== result.source.sha256 ||
     typeof report.started_at !== 'string' ||
     Date.parse(report.started_at) !== Date.parse(result.started_at)

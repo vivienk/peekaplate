@@ -15,8 +15,14 @@ carry `jobId` and `privateArtifactRef` (the `private_review_artifact` the extrac
 The server reads `menu-ingestion/review-artifacts/{venueId}/{jobId}/{attempt}/bundle.json` from the
 private `INGESTION_REPORTS_BUCKET`, checks its SHA-256 and stored scope, and requires the source,
 versions, status, start time and every candidate's `original` and `evidence` to equal the bundle
-report's `drafts`/`evidence` (a report `null` equals an omitted exported field). Page coverage and
-diagnostics are bound too: every report segment in order (status, error, text, metadata), and the
+report's `drafts`/`evidence` (a report `null` equals an omitted exported field).
+
+The full source provenance is checked: kind, location, byte size and retrieval
+instant must match the producer, alongside the source ID and hash. Equivalent ISO
+representations of the same retrieval instant are accepted; changed provenance
+returns `409 artifact_mismatch` before any review-session write.
+
+Page coverage and diagnostics are bound too: every report segment in order (status, error, text, metadata), and the
 report's `warnings` and `errors`. The only permitted difference is the exporter-added
 `metadata.candidate_box_evidence`, which must equal the links the exporter derives from the report's
 evidence box records. A reviewer therefore cannot register originals the producer never emitted or

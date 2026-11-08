@@ -88,6 +88,31 @@ describe('verifyReviewArtifact', () => {
     ).toBe('ok');
   });
 
+  it.each([
+    ['location', 'invented-other-menu.pdf'],
+    ['kind', 'website'],
+    ['retrieved_at', '2026-10-26T12:00:00Z'],
+    ['size_bytes', 999],
+  ])('rejects altered source %s with an otherwise genuine artifact', async (field, value) => {
+    const tampered = structuredClone(candidates);
+    tampered.source[field] = value;
+    expect(
+      await codeOf(
+        verifyReviewArtifact({ appEnv: 'staging', venueId, input: request(tampered), read }),
+      ),
+    ).toBe('409 artifact_mismatch');
+  });
+
+  it('accepts an equivalent source retrieval instant in a different ISO representation', async () => {
+    const equivalent = structuredClone(candidates);
+    equivalent.source.retrieved_at = '2026-10-25T13:00:00+01:00';
+    expect(
+      await codeOf(
+        verifyReviewArtifact({ appEnv: 'staging', venueId, input: request(equivalent), read }),
+      ),
+    ).toBe('ok');
+  });
+
   it('requires the artifact reference and job outside local, but not for local fixtures', async () => {
     const noRef = request(candidates, null);
     expect(
