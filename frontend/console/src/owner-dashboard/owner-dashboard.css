@@ -1641,6 +1641,11 @@ article.insight {
     right: auto;
     left: 14px;
   }
+  /* The button sits bottom-left here, so the panel opens rightwards instead of off-screen. */
+  .app.has-ai .pctl-p {
+    right: auto;
+    left: 0;
+  }
 }
 @media (min-width: 901px) and (max-width: 1200px) {
   .app.has-ai {
