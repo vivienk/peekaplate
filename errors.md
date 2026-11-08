@@ -1607,3 +1607,8 @@ sections and records fresh evidence separately from historical results.
 The first remote fetch used the upstream repository for a fork-owned feature
 branch and failed without changing files; fetching `pull/25/head` pinned the
 correct source. Future pushes target the verified head repository explicitly.
+
+Final-head CI then caught a stale assets fingerprint because an unused test import
+was removed after the last refresh. Database and browser jobs passed. Refreshed
+context after that final source edit and reran `pnpm verify context:check docs:check`;
+these checks pass. Keep fingerprint refresh after every final referenced-file edit.
