@@ -4,10 +4,13 @@ import {
   ApproveDishDraftRequestSchema,
   ApproveMenuRevisionSchema,
   type BoundedRetrievalResult,
+  CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
+  ExtractionReviewScopeSchema,
+  type ExtractionReviewSessionResponse,
   type HealthResponse,
   JobScopeSchema,
   MAX_ORDER_OUTCOME_FILE_BYTES,
@@ -18,10 +21,15 @@ import {
   type OrderOutcomeImportResponse,
   type PublicMenuResponse,
   PublishMenuSchema,
+  type ReviewCandidateCommand,
+  ReviewCandidateCommandSchema,
+  type ReviewCandidateItemResponse,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
+  type UpsertExtractionReviewSessionRequest,
+  UpsertExtractionReviewSessionRequestSchema,
   VenueScopeSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
@@ -79,6 +87,13 @@ import {
   withdrawMenu,
 } from './publication-command';
 import { retrieveMenuEvidence } from './retrieval';
+import { type ReviewArtifactObject, verifyReviewArtifact } from './review-artifact';
+import {
+  getExtractionReviewSession,
+  ReviewCommandError,
+  saveCandidateReviewCommand,
+  upsertExtractionReviewSession,
+} from './review-command';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
@@ -100,9 +115,14 @@ export type Bindings = {
     limit(input: { key: string }): Promise<{ success: boolean }>;
   };
   INGESTION_QUEUE?: { send(message: unknown): Promise<void> };
+  /**
+   * Private bucket: ingestion writes reports with put(); the review verifier reads the extraction
+   * host's attempt bundles with get(). get stays optional because ingestion-only environments and
+   * tests bind put() alone; without it, review sessions outside local fail as artifact_unavailable.
+   */
   INGESTION_REPORTS_BUCKET?: {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
-    get?(key: string): Promise<unknown>;
+    get?(key: string): Promise<ReviewArtifactObject | null>;
   };
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
@@ -202,6 +222,26 @@ type Dependencies = {
     sourceFilename: string,
     env: Bindings,
   ) => Promise<OrderOutcomeImportResponse>;
+  upsertReviewSession?: (
+    actorId: string,
+    venueId: string,
+    input: UpsertExtractionReviewSessionRequest,
+    env: Bindings,
+  ) => Promise<ExtractionReviewSessionResponse>;
+  getReviewSession?: (
+    actorId: string,
+    venueId: string,
+    extractionId: string,
+    env: Bindings,
+  ) => Promise<ExtractionReviewSessionResponse>;
+  saveCandidateReview?: (
+    actorId: string,
+    venueId: string,
+    extractionId: string,
+    candidateId: string,
+    input: ReviewCandidateCommand,
+    env: Bindings,
+  ) => Promise<ReviewCandidateItemResponse>;
 };
 
 export async function authorizeStaffVenue(
@@ -278,6 +318,19 @@ export async function consumeJtiRateLimit(
   if (!minute.success) return { allowed: false, retryAfterSeconds: 60 };
   if (!burst.success) return { allowed: false, retryAfterSeconds: 10 };
   return { allowed: true, retryAfterSeconds: 1 };
+}
+
+async function withDatabase<T>(env: Bindings, run: (client: Client) => Promise<T>): Promise<T> {
+  const connectionString =
+    env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+  if (!connectionString) throw new AuthUnavailableError();
+  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  try {
+    await client.connect();
+    return await run(client);
+  } finally {
+    await client.end();
+  }
 }
 
 const dependencies: Dependencies = {
@@ -431,6 +484,27 @@ const dependencies: Dependencies = {
       allowLocalIssuer: env.APP_ENV === 'local',
     });
   },
+  async upsertReviewSession(actorId, venueId, input, env) {
+    const bucket = env.INGESTION_REPORTS_BUCKET;
+    const get = bucket?.get;
+    await verifyReviewArtifact({
+      appEnv: env.APP_ENV,
+      venueId,
+      input,
+      read: get ? (key) => get.call(bucket, key) : undefined,
+    });
+    return withDatabase(env, (client) =>
+      upsertExtractionReviewSession(client, actorId, venueId, input),
+    );
+  },
+  getReviewSession: (actorId, venueId, extractionId, env) =>
+    withDatabase(env, (client) =>
+      getExtractionReviewSession(client, actorId, venueId, extractionId),
+    ),
+  saveCandidateReview: (actorId, venueId, extractionId, candidateId, input, env) =>
+    withDatabase(env, (client) =>
+      saveCandidateReviewCommand(client, actorId, venueId, extractionId, candidateId, input),
+    ),
 };
 
 export async function approveDishDraftAtomic(
@@ -574,17 +648,29 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
+  const orderImportLimit = bodyLimit({
+    maxSize: MAX_ORDER_OUTCOME_FILE_BYTES,
+    onError: (ctx) => ctx.json({ error: 'payload_too_large' }, 413),
+  });
+  const reviewSessionLimit = bodyLimit({
+    maxSize: 524_288,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
+  const defaultVenueLimit = bodyLimit({
+    maxSize: 16_384,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
   app.use('/venues/*', async (c, next) => {
     if (c.req.path.includes('/orders/import')) {
-      return bodyLimit({
-        maxSize: MAX_ORDER_OUTCOME_FILE_BYTES,
-        onError: (ctx) => ctx.json({ error: 'payload_too_large' }, 413),
-      })(c, next);
+      return orderImportLimit(c, next);
     }
-    return bodyLimit({
-      maxSize: 16_384,
-      onError: (ctx) => ctx.json({ error: 'body_too_large' }, 413),
-    })(c, next);
+    if (
+      c.req.method === 'PUT' &&
+      /^\/venues\/[^/]+\/extractions\/[^/]+\/review-session$/.test(c.req.path)
+    ) {
+      return reviewSessionLimit(c, next);
+    }
+    return defaultVenueLimit(c, next);
   });
   app.use(
     '/public/venues/*',
@@ -1048,6 +1134,89 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result, 200);
   });
 
+  app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = ExtractionReviewScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = UpsertExtractionReviewSessionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (parsed.data.extractionResult.extraction_id !== scope.data.extractionId) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+
+    if (!services.upsertReviewSession) throw new AuthUnavailableError();
+    const handler = services.upsertReviewSession;
+
+    const result = await handler(actorId, scope.data.venueId, parsed.data, c.env ?? {});
+    return c.json(result);
+  });
+  app.get('/venues/:venueId/extractions/:extractionId/candidates', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = ExtractionReviewScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!services.getReviewSession) throw new AuthUnavailableError();
+    const handler = services.getReviewSession;
+
+    const result = await handler(actorId, scope.data.venueId, scope.data.extractionId, c.env ?? {});
+    return c.json(result);
+  });
+  app.post(
+    '/venues/:venueId/extractions/:extractionId/candidates/:candidateId/review',
+    async (c) => {
+      const authorization = c.req.header('Authorization');
+      if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+        return c.json({ error: 'unauthorized' }, 401);
+      }
+      const actorId = await services.verify(authorization, c.env ?? {});
+      const scope = CandidateReviewScopeSchema.safeParse(c.req.param());
+      if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+      if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+        return c.json({ error: 'unsupported_media_type' }, 415);
+      }
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ error: 'invalid_json' }, 400);
+      }
+      const parsed = ReviewCandidateCommandSchema.safeParse(body);
+      if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+      if (!services.saveCandidateReview) throw new AuthUnavailableError();
+      const handler = services.saveCandidateReview;
+
+      const result = await handler(
+        actorId,
+        scope.data.venueId,
+        scope.data.extractionId,
+        scope.data.candidateId,
+        parsed.data,
+        c.env ?? {},
+      );
+      return c.json(result);
+    },
+  );
+
   app.onError((error, c) => {
     if (error instanceof AuthenticationError) return c.json({ error: 'unauthorized' }, 401);
     if (error instanceof MenuTokenAuthenticationError)
@@ -1062,6 +1231,7 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
     if (error instanceof OrderImportError)
       return c.json({ error: error.code, message: error.message }, error.status as any);
+    if (error instanceof ReviewCommandError) return c.json({ error: error.code }, error.status);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
       JSON.stringify({ event: 'command_failed', requestId: c.res.headers.get('X-Request-ID') }),

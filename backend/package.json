@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./retrieval": "./src/retrieval/index.ts"
+    "./retrieval": "./src/retrieval/index.ts",
+    "./owner-ai": "./src/owner-ai/index.ts"
   },
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
