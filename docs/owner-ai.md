@@ -132,3 +132,16 @@ application tests pass (four skipped); build/context/docs checks pass. The same
 preview-junction setup limitation prevents the agent aggregate check from being
 green. This is not evidence for the unmerged nullable-freshness report producer,
 actual SQL cohorts or live owner integration.
+
+## November 8 normal-terminal verification
+
+The contributor's normal-terminal `pnpm check` passes on the synchronized #112
+source: lint, all seven package typechecks, 925 application tests (four skipped),
+all 67 script tests including artifact-symlink rejection, and context/docs.
+The initial terminal launch lacked pnpm on child-process PATH; a task-local
+launcher selected the unchanged project-pinned pnpm 11.25.0 and Node 24.22.1.
+No repository script, security test or engine/lockfile policy was relaxed.
+The final evidence-ledger/documentation update does not change runtime code,
+contracts or tests. Dedicated reports identify their actual clean source commits.
+Database/browser integration, hosted reporting, model execution and independent
+rubric acceptance remain separate verification gates; #112 stays Draft.
