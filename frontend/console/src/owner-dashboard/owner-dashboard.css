@@ -2564,7 +2564,8 @@ h3 {
   padding: 10px 6px;
 }
 .dtable .tbl td:first-child .btn {
-  white-space: nowrap;
+  /* Long dish names wrap so every column fits next to the AI panel at 1440px. */
+  min-width: 8em;
   padding: 4px 8px;
 }
 .dtable .tbl td:first-child .row {
@@ -2574,7 +2575,11 @@ h3 {
   width: 64px;
   height: auto;
 }
+.dtable .tbl th,
 .dtable .tbl th button {
+  white-space: normal;
+}
+.dtable .tbl td.r {
   white-space: nowrap;
 }
 /* buttons: slightly smaller text; white text on orange */
