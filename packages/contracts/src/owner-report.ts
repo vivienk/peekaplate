@@ -73,6 +73,12 @@ export const COHORT_METRICS = [
   'save_rate',
 ] as const;
 
+const COMPLEMENTARY_SUPPRESSION_METRICS = [
+  'avg_interaction_time_seconds',
+  'timing_coverage',
+  'open_rate',
+] as const;
+
 function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.ZodType<MetricValue>>(
   rate: () => Rate,
   average: () => Average,
@@ -161,9 +167,11 @@ function reportSchema<Rate extends z.ZodType<MetricValue>, Average extends z.Zod
               !checkCohorts &&
               sessions.status === 'SUPPRESSED' &&
               dish.evidence_state === 'NORMAL' &&
-              dish.metrics.avg_interaction_time_seconds.status === 'SUPPRESSED' &&
-              dish.metrics.timing_coverage.status === 'SUPPRESSED' &&
-              dish.metrics.open_rate.status === 'SUPPRESSED';
+              COMPLEMENTARY_SUPPRESSION_METRICS.every((name) =>
+                Object.entries(dish.metrics).some(
+                  ([metricName, metric]) => metricName === name && metric.status === 'SUPPRESSED',
+                ),
+              );
             // The serializer may hide these cells while retaining independently safe cohorts.
             if (sessions.status !== 'NORMAL' && !complementarySuppression) {
               for (const [name, value] of Object.entries(dish.metrics)) {

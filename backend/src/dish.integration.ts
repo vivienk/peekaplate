@@ -117,7 +117,7 @@ async function requestPutSession(
     {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${await token(subject)}`,
+        Authorization: `Bearer ${await token({ sub: subject })}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -131,7 +131,7 @@ async function requestGetCandidates(extractionId: string, tenant = venue, subjec
     {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${await token(subject)}`,
+        Authorization: `Bearer ${await token({ sub: subject })}`,
       },
     },
   );
@@ -149,7 +149,7 @@ async function requestCandidateReview(
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${await token(subject)}`,
+        Authorization: `Bearer ${await token({ sub: subject })}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -785,7 +785,7 @@ describe('real PostgreSQL staff command', () => {
             }
           },
         });
-        const authorization = `Bearer ${await token(actor)}`;
+        const authorization = `Bearer ${await token({ sub: actor })}`;
         const url = `http://localhost/venues/${reviewVenue}/extractions/${fixtureV2.extraction_id}/review-session`;
         const put = (extractionResult: unknown) =>
           app.request(
