@@ -1795,3 +1795,26 @@ backend/contracts strict types and context/docs checks pass with the existing
 installation. The frozen-install and broader workspace limitations above remain
 open until dependencies are repaired and those checks are rerun. No unmerged
 report schema, SQL producer, live model or hosted integration was adopted.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T18:59:18.059Z","exitCode":1}
+```
+
+## November 8 normal-install validation follow-up
+
+The contributor completed normal `pnpm install --frozen-lockfile` on this
+checkout: eight workspace projects, 213 policy-checked lock entries, exit 0.
+The missing diner workspace import is resolved. Without the dependency-status
+warning override, lint, all seven package typechecks and all 57 application test
+files pass (925 tests passed, four skipped) on the synchronized #112 source.
+Build, context and documentation checks also pass; the Worker build is dry-run.
+Wrangler's optional log-file write reports a local permission warning, without
+changing the successful build exit or performing a deployment.
+
+The remaining `pnpm check` failure is observation
+2026-11-08T18:59:18.059Z: `scripts/preview.test.mjs` cannot create the junction
+needed to test artifact-symlink rejection. The other 66 script tests pass. This
+is a test-setup permission failure before the rejection assertion; retain that
+security regression and verify it in a normal terminal or Linux CI. Do not
+claim the aggregate check passed in this agent environment.
