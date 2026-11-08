@@ -50,7 +50,7 @@ const report = ({
       duration_hours: 168,
     },
     coverage: { total_dishes_monitored: 1, measurable_dishes_count: 1 },
-    freshness: { last_event_ingested_at: '2026-11-02T09:00:00Z', is_stale: false },
+    freshness: { last_event_ingested_at: '2026-11-02T09:00:00Z', is_stale: null },
     report_status: 'NORMAL',
     ...metadata,
   },
@@ -207,6 +207,11 @@ describe('OwnerDishReportSchema', () => {
       expect(accepts(report({ metadata: { freshness, report_status: 'EMPTY' } }))).toBe(true);
       expect(accepts(report({ metadata: { freshness } }))).toBe(false);
     });
+
+    it('represents unverified freshness without claiming fresh or stale', () => {
+      const freshness = { last_event_ingested_at: '2026-11-02T09:00:00Z', is_stale: null };
+      expect(accepts(report({ metadata: { freshness } }))).toBe(true);
+    });
   });
 
   describe('strict shape', () => {
@@ -334,6 +339,28 @@ describe('per-metric cohort floor (internal report)', () => {
     expect(JSON.stringify(owner)).not.toContain('eligible_sessions');
     expect(OwnerDishReportSchema.safeParse(owner).success).toBe(true);
     expect(owner.dishes[0]?.metrics.save_rate).toEqual({ value: 0.1, status: 'NORMAL' });
+  });
+
+  it('toOwnerReport masks timing-derived cells when fewer than ten sessions were timed', () => {
+    const owner = toOwnerReport(
+      internal({
+        avg_interaction_time_seconds: cell(null, 'SUPPRESSED', 9),
+        timing_coverage: cell(0.9, 'NORMAL', 10),
+        open_rate: cell(1, 'NORMAL', 10),
+      }),
+    );
+
+    expect(owner.dishes[0]?.evidence_state).toBe('NORMAL');
+    expect(owner.dishes[0]?.metrics).toMatchObject({
+      active_sessions: { value: null, status: 'SUPPRESSED' },
+      avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+      timing_coverage: { value: null, status: 'SUPPRESSED' },
+      open_rate: { value: null, status: 'SUPPRESSED' },
+      engagement_rate: { value: 0.25, status: 'NORMAL' },
+      save_rate: { value: 0.1, status: 'NORMAL' },
+    });
+    expect(OwnerDishReportSchema.safeParse(owner).success).toBe(true);
+    expect(JSON.stringify(owner)).not.toContain('eligible_sessions');
   });
 
   it('toOwnerReport refuses an internal report that breaks the cohort floor', () => {

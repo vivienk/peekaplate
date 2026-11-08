@@ -1,3 +1,5 @@
+export * from './owner-ai';
+
 import { z } from 'zod';
 
 export {
@@ -565,6 +567,32 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
 export * from './owner-report';
+export {
+  type CandidateCorrectedFields,
+  CandidateCorrectedFieldsSchema,
+  type CandidateReviewRecord,
+  CandidateReviewRecordSchema,
+  type CandidateReviewScope,
+  CandidateReviewScopeSchema,
+  type ExtractionReviewScope,
+  ExtractionReviewScopeSchema,
+  type ExtractionReviewSessionResponse,
+  ExtractionReviewSessionResponseSchema,
+  type PrivateArtifactRef,
+  PrivateArtifactRefSchema,
+  type ResolvedCandidateFields,
+  ResolvedCandidateFieldsSchema,
+  type ReviewCandidateCommand,
+  ReviewCandidateCommandSchema,
+  type ReviewCandidateItemResponse,
+  ReviewCandidateItemResponseSchema,
+  type ReviewCandidateStatus,
+  ReviewCandidateStatusSchema,
+  type ReviewEditableField,
+  ReviewEditableFieldSchema,
+  type UpsertExtractionReviewSessionRequest,
+  UpsertExtractionReviewSessionRequestSchema,
+} from './review-persistence';
 
 // Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
 // Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
