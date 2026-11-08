@@ -1385,3 +1385,41 @@ original failure observation above rather than treating a rerun as its diagnosis
 ## November 7 S5-DATA-07 order-outcome import verification
 
 Implemented restricted CSV ingestion path (pilot_order_outcome.v1) for venue owners, tenant-scoped RLS persistence across order_outcome_import_batches, order_outcome_lines, order_outcome_quarantine, and order_outcome_conflicts with append-only triggers, immutable published menu bundle revision verification, and strict isolation from diner observations and owner reports. All 188 contracts tests, 61 backend service and HTTP tests, and 29 pgTAP database assertions pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:22:36.990Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:29:44.200Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:35:17.101Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-08T12:40:54.175Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T12:41:09.350Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-08T12:42:43.238Z","exitCode":1}
+```
+
+## November 8 S5-DATA-07 PR #120 Review Corrections & Verification
+
+During review remediation verification:
+1. `test:db`: Real PostgreSQL test probes in `order-ingestion.integration.ts` initially used a sparse bundle mock missing mandatory `PublicMenuContentBundleSchema` dish fields (`price`, `ingredients`, `images`), causing expected validation rejection during ingestion. Added conformant bundle structure. pgTAP test plan in `tests/db/order_outcomes.sql` updated to 68 assertions verifying reviewer UUID audit provenance retention after membership removal (`migrations/20261108120000_pos_mapping_reviewer_provenance.sql`). All 9 pgTAP test suites (260 assertions) and all 6 integration suites (77 tests) pass.
+2. `lint`: Import sorting and line wraps in `order-ingestion.integration.ts` and `service.ts` resolved via Biome format.
+3. `typecheck`: `noUncheckedIndexedAccess` required safe indexing for `publishedActive[0]` in `service.ts`, and test `createApp` stubs required `execute` dummy property. Resolved in `service.ts` and `order-ingestion.integration.ts`.
+4. `context:check`: Context module fingerprints updated for new contracts handoff fixtures and integration paths via `pnpm context:refresh`. All checks pass clean.

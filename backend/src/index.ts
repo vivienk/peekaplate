@@ -1021,22 +1021,12 @@ export function createApp(services: Dependencies = dependencies) {
             ? Number.parseInt(env.ORDER_IMPORT_HISTORICAL_DAYS, 10)
             : undefined;
 
-          // Retrieve authoritative tracking-start evidence (explicit server-controlled venue tracking activation)
-          const trackingRes = await client.query<{ activated_at: Date | null }>(
-            `SELECT activated_at
-             FROM app_private.venue_tracking_activations
-             WHERE tenant_id = $1`,
-            [venueId],
-          );
-          const trackingStartedAt = trackingRes.rows[0]?.activated_at ?? undefined;
-
           return await importOrderOutcomesService({
             client,
             actorId,
             venueId,
             csvText,
             sourceFilename,
-            trackingStartedAt,
             maxHistoricalDays,
             storage:
               env.ORDER_OUTCOME_ARCHIVE_BUCKET ??

@@ -19,6 +19,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/index.test.ts",
         "packages/contracts/src/order-outcome.ts",
         "packages/contracts/src/order-outcome.test.ts",
+        "packages/contracts/fixtures/order-outcome.v1/handoff-fixture.json",
+        "packages/contracts/fixtures/order-outcome.v1/README.md",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
         "packages/contracts/fixtures/observation.v2/README.md",
         "packages/contracts/src/owner-report.ts",
@@ -45,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "36ef66105adac33863588618001117a27930afc18d1525d9fa8a306462521c10"
+      "sourceFingerprint": "71a7f53df6fbacbbf16180711b9a546772fcc9a0889aa78f5a9dbebc49698ca5"
     },
     {
       "id": "tokens",
@@ -233,6 +235,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/team-auth.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/service.test.ts",
+        "backend/src/order-ingestion/order-ingestion.integration.ts",
         "backend/tsconfig.json",
         "backend/wrangler.extraction.jsonc",
         "backend/wrangler.jsonc",
@@ -271,7 +274,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1ed17e9375c4784923febb8d138eaa110ce208b3eb34fd92ebdc85f321681645"
+      "sourceFingerprint": "9fb9348d086826d61c1f67836e749413ed6f0de44d6080017ac7c6e5151c77b4"
     },
     {
       "id": "database",
@@ -288,6 +291,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261026120000_observation_facts.sql",
         "migrations/20261026220000_menu_ingestion_drafts.sql",
         "migrations/20261107120000_order_outcomes.sql",
+        "migrations/20261108120000_pos_mapping_reviewer_provenance.sql",
         "scripts/test-db.mjs",
         "scripts/test-db.test.mjs",
         "tests/db/Dockerfile",
@@ -310,7 +314,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "2fbb1d87829a6935824e1ab69f09871f8661ce2a406c3526f8a09fda0f8646a9"
+      "sourceFingerprint": "84651bac28707e85579e64957e4dffa4f95fe94c2f02ae1055710a0940facca1"
     },
     {
       "id": "measurement",
@@ -334,7 +338,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5d27f33ec9c6c2489c02b9fbe67cb4e246737afcfce9b42f53495557adae3a3c"
+      "sourceFingerprint": "854b67609432f4e88c63ce7d24cb0b78ac7b77e87242e8e25ced916442a06e53"
     },
     {
       "id": "delivery",
@@ -622,7 +626,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
     },
     {
-      "summary": "November 7-8: S5-DATA-07 implements controlled pilot order-outcome import with reviewed administrative POS mapping and explicit server-controlled venue tracking activation. Resolves POS item codes via reviewed mapping in app_private.pos_dish_mappings (enforces owner/editor permission, records reviewer provenance, and blocks silent dish modifications). Venue live tracking activation is recorded in app_private.venue_tracking_activations upon live publication or administrative enablement; client backdating and inference from first observation are forbidden. Activation eligibility strictly decoupled from diner visit matching (orders without matching observations remain explicitly unlinked). Full Docker pgTAP (52 assertions across order outcomes) and database integration test suites pass.",
+      "summary": "November 8: S5-DATA-07 PR #120 review audit corrections: (A) runtime tracking activation lookup moved inside authorized tenant transaction with app.tenant_id established; (B) staff_membership FOR SHARE re-check acquired inside processing transaction before commit; (C) reviewer UUID provenance preserved via forward migration dropping restrictive FK to staff_membership; (D) canonical menu publication and withdrawal history resolved via app_private.es_event; (E) duplicate file SHA-256 re-checked under advisory lock; (F) order identity tuple formatted as JSON array [order_id, order_line_id, outcome_type]; (G) strict integer quantity validation (1-999); (H) downstream handoff fixture added with documentation; (I) raw CSV retention purge gated behind enableRawCsvPurge flag; (J) automatic tracking activation insert decoupled from publishMenu. 68/68 pgTAP assertions and 5/5 real PostgreSQL integration probes pass.",
       "modules": [
         "contracts",
         "backend",

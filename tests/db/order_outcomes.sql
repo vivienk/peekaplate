@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(65);
+SELECT plan(68);
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -310,6 +310,37 @@ SELECT lives_ok(
        'approved', '00000000-0000-0000-0000-000000000001', now())$$,
   'authenticated staff owner can insert reviewed approved POS dish mapping'
 );
+
+-- Preserve reviewer history during membership removal (Finding C)
+-- Normal membership removal operation succeeds without 23503 foreign key violation
+SELECT lives_ok(
+  $$DELETE FROM app_private.staff_membership
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'
+      AND actor_id = '00000000-0000-0000-0000-000000000001'$$,
+  'removing membership for past reviewer succeeds'
+);
+
+-- Historical mapping retains reviewer UUID provenance
+SELECT is(
+  (SELECT reviewed_by FROM app_private.pos_dish_mappings
+   WHERE tenant_id = '00000000-0000-0000-0000-000000000801' AND pos_item_code = 'POS-ITEM-01'),
+  '00000000-0000-0000-0000-000000000001'::uuid,
+  'historical mapping preserves reviewer UUID provenance after membership removal'
+);
+
+-- Removed member can no longer create or modify mappings
+SELECT throws_like(
+  $$INSERT INTO app_private.pos_dish_mappings
+      (tenant_id, pos_item_code, dish_id, review_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000801', 'POS-ITEM-02', '11111111-1111-4000-8000-000000000001', 'pending')$$,
+  '%Current actor is not authorized to create or modify POS dish mappings%',
+  'removed staff actor cannot create POS dish mapping'
+);
+
+-- Re-establish owner membership for subsequent tests
+INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission)
+VALUES ('00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', 'owner');
 
 -- Modifying mapped dish without re-review is rejected
 SELECT throws_like(

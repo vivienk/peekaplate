@@ -493,5 +493,32 @@ describe('S5-DATA-07 order outcome contracts & CSV parser', () => {
       };
       expect(OrderOutcomeImportResponseSchema.safeParse(response).success).toBe(true);
     });
+
+    it('validates the version-controlled synthetic DATA-08 handoff fixture', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const fixturePath = path.resolve(
+        __dirname,
+        '../fixtures/order-outcome.v1/handoff-fixture.json',
+      );
+      const raw = fs.readFileSync(fixturePath, 'utf8');
+      const fixture = JSON.parse(raw);
+
+      expect(fixture.schema_version).toBe('pilot_order_outcome.v1');
+      expect(fixture.tenant_id).toBeDefined();
+      expect(fixture.import_batch).toBeDefined();
+
+      // Validate accepted outcomes match OrderOutcomeLineSchema
+      for (const entry of fixture.accepted_order_outcomes) {
+        expect(OrderOutcomeLineSchema.safeParse(entry.line).success).toBe(true);
+        expect(entry.linkage_status).toBe('unlinked');
+      }
+
+      // Validate quarantined outcomes match diagnostic schema
+      for (const q of fixture.quarantined_order_outcomes) {
+        expect(SanitizedRowDiagnosticSchema.safeParse(q.diagnostic).success).toBe(true);
+        expect(q.diagnostic.reasonCode).toBe('missing_pos_mapping');
+      }
+    });
   });
 });

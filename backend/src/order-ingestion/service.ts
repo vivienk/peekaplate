@@ -62,11 +62,13 @@ export type OrderOutcomeStorage = {
 export type OrderOutcomeRetentionConfig = {
   rawCsvRetentionDays?: number | undefined; // default 90 days (pilot proposal)
   orphanGracePeriodMs?: number | undefined; // default 2 hours (7_200_000 ms)
+  enableRawCsvPurge?: boolean | undefined; // Gated: requires explicit product/privacy approval
 };
 
 export const DEFAULT_RETENTION_CONFIG: Required<OrderOutcomeRetentionConfig> = {
   rawCsvRetentionDays: DEFAULT_RAW_CSV_RETENTION_DAYS,
   orphanGracePeriodMs: 2 * 60 * 60 * 1000,
+  enableRawCsvPurge: false,
 };
 
 export type ImportOrderOutcomeOptions = {
@@ -243,10 +245,89 @@ export async function importOrderOutcomes(
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
 
+    // Recheck owner permission inside the final processing transaction and hold FOR SHARE through commit/rollback (Finding B)
+    const recheckMembership = await client.query<{ permission: string }>(
+      `SELECT permission
+       FROM app_private.staff_membership
+       WHERE tenant_id = $1 AND actor_id = $2
+       FOR SHARE`,
+      [venueId, actorId],
+    );
+
+    if (recheckMembership.rows[0]?.permission !== 'owner') {
+      throw new OrderImportError(
+        'forbidden',
+        403,
+        'Order outcome import requires owner permission',
+      );
+    }
+
     // Transaction-level advisory lock serializes concurrent imports for the venue
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `order_import:${venueId}`,
     ]);
+
+    // Recheck identical file hash under the advisory lock to handle concurrent imports (Finding E)
+    const existingFileAfterLock = await client.query<{
+      id: string;
+      status: string;
+      total_rows: number;
+      accepted_rows: number;
+      duplicate_rows: number;
+      quarantined_rows: number;
+      conflict_rows: number;
+      file_sha256: string;
+      created_at: Date;
+      finished_at: Date | null;
+    }>(
+      `SELECT id, status, total_rows, accepted_rows, duplicate_rows, quarantined_rows, conflict_rows,
+              file_sha256, created_at, finished_at
+       FROM app_private.order_outcome_import_batches
+       WHERE tenant_id = $1 AND file_sha256 = $2`,
+      [venueId, fileSha256],
+    );
+
+    if (existingFileAfterLock.rows.length > 0) {
+      const existing = existingFileAfterLock.rows[0]!;
+      if (existing.status === 'completed') {
+        if (options.storage && typeof options.storage.delete === 'function') {
+          try {
+            await options.storage.delete(storageKey);
+          } catch {
+            // Compensating cleanup failure suppressed
+          }
+        }
+        await client.query('COMMIT');
+        inTx = false;
+        return {
+          batchId: existing.id,
+          venueId,
+          status: 'completed',
+          totalRows: existing.total_rows,
+          acceptedRows: existing.accepted_rows,
+          duplicateRows: existing.duplicate_rows,
+          quarantinedRows: existing.quarantined_rows,
+          conflictRows: existing.conflict_rows,
+          isDuplicateFile: true,
+          fileSha256: existing.file_sha256,
+          diagnostics: [],
+          createdAt: existing.created_at.toISOString(),
+          finishedAt: existing.finished_at ? existing.finished_at.toISOString() : null,
+        };
+      }
+    }
+
+    // Query venue tracking activation inside the authorized tenant transaction if not passed (Finding A)
+    let effectiveTrackingStartedAt = options.trackingStartedAt;
+    if (effectiveTrackingStartedAt === undefined) {
+      const trackingRes = await client.query<{ activated_at: Date | null }>(
+        `SELECT activated_at
+         FROM app_private.venue_tracking_activations
+         WHERE tenant_id = $1`,
+        [venueId],
+      );
+      effectiveTrackingStartedAt = trackingRes.rows[0]?.activated_at ?? undefined;
+    }
 
     // Insert batch in 'processing' status
     await client.query(
@@ -332,9 +413,9 @@ export async function importOrderOutcomes(
         continue;
       }
 
-      // Validate quantity
-      const qty = Number.parseInt(data.quantity || '', 10);
-      if (Number.isNaN(qty) || qty < 1 || qty > 999) {
+      // Validate quantity (Finding G: complete token validation before conversion)
+      const rawQty = data.quantity ?? '';
+      if (!/^[1-9]\d{0,2}$/.test(rawQty)) {
         const diagnostic: SanitizedRowDiagnostic = {
           rowIndex,
           fieldName: 'quantity',
@@ -346,6 +427,7 @@ export async function importOrderOutcomes(
         quarantinedRows++;
         continue;
       }
+      const qty = Number.parseInt(rawQty, 10);
 
       // Validate pricing fields
       const hasUnitPrice = Boolean(data.unit_price && data.unit_price.trim().length > 0);
@@ -383,8 +465,8 @@ export async function importOrderOutcomes(
         continue;
       }
 
-      // Validate tracking-start evidence and timestamp limits
-      if (!options.trackingStartedAt) {
+      // Validate tracking-start evidence and timestamp limits (Finding A)
+      if (!effectiveTrackingStartedAt) {
         const diagnostic: SanitizedRowDiagnostic = {
           rowIndex,
           fieldName: 'ordered_at',
@@ -400,7 +482,7 @@ export async function importOrderOutcomes(
 
       const timeCheck = classifyOrderTimestampWindow(data.ordered_at || '', nowIso, {
         maxHistoricalDays: options.maxHistoricalDays,
-        trackingStartedAt: options.trackingStartedAt,
+        trackingStartedAt: effectiveTrackingStartedAt,
       });
       if (!timeCheck.valid) {
         const diagnostic: SanitizedRowDiagnostic = {
@@ -435,6 +517,28 @@ export async function importOrderOutcomes(
             diagnosticMessage: revRes
               ? revRes.message
               : 'Menu revision is not authorized or approved for this venue',
+          };
+          await insertQuarantine(client, venueId, batchId, diagnostic);
+          diagnostics.push(diagnostic);
+          quarantinedRows++;
+          continue;
+        }
+
+        // Enforce actual publication and withdrawal history at ordered_at (Finding D)
+        const activePubs = await getActiveMenuPublicationsAtTimestamp(
+          client,
+          venueId,
+          data.ordered_at!,
+        );
+        const isRevisionActive = activePubs.some(
+          (p) => p.eventType === 'menu.published' && p.menuRevisionId === data.menu_revision_id,
+        );
+        if (!isRevisionActive) {
+          const diagnostic: SanitizedRowDiagnostic = {
+            rowIndex,
+            fieldName: 'menu_revision_id',
+            reasonCode: 'out_of_revision_window',
+            diagnosticMessage: 'Specified menu revision was not active at order timestamp',
           };
           await insertQuarantine(client, venueId, batchId, diagnostic);
           diagnostics.push(diagnostic);
@@ -616,7 +720,8 @@ export async function importOrderOutcomes(
         currency: line.currency ?? null,
       });
 
-      const lineIdentity = `${line.order_id}:${line.order_line_id}:${line.outcome_type}`;
+      // Encode composite order identity tuple without delimiter collisions (Finding F)
+      const lineIdentity = JSON.stringify([line.order_id, line.order_line_id, line.outcome_type]);
 
       // In-batch duplicate / conflict check
       if (seenInBatch.has(lineIdentity)) {
@@ -897,6 +1002,38 @@ async function resolveMenuRevision(
   };
 }
 
+async function getActiveMenuPublicationsAtTimestamp(
+  client: Client,
+  venueId: string,
+  orderedAtIso: string,
+): Promise<{ menuId: string; menuRevisionId: string | null; eventType: string }[]> {
+  const res = await client.query<{
+    menu_id: string;
+    event_type: string;
+    menu_revision_id: string | null;
+  }>(
+    `SELECT DISTINCT ON (e.stream_id)
+       e.stream_id AS menu_id,
+       e.event_type,
+       a.menu_revision_id
+     FROM app_private.es_event e
+     LEFT JOIN app_private.menu_approval a
+       ON a.tenant_id = e.tenant_id
+      AND a.approval_id = (e.payload->>'approvalId')::uuid
+     WHERE e.tenant_id = $1
+       AND e.stream_type = 'menu_publication'
+       AND e.occurred_at <= $2
+     ORDER BY e.stream_id, e.occurred_at DESC, e.version DESC`,
+    [venueId, orderedAtIso],
+  );
+
+  return res.rows.map((r) => ({
+    menuId: r.menu_id,
+    menuRevisionId: r.menu_revision_id,
+    eventType: r.event_type,
+  }));
+}
+
 async function resolveActiveMenuRevisionAtTimestamp(
   client: Client,
   venueId: string,
@@ -904,23 +1041,12 @@ async function resolveActiveMenuRevisionAtTimestamp(
   bundleLoader?: OrderOutcomeBundleLoader,
   cache?: Map<string, MenuRevisionResolution>,
 ): Promise<MenuRevisionResolution> {
-  const res = await client.query<{
-    menu_revision_id: string;
-  }>(
-    `SELECT approval.menu_revision_id
-     FROM app_private.menu_approval approval
-     JOIN app_private.public_menu_bundle bundle
-       ON bundle.tenant_id = approval.tenant_id
-      AND bundle.menu_id = approval.menu_id
-      AND bundle.menu_revision_id = approval.menu_revision_id
-     WHERE approval.tenant_id = $1 AND approval.approved_at <= $2
-     ORDER BY approval.approved_at DESC
-     LIMIT 1`,
-    [venueId, orderedAtIso],
+  const activePubs = await getActiveMenuPublicationsAtTimestamp(client, venueId, orderedAtIso);
+  const publishedActive = activePubs.filter(
+    (p) => p.eventType === 'menu.published' && p.menuRevisionId,
   );
 
-  const row = res.rows[0];
-  if (!row) {
+  if (publishedActive.length === 0) {
     return {
       valid: false,
       reasonCode: 'out_of_revision_window',
@@ -928,13 +1054,31 @@ async function resolveActiveMenuRevisionAtTimestamp(
     };
   }
 
-  if (cache?.has(row.menu_revision_id)) {
-    return cache.get(row.menu_revision_id)!;
+  if (publishedActive.length > 1) {
+    return {
+      valid: false,
+      reasonCode: 'out_of_revision_window',
+      message: 'Multiple active menus were published at order timestamp (ambiguous menu history)',
+    };
   }
 
-  const resolution = await resolveMenuRevision(client, venueId, row.menu_revision_id, bundleLoader);
+  const activePub = publishedActive[0];
+  if (!activePub || !activePub.menuRevisionId) {
+    return {
+      valid: false,
+      reasonCode: 'out_of_revision_window',
+      message: 'No published menu revision was active at order timestamp',
+    };
+  }
+
+  const menuRevisionId = activePub.menuRevisionId;
+  if (cache?.has(menuRevisionId)) {
+    return cache.get(menuRevisionId)!;
+  }
+
+  const resolution = await resolveMenuRevision(client, venueId, menuRevisionId, bundleLoader);
   if (cache) {
-    cache.set(row.menu_revision_id, resolution);
+    cache.set(menuRevisionId, resolution);
   }
   return resolution;
 }
@@ -1071,9 +1215,11 @@ export async function cleanupOrphanedOrderImports(
         result.deletedOrphans++;
         result.deleted++;
       } else {
-        // DB record exists: check raw CSV retention policy
+        // DB record exists: check raw CSV retention policy (Finding I)
+        // Destructive purge of raw source files requires explicit approval and configuration
+        const purgeEnabled = options.retentionConfig?.enableRawCsvPurge === true;
         const ageMs = BigInt(nowMs - uploadedMs);
-        if (ageMs >= rawCsvRetentionMs) {
+        if (purgeEnabled && ageMs >= rawCsvRetentionMs) {
           // Object exceeded raw CSV retention period: safely prune from storage
           await options.storage.delete(obj.key);
           result.deletedAgedRawCsv++;

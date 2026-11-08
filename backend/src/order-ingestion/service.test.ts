@@ -23,6 +23,13 @@ type MockDbState = {
     bundleUrl: string;
     contentHash: string;
   };
+  publicationEvents?: Array<{
+    menuId: string;
+    menuRevisionId: string;
+    eventType: 'menu.published' | 'menu.withdrawn';
+    occurredAt: Date;
+    version?: number;
+  }>;
   bundleContent?: PublicMenuContentBundle;
   posDishMappings: Map<string, any>;
   venueTrackingActivations?: Map<string, any>;
@@ -199,7 +206,50 @@ function createMockClient(state: MockDbState) {
         return { rows: [], rowCount: 1 };
       }
 
-      // 5. Menu approval & public bundle check
+      // 5. Menu publication event history query (Finding D)
+      if (
+        normalizedSql.includes('FROM app_private.es_event e') &&
+        normalizedSql.includes('menu_publication')
+      ) {
+        const [tenantId, orderedAtIso] = params!;
+        if (tenantId !== state.venueId) return { rows: [], rowCount: 0 };
+        const orderedAt = new Date(orderedAtIso);
+        const events =
+          state.publicationEvents ??
+          (state.menuApproval
+            ? [
+                {
+                  menuId: '00000000-0000-0000-0000-000000000001',
+                  menuRevisionId: state.menuApproval.menuRevisionId,
+                  eventType: 'menu.published' as const,
+                  occurredAt: state.menuApproval.approvedAt ?? new Date('2026-01-01T00:00:00Z'),
+                  version: 1,
+                },
+              ]
+            : []);
+
+        const eligible = events.filter((e) => e.occurredAt <= orderedAt);
+        const latestByMenu = new Map<string, (typeof eligible)[0]>();
+        for (const ev of eligible) {
+          const current = latestByMenu.get(ev.menuId);
+          if (
+            !current ||
+            ev.occurredAt > current.occurredAt ||
+            (ev.occurredAt.getTime() === current.occurredAt.getTime() &&
+              (ev.version ?? 1) > (current.version ?? 1))
+          ) {
+            latestByMenu.set(ev.menuId, ev);
+          }
+        }
+        const rows = [...latestByMenu.values()].map((e) => ({
+          menu_id: e.menuId,
+          event_type: e.eventType,
+          menu_revision_id: e.menuRevisionId,
+        }));
+        return { rows, rowCount: rows.length };
+      }
+
+      // Legacy fallback for tests querying menu_approval directly
       if (
         normalizedSql.includes('FROM app_private.menu_approval approval') &&
         normalizedSql.includes('ORDER BY approval.approved_at DESC')
@@ -244,8 +294,13 @@ function createMockClient(state: MockDbState) {
       // 6. Check existing order outcome line
       if (normalizedSql.includes('FROM app_private.order_outcome_lines')) {
         const [tenantId, orderId, orderLineId, outcomeType] = params!;
-        const key = `${tenantId}:${orderId}:${orderLineId}:${outcomeType}`;
-        const existing = state.lines.get(key);
+        const existing = [...state.lines.values()].find(
+          (l) =>
+            l.tenant_id === tenantId &&
+            l.order_id === orderId &&
+            l.order_line_id === orderLineId &&
+            l.outcome_type === outcomeType,
+        );
         return { rows: existing ? [existing] : [], rowCount: existing ? 1 : 0 };
       }
 
@@ -1131,7 +1186,7 @@ describe('importOrderOutcomes service', () => {
         delete: vi.fn().mockResolvedValue(undefined),
       };
 
-      // 1. Run cleanup with default 90-day retention
+      // 1. Run cleanup with default retention policy: destructive purge of raw CSV is disabled by default
       return cleanupOrphanedOrderImports({
         storage: mockStorage as any,
         client: client as any,
@@ -1140,17 +1195,18 @@ describe('importOrderOutcomes service', () => {
         expect(resultDefault.scanned).toBe(4);
         expect(resultDefault.skippedActive).toBe(1); // 30 mins ago
         expect(resultDefault.deletedOrphans).toBe(1); // 4 hours ago orphan
-        expect(resultDefault.deletedAgedRawCsv).toBe(1); // 100 days ago (> 90 days)
-        expect(resultDefault.retained).toBe(1); // 40 days ago (< 90 days)
-        expect(resultDefault.deleted).toBe(2);
+        expect(resultDefault.deletedAgedRawCsv).toBe(0); // raw CSV purge disabled by default to prevent data loss
+        expect(resultDefault.retained).toBe(2); // both 100 days ago and 40 days ago safely retained
+        expect(resultDefault.deleted).toBe(1);
 
-        // 2. Run cleanup with custom 30-day retention policy: 40-day-old file is now deleted
+        // 2. Run cleanup with custom 30-day retention and explicit enableRawCsvPurge: true
         mockStorage.delete.mockClear();
         const resultCustom = await cleanupOrphanedOrderImports({
           storage: mockStorage as any,
           client: client as any,
           retentionConfig: {
             rawCsvRetentionDays: 30,
+            enableRawCsvPurge: true,
           },
           now: () => now,
         });
@@ -1268,8 +1324,9 @@ describe('importOrderOutcomes service', () => {
       expect(result.diagnostics[0]?.diagnosticMessage).toMatch(/reviewed approval required/);
     });
 
-    it('quarantines row with missing_tracking_start_evidence when trackingStartedAt is omitted', async () => {
+    it('quarantines row with missing_tracking_start_evidence when trackingStartedAt is omitted and no DB activation exists', async () => {
       const state = defaultState();
+      state.venueTrackingActivations = new Map(); // No activation in DB either
       state.menuApproval!.approvedAt = new Date('2026-10-01T00:00:00Z');
       const client = createMockClient(state);
 
@@ -1295,6 +1352,31 @@ describe('importOrderOutcomes service', () => {
       expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
         /Authoritative venue tracking-start date is not established/,
       );
+    });
+
+    it('loads activation from authorized tenant context when trackingStartedAt is omitted and DB activation exists (Finding A)', async () => {
+      const state = defaultState(); // Has venueTrackingActivations
+      state.menuApproval!.approvedAt = new Date('2026-10-01T00:00:00Z');
+      const client = createMockClient(state);
+
+      const csv = [
+        'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+        'pilot_order_outcome.v1,ORD-TRACK-OK,LINE-1,2026-11-05T12:00:00Z,POS-PIZZA-1,ordered,1',
+      ].join('\n');
+
+      const result = await importOrderOutcomes({
+        client: client as any,
+        actorId,
+        venueId,
+        csvText: csv,
+        // trackingStartedAt intentionally omitted
+        bundleLoader,
+        now: () => new Date('2026-11-07T12:00:00Z'),
+      });
+
+      expect(result.status).toBe('completed');
+      expect(result.acceptedRows).toBe(1);
+      expect(result.quarantinedRows).toBe(0);
     });
 
     it('quarantines row with before_tracking_start when order timestamp is before restaurant tracking start', async () => {
@@ -1719,6 +1801,526 @@ describe('importOrderOutcomes service', () => {
       expect(result.quarantinedRows).toBe(1);
       expect(result.diagnostics[0]?.reasonCode).toBe('unreviewed_pos_mapping');
       expect(result.diagnostics[0]?.diagnosticMessage).toMatch(/reviewed approval required/);
+    });
+  });
+
+  describe('PR Review Findings Regression Coverage (DATA-07)', () => {
+    // Finding G: Strict quantity validation
+    describe('Strict quantity validation (Finding G)', () => {
+      it.each([
+        ['1.5', 'decimal number'],
+        ['1junk', 'trailing non-digit characters'],
+        ['1e2', 'scientific notation'],
+        ['0', 'zero quantity'],
+        ['1000', 'quantity exceeding 999 ceiling'],
+        ['-1', 'negative quantity'],
+        ['', 'empty quantity token'],
+      ])('quarantines invalid quantity %s (%s) with invalid_format', async (qtyStr) => {
+        const state = defaultState();
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          `pilot_order_outcome.v1,ORD-QTY-INV,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,${qtyStr}`,
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-05T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.fieldName).toBe('quantity');
+        expect(result.diagnostics[0]?.reasonCode).toBe('invalid_format');
+        expect(result.diagnostics[0]?.diagnosticMessage).toBe(
+          'quantity must be an integer between 1 and 999',
+        );
+      });
+
+      it.each([
+        ['1', 1],
+        ['999', 999],
+        ['42', 42],
+      ])('accepts valid boundary integer quantity %s', async (qtyStr, expectedQty) => {
+        const state = defaultState();
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          `pilot_order_outcome.v1,ORD-QTY-OK,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,${qtyStr}`,
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-05T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(1);
+        expect(result.quarantinedRows).toBe(0);
+        const persisted = [...state.lines.values()][0];
+        expect(persisted?.quantity).toBe(expectedQty);
+      });
+    });
+
+    // Finding F: Unambiguous tuple identity encoding
+    describe('Unambiguous order identity tuple (Finding F)', () => {
+      it('accepts (A:B, C, ordered) and (A, B:C, ordered) independently in same batch without delimiter collision', async () => {
+        const state = defaultState();
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,A:B,C,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+          'pilot_order_outcome.v1,A,B:C,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-05T12:00:00Z'),
+        });
+
+        expect(result.status).toBe('completed');
+        expect(result.totalRows).toBe(2);
+        expect(result.acceptedRows).toBe(2);
+        expect(result.duplicateRows).toBe(0);
+        expect(result.conflictRows).toBe(0);
+        expect(result.quarantinedRows).toBe(0);
+      });
+
+      it('detects genuine duplicate lines within the batch with identical tuple identity and checksum', async () => {
+        const state = defaultState();
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-DUP,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+          'pilot_order_outcome.v1,ORD-DUP,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-05T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(1);
+        expect(result.duplicateRows).toBe(1);
+        expect(result.conflictRows).toBe(0);
+      });
+    });
+
+    // Finding D: Canonical Sprint 4 Publication and Withdrawal History
+    describe('Canonical publication and withdrawal history (Finding D)', () => {
+      it('quarantines row when order timestamp is before menu publication event (approval before publication)', async () => {
+        const state = defaultState();
+        // Menu was approved at 2026-09-01, but only published at 2026-10-05
+        state.publicationEvents = [
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-05T00:00:00Z'),
+            version: 1,
+          },
+        ];
+        const client = createMockClient(state);
+
+        // Order occurred on 2026-10-02 (before publication on 2026-10-05)
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-BEFORE-PUB,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-09-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+        expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+          /No published menu revision was active at order timestamp/,
+        );
+      });
+
+      it('accepts row when order timestamp is during valid active publication', async () => {
+        const state = defaultState();
+        state.publicationEvents = [
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-01T00:00:00Z'),
+            version: 1,
+          },
+        ];
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-VALID-PUB,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(1);
+        expect(result.quarantinedRows).toBe(0);
+      });
+
+      it('quarantines row when order timestamp is after menu withdrawal', async () => {
+        const state = defaultState();
+        state.publicationEvents = [
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-01T00:00:00Z'),
+            version: 1,
+          },
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.withdrawn',
+            occurredAt: new Date('2026-10-03T00:00:00Z'),
+            version: 2,
+          },
+        ];
+        const client = createMockClient(state);
+
+        // Order on 2026-10-04 (after withdrawal)
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-AFTER-WITHDRAWN,LINE-1,2026-10-04T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+        expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+          /No published menu revision was active at order timestamp/,
+        );
+      });
+
+      it('quarantines row when multiple active menus are published at order timestamp (ambiguous menu history)', async () => {
+        const state = defaultState();
+        const secondMenuRevId = '00000000-0000-0000-0000-000000000099';
+        state.publicationEvents = [
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-01T00:00:00Z'),
+            version: 1,
+          },
+          {
+            menuId: '00000000-0000-0000-0000-000000000002',
+            menuRevisionId: secondMenuRevId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-01T00:00:00Z'),
+            version: 1,
+          },
+        ];
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-MULTI-MENU,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+        expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+          /Multiple active menus were published at order timestamp/,
+        );
+      });
+
+      it('quarantines explicit canonical ID row when the revision was never published', async () => {
+        const state = defaultState();
+        state.publicationEvents = []; // No publication events
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+          `pilot_order_outcome.v1,ORD-CANON-UNPUB,LINE-1,2026-10-02T12:00:00Z,${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+        expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+          /Specified menu revision was not active at order timestamp/,
+        );
+      });
+
+      it('quarantines explicit canonical ID row when the revision was withdrawn before order timestamp', async () => {
+        const state = defaultState();
+        state.publicationEvents = [
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.published',
+            occurredAt: new Date('2026-10-01T00:00:00Z'),
+            version: 1,
+          },
+          {
+            menuId: '00000000-0000-0000-0000-000000000001',
+            menuRevisionId,
+            eventType: 'menu.withdrawn',
+            occurredAt: new Date('2026-10-03T00:00:00Z'),
+            version: 2,
+          },
+        ];
+        const client = createMockClient(state);
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+          `pilot_order_outcome.v1,ORD-CANON-WITHDRAWN,LINE-1,2026-10-04T12:00:00Z,${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          trackingStartedAt: '2026-10-01T00:00:00Z',
+          bundleLoader,
+          now: () => new Date('2026-10-10T12:00:00Z'),
+        });
+
+        expect(result.acceptedRows).toBe(0);
+        expect(result.quarantinedRows).toBe(1);
+        expect(result.diagnostics[0]?.reasonCode).toBe('out_of_revision_window');
+        expect(result.diagnostics[0]?.diagnosticMessage).toMatch(
+          /Specified menu revision was not active at order timestamp/,
+        );
+      });
+    });
+
+    // Finding B: Reauthorization in processing transaction
+    describe('Reauthorization in processing transaction (Finding B)', () => {
+      it('rejects with 403 and cleans uploaded archive if owner permission is revoked before processing transaction', async () => {
+        const state = defaultState();
+        let checkCount = 0;
+        const mockStorage = {
+          put: vi.fn().mockResolvedValue(undefined),
+          delete: vi.fn().mockResolvedValue(undefined),
+        };
+
+        const client = {
+          query: vi.fn(async (sql: string, params?: any[]) => {
+            const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+            if (
+              normalizedSql.startsWith('BEGIN') ||
+              normalizedSql.startsWith('COMMIT') ||
+              normalizedSql.startsWith('ROLLBACK')
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (
+              normalizedSql.includes("set_config('app.actor_id'") ||
+              normalizedSql.includes("set_config('app.tenant_id'")
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (
+              normalizedSql.includes('SET LOCAL') ||
+              normalizedSql.includes('pg_advisory_xact_lock')
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (normalizedSql.includes('FROM app_private.staff_membership')) {
+              checkCount++;
+              // First check during initial auth succeeds
+              if (checkCount === 1) {
+                return { rows: [{ permission: 'owner' }], rowCount: 1 };
+              }
+              // Second check inside processing transaction fails (e.g. membership revoked or downgraded)
+              return { rows: [{ permission: 'editor' }], rowCount: 1 };
+            }
+            if (normalizedSql.includes('FROM app_private.order_outcome_import_batches')) {
+              return { rows: [], rowCount: 0 };
+            }
+            return { rows: [], rowCount: 0 };
+          }),
+        };
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-REVOKED,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        await expect(
+          importOrderOutcomes({
+            client: client as any,
+            actorId,
+            venueId,
+            csvText: csv,
+            storage: mockStorage as any,
+            bundleLoader,
+            now: () => new Date('2026-10-05T12:00:00Z'),
+          }),
+        ).rejects.toThrow('Order outcome import requires owner permission');
+
+        // Verify storage compensation executed
+        expect(mockStorage.delete).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // Finding E: Idempotency under advisory lock
+    describe('Concurrent file idempotency under advisory lock (Finding E)', () => {
+      it('returns existing completed receipt and deletes redundant archive upload if file was completed concurrently', async () => {
+        const state = defaultState();
+        const existingBatchId = '00000000-0000-0000-0000-000000000888';
+        let batchQueryCount = 0;
+
+        const mockStorage = {
+          put: vi.fn().mockResolvedValue(undefined),
+          delete: vi.fn().mockResolvedValue(undefined),
+        };
+
+        const client = {
+          query: vi.fn(async (sql: string, params?: any[]) => {
+            const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+            if (
+              normalizedSql.startsWith('BEGIN') ||
+              normalizedSql.startsWith('COMMIT') ||
+              normalizedSql.startsWith('ROLLBACK')
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (
+              normalizedSql.includes("set_config('app.actor_id'") ||
+              normalizedSql.includes("set_config('app.tenant_id'")
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (
+              normalizedSql.includes('SET LOCAL') ||
+              normalizedSql.includes('pg_advisory_xact_lock')
+            ) {
+              return { rows: [], rowCount: 0 };
+            }
+            if (normalizedSql.includes('FROM app_private.staff_membership')) {
+              return { rows: [{ permission: 'owner' }], rowCount: 1 };
+            }
+            if (
+              normalizedSql.includes('FROM app_private.order_outcome_import_batches') &&
+              normalizedSql.includes('file_sha256 = $2')
+            ) {
+              batchQueryCount++;
+              // First query before upload: no batch exists yet
+              if (batchQueryCount === 1) {
+                return { rows: [], rowCount: 0 };
+              }
+              // Second query after advisory lock: another concurrent worker completed the import!
+              return {
+                rows: [
+                  {
+                    id: existingBatchId,
+                    status: 'completed',
+                    total_rows: 1,
+                    accepted_rows: 1,
+                    duplicate_rows: 0,
+                    quarantined_rows: 0,
+                    conflict_rows: 0,
+                    file_sha256: 'mock-sha',
+                    created_at: new Date('2026-10-01T00:00:00Z'),
+                    finished_at: new Date('2026-10-01T00:01:00Z'),
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
+            return { rows: [], rowCount: 0 };
+          }),
+        };
+
+        const csv = [
+          'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+          'pilot_order_outcome.v1,ORD-CONC,LINE-1,2026-10-02T12:00:00Z,POS-PIZZA-1,ordered,1',
+        ].join('\n');
+
+        const result = await importOrderOutcomes({
+          client: client as any,
+          actorId,
+          venueId,
+          csvText: csv,
+          storage: mockStorage as any,
+          bundleLoader,
+          now: () => new Date('2026-10-05T12:00:00Z'),
+        });
+
+        expect(result.batchId).toBe(existingBatchId);
+        expect(result.status).toBe('completed');
+        expect(result.isDuplicateFile).toBe(true);
+        // Redundant storage file deleted
+        expect(mockStorage.delete).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
