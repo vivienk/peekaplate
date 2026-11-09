@@ -199,6 +199,11 @@
   --pp-input-edge: var(--pp-role-input-border-error);
   color: var(--pp-role-input-text-error);
 }
+/* Keep the red error edge while giving keyboard focus its own visible cue. */
+.pp-input[aria-invalid="true"]:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
 .pp-input:disabled {
   --pp-input-edge: var(--pp-role-input-border-disabled);
   background-color: var(--pp-role-input-bg-disabled);

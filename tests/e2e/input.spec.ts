@@ -84,6 +84,47 @@ test('keyboard focus skips disabled inputs and stays visible', async ({ page }) 
   }
 });
 
+test('an invalid field has a distinct keyboard focus cue while retaining its error', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 960 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(demo);
+  const price = page.getByLabel('Price');
+  const appearance = () =>
+    price.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        outline: style.outline,
+        outlineWidth: style.outlineWidth,
+        outlineStyle: style.outlineStyle,
+        outlineOffset: style.outlineOffset,
+        border: style.borderTopColor,
+        shadow: style.boxShadow,
+        height: element.getBoundingClientRect().height,
+      };
+    });
+  await page.getByLabel('Dish name').focus();
+  const blurred = await appearance();
+  await page.keyboard.press('Tab');
+  await expect(price).toBeFocused();
+  const focused = await appearance();
+  expect(focused.outline).not.toBe(blurred.outline);
+  expect(focused.outlineWidth).toBe('2px');
+  expect(focused.outlineStyle).toBe('solid');
+  expect(focused.outlineOffset).toBe('2px');
+  expect(focused.border).toBe(blurred.border);
+  expect(focused.shadow).toBe(blurred.shadow);
+  expect(focused.height).toBe(44);
+  await expect(price).toHaveAccessibleDescription('Error: Enter a price');
+  await page.screenshot({
+    path: testInfo.outputPath('textfield-focused-error-390.png'),
+    fullPage: true,
+  });
+  await page.getByLabel('Dish name').focus();
+  expect((await appearance()).outline).toBe(blurred.outline);
+});
+
 // Rania's spec (1 Nov): the input box is exactly 44px tall in every state, with 16px text on a 24px
 // line height. Measured on the textbox itself, so the label and helper or error text are excluded.
 // Rania's review (5 Nov): the label sits above the input, the helper or error text below it, and an
