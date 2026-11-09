@@ -1702,6 +1702,12 @@ Backend typecheck and Biome checks pass.
     "ownerReportFixture": "Covers a future opening, an out-of-window activity checkpoint and a comparison-only session."
   }
 }
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-07T16:24:15.985Z"},"status":"resolved","cause":"While merging develop into S3-TOK-01 (#74), the docs/CONTEXT.md conflict (source fingerprints only) was first resolved by taking develop's whole file, which dropped the branch's module path changes (foundations Input.tsx and input.css renamed to TextField.tsx and field.css), so the context check could not read the old paths.","prevention":"Resolve CONTEXT.md conflicts hunk by hunk, keeping both sides' non-conflicting changes, then run context:refresh; never replace the whole file with one side.","regression":"Re-resolved only the three conflicting fingerprint hunks; context:refresh and context:check then passed (12 modules, 10 handoffs)."}
+```
 
 
 ## November 3 S3-RES-01.2 review persistence hardening
@@ -1988,3 +1994,30 @@ The first local merge helper stopped at the summary cap, but a missing exit guar
 Independent review identified two additional paths: failed clearing lost its pending state after a reload, and clearing a fallback memory store could incorrectly certify that a temporarily unavailable IndexedDB backend was empty. Both regressions replayed the old event before correction. Withdrawal now records deletion-work tokens in sessionStorage/localStorage and explicitly clears both durable backends; incomplete clearance keeps new work in memory and is retried on reopening. Completion records cannot erase a newer request. Eight withdrawal unit tests cover reload, fallback, overlap and unreadable markers; a real Chromium reload test seeds both backends, interrupts IndexedDB access and verifies that old records never reach delivery after recovery. All-storage-write failure remains an explicit documented limitation; no hosted acceptance is inferred.
 
 Tooling corrections: a Windows rg path containing a wildcard was treated literally; use directory paths with rg's glob filter instead. A revised PR description initially omitted the repository's three required context labels; the exact body now passes scripts/check-pr.mjs before publishing.
+
+
+## November 8 PR74 reconciliation and invalid-field focus
+
+The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
+
+The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T10:41:49.339Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-09T10:41:49.339Z"},"status":"resolved","cause":"The new fail-closed route correctly returned 503 to the real-PostgreSQL owner-report fixture because its synthetic request omitted the required source selector.","prevention":"Synthetic integration callers must explicitly set source=synthetic; do not weaken the route gate to preserve implicit behavior.","regression":"The real Worker fixture now requests source=synthetic; pnpm verify test:db passes all 77 integration tests and 213 pgTAP assertions."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-09T10:39:08.000Z","result":"failed"}
+```
+
+<!-- resolution of the context:refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-09T10:39:08.000Z"},"status":"resolved","cause":"The backend context summary grew to 1118 characters, exceeding the validator's 1000-character limit.","prevention":"Keep module summaries within the context validator's limit and shorten summaries before refreshing fingerprints.","regression":"Shortened the summary; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
+```

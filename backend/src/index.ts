@@ -729,6 +729,10 @@ export function createApp(services: Dependencies = dependencies) {
     const actorId = await services.verify(authorization, c.env ?? {});
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (sources.length !== 1 || sources[0] !== 'synthetic') {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,

@@ -1829,9 +1829,12 @@ describe('Multi-tenant owner report isolation', () => {
     await addDirectSave(exposedSessions[10]!);
 
     const requestReport = async (tenant: string, subject: string) =>
-      fetch(`http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes`, {
-        headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
-      });
+      fetch(
+        `http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes?source=synthetic`,
+        {
+          headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
+        },
+      );
 
     const ownerResponse = await requestReport(venue, actor);
     expect(ownerResponse.status).toBe(200);

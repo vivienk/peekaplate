@@ -63,7 +63,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "657afec34a4f9c2da845e614be17fc732469c7d06154242955706c31d8c372b1"
+      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
     },
     {
       "id": "ui",
@@ -80,7 +80,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
+      "sourceFingerprint": "1479570f1b3584333e12b22847767167494f78c9d12d7a5aa58ff3863310c895"
     },
     {
       "id": "diner",
@@ -162,23 +162,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "06f127b8452fb6f7a35656c1b35475bca3048e23bc3e97e06596255b35a1da49"
+      "sourceFingerprint": "870fe0fba2eaad666945c79cabf89660579ff75a4b17435a7b6549a29a050095"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
         "frontend/console/package.json",
         "frontend/console/foundations.html",
-        "frontend/console/src/foundations/Input.tsx",
-        "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
         "tests/e2e/input.spec.ts",
-        "frontend/console/vite.config.ts"
+        "frontend/console/vite.config.ts",
+        "frontend/console/src/foundations/TextField.tsx",
+        "frontend/console/src/foundations/field.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -188,12 +188,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
+      "sourceFingerprint": "c1af4f0e5ecec13375e3e01ebd7f7d7614fdaf64f0597cd841168a7754d6da36"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened pair dishes once, with same-producer local sequence breaking timestamp ties. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness is unverified until pipeline evidence confirms it. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical observation/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally covers checkpoint ordering, archive restore, retries, duplicate replay and two-session facts without owner-view leakage. Owner reports authorize membership and bound evidence to 24h; ordered comparisons credit both opened dishes once. Dish-report HTTP requires exactly one source=synthetic or returns 503 before reader invocation. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness remains unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -292,7 +292,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "198316f173ae235e18d93679e1f56166444b46e53f586d87ce1fa54bc49d8c91"
+      "sourceFingerprint": "5b15f42e3a617490d487dfe80a165003c6c0d53de36ffc9f193eca703564da60"
     },
     {
       "id": "database",
@@ -409,7 +409,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6402306233c31b02c71f333e80b9b58be51d9b46d0a301f710429e16074cd12f"
+      "sourceFingerprint": "978edb1b904966c9d49a6b47870e2218c1db493bafd4ac393cc30e6790aae3e0"
     },
     {
       "id": "agents",
@@ -597,6 +597,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
+      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
+      "modules": [
+        "console",
+        "tokens"
+      ],
+      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
+    },
+    {
+      "date": "2026-11-08",
       "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
       "modules": [
         "diner",
@@ -661,12 +670,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     },
     {
-      "summary": "November 8 owner-report follow-up: the owner-scoped report bounds event, timing and comparison evidence to the supplied 24-hour window. A comparison qualifies only after either participant opens; each participant opened in that session receives one engagement credit, including a later second opening. Real-PostgreSQL fixtures cover ordered and premature comparisons, duplicate pair events and a 10-active/9-timed complementary-suppression case. Owner serialization hides timing-derived indicators while retaining independently safe metric cohorts. The actual latest ingestion timestamp remains visible, but is_stale is null until target pipeline evidence verifies freshness. Hosted acceptance remains unverified.",
+      "date": "2026-11-09",
+      "summary": "Owner-report release gate: the route returns 503 before invoking its reader unless query contains exactly one source=synthetic; a signed-staff-JWT regression covers missing, production and duplicate selectors plus synthetic 200. The real-PostgreSQL route fixture also marks its source synthetic. pnpm verify test passes (999 tests, 4 skipped across 63 files); pnpm verify test:db passes (77 tests, 213 pgTAP assertions). Freshness and hosted acceptance remain pending; collection stays paused.",
       "modules": [
         "backend",
         "delivery"
       ],
-      "next": "Keep freshness unavailable until accepted-online observation-to-summary evidence and its agreed delay policy are verified; do not infer staleness from a quiet venue. Keep collection paused pending real controls/outbox/privacy and hosted report, native recovery and production acceptance gates."
+      "next": "Keep production reads unavailable until a separately reviewed release policy changes. Keep freshness unverified until accepted-online observation-to-summary evidence and its agreed delay policy are verified; collection stays paused pending hosted report, native recovery and production acceptance gates."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
@@ -676,13 +686,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing"
       ],
       "next": "Verify the reconciled head and independent tests before merge. Complete #73 artifact/command integrity corrections and #45 retry-exhaustion recovery before hosted upload-to-review acceptance."
-    },
-    {
-      "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
     }
   ]
 }
