@@ -1,3 +1,4 @@
+import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
@@ -21,6 +22,9 @@ const ALL_CATEGORY_ID = 'all';
 let menuObserver: IntersectionObserver | null = null;
 let activeCategoryId: string | null = null;
 let openerDishId: string | null = null;
+// True while the screen is showing fixture data. Only then may it show the "Fixture data"
+// label and the demo restaurant name; real menus must never show either.
+let fixtureMode = true;
 
 function disposeObserver(): void {
   menuObserver?.disconnect();
@@ -50,19 +54,27 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// INTERIM: loading and error states have no restaurant name from the data, so a live menu uses
+// a neutral heading. Design confirmation pending (open question 3 in the DIN-03 ticket).
+function stateHeading(): string {
+  return fixtureMode ? demoBundle.restaurant.name : 'Menu';
+}
+
+function fixtureNotice(): string {
+  return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
+}
+
 function renderLoading(container: HTMLElement): void {
   container.innerHTML = `
-    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
+    <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--loading" role="status" aria-live="polite">
       <div class="pp-spinner" aria-hidden="true"></div>
       <p class="pp-loading-text">Loading menu…</p>
-      <p class="pp-notice">${FIXTURE_LABEL}</p>
+      ${fixtureNotice()}
     </div>
   `;
 }
 
-// INTERIM: Failure heading uses demoBundle.restaurant.name because an error or 404 response
-// carries no restaurant name. Design confirmation pending.
 function renderFailure(
   container: HTMLElement,
   status: MenuLoadResult['status'],
@@ -76,11 +88,11 @@ function renderFailure(
   };
   const showRetry = (status === 'error' || status === 'offline') && Boolean(onRetry);
   container.innerHTML = `
-    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
+    <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
       ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
-      <p class="pp-notice">${FIXTURE_LABEL}</p>
+      ${fixtureNotice()}
     </div>
   `;
   if (showRetry && onRetry) {
@@ -329,13 +341,21 @@ export function mountMenuScreen(container: HTMLElement): void {
   const loadMenu = () => {
     if (isLoading) return;
     isLoading = true;
+    const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
+    fixtureMode = mode === 'fixture';
     renderLoading(container);
 
     // Re-reading scenario and delay from the query on each load allows retry recovery
     // in tests while maintaining identical behavior in production where the query is static.
     const scenario = scenarioFromQuery();
     const delayMs = delayFromQuery();
-    const source = createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs });
+
+    // Fixture mode calls load() synchronously, exactly as before. Live mode loads the published
+    // adapter on demand (dynamic import), so fixture builds do not carry or run it.
+    const loading: Promise<MenuLoadResult> =
+      mode === 'live'
+        ? import('./published').then((m) => m.createPublishedMenuSource().load())
+        : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
     const handleRetry = () => {
       if (isLoading) return;
@@ -343,8 +363,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       loadMenu();
     };
 
-    source
-      .load()
+    loading
       .then((result: MenuLoadResult) => {
         isLoading = false;
         if (result.status !== 'ready') {
