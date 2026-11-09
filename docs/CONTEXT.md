@@ -13,10 +13,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 validates scoped evidence.",
+      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Public menu integrity verifies exact bytes before parsing; synthetic round-trip and tamper fixtures document the handoff. Queue contracts normalize payloads and retain server-derived traffic_class. Contracts reject client authority and private/unknown payload fields. Menu-token claims allow optional signed traffic_class. Owner reports suppress metrics below the active-session threshold; per-metric eligibility is stripped from public reports. RES-01.1 review candidates and AI-01 scoped evidence are validated.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
+        "packages/contracts/src/public-menu-integrity.test.ts",
+        "packages/contracts/fixtures/public-menu-bundle.v1/README.md",
+        "packages/contracts/fixtures/public-menu-bundle.v1/bundle.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/expected.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/tampered.json",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
         "packages/contracts/fixtures/observation.v2/README.md",
         "packages/contracts/src/owner-report.ts",
@@ -47,7 +52,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
+      "sourceFingerprint": "9709fcd107f1d262783423998297ae01922eef9d85c2b6fca43d5b2e590102bb"
     },
     {
       "id": "tokens",
@@ -193,8 +198,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK. S4-DATA-04 locally tests checkpoint ordering, archive restoration, retry/redelivery and owner-view exclusion; hosted recovery remains pending. S4-RES locally builds deterministic menu bundles from approved tenant-scoped sources and verified T0 variants, with privileged opt-in handoff admission; hosting and DIN-03 adoption remain staging gates. AI-01 returns scoped drafts or abstention.",
       "paths": [
+        "backend/src/bundle-producer/ids.ts",
+        "backend/src/bundle-producer/price.ts",
+        "backend/src/bundle-producer/produce.ts",
+        "backend/src/bundle-producer/produce.test.ts",
+        "backend/src/bundle-producer/repository.ts",
+        "backend/src/bundle-producer/request.ts",
+        "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/scripts/produce-menu-bundle.ts",
+        "docs/s4-res-bundle-producer.md",
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
         "backend/local.test.mjs",
@@ -290,7 +304,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cf3deed9ce38c1652c19f5d12fc1b1306176e297a11927f63dbdf20bcb14ca3c"
+      "sourceFingerprint": "46f1d608e6cf94ca8689d8801778344cc2239aa5648c0d11ce04fe5e75fe20a9"
     },
     {
       "id": "database",
@@ -353,6 +367,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "status": "foundation",
       "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Merged PRs keep their last successfully deployed preview; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical.",
       "paths": [
+        "scripts/node-ts-hooks.mjs",
         "README.md",
         "SECURITY.md",
         "docs/team_guide.md",
@@ -407,7 +422,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6402306233c31b02c71f333e80b9b58be51d9b46d0a301f710429e16074cd12f"
+      "sourceFingerprint": "4e0ceebbf515c96ef12e4b2103c767e91cc41949d8ef4b141e3b4eaa27c8b06a"
     },
     {
       "id": "agents",
