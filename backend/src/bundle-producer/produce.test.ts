@@ -142,8 +142,8 @@ async function produceDefault() {
 
 async function producerError(promise: Promise<unknown>) {
   const error = await promise.catch((caught: unknown) => caught);
-  expect(error).toBeInstanceOf(BundleProducerError);
-  return (error as BundleProducerError).code;
+  if (!(error instanceof BundleProducerError)) throw error;
+  return error.code;
 }
 
 function dishes(result: ProducedMenuBundle) {
