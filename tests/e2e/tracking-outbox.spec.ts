@@ -5,6 +5,70 @@ import { expect, type Page, test } from '@playwright/test';
 const DINER = 'http://127.0.0.1:5173/';
 const PUBLICATION = 'a5000000-0000-4000-8000-000000000001';
 
+test('the existing consent control gates both destinations even without PostHog configuration', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true });
+  await page.evaluate(() => {
+    const holder = window as unknown as {
+      tracking: { connectPostHog(sink: unknown): void };
+      reviewCaptures: unknown[];
+    };
+    holder.reviewCaptures = [];
+    holder.tracking.connectPostHog({
+      capturePostHog: (...args: unknown[]) => holder.reviewCaptures.push(args),
+      setConsent: () => {},
+    });
+  });
+  await trackMenuViewed(page);
+  await hidePage(page);
+  expect(await delivered(page)).toBe(0);
+  await page.getByRole('button', { name: 'Allow optional analytics', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Turn off optional analytics' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await trackMenuViewed(page);
+  await expect.poll(() => storedEvents(page)).toBe(1);
+  await hidePage(page);
+  await expect.poll(() => delivered(page)).toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewCaptures: unknown[] }).reviewCaptures.length,
+    ),
+  ).toBe(1);
+  await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
+  await trackMenuViewed(page);
+  await hidePage(page);
+  await expect.poll(() => storedEvents(page)).toBe(0);
+  expect(await delivered(page)).toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewCaptures: unknown[] }).reviewCaptures.length,
+    ),
+  ).toBe(1);
+});
+
+test('the consent control stays off when a browser privacy signal blocks the shared gate', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await startTracking(page, { live: true });
+  await page.evaluate(() =>
+    (
+      window as unknown as { tracking: { setPrivacySignal(signal: () => boolean): void } }
+    ).tracking.setPrivacySignal(() => true),
+  );
+  const button = page.getByRole('button', { name: 'Allow optional analytics', exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+  await trackMenuViewed(page);
+  await hidePage(page);
+  expect(await delivered(page)).toBe(0);
+  await expect.poll(() => storedEvents(page)).toBe(0);
+});
+
 // `hold`: live mode without a sender, as in TRK-01.2 before delivery exists; events stay queued.
 type Options = { live?: boolean; consent?: boolean; hold?: boolean };
 
@@ -300,4 +364,105 @@ test('each live event reaches PostHog once with the canonical event_id; fixture 
   await hidePage(page);
   await page.waitForTimeout(300);
   expect((await postHogInfo(page)).captured).toEqual([]);
+});
+
+// Fixtures README (observation.v2): browser delivery tests owned by TRK-01. Save and Unsave report
+// success only for committed writes, so a failed Save storage write must never reach delivery.
+// Save's hearts are wired to the real track(); only localStorage (Save's store) is blocked, so the
+// IndexedDB outbox still works.
+async function saveAndUnsaveThroughTracking(page: Page, blockSaveStorage: boolean) {
+  await page.goto(DINER);
+  await startTracking(page, { live: true, consent: true });
+  await page.evaluate(async (blockSaveStorage) => {
+    const load = (path: string) => import(/* @vite-ignore */ path);
+    const { createSaveState } = await load('/src/save/save-state.ts');
+    const { mountSaveHeart } = await load('/src/save/mount.ts');
+    const fixtures = await load('/src/menu/fixtures.ts');
+    const { toMenu } = await load('/src/menu/adapter.ts');
+    const menu = toMenu(
+      fixtures.edgeCaseBundle,
+      'fixture',
+      fixtures.FIXTURE_PUBLICATION_REVISION_ID,
+    ).menu;
+    const dish = menu.categories
+      .flatMap((c: { dishes: { dishId: string }[] }) => c.dishes)
+      .find((d: { dishId: string }) => d.dishId === fixtures.DISH.avocadoToast);
+    if (blockSaveStorage) {
+      Storage.prototype.setItem = () => {
+        throw new DOMException('blocked', 'SecurityError');
+      };
+    }
+    const saveState = createSaveState({ venueId: menu.venueId });
+    saveState.reconcile(menu);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Save Avocado Toast';
+    document.body.append(button);
+    const { tracking } = window as unknown as {
+      tracking: { track(name: string, payload: Record<string, unknown>): void };
+    };
+    mountSaveHeart(button, {
+      saveState,
+      menu,
+      dish,
+      surface: 'menu_card',
+      send: (name: string, payload: Record<string, unknown>) => tracking.track(name, payload),
+    });
+    button.click();
+    button.click();
+  }, blockSaveStorage);
+  // A control event, so the test knows delivery ran.
+  await trackMenuViewed(page);
+  await hidePage(page);
+  await expect.poll(() => delivered(page)).toBeGreaterThan(0);
+  return page.evaluate(() =>
+    (window as unknown as { delivered: { type: string }[][] }).delivered
+      .flat()
+      .map((event) => event.type),
+  );
+}
+
+test('committed Save and Unsave reach delivery once each', async ({ page }) => {
+  expect(await saveAndUnsaveThroughTracking(page, false)).toEqual([
+    'dish_saved',
+    'dish_unsaved',
+    'menu_viewed',
+  ]);
+});
+
+test('when Save storage fails, no Save or Unsave success event reaches delivery', async ({
+  page,
+}) => {
+  expect(await saveAndUnsaveThroughTracking(page, true)).toEqual(['menu_viewed']);
+});
+
+// A failed send keeps the event, and its retry, even after a reload, carries the identical
+// envelope: same event_id, session_id, producer_id, local_sequence, timestamps and payload.
+test('a retried event keeps its identity, even across a reload', async ({ page }) => {
+  await page.goto(DINER);
+  await page.evaluate(async () => {
+    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    tracking.enableLiveTracking(async (batch: unknown[]) => {
+      sessionStorage.setItem('attempted', JSON.stringify(batch));
+      throw new Error('503');
+    });
+    tracking.setTrackingAllowed(true);
+    Object.assign(window, { tracking });
+  });
+  await trackMenuViewed(page);
+  await expect.poll(() => storedEvents(page)).toBe(1);
+  await hidePage(page);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('attempted'))).not.toBeNull();
+  expect(await storedEvents(page)).toBe(1);
+
+  await page.reload();
+  await startTracking(page, { live: true, consent: true });
+  await hidePage(page);
+  await expect.poll(() => delivered(page)).toBe(1);
+  const [attempted, retried] = await page.evaluate(() => [
+    JSON.parse(sessionStorage.getItem('attempted') ?? '[]'),
+    (window as unknown as { delivered: unknown[][] }).delivered.flat(),
+  ]);
+  expect(attempted).toHaveLength(1);
+  expect(retried).toEqual(attempted);
 });

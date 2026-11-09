@@ -41,6 +41,16 @@ function notify() {
   }
 }
 
+// The current privacy signal, read the same way as the gate (unreadable counts as set). Passed to
+// the PostHog adapter so both destinations use one signal.
+export function readPrivacySignal(): boolean {
+  try {
+    return privacySignal();
+  } catch {
+    return true;
+  }
+}
+
 // The diner's choice. Withdrawing it (false) stops collection and pending sends on both paths.
 export function setTrackingAllowed(value: boolean): void {
   chosen = value;

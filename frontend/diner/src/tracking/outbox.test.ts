@@ -42,13 +42,41 @@ describe('consent gate', () => {
 });
 
 describe('outbox', () => {
+  it('preserves interleaved additions from two instances', async () => {
+    const store = memoryOutboxStore();
+    const a = await createOutbox(store, { now: () => NOW });
+    const b = await createOutbox(store, { now: () => NOW });
+    const first = envelope();
+    const second = envelope();
+    await Promise.all([a.add(first), b.add(second)]);
+    expect(await (await createOutbox(store, { now: () => NOW })).pending()).toEqual([
+      first,
+      second,
+    ]);
+  });
+
+  it('a stale instance neither sends nor resurrects removed or cleared records', async () => {
+    const store = memoryOutboxStore();
+    const a = await createOutbox(store, { now: () => NOW });
+    const first = envelope();
+    await a.add(first);
+    const stale = await createOutbox(store, { now: () => NOW });
+    await a.remove([first.event_id]);
+    expect(await stale.pending()).toEqual([]);
+    const second = envelope();
+    await a.add(second);
+    await stale.clear();
+    await a.remove([first.event_id]);
+    expect(await (await createOutbox(store, { now: () => NOW })).pending()).toEqual([]);
+  });
+
   it('keeps events in order, unchanged, including their session and producer IDs', async () => {
     const outbox = await createOutbox(memoryOutboxStore(), { now: () => NOW });
     const a = envelope();
     const b = envelope();
     await outbox.add(a);
     await outbox.add(b);
-    expect(outbox.pending()).toEqual([a, b]);
+    expect(await outbox.pending()).toEqual([a, b]);
   });
 
   it('survives a reload through its store', async () => {
@@ -57,7 +85,7 @@ describe('outbox', () => {
     const a = envelope();
     await first.add(a);
     const reloaded = await createOutbox(store, { now: () => NOW });
-    expect(reloaded.pending()).toEqual([a]);
+    expect(await reloaded.pending()).toEqual([a]);
   });
 
   it('removes only the events it is told were handled', async () => {
@@ -67,18 +95,18 @@ describe('outbox', () => {
     await outbox.add(a);
     await outbox.add(b);
     await outbox.remove([a.event_id]);
-    expect(outbox.pending()).toEqual([b]);
+    expect(await outbox.pending()).toEqual([b]);
   });
 
   it('drops events older than 24 hours instead of keeping them', async () => {
     const store = memoryOutboxStore();
     const old = envelope(NOW - MAX_EVENT_AGE_MS - 1);
     const fresh = envelope(NOW - 1000);
-    await store.save([old, fresh]);
+    await store.update(() => [old, fresh]);
     const outbox = await createOutbox(store, { now: () => NOW });
-    expect(outbox.pending()).toEqual([fresh]);
+    expect(await outbox.pending()).toEqual([fresh]);
     await outbox.add(envelope(NOW - MAX_EVENT_AGE_MS - 1));
-    expect(outbox.pending()).toEqual([fresh]);
+    expect(await outbox.pending()).toEqual([fresh]);
   });
 
   it('drops the oldest events past 500, warning only through the developer callback', async () => {
@@ -86,8 +114,8 @@ describe('outbox', () => {
     const outbox = await createOutbox(memoryOutboxStore(), { now: () => NOW, warn });
     const events = Array.from({ length: OUTBOX_MAX_EVENTS + 3 }, () => envelope());
     for (const event of events) await outbox.add(event);
-    expect(outbox.pending()).toHaveLength(OUTBOX_MAX_EVENTS);
-    expect(outbox.pending()[0]).toBe(events[3]);
+    expect(await outbox.pending()).toHaveLength(OUTBOX_MAX_EVENTS);
+    expect((await outbox.pending())[0]).toBe(events[3]);
     expect(warn).toHaveBeenCalledTimes(3);
   });
 
@@ -96,18 +124,18 @@ describe('outbox', () => {
     const big = 'x'.repeat(200 * 1024);
     for (let n = 0; n < 6; n++) await outbox.add(envelope(NOW, { note: big }));
     expect(outbox.bytes()).toBeLessThanOrEqual(OUTBOX_MAX_BYTES);
-    expect(outbox.pending().length).toBeLessThan(6);
+    expect((await outbox.pending()).length).toBeLessThan(6);
   });
 
   it('keeps working in memory when its store fails', async () => {
     const failing = {
       load: () => Promise.reject(new Error('blocked')),
-      save: () => Promise.reject(new Error('full')),
+      update: () => Promise.reject(new Error('full')),
     };
     const outbox = await createOutbox(failing, { now: () => NOW });
     const a = envelope();
     await expect(outbox.add(a)).resolves.toBeUndefined();
-    expect(outbox.pending()).toEqual([a]);
+    expect(await outbox.pending()).toEqual([a]);
   });
 });
 
@@ -127,9 +155,11 @@ describe('localStorage store', () => {
 
   it('round-trips events and starts empty on damaged data', async () => {
     const local = new FakeLocal();
-    const store = localStorageOutboxStore(local);
+    const store = localStorageOutboxStore(local, {
+      request: async (_name: string, callback: LockGrantedCallback<unknown>) => callback(null),
+    } as Pick<LockManager, 'request'>);
     const a = envelope();
-    await store.save([a]);
+    await store.update(() => [a]);
     expect(await store.load()).toEqual([a]);
     local.values.set([...local.values.keys()][0] ?? '', '{nope');
     expect(await store.load()).toEqual([]);

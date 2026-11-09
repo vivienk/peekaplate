@@ -1,5 +1,7 @@
-// The P0 event allowlist (S3-TRK-01.1). Any other name is dropped locally and nothing is sent: no
-// events for search, toasts, chips, placeholders or the Portion control.
+// The P0 event allowlist, shared by the diner tracking layer and the PostHog adapter (single source,
+// per Sai, 4 Nov). Any other name is dropped locally and nothing is sent: no events for search,
+// toasts, chips, placeholders or the Portion control. Kept free of other imports, so importing it
+// never pulls in PostHog or contract code.
 export const P0_EVENT_NAMES = [
   'menu_viewed',
   'dish_viewed',

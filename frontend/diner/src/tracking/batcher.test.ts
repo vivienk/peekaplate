@@ -84,7 +84,7 @@ describe('batching', () => {
     expect(batches[0]?.[0]?.local_sequence).toBeLessThan(batches[0]?.[24]?.local_sequence ?? 0);
     await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS);
     expect(batches[1]).toHaveLength(5);
-    expect(outbox.pending()).toEqual([]);
+    expect(await outbox.pending()).toEqual([]);
   });
 
   it('keeps each full request body, wrapper included, within 32,768 bytes', async () => {
@@ -114,7 +114,7 @@ describe('batching', () => {
     const size = (events: Envelope[]) =>
       new TextEncoder().encode(JSON.stringify(batchBody(events))).byteLength;
     const batch = batches[0] ?? [];
-    const next = outbox.pending()[batch.length];
+    const next = (await outbox.pending())[batch.length];
     expect(next).toBeDefined();
     expect(size(batch)).toBeLessThanOrEqual(BATCH_MAX_BYTES);
     expect(size([...batch, ...(next ? [next] : [])])).toBeGreaterThan(BATCH_MAX_BYTES);
@@ -220,7 +220,7 @@ describe('batching', () => {
     page.hide();
     await settle();
     expect(batches).toEqual([]);
-    expect(outbox.pending()).toHaveLength(2);
+    expect(await outbox.pending()).toHaveLength(2);
     page.goOnline();
     await settle();
     expect(batches[0]).toHaveLength(2);
@@ -230,14 +230,14 @@ describe('batching', () => {
     const { outbox, deliver } = await setup(3);
     deliver.mockImplementation(async (batch: Envelope[]) => [batch[0]?.event_id ?? '']);
     await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS);
-    expect(outbox.pending()).toHaveLength(2);
+    expect(await outbox.pending()).toHaveLength(2);
   });
 
   it('keeps every event when sending fails', async () => {
     const { outbox, deliver } = await setup(3);
     deliver.mockRejectedValue(new Error('network down'));
     await vi.advanceTimersByTimeAsync(FLUSH_EVERY_MS);
-    expect(outbox.pending()).toHaveLength(3);
+    expect(await outbox.pending()).toHaveLength(3);
   });
 
   it('never runs two flushes at once', async () => {
@@ -254,6 +254,23 @@ describe('batching', () => {
     await settle();
     expect(deliver).toHaveBeenCalledOnce();
     release();
+  });
+
+  it('does not send when stopped while an authoritative pending read is in flight', async () => {
+    const { outbox, deliver, batcher } = await setup(1);
+    const pending = await outbox.pending();
+    let release!: (events: Envelope[]) => void;
+    vi.spyOn(outbox, 'pending').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const flush = batcher.flush();
+    batcher.stop();
+    release(pending);
+    await flush;
+    expect(deliver).not.toHaveBeenCalled();
   });
 });
 
@@ -279,7 +296,7 @@ describe('retry pause', () => {
     }
     await settle();
     expect(batches).toEqual([]);
-    expect(outbox.pending()).toHaveLength(3 + BATCH_MAX_ITEMS);
+    expect(await outbox.pending()).toHaveLength(3 + BATCH_MAX_ITEMS);
   });
 
   it('runs one flush as soon as the pause ends, without waiting for the next tick', async () => {

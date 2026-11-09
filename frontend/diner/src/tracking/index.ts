@@ -10,13 +10,16 @@
 //   can never be sent later.
 // - Live: only when the consent gate allows it (off by default; see consent.ts) is an event
 //   delivered, independently, to the canonical outbox (POST /observations, sent by TRK-01.3) and to
-//   PostHog through the adapter connected with connectPostHog (Sai with Vivien, 3 Nov).
+//   PostHog through Jeffin's adapter, connected by connectPostHogFromEnv (Sai with Vivien, 3 Nov).
+import type { AnalyticsEnvironment } from '@peekaplate/analytics';
+import type { P0EventName } from '@peekaplate/analytics/event-names';
+import { createPostHogAdapter, type PostHogSdk } from '@peekaplate/analytics/posthog';
 import { browserBatchTriggers, createBatcher, type Deliver } from './batcher';
-import { isTrackingAllowed, onTrackingAllowedChange } from './consent';
+import { isTrackingAllowed, onTrackingAllowedChange, readPrivacySignal } from './consent';
 import { buildEnvelope, type Envelope } from './envelope';
-import type { P0EventName } from './event-names';
 import { browserLifecycle, browserSessionStore, createIdentity, type Identity } from './identity';
 import { browserOutboxStore, createOutbox, memoryOutboxStore, type OutboxStore } from './outbox';
+import { clearPendingWithdrawal, hasPendingWithdrawal, markWithdrawal } from './withdrawal';
 
 export { startOpeningClock } from './activity-clock';
 export type { Deliver } from './batcher';
@@ -41,14 +44,21 @@ const devWarn = (message: string, detail?: string) => {
 type Pipeline = {
   queue(envelope: Envelope): void;
   pauseUntil(timestampMs: number): void;
-  clear(): void;
+  clear(): Promise<void>;
 };
 
 function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): Pipeline {
   const now = () => Date.now();
+  let retired = false;
+  let activeBatcher: ReturnType<typeof createBatcher> | undefined;
   const ready = storePromise.then(async (store) => {
     const outbox = await createOutbox(store, { now, warn: (message) => devWarn(message) });
-    const batcher = createBatcher(outbox, { deliver, triggers: browserBatchTriggers() });
+    const batcher = createBatcher(outbox, {
+      deliver: (batch) => (retired ? Promise.resolve([]) : deliver(batch)),
+      triggers: browserBatchTriggers(),
+    });
+    activeBatcher = batcher;
+    if (retired) batcher.stop();
     return { outbox, batcher };
   });
   // Adds run in order, even while the store is still opening.
@@ -58,8 +68,9 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
       chain = chain
         .then(() => ready)
         .then(async ({ outbox, batcher }) => {
-          await outbox.add(envelope);
-          batcher.added();
+          if (retired) return;
+          await outbox.add(envelope, () => !retired);
+          if (!retired) batcher.added();
         })
         .catch(() => {});
     },
@@ -67,10 +78,10 @@ function createPipeline(storePromise: Promise<OutboxStore>, deliver: Deliver): P
       ready.then(({ batcher }) => batcher.pauseUntil(timestampMs)).catch(() => {});
     },
     clear() {
-      chain = chain
-        .then(() => ready)
-        .then(({ outbox }) => outbox.clear())
-        .catch(() => {});
+      retired = true;
+      activeBatcher?.stop();
+      chain = chain.then(() => ready).then(({ outbox }) => outbox.clear());
+      return chain.then(() => {});
     },
   };
 }
@@ -89,6 +100,7 @@ let mode: 'fixture' | 'live' = 'fixture';
 let liveDeliver: Deliver = holdDeliver;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
+let clearing: Promise<void> = Promise.resolve();
 
 // For the PostHog adapter's isLive check: fixture mode never reaches PostHog.
 export function isLiveTracking(): boolean {
@@ -97,11 +109,24 @@ export function isLiveTracking(): boolean {
 
 // Withdrawal (consent withdrawn or a privacy signal) stops pending canonical sends: the live sender
 // is never called while the gate is closed, and unsent events are discarded, including a batch whose
-// send was in flight. Nothing collected before withdrawal is sent after opting in again. Decided by
-// Sai (5 Nov), matching the PostHog adapter, which drops its own queued events.
+// send was in flight. Persistent deletion markers retry failed clearing across reloads. Complete
+// storage failure cannot guarantee erasure (docs/posthog.md). Decided by Sai (5 Nov), matching the
+// PostHog adapter, which drops its own queued events.
 const WITHDRAWAL_CLEARS_QUEUE = true;
 onTrackingAllowedChange((allowed) => {
-  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) pipelines.live?.clear();
+  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) {
+    markWithdrawal();
+    const old = pipelines.live;
+    delete pipelines.live;
+    const retired = old?.clear();
+    void retired?.catch(() => {});
+    clearing = clearing
+      .then(async () => {
+        await retired?.catch(() => {});
+        await clearPendingWithdrawal();
+      })
+      .catch(() => {});
+  } else if (allowed) resumeLiveDelivery();
 });
 const consentedDeliver: Deliver = async (batch) => (isTrackingAllowed() ? liveDeliver(batch) : []);
 
@@ -140,6 +165,29 @@ export function connectPostHog(sink: PostHogSink): () => void {
   };
 }
 
+// Builds Jeffin's PostHog adapter (packages/analytics, #113) from the build's PostHog settings and
+// connects it to this gate, with the same privacy signal and fixture-mode check. Does nothing unless
+// PostHog is configured for this build and origin; even then the SDK downloads only after consent,
+// in live mode, on the first event. Returns a function that disconnects it.
+export function connectPostHogFromEnv(
+  env: AnalyticsEnvironment,
+  options: { origin?: string; loadSdk?: () => Promise<PostHogSdk> } = {},
+): () => void {
+  try {
+    const adapter = createPostHogAdapter(env, {
+      origin: options.origin ?? location.origin,
+      privacySignal: readPrivacySignal,
+      isLive: isLiveTracking,
+      ...(options.loadSdk ? { loadSdk: options.loadSdk } : {}),
+    });
+    if (!adapter.configured) return () => {};
+    return connectPostHog(adapter);
+  } catch {
+    // PostHog must never break browsing.
+    return () => {};
+  }
+}
+
 // Exactly once per track() call, after validation and consent. Canonical retries, receipts and the
 // Queue never come back here, so they can never send to PostHog again. A PostHog failure never
 // reaches the canonical path or the screens.
@@ -154,6 +202,16 @@ function captureToPostHog(envelope: Envelope) {
 export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
   mode = 'live';
   liveDeliver = deliver;
+  resumeLiveDelivery();
+}
+
+// Opens the durable outbox once live tracking is on and allowed, so events kept from an earlier
+// page (for example after a failed send and a reload) are sent without waiting for a new event.
+// Everything stored was collected with consent: withdrawal empties the outbox.
+function resumeLiveDelivery(): void {
+  try {
+    if (mode === 'live' && isTrackingAllowed()) pipeline();
+  } catch {}
 }
 
 // For TRK-01.3 delivery: after a failed send, pause live delivery until timestampMs (Date.now()
@@ -171,7 +229,21 @@ function pipeline(): Pipeline {
     pipelines.fixture ??= createPipeline(Promise.resolve(memoryOutboxStore()), consoleDeliver);
     return pipelines.fixture;
   }
-  pipelines.live ??= createPipeline(browserOutboxStore(), consentedDeliver);
+  pipelines.live ??= createPipeline(
+    clearing.then(async () => {
+      if (hasPendingWithdrawal()) {
+        try {
+          await clearPendingWithdrawal();
+        } catch {
+          // New work stays in memory rather than reopening records whose withdrawal failed.
+          return memoryOutboxStore();
+        }
+        if (hasPendingWithdrawal()) return memoryOutboxStore();
+      }
+      return browserOutboxStore();
+    }),
+    consentedDeliver,
+  );
   return pipelines.live;
 }
 

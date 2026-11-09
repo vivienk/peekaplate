@@ -93,6 +93,18 @@ export function createIdentity({
     save();
   });
   lifecycle.onShow(() => {
+    if (persistent) {
+      // An intervening same-tab page may have advanced the sequence or started a new visit.
+      const latest = readState(store);
+      if (!latest || now() - latest.lastActivityAt >= VISIT_TIMEOUT_MS) state = fresh();
+      else if (latest.producerId === state.producerId && latest.sessionId === state.sessionId) {
+        state = {
+          ...latest,
+          nextSequence: Math.max(state.nextSequence, latest.nextSequence),
+          lastActivityAt: Math.max(state.lastActivityAt, latest.lastActivityAt),
+        };
+      } else state = latest;
+    }
     state = { ...state, open: true };
     save();
   });

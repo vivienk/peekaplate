@@ -3,7 +3,9 @@
 // receipts and says which events leave the outbox and which stay for a retry. The outbox, batching
 // and flush timing belong to TRK-01.2. This module never stores or relabels anything; development
 // builds log only aggregate terminal counts, never event contents or the token.
+import { type ObservationReceipt, ObservationReceiptBatchSchema } from '@peekaplate/contracts';
 import { BATCH_MAX_BYTES, BATCH_MAX_ITEMS, batchBody, type Deliver } from './batcher';
+import { isTrackingAllowed, onTrackingAllowedChange } from './consent';
 import type { Envelope } from './envelope';
 import { pauseDeliveryUntil } from './index';
 
@@ -14,6 +16,7 @@ export const MAX_BATCH_BYTES = BATCH_MAX_BYTES;
 // Retry backoff starts at 1 second, doubles and is capped at 60 seconds.
 export const RETRY_BASE_MS = 1_000;
 export const RETRY_CAP_MS = 60_000;
+export const REQUEST_TIMEOUT_MS = 10_000;
 
 // The token from the current menu response (RES-02): held in memory for the visit only, never
 // stored in the outbox, so it never outlives the visit.
@@ -58,9 +61,9 @@ export type DeliveryOptions = {
   now: () => number;
   // The current menu token, or null before a menu with a token has loaded.
   token: () => MenuToken | null;
+  // Rechecked before every request, including split batches.
+  canSend?: () => boolean;
 };
-
-type Receipt = { event_id: string | null; status: string; retryable: boolean };
 
 function emptyCounts(): TerminalCounts {
   return {
@@ -84,23 +87,24 @@ function bodyBytes(body: string): number {
 
 // Receipts come back in request order, one per event (observation-receipt.v1). Anything else is
 // an uncertain answer, so the whole batch is retried rather than guessed at.
-function readReceipts(body: unknown, batch: QueuedEnvelope[]): Receipt[] | null {
-  if (typeof body !== 'object' || body === null) return null;
-  const { contract, receipts } = body as Record<string, unknown>;
-  if (contract !== 'observation-receipt.v1' || !Array.isArray(receipts)) return null;
+function readReceipts(body: unknown, batch: QueuedEnvelope[]): ObservationReceipt[] | null {
+  const parsed = ObservationReceiptBatchSchema.safeParse(body);
+  if (!parsed.success) return null;
+  const { receipts } = parsed.data;
   if (receipts.length !== batch.length) return null;
   const valid = receipts.every((r, i) => {
-    if (typeof r !== 'object' || r === null) return false;
-    const { event_id: id, status } = r as Record<string, unknown>;
+    const { event_id: id, status } = r;
     const idMatches = id === batch[i]?.event_id || (id === null && status === 'rejected');
     return idMatches && (status === 'accepted' || status === 'retry' || status === 'rejected');
   });
-  return valid ? (receipts as Receipt[]) : null;
+  return valid ? receipts : null;
 }
 
-function retryAfterMs(response: Response): number | null {
-  const seconds = Number(response.headers.get('Retry-After'));
-  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+function retryAfterMs(response: Response, now: number): number | null {
+  const header = response.headers.get('Retry-After');
+  if (!header) return null;
+  const milliseconds = /^\d+$/.test(header) ? Number(header) * 1000 : Date.parse(header) - now;
+  return Number.isFinite(milliseconds) && milliseconds > 0 ? milliseconds : null;
 }
 
 function splitInHalf(batch: QueuedEnvelope[]): [QueuedEnvelope[], QueuedEnvelope[]] {
@@ -111,36 +115,57 @@ function splitInHalf(batch: QueuedEnvelope[]): [QueuedEnvelope[], QueuedEnvelope
 // Sends one batch. Too-large batches are halved down to single events (413).
 async function sendBatch(
   batch: QueuedEnvelope[],
-  token: MenuToken,
   options: DeliveryOptions,
   result: DeliveryResult,
 ): Promise<void> {
   const ids = batch.map((e) => e.event_id);
+  if (result.retry.length > 0 || options.canSend?.() === false) {
+    result.retry.push(...ids);
+    return;
+  }
+  const token = options.token();
+  if (!token) {
+    result.retry.push(...ids);
+    return;
+  }
+  if (
+    options.now() >= token.expiresAt ||
+    batch.some((event) => event.publication_revision_id !== token.publicationRevisionId)
+  ) {
+    result.done.push(...ids);
+    result.counts.expired += ids.length;
+    return;
+  }
   const body = requestBody(batch);
 
   if (batch.length > MAX_BATCH_EVENTS || bodyBytes(body) > MAX_BATCH_BYTES) {
-    return splitOrDropOversized(batch, token, options, result);
+    return splitOrDropOversized(batch, options, result);
   }
 
   let response: Response;
   result.requests++;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let parsed: unknown = null;
   try {
     response = await options.fetch(options.endpoint, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/json' },
       body,
+      signal: controller.signal,
+      credentials: 'omit',
+      redirect: 'error',
     });
+    if (response.status === 200) parsed = await response.json();
   } catch {
     // Offline or the request never completed: the outcome is unknown, so keep everything.
     result.retry.push(...ids);
     return;
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (response.status === 200) {
-    let parsed: unknown = null;
-    try {
-      parsed = await response.json();
-    } catch {}
     const receipts = readReceipts(parsed, batch);
     if (!receipts) {
       result.retry.push(...ids);
@@ -159,7 +184,7 @@ async function sendBatch(
     return;
   }
 
-  if (response.status === 413) return splitOrDropOversized(batch, token, options, result);
+  if (response.status === 413) return splitOrDropOversized(batch, options, result);
 
   if (response.status === 400) {
     // An unreadable envelope is never resent (client_invalid).
@@ -176,7 +201,7 @@ async function sendBatch(
   }
 
   if (response.status === 429) {
-    const wait = retryAfterMs(response);
+    const wait = retryAfterMs(response, options.now());
     if (wait !== null) result.retryAfterMs = Math.max(result.retryAfterMs ?? 0, wait);
   }
   // 429, 503 and anything unexpected: nothing was accepted, so keep the batch as it is.
@@ -185,7 +210,6 @@ async function sendBatch(
 
 async function splitOrDropOversized(
   batch: QueuedEnvelope[],
-  token: MenuToken,
   options: DeliveryOptions,
   result: DeliveryResult,
 ): Promise<void> {
@@ -195,7 +219,7 @@ async function splitOrDropOversized(
     result.counts.payloadTooLarge++;
     return;
   }
-  for (const half of splitInHalf(batch)) await sendBatch(half, token, options, result);
+  for (const half of splitInHalf(batch)) await sendBatch(half, options, result);
 }
 
 // Sends the given queued events with the current menu token. An event is sent only under a valid
@@ -231,7 +255,7 @@ export async function deliver(
   }
 
   for (let start = 0; start < sendable.length; start += MAX_BATCH_EVENTS) {
-    await sendBatch(sendable.slice(start, start + MAX_BATCH_EVENTS), token, options, result);
+    await sendBatch(sendable.slice(start, start + MAX_BATCH_EVENTS), options, result);
   }
   return result;
 }
@@ -322,9 +346,25 @@ export function createLiveDeliver(
   { onResult, log, ...pauseOptions }: LiveDeliverOptions = {},
 ): Deliver {
   const backOff = createRetryPause(pauseOptions);
-  return createDeliver(options, (result) => {
-    backOff(result);
-    logTerminalCounts(result, log);
-    onResult?.(result);
-  });
+  return async (batch) => {
+    let withdrawn = false;
+    const stop = onTrackingAllowedChange((allowed) => {
+      if (!allowed) withdrawn = true;
+    });
+    try {
+      return await createDeliver(
+        {
+          ...options,
+          canSend: () => !withdrawn && isTrackingAllowed() && options.canSend?.() !== false,
+        },
+        (result) => {
+          backOff(result);
+          logTerminalCounts(result, log);
+          onResult?.(result);
+        },
+      )(batch);
+    } finally {
+      stop();
+    }
+  };
 }

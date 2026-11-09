@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BATCH_MAX_BYTES, BATCH_MAX_ITEMS, createBatcher } from './batcher';
+import { setPrivacySignal, setTrackingAllowed } from './consent';
 import {
   createDeliver,
   createLiveDeliver,
@@ -10,6 +11,7 @@ import {
   MAX_BATCH_BYTES,
   MAX_BATCH_EVENTS,
   type MenuToken,
+  REQUEST_TIMEOUT_MS,
   RETRY_CAP_MS,
   retryDelayMs,
 } from './delivery';
@@ -93,11 +95,111 @@ function options(fetch: typeof globalThis.fetch, token: MenuToken | null = TOKEN
   return { endpoint: ENDPOINT, fetch, now: () => now, token: () => token };
 }
 
+beforeEach(() => {
+  setPrivacySignal(() => false);
+  setTrackingAllowed(true);
+});
+
 afterEach(() => {
+  setTrackingAllowed(false);
   vi.restoreAllMocks();
 });
 
 describe('deliver', () => {
+  it.each([
+    { status: 'accepted', retryable: true, reason_code: null },
+    { status: 'accepted', retryable: false },
+    { status: 'rejected', retryable: false, reason_code: 'not_a_reason' },
+    { status: 'rejected', retryable: false, reason_code: 'event_id_conflict', event_id: null },
+  ])('retains events when a receipt violates the shared contract: %j', async (receipt) => {
+    const server = fakeServer(() => ({
+      status: 200,
+      body: {
+        contract: 'observation-receipt.v1',
+        request_id: 'a0000000-0000-4000-8000-000000000001',
+        receipts: [{ event_id: id(1), ...receipt }],
+      },
+    }));
+    const result = await deliver([envelope(1)], options(server.fetch));
+    expect(result.done).toEqual([]);
+    expect(result.retry).toEqual([id(1)]);
+  });
+
+  it('stops split requests after a rate limit and preserves the remaining IDs', async () => {
+    const server = fakeServer((_, call) =>
+      call === 1 ? { status: 413 } : { status: 429, headers: { 'Retry-After': '20' } },
+    );
+    const result = await deliver([envelope(1), envelope(2)], options(server.fetch));
+    expect(server.calls).toHaveLength(2);
+    expect(result.retry).toEqual([id(1), id(2)]);
+    expect(result.retryAfterMs).toBe(20_000);
+  });
+
+  it('rechecks the current token before each split request', async () => {
+    let token: MenuToken | null = TOKEN;
+    const server = fakeServer(() => {
+      token = null;
+      return { status: 413 };
+    });
+    const result = await deliver([envelope(1), envelope(2)], {
+      ...options(server.fetch),
+      token: () => token,
+    });
+    expect(server.calls).toHaveLength(1);
+    expect(result.retry).toEqual([id(1), id(2)]);
+  });
+
+  it('does not send a split under a token that expired during the first request', async () => {
+    let now = NOW;
+    const server = fakeServer(() => {
+      now = TOKEN.expiresAt;
+      return { status: 413 };
+    });
+    const result = await deliver([envelope(1), envelope(2)], {
+      ...options(server.fetch),
+      now: () => now,
+    });
+    expect(server.calls).toHaveLength(1);
+    expect(result.counts.expired).toBe(2);
+  });
+
+  it('honours an HTTP-date Retry-After', async () => {
+    const server = fakeServer(() => ({
+      status: 429,
+      headers: { 'Retry-After': new Date(NOW + 20_000).toUTCString() },
+    }));
+    expect((await deliver([envelope(1)], options(server.fetch))).retryAfterMs).toBe(20_000);
+  });
+
+  it.each(['headers', 'body'])(
+    'bounds a stalled response %s and permits the same-ID retry',
+    async (stage) => {
+      vi.useFakeTimers();
+      let aborted = false;
+      const fetch = vi.fn((_url, init) => {
+        const stalled = new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            aborted = true;
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+        return stage === 'headers'
+          ? stalled
+          : Promise.resolve(Object.assign(new Response(null), { json: () => stalled }));
+      }) as unknown as typeof globalThis.fetch;
+      try {
+        const pending = deliver([envelope(1)], options(fetch));
+        await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+        expect(aborted).toBe(true);
+        expect(await pending).toMatchObject({ done: [], retry: [id(1)] });
+        const server = fakeServer(accepted);
+        expect((await deliver([envelope(1)], options(server.fetch))).done).toEqual([id(1)]);
+        expect(server.calls[0]?.events).toEqual([envelope(1)]);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
   it('removes an event on a valid first delivery (accepted)', async () => {
     const server = fakeServer(accepted);
     const result = await deliver([envelope(1)], options(server.fetch));
@@ -425,6 +527,24 @@ describe('createLiveDeliver with the TRK-01.2 batcher', () => {
     vi.useRealTimers();
   });
 
+  it('stops split requests even if consent is withdrawn and granted again in flight', async () => {
+    const server = fakeServer(() => {
+      setTrackingAllowed(false);
+      setTrackingAllowed(true);
+      return { status: 413 };
+    });
+    const send = createLiveDeliver(options(server.fetch));
+    expect(await send([envelope(1), envelope(2)])).toEqual([]);
+    expect(server.calls).toHaveLength(1);
+  });
+
+  it('never starts a live request without consent', async () => {
+    setTrackingAllowed(false);
+    const server = fakeServer(accepted);
+    expect(await createLiveDeliver(options(server.fetch))([envelope(1)])).toEqual([]);
+    expect(server.calls).toHaveLength(0);
+  });
+
   it('a 429 pauses every trigger for its Retry-After, then one flush delivers', async () => {
     vi.useFakeTimers({
       toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
@@ -457,7 +577,7 @@ describe('createLiveDeliver with the TRK-01.2 batcher', () => {
 
     await batcher.flush();
     expect(server.calls).toHaveLength(1);
-    expect(outbox.pending()).toHaveLength(1);
+    expect(await outbox.pending()).toHaveLength(1);
 
     // Timer and page-hide triggers during the pause do not resend.
     await vi.advanceTimersByTimeAsync(19_999);
@@ -468,7 +588,7 @@ describe('createLiveDeliver with the TRK-01.2 batcher', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(server.calls).toHaveLength(2);
     expect(server.calls[1]?.events.map((e) => e.event_id)).toEqual([id(1)]);
-    expect(outbox.pending()).toHaveLength(0);
+    expect(await outbox.pending()).toHaveLength(0);
     batcher.stop();
   });
 });

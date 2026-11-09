@@ -261,3 +261,112 @@ describe('shared dispatch', () => {
     expect(sink.setConsent).toHaveBeenCalledTimes(updates);
   });
 });
+
+// Jeffin's adapter (#113) wired to the shared gate. A stand-in SDK records what would be sent.
+const ORIGIN = 'https://diner.example';
+const postHogEnv = {
+  VITE_POSTHOG_ENABLED: 'true',
+  VITE_POSTHOG_ENVIRONMENT: 'staging',
+  MODE: 'staging',
+  VITE_POSTHOG_HOST: 'https://eu.i.posthog.com',
+  VITE_POSTHOG_KEY: 'phc_test',
+  VITE_POSTHOG_ALLOWED_ORIGIN: ORIGIN,
+};
+
+function fakeSdk() {
+  const captures: { type: string; properties: Record<string, unknown>; uuid: unknown }[] = [];
+  const instances: { __loaded: boolean }[] = [];
+  const client = {
+    __loaded: true,
+    capture: vi.fn(),
+    init: vi.fn(() => {
+      const instance = {
+        __loaded: true,
+        init: client.init,
+        capture: vi.fn(
+          (type: string, properties: Record<string, unknown>, options?: { uuid?: unknown }) => {
+            captures.push({ type, properties, uuid: options?.uuid });
+            return undefined;
+          },
+        ),
+      };
+      instances.push(instance);
+      return instance;
+    }),
+  };
+  const loadSdk = vi.fn(async () => client as never);
+  return { loadSdk, captures, instances };
+}
+
+describe('PostHog adapter wiring', () => {
+  it('a live, consented event reaches PostHog once with the canonical event_id as its uuid', async () => {
+    const tracking = await fresh();
+    const sdk = fakeSdk();
+    const canonical = recordingDeliver();
+    tracking.enableLiveTracking(canonical.deliver);
+    tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: sdk.loadSdk });
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    expect(sdk.loadSdk).toHaveBeenCalledOnce();
+    const eventId = canonical.sent()[0];
+    expect(sdk.captures).toEqual([
+      { type: 'menu_viewed', properties: { event_id: eventId, entry_source: 'qr' }, uuid: eventId },
+    ]);
+  });
+
+  it('loads nothing when PostHog is not configured for this build or origin', async () => {
+    for (const [env, origin] of [
+      [{ ...postHogEnv, VITE_POSTHOG_ENABLED: 'false' }, ORIGIN],
+      [postHogEnv, 'https://other.example'],
+    ] as const) {
+      const tracking = await fresh();
+      const sdk = fakeSdk();
+      tracking.enableLiveTracking(recordingDeliver().deliver);
+      tracking.connectPostHogFromEnv(env, { origin, loadSdk: sdk.loadSdk });
+      tracking.setTrackingAllowed(true);
+      tracking.track('menu_viewed', menuViewed);
+      await flush();
+      expect(sdk.loadSdk).not.toHaveBeenCalled();
+    }
+  });
+
+  it('never loads the SDK without consent, with a privacy signal, or in fixture mode', async () => {
+    const cases: ((tracking: Awaited<ReturnType<typeof fresh>>) => void)[] = [
+      (tracking) => tracking.enableLiveTracking(recordingDeliver().deliver),
+      (tracking) => {
+        tracking.enableLiveTracking(recordingDeliver().deliver);
+        tracking.setPrivacySignal(() => true);
+        tracking.setTrackingAllowed(true);
+      },
+      (tracking) => tracking.setTrackingAllowed(true),
+    ];
+    for (const setUp of cases) {
+      const tracking = await fresh();
+      const sdk = fakeSdk();
+      tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: sdk.loadSdk });
+      setUp(tracking);
+      tracking.track('menu_viewed', menuViewed);
+      await flush();
+      expect(sdk.loadSdk).not.toHaveBeenCalled();
+    }
+  });
+
+  it('withdrawal retires the SDK instance; opting in again starts a new one', async () => {
+    const tracking = await fresh();
+    const sdk = fakeSdk();
+    tracking.enableLiveTracking(recordingDeliver().deliver);
+    tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: sdk.loadSdk });
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    tracking.setTrackingAllowed(false);
+    expect(sdk.instances[0]?.__loaded).toBe(false);
+    tracking.track('menu_viewed', menuViewed);
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    expect(sdk.instances).toHaveLength(2);
+    expect(sdk.captures).toHaveLength(2);
+  });
+});
