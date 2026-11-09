@@ -426,6 +426,13 @@ describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
     ['no ingredients', { ingredients: null }, 'ingredients_missing'],
     ['empty ingredients', { ingredients: [] }, 'ingredients_missing'],
     ['blank ingredient', { ingredients: ['Leeks', ' '] }, 'ingredients_missing'],
+    [
+      'ingredient longer than 160 characters',
+      { ingredients: ['x'.repeat(161)] },
+      'ingredients_missing',
+    ],
+    ['too many ingredients', { ingredients: Array(101).fill('Leeks') }, 'ingredients_missing'],
+    ['ingredient containing NUL', { ingredients: ['Leek\u0000s'] }, 'ingredients_missing'],
     ['RES-01.2 incomplete', { reviewState: 'incomplete' }, 'review_incomplete'],
   ];
 
@@ -444,6 +451,20 @@ describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
       expect(result.diagnostics).toContainEqual({ dishId: LEEKS, code });
     });
   }
+
+  it('accepts 100 ingredients and a 160-character trimmed name', async () => {
+    const names = [` ${'x'.repeat(160)} `, ...Array(99).fill('Leeks')];
+    const result = await produceMenuBundle(
+      parseRequest(requestInput()),
+      sources({ [LEEKS]: { ingredients: names } }),
+      assets(),
+    );
+    const dish = dishes(result)[0];
+    expect(dish?.complete).toBe(true);
+    if (!dish?.complete) throw new Error('Expected complete dish');
+    expect(dish.ingredients).toHaveLength(100);
+    expect(dish.ingredients[0]?.name).toBe('x'.repeat(160));
+  });
 
   it('turns a dish whose asset is for an older revision into a placeholder', async () => {
     const result = await produceMenuBundle(

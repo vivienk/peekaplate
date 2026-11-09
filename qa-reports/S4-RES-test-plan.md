@@ -12,7 +12,7 @@ Local evidence is synthetic; it does not establish staging readiness or stakehol
 | S4-HASH-1 | Exact canonical bytes verified before parsing; tamper, invalid UTF-8, JSON and schema rejected. | PASS, local |
 | S4-IDEM-1 | Repeat builds and CLI runs produced identical bytes and handoff output. | PASS, local |
 | S4-VER-1 | Content/URL changes alter revision and hash; a digest-only change at the same URL changes only asset hash/approval and conflicts at admission. Immutable asset hosting is required. | PASS for approved formula; same-URL mutation prohibited |
-| S4-NEG / S4-NOINV | Unit cases cover duplicate IDs, unknown fields, label rejection, incomplete fields, asset revision mismatch and price precision. | PASS, local |
+| S4-NEG / S4-NOINV | Unit cases cover duplicate IDs, unknown fields, label rejection, incomplete fields, asset revision mismatch, price precision, and ingredient length/count/NUL boundaries. Invalid ingredients produce an identity-only placeholder. | PASS, local |
 | S4-EXCL | Synthetic tests cover private fields, rejected reviews and cross-tenant DB reads on runtime and admin connections. | PASS, local |
 | S4-RES02-1 / 2 | Synthetic producer → privileged admission → approval → publication → public read; URL and hashes match; bytes verify. Runtime admission denied. | PASS, local |
 | CLI smoke | Real T0 preparation and disposable PostgreSQL: repeat build identical; price change produced new revision/hash; admission inserted then already-present; tampered variant and runtime admission rejected. | PASS, local |

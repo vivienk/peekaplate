@@ -202,7 +202,12 @@ async function buildDish(
   const ingredientNames =
     Array.isArray(source.ingredients) &&
     source.ingredients.length > 0 &&
-    source.ingredients.every((name) => typeof name === 'string' && name.trim().length > 0)
+    source.ingredients.length <= 100 &&
+    source.ingredients.every((name) => {
+      if (typeof name !== 'string' || name.includes('\u0000')) return false;
+      const trimmed = name.trim();
+      return trimmed.length > 0 && trimmed.length <= 160;
+    })
       ? (source.ingredients as string[]).map((name) => name.trim())
       : null;
   if (!ingredientNames) gaps.push('ingredients_missing');

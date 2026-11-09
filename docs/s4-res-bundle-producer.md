@@ -32,7 +32,7 @@ The T0 reader uses `card-480` and `detail-1280` WebP variants, requiring deliver
 
 ## 5. Completeness and diagnostics
 
-Complete dishes require a nonblank description, representable price, currency, nonempty ingredient names, confirmed alt text and T0 asset for the current revision. Otherwise the output has only the identity placeholder; diagnostics are in the local handoff report, never the bundle. Price normalization uses decimal strings, not floating point: `12.5000` becomes `12.50`; more than two significant decimal places or eight integer digits is not representable. Multi-price dishes whose scalar price is absent become placeholders with `price_missing`.
+Complete dishes require a nonblank description, representable price, currency, confirmed alt text and T0 asset for the current revision. Ingredients must contain 1–100 nonblank names, each at most 160 characters after trimming and without NUL. A dish with missing or unrepresentable ingredients becomes an identity-only placeholder with `ingredients_missing`; diagnostics stay in the local handoff report, never the bundle. Price normalization uses decimal strings, not floating point: `12.5000` becomes `12.50`; more than two significant decimal places or eight integer digits is not representable. Multi-price dishes whose scalar price is absent become placeholders with `price_missing`.
 
 ## 6. Operator usage
 
