@@ -1,0 +1,142 @@
+/*
+ * Save on the menu, dish detail and Saved screen (S3-DIN-02.2, .5). Provisional until Rania signs
+ * off against the Figma frames; colours match the DIN-01 menu (#69).
+ */
+
+/* A saved dish's heart is filled and orange, so the state shows without relying on the shape alone. */
+.pp-save-heart[aria-pressed="true"] .pp-save-heart__icon {
+  color: #f89537;
+}
+
+/* The menu styles the badge as inline-flex, which would otherwise override [hidden] at zero. */
+.pp-saved__badge[hidden] {
+  display: none;
+}
+
+/* Toasts: one at a time, above the bottom of the screen, never covering the header. */
+.pp-toast-area {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 16px;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.pp-toast {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 358px;
+  min-height: 48px;
+  padding: 4px 4px 4px 16px;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #2a2d36;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+.pp-toast__undo {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: #a34d00;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The Saved screen sits on the same surface as the menu, edge to edge like the menu and detail. */
+main:has(> .pp-saved-screen) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pp-saved-screen {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px 20px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.pp-saved-screen :where(button) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pp-saved__topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.pp-saved__back {
+  font-size: 20px;
+}
+
+.pp-saved__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pp-saved__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.pp-saved__image {
+  flex: none;
+  display: block;
+  border-radius: 8px;
+}
+
+.pp-saved__name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.pp-saved__price {
+  color: #a8a59e;
+}
+
+.pp-saved__save {
+  color: #f89537;
+  font-size: 20px;
+}
+
+.pp-saved__browse {
+  text-decoration: underline;
+}
+
+.pp-saved__notice {
+  margin: 0 0 12px;
+  color: #a8a59e;
+  font-size: 14px;
+}

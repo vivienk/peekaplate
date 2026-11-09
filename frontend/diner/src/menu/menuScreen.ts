@@ -1,4 +1,17 @@
+import { createSaveState, type SaveState } from '../save/save-state';
+import { renderSavedScreen } from '../save/saved-screen';
+import {
+  bindDetailSave,
+  bindMenuSave,
+  isSavedRoute,
+  SAVED_ROUTE,
+  savedHeaderMarkup,
+  saveHeartMarkup,
+  toastAreaMarkup,
+} from '../save/screens';
+import { track } from '../tracking';
 import { renderDishDetail } from './dishDetail';
+import { trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
@@ -90,9 +103,7 @@ function renderCard(dish: CompleteDish): string {
         <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
         <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}"><span class="pp-card__name-text">${escapeHtml(dish.name)}</span></button></h2>
         <p class="pp-card__price">${escapeHtml(formatPrice(dish.price))}</p>
-        <button class="pp-card__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-        <span aria-hidden="true">♡</span><span aria-hidden="true">Save</span>
-        </button>
+        ${saveHeartMarkup(dish, 'pp-card__save')}
         <p class="pp-card__description">${escapeHtml(dish.description)}</p>
       </div>
     </article>
@@ -138,9 +149,7 @@ function renderMenu(
     <div class="pp-menu">
       <h1 class="pp-sr-only">${escapeHtml(menu.restaurant.name)}</h1>
       <header class="pp-header">
-        <button class="pp-saved" type="button" aria-label="Saved dishes (not available yet)" disabled>
-          <span class="pp-saved__icon" aria-hidden="true">♥</span>
-        </button>
+        ${savedHeaderMarkup()}
         <div class="pp-logo">
           <span class="pp-logo__emblem" aria-hidden="true"></span>
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
@@ -149,6 +158,7 @@ function renderMenu(
           <span aria-hidden="true">⌕</span>
         </button>
       </header>
+      ${toastAreaMarkup()}
       ${
         import.meta.env.VITE_OWNER_SIGN_IN_URL
           ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
@@ -182,7 +192,7 @@ function renderMenu(
 
       <p class="pp-end">End of menu</p>
       ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
-      <p class="pp-notice">Search, Save and Compare are not available yet.</p>
+      <p class="pp-notice">Search and Compare are not available yet.</p>
     </div>
   `;
 
@@ -247,8 +257,21 @@ function renderMenu(
   });
 }
 
+// Save must never break browsing: if attaching it fails, the screen still works without Save.
+function attachSave(bind: () => () => void): () => void {
+  try {
+    return bind();
+  } catch {
+    return () => {};
+  }
+}
+
+// Removes the previous mount's Saved-route listener, so remounting never navigates twice.
+let stopRouting: () => void = () => {};
+
 export function mountMenuScreen(container: HTMLElement): void {
   disposeObserver();
+  stopRouting();
   activeCategoryId = null;
   openerDishId = null;
   renderLoading(container);
@@ -259,6 +282,13 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   let savedScroll = 0;
   let currentMenu: Menu | null = null;
+  // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
+  let saveState: SaveState | null = null;
+  let view: 'menu' | 'detail' | 'saved' = 'menu';
+  // Detaches the current screen's Save behaviour before the next screen renders.
+  let leaveScreen: () => void = () => {};
+  // True when this page added the Saved route to history, so leaving it can go back instead.
+  let savedRouteAdded = false;
 
   const restoreOpenerFocus = () => {
     if (!openerDishId) return;
@@ -268,19 +298,103 @@ export function mountMenuScreen(container: HTMLElement): void {
     opener?.focus({ preventScroll: true });
   };
 
-  const showMenu = () => {
-    if (!currentMenu) return;
-    renderMenu(container, currentMenu, showDetail);
-    window.scrollTo(0, savedScroll);
-    restoreOpenerFocus();
+  const switchScreen = (next: typeof view) => {
+    if (view === 'menu') savedScroll = window.scrollY;
+    leaveScreen();
+    leaveScreen = () => {};
+    disposeObserver();
+    view = next;
   };
 
-  const showDetail = (dish: CompleteDish) => {
-    savedScroll = window.scrollY;
-    disposeObserver();
-    renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
-    window.scrollTo(0, 0);
+  const showMenu = (focus: 'opener' | 'saved' = 'opener') => {
+    if (!currentMenu || !saveState) return;
+    const menu = currentMenu;
+    switchScreen('menu');
+    renderMenu(container, menu, (dish) => showDetail(dish, 'menu_card'));
+    const state = saveState;
+    leaveScreen = attachSave(() =>
+      bindMenuSave(container, { saveState: state, menu, send: track, onOpenSaved: openSaved }),
+    );
+    window.scrollTo(0, savedScroll);
+    if (focus === 'saved') container.querySelector<HTMLElement>('.pp-saved')?.focus();
+    else restoreOpenerFocus();
   };
+
+  const showDetail = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+    if (!currentMenu || !saveState) return;
+    const menu = currentMenu;
+    switchScreen('detail');
+    const fromSaved = from === 'saved_screen';
+    renderDishDetail(container, dish, fromSaved ? showSaved : () => showMenu(), menu.notice);
+    if (fromSaved) {
+      container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
+    }
+    const state = saveState;
+    leaveScreen = attachSave(() =>
+      bindDetailSave(container, { saveState: state, menu, send: track }),
+    );
+    window.scrollTo(0, 0);
+    // Openings from the menu card are tracked by S3-DIN-01.5's triggers (#78); this is the Saved
+    // screen's own entry point (DIN-02.5).
+    if (fromSaved) {
+      try {
+        trackDishDetailOpened(menu, dish, {
+          source: 'saved_screen',
+          saveAvailable: saveState.isSaveAvailable(),
+        });
+      } catch {}
+    }
+  };
+
+  const showSaved = () => {
+    if (!currentMenu || !saveState) return;
+    const menu = currentMenu;
+    switchScreen('saved');
+    leaveScreen = renderSavedScreen(container, {
+      saveState,
+      menu,
+      send: track,
+      onOpenDish: (dish) => showDetail(dish, 'saved_screen'),
+      onBack: leaveSaved,
+    });
+    window.scrollTo(0, 0);
+    const title = container.querySelector<HTMLElement>('.pp-saved__title');
+    title?.setAttribute('tabindex', '-1');
+    title?.focus();
+  };
+
+  // The header heart: adds the Saved route, and the route change shows the screen.
+  function openSaved() {
+    if (isSavedRoute()) {
+      showSaved();
+      return;
+    }
+    savedRouteAdded = true;
+    window.location.hash = SAVED_ROUTE;
+  }
+
+  // Back and "Browse menu". Going back in history keeps the browser's Back button in step; after a
+  // reload on the Saved route there is nothing to go back to, so the route is replaced instead.
+  function leaveSaved() {
+    if (savedRouteAdded && isSavedRoute()) {
+      savedRouteAdded = false;
+      window.history.back();
+      return;
+    }
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    showMenu('saved');
+  }
+
+  // The browser's Back and Forward buttons, and links to the Saved route.
+  const onRouteChange = () => {
+    if (isSavedRoute()) {
+      if (view !== 'saved') showSaved();
+    } else if (view !== 'menu') {
+      showMenu(view === 'saved' ? 'saved' : 'opener');
+    }
+  };
+  window.addEventListener('hashchange', onRouteChange);
+  stopRouting = () => window.removeEventListener('hashchange', onRouteChange);
 
   void source
     .load()
@@ -290,7 +404,11 @@ export function mountMenuScreen(container: HTMLElement): void {
         return;
       }
       currentMenu = result.menu;
-      renderMenu(container, currentMenu, showDetail);
+      saveState = createSaveState({ venueId: result.menu.venueId });
+      // Only after a successful load: removes withdrawn dishes and enables saving.
+      saveState.reconcile(result.menu);
+      if (isSavedRoute()) showSaved();
+      else showMenu();
     })
     .catch(() => {
       renderFailure(container, 'error');

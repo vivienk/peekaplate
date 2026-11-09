@@ -2,6 +2,7 @@
 // renders into a container and navigates through callbacks; it is built with DOM methods, so dish
 // text is never parsed as markup. Copy and look are provisional until the Figma Saved frames are
 // applied.
+import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
 import type { SendEvent } from './events';
 import { mountSaveHeart, mountToastArea } from './mount';
@@ -25,10 +26,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
-function money(dish: CompleteDish): string {
-  return `${dish.price.currency} ${dish.price.amount}`.trim();
-}
-
 export type SavedScreenOptions = {
   saveState: SaveState;
   menu: Menu;
@@ -46,7 +43,8 @@ export function renderSavedScreen(
   container: HTMLElement,
   { saveState, menu, onOpenDish, onBack, send = noSend }: SavedScreenOptions,
 ): () => void {
-  const screen = el('div', 'pp-saved');
+  // Not .pp-saved: that is the menu header's Saved button.
+  const screen = el('div', 'pp-saved-screen');
   const header = el('header', 'pp-saved__topbar');
   const back = el('button', 'pp-saved__back', '←');
   back.type = 'button';
@@ -62,7 +60,9 @@ export function renderSavedScreen(
   const notice = el('p', 'pp-saved__notice', SESSION_ONLY_NOTICE);
   notice.setAttribute('role', 'status');
   const content = el('div', 'pp-saved__content');
-  screen.append(header, toastArea, notice, content);
+  // Fixture or other non-published data keeps its visible label here too, as on the menu.
+  const dataNotice = menu.notice ? [el('p', 'pp-notice', menu.notice)] : [];
+  screen.append(header, ...dataNotice, toastArea, notice, content);
   container.replaceChildren(screen);
 
   const stopToasts = mountToastArea(toastArea, saveState);
@@ -75,7 +75,7 @@ export function renderSavedScreen(
       'aria-label',
       item.kind === 'complete' ? `Save ${item.dish.name}` : 'Remove this dish from Saved',
     );
-    const icon = el('span', '', '♡');
+    const icon = el('span', '', '♥');
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon);
     stopHearts.push(
@@ -96,6 +96,7 @@ export function renderSavedScreen(
     const { dish } = item;
     const open = el('button', 'pp-saved__open');
     open.type = 'button';
+    // A dish without an image gets the menu card's empty image box (DIN-01), so rows line up.
     if (dish.images) {
       const image = el('img', 'pp-saved__image');
       image.src = dish.images.card.url;
@@ -103,10 +104,14 @@ export function renderSavedScreen(
       image.width = dish.images.card.width;
       image.height = dish.images.card.height;
       open.append(image);
+    } else {
+      const missing = el('span', 'pp-saved__image pp-card__image--missing');
+      missing.setAttribute('aria-hidden', 'true');
+      open.append(missing);
     }
     open.append(
       el('span', 'pp-saved__name', dish.name),
-      el('span', 'pp-saved__price', money(dish)),
+      el('span', 'pp-saved__price', formatPrice(dish.price)),
     );
     open.addEventListener('click', () => onOpenDish(dish));
     row.append(open, heart(item));

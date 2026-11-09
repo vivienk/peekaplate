@@ -620,7 +620,7 @@ test('Saved screen works by keyboard and passes an accessibility scan', async ({
   expect((await savedInfo(page)).opened).toHaveLength(1);
 
   // Every control is at least 44px square, whatever the platform's font.
-  for (const button of await page.locator('.pp-saved button').all()) {
+  for (const button of await page.locator('.pp-saved-screen button').all()) {
     const box = await button.boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
