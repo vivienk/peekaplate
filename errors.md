@@ -1740,3 +1740,24 @@ Tooling corrections: a Windows rg path containing a wildcard was treated literal
 The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
 
 The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
+
+
+## November 9 PR84 delivery reconciliation
+
+The first focused delivery check after merging develop failed because its two
+outbox.pending assertions still treated the now-authoritative asynchronous read
+as an array. Awaiting those reads restores the existing 429/backoff regression.
+Independent regressions also reproduced malformed receipt deletion and split
+requests continuing after withdrawal, token changes and Retry-After; the fixes
+validate shared receipts and recheck each request boundary. Stalled headers/body
+are bounded by a ten-second abort and retain the same event for retry. Focused
+unit and synthetic Chromium delivery checks provide local evidence only.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-09T18:50:34.903Z","exitCode":2}
+```
+
+The first full PR84 typecheck rejected an incomplete Response cast in the new
+body-timeout test. The fixture now overrides json on a real Response instead;
+production behavior is unchanged. The corrected full check is recorded in the PR.
