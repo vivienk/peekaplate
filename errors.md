@@ -2040,3 +2040,38 @@ The new Chromium regression failed because the invalid input had identical focus
 ```json
 {"kind":"manual-check-observation","check":"push active PR branch","timestamp":"2026-11-09T11:05:29.425Z","result":"blocked","cause":"GitHub credentials are unavailable; no remote update occurred."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T18:53:26.478Z","exitCode":1}
+```
+
+<!-- resolution of the transient database-test timeout above -->
+```json
+{"kind":"manual-check-resolution","resolves":"test:db automatic observation 2026-11-09T18:53:26.478Z","timestamp":"2026-11-09T18:55:00Z","status":"resolved","cause":"The first disposable-database run had one existing publication-route integration test exceed its 15-second timeout; the full identical rerun passed all 77 Worker/PostgreSQL integration tests and 213 pgTAP assertions. The failure was transient and unrelated to the owner-report changes.","regression":"The repeat pnpm verify test:db run passed; the changed owner-report opening coverage and unapproved-venue cases are included in that suite."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-09T18:55:48.510Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-09T18:56:50.603Z","exitCode":1}
+```
+
+<!-- resolution of the formatting and context observations above -->
+```json
+{"kind":"manual-check-resolution","resolves":"lint automatic observation 2026-11-09T18:55:48.510Z","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The contract serializer edit needed the repository formatter; a subsequent context check also found its source fingerprint stale because formatting ran after the prior refresh.","regression":"Formatted packages/contracts/src/owner-report.ts, refreshed context fingerprints, and reran pnpm check successfully: lint, typecheck, 1005 unit tests, 67 script tests, context:check and docs:check passed."}
+```
+
+<!-- resolution of the stale fingerprint observation -->
+```json
+{"kind":"manual-check-resolution","resolves":"context:check automatic observation 2026-11-09T18:56:50.603Z","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The contract formatter changed a fingerprinted file after context:refresh; the graph was refreshed afterward.","regression":"The final pnpm check passed context:check with 13 modules and 10 handoffs."}
+```
+
+<!-- resolution of the context-refresh summary validation failure -->
+```json
+{"kind":"manual-check-resolution","resolves":"initial pnpm context:refresh invalid-summary result in this work","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The backend context summary exceeded the repository's 1000-character validation limit; it was shortened without changing behavior or dropping the new boundary.","regression":"pnpm context:refresh passed, followed by pnpm check and its context:check."}
+```

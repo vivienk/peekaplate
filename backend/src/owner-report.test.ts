@@ -29,6 +29,8 @@ function reportRow(overrides: Record<string, unknown> = {}) {
     total_sessions: 9,
     exposed_open_sessions: 8,
     open_eligible_sessions: 8,
+    total_openings: 10,
+    timed_openings: 10,
     engaged_sessions: 7,
     saved_sessions: 6,
     timed_sessions: 5,
@@ -161,6 +163,46 @@ describe('readOwnerReport report contract and session metrics', () => {
       ],
     });
     expect(JSON.stringify(report)).not.toContain('eligible_sessions');
+  });
+
+  it('suppresses opening coverage when ten openings come from one distinct session', async () => {
+    const { client } = fakeClient('owner', [
+      reportRow({
+        total_sessions: 20,
+        exposed_open_sessions: 1,
+        open_eligible_sessions: 1,
+        total_openings: 10,
+        timed_openings: 0,
+        engaged_sessions: 0,
+        saved_sessions: 0,
+        timed_sessions: 0,
+        average_active_seconds: null,
+      }),
+    ]);
+
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+    );
+
+    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    expect(report).toMatchObject({
+      dishes: [
+        {
+          evidence_state: 'NORMAL',
+          metrics: {
+            active_sessions: { value: null, status: 'SUPPRESSED' },
+            avg_interaction_time_seconds: { value: null, status: 'SUPPRESSED' },
+            timing_coverage: { value: null, status: 'SUPPRESSED' },
+            open_rate: { value: null, status: 'SUPPRESSED' },
+            engagement_rate: { value: null, status: 'SUPPRESSED' },
+            save_rate: { value: 0, status: 'VALID_ZERO' },
+          },
+        },
+      ],
+    });
   });
 
   it('labels synthetic reports and calculations as synthetic', async () => {

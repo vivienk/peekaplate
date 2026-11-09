@@ -256,6 +256,9 @@ export function toOwnerReport(internal: unknown): OwnerDishReport {
       const hideTimingRelatedMetrics =
         dish.metrics.avg_interaction_time_seconds.eligible_sessions > 0 &&
         dish.metrics.avg_interaction_time_seconds.eligible_sessions < PRIVACY_FLOOR_SESSIONS;
+      const hideSmallOpenedCohort =
+        dish.metrics.engagement_rate.eligible_sessions > 0 &&
+        dish.metrics.engagement_rate.eligible_sessions < PRIVACY_FLOOR_SESSIONS;
       const timingRelatedMetrics = new Set([
         'active_sessions',
         'avg_interaction_time_seconds',
@@ -268,7 +271,7 @@ export function toOwnerReport(internal: unknown): OwnerDishReport {
         metrics: Object.fromEntries(
           Object.entries(dish.metrics).map(([name, { value, status }]) => [
             name,
-            hideTimingRelatedMetrics && timingRelatedMetrics.has(name)
+            (hideTimingRelatedMetrics || hideSmallOpenedCohort) && timingRelatedMetrics.has(name)
               ? { value: null, status: 'SUPPRESSED' }
               : { value, status },
           ]),

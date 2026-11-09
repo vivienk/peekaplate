@@ -192,7 +192,7 @@ describe('owner report HTTP boundary', () => {
       const syntheticResponse = await app.request(
         `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
-        { APP_ENV: 'local' },
+        { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
       );
       expect(syntheticResponse.status).toBe(200);
       expect(await syntheticResponse.json()).toEqual({ venue_id: venueId, dishes: [] });
@@ -201,7 +201,7 @@ describe('owner report HTTP boundary', () => {
         actorId,
         venueId,
         expect.any(Date),
-        { APP_ENV: 'local' },
+        { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
         'synthetic',
       );
     } finally {
@@ -211,7 +211,7 @@ describe('owner report HTTP boundary', () => {
     }
   });
 
-  it('derives the actor from the verified token and passes the venue and current time to the reader', async () => {
+  it('restricts the report reader to the configured synthetic venue', async () => {
     const actorId = '00000000-0000-4000-8000-000000000003';
     const venueId = '00000000-0000-4000-8000-000000000001';
     const now = new Date('2026-11-06T12:00:00.000Z');
@@ -229,19 +229,44 @@ describe('owner report HTTP boundary', () => {
       {
         headers: { Authorization: 'Bearer test-token' },
       },
-      { APP_ENV: 'local' },
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
-    expect(verify).toHaveBeenCalledWith('Bearer test-token', { APP_ENV: 'local' });
+    expect(verify).toHaveBeenCalledWith('Bearer test-token', {
+      APP_ENV: 'local',
+      SYNTHETIC_REPORT_VENUE_ID: venueId,
+    });
     expect(readOwnerReport).toHaveBeenCalledWith(
       actorId,
       venueId,
       now,
-      { APP_ENV: 'local' },
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
       'synthetic',
     );
+  });
+
+  it('rejects an unapproved venue before reading live or mixed-provenance data', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const requestedVenueId = '00000000-0000-4000-8000-000000000001';
+    const approvedSyntheticVenueId = '00000000-0000-4000-8000-000000000004';
+    const readOwnerReport = vi.fn();
+    const app = createApp({
+      verify: vi.fn().mockResolvedValue(actorId),
+      execute: vi.fn(),
+      readOwnerReport,
+    });
+
+    const response = await app.request(
+      `/api/v1/venues/${requestedVenueId}/analytics/dishes?source=synthetic`,
+      { headers: { Authorization: ['Bearer', 'test-token'].join(' ') } },
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: approvedSyntheticVenueId },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    expect(readOwnerReport).not.toHaveBeenCalled();
   });
 });
 
