@@ -363,6 +363,28 @@ describe('per-metric cohort floor (internal report)', () => {
     expect(JSON.stringify(owner)).not.toContain('eligible_sessions');
   });
 
+  it.each([10, 150])(
+    'toOwnerReport preserves counts and statuses when the timed cohort is zero (%i active sessions)',
+    (activeSessions) => {
+      const input = internal({
+        avg_interaction_time_seconds: cell(null, 'NOT_MEASURABLE', 0),
+        timing_coverage: cell(0, 'VALID_ZERO', 20),
+      });
+      input.dishes[0]!.metrics.active_sessions = metric(activeSessions);
+
+      const owner = toOwnerReport(input);
+
+      expect(owner.dishes[0]?.metrics).toMatchObject({
+        active_sessions: { value: activeSessions, status: 'NORMAL' },
+        avg_interaction_time_seconds: { value: null, status: 'NOT_MEASURABLE' },
+        timing_coverage: { value: 0, status: 'VALID_ZERO' },
+        open_rate: { value: 0.5, status: 'NORMAL' },
+      });
+      expect(OwnerDishReportSchema.safeParse(owner).success).toBe(true);
+      expect(JSON.stringify(owner)).not.toContain('eligible_sessions');
+    },
+  );
+
   it('toOwnerReport refuses an internal report that breaks the cohort floor', () => {
     const below = internal({ save_rate: cell(0.5, 'NORMAL', 3) });
     expect(() => toOwnerReport(below)).toThrow();

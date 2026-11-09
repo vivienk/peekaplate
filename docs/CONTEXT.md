@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing, open-rate and active-session cells when the timed cohort is below ten, retaining independently safe metrics. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing/open-rate/active-session cells for timed cohorts of 1–9, but retains statuses and independent counts when timed cohort is zero. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -47,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "afecf069b03c107f82404fef34c283085bf48626f16049f2c2ce7004f4429d07"
+      "sourceFingerprint": "1f99f901d75ab3b211681c3fa097aa711f46bbe54db5eb8288882672ffa64c35"
     },
     {
       "id": "tokens",
@@ -671,9 +671,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-09",
-      "summary": "Owner-report gate: only one source=synthetic in trusted local/staging APP_ENV can read; production fails closed even when a client sends synthetic. The reader labels output/calculation synthetic.v1. Signed-JWT route tests cover absent/production/duplicate selectors and production override; real PostgreSQL confirms synthetic provenance. pnpm verify test passed (1000 tests, 4 skipped across 63 files); test:db passed (77 tests, 213 pgTAP assertions). Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Owner-report gate permits only one source=synthetic in trusted local/staging; production fails closed even with that selector. Reader labels reports synthetic.v1. Zero timed cohort is NOT_MEASURABLE and no longer triggers complementary suppression of active counts or independent metrics; cohorts1–9 remain blinded. Signed-JWT and real-PostgreSQL regressions cover source provenance. Zero-cohort contract cases preserve active_sessions 10/150 and valid statuses; focused contract tests40 PASS, database tests77 and pgTAP213 PASS.",
       "modules": [
         "backend",
+        "contracts",
         "delivery"
       ],
       "next": "Keep production reads unavailable until a separately reviewed release policy changes. Keep freshness unverified until accepted-online observation-to-summary evidence and its agreed delay policy are verified; collection stays paused pending hosted report, native recovery and production acceptance gates."

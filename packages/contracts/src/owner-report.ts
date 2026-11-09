@@ -254,6 +254,7 @@ export function toOwnerReport(internal: unknown): OwnerDishReport {
     ...report,
     dishes: report.dishes.map((dish) => {
       const hideTimingRelatedMetrics =
+        dish.metrics.avg_interaction_time_seconds.eligible_sessions > 0 &&
         dish.metrics.avg_interaction_time_seconds.eligible_sessions < PRIVACY_FLOOR_SESSIONS;
       const timingRelatedMetrics = new Set([
         'active_sessions',
