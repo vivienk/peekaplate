@@ -151,6 +151,51 @@ function dishes(result: ProducedMenuBundle) {
 }
 
 describe('S4-RES bundle producer: AC-S1 shape', () => {
+  it('normalizes uppercase UUIDs in request identities', () => {
+    const input = requestInput();
+    input.venue_id = 'ABCDEF01-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.menu_id = 'ABCDEF02-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.categories[0]!.category_id = 'ABCDEF03-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.categories[0]!.dishes[0]!.dish_id = 'ABCDEF04-ABCD-4ABC-8ABC-ABCDEF012345';
+    const parsed = parseRequest(input);
+    expect(parsed.venue_id).toBe('abcdef01-abcd-4abc-8abc-abcdef012345');
+    expect(parsed.menu_id).toBe('abcdef02-abcd-4abc-8abc-abcdef012345');
+    expect(parsed.categories[0]!.category_id).toBe('abcdef03-abcd-4abc-8abc-abcdef012345');
+    expect(parsed.categories[0]!.dishes[0]!.dish_id).toBe('abcdef04-abcd-4abc-8abc-abcdef012345');
+  });
+
+  it('produces a verified empty menu with normalized venue and menu IDs', async () => {
+    const input = requestInput();
+    input.venue_id = 'ABCDEF01-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.menu_id = 'ABCDEF02-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.categories = [];
+    const result = await produceMenuBundle(parseRequest(input), new Map(), new Map());
+    expect(result.bundle.venue_id).toBe('abcdef01-abcd-4abc-8abc-abcdef012345');
+    expect(result.bundle.menu_id).toBe('abcdef02-abcd-4abc-8abc-abcdef012345');
+    expect(result.bundle.categories).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
+    expect(PublicMenuContentBundleSchema.parse(result.bundle)).toEqual(result.bundle);
+    await expect(verifyPublicMenuContentBytes(result.bytes, result.contentHash)).resolves.toEqual(
+      result.bundle,
+    );
+  });
+
+  it.each(['not-a-uuid', 'abcdef01-abcd-4abc-8abc-abcdef012345\u0000'])(
+    'rejects invalid UUID %j',
+    (value) => {
+      const input = requestInput();
+      input.venue_id = value;
+      expect(MenuBundleRequestSchema.safeParse(input).success).toBe(false);
+    },
+  );
+
+  it('rejects duplicate dish IDs across categories after case normalization', () => {
+    const input = requestInput();
+    input.categories[0]!.dishes[0]!.dish_id = 'ABCDEF04-ABCD-4ABC-8ABC-ABCDEF012345';
+    input.categories[1]!.dishes[0]!.dish_id = 'abcdef04-abcd-4abc-8abc-abcdef012345';
+    expect(MenuBundleRequestSchema.safeParse(input).success).toBe(false);
+  });
+
   it('builds a schema-valid bundle with exact identities, URLs, alt text and dimensions', async () => {
     const result = await produceDefault();
     const { bundle } = result;

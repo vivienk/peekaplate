@@ -23,3 +23,35 @@ Local evidence is synthetic; it does not establish staging readiness or stakehol
 | AC-S6 | Stakeholder sign-offs remain outstanding; independent reviews are separate from approvals. | PENDING |
 
 Deployment owner must provide approved HTTPS asset/bundle hosts and diner CORS origins. DIN-03 must adopt exact-byte verification. No real restaurant data was used.
+
+## PR #117 local QA — 2026-11-09
+
+Pinned local HEAD `f62c502d29a39574c919c47d46474cf0444d209a`; regression tests and review vectors are uncommitted. The earlier rows are historical evidence, not reruns at this pin.
+
+| Check | Current result |
+|---|---|
+| Uppercase UUID normalization; zero categories; malformed and NUL UUID; mixed-case duplicate dish | PASS — focused producer and integrity run: 63 tests across two files. Empty categories produce no diagnostics and verify against the shared schema and exact-byte integrity. |
+| Five supplied synthetic, proposed vectors | PASS — original and repeat accepted; same-value reformatted and changed-name bytes rejected by hash; matching-hash wrong revision rejected by delivery identity. All four file lengths and SHA-256 values match the supplied manifest. |
+| `TEST_WORKERD=1 pnpm check` | FAIL exit 1 at `context:check`: contracts fingerprint is stale after the integrity test edit. Lint and typecheck passed; 1,052 Vitest tests and 67 script tests passed, including the four workerd cases. `pnpm docs:check` separately passed. Refreshing `docs/CONTEXT.md` is outside the requested QA-record-only documentation scope. |
+| `pnpm verify test:db` | PASS after starting Docker Desktop: 213 pgTAP assertions across nine suites, 84 integration tests across six files, and local Worker smoke; initial attempt failed before database creation. |
+| Python offline suite | PASS: 476 tests; offline socket guard recorded no unexpected network attempts. |
+| `pnpm verify build`; `uv build --project processing` | PASS: both exit 0; Worker dry-run and Python wheel/sdist only, no deployment. |
+| Playwright default / intercepted PostHog / review preview | PASS: 78 / 9 / 6 tests, respectively, each exit 0 and one worker. |
+| Synthetic T0 preparation | PASS: two 1,600×1,200 synthetic JPEGs prepared; manifests say `needs_review`, `publication_eligible: false`. |
+| CLI asset privacy/integrity negative checks | PASS: changed WebP byte and `source.jpg` manifest substitution rejected, each exit 1. A disposable-DB corruption check confirmed zero subject and bundle rows for the new menu. |
+| Producer/DB/HTTP smoke | PASS for exercised synthetic journey: repeat CLI builds, two complete dishes and identity-only placeholder, loopback exact-byte/identity rejection, repricing, idempotent admission, runtime denial, cross-tenant rejection and immutable overwrite denial. One subject and bundle, zero approvals/publications. |
+
+The workerd-enabled run reported no skips. The DB integration suite ran separately in `test:db`. Hosted CI, real restaurant approval/content, external hosting and approved CORS, DIN-03 end-to-end consumption, physical-device checks and stakeholder acceptance remain NOT RUN/BLOCKED. The exact-byte rule remains proposed pending consumer agreement; `publicationHash` is unchanged.
+
+## Synced-develop verification — 2026-11-09
+
+Merged `origin/develop` at `93194f2772e79958a6edf6ccd02ebf3094cf8d53` and reconciled the fork PR head `d3ea003a59d5f4cbb1dc6ea10d06810d70a2909c`, whose kickoff patch matches local `4183db4`. The earlier context failure was resolved by refreshing merged source fingerprints.
+
+| Check | Result |
+|---|---|
+| `TEST_WORKERD=1 pnpm check` | PASS: lint, typecheck, 1,052 Vitest tests, 67 script tests, context and docs checks. |
+| `pnpm verify test:db` | PASS: 213 pgTAP assertions, 84 integration tests and local Worker smoke. |
+| `pnpm verify build` | PASS: frontend builds and Worker dry-run; no deployment. |
+| `pnpm exec playwright test tests/e2e/input.spec.ts --workers=1` | PASS: 14 browser tests for the newly merged TextField. |
+
+Prior synthetic producer/HTTP, Python offline and other browser results above were observed before this sync; they do not establish hosted or stakeholder acceptance.

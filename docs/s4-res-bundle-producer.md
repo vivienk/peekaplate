@@ -1,6 +1,6 @@
 # S4-RES: Trusted immutable menu bundle producer
 
-**Task:** [S4-RES](https://app.clickup.com/t/86bct99xa) · **Branch:** `feat/s4-res-bundle-producer` · **Base:** `2da95ad` (`origin/develop`)
+**Task:** [S4-RES](https://app.clickup.com/t/86bct99xa) · **Branch:** `feat/s4-res-bundle-producer` · **Synced develop:** `93194f2`
 
 ## 1. Scope
 
