@@ -2035,3 +2035,8 @@ The new Chromium regression failed because the invalid input had identical focus
 ```json
 {"kind":"manual-check-resolution","check":"pinned owner-report release-gate review","status":"resolved","area":"owner-report-source-provenance","reviewBase":"e93be2926644ecd912a92a5c9ab56b0226f6caef","reviewHead":"982edce382b55d63d98465d42080a9c279febd23","cause":"A caller-controlled source=synthetic query reached the default reader, whose source default and calculation metadata were production.","prevention":"Require trusted local/staging APP_ENV as well as one exact synthetic selector, propagate the synthetic source to the reader, and label its calculation version accordingly.","regression":"The signed-JWT test proves source=synthetic is blocked in production without a reader call; local synthetic responses pass. Unit and real-PostgreSQL tests assert source=synthetic and synthetic.v1; full test and test:db suites pass."}
 ```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"push active PR branch","timestamp":"2026-11-09T11:05:29.425Z","result":"blocked","cause":"GitHub credentials are unavailable; no remote update occurred."}
+```
