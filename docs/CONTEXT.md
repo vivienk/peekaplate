@@ -63,7 +63,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "657afec34a4f9c2da845e614be17fc732469c7d06154242955706c31d8c372b1"
+      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
     },
     {
       "id": "ui",
@@ -80,12 +80,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
+      "sourceFingerprint": "1479570f1b3584333e12b22847767167494f78c9d12d7a5aa58ff3863310c895"
     },
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static diner shell stays readable without JavaScript. Consent-gated shell views exist; published screens remain pending. A replaceable menu source and one known-field adapter provide labelled synthetic fixtures. Screen-free search returns complete-dish IDs and the staff allergy line. Compare helpers pick two different complete dishes, replace either side keeping comparison_id, and build an unsent payload. Save state stores per-restaurant dish IDs newest first, rechecks withdrawn dishes, handles stale-tab writes and falls back to memory. Save UI mounts hearts, badge and toasts (latest-removal Undo, 5s/3s), sending Save events only for committed writes; renderSavedScreen lists saved dishes (no shortlist_viewed in session-only mode). track() and its triggers are console-only; consented PostHog/canonical delivery needs integration (docs/posthog.md). Icon lookups map approved allergen/dietary values and ingredients to Figma assets; not wired to screens.",
+      "summary": "Diner fixture menu, detail, search helpers, Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -134,7 +134,26 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/saved-screen.ts",
         "frontend/diner/src/save/saved-screen-model.ts",
         "frontend/diner/src/save/saved-screen-model.test.ts",
-        "frontend/diner/src/save/saved-screen.css"
+        "frontend/diner/src/save/saved-screen.css",
+        "frontend/diner/src/tracking/ids.ts",
+        "frontend/diner/src/tracking/identity.ts",
+        "frontend/diner/src/tracking/envelope.ts",
+        "frontend/diner/src/tracking/core.test.ts",
+        "tests/e2e/tracking.spec.ts",
+        "frontend/diner/src/tracking/activity-clock.ts",
+        "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/validate.ts",
+        "frontend/diner/src/tracking/validate.test.ts",
+        "frontend/diner/src/tracking/consent.ts",
+        "frontend/diner/src/tracking/outbox.ts",
+        "frontend/diner/src/tracking/outbox.test.ts",
+        "frontend/diner/src/tracking/batcher.ts",
+        "frontend/diner/src/tracking/batcher.test.ts",
+        "tests/e2e/tracking-outbox.spec.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "frontend/diner/src/tracking/withdrawal.test.ts",
+        "tests/e2e/tracking-storage.spec.ts",
+        "frontend/diner/src/tracking/withdrawal.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -143,23 +162,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "acd75c3bef3d12a118c633cefa772d187b0f4b022f0a67fd6af51431b1875197"
+      "sourceFingerprint": "870fe0fba2eaad666945c79cabf89660579ff75a4b17435a7b6549a29a050095"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
         "frontend/console/package.json",
         "frontend/console/foundations.html",
-        "frontend/console/src/foundations/Input.tsx",
-        "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
         "tests/e2e/input.spec.ts",
-        "frontend/console/vite.config.ts"
+        "frontend/console/vite.config.ts",
+        "frontend/console/src/foundations/TextField.tsx",
+        "frontend/console/src/foundations/field.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -169,7 +188,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
+      "sourceFingerprint": "c1af4f0e5ecec13375e3e01ebd7f7d7614fdaf64f0597cd841168a7754d6da36"
     },
     {
       "id": "backend",
@@ -275,7 +294,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3607be3b6640ba1338b9ef6beb53cccb250d8388c283938a171a509e0ee09b6d"
+      "sourceFingerprint": "2db935f4bc28f7d93aadb0c24b7ae6eef27ad5a5335e5b4fd5424d362e92107e"
     },
     {
       "id": "database",
@@ -392,7 +411,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "9cd810019c302435d3b4ad6fc7767a852e76932cb6186729f0a23c2943df5297"
+      "sourceFingerprint": "bb7f74d48d930cb412b5ae6252d919b21070ecceea379170bac28a4b198091c0"
     },
     {
       "id": "agents",
@@ -425,7 +444,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Unwired until TRK-01 connectPostHog. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Diner uses TRK-01's gate. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -454,7 +473,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "b03cbc12dc1c2055a85f48276b3a53970385ebab8441c1224c28324bcd30be3b"
+      "sourceFingerprint": "4e68c26c4a071754c151ccb2d6e4539801050c0361716178627499c5b0d41c73"
     },
     {
       "id": "processing",
@@ -579,13 +598,48 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-08",
-      "summary": "AI-01 internal report-input validator synchronized with the count-free #82 evaluation and merged core #46 on develop 95fedc5. Dish selection, valid zero, value-free withheld states and the existing 20 input cases are unchanged. This remains a Draft v1 validator, not a live producer adapter.",
+      "date": "2026-11-09",
+      "summary": "Draft AI-01 internal report-input validator synchronized with #82 at 18bc671, incorporating develop 93194f2 tracking and TextField foundations. The existing 20 input cases, valid-zero handling and count-free 21-case evaluation remain unchanged. Both parent context graphs and append-only error histories are retained; no live report adapter, model or UI wiring is added.",
       "modules": [
         "backend",
         "contracts"
       ],
-      "next": "Verify the synchronized stack and retain Draft. Require actual internal producer fixtures, disclosure/freshness evidence, identity semantics and version compatibility before API/core/UI integration; AI-01 remains in progress."
+      "next": "Verify the synchronized stack and keep #112 Draft and AI-01 In Progress. Require a pinned internal producer fixture, trusted identity/window, per-metric cohorts and disclosure/freshness/version evidence before live adapter integration."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "AI-01 evaluation synchronized with develop 93194f2 after #77/#80 tracking and #74 TextField merged. Upstream module paths, recent handoffs and both append-only error histories are retained. The frozen 21 synthetic cases and count-free owner rationale are unchanged; no producer, model or dashboard integration is added.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Verify this synchronized head and clean-commit evaluation, then update #112 from it. Keep #112 Draft and AI-01 In Progress; human review, producer handoff, independent rubric/model runs and hosted acceptance remain separate gates."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
+      "modules": [
+        "console",
+        "tokens"
+      ],
+      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
     },
     {
       "date": "2026-11-08",
@@ -634,39 +688,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
-    },
-    {
-      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
-    },
-    {
-      "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
-    },
-    {
-      "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "processing"
-      ],
-      "next": "Verify the reconciled head and independent tests before merge. Complete #73 artifact/command integrity corrections and #45 retry-exhaustion recovery before hosted upload-to-review acceptance."
-    },
-    {
-      "summary": "PR109 adds Figma-derived allergen, dietary, ingredient and UI SVG assets, exact normalized-name lookups and a synthetic fixture restaurant logo. Unknown icons return null; labels remain authoritative. No screen, network or event dispatch is added. Current develop Compare, tracking, preview and QA work is preserved.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Use decorative icons with retained text labels in the menu/detail integration. Keep unsupported ingredient names text-only; confirm final Figma rendering there. The fixture logo is synthetic, not an approved real-restaurant asset."
     }
   ]
 }

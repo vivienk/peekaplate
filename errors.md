@@ -1424,6 +1424,11 @@ checks require the pushed revision's Linux CI. RTK was unavailable.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T21:06:43.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-03T15:57:21.681Z","exitCode":2}
 ```
 
@@ -1602,6 +1607,16 @@ original failure observation above rather than treating a rerun as its diagnosis
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-07T16:24:15.985Z"},"status":"resolved","cause":"While merging develop into S3-TOK-01 (#74), the docs/CONTEXT.md conflict (source fingerprints only) was first resolved by taking develop's whole file, which dropped the branch's module path changes (foundations Input.tsx and input.css renamed to TextField.tsx and field.css), so the context check could not read the old paths.","prevention":"Resolve CONTEXT.md conflicts hunk by hunk, keeping both sides' non-conflicting changes, then run context:refresh; never replace the whole file with one side.","regression":"Re-resolved only the three conflicting fingerprint hunks; context:refresh and context:check then passed (12 modules, 10 handoffs)."}
+```
+
+
 ## November 3 S3-RES-01.2 review persistence hardening
 
 ```json
@@ -1633,19 +1648,8 @@ endpoint documentation moved to `docs/review-api.md`, so the later #58 merge doe
 {"id":"OBS-20261103-VIS03-PRES-ID-001","status":"resolved","area":"asset-delivery","observation":"Sai reproduced on PR #25 at 965abc7 that two different valid presentation candidates (512x512 and 768x768), or the same candidate from model-a and model-b, received the same pres_ asset id; in one output root the create-only check prevented retaining the second candidate under its own identity.","cause":"prepare_presentation_bundle derived the presentation asset id before generation from the T0 id, dish/revision ids, cutout/reference hashes and recipe version only, so the candidate SHA-256, effective model version, prompt version/hash and success-versus-fallback outcome were not part of the identity.","prevention":"Derive content-addressed ids after validation from every input that changes the delivered bytes or their provenance, and run the create-only check against that final id. A retained fallback carries its own identity, including the rejected candidate hash when one was returned.","regression":"test_asset_id_identifies_the_validated_candidate_and_its_provenance failed before the change and passes after it: different candidates, model versions, and success/fallback outcomes get distinct ids, also within one output root. test_identical_presentation_content_remains_create_only keeps identical content create-only with a byte-identical first manifest and no leftover temporary directory.","sources":["processing/src/peekaplate_processing/presentation.py","processing/tests/test_presentation.py","docs/asset-delivery.md","processing/README.md"]}
 ```
 
-The develop reconciliation for PR #25 conflicted only in `docs/CONTEXT.md`. It was
-resolved from current develop: the processing node keeps develop's paths plus the
-asset/presentation paths, and the VIS-03 handoff replaces the oldest (October 28
-DIN-01.4 search) entry to stay within ten handoffs. Develop's newer handoffs,
-including the November 2 allergen-label note, are preserved.
 
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
-```
 
-<!-- automatic observation; not root cause -->
-```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
 ```
 
@@ -1862,3 +1866,75 @@ Only this ledger and documentation changed after that source validation.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T19:06:55.022Z","exitCode":1}
 ```
+
+
+## November 8 PR77 cached-page identity correction
+
+Three new core.test.ts cases reproduced cached-page sequence reuse, resurrection of an expired visit and reuse after stored state disappeared. identity.ts now reconciles the persisted identity before saving on pageshow, preserves the maximum sequence for the same producer, adopts a newer visit and starts fresh when persistent state cannot be recovered. All 44 tracking tests and four Chromium lifecycle/fixture tests pass. The first context handoff exceeded the 1000-character summary cap; its guard prevented any write. The summary was shortened and fingerprints refreshed without dropping either side of the append-only merge ledger.
+
+
+## November 8 PR80 withdrawal and atomic-store corrections
+
+Four RED storage/public-dispatch regressions reproduced cold-page withdrawal replay, 25 delayed additions crossing withdrawal/re-opt-in, interleaved event loss and stale snapshots after receipt/clear. Atomic IndexedDB transactions and Web-Locked localStorage now update the latest record; pending reads are authoritative. Retiring a pipeline synchronously invalidates its queued additions and stops its batcher. Reopening waits for durable clearing, retries an unconfirmed clear and uses visit memory if it still fails. A further RED fault test proved failed clearing could otherwise replay old work; it now passes. Browser checks cover two genuine tabs, transaction abort after request success, memory fallback without Web Locks and the actual banner with both destinations. Shared consent injection preserves console behavior and removes the separate legacy diner capture path.
+
+The first local merge helper stopped at the summary cap, but a missing exit guard allowed conflict markers into an unpublished merge commit. Recovery reconstructed both parent graphs and path sets, preserved both append-only ledger sides and amended only that unpublished merge. Legacy handoffs without date fields are retained without assuming a common date shape. Subsequent mutation steps stop at the first nonzero result; context:check and git diff --check verify the repaired result before push. A test-only LockGrantedCallback generic annotation was corrected after strict TypeScript rejected it.
+
+## November 8 PR80 failed-clear recovery follow-up
+
+Independent review identified two additional paths: failed clearing lost its pending state after a reload, and clearing a fallback memory store could incorrectly certify that a temporarily unavailable IndexedDB backend was empty. Both regressions replayed the old event before correction. Withdrawal now records deletion-work tokens in sessionStorage/localStorage and explicitly clears both durable backends; incomplete clearance keeps new work in memory and is retried on reopening. Completion records cannot erase a newer request. Eight withdrawal unit tests cover reload, fallback, overlap and unreadable markers; a real Chromium reload test seeds both backends, interrupts IndexedDB access and verifies that old records never reach delivery after recovery. All-storage-write failure remains an explicit documented limitation; no hosted acceptance is inferred.
+
+Tooling corrections: a Windows rg path containing a wildcard was treated literally; use directory paths with rg's glob filter instead. A revised PR description initially omitted the repository's three required context labels; the exact body now passes scripts/check-pr.mjs before publishing.
+
+
+## November 8 PR74 reconciliation and invalid-field focus
+
+The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
+
+The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
+
+## November 9 append-only history reconciliation
+
+The synchronization guard found a historical observation omitted by the
+automatic merge outside the conflict block. It is retained below from the
+previous PR82 head; its timestamp is historical, not a new test run.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
+```
+
+## November 9 AI evaluation sync setup boundary
+
+The synchronized source preserves develop 93194f2 and the unchanged frozen AI
+evaluation. Normal pnpm startup attempted dependency reconciliation but Windows
+denied its project-registration symlink before context refresh could run.
+Context refresh itself succeeds through its existing Node entry point. Checks
+using the installed dependencies explicitly set dependency-status reporting to
+warn; they do not establish a fresh frozen installation. No engine, lockfile,
+security regression or test assertion is weakened. Normal installation and the
+full security/browser/database checks remain to be established on the new head
+in a normal terminal or Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-09T08:49:42.325Z","exitCode":1}
+```
+
+The installed-dependency recheck passes lint, seven package strict typechecks
+and all 63 application test files (1006 passed, four skipped). Of 67 script
+tests, 64 pass; two console build tests cannot resolve the newly merged pinned
+Inter font dependency before a normal installation, and the existing artifact
+symlink rejection test cannot create its junction in this sandbox. Keep all
+three tests and install the frozen dependencies before the next full check.
+This is not an aggregate-check pass or live AI/report acceptance.
+
+## November 9 Draft report-input synchronization
+
+The Draft stack now includes the synchronized evaluation and develop 93194f2.
+AI core, report-input, contracts and evaluation source are byte-identical to
+the previous Draft head; only the inherited foundations and reconciliation
+documentation change. All 67 focused AI/contract/input cases pass, together
+with lint, all seven package typechecks, context freshness and documentation
+links using the existing installation. The new Inter font installation and
+sandbox junction limitations recorded above remain unresolved for the full
+aggregate check. Keep #112 Draft; this is not live report/model/UI acceptance.
