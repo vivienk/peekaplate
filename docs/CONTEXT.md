@@ -200,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. Own-token ES256/claim checks and S4-DATA-04 restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Local/staging dish reports require source=synthetic, matching SYNTHETIC_REPORT_VENUE_ID and server-allowlist membership; canonical venues fail closed even if configured. Timing coverage counts final/total openings; privacy floors count sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate/strip owner_report.v1; freshness unverified. AI-01 returns scoped drafts or abstention. Hosted acceptance pending; collection paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. Own-token ES256/claim checks and S4-DATA-04 restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Local/staging dish reports require source=synthetic, matching SYNTHETIC_REPORT_VENUE_ID and server-allowlist membership; entries are typed as strings, and canonical venues fail closed even if configured. Timing coverage counts final/total openings; privacy floors count sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate/strip owner_report.v1; freshness unverified. AI-01 returns scoped drafts or abstention. Hosted acceptance pending; collection paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -299,7 +299,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f0865d82b23ac1cff9d9d84789947a25e5a7e6f1805dd879623f1ae690ff2f2f"
+      "sourceFingerprint": "c8570d6a76187fed77acf9e278b3a08fd67201a6ceffae5f450b165d2adb743d"
     },
     {
       "id": "database",
