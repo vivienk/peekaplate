@@ -465,9 +465,13 @@ describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
 
   const gaps: [string, Partial<ApprovedDishSource>, string][] = [
     ['blank description', { description: '   ' }, 'description_missing'],
+    ['overlong description', { description: 'x'.repeat(4001) }, 'description_missing'],
+    ['description containing NUL', { description: 'Dish\u0000description' }, 'description_missing'],
     ['null price', { priceAmount: null }, 'price_missing'],
     ['over-precise price', { priceAmount: '14.555' }, 'price_not_representable'],
     ['missing currency', { priceCurrency: null }, 'currency_missing'],
+    ['invalid currency', { priceCurrency: 'usd' }, 'currency_missing'],
+    ['whitespace currency', { priceCurrency: '   ' }, 'currency_missing'],
     ['no ingredients', { ingredients: null }, 'ingredients_missing'],
     ['empty ingredients', { ingredients: [] }, 'ingredients_missing'],
     ['blank ingredient', { ingredients: ['Leeks', ' '] }, 'ingredients_missing'],
@@ -496,6 +500,18 @@ describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
       expect(result.diagnostics).toContainEqual({ dishId: LEEKS, code });
     });
   }
+
+  it('accepts a 4000-character description and valid uppercase currency', async () => {
+    const result = await produceMenuBundle(
+      parseRequest(requestInput()),
+      sources({ [LEEKS]: { description: 'x'.repeat(4000), priceCurrency: 'USD' } }),
+      assets(),
+    );
+    const dish = dishes(result)[0];
+    if (!dish?.complete) throw new Error('Expected complete dish');
+    expect(dish.description).toBe('x'.repeat(4000));
+    expect(dish.price.currency).toBe('USD');
+  });
 
   it('accepts 100 ingredients and a 160-character trimmed name', async () => {
     const names = [` ${'x'.repeat(160)} `, ...Array(99).fill('Leeks')];

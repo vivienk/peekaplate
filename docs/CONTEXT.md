@@ -22,6 +22,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/bundle.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/expected.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/tampered.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/README.txt",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.original.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.same-value-pretty.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
         "packages/contracts/fixtures/observation.v2/fixtures.json",
         "packages/contracts/fixtures/observation.v2/README.md",
         "packages/contracts/src/owner-report.ts",
@@ -52,7 +59,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f52c70d972b70075f88dadf333133bc60e25bf17453220e367d2a1087e5937b6"
+      "sourceFingerprint": "215af3c88cce64e2a116c12a3855b4fa0490c23a9064a205de5baabb2e6b4154"
     },
     {
       "id": "tokens",
@@ -304,7 +311,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "051f3bc6d23ca3aff01fefc425b477ba6213d06c35d24fbd15a2f53ac9dbaafd"
+      "sourceFingerprint": "9c8fefa3be55ffa053d4b52a09e194123bc9b3cfa2280ac59416c74ea5f54645"
     },
     {
       "id": "database",

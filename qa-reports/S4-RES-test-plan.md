@@ -55,3 +55,17 @@ Merged `origin/develop` at `93194f2772e79958a6edf6ccd02ebf3094cf8d53` and reconc
 | `pnpm exec playwright test tests/e2e/input.spec.ts --workers=1` | PASS: 14 browser tests for the newly merged TextField. |
 
 Prior synthetic producer/HTTP, Python offline and other browser results above were observed before this sync; they do not establish hosted or stakeholder acceptance.
+
+## Producer review fixes — 2026-11-09
+
+Independent review found that corrected candidate reviews could retain incomplete fields while the producer treated them as complete, and that unrepresentable descriptions or currencies aborted an entire bundle. The corresponding regression cases failed before the fixes and passed afterward.
+
+| Check | Result |
+|---|---|
+| `TEST_WORKERD=1 pnpm check` | PASS after fixes: 1,057 Vitest and 67 script tests, lint, types, context and docs. |
+| `pnpm verify test:db` | PASS after fixes: 213 pgTAP assertions, 85 integration tests and local Worker smoke. |
+| `pnpm verify build` | PASS after fixes: frontend builds and Worker dry-run. |
+| `pnpm verify test:e2e` | PASS after fixes: 87 default and 9 intercepted PostHog browser tests. |
+| Synthetic CLI/DB/HTTP smoke | PASS after fixes: repeated bytes, repricing, admission, identity/hash rejection, runtime/tenant isolation and overwrite checks. Corrupted-asset admission separately produced zero handoff rows. |
+
+The earlier browser, Python and asset results remain scoped to the versions and conditions noted above; they are not hosted or restaurant approval.

@@ -193,11 +193,20 @@ async function buildDish(
   if (source.reviewState === 'incomplete') gaps.push('review_incomplete');
 
   const description = source.description.trim();
-  if (description.length === 0) gaps.push('description_missing');
+  if (
+    description.length === 0 ||
+    description.length > 4000 ||
+    source.description.includes('\u0000')
+  ) {
+    gaps.push('description_missing');
+  }
 
   const price = normalizePrice(source.priceAmount);
   if (!price.ok) gaps.push(price.reason);
-  if (!source.priceCurrency) gaps.push('currency_missing');
+  const currency = source.priceCurrency;
+  if (!currency || !/^[A-Z]{3}$/.test(currency)) {
+    gaps.push('currency_missing');
+  }
 
   const ingredientNames =
     Array.isArray(source.ingredients) &&
@@ -230,7 +239,7 @@ async function buildDish(
   if (
     gaps.length > 0 ||
     !price.ok ||
-    !source.priceCurrency ||
+    !currency ||
     !ingredientNames ||
     requested.image_alt === null ||
     !asset
@@ -259,7 +268,7 @@ async function buildDish(
       complete: true,
       name: source.name.trim(),
       description,
-      price: { amount: price.amount, currency: source.priceCurrency },
+      price: { amount: price.amount, currency },
       ingredients,
       allergens: requested.allergens,
       dietary: requested.dietary,

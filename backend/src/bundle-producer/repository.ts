@@ -12,6 +12,7 @@ type CandidateReviewRow = {
   published_dish_id: string;
   review_status: 'corrected' | 'rejected' | 'incomplete';
   corrected_fields: Record<string, unknown>;
+  incomplete_fields: string[] | null;
 };
 
 async function inTenantTransaction<T>(
@@ -73,7 +74,7 @@ export async function loadApprovedDishSources(
         [tenantId, ids],
       );
       const reviews = await client.query<CandidateReviewRow>(
-        `SELECT d.published_dish_id, c.review_status, c.corrected_fields
+        `SELECT d.published_dish_id, c.review_status, c.corrected_fields, c.incomplete_fields
          FROM app_private.dish_drafts d
          JOIN app_private.extraction_review_session s
            ON s.tenant_id = d.tenant_id AND s.job_id = d.job_id
@@ -134,7 +135,13 @@ export async function loadApprovedDishSources(
           priceAmount,
           priceCurrency,
           ingredients,
-          reviewState: review?.review_status ?? 'none',
+          reviewState:
+            review?.review_status === 'rejected'
+              ? 'rejected'
+              : (review?.incomplete_fields?.length ?? 0) > 0 ||
+                  review?.review_status === 'incomplete'
+                ? 'incomplete'
+                : (review?.review_status ?? 'none'),
         });
       }
       return sources;

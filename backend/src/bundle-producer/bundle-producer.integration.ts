@@ -265,6 +265,35 @@ describe('S4-RES bundle producer database sources', () => {
     }
   });
 
+  it('keeps a corrected candidate with remaining incomplete fields as a placeholder', async () => {
+    const { dishId, revisionId } = await seedDish(venue);
+    const jobId = await seedJob(venue);
+    await seedDraft(venue, jobId, {
+      reviewStatus: 'accepted',
+      publishedDishId: dishId,
+      candidateId: 'cand-partial-correction',
+    });
+    await seedCandidateReview(venue, jobId, 'cand-partial-correction', 'corrected', {
+      ingredients: ['Corrected ingredient'],
+    });
+    await admin.query(
+      `UPDATE app_private.candidate_review_current SET incomplete_fields = ARRAY['price_amount']
+       WHERE tenant_id = $1 AND candidate_id = $2`,
+      [venue, 'cand-partial-correction'],
+    );
+    const loaded = await loadApprovedDishSources(admin, venue, [dishId]);
+    expect(loaded.get(dishId)?.reviewState).toBe('incomplete');
+    const produced = await produceMenuBundle(
+      bundleRequest([{ dishId, assetId: 't0_00000000000000000000000000000001' }]),
+      loaded,
+      new Map([['t0_00000000000000000000000000000001', manifestFor(dishId, revisionId, 1)]]),
+    );
+    expect(produced.bundle.categories[0]?.dishes).toEqual([
+      { dish_id: dishId, dish_revision_id: revisionId, complete: false },
+    ]);
+    expect(produced.diagnostics).toContainEqual({ dishId, code: 'review_incomplete' });
+  });
+
   it('omits a dish whose RES-01.2 review rejected the candidate', async () => {
     const { dishId } = await seedDish(venue);
     const jobId = await seedJob(venue);
