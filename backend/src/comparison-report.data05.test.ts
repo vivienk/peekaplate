@@ -1,4 +1,3 @@
-
 import { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { readComparisonReport } from './comparison-report';
@@ -51,12 +50,7 @@ describe('DATA-05 independent privacy boundaries', () => {
     it(`validates ${sessionCount} eligible sessions`, async () => {
       const { client } = createClient(sessionCount);
 
-      const report = await readComparisonReport(
-        client,
-        venueId,
-        venueId,
-        ...windows,
-      );
+      const report = await readComparisonReport(client, venueId, venueId, ...windows);
 
       const dish = report.dishes[0];
       expect(dish).toBeDefined();
@@ -76,9 +70,7 @@ describe('DATA-05 independent privacy boundaries', () => {
         }
       }
 
-      expect(report.comparison_eligibility).toBe(
-        sessionCount < 10 ? 'INSUFFICIENT' : 'COMPARABLE',
-      );
+      expect(report.comparison_eligibility).toBe(sessionCount < 10 ? 'INSUFFICIENT' : 'COMPARABLE');
     });
   }
 });
