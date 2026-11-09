@@ -1648,8 +1648,19 @@ endpoint documentation moved to `docs/review-api.md`, so the later #58 merge doe
 {"id":"OBS-20261103-VIS03-PRES-ID-001","status":"resolved","area":"asset-delivery","observation":"Sai reproduced on PR #25 at 965abc7 that two different valid presentation candidates (512x512 and 768x768), or the same candidate from model-a and model-b, received the same pres_ asset id; in one output root the create-only check prevented retaining the second candidate under its own identity.","cause":"prepare_presentation_bundle derived the presentation asset id before generation from the T0 id, dish/revision ids, cutout/reference hashes and recipe version only, so the candidate SHA-256, effective model version, prompt version/hash and success-versus-fallback outcome were not part of the identity.","prevention":"Derive content-addressed ids after validation from every input that changes the delivered bytes or their provenance, and run the create-only check against that final id. A retained fallback carries its own identity, including the rejected candidate hash when one was returned.","regression":"test_asset_id_identifies_the_validated_candidate_and_its_provenance failed before the change and passes after it: different candidates, model versions, and success/fallback outcomes get distinct ids, also within one output root. test_identical_presentation_content_remains_create_only keeps identical content create-only with a byte-identical first manifest and no leftover temporary directory.","sources":["processing/src/peekaplate_processing/presentation.py","processing/tests/test_presentation.py","docs/asset-delivery.md","processing/README.md"]}
 ```
 
+The develop reconciliation for PR #25 conflicted only in `docs/CONTEXT.md`. It was
+resolved from current develop: the processing node keeps develop's paths plus the
+asset/presentation paths, and the VIS-03 handoff replaces the oldest (October 28
+DIN-01.4 search) entry to stay within ten handoffs. Develop's newer handoffs,
+including the November 2 allergen-label note, are preserved.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
+```
 
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
 ```
 
@@ -1894,14 +1905,11 @@ The new Chromium regression failed because the invalid input had identical focus
 
 ## November 9 append-only history reconciliation
 
-The synchronization guard found a historical observation omitted by the
-automatic merge outside the conflict block. It is retained below from the
-previous PR82 head; its timestamp is historical, not a new test run.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
-```
+The synchronization guard and independent review found a historical paragraph
+and observation omitted by the automatic merge outside its conflict block.
+The original PR25 reconciliation paragraph and fenced failure records are
+restored at their original position from the previous PR82 head. Their
+timestamps are historical, not new test runs.
 
 ## November 9 AI evaluation sync setup boundary
 
@@ -1938,3 +1946,21 @@ with lint, all seven package typechecks, context freshness and documentation
 links using the existing installation. The new Inter font installation and
 sandbox junction limitations recorded above remain unresolved for the full
 aggregate check. Keep #112 Draft; this is not live report/model/UI acceptance.
+
+## November 9 normal-terminal stack verification
+
+The contributor completed normal frozen installation: eight workspace projects,
+214 policy-checked lock entries and the one newly merged Inter font package.
+Normal `pnpm check` then passed on synchronized Draft source 6c10b24: lint, all
+seven package typechecks, all 64 application test files (1026 passed, four
+skipped), all 67 script tests including both console builds and artifact-symlink
+rejection, context freshness and documentation links. The source includes the
+complete PR82 evaluation plus the existing 20 report-input cases. This resolves
+the missing-font setup issue and supplies normal-terminal evidence for the
+junction regression blocked inside the agent sandbox. The earlier failures
+remain recorded. Only reconciliation documentation changes after that run;
+no application, assertion, dependency or configuration is weakened.
+
+Both synchronized implementation heads also passed their 21-case standard
+development evaluation with a clean working tree. Independent rubric/model
+evaluation and hosted report/AI acceptance remain separate, unverified gates.
