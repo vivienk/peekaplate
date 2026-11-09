@@ -166,29 +166,46 @@
   width: 100%;
   /* stopgap: spacing token used as height; pending --pp-size-* tokens */
   min-height: var(--pp-space-40);
-  padding: var(--pp-space-8) var(--pp-space-12);
-  border: 1px solid var(--pp-role-input-border);
-  border-radius: var(--pp-radius-8);
+  /* Rania (Figma, 5 Nov): 16px side padding, 1.5px border, 12px radius. Chrome draws borders in
+   * whole pixels (1.5px shows as 1px), so the border is 1px plus a 0.5px inset shadow in the same
+   * colour. States change --pp-input-edge, never border-color, so the two always match. */
+  --pp-input-edge: var(--pp-role-input-border);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  border: 1px solid var(--pp-input-edge);
+  box-shadow: inset 0 0 0 0.5px var(--pp-input-edge);
+  border-radius: var(--pp-radius-12);
   background-color: var(--pp-role-input-bg);
   color: var(--pp-role-input-text);
   font-family: var(--pp-font-family-base);
   font-size: var(--pp-font-size-paragraph-1);
   line-height: var(--pp-line-height-paragraph-1);
-  transition: border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out);
+  transition:
+    border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    box-shadow var(--pp-motion-duration-press) var(--pp-motion-ease-out);
 }
 .pp-input::placeholder {
   color: var(--pp-role-input-placeholder);
 }
+/* Hover sits before focus, error and disabled, which share its specificity and so win over it. */
+.pp-input:hover {
+  --pp-input-edge: var(--pp-role-input-border-hover);
+}
 .pp-input:focus-visible {
+  /* Rania (6 Nov): focus is the 1.5px edge in the focus colour, with no extra halo. */
   outline: none;
-  border-color: var(--pp-role-input-border-focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pp-role-input-border-focus) 30%, transparent);
+  --pp-input-edge: var(--pp-role-input-border-focus);
 }
 .pp-input[aria-invalid="true"] {
-  border-color: var(--pp-role-input-border-error);
+  --pp-input-edge: var(--pp-role-input-border-error);
   color: var(--pp-role-input-text-error);
 }
+/* Keep the red error edge while giving keyboard focus its own visible cue. */
+.pp-input[aria-invalid="true"]:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
 .pp-input:disabled {
+  --pp-input-edge: var(--pp-role-input-border-disabled);
   background-color: var(--pp-role-input-bg-disabled);
   color: var(--pp-role-input-text-disabled);
   cursor: not-allowed;
