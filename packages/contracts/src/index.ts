@@ -1028,7 +1028,8 @@ export async function verifyPublicMenuContentBytes(
   }
   let text: string;
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    // ignoreBOM keeps a BOM in the text so it fails JSON.parse instead of being silently dropped.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     throw new PublicMenuIntegrityError('invalid_utf8', 'Bundle bytes are not valid UTF-8');
   }
