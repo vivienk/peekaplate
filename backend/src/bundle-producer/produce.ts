@@ -146,13 +146,7 @@ export async function produceMenuBundle(
     categories,
   });
   const { menu_revision_id: _pending, ...withoutRevision } = pending;
-  // The asset manifest hash is part of the revision so that re-encoded variants behind
-  // unchanged URLs still produce a new reviewable subject instead of a handoff conflict.
-  const menuRevisionId = await derivedUuid(
-    'menu-revision:v1',
-    canonicalJson(withoutRevision),
-    assetManifestHash,
-  );
+  const menuRevisionId = await derivedUuid('menu-revision:v1', canonicalJson(withoutRevision));
   const bundle = parseBundle({ ...pending, menu_revision_id: menuRevisionId });
   const bytes = new TextEncoder().encode(canonicalJson(bundle));
   const contentHash = await sha256(bytes);

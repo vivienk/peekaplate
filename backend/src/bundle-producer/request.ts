@@ -92,16 +92,20 @@ export type MenuBundleRequestDish = z.infer<typeof MenuBundleRequestDishSchema>;
 
 const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/);
 
-const T0AssetVariantSchema = z.object({
-  name: z.enum(['card-480', 'detail-1280']),
-  format: z.enum(['webp', 'jpeg']),
-  // PR #25 writes plain file names inside the asset directory; anything else could escape it.
-  path: z.string().regex(/^[a-z0-9-]+\.(webp|jpg)$/),
-  sha256: sha256Hex,
-  size_bytes: z.number().int().positive(),
-  width: z.number().int().positive().max(16_384),
-  height: z.number().int().positive().max(16_384),
-});
+const T0AssetVariantSchema = z
+  .object({
+    name: z.enum(['card-480', 'detail-1280']),
+    format: z.enum(['webp', 'jpeg']),
+    path: z.string(),
+    sha256: sha256Hex,
+    size_bytes: z.number().int().positive(),
+    width: z.number().int().positive().max(16_384),
+    height: z.number().int().positive().max(16_384),
+  })
+  .refine(
+    (variant) => variant.path === `${variant.name}.${variant.format === 'webp' ? 'webp' : 'jpg'}`,
+    'Variant filename must match its name and format',
+  );
 
 /** Reader for PR #25 `prepare_t0_bundle` manifests; only the fields the producer uses. */
 export const T0AssetManifestSchema = z

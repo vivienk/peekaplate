@@ -214,6 +214,10 @@ describe('S4-RES bundle producer: AC-S1 shape', () => {
     expect(text).toBe(canonicalJson(result.bundle));
     expect(text.endsWith('\n')).toBe(false);
     expect(result.contentHash).toBe(await sha256(result.bytes));
+    const { menu_revision_id: _revision, ...withoutRevision } = result.bundle;
+    expect(result.menuRevisionId).toBe(
+      await derivedUuid('menu-revision:v1', canonicalJson(withoutRevision)),
+    );
     expect(result.contentApprovalId).toBe(
       await derivedUuid('content-approval:v1', result.contentHash),
     );
@@ -331,15 +335,6 @@ describe('S4-RES bundle producer: AC-S2 determinism', () => {
       },
     ],
     [
-      'asset variant sha',
-      () =>
-        produceMenuBundle(
-          parseRequest(requestInput()),
-          sources(),
-          assets({ [assetId(1)]: { manifest: manifest(1, LEEKS, id(120), 'c') } }),
-        ),
-    ],
-    [
       'asset base url',
       () => {
         const input = requestInput();
@@ -377,10 +372,18 @@ describe('S4-RES bundle producer: AC-S2 determinism', () => {
     );
     expect(changed.assetManifestHash).not.toBe(base.assetManifestHash);
     expect(changed.assetApprovalId).not.toBe(base.assetApprovalId);
+    expect(changed.menuRevisionId).toBe(base.menuRevisionId);
+    expect(changed.contentHash).toBe(base.contentHash);
   });
 });
 
 describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
+  it('rejects a manifest that substitutes the private original for a delivery variant', () => {
+    const candidate = manifest(1, LEEKS, id(120));
+    candidate.variants[0]!.path = 'source.jpg';
+    expect(T0AssetManifestSchema.safeParse(candidate).success).toBe(false);
+  });
+
   it('rejects duplicate dish or category IDs, unknown fields and display labels', () => {
     const duplicateDish = requestInput();
     duplicateDish.categories[1]?.dishes.push({ ...duplicateDish.categories[0]?.dishes[0] });

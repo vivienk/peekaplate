@@ -18,8 +18,11 @@ async function inTenantTransaction<T>(
   client: DatabaseClient,
   tenantId: string,
   work: () => Promise<T>,
+  readOnlySnapshot = false,
 ): Promise<T> {
-  await client.query('BEGIN;');
+  await client.query(
+    readOnlySnapshot ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;' : 'BEGIN;',
+  );
   try {
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
@@ -50,24 +53,27 @@ export async function loadApprovedDishSources(
   tenantId: string,
   dishIds: readonly string[],
 ): Promise<Map<string, ApprovedDishSource>> {
-  return inTenantTransaction(client, tenantId, async () => {
-    const ids = [...dishIds];
-    const current = await client.query<DishCurrentRow>(
-      `SELECT dish_id, revision_id, name, description
+  return inTenantTransaction(
+    client,
+    tenantId,
+    async () => {
+      const ids = [...dishIds];
+      const current = await client.query<DishCurrentRow>(
+        `SELECT dish_id, revision_id, name, description
          FROM app_private.dish_current
         WHERE tenant_id = $1 AND dish_id = ANY($2::uuid[])`,
-      [tenantId, ids],
-    );
-    const drafts = await client.query<DraftRow>(
-      `SELECT published_dish_id, price_amount::text AS price_amount, price_currency, ingredients
+        [tenantId, ids],
+      );
+      const drafts = await client.query<DraftRow>(
+        `SELECT published_dish_id, price_amount::text AS price_amount, price_currency, ingredients
          FROM app_private.dish_drafts
         WHERE tenant_id = $1
           AND published_dish_id = ANY($2::uuid[])
           AND review_status IN ('accepted', 'edited')`,
-      [tenantId, ids],
-    );
-    const reviews = await client.query<CandidateReviewRow>(
-      `SELECT d.published_dish_id, c.review_status, c.corrected_fields
+        [tenantId, ids],
+      );
+      const reviews = await client.query<CandidateReviewRow>(
+        `SELECT d.published_dish_id, c.review_status, c.corrected_fields
          FROM app_private.dish_drafts d
          JOIN app_private.extraction_review_session s
            ON s.tenant_id = d.tenant_id AND s.job_id = d.job_id
@@ -78,61 +84,63 @@ export async function loadApprovedDishSources(
         WHERE d.tenant_id = $1
           AND d.published_dish_id = ANY($2::uuid[])
           AND d.review_status IN ('accepted', 'edited')`,
-      [tenantId, ids],
-    );
+        [tenantId, ids],
+      );
 
-    const draftByDish = new Map<string, DraftRow>();
-    for (const row of drafts.rows) {
-      if (draftByDish.has(row.published_dish_id)) {
-        throw new BundleProducerError(
-          'ambiguous_dish_source',
-          `Dish ${row.published_dish_id} has more than one accepted/edited draft`,
-        );
+      const draftByDish = new Map<string, DraftRow>();
+      for (const row of drafts.rows) {
+        if (draftByDish.has(row.published_dish_id)) {
+          throw new BundleProducerError(
+            'ambiguous_dish_source',
+            `Dish ${row.published_dish_id} has more than one accepted/edited draft`,
+          );
+        }
+        draftByDish.set(row.published_dish_id, row);
       }
-      draftByDish.set(row.published_dish_id, row);
-    }
-    const reviewByDish = new Map<string, CandidateReviewRow>();
-    for (const row of reviews.rows) {
-      if (reviewByDish.has(row.published_dish_id)) {
-        throw new BundleProducerError(
-          'ambiguous_candidate_review',
-          `Dish ${row.published_dish_id} has more than one RES-01.2 candidate review`,
-        );
+      const reviewByDish = new Map<string, CandidateReviewRow>();
+      for (const row of reviews.rows) {
+        if (reviewByDish.has(row.published_dish_id)) {
+          throw new BundleProducerError(
+            'ambiguous_candidate_review',
+            `Dish ${row.published_dish_id} has more than one RES-01.2 candidate review`,
+          );
+        }
+        reviewByDish.set(row.published_dish_id, row);
       }
-      reviewByDish.set(row.published_dish_id, row);
-    }
 
-    const sources = new Map<string, ApprovedDishSource>();
-    for (const row of current.rows) {
-      const draft = draftByDish.get(row.dish_id);
-      const review = reviewByDish.get(row.dish_id);
-      const corrected = review?.corrected_fields ?? {};
-      let priceAmount = draft?.price_amount ?? null;
-      let priceCurrency = draft?.price_currency ?? null;
-      let ingredients: unknown = draft?.ingredients ?? null;
-      if ('price_amount' in corrected) {
-        const value = corrected.price_amount;
-        // A malformed stored correction must not fall back to the uncorrected draft price.
-        priceAmount = value === null || typeof value === 'string' ? value : '';
+      const sources = new Map<string, ApprovedDishSource>();
+      for (const row of current.rows) {
+        const draft = draftByDish.get(row.dish_id);
+        const review = reviewByDish.get(row.dish_id);
+        const corrected = review?.corrected_fields ?? {};
+        let priceAmount = draft?.price_amount ?? null;
+        let priceCurrency = draft?.price_currency ?? null;
+        let ingredients: unknown = draft?.ingredients ?? null;
+        if ('price_amount' in corrected) {
+          const value = corrected.price_amount;
+          // A malformed stored correction must not fall back to the uncorrected draft price.
+          priceAmount = value === null || typeof value === 'string' ? value : '';
+        }
+        if ('price_currency' in corrected) {
+          const value = corrected.price_currency;
+          priceCurrency = typeof value === 'string' ? value : null;
+        }
+        if ('ingredients' in corrected) ingredients = corrected.ingredients;
+        sources.set(row.dish_id, {
+          dishId: row.dish_id,
+          dishRevisionId: row.revision_id,
+          name: row.name,
+          description: row.description,
+          priceAmount,
+          priceCurrency,
+          ingredients,
+          reviewState: review?.review_status ?? 'none',
+        });
       }
-      if ('price_currency' in corrected) {
-        const value = corrected.price_currency;
-        priceCurrency = typeof value === 'string' ? value : null;
-      }
-      if ('ingredients' in corrected) ingredients = corrected.ingredients;
-      sources.set(row.dish_id, {
-        dishId: row.dish_id,
-        dishRevisionId: row.revision_id,
-        name: row.name,
-        description: row.description,
-        priceAmount,
-        priceCurrency,
-        ingredients,
-        reviewState: review?.review_status ?? 'none',
-      });
-    }
-    return sources;
-  });
+      return sources;
+    },
+    true,
+  );
 }
 
 export type MenuBundleHandoff = {

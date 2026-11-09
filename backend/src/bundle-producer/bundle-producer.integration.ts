@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { DatabaseClient } from '../ingestion/repository';
 import { BundleProducerError, produceMenuBundle, type VerifiedT0Asset } from './produce';
 import {
   admitMenuBundleHandoff,
@@ -193,6 +194,29 @@ afterAll(async () => {
 });
 
 describe('S4-RES bundle producer database sources', () => {
+  it('loads dish and draft from one snapshot during concurrent changes', async () => {
+    const { dishId } = await seedDish(venue);
+    const jobId = await seedJob(venue);
+    await seedDraft(venue, jobId, { reviewStatus: 'accepted', publishedDishId: dishId });
+    const intercepted: DatabaseClient = {
+      async query<R = Record<string, unknown>>(text: string, values?: unknown[]) {
+        const result = await runtime.query(text, values);
+        if (text.includes('FROM app_private.dish_current')) {
+          await admin.query(
+            'UPDATE app_private.dish_drafts SET price_amount = 99 WHERE published_dish_id = $1',
+            [dishId],
+          );
+        }
+        return { rows: result.rows as R[], rowCount: result.rowCount };
+      },
+    };
+    const snapshot = await loadApprovedDishSources(intercepted, venue, [dishId]);
+    expect(snapshot.get(dishId)?.priceAmount).toBe('14.5');
+    expect((await loadApprovedDishSources(runtime, venue, [dishId])).get(dishId)?.priceAmount).toBe(
+      '99',
+    );
+  });
+
   it('uses the accepted draft with its RES-01.2 correction and ignores unlinked drafts', async () => {
     const { dishId, revisionId } = await seedDish(venue);
     const jobId = await seedJob(venue);
