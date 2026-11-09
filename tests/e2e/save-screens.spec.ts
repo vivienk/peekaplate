@@ -72,6 +72,18 @@ test('a card heart saves the dish, and the badge, detail heart and header agree'
     .toEqual(['menu_card']);
 });
 
+test('hearts keep working on the cards search leaves visible (#121)', async ({ page }) => {
+  await page.goto(DINER);
+  await page.getByRole('button', { name: 'Search menu' }).click();
+  await page.getByRole('searchbox', { name: 'Search dishes or ingredients' }).fill('benedict');
+  const heart = cardHeart(page, 'Classic Eggs Benedict');
+  await expect(heart).toBeVisible();
+  await expect(cardHeart(page, 'Avocado Toast')).toBeHidden();
+  await heart.click();
+  await expect(heart).toHaveAttribute('aria-pressed', 'true');
+  await expect(badge(page)).toHaveText('1');
+});
+
 test('removing a dish on the detail shows Undo, and Undo restores it everywhere', async ({
   page,
 }) => {
