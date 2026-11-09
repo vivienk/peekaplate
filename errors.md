@@ -1783,4 +1783,3 @@ During review remediation verification:
 
 During integration test expansion for PR #120 review findings:
 1. `test:db`: Draft integration probe for inverted publication timestamps initially attempted an `UPDATE` on `app_private.venue_tracking_activations`, which failed due to the immutable activation trigger `enforce_venue_tracking_activation` (`Modifying venue tracking activation timestamp is prohibited`). Resolved by deriving relative monotonic event timestamps forward from the initial activation timestamp (`actDate`) without mutating historical activation records. All 10 pgTAP suites (281 assertions) and all 6 integration suites (84 tests) pass cleanly.
-
