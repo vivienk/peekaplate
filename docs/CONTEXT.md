@@ -47,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "b9e8b42af3a2b80babceaf7a9e33632d4458b2a84e42e813ba313120789328ca"
+      "sourceFingerprint": "dcf02295c921350ee2c9a751da9f9aa62574bd1db0ecdee2df7af9f326e8b398"
     },
     {
       "id": "tokens",
@@ -193,7 +193,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical observation/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally covers archive restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; ordered comparisons credit both opened dishes once. Dish reports require one source=synthetic in local/staging; otherwise 503 before reads. Synthetic reports use synthetic.v1. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness remains unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses configured public JWK with ES256/claim checks. S4-DATA-04 covers archive restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Dish reports in local/staging require source=synthetic and matching operator-configured SYNTHETIC_REPORT_VENUE_ID; the reader uses only that UUID. Timing coverage counts final/total openings; privacy floors count distinct sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate and strip owner_report.v1. Freshness remains unverified. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -292,7 +292,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d3a0f2b442581688eafb95556ccf4d706fb9929f9daf8a7f7e5fc320394124de"
+      "sourceFingerprint": "d660ab3e1b874178abadb6c582c931fb540ce10eaec0a361ecfc5b32b38ad39f"
     },
     {
       "id": "database",
@@ -409,7 +409,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "dcb779fc7c1f4e0aa719bca79b5d5507c3866fa3673dd64a1b0cf2bb4e2ceca6"
+      "sourceFingerprint": "b3f330f08225e9c399fecd416be369a76d2689a924700c07f5c235d5af80aac2"
     },
     {
       "id": "agents",
@@ -671,13 +671,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-09",
-      "summary": "Owner-report gate permits only one source=synthetic in trusted local/staging; production fails closed even with that selector. Reader labels reports synthetic.v1. Zero timed cohort is NOT_MEASURABLE and no longer triggers complementary suppression of active counts or independent metrics; cohorts1–9 remain blinded. Signed-JWT and real-PostgreSQL regressions cover source provenance. Zero-cohort contract cases preserve active_sessions 10/150 and valid statuses; focused contract tests40 PASS, database tests77 and pgTAP213 PASS.",
+      "summary": "Owner-report route requires source=synthetic, local/staging and operator-configured SYNTHETIC_REPORT_VENUE_ID matching the request; the reader receives only that UUID. Timing coverage counts final/total openings while privacy floors remain distinct sessions, including 10 openings from one session. Complementary masking covers 1–9 timed/opened cohorts with zero timing; zero openings remain NOT_MEASURABLE. Signed-JWT, contract and real-PostgreSQL regressions pass: pnpm check (1006 unit, 67 script), pnpm verify test:db (77 integration, 213 pgTAP), and backend Biome. No hosted configuration or deployment.",
       "modules": [
         "backend",
         "contracts",
         "delivery"
       ],
-      "next": "Keep production reads unavailable until a separately reviewed release policy changes. Keep freshness unverified until accepted-online observation-to-summary evidence and its agreed delay policy are verified; collection stays paused pending hosted report, native recovery and production acceptance gates."
+      "next": "Set SYNTHETIC_REPORT_VENUE_ID only for a dedicated synthetic-data venue; the endpoint otherwise stays unavailable. Keep production reads unavailable and freshness unverified until a separately reviewed release policy and accepted-online evidence exist; collection remains paused pending hosted report, native recovery and production acceptance."
     },
     {
       "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
