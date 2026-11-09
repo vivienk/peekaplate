@@ -90,6 +90,8 @@ import {
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
+export const SYNTHETIC_REPORT_VENUE_ALLOWLIST = ['00000000-0000-4000-8000-000000000123'] as const;
+
 export type Bindings = {
   APP_ENV?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
@@ -745,6 +747,9 @@ export function createApp(services: Dependencies = dependencies) {
     });
     if (
       !approvedSyntheticVenue.success ||
+      !SYNTHETIC_REPORT_VENUE_ALLOWLIST.some(
+        (venueId) => venueId === approvedSyntheticVenue.data.venueId.toLowerCase(),
+      ) ||
       scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
     ) {
       return c.json({ error: 'service_unavailable' }, 503);

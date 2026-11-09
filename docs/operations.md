@@ -74,11 +74,13 @@ its relevant tests before release.
 ### Synthetic owner-report read boundary
 
 The local/staging dish-report route remains unavailable unless the server has an
-operator-configured `SYNTHETIC_REPORT_VENUE_ID`. Requests are accepted only for
+operator-configured `SYNTHETIC_REPORT_VENUE_ID` that is also in the backend's
+server-maintained synthetic venue allowlist. Requests are accepted only for
 that UUID, and the backend passes that configured UUID—not a caller-selected
-venue—to the owner-report reader. Configure it only for a dedicated
-synthetic-data venue; `source=synthetic` labels a calculation and does not
-convert or sanitize production observations. Production remains unavailable.
+venue—to the owner-report reader. Adding a reportable synthetic venue requires
+an explicit allowlist change as well as environment configuration;
+`source=synthetic` labels a calculation and does not convert or sanitize
+production observations. Production remains unavailable.
 
 The earlier index/conflict and native retry/DLQ evidence follows below as a
 historical release record; its statement that typed facts were missing applied

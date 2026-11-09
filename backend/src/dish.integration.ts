@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createStaffVerifier } from './auth';
 import { createDishRevision, replayDish } from './dish-command';
-import { type Bindings, createApp } from './index';
+import { type Bindings, createApp, SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './index';
 import { replayPublication, replayReview } from './publication-command';
 import { verifyReviewArtifact } from './review-artifact';
 import { upsertExtractionReviewSession } from './review-command';
@@ -31,7 +31,7 @@ const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
 if (!runtimeUrl || !adminUrl)
   throw new Error('Run pnpm verify test:db with its disposable database');
 const admin = new Client({ connectionString: adminUrl });
-const venue = crypto.randomUUID();
+const venue = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
 const otherVenue = crypto.randomUUID();
 const actor = crypto.randomUUID();
 const otherActor = crypto.randomUUID();
