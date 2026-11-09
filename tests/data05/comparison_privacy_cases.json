@@ -1,0 +1,46 @@
+{
+  "fixture_version": "data05.validation.v1",
+  "description": "Synthetic privacy boundary validation",
+  "cases": [
+    {
+      "case_id": "PRIVACY_009",
+      "description": "Revision-level metric with 9 eligible sessions",
+      "synthetic": true,
+      "input": {
+        "publication_revision": "revision_A",
+        "eligible_session_count": 9
+      },
+      "expected": {
+        "display_allowed": false,
+        "evidence_state": "SUPPRESSED",
+        "metric_value": null
+      }
+    },
+    {
+      "case_id": "PRIVACY_010",
+      "description": "Revision-level metric with 10 eligible sessions",
+      "synthetic": true,
+      "input": {
+        "publication_revision": "revision_B",
+        "eligible_session_count": 10
+      },
+      "expected": {
+        "privacy_threshold_met": true,
+        "display_allowed_if_otherwise_valid": true
+      }
+    },
+    {
+      "case_id": "PRIVACY_011",
+      "description": "Revision-level metric with 11 eligible sessions",
+      "synthetic": true,
+      "input": {
+        "publication_revision": "revision_C",
+        "eligible_session_count": 11
+      },
+      "expected": {
+        "privacy_threshold_met": true,
+        "display_allowed_if_otherwise_valid": true
+      }
+    }
+  ]
+}

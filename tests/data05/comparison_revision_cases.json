@@ -1,0 +1,28 @@
+{
+  "fixture_version": "data05.revision.validation.v1",
+  "description": "Synthetic cross-revision deduplication validation",
+  "cases": [
+    {
+      "case_id": "REVISION_DEDUP_001",
+      "description": "Three sessions appear in both publication revisions",
+      "synthetic": true,
+      "input": {
+        "revision_A_session_ids": [
+          "S01", "S02", "S03", "S04", "S05",
+          "S06", "S07", "S08", "S09", "S10"
+        ],
+        "revision_B_session_ids": [
+          "S08", "S09", "S10", "S11", "S12",
+          "S13", "S14", "S15", "S16", "S17"
+        ]
+      },
+      "expected": {
+        "revision_A_count": 10,
+        "revision_B_count": 10,
+        "overlapping_sessions": 3,
+        "combined_distinct_sessions": 17,
+        "duplicate_sessions_counted_once": true
+      }
+    }
+  ]
+}
