@@ -14,6 +14,18 @@ for (const port of [5173, 5174]) {
     await expect(button).toBeVisible();
     expect(bodies).toHaveLength(0);
     await button.click();
+    if (port === 5173) {
+      // The diner uses the shared gate and remains fixture-only until a live menu enables it.
+      await expect(page.getByRole('button', { name: 'Turn off optional analytics' })).toBeVisible();
+      await page.getByRole('button', { name: 'Turn off optional analytics' }).click();
+      await page.reload();
+      await expect(button).toBeVisible();
+      expect(bodies).toHaveLength(0);
+      expect(
+        (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations,
+      ).toEqual([]);
+      return;
+    }
     await expect.poll(() => bodies.length).toBe(1);
     expect(bodies[0]).toMatchObject({
       event: 'app_shell_viewed',
