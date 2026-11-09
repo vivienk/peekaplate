@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { fileURLToPath, URL } from 'node:url';
 import {
   canonicalJson,
   classifyObservationTimeWindow,
@@ -8,9 +11,30 @@ import {
   sha256,
   toCanonicalObservation,
 } from '@peekaplate/contracts';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
-import app, { consumeJtiRateLimit, createApp, createWorker, queue } from './index';
+import { createStaffVerifier } from './auth';
+import app, {
+  consumeJtiRateLimit,
+  createApp,
+  createWorker,
+  handleQueueBatch,
+  queue,
+} from './index';
 import { ingestObservations } from './observation-ingest';
+import { ReviewCommandError } from './review-command';
+
+const fixtureV2 = JSON.parse(
+  readFileSync(
+    fileURLToPath(
+      new URL(
+        '../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json',
+        import.meta.url,
+      ),
+    ),
+    'utf8',
+  ),
+);
 
 const parseObservationReceiptBatch = async (response: Response) =>
   ObservationReceiptBatchSchema.parse(await response.json());
@@ -105,6 +129,119 @@ describe('foundation API', () => {
     );
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'unauthorized' });
+  });
+});
+
+describe('owner report HTTP boundary', () => {
+  it('fails closed without one explicit synthetic source using a signed staff JWT', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const keys = await generateKeyPair('RS256');
+    const publicJwk = {
+      ...(await exportJWK(keys.publicKey)),
+      kid: 'owner-report-test-key',
+      use: 'sig',
+      alg: 'RS256',
+    };
+    const jwksServer = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ keys: [publicJwk] }));
+    });
+    await new Promise<void>((resolve) => jwksServer.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const address = jwksServer.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Test JWKS server did not provide an address.');
+      }
+      const issuer = `http://127.0.0.1:${address.port}/auth/v1`;
+      const token = await new SignJWT({ role: 'authenticated', is_anonymous: false })
+        .setProtectedHeader({ alg: 'RS256', kid: 'owner-report-test-key' })
+        .setIssuer(issuer)
+        .setAudience('authenticated')
+        .setSubject(actorId)
+        .setIssuedAt()
+        .setExpirationTime('5 minutes')
+        .sign(keys.privateKey);
+      const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+      const app = createApp({
+        verify: createStaffVerifier({ issuer, allowLocalIssuer: true }),
+        execute: vi.fn(),
+        readOwnerReport,
+      });
+
+      for (const [query, env] of [
+        ['', { APP_ENV: 'local' }],
+        ['?source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic&source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic', { APP_ENV: 'production' }],
+        ['?source=synthetic', {}],
+      ]) {
+        const response = await app.request(
+          `/api/v1/venues/${venueId}/analytics/dishes${query}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+          env,
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: 'service_unavailable' });
+      }
+      expect(readOwnerReport).not.toHaveBeenCalled();
+
+      const syntheticResponse = await app.request(
+        `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        { APP_ENV: 'local' },
+      );
+      expect(syntheticResponse.status).toBe(200);
+      expect(await syntheticResponse.json()).toEqual({ venue_id: venueId, dishes: [] });
+      expect(readOwnerReport).toHaveBeenCalledTimes(1);
+      expect(readOwnerReport).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        expect.any(Date),
+        { APP_ENV: 'local' },
+        'synthetic',
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        jwksServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  it('derives the actor from the verified token and passes the venue and current time to the reader', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const now = new Date('2026-11-06T12:00:00.000Z');
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const app = createApp({
+      verify,
+      execute: vi.fn(),
+      readOwnerReport,
+      now: () => now,
+    });
+
+    const response = await app.request(
+      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      {
+        headers: { Authorization: 'Bearer test-token' },
+      },
+      { APP_ENV: 'local' },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
+    expect(verify).toHaveBeenCalledWith('Bearer test-token', { APP_ENV: 'local' });
+    expect(readOwnerReport).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      now,
+      { APP_ENV: 'local' },
+      'synthetic',
+    );
   });
 });
 
@@ -1133,5 +1270,635 @@ describe('RES-02 publication HTTP boundary', () => {
       expect(response.status).toBe(400);
     }
     expect(approve).not.toHaveBeenCalled();
+  });
+});
+
+describe('menu ingestion HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000001';
+  const jobId = '00000000-0000-4000-8000-000000000002';
+  const draftId = '00000000-0000-4000-8000-000000000003';
+  const actorId = '00000000-0000-4000-8000-000000000004';
+
+  it('submits a menu ingestion job when authenticated and authorized', async () => {
+    const mockJob = {
+      id: jobId,
+      tenant_id: venueId,
+      source_type: 'url',
+      source_url: 'https://example.com/menu',
+      idempotency_key: 'idem_post_1',
+      status: 'queued',
+    };
+    const submitIngestion = vi.fn().mockResolvedValue(mockJob);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      submitIngestion,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/menus/jobs`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_post_1',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ job: mockJob });
+    expect(submitIngestion).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      {
+        sourceType: 'url',
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'idem_post_1',
+      },
+      {},
+    );
+  });
+
+  it('retrieves an ingestion job status by ID', async () => {
+    const mockJob = {
+      id: jobId,
+      tenant_id: venueId,
+      status: 'complete',
+      draft_count: 5,
+    };
+    const getIngestionJob = vi.fn().mockResolvedValue(mockJob);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      getIngestionJob,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/menus/jobs/${jobId}`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid_token' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ job: mockJob });
+    expect(getIngestionJob).toHaveBeenCalledWith(actorId, venueId, jobId, {});
+  });
+
+  it('lists dish drafts for review', async () => {
+    const mockDrafts = [
+      {
+        id: draftId,
+        tenant_id: venueId,
+        name: 'Soup',
+        review_status: 'pending',
+      },
+    ];
+    const listDrafts = vi.fn().mockResolvedValue(mockDrafts);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      listDrafts,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts?status=pending`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer valid_token' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ drafts: mockDrafts });
+    expect(listDrafts).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      { status: 'pending', jobId: undefined },
+      {},
+    );
+  });
+
+  it('approves a dish draft and promotes to published revision', async () => {
+    const mockResult = {
+      draft: {
+        id: draftId,
+        review_status: 'accepted',
+        published_dish_id: '00000000-0000-4000-8000-000000000005',
+      },
+      publishedRevision: {
+        dishId: '00000000-0000-4000-8000-000000000005',
+        revisionId: '00000000-0000-4000-8000-000000000006',
+        version: 1,
+        name: 'Soup',
+        description: 'Warm soup',
+      },
+    };
+    const approveDraft = vi.fn().mockResolvedValue(mockResult);
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const commandId = '00000000-0000-4000-8000-000000000007';
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commandId,
+        expectedVersion: 0,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(mockResult);
+    expect(approveDraft).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      draftId,
+      { commandId, expectedVersion: 0 },
+      {},
+    );
+  });
+
+  it('rejects malformed nonempty JSON on approval with 400 invalid_json without executing command', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const draftId = '00000000-0000-4000-8000-000000000002';
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const approveDraft = vi.fn();
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: '{"commandId":',
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_json' });
+    expect(approveDraft).not.toHaveBeenCalled();
+  });
+
+  it('rejects approval request without required commandId with 400 invalid_request', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const draftId = '00000000-0000-4000-8000-000000000002';
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const approveDraft = vi.fn();
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const testApp = createApp({
+      verify,
+      execute: vi.fn(),
+      approveDraft,
+    });
+
+    const response = await testApp.request(`/venues/${venueId}/drafts/${draftId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_request' });
+    expect(approveDraft).not.toHaveBeenCalled();
+  });
+
+  describe('Cloudflare Queue Worker Handler', () => {
+    it('retries all messages when database connection string is unavailable', async () => {
+      const msg1 = { ack: vi.fn(), retry: vi.fn() };
+      const msg2 = { ack: vi.fn(), retry: vi.fn() };
+
+      await handleQueueBatch(
+        { messages: [msg1, msg2] as any },
+        { APP_ENV: 'local' }, // no LOCAL_DATABASE_URL or HYPERDRIVE
+      );
+
+      expect(msg1.retry).toHaveBeenCalledTimes(1);
+      expect(msg2.retry).toHaveBeenCalledTimes(1);
+      expect(msg1.ack).not.toHaveBeenCalled();
+      expect(msg2.ack).not.toHaveBeenCalled();
+    });
+
+    it('connects INGESTION_REPORTS_BUCKET to reportStorage and passes leaseTimeoutMinutes 15', async () => {
+      const mockPut = vi.fn().mockResolvedValue(undefined);
+      const mockBucket = { put: mockPut };
+      const msg = { ack: vi.fn(), retry: vi.fn() };
+      const mockProcessBatch = vi
+        .fn()
+        .mockImplementation(async (_client, _batch, _extractor, options) => {
+          expect(options.leaseTimeoutMinutes).toBe(15);
+          expect(options.reportStorage).toBeDefined();
+          // Invoke put to verify bucket wiring
+          await options.reportStorage.put('reports/t1/j1/extraction.json', '{"test":true}');
+        });
+
+      // Provide mock database URL to pass the initial connection check
+      // Mock Client connection
+      const mockEnv = {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://user:pass@localhost:5432/testdb',
+        INGESTION_REPORTS_BUCKET: mockBucket,
+      };
+
+      // Mock Client prototype
+      const { Client } = await import('pg');
+      const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined as any);
+      const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined as any);
+
+      try {
+        await handleQueueBatch({ messages: [msg as any] }, mockEnv, {
+          verify: vi.fn(),
+          execute: vi.fn(),
+          processQueueBatch: mockProcessBatch,
+        });
+
+        expect(mockProcessBatch).toHaveBeenCalledTimes(1);
+        expect(mockPut).toHaveBeenCalledWith('reports/t1/j1/extraction.json', '{"test":true}');
+      } finally {
+        connectSpy.mockRestore();
+        endSpy.mockRestore();
+      }
+    });
+
+    it('retries queue message when report storage throws before completion/ACK', async () => {
+      const msg = { ack: vi.fn(), retry: vi.fn() };
+      const mockFailingProcessBatch = vi.fn().mockImplementation(async () => {
+        throw new Error('R2 write failed: INGESTION_REPORTS_BUCKET unavailable');
+      });
+
+      const mockEnv = {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://user:pass@localhost:5432/testdb',
+        INGESTION_REPORTS_BUCKET: { put: vi.fn().mockRejectedValue(new Error('R2 write failed')) },
+      };
+
+      const { Client } = await import('pg');
+      const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined as any);
+      const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined as any);
+
+      try {
+        await handleQueueBatch({ messages: [msg as any] }, mockEnv, {
+          verify: vi.fn(),
+          execute: vi.fn(),
+          processQueueBatch: mockFailingProcessBatch,
+        });
+
+        expect(msg.retry).toHaveBeenCalledTimes(1);
+        expect(msg.ack).not.toHaveBeenCalled();
+      } finally {
+        connectSpy.mockRestore();
+        endSpy.mockRestore();
+      }
+    });
+  });
+});
+
+describe('review candidate HTTP boundaries', () => {
+  const venueId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+  const extractionId = 'extraction:e1bb4c9c059eb377dc7e92f340e78416';
+  const candidateId = 'draft:0bbe00087c6841623c76d7b6f9da5ebf';
+  const actorId = 'a11ac10b-58cc-4372-a567-0e02b2c3d479';
+  const commandId = 'c11ac10b-58cc-4372-a567-0e02b2c3d479';
+
+  const sessionPath = `/venues/${venueId}/extractions/${extractionId}/review-session`;
+  const candidatesPath = `/venues/${venueId}/extractions/${extractionId}/candidates`;
+  const reviewPath = `/venues/${venueId}/extractions/${extractionId}/candidates/${candidateId}/review`;
+
+  const minimalExtractionResult = fixtureV2;
+
+  describe('PUT .../review-session', () => {
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(sessionPath, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandId, extractionResult: minimalExtractionResult }),
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('rejects unsupported media type with 415', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      const response = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'text/plain' },
+        body: 'invalid',
+      });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'unsupported_media_type' });
+    });
+
+    it('rejects malformed JSON with 400', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      const response = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: '{ malformed json',
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_json' });
+    });
+
+    it('rejects mismatched extraction_id with 400', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      const response = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commandId,
+          extractionResult: {
+            ...minimalExtractionResult,
+            extraction_id: 'extraction:mismatched',
+          },
+        }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('delegates to upsertReviewSession and returns 200 on valid request', async () => {
+      const expectedResponse = {
+        schemaVersion: 1,
+        venueId,
+        extractionResult: minimalExtractionResult,
+        items: [],
+        privateArtifactRef: null,
+        published: false,
+      };
+      const upsertReviewSession = vi.fn().mockResolvedValue(expectedResponse);
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+        upsertReviewSession,
+      });
+      const response = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandId, extractionResult: minimalExtractionResult }),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expectedResponse);
+      expect(upsertReviewSession).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        { commandId, extractionResult: minimalExtractionResult },
+        {},
+      );
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Request-ID')).toMatch(/^[0-9a-f-]{36}$/);
+    });
+    it('enforces 512 KB limit on PUT review-session and allows bodies above 16 KB', async () => {
+      const upsertReviewSession = vi.fn().mockResolvedValue({
+        schemaVersion: 1,
+        venueId,
+        extractionResult: minimalExtractionResult,
+        items: [],
+        privateArtifactRef: null,
+        published: false,
+      });
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+        upsertReviewSession,
+      });
+
+      // Positive case: valid payload > 16 KB (padded metadata ~30 KB)
+      const largePayload = {
+        commandId,
+        extractionResult: {
+          ...minimalExtractionResult,
+          segments: minimalExtractionResult.segments.map(
+            (seg: (typeof minimalExtractionResult.segments)[number], i: number) =>
+              i === 0 ? { ...seg, metadata: { ...seg.metadata, pad: 'x'.repeat(30_000) } } : seg,
+          ),
+        },
+      };
+      const largePayloadString = JSON.stringify(largePayload);
+      expect(largePayloadString.length).toBeGreaterThan(16_384);
+      expect(largePayloadString.length).toBeLessThan(524_288);
+
+      const largeResponse = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: largePayloadString,
+      });
+      expect(largeResponse.status).toBe(200);
+      expect(upsertReviewSession).toHaveBeenCalled();
+
+      // Negative case: exceeds 512 KB
+      const oversizeResponse = await testApp.request(sessionPath, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: 'x'.repeat(524_289),
+      });
+      expect(oversizeResponse.status).toBe(413);
+      expect(await oversizeResponse.json()).toEqual({ error: 'body_too_large' });
+    });
+  });
+
+  describe('GET .../candidates', () => {
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(candidatesPath);
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('delegates to getReviewSession and returns 200 on success', async () => {
+      const expectedResponse = {
+        schemaVersion: 1,
+        venueId,
+        extractionResult: minimalExtractionResult,
+        items: [],
+        privateArtifactRef: null,
+        published: false,
+      };
+      const getReviewSession = vi.fn().mockResolvedValue(expectedResponse);
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+        getReviewSession,
+      });
+      const response = await testApp.request(candidatesPath, {
+        headers: { Authorization: 'Bearer signed' },
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expectedResponse);
+      expect(getReviewSession).toHaveBeenCalledWith(actorId, venueId, extractionId, {});
+    });
+  });
+
+  describe('POST .../review', () => {
+    const validCorrectCommand = {
+      commandId,
+      expectedVersion: 0,
+      action: 'correct',
+      corrected: { name: 'Organic Soup', price_amount: '10.00' },
+    };
+
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(reviewPath, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validCorrectCommand),
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('rejects oversized candidate review bodies (> 16 KB) with 413', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      const response = await testApp.request(reviewPath, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: 'x'.repeat(16_385),
+      });
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ error: 'body_too_large' });
+    });
+    it('strictly enforces 16 KB limit even when extractionId is literal review-session', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      const bypassAttemptPath = `/venues/${venueId}/extractions/review-session/candidates/${candidateId}/review`;
+      const response = await testApp.request(bypassAttemptPath, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: 'x'.repeat(16_385),
+      });
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ error: 'body_too_large' });
+    });
+
+    it('rejects invalid action commands with 400', async () => {
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+      });
+      // action correct without corrected fields
+      const response = await testApp.request(reviewPath, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commandId,
+          expectedVersion: 0,
+          action: 'correct',
+        }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('delegates to saveCandidateReview and returns 200 on success', async () => {
+      const expectedItemResponse = {
+        candidate: {
+          candidate_id: candidateId,
+          original: {
+            name: 'Garden Soup',
+            description: null,
+            category: null,
+            price_amount: null,
+            price_currency: null,
+            ingredients: null,
+            source_id: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            source_text: 'Soup',
+            image_id: null,
+            review_warnings: [],
+            status: 'needs_review',
+          },
+          evidence: [{ segment_id: 'seg:1', start: 0, end: 4 }],
+          missing_fields: [],
+        },
+        review: {
+          extractionId,
+          candidateId,
+          revisionId: crypto.randomUUID(),
+          version: 1,
+          reviewStatus: 'corrected',
+          corrected: { name: 'Organic Soup', price_amount: '10.00' },
+          editedFields: ['name', 'price_amount'],
+          incompleteFields: [],
+          reviewNote: null,
+          reviewedBy: actorId,
+          reviewedAt: new Date().toISOString(),
+          publishable: false,
+        },
+        effective: {
+          name: 'Organic Soup',
+          description: null,
+          category: null,
+          price_amount: '10.00',
+          price_currency: null,
+          ingredients: null,
+        },
+      };
+
+      const saveCandidateReview = vi.fn().mockResolvedValue(expectedItemResponse);
+      const testApp = createApp({
+        verify: async () => actorId,
+        execute: vi.fn(),
+        saveCandidateReview,
+      });
+      const response = await testApp.request(reviewPath, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+        body: JSON.stringify(validCorrectCommand),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expectedItemResponse);
+      expect(saveCandidateReview).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        extractionId,
+        candidateId,
+        validCorrectCommand,
+        {},
+      );
+    });
+    it('maps ReviewCommandError codes and statuses properly in app.onError', async () => {
+      for (const [code, status] of [
+        ['forbidden', 403],
+        ['not_found', 404],
+        ['version_conflict', 409],
+        ['command_conflict', 409],
+        ['invalid_candidate', 400],
+      ] as const) {
+        const saveCandidateReview = vi.fn().mockRejectedValue(new ReviewCommandError(code, status));
+        const testApp = createApp({
+          verify: async () => actorId,
+          execute: vi.fn(),
+          saveCandidateReview,
+        });
+        const response = await testApp.request(reviewPath, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer signed', 'Content-Type': 'application/json' },
+          body: JSON.stringify(validCorrectCommand),
+        });
+        expect(response.status).toBe(status);
+        expect(await response.json()).toEqual({ error: code });
+      }
+    });
   });
 });

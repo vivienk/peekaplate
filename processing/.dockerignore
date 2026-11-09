@@ -5,3 +5,8 @@
 !README.md
 !src/
 !src/**
+**/.env
+**/.env.*
+**/*.local.md
+**/*.jsonl
+**/__pycache__

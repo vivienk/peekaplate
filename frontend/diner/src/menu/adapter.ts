@@ -1,8 +1,10 @@
+import { PublicMenuContentBundleSchema } from '@peekaplate/contracts';
 import {
   ALLERGENS,
   type CompleteDish,
   DIETARY_VALUES,
   type Dish,
+  LEGACY_ALLERGEN_CODES,
   type Menu,
   type MenuImage,
   type MenuLoadResult,
@@ -19,12 +21,16 @@ export function chipKey(value: string): string {
 // Listing either value means the dish cannot also be shown as Gluten-free.
 const EXCLUDES_GLUTEN_FREE = new Set([chipKey('Gluten'), chipKey('Wheat')]);
 
-const ALLERGEN_LABELS = new Map<string, string>(
-  ALLERGENS.flatMap((a) => [
-    [chipKey(a.code), a.label],
-    [chipKey(a.label), a.label],
+const ALLERGEN_LABELS = new Map<string, string>([
+  ...ALLERGENS.flatMap((a) => [
+    [chipKey(a.code), a.label] as const,
+    [chipKey(a.label), a.label] as const,
   ]),
-);
+  ...Object.entries(LEGACY_ALLERGEN_CODES).map(
+    ([legacy, code]) =>
+      [chipKey(legacy), ALLERGENS.find((a) => a.code === code)?.label ?? legacy] as const,
+  ),
+]);
 
 // An allergen outside the P0 list keeps its own text (a text-only chip); allergens are never dropped.
 function allergenLabel(value: string): string {
@@ -46,6 +52,7 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       categoryId,
     };
   }
+  // null and [] both mean "not confirmed"; the detail screen then shows the staff note under Contains.
   const labels = (dish.allergens ?? []).map(allergenLabel);
   const allergens = [...new Map(labels.map((a) => [chipKey(a), a])).values()];
   const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));
@@ -81,6 +88,11 @@ export function toMenu(
   source: Menu['source'],
   publicationRevisionId: string,
 ): MenuLoadResult {
+  // Published data must match the shared contract. Any invalid record rejects the whole menu,
+  // so nothing is repaired or invented. Fixtures are demo data and skip this check.
+  if (source === 'published' && !PublicMenuContentBundleSchema.safeParse(bundle).success) {
+    return { status: 'error' };
+  }
   const categories = bundle.categories.map((c) => ({
     categoryId: c.category_id,
     name: c.name,
