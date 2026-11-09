@@ -17,7 +17,7 @@ const { contentHash } = JSON.parse(readFileSync(new URL('expected.json', fixture
 async function expectIntegrityError(bytes: Uint8Array, hash: string, code: string) {
   const error = await verifyPublicMenuContentBytes(bytes, hash).catch((caught: unknown) => caught);
   expect(error).toBeInstanceOf(PublicMenuIntegrityError);
-  expect((error as PublicMenuIntegrityError).code).toBe(code);
+  expect(error).toMatchObject({ code });
 }
 
 describe('public menu bundle integrity', () => {
