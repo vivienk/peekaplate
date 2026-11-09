@@ -71,6 +71,15 @@ its relevant tests before release.
 | Real diner tracking | [#65](https://github.com/vivienk/peekaplate/pull/65) → [#77](https://github.com/vivienk/peekaplate/pull/77) → [#80](https://github.com/vivienk/peekaplate/pull/80) → [#84](https://github.com/vivienk/peekaplate/pull/84), with actual menu controls/published adapter | Several are drafts; consent, stored retries, real Save/compare transitions and browser-to-owner acceptance remain |
 | Visual assets | [#25](https://github.com/vivienk/peekaplate/pull/25), in parallel | Its asset-ID/review gates are independent of observation transport |
 
+### Synthetic owner-report read boundary
+
+The local/staging dish-report route remains unavailable unless the server has an
+operator-configured `SYNTHETIC_REPORT_VENUE_ID`. Requests are accepted only for
+that UUID, and the backend passes that configured UUID—not a caller-selected
+venue—to the owner-report reader. Configure it only for a dedicated
+synthetic-data venue; `source=synthetic` labels a calculation and does not
+convert or sanitize production observations. Production remains unavailable.
+
 The earlier index/conflict and native retry/DLQ evidence follows below as a
 historical release record; its statement that typed facts were missing applied
 to that earlier release only.
