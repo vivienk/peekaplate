@@ -170,18 +170,19 @@ describe('owner report HTTP boundary', () => {
         readOwnerReport,
       });
 
-      for (const query of [
-        '',
-        '?source=production',
-        '?source=synthetic&source=production',
-        '?source=synthetic',
+      for (const [query, env] of [
+        ['', { APP_ENV: 'local' }],
+        ['?source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic&source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic', { APP_ENV: 'production' }],
+        ['?source=synthetic', {}],
       ]) {
         const response = await app.request(
           `/api/v1/venues/${venueId}/analytics/dishes${query}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
-          { APP_ENV: 'production' },
+          env,
         );
         expect(response.status).toBe(503);
         expect(await response.json()).toEqual({ error: 'service_unavailable' });
