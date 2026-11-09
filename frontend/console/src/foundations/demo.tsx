@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
-import { Input } from './Input';
+import { TextField } from './TextField';
 
 // Development-only page served at /foundations.html; it is not part of the production build.
 const root = document.getElementById('root');
@@ -16,17 +16,17 @@ createRoot(root).render(
         Synthetic demo: these fields use made-up values and nothing is saved or sent.
       </p>
       <div style={{ display: 'grid', gap: '1.5rem' }}>
-        <Input label="Dish name" hint="Shown to diners on the menu." required />
-        <Input
+        <TextField label="Dish name" hint="Shown to diners on the menu." required />
+        <TextField
           label="Price"
           hint="Numbers only, for example 12.50."
           error="Enter a price"
           inputMode="decimal"
         />
-        <Input label="Short name" defaultValue="Berry pancakes" />
-        <Input label="Category" defaultValue="Breakfast" disabled />
+        <TextField label="Short name" defaultValue="Berry pancakes" />
+        <TextField label="Category" defaultValue="Breakfast" disabled />
         {/* Whitespace-only hint and error text are ignored, so this stays a plain field. */}
-        <Input label="Internal note" hint=" " error=" " />
+        <TextField label="Internal note" hint=" " error=" " />
       </div>
     </main>
   </StrictMode>,

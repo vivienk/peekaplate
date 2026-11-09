@@ -163,6 +163,23 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(JSON.stringify(report)).not.toContain('eligible_sessions');
   });
 
+  it('labels synthetic reports and calculations as synthetic', async () => {
+    const { client } = fakeClient('owner', [reportRow()]);
+    const report = await readOwnerReport(
+      client,
+      'actor-1',
+      venueId,
+      new Date('2026-11-06T10:00:00Z'),
+      'synthetic',
+    );
+
+    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    expect(report).toMatchObject({
+      source: 'synthetic',
+      report_metadata: { calculation_version: 'synthetic.v1' },
+    });
+  });
+
   it('masks timing-related indicators when nine of ten sessions have valid timing', async () => {
     const { client } = fakeClient('owner', [
       reportRow({

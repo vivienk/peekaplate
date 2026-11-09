@@ -311,7 +311,7 @@ function buildInternalReport(
     venue_id: venueId,
     source,
     report_metadata: {
-      calculation_version: 'production.v1',
+      calculation_version: `${source}.v1`,
       generated_at: now.toISOString(),
       date_window: {
         duration_hours: 24,
