@@ -170,10 +170,19 @@ describe('owner report HTTP boundary', () => {
         readOwnerReport,
       });
 
-      for (const query of ['', '?source=production', '?source=synthetic&source=production']) {
-        const response = await app.request(`/api/v1/venues/${venueId}/analytics/dishes${query}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      for (const query of [
+        '',
+        '?source=production',
+        '?source=synthetic&source=production',
+        '?source=synthetic',
+      ]) {
+        const response = await app.request(
+          `/api/v1/venues/${venueId}/analytics/dishes${query}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+          { APP_ENV: 'production' },
+        );
         expect(response.status).toBe(503);
         expect(await response.json()).toEqual({ error: 'service_unavailable' });
       }
@@ -182,11 +191,18 @@ describe('owner report HTTP boundary', () => {
       const syntheticResponse = await app.request(
         `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
+        { APP_ENV: 'local' },
       );
       expect(syntheticResponse.status).toBe(200);
       expect(await syntheticResponse.json()).toEqual({ venue_id: venueId, dishes: [] });
       expect(readOwnerReport).toHaveBeenCalledTimes(1);
-      expect(readOwnerReport).toHaveBeenCalledWith(actorId, venueId, expect.any(Date), {});
+      expect(readOwnerReport).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        expect.any(Date),
+        { APP_ENV: 'local' },
+        'synthetic',
+      );
     } finally {
       await new Promise<void>((resolve, reject) =>
         jwksServer.close((error) => (error ? reject(error) : resolve())),
@@ -212,12 +228,19 @@ describe('owner report HTTP boundary', () => {
       {
         headers: { Authorization: 'Bearer test-token' },
       },
+      { APP_ENV: 'local' },
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
-    expect(verify).toHaveBeenCalledWith('Bearer test-token', {});
-    expect(readOwnerReport).toHaveBeenCalledWith(actorId, venueId, now, {});
+    expect(verify).toHaveBeenCalledWith('Bearer test-token', { APP_ENV: 'local' });
+    expect(readOwnerReport).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      now,
+      { APP_ENV: 'local' },
+      'synthetic',
+    );
   });
 });
 

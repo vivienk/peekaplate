@@ -162,6 +162,7 @@ type Dependencies = {
     venueId: string,
     now: Date,
     env: Bindings,
+    source: 'synthetic',
   ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
@@ -442,14 +443,14 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
-  async readOwnerReport(actorId, venueId, now, env) {
+  async readOwnerReport(actorId, venueId, now, env, source) {
     const connectionString =
       env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
     if (!connectionString) throw new AuthUnavailableError();
     const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await client.connect();
-      return await queryOwnerReport(client, actorId, venueId, now);
+      return await queryOwnerReport(client, actorId, venueId, now, source);
     } finally {
       await client.end();
     }
@@ -729,8 +730,13 @@ export function createApp(services: Dependencies = dependencies) {
     const actorId = await services.verify(authorization, c.env ?? {});
     const scope = VenueScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
     const sources = new URL(c.req.url).searchParams.getAll('source');
-    if (sources.length !== 1 || sources[0] !== 'synthetic') {
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
@@ -738,7 +744,8 @@ export function createApp(services: Dependencies = dependencies) {
       actorId,
       scope.data.venueId,
       services.now?.() ?? new Date(),
-      c.env ?? {},
+      env,
+      'synthetic',
     );
     return c.json(report);
   });

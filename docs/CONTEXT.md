@@ -193,7 +193,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical observation/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally covers checkpoint ordering, archive restore, retries, duplicate replay and two-session facts without owner-view leakage. Owner reports authorize membership and bound evidence to 24h; ordered comparisons credit both opened dishes once. Dish-report HTTP requires exactly one source=synthetic or returns 503 before reader invocation. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness remains unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical observation/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally covers archive restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; ordered comparisons credit both opened dishes once. Dish reports require one source=synthetic in local/staging; otherwise 503 before reads. Synthetic reports use synthetic.v1. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness remains unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -292,7 +292,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5b15f42e3a617490d487dfe80a165003c6c0d53de36ffc9f193eca703564da60"
+      "sourceFingerprint": "5a82ad6c1b0b2995d2694c222fbb40b1479df601c1d3855ea959e32cac0c578d"
     },
     {
       "id": "database",
@@ -671,7 +671,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-09",
-      "summary": "Owner-report release gate: the route returns 503 before invoking its reader unless query contains exactly one source=synthetic; a signed-staff-JWT regression covers missing, production and duplicate selectors plus synthetic 200. The real-PostgreSQL route fixture also marks its source synthetic. pnpm verify test passes (999 tests, 4 skipped across 63 files); pnpm verify test:db passes (77 tests, 213 pgTAP assertions). Freshness and hosted acceptance remain pending; collection stays paused.",
+      "summary": "Owner-report gate: only one source=synthetic in trusted local/staging APP_ENV can read; production fails closed even when a client sends synthetic. The reader labels output/calculation synthetic.v1. Signed-JWT route tests cover absent/production/duplicate selectors and production override; real PostgreSQL confirms synthetic provenance. pnpm verify test passed (1000 tests, 4 skipped across 63 files); test:db passed (77 tests, 213 pgTAP assertions). Hosted acceptance remains pending; collection stays paused.",
       "modules": [
         "backend",
         "delivery"

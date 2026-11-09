@@ -2021,3 +2021,17 @@ The new Chromium regression failed because the invalid input had identical focus
 ```json
 {"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-09T10:39:08.000Z"},"status":"resolved","cause":"The backend context summary grew to 1118 characters, exceeding the validator's 1000-character limit.","prevention":"Keep module summaries within the context validator's limit and shorten summaries before refreshing fingerprints.","regression":"Shortened the summary; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
 ```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-09T10:51:07.985Z","result":"failed"}
+```
+
+<!-- resolution of the context:refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-09T10:51:07.985Z"},"status":"resolved","cause":"Adding the trusted environment and provenance gate grew the backend summary to 1047 characters, above the 1000-character limit.","prevention":"Keep changed module summaries below the validator limit; put full acceptance detail in the bounded handoff.","regression":"Condensed the backend summary; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
+```
+
+```json
+{"kind":"manual-check-resolution","check":"pinned owner-report release-gate review","status":"resolved","area":"owner-report-source-provenance","reviewBase":"e93be2926644ecd912a92a5c9ab56b0226f6caef","reviewHead":"982edce382b55d63d98465d42080a9c279febd23","cause":"A caller-controlled source=synthetic query reached the default reader, whose source default and calculation metadata were production.","prevention":"Require trusted local/staging APP_ENV as well as one exact synthetic selector, propagate the synthetic source to the reader, and label its calculation version accordingly.","regression":"The signed-JWT test proves source=synthetic is blocked in production without a reader call; local synthetic responses pass. Unit and real-PostgreSQL tests assert source=synthetic and synthetic.v1; full test and test:db suites pass."}
+```

@@ -1840,6 +1840,10 @@ describe('Multi-tenant owner report isolation', () => {
     expect(ownerResponse.status).toBe(200);
     const ownerReport = OwnerDishReportSchema.parse(await ownerResponse.json());
     expect(ownerReport.venue_id).toBe(venue);
+    expect(ownerReport).toMatchObject({
+      source: 'synthetic',
+      report_metadata: { calculation_version: 'synthetic.v1' },
+    });
     expect(ownerReport.dishes).toHaveLength(1);
     expect(ownerReport.dishes[0]?.metrics).toMatchObject({
       active_sessions: { value: 12, status: 'NORMAL' },
