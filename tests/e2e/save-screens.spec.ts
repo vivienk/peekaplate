@@ -43,6 +43,16 @@ test('a card heart saves the dish, and the badge, detail heart and header agree'
   await expect(heart.locator('.pp-save-heart__icon')).toHaveText('♥');
   await expect(badge(page)).toHaveText('1');
   await expect(headerButton(page)).toHaveAccessibleName('Saved dishes, 1');
+  // The count sits on the heart's top-right edge, as in Figma, not over its centre (Adam, 9 Nov).
+  const box = async (selector: string) => {
+    const found = await page.locator(selector).boundingBox();
+    if (!found) throw new Error(`${selector} has no box`);
+    return found;
+  };
+  const icon = await box('.pp-saved__icon');
+  const count = await box('.pp-saved__badge');
+  expect(count.x + count.width / 2).toBeGreaterThan(icon.x + icon.width * 0.7);
+  expect(count.y + count.height / 2).toBeLessThan(icon.y + icon.height * 0.4);
   // Saving is quiet: only removing shows a toast.
   await expect(page.locator('.pp-toast')).toHaveCount(0);
 

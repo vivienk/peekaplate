@@ -8,6 +8,16 @@
   color: #f89537;
 }
 
+/* The saved count sits on the heart's top-right edge, as in Figma (Adam, 9 Nov), not over its centre. */
+.pp-saved .pp-saved__badge {
+  top: -3px;
+  left: 24px;
+  width: 16px;
+  height: 16px;
+  font-size: 11px;
+  line-height: 1;
+}
+
 /* The menu styles the badge as inline-flex, which would otherwise override [hidden] at zero. */
 .pp-saved__badge[hidden] {
   display: none;
