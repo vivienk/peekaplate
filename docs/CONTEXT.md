@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 validates scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; Serialization strips cohort counts and masks reconstructive timing/open-rate/active-session cells for timed or opened cohorts of 1–9, preserving genuine zero-opening NOT_MEASURABLE states. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -47,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
+      "sourceFingerprint": "33e3df8813d870455726c017f450093c168bbf021a884424451aa032e33c4b07"
     },
     {
       "id": "tokens",
@@ -200,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention. Offline AI evaluation records 21 synthetic safety cases with count-free owner rationale; internal cohorts still enforce the ten-session floor. The server-only report-input validator selects an authorized dish, preserves valid zero and withholds unusable metrics.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. ES256 claims, restore/retry/replay and tenant checks remain. Owner reports authorize membership and bound evidence to 24h; ordered eligible comparisons credit both dishes once. Local/staging requires source=synthetic, a configured reserved venue and server allowlist; canonical venues fail closed. Timing coverage counts openings; privacy floors count sessions. Timed and small opened cohorts are complementarily suppressed; zero openings are NOT_MEASURABLE. owner_report.v1 strips internal cohorts; freshness is unverified. AI-01 returns scoped drafts/abstention. Its internal input validator preserves valid zero and withholds stale/unknown freshness or unusable metrics. Offline evaluation requires a fresh complete passing 21-case artifact. Hosted/model/rubric/producer integration remains unverified; collection paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -226,6 +226,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
@@ -287,6 +289,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-ai.md",
         "backend/src/owner-ai/evaluation.test.ts",
         "scripts/evaluate-owner-ai.mjs",
+        "scripts/evaluate-owner-ai.test.mjs",
         "backend/src/owner-ai/report-input.ts",
         "backend/src/owner-ai/report-input.test.ts"
       ],
@@ -301,7 +304,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2db935f4bc28f7d93aadb0c24b7ae6eef27ad5a5335e5b4fd5424d362e92107e"
+      "sourceFingerprint": "d8651a48f67242aa352396f90507c895c420de947b5bdf0dc26fd6d6690e256d"
     },
     {
       "id": "database",
@@ -418,7 +421,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "bb7f74d48d930cb412b5ae6252d919b21070ecceea379170bac28a4b198091c0"
+      "sourceFingerprint": "bcd8a8b520d430934d13b514a44e265da2a33f1a214491d0f2edacb16036b4c7"
     },
     {
       "id": "agents",
@@ -605,24 +608,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-09",
-      "summary": "Draft AI-01 report-input validation synchronized with the updated #82 and develop 78fd475 search/delivery foundations. Existing 20 input cases, valid-zero handling and frozen 21-case evaluation remain unchanged. Upstream module paths, current handoffs and both append-only ledger histories are retained; no live adapter or model wiring is added.",
+      "date": "2026-11-10",
+      "summary": "Draft PR112 synchronized with develop085ecfd after PR107 and PR82 merged. The reserved synthetic-venue report gate, frozen 21-case oracle and evaluation CLI completeness fix/five regressions are retained. A new reachable nullable-freshness input must remain value-free unavailable rather than usable AI evidence; verified-fresh valid zero is retained. Producer-issued internal fixture/identity/cohort/freshness handoff and live wiring remain separate.",
       "modules": [
         "backend",
-        "diner",
-        "contracts"
+        "contracts",
+        "delivery"
       ],
-      "next": "Verify this synchronized head and clean-commit development evaluation. Keep #112 Draft and AI-01 In Progress; independent review, trusted internal producer handoff, rubric/model evaluation and hosted acceptance remain separate gates."
+      "next": "Verify the synchronized validator and evaluation on a clean final commit, retarget PR112 to develop, and retain Draft/AI-01 In Progress. Current membership authorization, producer handoff, model/provider/budget, independent rubric and hosted acceptance remain gates."
     },
     {
       "date": "2026-11-09",
-      "summary": "AI-01 evaluation synchronized with develop 78fd475 after menu search #121 and token-bound delivery #84 merged. Both module graphs and append-only ledger histories are retained. Frozen 21-case synthetic evaluation and count-free owner rationale are unchanged; this merge does not add producer, model or dashboard integration.",
+      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
       "modules": [
         "backend",
-        "diner",
+        "delivery"
+      ],
+      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
+      "modules": [
+        "backend",
         "contracts"
       ],
-      "next": "Verify this synchronized head and clean-commit development evaluation. Keep #112 Draft and AI-01 In Progress; independent review, trusted internal producer handoff, rubric/model evaluation and hosted acceptance remain separate gates."
+      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
     },
     {
       "date": "2026-11-09",
@@ -692,16 +703,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
-      "modules": [
-        "assets",
-        "processing",
-        "delivery"
-      ],
-      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
     }
   ]
 }

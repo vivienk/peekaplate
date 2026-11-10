@@ -125,6 +125,26 @@ describe('AI-01 internal report input validation', () => {
     });
   });
 
+  it('withholds usable metrics when pipeline freshness is unknown', () => {
+    const input = report();
+    const result = validateOwnerAiReportInput(
+      {
+        ...input,
+        report_metadata: {
+          ...input.report_metadata,
+          freshness: { ...input.report_metadata.freshness, is_stale: null },
+        },
+      },
+      scope,
+    );
+    expect(result.metadata.freshness.is_stale).toBeNull();
+    expect(result.metrics).toEqual([
+      { metricKey: 'open_rate', state: 'missing' },
+      { metricKey: 'engagement_rate', state: 'missing' },
+      { metricKey: 'save_rate', state: 'missing' },
+    ]);
+  });
+
   it('rejects public payloads with hidden cohorts and the unfinished API wrapper', () => {
     expect(() => validateOwnerAiReportInput(toOwnerReport(report()), scope)).toThrow();
     expect(() => validateOwnerAiReportInput({ success: true, data: [] }, scope)).toThrow();

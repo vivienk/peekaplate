@@ -38,7 +38,9 @@ export function validateOwnerAiReportInput(
   const metadata = report.report_metadata;
   let reportState: WithheldState | undefined;
   if (metadata.report_status === 'ERROR') reportState = 'conflicting';
-  else if (metadata.report_status === 'STALE' || metadata.freshness.is_stale) reportState = 'stale';
+  else if (metadata.report_status === 'STALE' || metadata.freshness.is_stale === true)
+    reportState = 'stale';
+  else if (metadata.freshness.is_stale === null) reportState = 'missing';
   else if (metadata.report_status === 'EMPTY') reportState = 'missing';
   else if (dish.evidence_state !== 'NORMAL') reportState = withheldStates[dish.evidence_state];
 

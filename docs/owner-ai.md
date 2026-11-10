@@ -29,6 +29,12 @@ unit suite also runs these cases, without writing the report. The dedicated
 command removes any old report before starting, and returns a failing exit code
 when a case, discovery or startup fails.
 
+It also validates the fresh report after Vitest exits: `synthetic-core.v1` must
+contain all 21 unique passing cases and `DEVELOPMENT_CHECK_PASS`. Missing or
+incomplete evidence fails the command even when Vitest itself exits successfully.
+The CLI regressions use isolated child fixtures; they do not change the frozen
+recommendation oracle or call a provider.
+
 The report includes source commit, dirty-worktree flag, timestamp, fixture and
 criterion IDs, full expected/actual output, case counts and development-only
 disposition. Retain only clean-commit reports as reproducible handoff evidence.
@@ -105,7 +111,10 @@ its own checked eligible-session count. VALID_ZERO retains numeric zero;
 SUPPRESSED and NOT_MEASURABLE become distinct value-free states. Invalid
 status/value pairs, foreign venues, absent dishes and duplicate identities are
 rejected. Report ERROR, STALE/freshness and EMPTY override locally available
-rates. Source, calculation version and report window are retained.
+rates. Unknown pipeline freshness (`is_stale: null`) also withholds all rates as
+value-free `missing` evidence, including otherwise valid numeric zero; verified
+freshness (`false`) retains that zero. Source, calculation version, report window
+and unknown freshness metadata are retained.
 
 Public owner responses omit cohort counts and cannot be used as this input.
 The reporting service must supply its validated internal report after
@@ -115,8 +124,9 @@ SQL, consent, suppression or freshness calculations are correct.
 This exported boundary has local synthetic tests. The reporting API and
 recommendation core are not yet wired to it. Stable report/evidence identities,
 dish-scoped recommendation references and mapping not_measurable into a core
-abstention remain integration dependencies. Draft PR #107 responses are not
-accepted contract fixtures.
+abstention remain integration dependencies. Merged PR #107 retains the reserved
+synthetic-venue gate; its public responses omit internal cohorts and are not the
+internal producer fixture needed by this validator.
 
 ## November 8 input-validation synchronization (#112)
 
@@ -145,3 +155,21 @@ The final evidence-ledger/documentation update does not change runtime code,
 contracts or tests. Dedicated reports identify their actual clean source commits.
 Database/browser integration, hosted reporting, model execution and independent
 rubric acceptance remain separate verification gates; #112 stays Draft.
+
+## November 10 input-validation synchronization (#112)
+
+PR82 and PR107 are merged into develop. This synchronization retains the frozen
+21-case oracle, the fresh/complete evaluation-artifact guard and its five CLI
+regressions, together with the reserved synthetic-venue report gate.
+
+The widened report schema admits unknown freshness as null. A failing regression
+showed that the previous input validator incorrectly admitted all three rates.
+The validator now withholds those rates as value-free missing evidence, retains
+the original null metadata and still preserves valid zero when freshness is
+verified. There are 21 input-validation cases after this correction.
+
+This remains an internal validator, without report-to-recommendation/API wiring.
+Louis's precise internal producer fixture, trusted identities, post-disclosure
+cohorts and freshness handoff remain required. Keep PR112 Draft and AI-01 In
+Progress; model/provider/budget, independent rubric and hosted acceptance are
+separate gates.
