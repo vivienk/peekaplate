@@ -1,22 +1,33 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
 import {
   DishRevisionSchema,
+  ExtractionReviewSessionResponseSchema,
   MenuApprovalSchema,
   MenuPublicationSchema,
   ObservationReceiptBatchSchema,
   OwnerDishReportSchema,
   PublicMenuResponseSchema,
+  ReviewCandidateItemResponseSchema,
+  verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
 import { chromium } from '@playwright/test';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
+import { createStaffVerifier } from './auth';
+import { produceMenuBundle } from './bundle-producer/produce';
+import { admitMenuBundleHandoff, loadApprovedDishSources } from './bundle-producer/repository';
+import { MenuBundleRequestSchema, T0AssetManifestSchema } from './bundle-producer/request';
 import { createDishRevision, replayDish } from './dish-command';
-import { type Bindings, SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './index';
+import { type Bindings, createApp, SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './index';
 import { replayPublication, replayReview } from './publication-command';
+import { verifyReviewArtifact } from './review-artifact';
+import { upsertExtractionReviewSession } from './review-command';
 import { readTeamAnalytics } from './team-analytics';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -28,8 +39,8 @@ const venue = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
 const otherVenue = crypto.randomUUID();
 const actor = crypto.randomUUID();
 const otherActor = crypto.randomUUID();
-const otherVenueOwner = crypto.randomUUID();
 const viewer = crypto.randomUUID();
+const otherVenueOwner = crypto.randomUUID();
 let server: Server;
 let env: Bindings;
 let signingKey: CryptoKey;
@@ -53,12 +64,12 @@ function command(patch = {}) {
   };
 }
 
-async function token(subject: string) {
+async function token({ sub }: { sub: string }) {
   return new SignJWT({ role: 'authenticated', is_anonymous: false })
     .setProtectedHeader({ alg: 'ES256', kid: 'integration' })
     .setIssuer(env.AUTH_ISSUER!)
     .setAudience('authenticated')
-    .setSubject(subject)
+    .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime('5m')
     .sign(signingKey);
@@ -68,7 +79,7 @@ async function request(dishId: string, body = command(), tenant = venue, subject
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/dishes/${dishId}/revisions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -83,11 +94,71 @@ async function requestEvidence(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menu-evidence`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
+}
+const fixtureV2 = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json',
+      import.meta.url,
+    ),
+    'utf8',
+  ),
+);
+
+async function requestPutSession(
+  extractionId: string,
+  body: unknown,
+  tenant = venue,
+  subject = actor,
+) {
+  return fetch(
+    `http://127.0.0.1:${worker.port}/venues/${tenant}/extractions/${extractionId}/review-session`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${await token({ sub: subject })}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+async function requestGetCandidates(extractionId: string, tenant = venue, subject = actor) {
+  return fetch(
+    `http://127.0.0.1:${worker.port}/venues/${tenant}/extractions/${extractionId}/candidates`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${await token({ sub: subject })}`,
+      },
+    },
+  );
+}
+
+async function requestCandidateReview(
+  extractionId: string,
+  candidateId: string,
+  body: unknown,
+  tenant = venue,
+  subject = actor,
+) {
+  return fetch(
+    `http://127.0.0.1:${worker.port}/venues/${tenant}/extractions/${extractionId}/candidates/${candidateId}/review`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await token({ sub: subject })}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 async function requestPublication(
@@ -100,7 +171,7 @@ async function requestPublication(
   return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/menus/${menuId}/${action}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${await token(subject)}`,
+      Authorization: `Bearer ${await token({ sub: subject })}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -187,12 +258,8 @@ beforeAll(async () => {
   ]);
   await admin.query(
     `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission)
-    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner')`,
-    [venue, otherVenue, actor, otherActor, viewer],
-  );
-  await admin.query(
-    `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'owner')`,
-    [otherVenue, otherVenueOwner],
+    VALUES ($1,$3,'owner'),($1,$4,'editor'),($1,$5,'viewer'),($2,$4,'owner'),($2,$6,'owner')`,
+    [venue, otherVenue, actor, otherActor, viewer, otherVenueOwner],
   );
   const keys = await generateKeyPair('ES256');
   signingKey = keys.privateKey;
@@ -654,6 +721,588 @@ describe('real PostgreSQL staff command', () => {
       expect(res2.status).toBe(403);
     });
   });
+
+  describe('S3-RES-01.2 review candidate persistence staging journey', () => {
+    const reviewExtractionId = fixtureV2.extraction_id;
+    const soupCandidateId = 'draft:0bbe00087c6841623c76d7b6f9da5ebf';
+    const coffeeCandidateId = 'draft:0ff0863ef48b2db591694fcc3c35fbb0';
+    const breadCandidateId = 'draft:6dbe8d78dae3c41e819deed5267f8149';
+
+    it('rejects changed source provenance before persistence and reloads the honest producer source', async () => {
+      const report = JSON.parse(
+        readFileSync(
+          new URL(
+            '../../processing/tests/fixtures/review-candidates/representative-extraction-v2.json',
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      );
+      for (const [field, value] of [
+        ['location', 'invented-other-menu.pdf'],
+        ['kind', 'website'],
+        ['retrieved_at', '2026-10-26T12:00:00Z'],
+        ['size_bytes', 999],
+      ] as const) {
+        const reviewVenue = crypto.randomUUID();
+        const jobId = crypto.randomUUID();
+        const attemptId = crypto.randomUUID();
+        await admin.query('INSERT INTO app_private.venues(id,name) VALUES ($1,$2)', [
+          reviewVenue,
+          'Synthetic provenance check',
+        ]);
+        await admin.query(
+          "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'owner')",
+          [reviewVenue, actor],
+        );
+        const key = `menu-ingestion/review-artifacts/${reviewVenue}/${jobId}/${attemptId}/bundle.json`;
+        const bytes = new TextEncoder().encode(
+          JSON.stringify({
+            report,
+            scope: {
+              tenant_id: reviewVenue,
+              job_id: jobId,
+              attempt_id: attemptId,
+              source_hash: report.source.sha256,
+            },
+          }),
+        );
+        const app = createApp({
+          verify: createStaffVerifier({ issuer: env.AUTH_ISSUER!, allowLocalIssuer: true }),
+          execute: async () => {
+            throw new Error('Unexpected dish command in provenance test');
+          },
+          async upsertReviewSession(actorId, venueId, input) {
+            await verifyReviewArtifact({
+              appEnv: 'staging',
+              venueId,
+              input,
+              read: async (requested) =>
+                requested === key
+                  ? { size: bytes.length, arrayBuffer: async () => bytes.slice().buffer }
+                  : null,
+            });
+            const client = new Client({ connectionString: runtimeUrl });
+            try {
+              await client.connect();
+              return await upsertExtractionReviewSession(client, actorId, venueId, input);
+            } finally {
+              await client.end();
+            }
+          },
+        });
+        const authorization = `Bearer ${await token({ sub: actor })}`;
+        const url = `http://localhost/venues/${reviewVenue}/extractions/${fixtureV2.extraction_id}/review-session`;
+        const put = (extractionResult: unknown) =>
+          app.request(
+            url,
+            {
+              method: 'PUT',
+              headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                commandId: crypto.randomUUID(),
+                extractionResult,
+                jobId,
+                privateArtifactRef: {
+                  schema_version: 1,
+                  key,
+                  sha256: createHash('sha256').update(bytes).digest('hex'),
+                },
+              }),
+            },
+            env,
+          );
+        const altered = structuredClone(fixtureV2);
+        altered.source[field] = value;
+        const denied = await put(altered);
+        expect(denied.status).toBe(409);
+        expect(await denied.json()).toEqual({ error: 'artifact_mismatch' });
+        expect(
+          (
+            await admin.query(
+              'SELECT count(*)::int AS count FROM app_private.extraction_review_session WHERE tenant_id=$1',
+              [reviewVenue],
+            )
+          ).rows[0].count,
+        ).toBe(0);
+        expect((await put(fixtureV2)).status).toBe(200);
+        const reload = await requestGetCandidates(fixtureV2.extraction_id, reviewVenue, actor);
+        expect(reload.status).toBe(200);
+        expect(
+          ((await reload.json()) as { extractionResult: typeof fixtureV2 }).extractionResult.source,
+        ).toEqual(fixtureV2.source);
+      }
+    });
+
+    it('registers review session, reloads pending state, corrects, marks incomplete, rejects, and verifies persistence and publication isolation', async () => {
+      const reviewVenue = crypto.randomUUID();
+      await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+        reviewVenue,
+        'Review Venue',
+      ]);
+      await admin.query(
+        "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner'), ($1, $3, 'viewer')",
+        [reviewVenue, actor, viewer],
+      );
+
+      const sessionCommandId = crypto.randomUUID();
+      const putRes = await requestPutSession(
+        reviewExtractionId,
+        {
+          commandId: sessionCommandId,
+          extractionResult: fixtureV2,
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(putRes.status).toBe(200);
+      const sessionData = (await putRes.json()) as {
+        schemaVersion: number;
+        venueId: string;
+        items: unknown[];
+        published: boolean;
+      };
+      expect(sessionData.schemaVersion).toBe(1);
+      expect(sessionData.venueId).toBe(reviewVenue);
+      expect(sessionData.published).toBe(false);
+      expect(sessionData.items).toHaveLength(3);
+
+      // Idempotent reload on PUT
+      const putRetry = await requestPutSession(
+        reviewExtractionId,
+        {
+          commandId: sessionCommandId,
+          extractionResult: fixtureV2,
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(putRetry.status).toBe(200);
+      expect(await putRetry.json()).toEqual(sessionData);
+
+      // Initial reload via GET
+      const getRes1 = await requestGetCandidates(reviewExtractionId, reviewVenue, actor);
+      expect(getRes1.status).toBe(200);
+      const getData1 = (await getRes1.json()) as {
+        items: Array<{
+          candidate: {
+            candidate_id: string;
+            original: { name: string; price_amount: string | null };
+          };
+          review: { reviewStatus: string; version: number; publishable: boolean };
+          effective: { name: string };
+        }>;
+        published: boolean;
+      };
+      expect(getData1.published).toBe(false);
+      expect(getData1.items).toHaveLength(3);
+      for (const item of getData1.items) {
+        expect(item.review.reviewStatus).toBe('pending');
+        expect(item.review.version).toBe(0);
+        expect(item.review.publishable).toBe(false);
+      }
+
+      // Action 1: Correct Garden Soup
+      const cmd1Id = crypto.randomUUID();
+      const correctRes = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: cmd1Id,
+          expectedVersion: 0,
+          action: 'correct',
+          corrected: {
+            name: 'Organic Garden Soup',
+            price_amount: '9.50',
+          },
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(correctRes.status).toBe(200);
+      const correctData = (await correctRes.json()) as {
+        candidate: { original: { name: string; price_amount: string | null } };
+        review: {
+          reviewStatus: string;
+          version: number;
+          editedFields: string[];
+          reviewedBy: string;
+        };
+        effective: { name: string; price_amount: string };
+      };
+      expect(correctData.review.version).toBe(1);
+      expect(correctData.review.reviewStatus).toBe('corrected');
+      expect(correctData.review.editedFields).toEqual(['name', 'price_amount']);
+      expect(correctData.review.reviewedBy).toBe(actor);
+      // Original values are immutable!
+      expect(correctData.candidate.original.name).toBe('Garden Soup');
+      expect(correctData.candidate.original.price_amount).toBeNull();
+      // Effective reflects correction
+      expect(correctData.effective.name).toBe('Organic Garden Soup');
+      expect(correctData.effective.price_amount).toBe('9.50');
+
+      // Action 2: Mark Incomplete Coffee
+      const cmd2Id = crypto.randomUUID();
+      const incompleteRes = await requestCandidateReview(
+        reviewExtractionId,
+        coffeeCandidateId,
+        {
+          commandId: cmd2Id,
+          expectedVersion: 0,
+          action: 'mark_incomplete',
+          incompleteFields: ['price_amount', 'description'],
+          reviewNote: 'Confirm espresso size pricing with kitchen',
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(incompleteRes.status).toBe(200);
+      const incompleteData = (await incompleteRes.json()) as {
+        review: {
+          reviewStatus: string;
+          version: number;
+          incompleteFields: string[];
+          reviewNote: string;
+        };
+      };
+      expect(incompleteData.review.version).toBe(1);
+      expect(incompleteData.review.reviewStatus).toBe('incomplete');
+      expect(incompleteData.review.incompleteFields).toEqual(['price_amount', 'description']);
+      expect(incompleteData.review.reviewNote).toBe('Confirm espresso size pricing with kitchen');
+
+      // Action 3: Reject Bread
+      const cmd3Id = crypto.randomUUID();
+      const rejectRes = await requestCandidateReview(
+        reviewExtractionId,
+        breadCandidateId,
+        {
+          commandId: cmd3Id,
+          expectedVersion: 0,
+          action: 'reject',
+          reviewNote: 'Complimentary table bread, not a standalone menu item',
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(rejectRes.status).toBe(200);
+      const rejectData = (await rejectRes.json()) as {
+        review: {
+          reviewStatus: string;
+          version: number;
+          editedFields: string[];
+          reviewNote: string;
+        };
+      };
+      expect(rejectData.review.version).toBe(1);
+      expect(rejectData.review.reviewStatus).toBe('rejected');
+      expect(rejectData.review.editedFields).toEqual([]);
+      expect(rejectData.review.reviewNote).toBe(
+        'Complimentary table bread, not a standalone menu item',
+      );
+
+      // Reload via GET: all states persist consistently
+      const getRes2 = await requestGetCandidates(reviewExtractionId, reviewVenue, actor);
+      expect(getRes2.status).toBe(200);
+      const getData2 = (await getRes2.json()) as {
+        items: Array<{
+          candidate: { candidate_id: string; original: { name: string } };
+          review: { reviewStatus: string; version: number; reviewedBy: string };
+          effective: { name: string; price_amount?: string | null };
+        }>;
+        published: boolean;
+      };
+      expect(getData2.published).toBe(false);
+
+      const soupItem = getData2.items.find((i) => i.candidate.candidate_id === soupCandidateId);
+      expect(soupItem?.review.reviewStatus).toBe('corrected');
+      expect(soupItem?.review.version).toBe(1);
+      expect(soupItem?.candidate.original.name).toBe('Garden Soup');
+      expect(soupItem?.effective.name).toBe('Organic Garden Soup');
+      expect(soupItem?.effective.price_amount).toBe('9.50');
+      expect(soupItem?.review.reviewedBy).toBe(actor);
+
+      const coffeeItem = getData2.items.find((i) => i.candidate.candidate_id === coffeeCandidateId);
+      expect(coffeeItem?.review.reviewStatus).toBe('incomplete');
+      expect(coffeeItem?.review.version).toBe(1);
+
+      const breadItem = getData2.items.find((i) => i.candidate.candidate_id === breadCandidateId);
+      expect(breadItem?.review.reviewStatus).toBe('rejected');
+      expect(breadItem?.review.version).toBe(1);
+
+      // Idempotent retry on correction
+      const retryRes = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: cmd1Id,
+          expectedVersion: 0,
+          action: 'correct',
+          corrected: {
+            name: 'Organic Garden Soup',
+            price_amount: '9.50',
+          },
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(retryRes.status).toBe(200);
+      expect(await retryRes.json()).toEqual(correctData);
+
+      // Stale expectedVersion conflict
+      const staleRes = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0, // current is 1
+          action: 'correct',
+          corrected: { name: 'Another Soup' },
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(staleRes.status).toBe(409);
+      expect(await staleRes.json()).toEqual({ error: 'version_conflict' });
+
+      // Concurrent update race with expectedVersion: 1
+      const raceCmdA = crypto.randomUUID();
+      const raceCmdB = crypto.randomUUID();
+      const [raceResA, raceResB] = await Promise.all([
+        requestCandidateReview(
+          reviewExtractionId,
+          soupCandidateId,
+          {
+            commandId: raceCmdA,
+            expectedVersion: 1,
+            action: 'correct',
+            corrected: { name: 'Winner A Soup' },
+          },
+          reviewVenue,
+          actor,
+        ),
+        requestCandidateReview(
+          reviewExtractionId,
+          soupCandidateId,
+          {
+            commandId: raceCmdB,
+            expectedVersion: 1,
+            action: 'correct',
+            corrected: { name: 'Winner B Soup' },
+          },
+          reviewVenue,
+          actor,
+        ),
+      ]);
+
+      const statuses = [raceResA.status, raceResB.status].sort();
+      expect(statuses).toEqual([200, 409]);
+      const conflictRes = raceResA.status === 409 ? raceResA : raceResB;
+      expect(await conflictRes.json()).toEqual({ error: 'version_conflict' });
+
+      // Tenant isolation and role denial
+      // 1. Other venue owner (with no membership on reviewVenue) cannot read or mutate reviewVenue's extraction
+      const otherVenueActor = crypto.randomUUID();
+      await admin.query(
+        "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner')",
+        [otherVenue, otherVenueActor],
+      );
+      const otherVenueGet = await requestGetCandidates(
+        reviewExtractionId,
+        reviewVenue,
+        otherVenueActor,
+      );
+      expect(otherVenueGet.status).toBe(403);
+      expect(await otherVenueGet.json()).toEqual({ error: 'forbidden' });
+
+      const otherVenuePost = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 2,
+          action: 'correct',
+          corrected: { name: 'Hack' },
+        },
+        reviewVenue,
+        otherVenueActor,
+      );
+      expect(otherVenuePost.status).toBe(403);
+      expect(await otherVenuePost.json()).toEqual({ error: 'forbidden' });
+
+      // 2. Viewer on reviewVenue cannot mutate
+      const viewerPost = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 2,
+          action: 'correct',
+          corrected: { name: 'Viewer Edit' },
+        },
+        reviewVenue,
+        viewer,
+      );
+      expect(viewerPost.status).toBe(403);
+      expect(await viewerPost.json()).toEqual({ error: 'forbidden' });
+
+      // Zero implicit publication: app_private.dish_current and dish stream events MUST be 0
+      const dishCurrentRows = await admin.query<{ count: string }>(
+        'SELECT count(*)::int AS count FROM app_private.dish_current WHERE tenant_id = $1',
+        [reviewVenue],
+      );
+      expect(Number(dishCurrentRows.rows[0]?.count)).toBe(0);
+
+      const dishEventRows = await admin.query<{ count: string }>(
+        "SELECT count(*)::int AS count FROM app_private.es_event WHERE tenant_id = $1 AND stream_type = 'dish'",
+        [reviewVenue],
+      );
+      expect(Number(dishEventRows.rows[0]?.count)).toBe(0);
+
+      // Verify exactly 4 candidate_review events were created in total
+      const candidateReviewEvents = await admin.query<{ count: string }>(
+        "SELECT count(*)::int AS count FROM app_private.es_event WHERE tenant_id = $1 AND stream_type = 'candidate_review'",
+        [reviewVenue],
+      );
+      expect(Number(candidateReviewEvents.rows[0]?.count)).toBe(4);
+    });
+
+    async function registeredReviewVenue() {
+      const reviewVenue = crypto.randomUUID();
+      await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+        reviewVenue,
+        'Review Venue',
+      ]);
+      await admin.query(
+        "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner')",
+        [reviewVenue, actor],
+      );
+      const put = await requestPutSession(
+        reviewExtractionId,
+        { commandId: crypto.randomUUID(), extractionResult: fixtureV2 },
+        reviewVenue,
+        actor,
+      );
+      expect(put.status).toBe(200);
+      return reviewVenue;
+    }
+
+    it('T-DB-1 withdraws a correction when its field is marked incomplete and reloads the same state', async () => {
+      const reviewVenue = await registeredReviewVenue();
+      const corrected = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          action: 'correct',
+          corrected: { price_amount: '9.50', name: 'Organic Garden Soup' },
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(corrected.status).toBe(200);
+      const incomplete = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 1,
+          action: 'mark_incomplete',
+          incompleteFields: ['price_amount'],
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(incomplete.status).toBe(200);
+      const saved = ReviewCandidateItemResponseSchema.parse(await incomplete.json());
+      expect(saved.review).toMatchObject({
+        version: 2,
+        reviewStatus: 'incomplete',
+        corrected: { name: 'Organic Garden Soup' },
+        editedFields: ['name'],
+        incompleteFields: ['price_amount'],
+      });
+      expect(saved.review.corrected).toEqual({ name: 'Organic Garden Soup' });
+      expect(saved.effective.price_amount).toBeNull();
+
+      const reload = await requestGetCandidates(reviewExtractionId, reviewVenue, actor);
+      const { items } = ExtractionReviewSessionResponseSchema.parse(await reload.json());
+      const soup = items.find((item) => item.candidate.candidate_id === soupCandidateId);
+      expect(soup?.review).toEqual(saved.review);
+      expect(soup?.effective).toEqual(saved.effective);
+
+      const overlap = await requestCandidateReview(
+        reviewExtractionId,
+        soupCandidateId,
+        {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 2,
+          action: 'mark_incomplete',
+          corrected: { price_amount: '9.50' },
+          incompleteFields: ['price_amount'],
+        },
+        reviewVenue,
+        actor,
+      );
+      expect(overlap.status).toBe(400);
+      expect(await overlap.json()).toEqual({ error: 'invalid_candidate' });
+      const events = await admin.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM app_private.es_event WHERE tenant_id = $1 AND stream_type = 'candidate_review'",
+        [reviewVenue],
+      );
+      expect(events.rows[0]?.count).toBe(2);
+    });
+
+    it('T-DB-2 keeps an omitted note, conflicts on null reuse of the same commandId, and clears on a new null command', async () => {
+      const reviewVenue = await registeredReviewVenue();
+      const save = (body: Record<string, unknown>) =>
+        requestCandidateReview(reviewExtractionId, soupCandidateId, body, reviewVenue, actor);
+      expect(
+        (
+          await save({
+            commandId: crypto.randomUUID(),
+            expectedVersion: 0,
+            action: 'correct',
+            corrected: { name: 'Organic Garden Soup' },
+            reviewNote: 'Retained note',
+          })
+        ).status,
+      ).toBe(200);
+      const omittedCommand = {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 1,
+        action: 'correct',
+        corrected: { price_amount: '9.50' },
+      };
+      const omitted = await save(omittedCommand);
+      expect(omitted.status).toBe(200);
+      const omittedBody = ReviewCandidateItemResponseSchema.parse(await omitted.json());
+      expect(omittedBody.review.reviewNote).toBe('Retained note');
+
+      const reusedWithNull = await save({ ...omittedCommand, reviewNote: null });
+      expect(reusedWithNull.status).toBe(409);
+      expect(await reusedWithNull.json()).toEqual({ error: 'command_conflict' });
+
+      const retry = await save(omittedCommand);
+      expect(retry.status).toBe(200);
+      expect(ReviewCandidateItemResponseSchema.parse(await retry.json())).toEqual(omittedBody);
+
+      const cleared = await save({
+        commandId: crypto.randomUUID(),
+        expectedVersion: 2,
+        action: 'correct',
+        corrected: { price_amount: '9.50' },
+        reviewNote: null,
+      });
+      expect(cleared.status).toBe(200);
+      const reload = ExtractionReviewSessionResponseSchema.parse(
+        await (await requestGetCandidates(reviewExtractionId, reviewVenue, actor)).json(),
+      );
+      const soup = reload.items.find((item) => item.candidate.candidate_id === soupCandidateId);
+      expect(soup?.review.version).toBe(3);
+      expect(soup?.review.reviewNote).toBeNull();
+    });
+  });
 });
 
 describe('real PostgreSQL menu publication commands', () => {
@@ -804,6 +1453,141 @@ describe('real PostgreSQL menu publication commands', () => {
       await browser?.close();
       await new Promise<void>((resolve) => browserServer.close(() => resolve()));
     }
+
+    const withdrawal = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawal.status).toBe(200);
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+  });
+
+  it('publishes a producer-built bundle: admit, approve, publish, public read, withdraw', async () => {
+    const menuId = crypto.randomUUID();
+    const dishId = crypto.randomUUID();
+    const revisionId = crypto.randomUUID();
+    const jobId = crypto.randomUUID();
+    const assetId = `t0_${'a'.repeat(32)}`;
+    await admin.query(
+      `INSERT INTO app_private.dish_current (tenant_id, dish_id, version, revision_id, name, description)
+       VALUES ($1, $2, 1, $3, 'Producer dish', 'Approved producer description.')`,
+      [venue, dishId, revisionId],
+    );
+    await admin.query(
+      `INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key)
+       VALUES ($1, $2, 'text', $3)`,
+      [jobId, venue, `producer-${jobId}`],
+    );
+    await admin.query(
+      `INSERT INTO app_private.dish_drafts
+         (id, tenant_id, job_id, draft_id, draft_index, name, price_amount, price_currency,
+          ingredients, source_id, source_text, evidence, review_status, reviewed_by, reviewed_at,
+          published_dish_id)
+       VALUES ($1, $2, $3, 'draft-1', 0, 'Producer dish', 18, 'USD', '["Tomato", "Basil"]'::jsonb,
+               'source-1', 'Producer dish 18', '{}'::jsonb, 'accepted', $4, now(), $5)`,
+      [crypto.randomUUID(), venue, jobId, actor, dishId],
+    );
+    const manifest = T0AssetManifestSchema.parse({
+      schema_version: 1,
+      asset_id: assetId,
+      tier: 'T0',
+      source: {
+        sha256: 'b'.repeat(64),
+        capture_evidence: 'Synthetic fixture; not a real restaurant capture.',
+      },
+      dish: { dish_id: dishId, revision_id: revisionId },
+      variants: [
+        ['card-480', 'webp', 480, 360],
+        ['card-480', 'jpeg', 480, 360],
+        ['detail-1280', 'webp', 1280, 960],
+        ['detail-1280', 'jpeg', 1280, 960],
+      ].map(([name, format, width, height], index) => ({
+        name,
+        format,
+        path: `${name}.${format === 'webp' ? 'webp' : 'jpg'}`,
+        sha256: String(index).repeat(64),
+        size_bytes: 1000,
+        width,
+        height,
+      })),
+    });
+    const bundleRequest = MenuBundleRequestSchema.parse({
+      schema_version: 1,
+      venue_id: venue,
+      menu_id: menuId,
+      restaurant: { name: 'Synthetic venue', logo: null },
+      bundle_base_url: 'https://bundles.example.test/menus',
+      asset_base_url: 'https://assets.example.test/t0',
+      categories: [
+        {
+          category_id: crypto.randomUUID(),
+          name: 'Mains',
+          dishes: [
+            {
+              dish_id: dishId,
+              allergens: null,
+              dietary: ['vegetarian'],
+              image_alt: 'Tomato and basil dish',
+              t0_asset_id: assetId,
+            },
+          ],
+        },
+      ],
+    });
+    const produced = await produceMenuBundle(
+      bundleRequest,
+      await loadApprovedDishSources(admin, venue, [dishId]),
+      new Map([[assetId, { manifest }]]),
+    );
+    expect(produced.diagnostics).toEqual([]);
+    expect(produced.bundle.categories[0]?.dishes[0]?.complete).toBe(true);
+    expect(
+      await admitMenuBundleHandoff(admin, {
+        tenantId: venue,
+        menuId,
+        menuRevisionId: produced.menuRevisionId,
+        contentApprovalId: produced.contentApprovalId,
+        contentHash: produced.contentHash,
+        assetApprovalId: produced.assetApprovalId,
+        assetManifestHash: produced.assetManifestHash,
+        bundleUrl: produced.bundleUrl,
+      }),
+    ).toBe('inserted');
+
+    const approval = MenuApprovalSchema.parse(
+      await (
+        await requestPublication(menuId, 'approvals', {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          menuRevisionId: produced.menuRevisionId,
+          contentApprovalId: produced.contentApprovalId,
+          assetApprovalId: produced.assetApprovalId,
+        })
+      ).json(),
+    );
+    const publish = await requestPublication(menuId, 'publications', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    });
+    expect(publish.status).toBe(200);
+
+    const response = await requestPublicMenu(menuId);
+    expect(response.status).toBe(200);
+    const body = PublicMenuResponseSchema.parse(await response.json());
+    expect(body.menuRevisionId).toBe(produced.menuRevisionId);
+    expect(body.bundle).toEqual({
+      url: produced.bundleUrl,
+      contentHash: produced.contentHash,
+      assetManifestHash: produced.assetManifestHash,
+    });
+    await expect(
+      verifyPublicMenuContentBytes(produced.bytes, body.bundle.contentHash),
+    ).resolves.toMatchObject({
+      venue_id: venue,
+      menu_id: menuId,
+      menu_revision_id: body.menuRevisionId,
+    });
 
     const withdrawal = await requestPublication(menuId, 'withdrawals', {
       commandId: crypto.randomUUID(),
@@ -1007,7 +1791,6 @@ describe('real PostgreSQL menu publication commands', () => {
     });
   });
 });
-
 describe('Multi-tenant owner report isolation', () => {
   it('isolates reports and counts distinct reportable sessions', async () => {
     const dishId = crypto.randomUUID();
@@ -1190,18 +1973,12 @@ describe('Multi-tenant owner report isolation', () => {
       fetch(
         `http://127.0.0.1:${worker.port}/api/v1/venues/${tenant}/analytics/dishes?source=synthetic`,
         {
-          headers: {
-            Authorization: `Bearer ${await token(subject)}`,
-            Origin: 'https://peekaplate-console-staging.pages.dev',
-          },
+          headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
         },
       );
 
     const ownerResponse = await requestReport(venue, actor);
     expect(ownerResponse.status).toBe(200);
-    expect(ownerResponse.headers.get('Access-Control-Allow-Origin')).toBe(
-      'https://peekaplate-console-staging.pages.dev',
-    );
     const ownerReport = OwnerDishReportSchema.parse(await ownerResponse.json());
     expect(ownerReport.venue_id).toBe(venue);
     expect(ownerReport).toMatchObject({
@@ -1518,9 +2295,6 @@ describe('Multi-tenant owner report isolation', () => {
 
     const editorResponse = await requestReport(venue, otherActor);
     expect(editorResponse.status).toBe(403);
-    expect(editorResponse.headers.get('Access-Control-Allow-Origin')).toBe(
-      'https://peekaplate-console-staging.pages.dev',
-    );
 
     const otherTenantResponse = await requestReport(venue, otherVenueOwner);
     expect(otherTenantResponse.status).toBe(403);

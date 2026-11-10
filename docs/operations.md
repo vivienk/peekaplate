@@ -1,5 +1,10 @@
 # Local and staging operations
 
+For the November 10 diner Pages-only connection, exact-byte checks, pinned public
+asset snapshots, build settings and the release's hosted acceptance record, see
+[published diner connection](diner-connection.md). The dated records below describe
+their original releases; they do not override that newer frontend release record.
+
 <a id="observation-facts-hosted-acceptance"></a>
 
 ## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
@@ -70,6 +75,24 @@ its relevant tests before release.
 | Owner reports / AI | [#72](https://github.com/vivienk/peekaplate/pull/72) contract → report SQL/API implementation → integration with [#46](https://github.com/vivienk/peekaplate/pull/46) | #72 is schema only; #46's safety core is not a live model/report API |
 | Real diner tracking | [#65](https://github.com/vivienk/peekaplate/pull/65) → [#77](https://github.com/vivienk/peekaplate/pull/77) → [#80](https://github.com/vivienk/peekaplate/pull/80) → [#84](https://github.com/vivienk/peekaplate/pull/84), with actual menu controls/published adapter | Several are drafts; consent, stored retries, real Save/compare transitions and browser-to-owner acceptance remain |
 | Visual assets | [#25](https://github.com/vivienk/peekaplate/pull/25), in parallel | Its asset-ID/review gates are independent of observation transport |
+
+### Synthetic owner-report read boundary
+
+The local/staging dish-report route remains unavailable unless the server has an
+operator-configured `SYNTHETIC_REPORT_VENUE_ID` that is also in the backend's
+server-maintained synthetic venue allowlist. Requests are accepted only for
+that UUID, and the backend passes that configured UUID—not a caller-selected
+venue—to the owner-report reader. Adding a reportable synthetic venue requires
+an explicit allowlist change as well as environment configuration;
+`source=synthetic` labels a calculation and does not convert or sanitize
+production observations. Production remains unavailable.
+
+Browser access to this route (S3-RES-03, agreed with Sai on November 10) is
+limited to two exact console origins, `https://peekaplate-console-staging.pages.dev`
+and `http://127.0.0.1:5174`, for `GET` and its `OPTIONS` preflight with the
+`Authorization` header. There is no wildcard, preview or credentialed-cookie
+access, and the diner routes keep their own allowlist. CORS does not change
+authentication, the synthetic-source rule or venue access above.
 
 The earlier index/conflict and native retry/DLQ evidence follows below as a
 historical release record; its statement that typed facts were missing applied
