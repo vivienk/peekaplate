@@ -1,7 +1,7 @@
 import {
   type OwnerRecommendationResult,
   OwnerRecommendationResultSchema,
-} from '@peekaplate/contracts';
+} from '@peekaplate/contracts/owner-ai';
 
 /** Local display states; these do not extend owner-recommendation.v1. */
 export type AiPreviewState =
@@ -19,6 +19,13 @@ const abstentionText = {
   unsupported_evidence: 'The available evidence does not support this recommendation.',
   insufficient_evidence: 'There is not enough usable evidence for a recommendation.',
 } as const;
+
+const displayUtcTime = (timestamp: string) =>
+  new Date(timestamp)
+    .toISOString()
+    .replace('T', ' ')
+    .replace(/\.000Z$/, ' UTC')
+    .replace(/Z$/, ' UTC');
 
 function PreviewBody({ state }: { state: AiPreviewState }) {
   switch (state.kind) {
@@ -54,9 +61,11 @@ function PreviewBody({ state }: { state: AiPreviewState }) {
           <dl>
             <dt>Report window (UTC)</dt>
             <dd>
-              <time dateTime={result.timeWindow.start}>{result.timeWindow.start.slice(0, 10)}</time>
+              <time dateTime={result.timeWindow.start}>
+                {displayUtcTime(result.timeWindow.start)}
+              </time>
               {' to '}
-              <time dateTime={result.timeWindow.end}>{result.timeWindow.end.slice(0, 10)}</time>
+              <time dateTime={result.timeWindow.end}>{displayUtcTime(result.timeWindow.end)}</time>
               {' (end excluded)'}
             </dd>
             <dt>Confidence</dt>

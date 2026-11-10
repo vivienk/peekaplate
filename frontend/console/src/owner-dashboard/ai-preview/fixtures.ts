@@ -1,4 +1,4 @@
-import { OwnerRecommendationResultSchema } from '@peekaplate/contracts';
+import { OwnerRecommendationResultSchema } from '@peekaplate/contracts/owner-ai';
 
 // Public, value-free-of-cohort result examples. These are handwritten synthetic
 // wire payloads, not output from a live report, model or approved production policy.

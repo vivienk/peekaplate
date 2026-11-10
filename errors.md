@@ -1752,3 +1752,36 @@ refresh/check and documentation-link checks also run without installation.
 Typechecking, unit/browser tests and builds are NOT RUN for this candidate until
 normal installation is available. No test is removed, skipped or weakened to
 bypass the sandbox limitation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:41:35.066Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:42:35.891Z","exitCode":1}
+```
+
+## November 9 AI preview review corrections
+
+Normal dependency installation was completed in the contributor terminal. The
+first child full check passed lint/typechecks but localhost JWKS reads failed
+with EACCES; the root's permitted recheck passed all 998 application tests
+(four skipped). Root script verification then exposed a genuine new regression:
+the broad contracts barrel brought unrelated PostHog schema strings into the
+standalone demo bundle. The existing no-analytics artifact regression is kept.
+A public owner-ai export now exposes only the existing AI schemas; the console
+uses that subpath without changing any wire contract or external version.
+
+Independent correctness review also found that slicing offset-bearing report
+bounds to a date under a UTC label displayed the wrong day and discarded
+intraday times. Three regressions fail against the old date-only display and
+pass after UTC normalization: both offset directions crossing midnight and a
+same-day intraday window. All 16 focused preview unit cases now pass. Original
+dateTime values remain intact; there are no new result statuses or effects.
+
+The context update guard rejected an overlong contracts summary before writing;
+the same narrow export handoff is now recorded within the existing cap. Final
+aggregate/script, actual browser and build results still need the root recheck.
+The sandbox junction regression remains unchanged and is not bypassed.

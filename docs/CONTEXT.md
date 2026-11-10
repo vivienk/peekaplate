@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 validates scoped evidence.",
+      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 has a public owner-ai subpath.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -39,7 +39,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/review-persistence.ts",
         "packages/contracts/src/review-persistence.test.ts",
         "packages/contracts/src/owner-ai.ts",
-        "packages/contracts/src/owner-ai.test.ts"
+        "packages/contracts/src/owner-ai.test.ts",
+        "packages/contracts/package.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -47,7 +48,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
+      "sourceFingerprint": "e3afadcf7f9e2b00622ad66fe7e97fc41040a4fb5cc39a6e4c4dbf118052a3a5"
     },
     {
       "id": "tokens",
@@ -196,7 +197,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8470245ab46445f117c2f5a5b8565779bc6cef2114956b4637db2048536be925"
+      "sourceFingerprint": "7f4ebe1384593a8e890cd8211f255eaf0c519c3ff1f9668a48c2e725a76fb581"
     },
     {
       "id": "backend",
@@ -603,7 +604,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
-      "summary": "AI-01 synthetic result preview is a separate component on the existing owner-dashboard shell. It renders the shared recommendation/abstained wire result and four local display states, labels every example synthetic, rejects extra internal fields/effects, and uses fixed abstention copy. The minimal demo caller mounts in the existing panel/drawer; shell, chat and other screens are preserved. This does not connect reports/models, approve actions or establish hosted acceptance.",
+      "summary": "AI-01 synthetic result preview is a separate component on the existing owner-dashboard shell. It renders the shared recommendation/abstained wire result and four local display states, labels every example synthetic, rejects extra internal fields/effects, and uses fixed abstention copy. The minimal demo caller mounts in the existing panel/drawer; shell, chat and other screens are preserved. This does not connect reports/models, approve actions or establish hosted acceptance. UTC display preserves intraday boundaries and normalizes offsets. The public owner-ai subpath avoids bundling unrelated observation/analytics schemas; no wire changes.",
       "modules": [
         "console",
         "contracts"

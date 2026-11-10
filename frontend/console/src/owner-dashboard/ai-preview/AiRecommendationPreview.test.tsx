@@ -1,7 +1,7 @@
 import {
   type OwnerRecommendationResult,
   OwnerRecommendationResultSchema,
-} from '@peekaplate/contracts';
+} from '@peekaplate/contracts/owner-ai';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -35,6 +35,36 @@ describe('synthetic AI result preview', () => {
     expect(html).not.toContain('Draft recommendation');
     expect(html).not.toContain('0%');
   });
+
+  it.each([
+    {
+      start: '2026-10-05T00:30:00+03:00',
+      end: '2026-10-05T02:30:00+03:00',
+      displayedStart: '2026-10-04 21:30:00 UTC',
+      displayedEnd: '2026-10-04 23:30:00 UTC',
+    },
+    {
+      start: '2026-10-05T23:30:00-04:00',
+      end: '2026-10-06T00:30:00-04:00',
+      displayedStart: '2026-10-06 03:30:00 UTC',
+      displayedEnd: '2026-10-06 04:30:00 UTC',
+    },
+    {
+      start: '2026-10-05T11:15:00Z',
+      end: '2026-10-05T12:45:00Z',
+      displayedStart: '2026-10-05 11:15:00 UTC',
+      displayedEnd: '2026-10-05 12:45:00 UTC',
+    },
+  ])(
+    'normalizes the displayed UTC window and preserves intraday boundaries: $start',
+    ({ start, end, displayedStart, displayedEnd }) => {
+      const result = { ...syntheticRecommendation, timeWindow: { start, end } };
+      const html = render({ kind: 'result', result });
+      expect(html).toContain(displayedStart);
+      expect(html).toContain(displayedEnd);
+      expect(html).toContain('(end excluded)');
+    },
+  );
 
   it.each([
     ['loading', 'Loading the synthetic example', 'status'],

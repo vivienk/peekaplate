@@ -26,6 +26,11 @@ not print raw producer errors or internal fields. Abstention reasons use fixed
 owner-facing copy rather than raw diagnostic messages. Recommendation text
 must come from the trusted, count-free AI output boundary; schema validation
 alone does not establish provenance, authorization or the truth of text.
+The public `@peekaplate/contracts/owner-ai` subpath exposes the existing AI
+schemas without importing the broad observation/analytics barrel. It adds no
+wire fields or statuses. Displayed report boundaries are normalized to UTC and
+retain their time of day; original offset-bearing values remain in the `time`
+elements' `dateTime` attributes.
 
 The `loading`, `error`, `insufficient-evidence` and `withheld` variants belong
 to `AiPreviewState`, not to the server response schema. None has a numeric
