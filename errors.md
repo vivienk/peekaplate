@@ -2010,3 +2010,17 @@ execution permission boundary recorded earlier, not an aggregate-check PASS.
 The security test is retained unchanged. Lint, seven package typechecks,
 context freshness and local documentation links passed separately; Linux CI
 or a normal contributor terminal must establish the complete check.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:47:24.995Z","exitCode":1}
+```
+
+## November 9 evening Draft stack full-check boundary
+
+The synchronized Draft source 5d26fc8 passes lint, seven package typechecks and
+1084 application tests (four optional skips). Of 67 script tests, 66 pass;
+only the unchanged artifact-symlink regression cannot create its junction in
+this agent sandbox. The complete normal-terminal check remains to be supplied.
+The focused 67 AI/contract/input cases and clean 21-case standard evaluation
+already pass. This note does not claim live producer/report/model acceptance.
