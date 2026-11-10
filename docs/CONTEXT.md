@@ -363,7 +363,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Merged PRs keep their last successfully deployed preview; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical.",
+      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Merged PRs keep their last successfully deployed preview; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical. DATA-01 now includes a shared 12-case dual-destination acceptance preparation and per-run evidence fields in observation-infrastructure.md. All hosted cases remain planned/not run; Queue receipts, PostHog logical capture and durable/report outcomes are separate.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -419,7 +419,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "bcd8a8b520d430934d13b514a44e265da2a33f1a214491d0f2edacb16036b4c7"
+      "sourceFingerprint": "ae7acb1414ac900633c27e330381c8c1408e72f95d62cb82ecdbcffee651ac1b"
     },
     {
       "id": "agents",
@@ -606,6 +606,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-10",
+      "summary": "DATA-01 acceptance preparation extends the existing observation infrastructure runbook with D01-01 through D01-12 and one shared run-record template. It distinguishes logical PostHog capture from SDK attempts/readback, Queue receipt from archive/facts, stateless producer acceptance from consumer dedup/conflict, and labelled synthetic/report-gated results from real acceptance. Historical evidence is preserved.",
+      "modules": [
+        "diner",
+        "backend",
+        "delivery"
+      ],
+      "next": "Zhiliang prepares mapping/reconciliation and Uneeza independently checks expectations; Jeffin coordinates frontend readiness/run with the operator and Teeyansh backend handoff. Cases remain PLANNED/NOT RUN until compatible deployed versions and operator-approved bounded execution exist. DATA-01 stays In Review."
+    },
+    {
       "date": "2026-11-09",
       "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
       "modules": [
@@ -691,16 +701,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
-      "modules": [
-        "assets",
-        "processing",
-        "delivery"
-      ],
-      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
     }
   ]
 }

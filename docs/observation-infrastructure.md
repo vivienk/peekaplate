@@ -178,3 +178,107 @@ pnpm verify build
 Before enabling delivery, verify the actual consumer and settings through provider readback. Preserve existing messages during a consumer change; do not delete/recreate these Queues to deploy code. Keep production resources separate. App deployments follow [ADR 0012](adr/0012-main-environment-promotion.md) and [operations](operations.md).
 
 References: [accepted evidence boundary](adr/0003-intent-evidence.md), [integration handoff](adr/0015-integration-contracts-and-owner-evidence.md) (currently Proposed), [Cloudflare pause/expiry](https://developers.cloudflare.com/queues/configuration/pause-purge/), [DLQ semantics](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/), [R2 conditional operations](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#conditional-operations).
+
+## DATA-01 dual-destination acceptance preparation — November 10
+
+Status: **PREPARED; every case below is PLANNED / NOT RUN.** This is the shared
+DATA-01 run specification, not another acceptance ledger or permission to enable
+collection. Record actual results in the coordinator's existing shared run and
+link that run from [DATA-01](https://app.clickup.com/t/90141746115/86bcnfzu6).
+Do not replace the historical November 1/2 records above with these expectations.
+
+Zhiliang owns event/field mapping, ingestion/receipt checks and downstream
+reconciliation. Jeffin coordinates the integrated run; Uneeza independently checks
+expected results. Frontend owners retain controls, consent/outbox and delivery;
+Teeyansh retains backend handoff; the release operator controls environment
+configuration and any bounded resume/pause. This document assigns no additional
+implementation, policy, operational access or delivery date.
+
+### Preconditions and provenance
+
+- Use the reviewed Matrix v0.1h attached to DATA-01 and the current
+  [shared observation fixtures](../packages/contracts/fixtures/observation.v2/README.md).
+  Record the Matrix revision and exact served commits; a merged PR or local build
+  is not evidence that the corresponding code is deployed.
+- The coordinator/operator must confirm compatible frontend, Worker and database
+  releases, approved frontend/Worker/asset origins, token/publication references,
+  PostHog project/host and allowed properties, plus the bounded run and cleanup.
+  Normal collection remains paused. No production data, retention change, shared
+  Queue purge or unrelated acknowledgement is authorized by this preparation.
+- Enter through the approved direct-link path. Pin approved venue/menu/dish and
+  publication revisions before the run. Actual control wiring and release gates
+  must be ready; fixtures alone do not satisfy this condition.
+- Keep synthetic/test traffic explicitly labelled and excluded from real owner
+  metrics. Do not relabel test traffic as live to make a report appear. Synthetic
+  owner-report checks use only the producer's permitted reserved venue/entry.
+- Inspect the current [PostHog projection](../packages/analytics/src/posthog.ts),
+  [delivery rules](../frontend/diner/src/tracking/delivery.ts) and
+  [report reader](../backend/src/owner-report.ts) against the pinned deployment.
+  Current production report gating/unknown freshness may correctly yield
+  unavailable rather than a visible metric; record that outcome separately from
+  the future real-data report gate.
+
+### One shared run record
+
+For each case, fill these fields in the existing shared run before assigning a
+disposition. Keep actual evidence empty until executed; record why a case is
+blocked rather than inventing an actual result.
+
+| Record field | Required content |
+| --- | --- |
+| Run and case | Run ID, stable case ID below, UTC start/end, coordinator/operator, reviewer, PLANNED / NOT RUN / BLOCKED / PASS / FAIL |
+| Served versions | Frontend and Worker commit/build IDs, deployed Worker version, migration/schema versions, Matrix revision, SDK/config version; environment and source mode |
+| Approved scope | Authorized venue/menu/dish/publication/revision references, operator-approved origins and PostHog project/host; no credentials or full bearer token |
+| Browser observation | Exact control/action and preconditions, consent and privacy-signal state, storage mode, generated event IDs and relevant exposure/opening/comparison references; identify any prerequisite events separately |
+| Independent expectation | Approved event/property mapping, expected logical PostHog capture IDs, canonical disposition and expected persisted index/fact outcome, expected report state and relevant cohort/window |
+| Actual destinations | Redacted browser/capture observation and provider readback, ordered ingestion receipts, Queue processing evidence, create-only R2 checksum/archive identity, canonical index/fact/disposition, authorized report response |
+| Comparison and sign-off | Expected versus actual by stage, explained missing/extra IDs, limits, evidence links, reviewer/disposition and owner of any follow-up |
+
+`event_id` is the cross-destination reconciliation key. The PostHog adapter also
+passes it as the SDK event UUID; canonical session/producer IDs and menu tokens
+must not be copied into PostHog. A logical capture is not a network request count,
+and HTTP success is not independently observed provider ingestion.
+
+An `accepted` receipt proves Queue acceptance only. The stateless producer may
+accept an identical retry or changed reuse again; the consumer must deduplicate
+or quarantine it. Verify R2/index/typed facts independently. Do not require a
+producer `duplicate_same_payload` reason that the current implementation does
+not promise. PostHog loss/blocking and its page-memory queue can create explained
+gaps; the two complete ID sets are not assumed equal.
+
+### Prepared cases
+
+All rows start **PLANNED / NOT RUN**. Fault injection below is a test design,
+not authority to alter a shared service; prefer an isolated approved test layer
+and preserve browsing and unrelated work.
+
+| Case | Action / condition | Independent expected result and evidence to collect |
+| --- | --- | --- |
+| D01-01 Consent and privacy | Perform the agreed eligible control with consent absent, declined or ignored; repeat with DNT/GPC or an unreadable privacy signal. Then opt in. | No pre-consent observation is queued or sent to either destination; opting in does not backfill prior actions. Collect negative network/outbox evidence and allowlisted consent-state observations. |
+| D01-02 Fixture silence | Exercise the same controls in the ordinary fixture/demo source mode, including any consent UI. | No ingestion or PostHog capture/SDK request attributable to these fixture events. Console/test assertions are local evidence only; no fixture is described as a hosted diner observation. |
+| D01-03 Committed eligible action | With approved live-mode test configuration and consent, perform one selected supported control. Record prerequisite display events separately and correlate the selected event by its generated ID. | One logical capture for that event reaches PostHog independently of its canonical outbox enqueue. Verify approved properties/provider readback, ordered receipt, original archive checksum, one accepted canonical index and matching typed fact. An accepted receipt alone leaves persistence NOT VERIFIED. |
+| D01-04 PostHog-specific failure | Block only the PostHog/SDK path in the approved test layer while repeating D01-03 with a new action ID. | Canonical delivery/receipt/archive/fact and browsing remain functional. Record the missing PostHog observation and failure boundary; do not manufacture a matching PostHog row or feed owner reports from its export. |
+| D01-05 Canonical retry isolation | Permit PostHog, make canonical delivery transiently fail or leave its outcome unknown, then recover delivery under the original still-valid publication/token. | Pending canonical event keeps its original ID/payload and retries with bounded backoff. Recovery creates at most one accepted fact. Canonical retries, Queue redelivery and receipt processing create no second logical PostHog capture. SDK transport attempts are counted separately. |
+| D01-06 Offline and reload | Interrupt the browser after queueing a consented event, reload/reopen, and recover under the allowed source/publication/consent conditions. | Only eligible persisted canonical pending work may resume with original identity. Page-memory PostHog work can be lost; explain that gap instead of replaying canonical events into PostHog. No fresh action is inferred from network delivery or token renewal. |
+| D01-07 Partial or uncertain receipt | Use an approved isolated sender response with accepted/retry/rejected entries; separately test malformed, missing, duplicate, reordered or foreign receipt IDs. | A valid mixed receipt removes only terminal accepted/rejected entries and retains retry IDs. An untrusted/malformed receipt retains the uncertain batch. Check outbox state and repeated original IDs; a blanket HTTP200 is not blanket success. |
+| D01-08 Withdrawal | Withdraw before a pending send; separately withdraw while an already-dispatched request is in flight, then opt in again. | Applicable unsent work is cleared and no old work is retried/backfilled after re-opt-in. Capture/SDK retry paths stop. A dispatched request may already have arrived; reconcile any resulting archive/fact and do not claim recall, server erasure or downstream removal. |
+| D01-09 Publication/token boundary | Retry an old-publication event after replacement; test missing, expired and refused token states using a new isolated case. | No event is relabelled to a newer publication/token. Current sender waits with no token, drops terminal expiry/publication-mismatch and401 / 403 cases, and retains only permitted transient retries. Record discarded event IDs/counts and explain a possible PostHog-only gap. Renewal of original-publication delivery is not promised. |
+| D01-10 Save storage modes | Exercise Save/Unsave/Undo with the agreed persistent storage failure and with session-only mode; inspect Saved-screen behavior. | Apply the existing storage-mode decision: unavailable persistence does not emit a successful Save/Unsave/Undo measurement; session-only mode emits no shortlist_viewed. UI/storage owners verify exact behavior. Do not substitute UI appearance for a successful persisted transition or redefine the agreed mode. |
+| D01-11 Duplicate and conflict persistence | Repeat the same canonical ID/payload, then submit changed reuse in the isolated approved harness. | Queue receipts may accept again, but the original archive and accepted checksum/fact remain immutable. Identical retries create no extra fact; changed reuse is quarantined and never enters a report. Replaying consumer evidence never recaptures PostHog. |
+| D01-12 Report and tenant boundary | Read the authorized bounded report, then try a separate tenant/revoked actor. Check agreed zero/unknown/suppressed/stale and isolated 9 / 10 / 11 cohort examples through the supported source. | Use independently expected canonical facts and per-metric distinct eligible cohorts, exact window and revision attribution. Real reports exclude test/demo traffic; a one-visit cell may correctly stay suppressed. Unknown freshness/unlinked outcomes remain unavailable. Record current 503/release gating separately; public responses omit internal cohorts. A reserved synthetic report proves only its labelled path, not this journey's live metrics. |
+
+The positive transport case and the report case have separate dispositions. Do
+not lower the ten-session floor, turn unknown freshness into fresh, or claim that
+one captured action proves visible owner analytics. Current production report
+activation and complete producer disclosure checks remain independent gates.
+
+### Review and handoff
+
+Zhiliang prepares the mapping and expected stage-by-stage reconciliation; Uneeza
+checks the expected outcomes independently. Jeffin links the coordinated run and
+frontend readiness, Teeyansh supplies the compatible backend handoff, and the
+operator authorizes any hosted execution/cleanup. Each implementation owner
+handles findings in their own slice. A reviewer records the source/run version,
+decision and evidence link before DATA-01 can move from In Review to accepted.
+Preparing this section, or passing existing intercepted tests, executes none of
+these hosted cases.
