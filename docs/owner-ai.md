@@ -29,6 +29,12 @@ unit suite also runs these cases, without writing the report. The dedicated
 command removes any old report before starting, and returns a failing exit code
 when a case, discovery or startup fails.
 
+It also validates the fresh report after Vitest exits: `synthetic-core.v1` must
+contain all 21 unique passing cases and `DEVELOPMENT_CHECK_PASS`. Missing or
+incomplete evidence fails the command even when Vitest itself exits successfully.
+The CLI regressions use isolated child fixtures; they do not change the frozen
+recommendation oracle or call a provider.
+
 The report includes source commit, dirty-worktree flag, timestamp, fixture and
 criterion IDs, full expected/actual output, case counts and development-only
 disposition. Retain only clean-commit reports as reproducible handoff evidence.
