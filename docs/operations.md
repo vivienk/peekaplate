@@ -82,6 +82,13 @@ an explicit allowlist change as well as environment configuration;
 `source=synthetic` labels a calculation and does not convert or sanitize
 production observations. Production remains unavailable.
 
+Browser access to this route (S3-RES-03, agreed with Sai on November 10) is
+limited to two exact console origins, `https://peekaplate-console-staging.pages.dev`
+and `http://127.0.0.1:5174`, for `GET` and its `OPTIONS` preflight with the
+`Authorization` header. There is no wildcard, preview or credentialed-cookie
+access, and the diner routes keep their own allowlist. CORS does not change
+authentication, the synthetic-source rule or venue access above.
+
 The earlier index/conflict and native retry/DLQ evidence follows below as a
 historical release record; its statement that typed facts were missing applied
 to that earlier release only.
