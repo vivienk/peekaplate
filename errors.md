@@ -1840,8 +1840,8 @@ typechecks, context freshness, documentation links and frontend/Worker dry-run
 build pass. The full application suite passes; only the unchanged artifact
 junction security regression remains unable to create its test link in this
 agent sandbox. Its automatic observation is retained and the test is unchanged.
-A normal-terminal full check plus the three preview and two modal-drawer browser
-cases are required on the new combined source before requesting re-review.
+A complete Linux CI or normal-terminal full check plus the three preview and
+two modal-drawer browser cases are required before requesting re-review.
 Earlier passing checks at ba0a19d do not verify this integration. Both PRs #112
 and #124 remain Draft; AI-01 remains In Progress with existing integration and
 visual-review ownership. No extra scope or delivery date is assigned.
