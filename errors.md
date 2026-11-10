@@ -1728,6 +1728,18 @@ Four RED storage/public-dispatch regressions reproduced cold-page withdrawal rep
 
 The first local merge helper stopped at the summary cap, but a missing exit guard allowed conflict markers into an unpublished merge commit. Recovery reconstructed both parent graphs and path sets, preserved both append-only ledger sides and amended only that unpublished merge. Legacy handoffs without date fields are retained without assuming a common date shape. Subsequent mutation steps stop at the first nonzero result; context:check and git diff --check verify the repaired result before push. A test-only LockGrantedCallback generic annotation was corrected after strict TypeScript rejected it.
 
+## November 9 AI preview dependency setup boundary
+
+The new synthetic preview worktree's normal frozen install stopped at pnpm's
+project-registration symlink with Windows EPERM before workspace dependencies
+could be linked. The one added contracts dependency is a local workspace link;
+no external package, engine, lock version or installation policy is changed.
+Formatting and lint can use the already installed toolchain; direct context
+refresh/check and documentation-link checks also run without installation.
+Typechecking, unit/browser tests and builds are NOT RUN for this candidate until
+normal installation is available. No test is removed, skipped or weakened to
+bypass the sandbox limitation.
+
 ## November 8 PR80 failed-clear recovery follow-up
 
 Independent review identified two additional paths: failed clearing lost its pending state after a reload, and clearing a fallback memory store could incorrectly certify that a temporarily unavailable IndexedDB backend was empty. Both regressions replayed the old event before correction. Withdrawal now records deletion-work tokens in sessionStorage/localStorage and explicitly clears both durable backends; incomplete clearance keeps new work in memory and is retried on reopening. Completion records cannot erase a newer request. Eight withdrawal unit tests cover reload, fallback, overlap and unreadable markers; a real Chromium reload test seeds both backends, interrupts IndexedDB access and verifies that old records never reach delivery after recovery. All-storage-write failure remains an explicit documented limitation; no hosted acceptance is inferred.

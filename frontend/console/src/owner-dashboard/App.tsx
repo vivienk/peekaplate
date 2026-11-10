@@ -1,6 +1,7 @@
 // Owner Dashboard V2 (Simplified) demo shell: sidebar, top bar, AI panel/drawer, toast and the
 // prototype controls that switch report states.
 import { type ReactNode, useRef, useState } from 'react';
+import { SyntheticAiPreviewDemo } from './ai-preview/SyntheticAiPreviewDemo';
 import logo from './assets/logo.png';
 import { type Chat, ChatBox, CtxBar, type Message } from './chat';
 import {
@@ -182,6 +183,12 @@ export function App() {
   const panelTk = page === 'report' ? (ctx ? `ins:${ctx}` : 'report') : 'general';
   const panelChat = chatFor(panelTk);
   const ctxBar = page === 'report' && ctx ? <CtxBar ctx={ctx} askInsight={askInsight} /> : null;
+  const aiPreview = (
+    <>
+      {ctxBar}
+      <SyntheticAiPreviewDemo />
+    </>
+  );
   const editDish = (id: string, from?: string) => {
     const m = menu.find((x) => x.id === id);
     if (!m) return;
@@ -362,13 +369,18 @@ export function App() {
         <main id="content">{body}</main>
       </div>
       <aside className="aipanel" aria-label="PeekaPlate AI">
-        <ChatBox chat={panelChat} panel ctxBar={ctxBar} />
+        <ChatBox chat={panelChat} panel ctxBar={aiPreview} />
       </aside>
       {chatOpen && (
         <div>
           <div className="scrim" onClick={() => setChatOpen(false)} />
           <div className="drawer-p" role="dialog" aria-label="Ask PeekaPlate AI">
-            <ChatBox chat={panelChat} drawer onClose={() => setChatOpen(false)} ctxBar={ctxBar} />
+            <ChatBox
+              chat={panelChat}
+              drawer
+              onClose={() => setChatOpen(false)}
+              ctxBar={aiPreview}
+            />
           </div>
         </div>
       )}

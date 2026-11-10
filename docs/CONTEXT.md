@@ -167,7 +167,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. The AI preview mounts typed synthetic recommendation/abstention results and local loading/error/insufficient/withheld states in the existing dashboard panel/drawer; no live report/model or executable effects.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -178,7 +178,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/input.spec.ts",
         "frontend/console/vite.config.ts",
         "frontend/console/src/foundations/TextField.tsx",
-        "frontend/console/src/foundations/field.css"
+        "frontend/console/src/foundations/field.css",
+        "frontend/console/src/owner-dashboard/App.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.test.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/SyntheticAiPreviewDemo.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/fixtures.ts",
+        "frontend/console/src/owner-dashboard/ai-preview/ai-preview.css",
+        "tests/e2e/owner-ai-preview.spec.ts",
+        "docs/owner-ai-preview.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -188,7 +196,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d78e4f61ade86a3cf4e781b880b5bc299f275dbdc030788b9dd585c0f78d9930"
+      "sourceFingerprint": "8470245ab46445f117c2f5a5b8565779bc6cef2114956b4637db2048536be925"
     },
     {
       "id": "backend",
@@ -290,7 +298,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d9183d18d1b04bd1c8be8febd693e8e494ff7249595fcd950890e5aac7eba833"
+      "sourceFingerprint": "cdd32aa73de97e76eadf8f02a1f708f074302ddbb95ade9cfb39ffdb589908f4"
     },
     {
       "id": "database",
@@ -407,7 +415,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6494577783101f37cf635a1103780dca61993c9f5fe64b61686ed1289dcef11a"
+      "sourceFingerprint": "cb4e2182b657f33eb6b34e2b6df37d94b071dee2c0939906759cd5f1bdbcf398"
     },
     {
       "id": "agents",
@@ -594,6 +602,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-09",
+      "summary": "AI-01 synthetic result preview is a separate component on the existing owner-dashboard shell. It renders the shared recommendation/abstained wire result and four local display states, labels every example synthetic, rejects extra internal fields/effects, and uses fixed abstention copy. The minimal demo caller mounts in the existing panel/drawer; shell, chat and other screens are preserved. This does not connect reports/models, approve actions or establish hosted acceptance.",
+      "modules": [
+        "console",
+        "contracts"
+      ],
+      "next": "Verify component and actual panel/drawer states, then obtain independent code/design review. RES-03 owns final integration and the shell owner retains drawer focus fixes. Keep #112 Draft and AI-01 In Progress; real producer identity/cohort/freshness, authorization and approved model/policy remain separate gates."
+    },
+    {
       "date": "2026-11-08",
       "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
       "modules": [
@@ -674,15 +691,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
-    },
-    {
-      "summary": "November 5: extraction implementation review preserves the current develop graph and proposed ADR0016 alongside VIS02/RES01.1 producer contracts and private attempt artifacts. Grounded originals remain needs_review; no cloud deployment, provider call or Queue activation is part of this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "processing"
-      ],
-      "next": "Verify the reconciled head and independent tests before merge. Complete #73 artifact/command integrity corrections and #45 retry-exhaustion recovery before hosted upload-to-review acceptance."
     }
   ]
 }
