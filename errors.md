@@ -2580,3 +2580,63 @@ passes 1,122 application cases (four optional skips) and 71 of 72 script cases;
 its aggregate result is FAIL because the unchanged artifact-symlink security
 test cannot create a Windows junction in this sandbox (EPERM). The test remains
 intact. Linux CI must establish the complete aggregate result on the final head.
+
+## November 10 published-menu refresh and browser verification
+
+PR85 browser CI 42857040744 failed the detail-image fallback assertion: a real
+DNS failure raced the explicitly dispatched error and consumed both fallback
+steps. The test now uses a distinct valid data image and dispatches the first
+failure synchronously, leaving no network error to race it.
+
+Two new Chromium regressions failed before the rendering fix: publication swap
+lost focused Search, and returning from a withdrawn dish had no focus target.
+The swap now restores the equivalent visible control; a missing opener falls
+back to the menu heading. Both regressions and all ten focused browser checks
+pass. These use a synthetic source seam, not hosted integrity/delivery evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T18:05:34.662Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:06:48.247Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-10T18:07:11.221Z","exitCode":1}
+```
+
+The final focus regression also covers duplicate cards: restoration selects the
+visible category opener instead of its hidden All copy. It failed before the
+visible-match correction. A context summary initially exceeded the graph limit
+and was shortened without dropping the live-release gates. The concurrent full
+check hit a 20-second workerd loopback timeout; a separate unchanged rerun passed
+all 1,121 unit and 72 script tests in 29.058 seconds. A concurrent default-worker
+browser run timed out awaiting 500 persisted outbox records (306 observed);
+single-worker verification is recorded separately rather than hiding that run.
+
+All 111 browser checks then passed with one worker in 96.794 seconds, including
+the unchanged outbox-capacity case and the three refresh focus regressions.
+The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+## November 10 AI consumer forward synchronization after PR85
+
+Draft PR112 forward-merges develop e0eed262 without changing the AI adapter,
+frozen evaluation or upstream published-menu source. Shared context combines
+the separate backend and diner summaries, and both complete failure histories
+are preserved. Structural lint, seven workspace typechecks, context and local
+documentation checks pass.
+
+The first direct targeted run failed before collecting any tests because the
+sandbox denied a Vite SSR cache rename in the operating-system temporary
+directory. Using a task-owned temporary directory permits test collection. A
+parallel retry passes 171 cases but times out one unchanged upstream live-menu
+dynamic-import assertion. No implementation or assertion was altered. A
+single-worker rerun passes all 172 targeted AI/report/menu-state cases across
+11 files, and all five evaluation-CLI completeness regressions pass. These
+results do not erase the preceding failed runs or establish browser/hosted
+acceptance. The known junction-limited aggregate check is not repeated; exact
+head Linux CI remains required after pushing this synchronization.
