@@ -1882,3 +1882,49 @@ no application, assertion, dependency or configuration is weakened.
 Both synchronized implementation heads also passed their 21-case standard
 development evaluation with a clean working tree. Independent rubric/model
 evaluation and hosted report/AI acceptance remain separate, unverified gates.
+
+
+## November 9 PR84 delivery reconciliation
+
+The first focused delivery check after merging develop failed because its two
+outbox.pending assertions still treated the now-authoritative asynchronous read
+as an array. Awaiting those reads restores the existing 429/backoff regression.
+Independent regressions also reproduced malformed receipt deletion and split
+requests continuing after withdrawal, token changes and Retry-After; the fixes
+validate shared receipts and recheck each request boundary. Stalled headers/body
+are bounded by a ten-second abort and retain the same event for retry. Focused
+unit and synthetic Chromium delivery checks provide local evidence only.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-09T18:50:34.903Z","exitCode":2}
+```
+
+The first full PR84 typecheck rejected an incomplete Response cast in the new
+body-timeout test. The fixture now overrides json on a real Response instead;
+production behavior is unchanged. The corrected full check is recorded in the PR.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:37:25.661Z","exitCode":1}
+```
+
+## November 9 evening AI stack synchronization
+
+The #82 reconciliation imports develop 78fd475 (#121 search and #84 delivery)
+without changing the frozen AI evaluation or owner-output behavior. Complete
+paragraphs from both parent ledgers and both module path sets are retained.
+The first remote read used an incorrect source ref and then treated a fork
+branch as an upstream branch; metadata confirmed the correct fork and pinned
+SHA before review. No source or remote branch was changed by those reads.
+
+A focused Vitest startup initially failed while renaming its sandbox temporary
+SSR cache. Re-running with TEMP and TMP pointing to an ignored workspace
+output directory passed all 105 focused AI/contract/search/delivery cases;
+no assertion or test selection was removed. The normal full check then passed
+all application tests, but the existing artifact-symlink security regression
+could not create its Windows junction in this sandbox. This is the same
+execution permission boundary recorded earlier, not an aggregate-check PASS.
+The security test is retained unchanged. Lint, seven package typechecks,
+context freshness and local documentation links passed separately; Linux CI
+or a normal contributor terminal must establish the complete check.
