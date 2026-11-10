@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, search helpers, Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
+      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -153,7 +153,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/dispatch.test.ts",
         "frontend/diner/src/tracking/withdrawal.test.ts",
         "tests/e2e/tracking-storage.spec.ts",
-        "frontend/diner/src/tracking/withdrawal.ts"
+        "frontend/diner/src/tracking/withdrawal.ts",
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/searchView.test.ts",
+        "tests/e2e/search.spec.ts",
+        "frontend/diner/src/tracking/delivery.ts",
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts",
+        "tests/e2e/tracking-delivery.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -162,7 +169,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "870fe0fba2eaad666945c79cabf89660579ff75a4b17435a7b6549a29a050095"
+      "sourceFingerprint": "377a195623cab69f1ad5d26526df8a8e73b050f2b8cd6cfeb61cc548b61de4b1"
     },
     {
       "id": "console",
@@ -473,7 +480,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "4e68c26c4a071754c151ccb2d6e4539801050c0361716178627499c5b0d41c73"
+      "sourceFingerprint": "ea8d828a39fd80d003c97b6e306ee6072bba4bdeb240bcebe6e8ffdae51ee574"
     },
     {
       "id": "processing",
@@ -599,21 +606,47 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
-      "summary": "Draft AI-01 internal report-input validator synchronized with #82 at 18bc671, incorporating develop 93194f2 tracking and TextField foundations. The existing 20 input cases, valid-zero handling and count-free 21-case evaluation remain unchanged. Both parent context graphs and append-only error histories are retained; no live report adapter, model or UI wiring is added.",
+      "summary": "Draft AI-01 report-input validation synchronized with the updated #82 and develop 78fd475 search/delivery foundations. Existing 20 input cases, valid-zero handling and frozen 21-case evaluation remain unchanged. Upstream module paths, current handoffs and both append-only ledger histories are retained; no live adapter or model wiring is added.",
       "modules": [
         "backend",
+        "diner",
         "contracts"
       ],
-      "next": "Verify the synchronized stack and keep #112 Draft and AI-01 In Progress. Require a pinned internal producer fixture, trusted identity/window, per-metric cohorts and disclosure/freshness/version evidence before live adapter integration."
+      "next": "Verify this synchronized head and clean-commit development evaluation. Keep #112 Draft and AI-01 In Progress; independent review, trusted internal producer handoff, rubric/model evaluation and hosted acceptance remain separate gates."
     },
     {
       "date": "2026-11-09",
-      "summary": "AI-01 evaluation synchronized with develop 93194f2 after #77/#80 tracking and #74 TextField merged. Upstream module paths, recent handoffs and both append-only error histories are retained. The frozen 21 synthetic cases and count-free owner rationale are unchanged; no producer, model or dashboard integration is added.",
+      "summary": "AI-01 evaluation synchronized with develop 78fd475 after menu search #121 and token-bound delivery #84 merged. Both module graphs and append-only ledger histories are retained. Frozen 21-case synthetic evaluation and count-free owner rationale are unchanged; this merge does not add producer, model or dashboard integration.",
       "modules": [
         "backend",
-        "delivery"
+        "diner",
+        "contracts"
       ],
-      "next": "Verify this synchronized head and clean-commit evaluation, then update #112 from it. Keep #112 Draft and AI-01 In Progress; human review, producer handoff, independent rubric/model runs and hosted acceptance remain separate gates."
+      "next": "Verify this synchronized head and clean-commit development evaluation. Keep #112 Draft and AI-01 In Progress; independent review, trusted internal producer handoff, rubric/model evaluation and hosted acceptance remain separate gates."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/tracking/delivery.ts"
+      ],
+      "next": "DIN-03 must connect the current in-memory publication token and approved endpoint. Verify real controls reach PostHog and canonical facts independently; collection stays gated pending release acceptance."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
     },
     {
       "date": "2026-11-08",
@@ -643,15 +676,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-08",
-      "summary": "AI-01 offline evaluation reconciled with merged core #46 and develop 95fedc5, preserving #25/#73. The expected rationale now omits internal cohort counts; the 9/10/11 input cases and synthetic policy are unchanged. Existing standard entrypoint and source/dirty provenance remain intact.",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "next": "Regenerate clean-commit development evidence, then synchronize #112. Human review, actual report producer handoff, independent rubric/model evaluation and hosted acceptance remain separate gates."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR46 safe recommendation core reconciled with develop e725b24, preserving PR25 assets and PR73 review/provenance behavior. Deterministic rules consume bounded, same-venue/report/window evidence and abstain on withheld input; no HTTP/model/effect execution. Re-review found internal eligible-session counts in owner rationale. A red/green regression proves output no longer changes for cohorts23vs97 while the ten-session input floor remains.26 focusedAI,888unit+67script,213SQL+76integration and build pass; timings and downstream handoff in docs/owner-ai.md. No deployment/provider calls.",
       "modules": [
         "contracts",
@@ -678,16 +702,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
-    },
-    {
-      "date": "2026-11-06",
-      "summary": "S3-VIS-03 PR #25 rebased linearly onto develop d6e5a16 (was c005b0f merge). schemas.py keeps develop's box-evidence validator and adds the asset/spatial/presentation models; asset files moved to their own assets context node because the processing summary is at its cap. Presentation asset ids derive after candidate validation from the candidate PNG hash and effective model version. Rebase QA: 465 Python tests, pnpm verify, 7 CLI and 6 Chromium harness cases passed on synthetic data (qa-reports/S3-VIS-03-test-report.md).",
-      "modules": [
-        "processing",
-        "assets",
-        "delivery"
-      ],
-      "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
     }
   ]
 }
