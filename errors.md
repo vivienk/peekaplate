@@ -1785,3 +1785,35 @@ The context update guard rejected an overlong contracts summary before writing;
 the same narrow export handoff is now recorded within the existing cap. Final
 aggregate/script, actual browser and build results still need the root recheck.
 The sandbox junction regression remains unchanged and is not bypassed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:48:45.851Z","exitCode":1}
+```
+
+## November 9 preview final local verification boundary
+
+At implementation 69e2060, the 16 focused component cases pass, including three
+UTC offset/intraday regressions. Normal lint and seven package typechecks pass.
+The full application suite passes 1001 tests (four optional skips); 66 of 67
+script tests pass, including the unchanged no-analytics preview-build check.
+Only the existing artifact-symlink regression cannot create its junction in the
+agent sandbox. No test, engine or lockfile security policy is weakened.
+
+Browser setup initially lacked the pinned Chromium runtime and attempted to
+write Wrangler logs/registry outside the workspace. Installing the official
+Playwright Chromium runtime to ignored outputs and using Wrangler's supported
+local log/registry paths resolved startup. All three unchanged preview cases
+then report passing assertions (desktop six states/no API requests, narrow
+mobile drawer and keyboard/scoped axe). The Windows process teardown did not
+return, even in a console-only local harness; it was interrupted after the
+assertions and local servers stopped. This is not a normal browser-command
+completion. The first ignored focused config was inside the runner-cleaned
+output directory; moving it outside that directory resolved its launch cwd
+failure. Temporary harness files are not part of this change or CI.
+
+The final frontend/Worker dry-run build passes. A normal-terminal full check
+and standard three-server browser command are still required before pushing
+this candidate. Final visual inspection confirmed the component mounted in
+the existing desktop panel with its synthetic label and UTC time window;
+manual device/screen-reader and full shell design acceptance remain separate.
