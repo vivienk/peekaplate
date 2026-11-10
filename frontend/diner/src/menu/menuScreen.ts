@@ -1,3 +1,4 @@
+import { renderComparePicker } from '../compare/pickerScreen';
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
@@ -301,10 +302,31 @@ export function mountMenuScreen(container: HTMLElement): void {
     restoreOpenerFocus();
   };
 
+  // Detail without touching savedScroll, so a return from the picker still restores the menu.
+  const renderDetail = (dish: CompleteDish) => {
+    renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null, () =>
+      showPicker(dish),
+    );
+    window.scrollTo(0, 0);
+  };
+
   const showDetail = (dish: CompleteDish) => {
     savedScroll = window.scrollY;
     disposeObserver();
-    renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
+    renderDetail(dish);
+  };
+
+  // Compare on a detail opens the picker; closing it returns to that detail's Compare button.
+  const showPicker = (dish: CompleteDish) => {
+    if (!currentMenu) return;
+    renderComparePicker(container, {
+      menu: currentMenu,
+      keptDish: dish,
+      onClose: () => {
+        renderDetail(dish);
+        container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
+      },
+    });
     window.scrollTo(0, 0);
   };
 

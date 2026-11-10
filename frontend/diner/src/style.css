@@ -434,7 +434,8 @@ main:has(> .pp-detail) {
   padding: 4px 0 0;
 }
 
-.pp-search-panel .pp-search-bar {
+.pp-search-panel .pp-search-bar,
+.pp-picker__search {
   position: relative;
 }
 
@@ -449,14 +450,16 @@ main:has(> .pp-detail) {
   pointer-events: none;
 }
 
-.pp-search-panel .pp-search-input {
+.pp-search-panel .pp-search-input,
+.pp-picker__search .pp-search-input {
   height: 36px;
   padding: 6px 12px 6px 34px;
   border: 1px solid transparent;
   font-size: 14px;
 }
 
-.pp-search-panel .pp-search-input:focus {
+.pp-search-panel .pp-search-input:focus,
+.pp-picker__search .pp-search-input:focus {
   outline: none;
   border-color: #f89537;
   box-shadow: 0 0 0 2px rgba(248, 149, 55, 0.35);
@@ -891,4 +894,143 @@ main:has(> .pp-detail) {
     width: 100%;
     height: 160px;
   }
+}
+
+/* Compare picker (S3-DIN-02.3, Figma "Compare Dish"). */
+.pp-picker {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px 96px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.pp-picker button,
+.pp-picker input {
+  font-family: inherit;
+}
+
+.pp-picker__close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.pp-picker__close:focus-visible,
+.pp-picker__confirm:focus-visible,
+.pp-picker__choose:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+.pp-picker__label {
+  margin: 16px 0 8px;
+  color: #a8a59e;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pp-picker__kept {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 248, 237, 0.05);
+  border: 1px solid rgba(255, 248, 237, 0.1);
+}
+
+.pp-picker__kept-image {
+  display: block;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.pp-picker__kept-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pp-picker__hint,
+.pp-picker__none {
+  margin: 0 0 12px;
+  color: #a8a59e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pp-picker__search {
+  margin-bottom: 4px;
+}
+
+.pp-picker__list {
+  padding: 12px 0 0;
+}
+
+.pp-picker__list[hidden] {
+  display: none;
+}
+
+.pp-picker__option {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+
+.pp-picker__check {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #f89537;
+  color: #421708;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  text-align: center;
+}
+
+.pp-card--selected {
+  border-color: #f89537;
+}
+
+.pp-card--selected .pp-picker__check {
+  display: block;
+}
+
+.pp-picker__footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  max-width: 390px;
+  margin: 0 auto;
+  padding: 12px 16px 16px;
+  background: #2a2d36;
+  border-top: 1px solid rgba(113, 115, 122, 0.3);
+  text-align: center;
+}
+
+.pp-picker__confirm {
+  width: 100%;
+}
+
+.pp-picker__footer .pp-notice {
+  margin: 8px 0 0;
 }

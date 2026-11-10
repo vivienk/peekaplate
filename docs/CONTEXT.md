@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
+      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and the Compare picker use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -156,7 +156,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/withdrawal.ts",
         "frontend/diner/src/menu/searchView.ts",
         "frontend/diner/src/menu/searchView.test.ts",
-        "tests/e2e/search.spec.ts"
+        "tests/e2e/search.spec.ts",
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/compare/pickerScreen.test.ts",
+        "tests/e2e/compare-picker.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -165,7 +168,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3be30db8a0a7bf90ab4215e371d6b470e2ebfb87830713c2b4f9afbaff5c7053"
+      "sourceFingerprint": "3e609c0fa9717fbec1197f6c98b89217bdab8c9f135ac0dd95660de0bc1910be"
     },
     {
       "id": "console",
@@ -598,6 +601,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
+      "summary": "S3-DIN-02.3 Compare picker screen: frontend/diner/src/compare/pickerScreen.ts. pickerViewState(menu, exclude, query) is the pure view model over pickerOptions (shared searchMenu rules, incomplete and excluded dishes never offered, noOptions for a menu with no other dish). renderComparePicker shows Compare Dish, the Keeping dish, the search bar with No Result Found/Clear and the staff line, and single selection (aria-pressed, orange border and check). Close and Escape return to the detail Compare button. No request, no track() call, query never logged or put in the URL. Stacked on #121 to reuse its search markup and styles.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "tests/e2e/compare-picker.spec.ts"
+      ],
+      "next": "DIN-02.4 passes onConfirm (and exclude for Replace) to enable the Compare button and show the result. The no-other-dish copy is a placeholder until Rania/Amr design it; the heart stays disabled like the menu cards until DIN-02.2 Save is wired."
+    },
+    {
+      "date": "2026-11-08",
       "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
       "modules": [
         "diner"
@@ -682,14 +698,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
-    },
-    {
-      "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
     }
   ]
 }

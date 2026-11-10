@@ -53,6 +53,8 @@ export function renderDishDetail(
   dish: CompleteDish,
   onBack: () => void,
   notice: string | null = null,
+  // Opens the Compare picker (DIN-02.3); without it the Compare button stays disabled.
+  onCompare?: () => void,
 ): void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
@@ -126,14 +128,19 @@ export function renderDishDetail(
 
         <div class="pp-detail__actions">
           <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
-          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
+          <button class="pp-btn pp-btn--outlined pp-detail__compare" type="button"${onCompare ? '' : ' disabled'}>Compare <span aria-hidden="true">→</span></button>
         </div>
-        <p class="pp-notice">View Portion, Save and Compare are not available yet.</p>
+        <p class="pp-notice">${onCompare ? 'View Portion and Save are' : 'View Portion, Save and Compare are'} not available yet.</p>
       </section>
     </div>
   `;
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
   backButton?.addEventListener('click', onBack);
+  if (onCompare) {
+    container
+      .querySelector<HTMLButtonElement>('.pp-detail__compare')
+      ?.addEventListener('click', onCompare);
+  }
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 }

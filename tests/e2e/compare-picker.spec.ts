@@ -1,0 +1,182 @@
+// S3-DIN-02.3 Compare picker on synthetic fixtures (Figma "Compare Dish"). Evidence is fixture
+// only: no live menu, network or tracking is involved.
+import AxeBuilder from '@axe-core/playwright';
+import { expect, type Page, test } from '@playwright/test';
+
+const STAFF_LINE = 'For allergy questions, please ask the restaurant staff.';
+
+async function openPicker(page: Page, dishName = 'Avocado Toast') {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await page
+    .getByRole('button', { name: `Open ${dishName}` })
+    .first()
+    .click();
+  await expect(page.locator('.pp-detail')).toBeVisible();
+  await page.getByRole('button', { name: 'Compare' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Compare Dish' })).toBeVisible();
+}
+
+const optionNames = (page: Page) => page.locator('.pp-picker__option .pp-card__name-text');
+
+async function expectNoAxeViolations(page: Page) {
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(
+    violations.map(({ id, impact, nodes }) => ({
+      id,
+      impact,
+      targets: nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+}
+
+test('Compare on a dish detail opens the picker with that dish as Keeping', async ({ page }) => {
+  await openPicker(page);
+  await expect(page.getByRole('heading', { level: 1, name: 'Compare Dish' })).toBeFocused();
+  await expect(page.locator('.pp-picker__kept-name')).toHaveText('Avocado Toast');
+  await expect(page.getByText('Choose a dish to compare')).toBeVisible();
+
+  // The kept dish and incomplete dishes are not options.
+  await expect(optionNames(page)).toHaveText([
+    'Classic Eggs Benedict',
+    'Harvest Power Bowl',
+    'Salmon Poke Bowl',
+    'Garden Avocado Salad',
+  ]);
+  await expect(page.locator('.pp-picker__option .pp-card__save').first()).toBeDisabled();
+  await expectNoAxeViolations(page);
+});
+
+test('one dish is selected at a time, with the orange border and check', async ({ page }) => {
+  await openPicker(page);
+  const bowl = page.getByRole('button', { name: 'Compare with Harvest Power Bowl' });
+  const salad = page.getByRole('button', { name: 'Compare with Garden Avocado Salad' });
+
+  await bowl.click();
+  await expect(bowl).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.pp-card--selected .pp-card__name-text')).toHaveText(
+    'Harvest Power Bowl',
+  );
+  await expect(page.locator('.pp-card--selected .pp-picker__check')).toBeVisible();
+
+  // Tapping the card body selects too, and replaces the previous choice.
+  await page.locator('.pp-picker__option', { hasText: 'Garden Avocado Salad' }).click({
+    position: { x: 20, y: 100 },
+  });
+  await expect(salad).toHaveAttribute('aria-pressed', 'true');
+  await expect(bowl).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.pp-card--selected')).toHaveCount(1);
+
+  // The result screen is DIN-02.4, so Compare stays disabled and says so.
+  await expect(page.locator('.pp-picker__confirm')).toBeDisabled();
+  await expect(page.getByText('Compare results are not available yet.')).toBeVisible();
+  await page.screenshot({
+    path: 'test-results/compare-picker-selected-fixture.png',
+    fullPage: true,
+  });
+  await expectNoAxeViolations(page);
+});
+
+test('picker search uses the menu rules, with no results, Clear and the staff line', async ({
+  page,
+}) => {
+  await openPicker(page);
+  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+
+  await input.fill('benedict');
+  await expect(optionNames(page)).toHaveText(['Classic Eggs Benedict']);
+  await expect(page.locator('#pp-picker-status')).toHaveText('1 dish found');
+
+  await input.fill('salads');
+  await expect(optionNames(page)).toHaveText(['Garden Avocado Salad']);
+
+  await input.fill('avocado');
+  await expect(optionNames(page)).toHaveText(['Harvest Power Bowl', 'Garden Avocado Salad']);
+  await expect(page.getByText(STAFF_LINE)).toBeHidden();
+
+  await input.fill('gluten-free');
+  await expect(page.getByText(STAFF_LINE)).toBeVisible();
+  await expect(optionNames(page).first()).toBeVisible();
+
+  await input.fill('gluten');
+  await expect(page.getByText(STAFF_LINE)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No Result Found' })).toBeVisible();
+
+  await input.fill('pizza');
+  await expect(page.getByRole('heading', { name: 'No Result Found' })).toBeVisible();
+  await expect(optionNames(page)).toHaveCount(0);
+  await page.screenshot({
+    path: 'test-results/compare-picker-no-results-fixture.png',
+    fullPage: true,
+  });
+  await expectNoAxeViolations(page);
+
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(input).toHaveValue('');
+  await expect(input).toBeFocused();
+  await expect(optionNames(page)).toHaveCount(4);
+});
+
+test('a selection survives a search that hides it', async ({ page }) => {
+  await openPicker(page);
+  await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  await input.fill('benedict');
+  await input.fill('');
+  await expect(page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+test('close and Escape return to the dish detail on its Compare button', async ({ page }) => {
+  await openPicker(page);
+  await page.getByRole('button', { name: 'Close compare' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Avocado Toast' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Compare' })).toBeFocused();
+
+  // Escape in a typed search clears it first; a second Escape closes the picker.
+  await page.getByRole('button', { name: 'Compare' }).click();
+  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  await input.fill('pizza');
+  await page.keyboard.press('Escape');
+  await expect(input).toHaveValue('');
+  await expect(page.getByRole('heading', { level: 1, name: 'Compare Dish' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Compare' })).toBeFocused();
+
+  // Back from that detail still returns to the menu.
+  await page.locator('.pp-detail__back').click();
+  await expect(page.getByRole('button', { name: 'Open Avocado Toast' }).first()).toBeVisible();
+});
+
+test('the picker sends no request, fires no tracking call and never logs the query', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await page.waitForLoadState('networkidle');
+  const requests: string[] = [];
+  const logs: string[] = [];
+  page.on('request', (request) => {
+    if (!request.url().startsWith('data:')) requests.push(request.url());
+  });
+  page.on('console', (message) => logs.push(message.text()));
+
+  await page.getByRole('button', { name: 'Open Avocado Toast' }).first().click();
+  await page.getByRole('button', { name: 'Compare' }).click();
+  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  for (const query of ['benedict', 'pizza', 'gluten']) await input.fill(query);
+  await input.fill('');
+  await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  await page.getByRole('button', { name: 'Close compare' }).click();
+
+  expect(requests).toEqual([]);
+  expect(logs.filter((text) => text.includes('[track]'))).toEqual([]);
+  for (const query of ['benedict', 'pizza']) {
+    expect(logs.some((text) => text.toLowerCase().includes(query))).toBe(false);
+  }
+  expect(page.url()).toBe('http://127.0.0.1:5173/?scenario=demo');
+});
