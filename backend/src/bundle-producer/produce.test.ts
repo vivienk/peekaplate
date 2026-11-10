@@ -122,7 +122,10 @@ function manifest(n: number, dishId: string, revisionId: string, shaSeed = 'a') 
       height: h,
       quality: 80,
     })),
-    source: { sha256: 'b'.repeat(64) },
+    source: {
+      sha256: 'b'.repeat(64),
+      capture_evidence: 'Synthetic fixture; not a real restaurant capture.',
+    },
     review: { status: 'needs_review' },
     publication: { eligible: false },
   });
@@ -423,6 +426,24 @@ describe('S4-RES bundle producer: AC-S2 determinism', () => {
 });
 
 describe('S4-RES bundle producer: AC-S3 rejection and placeholders', () => {
+  it('keeps private capture evidence and the source digest out of public bytes', async () => {
+    const text = new TextDecoder().decode((await produceDefault()).bytes);
+    expect(text).not.toContain('capture_evidence');
+    expect(text).not.toContain('Synthetic fixture; not a real restaurant capture.');
+    expect(text).not.toContain('b'.repeat(64));
+  });
+
+  it.each([
+    ['missing source', undefined],
+    ['missing capture evidence', { sha256: 'b'.repeat(64) }],
+    ['blank capture evidence', { sha256: 'b'.repeat(64), capture_evidence: '   ' }],
+    ['NUL capture evidence', { sha256: 'b'.repeat(64), capture_evidence: '\u0000' }],
+    ['invalid source digest', { sha256: 'invalid', capture_evidence: 'Synthetic fixture' }],
+  ])('rejects a T0 manifest with %s', (_label, source) => {
+    const candidate = { ...manifest(1, LEEKS, id(120)), source };
+    expect(T0AssetManifestSchema.safeParse(candidate).success).toBe(false);
+  });
+
   it('rejects a manifest that substitutes the private original for a delivery variant', () => {
     const candidate = manifest(1, LEEKS, id(120));
     candidate.variants[0]!.path = 'source.jpg';

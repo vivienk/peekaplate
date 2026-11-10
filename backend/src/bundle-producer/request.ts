@@ -113,6 +113,10 @@ export const T0AssetManifestSchema = z
     schema_version: z.literal(1),
     asset_id: z.string().regex(/^t0_[0-9a-f]{32}$/),
     tier: z.literal('T0'),
+    source: z.object({
+      sha256: sha256Hex,
+      capture_evidence: text.pipe(z.string().min(1)),
+    }),
     dish: z.object({ dish_id: uuid, revision_id: uuid }),
     variants: z.array(T0AssetVariantSchema).length(4),
   })

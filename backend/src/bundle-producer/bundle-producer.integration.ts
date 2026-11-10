@@ -122,6 +122,10 @@ function manifestFor(dishId: string, revisionId: string, n: number): VerifiedT0A
       schema_version: 1,
       asset_id: `t0_${String(n).padStart(32, '0')}`,
       tier: 'T0',
+      source: {
+        sha256: 'b'.repeat(64),
+        capture_evidence: 'Synthetic fixture; not a real restaurant capture.',
+      },
       dish: { dish_id: dishId, revision_id: revisionId },
       variants: (['card-480', 'detail-1280'] as const).flatMap((name, index) =>
         (['webp', 'jpeg'] as const).map((format) => ({

@@ -17,6 +17,7 @@
     "format": "biome check --write .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run && node --test scripts/*.test.mjs",
+    "eval:owner-ai": "node scripts/evaluate-owner-ai.mjs",
     "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts",
     "test:db": "node scripts/test-db.mjs",
     "context:check": "node scripts/context.mjs check",

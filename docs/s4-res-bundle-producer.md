@@ -28,7 +28,7 @@ The strict request file supplies venue/menu IDs, restaurant identity, HTTPS base
 
 Name, description and revision come from tenant-scoped `dish_current`. Price, currency and ingredients come from the single accepted/edited draft linked to the dish. RES-01.2 corrections override those three fields when the extraction session's job and candidate match. A rejected candidate is omitted; an incomplete review or a corrected review with remaining incomplete fields becomes a placeholder. Missing dishes, ambiguous approved drafts or ambiguous candidate reviews fail the build. The loader reads a repeatable, read-only snapshot and explicitly filters by tenant even when the connection bypasses RLS.
 
-The T0 reader uses `card-480` and `detail-1280` WebP variants, requiring delivery filenames to match the variant name and format. The CLI verifies their file digests and sizes against the manifest. A mismatched dish ID is an error; a stale dish revision yields a placeholder. Manifest approval is not inferred.
+The T0 reader requires a valid source SHA-256 and a nonblank capture-evidence reference, and uses `card-480` and `detail-1280` WebP variants with matching delivery filenames. The CLI verifies their file digests and sizes against the manifest. Capture evidence stays private; its presence does not prove photographic authenticity or human approval. A mismatched dish ID is an error; a stale dish revision yields a placeholder. Manifest approval is not inferred.
 
 ## 5. Completeness and diagnostics
 

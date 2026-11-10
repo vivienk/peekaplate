@@ -69,3 +69,27 @@ Independent review found that corrected candidate reviews could retain incomplet
 | Synthetic CLI/DB/HTTP smoke | PASS after fixes: repeated bytes, repricing, admission, identity/hash rejection, runtime/tenant isolation and overwrite checks. Corrupted-asset admission separately produced zero handoff rows. |
 
 The earlier browser, Python and asset results remain scoped to the versions and conditions noted above; they are not hosted or restaurant approval.
+
+## Reconciled independent verification — 2026-11-10
+
+Reconciled author head `a5c765f` with `develop` at `2ffc32c`, preserving the
+current context paths and publication/report/consumer changes. Five provenance
+regressions failed before correction and pass afterward: a missing source,
+missing/blank/NUL capture reference, and an invalid source digest are rejected.
+Private provenance is absent from public bytes. All three manifest fixtures
+were updated. The duplicate backend dev dependency was removed; Zod remains
+the same pinned runtime version and frozen installation passes.
+
+| Check | Result and wall time |
+|---|---|
+| `TEST_WORKERD=1 pnpm check` | PASS: 1,198 unit tests, 72 script tests, lint, types, context and docs; 25.611 s. |
+| `pnpm verify test:db` | PASS: 213 SQL assertions, 86 PostgreSQL/Worker integration tests and local command smoke; 48.075 s. |
+| `pnpm verify build` | PASS: both frontends and Worker dry-run; 7.267 s. |
+| `pnpm exec playwright test --workers=1` | PASS: 111 Chromium tests; 113.884 s. |
+| `pnpm exec playwright test --config playwright.posthog.config.ts --workers=1` | PASS: 9 SDK browser tests with intercepted destinations; 21.476 s. |
+| Actual CLI with a `prepare_t0_bundle` synthetic asset and disposable PostgreSQL | PASS: eight checks; 14.805 s. Covers complete exact-byte output, no default writes, runtime denial, privileged admission, identical retry, stripped-source rejection, WebP tampering and overwrite refusal. |
+
+These are local tests with synthetic content. No hosted database, live menu,
+Queue setting or deployment changed. DIN-03 must still adopt the exact-byte
+verifier; immutable HTTPS hosting/CORS, restaurant/source approvals and genuine
+hosted diner/PostHog/canonical acceptance remain release gates.
