@@ -1,3 +1,4 @@
+import { suspendLiveTracking } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
@@ -39,6 +40,7 @@ let menuToken: MenuToken | null = null;
 let liveTrackingOn = false;
 // The re-read timer for the live menu. Only one exists at a time; mounting again stops the old one.
 let activeRefresher: MenuRefresher | null = null;
+let activeLoad: AbortController | null = null;
 // The open search query (null when the bar is closed), kept across dish detail and back.
 let searchQuery: string | null = null;
 
@@ -340,6 +342,10 @@ function focusAfterRetry(container: HTMLElement, succeeded: boolean): void {
 }
 
 export function mountMenuScreen(container: HTMLElement): void {
+  activeLoad?.abort();
+  menuToken = null;
+  liveTrackingOn = false;
+  void suspendLiveTracking();
   disposeObserver();
   activeCategoryId = null;
   openerDishId = null;
@@ -418,6 +424,9 @@ export function mountMenuScreen(container: HTMLElement): void {
     isLoading = true;
     activeRefresher?.stop();
     activeRefresher = null;
+    activeLoad?.abort();
+    const controller = new AbortController();
+    activeLoad = controller;
     const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
     fixtureMode = mode === 'fixture';
     renderLoading(container);
@@ -444,6 +453,7 @@ export function mountMenuScreen(container: HTMLElement): void {
               apiBase,
               ...route,
               onDelivery: (info) => {
+                if (controller.signal.aborted) return;
                 menuToken = {
                   value: info.token,
                   expiresAt: info.expiresAt,
@@ -459,21 +469,24 @@ export function mountMenuScreen(container: HTMLElement): void {
                     fetch: (input, init) => fetch(input, init),
                     now: () => Date.now(),
                     token: () => menuToken,
+                    canSend: () => !controller.signal.aborted && tracking.isLiveTracking(),
                   }),
                 );
               },
             });
             activeRefresher = createMenuRefresher({
-              source,
+              source: { load: () => source.load(controller.signal) },
               getCurrent: () => currentMenu,
               onSwap: swapMenu,
               // The publication is gone. The menu on screen stays, but nothing more is delivered.
               onStop: () => {
                 menuToken = null;
-                // shortcut: live activation must also gate new events to both destinations on 404.
+                controller.abort();
+                liveTrackingOn = false;
+                void tracking.suspendLiveTracking();
               },
             });
-            return source.load();
+            return source.load(controller.signal);
           })
         : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
@@ -485,6 +498,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
     loading
       .then((result: MenuLoadResult) => {
+        if (controller.signal.aborted) return;
         isLoading = false;
         if (result.status !== 'ready') {
           renderFailure(container, result.status, handleRetry);
@@ -500,6 +514,7 @@ export function mountMenuScreen(container: HTMLElement): void {
         }
       })
       .catch(() => {
+        if (controller.signal.aborted) return;
         isLoading = false;
         renderFailure(container, 'error', handleRetry);
         if (retryCount > 0) {
