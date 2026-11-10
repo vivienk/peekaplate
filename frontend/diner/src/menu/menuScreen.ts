@@ -1,3 +1,4 @@
+import type { MenuToken } from '../tracking/delivery';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
@@ -32,6 +33,9 @@ let openerDishId: string | null = null;
 // True while the screen is showing fixture data. Only then may it show the "Fixture data"
 // label and the demo restaurant name; real menus must never show either.
 let fixtureMode = true;
+// The current menu token and whether live tracking was switched on, kept in memory for the visit.
+let menuToken: MenuToken | null = null;
+let liveTrackingOn = false;
 // The open search query (null when the bar is closed), kept across dish detail and back.
 let searchQuery: string | null = null;
 
@@ -381,12 +385,38 @@ export function mountMenuScreen(container: HTMLElement): void {
     // adapter on demand (dynamic import), so fixture builds do not carry or run it.
     const loading: Promise<MenuLoadResult> =
       mode === 'live'
-        ? import('./published').then((m): Promise<MenuLoadResult> | MenuLoadResult => {
+        ? Promise.all([
+            import('./published'),
+            import('../tracking'),
+            import('../tracking/delivery'),
+          ]).then(([published, tracking, delivery]): Promise<MenuLoadResult> | MenuLoadResult => {
             const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
             if (!apiBase) return { status: 'error' };
             const route = menuRouteFromPath(window.location.pathname);
             if (!route) return { status: 'unavailable' };
-            return m.createPublishedMenuSource({ apiBase, ...route }).load();
+            return published
+              .createPublishedMenuSource({
+                apiBase,
+                ...route,
+                onDelivery: (info) => {
+                  menuToken = {
+                    value: info.token,
+                    expiresAt: info.expiresAt,
+                    publicationRevisionId: info.publicationId,
+                  };
+                  if (liveTrackingOn) return;
+                  liveTrackingOn = true;
+                  tracking.enableLiveTracking(
+                    delivery.createLiveDeliver({
+                      endpoint: `${apiBase.replace(/\/+$/, '')}/observations`,
+                      fetch: (input, init) => fetch(input, init),
+                      now: () => Date.now(),
+                      token: () => menuToken,
+                    }),
+                  );
+                },
+              })
+              .load();
           })
         : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
