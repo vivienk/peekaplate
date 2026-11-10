@@ -115,6 +115,20 @@ Related: `.github/workflows/deploy-preview.yml`, `docs/previews.md`.
 Source: https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/
 Pattern: actions.default-branch-trigger; first occurrence, no policy promotion.
 
+## LRN-20261109-EVAL-001 · Check evaluation evidence as well as process status
+
+**Logged**: November 9, 2026 · **Status**: resolved · **Area**: tests
+
+A test process can exit successfully after discovering only part of an offline
+evaluation. Its result artifact can correctly report incomplete execution while
+the wrapper incorrectly reports success. Validate fresh artifact completeness,
+dataset identity and passing unique records after a successful child exit; keep
+child failures nonzero. A one-of-21-case probe reproduced this mismatch, and the
+CLI regressions distinguish missing, incomplete, duplicate and failed evidence.
+
+Related: `scripts/evaluate-owner-ai.mjs`, `scripts/evaluate-owner-ai.test.mjs`.
+Pattern: eval.artifact-exit-consistency; first occurrence, no policy promotion.
+
 
 ## LRN-20261027-REMOTE-R2 · Verify the actual storage destination
 
