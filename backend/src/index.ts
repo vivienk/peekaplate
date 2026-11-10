@@ -295,6 +295,16 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
 ] as const;
 
 /**
+ * Exact console-origin allowlist for the owner report route only (S3-RES-03; agreed with Sai,
+ * 10 Nov). The owner dashboard calls the report from the browser with the owner's bearer token.
+ * No wildcard, preview or other console origins; other routes keep their own lists.
+ */
+export const CONSOLE_REPORT_CORS_ALLOWED_ORIGINS = [
+  'https://peekaplate-console-staging.pages.dev',
+  'http://127.0.0.1:5174',
+] as const;
+
+/**
  * Native rate limiting for token-scoped observation ingestion.
  * Note: Cloudflare Worker rate limiting bindings enforce approximate per-location limits
  * across edge locations, not a strict globally synchronized token bucket.
@@ -727,6 +737,16 @@ export function createApp(services: Dependencies = dependencies) {
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
   });
+  // CORS only: authentication, the synthetic-source rule and venue access below are unchanged.
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
   app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer /.test(authorization)) {
