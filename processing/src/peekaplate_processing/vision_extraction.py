@@ -12,6 +12,17 @@ import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
+import openai
+
+MAX_VISION_RESPONSE_BYTES = 1_000_000
+MAX_VISION_SERIALIZED_BYTES = 6_000_000
+MAX_VISION_CAPTURE_BYTES = 4_000_000
+MAX_VISION_ATTEMPTS = 400
+
+
+class VisionCaptureLimitError(Exception):
+    """The private attempt history cannot be represented safely."""
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from peekaplate_processing.schemas import (
     DishDraft,
@@ -179,7 +190,8 @@ def _parse_page(text: str, page_num: int, errors: list[str]) -> list[V4Dish]:
         return recovered
 
 
-def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None) -> tuple[list[V4Dish], list[str]]:
+def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | None = None,
+                      attempts: list[dict] | None = None, provider: str = "default") -> tuple[list[V4Dish], list[str]]:
     """Run direct multimodal extraction per page.
 
     Returns dishes (page numbers forced to the page that was sent) and page-level errors
@@ -201,22 +213,81 @@ def extract_vision_v4(llm: Any, page_images: list[dict], *, timeout: float | Non
                 {"type": "image_url", "image_url": {"url": page["image_url"]}},
             ]
             messages = [("system", prompt), ("human", content)]
-            if timeout is not None and timeout > 0:
-                # Same pattern as the OCR graph: cancel the awaited HTTP request when the deadline passes.
-                try:
-                    response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
-                except asyncio.TimeoutError:
-                    raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
-            else:
-                response = await vision_llm.ainvoke(messages)
+            record = None
+            if attempts is not None:
+                if len(attempts) >= MAX_VISION_ATTEMPTS:
+                    raise VisionCaptureLimitError("Vision attempt limit exceeded.")
+                record = {"attempt": len(attempts) + 1, "provider": provider,
+                          "page_number": page_num, "outcome": "error", "response": None,
+                          "truncated": False, "failure_class": "provider_error"}
+                attempts.append(record)
+            try:
+                if timeout is not None and timeout > 0:
+                    try:
+                        response = await asyncio.wait_for(vision_llm.ainvoke(messages), timeout=timeout)
+                    except asyncio.TimeoutError:
+                        raise TimeoutError(f"Vision request exceeded its {timeout:g}s deadline and was cancelled.") from None
+                else:
+                    response = await vision_llm.ainvoke(messages)
+            except Exception as error:
+                if record is not None:
+                    record["failure_class"] = ("timeout" if isinstance(error, TimeoutError) else
+                                               "rate_limit" if isinstance(error, openai.RateLimitError) else
+                                               "provider_error")
+                raise
             raw_content = getattr(response, "content", None)
-            if not isinstance(raw_content, str) or not raw_content.strip():
-                errors.append(f"Page {page_num}: vision model returned no content.")
+            capture_content = raw_content
+            structured = not isinstance(raw_content, str)
+            if structured and raw_content is not None:
+                try:
+                    capture_content = json.dumps(raw_content, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+                except (TypeError, ValueError, OverflowError, RecursionError):
+                    capture_content = None
+            if record is not None and isinstance(capture_content, str):
+                try:
+                    raw_bytes = capture_content.encode("utf-8")
+                except UnicodeEncodeError:
+                    # JSON escaping preserves non-UTF-8 code points without pretending
+                    # the serialized form is the original provider text.
+                    capture_content = json.dumps(capture_content, ensure_ascii=True)
+                    raw_bytes = capture_content.encode("utf-8")
+                    structured = True
+                used = sum(len(item["response"].encode("utf-8")) for item in attempts
+                           if item["response"] is not None)
+                serialized_used = sum(len(json.dumps(item["response"], ensure_ascii=False).encode("utf-8"))
+                                      for item in attempts if item["response"] is not None)
+                limit = min(MAX_VISION_RESPONSE_BYTES, MAX_VISION_CAPTURE_BYTES - used)
+                captured = raw_bytes[:limit].decode("utf-8", errors="ignore")
+                serialized_limit = MAX_VISION_SERIALIZED_BYTES - serialized_used
+                if len(json.dumps(captured, ensure_ascii=False).encode("utf-8")) > serialized_limit:
+                    low, high = 0, len(captured)
+                    while low < high:
+                        middle = (low + high + 1) // 2
+                        if len(json.dumps(captured[:middle], ensure_ascii=False).encode("utf-8")) <= serialized_limit:
+                            low = middle
+                        else:
+                            high = middle - 1
+                    captured = captured[:low]
+                record.update(outcome="response", response=captured,
+                              truncated=len(raw_bytes) > len(captured.encode("utf-8")),
+                              failure_class="invalid_response" if structured else
+                                            None if raw_content.strip() else "empty_response")
+                if record["truncated"]:
+                    errors.append(f"Page {page_num}: private vision response capture was truncated.")
+            elif record is not None:
+                record["failure_class"] = "invalid_response"
+            if structured or not raw_content.strip():
+                errors.append(f"Page {page_num}: vision model returned no usable text content.")
                 continue
             metadata = getattr(response, "response_metadata", None) or {}
             if metadata.get("finish_reason") == "length":
                 errors.append(f"Page {page_num}: vision output hit the token limit; later dishes may be missing.")
-            dishes = _parse_page(raw_content.strip(), page_num, errors)
+            try:
+                dishes = _parse_page(raw_content.strip(), page_num, errors)
+            except ValueError:
+                if record is not None and record["outcome"] == "response":
+                    record["failure_class"] = "parse_error"
+                raise
             all_dishes.extend(d.model_copy(update={"page_number": page_num}) for d in dishes)
         return all_dishes, errors
 
@@ -333,7 +404,7 @@ def build_v4_result(
         segments=segments,
         drafts=drafts,
         evidence=evidence,
-        configuration={"pipeline_version": "3", "v4_vision": True},
+        configuration={"pipeline_version": "3", "v4_vision": True, "input_mode": "vision_v4"},
         warnings=warnings,
         errors=errors,
     )

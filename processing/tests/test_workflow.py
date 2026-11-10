@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from fixture_factory import make_pdf
+from peekaplate_processing.model_providers import create_cascading_clients, create_model_client
 from peekaplate_processing.run_pipeline import configured_llm, run_pipeline
 from peekaplate_processing.workflow import DishBatch, ExtractedDish
 from peekaplate_processing.errors import ExtractionError
@@ -77,6 +78,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(any("Batch 2" in e for e in report.errors))
         self.assertNotIn("secret", str(report.errors))
 
+    def test_provider_extraction_error_is_sanitized(self):
+        class Broken(FakeLLM):
+            async def ainvoke(self, messages):
+                raise ExtractionError("synthetic-provider-secret")
+        with tempfile.TemporaryDirectory() as directory:
+            report = self.run_case(directory, 1, Broken())
+            saved = (Path(directory)/"run/extraction.json").read_text()
+        self.assertEqual(report.status, "failed")
+        for output in (str(report.errors), saved):
+            self.assertNotIn("synthetic-provider-secret", output)
+            self.assertIn("ExtractionError", output)
+
     def test_existing_output_directory_refuses_before_any_llm_call(self):
         with tempfile.TemporaryDirectory() as directory:
             llm = FakeLLM()
@@ -126,6 +139,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(str(model.openai_api_base), "https://openrouter.ai/api/v1")
         self.assertEqual(model.max_retries, 0)
         self.assertEqual(model.extra_body["reasoning"], {"enabled": False})
+
+    def test_cascade_keeps_openrouter_key_separate_from_generic_endpoint_and_model(self):
+        settings = {
+            "OPENROUTER_API_KEY": "synthetic-openrouter-key",
+            "MENU_AI_API_KEY": "synthetic-generic-key",
+            "MENU_AI_API_URL": "https://generic.example.test/v1/chat/completions",
+            "MENU_AI_MODEL": "generic-model",
+        }
+        with patch.dict(os.environ, settings, clear=True):
+            clients = create_cascading_clients()
+            generic = configured_llm()
+            explicit = create_model_client("openrouter")
+        self.assertEqual([name for name, _ in clients], ["qwen", "glm", "openrouter"])
+        self.assertEqual(
+            [client.model_name for _, client in clients],
+            ["qwen/qwen3.8-flash", "z-ai/glm-5.3-flash", "google/gemini-3-flash-preview"],
+        )
+        for _, client in clients:
+            self.assertEqual(str(client.openai_api_base), "https://openrouter.ai/api/v1")
+            self.assertEqual(client.openai_api_key.get_secret_value(), "synthetic-openrouter-key")
+        self.assertEqual(str(generic.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(generic.openai_api_key.get_secret_value(), "synthetic-generic-key")
+        self.assertEqual(generic.model_name, "generic-model")
+        self.assertEqual(str(explicit.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(explicit.model_name, "generic-model")
 
     def test_nara_settings_take_precedence_without_openrouter_parameters(self):
         settings = {"MENU_AI_API_KEY":"old-synthetic", "MENU_AI_API_URL":"https://openrouter.ai/api/v1/chat/completions", "MENU_AI_MODEL":"old-model", "NARA_ROUTER_KEY":"synthetic", "NARA_ROUTER_URL":"https://router.bynara.id/v1", "NARA_ROUTER_MODEL":"minimax-m3.1-flash:free"}

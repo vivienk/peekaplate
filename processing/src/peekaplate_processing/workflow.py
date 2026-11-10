@@ -539,10 +539,13 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                         last_request_start = time.perf_counter()
                 print(f"Batch {state['worker_id']}: requesting dishes from {len(state['pages'])} pages...", file=sys.stderr, flush=True)
                 with measure(timings, "model_request"):
-                    answer = await asyncio.wait_for(
-                        structured_llm.ainvoke([("system", prompt), ("human", human)]),
-                        timeout=request_timeout,
-                    )
+                    try:
+                        answer = await asyncio.wait_for(
+                            structured_llm.ainvoke([("system", prompt), ("human", human)]),
+                            timeout=request_timeout,
+                        )
+                    except ExtractionError as error:
+                        raise ExtractionError(request_failure(error)) from None
                 raw = answer.get("raw")
                 if on_response is not None:
                     on_response(raw)

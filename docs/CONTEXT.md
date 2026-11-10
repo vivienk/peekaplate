@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "bac1362557f88a8a404bdae9c60f2bce7aeb007b5d527f5cdc1008a36c683b7b"
+      "sourceFingerprint": "fdc531e0155c62a5502780c18265ea219ac71a2d7f35aa1c78a7d48e3e809048"
     },
     {
       "id": "database",
@@ -339,7 +339,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "64c5ccdbc6b4fe7138008abd11228e9cf86194bf3b94926da0dc0dea25a22a50"
+      "sourceFingerprint": "486d1a656843b944202c6394a986d25ea99f5d75a1b7418ff58cd95cbe987566"
     },
     {
       "id": "agents",
@@ -401,7 +401,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PR58 evidence-grounded extraction and review exports preserve schema/version pairing, OCR+image service input, failed reports and private immutable attempt bundles. The host stores validated artifacts before returning success. The older deployed Gemini staging service passed a two-dish synthetic extraction on November7; that does not validate this candidate image or owner upload/persistence. Paired host/container deployment and hosted archive acceptance remain pending.",
+      "summary": "PR58 evidence-grounded extraction and review exports preserve schema/version pairing, failed reports and private immutable attempt bundles. The local staging candidate selects vision_v4 with OCR+image fallback; vision output and proposed boxes require review. The host stores validated artifacts before returning success. The older deployed Gemini staging service passed a two-dish synthetic extraction on November7; that does not validate this candidate image or owner upload/persistence. Paired host/container deployment and hosted archive acceptance remain pending.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -485,7 +485,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "e1f5dd6026943495b4f53235515dad797a4727285dc1c5267ede6d1c329deb2e"
+      "sourceFingerprint": "55304267f69cec5ee031bd6656e24ca1225b8173f57be5d4ac256e0b1b032ca6"
     }
   ],
   "handoffs": [
