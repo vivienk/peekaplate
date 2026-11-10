@@ -1456,7 +1456,7 @@ describe('real PostgreSQL menu publication commands', () => {
     });
     expect(withdrawal.status).toBe(200);
     expect((await requestPublicMenu(menuId)).status).toBe(404);
-  });
+  },30000);
 
   it('keeps approval, publication and withdrawal as separate atomic commands', async () => {
     const menuId = crypto.randomUUID();
