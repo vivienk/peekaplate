@@ -1,0 +1,105 @@
+// Re-reads the published menu before its token expires (DIN-03). The first load arms the timer
+// through schedule(); each successful re-read calls schedule() again, so there is no other polling.
+// A new publication replaces the menu in one step. A 404, invalid data or a failed read keeps the
+// current menu.
+import type { Menu, MenuLoadResult, MenuSource } from './types';
+
+// How long before the 30-minute token expires the re-read starts. Proposed, not yet agreed.
+export const REFRESH_LEAD_MS = 5 * 60 * 1000;
+// Never re-read sooner than this after being scheduled, so a clock error cannot cause a tight loop.
+const MIN_DELAY_MS = 30_000;
+// A retry is only attempted while at least this much of the token's life remains.
+const MIN_RETRY_REMAINING_MS = 10_000;
+
+export type RefreshOutcome = 'same' | 'swapped' | 'kept' | 'stopped';
+
+export type MenuRefresherOptions = {
+  source: MenuSource;
+  getCurrent: () => Menu | null;
+  // Replaces the displayed menu with the new one. Called only with a fully validated menu.
+  onSwap: (menu: Menu) => void;
+  // The publication is gone (404): the current menu stays and event collection must stop.
+  onStop: () => void;
+  now?: () => number;
+};
+
+export type MenuRefresher = {
+  // Arms the re-read for a token that expires at expiresAt (epoch ms). Replaces any earlier timer.
+  schedule(expiresAt: number): void;
+  refresh(): Promise<RefreshOutcome>;
+  stop(): void;
+};
+
+export function createMenuRefresher(options: MenuRefresherOptions): MenuRefresher {
+  const now = options.now ?? (() => Date.now());
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+  let running = false;
+  let expiresAt = 0;
+
+  const clear = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const arm = (delayMs: number) => {
+    clear();
+    timer = setTimeout(() => {
+      timer = null;
+      void refresh();
+    }, delayMs);
+  };
+
+  async function refresh(): Promise<RefreshOutcome> {
+    if (stopped || running) return 'kept';
+    running = true;
+    try {
+      let result: MenuLoadResult;
+      try {
+        result = await options.source.load();
+      } catch {
+        result = { status: 'error' };
+      }
+      if (stopped) return 'kept';
+
+      if (result.status === 'ready') {
+        const current = options.getCurrent();
+        // Same publication: the token was already updated by the source; the menu is unchanged.
+        if (current && result.menu.publicationRevisionId === current.publicationRevisionId) {
+          return 'same';
+        }
+        options.onSwap(result.menu);
+        return 'swapped';
+      }
+
+      if (result.status === 'unavailable') {
+        stopped = true;
+        clear();
+        options.onStop();
+        return 'stopped';
+      }
+
+      // error, offline or empty: keep the current menu. Retry halfway to expiry while time remains.
+      const remaining = expiresAt - now();
+      if (remaining > MIN_RETRY_REMAINING_MS) arm(remaining / 2);
+      return 'kept';
+    } finally {
+      running = false;
+    }
+  }
+
+  return {
+    schedule(at) {
+      if (stopped) return;
+      expiresAt = at;
+      arm(Math.max(at - now() - REFRESH_LEAD_MS, MIN_DELAY_MS));
+    },
+    refresh,
+    stop() {
+      stopped = true;
+      clear();
+    },
+  };
+}

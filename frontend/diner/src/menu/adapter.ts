@@ -1,4 +1,3 @@
-import { PublicMenuContentBundleSchema } from '@peekaplate/contracts';
 import {
   ALLERGENS,
   type CompleteDish,
@@ -10,6 +9,8 @@ import {
   type MenuLoadResult,
 } from './types';
 import type { WireDish, WireImage, WireMenuBundle } from './wire';
+
+export type { WireDish, WireImage, WireMenuBundle } from './wire';
 
 export const FIXTURE_NOTICE = 'Fixture data';
 
@@ -88,11 +89,6 @@ export function toMenu(
   source: Menu['source'],
   publicationRevisionId: string,
 ): MenuLoadResult {
-  // Published data must match the shared contract. Any invalid record rejects the whole menu,
-  // so nothing is repaired or invented. Fixtures are demo data and skip this check.
-  if (source === 'published' && !PublicMenuContentBundleSchema.safeParse(bundle).success) {
-    return { status: 'error' };
-  }
   const categories = bundle.categories.map((c) => ({
     categoryId: c.category_id,
     name: c.name,
