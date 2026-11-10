@@ -1216,9 +1216,8 @@ article.insight {
   right: 0;
   bottom: 0;
   width: min(480px, 100vw);
-  background: var(--glass-strong);
-  backdrop-filter: blur(26px) saturate(150%);
-  -webkit-backdrop-filter: blur(26px) saturate(150%);
+  /* Solid so page text behind the modal drawer never shows through. */
+  background: var(--pp-color-white);
   border-left: 1px solid var(--glass-b);
   z-index: 41;
   display: flex;

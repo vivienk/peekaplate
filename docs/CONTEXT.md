@@ -168,7 +168,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. The AI preview mounts typed synthetic recommendation/abstention results and local loading/error/insufficient/withheld states in the existing dashboard panel/drawer; no live report/model or executable effects.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. The typed synthetic AI preview and four local states mount in the existing panel/modal drawer. Parent #105 supplies focus trapping, inert background, Escape and opener restoration; no live report/model/effects.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -187,7 +187,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/ai-preview/fixtures.ts",
         "frontend/console/src/owner-dashboard/ai-preview/ai-preview.css",
         "tests/e2e/owner-ai-preview.spec.ts",
-        "docs/owner-ai-preview.md"
+        "docs/owner-ai-preview.md",
+        "frontend/console/src/owner-dashboard/drawer.tsx",
+        "frontend/console/src/owner-dashboard/owner-dashboard.css",
+        "tests/e2e/owner-dashboard-drawer.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -197,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7f4ebe1384593a8e890cd8211f255eaf0c519c3ff1f9668a48c2e725a76fb581"
+      "sourceFingerprint": "d13747cb8c1de0706a0a3a0651e4f7c15200037d3dacae310d84672385d21f80"
     },
     {
       "id": "backend",
@@ -604,6 +607,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
+      "summary": "AI-01 preview synchronized with owner-dashboard parent #105 dcb6fd4. The App.tsx conflict retains the parent ModalDrawer and both desktop/mobile ChatBox ctxBar={aiPreview} mounts. Parent drawer/CSS/two keyboard regressions are inherited unchanged. Result schema, synthetic fixtures, UTC-window formatting and all four local display states are unchanged. Integration verification must cover the 16 component cases plus three preview and two modal-drawer browser cases; this is not live report/model or hosted acceptance.",
+      "modules": [
+        "console"
+      ],
+      "next": "Verify the synchronized candidate and matching-head CI, then request the offered shell recheck. Nifemi retains final placement/integration and Rania visual review remains separate. Keep #112/#124 Draft and AI-01 In Progress; no extra implementation or delivery date is committed."
+    },
+    {
+      "date": "2026-11-09",
       "summary": "AI-01 synthetic result preview is a separate component on the existing owner-dashboard shell. It renders the shared recommendation/abstained wire result and four local display states, labels every example synthetic, rejects extra internal fields/effects, and uses fixed abstention copy. The minimal demo caller mounts in the existing panel/drawer; shell, chat and other screens are preserved. This does not connect reports/models, approve actions or establish hosted acceptance. UTC display preserves intraday boundaries and normalizes offsets. The public owner-ai subpath avoids bundling unrelated observation/analytics schemas; no wire changes.",
       "modules": [
         "console",
@@ -684,14 +695,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
-    },
-    {
-      "summary": "November 5: S4-DATA-04 adds local checkpoint/archive/backfill/replay and synthetic owner-exclusion coverage. Context reconciliation preserves existing diner, console, delivery and release entries; test coverage does not establish hosted recovery or normal collection acceptance.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the reconciled checks and real disposable-database suites. Keep collection paused for remaining screen, consent, reporting, native recovery and hosted acceptance gates."
     }
   ]
 }

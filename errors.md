@@ -1817,3 +1817,31 @@ and standard three-server browser command are still required before pushing
 this candidate. Final visual inspection confirmed the component mounted in
 the existing desktop panel with its synthetic label and UTC time window;
 manual device/screen-reader and full shell design acceptance remain separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T03:25:04.862Z","exitCode":1}
+```
+
+## November 9 late parent-drawer integration
+
+The preview branch now includes parent #105 dcb6fd4. Its sole App.tsx conflict
+keeps the parent ModalDrawer wrapper and the existing synthetic aiPreview in
+both ChatBox ctxBar slots. The parent drawer implementation, CSS and two
+keyboard browser regressions are inherited unchanged; shared result schemas,
+fixtures, formatting and application behavior outside this mount are unchanged.
+
+The initial inline context helper stopped before writing because a shell quote
+split its source. Running the same guarded update from a standalone helper
+preserved the bounded context graph and refreshed its fingerprints.
+
+On the synchronized candidate, the 16 component cases, lint, seven package
+typechecks, context freshness, documentation links and frontend/Worker dry-run
+build pass. The full application suite passes; only the unchanged artifact
+junction security regression remains unable to create its test link in this
+agent sandbox. Its automatic observation is retained and the test is unchanged.
+A normal-terminal full check plus the three preview and two modal-drawer browser
+cases are required on the new combined source before requesting re-review.
+Earlier passing checks at ba0a19d do not verify this integration. Both PRs #112
+and #124 remain Draft; AI-01 remains In Progress with existing integration and
+visual-review ownership. No extra scope or delivery date is assigned.

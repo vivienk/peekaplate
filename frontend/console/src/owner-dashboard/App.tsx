@@ -15,6 +15,7 @@ import {
   route,
   type Scenario,
 } from './data';
+import { ModalDrawer } from './drawer';
 import { DishForm, type EditState, MenuList, Review, Saved } from './menu';
 import {
   Actions,
@@ -372,17 +373,9 @@ export function App() {
         <ChatBox chat={panelChat} panel ctxBar={aiPreview} />
       </aside>
       {chatOpen && (
-        <div>
-          <div className="scrim" onClick={() => setChatOpen(false)} />
-          <div className="drawer-p" role="dialog" aria-label="Ask PeekaPlate AI">
-            <ChatBox
-              chat={panelChat}
-              drawer
-              onClose={() => setChatOpen(false)}
-              ctxBar={aiPreview}
-            />
-          </div>
-        </div>
+        <ModalDrawer label="Ask PeekaPlate AI" onClose={() => setChatOpen(false)}>
+          <ChatBox chat={panelChat} drawer onClose={() => setChatOpen(false)} ctxBar={aiPreview} />
+        </ModalDrawer>
       )}
       {toast && (
         <div className="toast" role="status">

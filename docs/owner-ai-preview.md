@@ -4,9 +4,11 @@ This slice renders the existing `owner-recommendation.v1` public result inside
 the development/PR-preview dashboard from #105. It does not connect a live
 report or model, authorize a restaurant, approve advice, or execute changes.
 The selected design surface is #105's existing owner AI panel and mobile
-drawer at base `583677a`; the component uses its light design tokens. Final
-visual sign-off and the shell's keyboard-focus/closing corrections remain
-separate from this component.
+drawer, initially based on `583677a` and synchronized with its `dcb6fd4`
+modal-drawer fix. The component uses its light design tokens. The existing
+`ModalDrawer` retains focus trapping, inert background, Escape/close behavior
+and opener-focus restoration while the nested `ChatBox` receives the synthetic
+preview through `ctxBar`. Final placement and visual sign-off remain separate.
 
 ## Integration boundary
 
@@ -48,8 +50,9 @@ examples are local and explicitly fictional. The dashboard remains excluded
 from normal production builds by the existing preview-demo build rule.
 
 Nifemi retains RES-03 integration ownership and replaces the demo caller when
-the agreed integration is ready. Jeffin retains the dashboard shell and its
-drawer/focus fixes. AI-01 owns this result component and typed output boundary;
+the agreed integration is ready. Jeffin retains the dashboard shell, including
+the modal-drawer behavior inherited from #105. AI-01 owns this result component
+and typed output boundary;
 other dashboard screens retain their existing owners. No delivery date or
 model/provider choice is established by this slice.
 
@@ -64,7 +67,7 @@ scoped accessibility. Run through the repository verification entry points:
 ```powershell
 pnpm install --frozen-lockfile
 pnpm check
-pnpm exec playwright test tests/e2e/owner-ai-preview.spec.ts --workers=1
+pnpm exec playwright test tests/e2e/owner-ai-preview.spec.ts tests/e2e/owner-dashboard-drawer.spec.ts --workers=1
 pnpm verify build
 ```
 
