@@ -5,18 +5,27 @@ import {
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { type AiPreviewState, AiRecommendationPreview } from './AiRecommendationPreview';
+import {
+  type AiPreviewContext,
+  type AiPreviewState,
+  AiRecommendationPreview,
+} from './AiRecommendationPreview';
 import { syntheticAbstention, syntheticRecommendation } from './fixtures';
+import { SyntheticAiPreviewDemo } from './SyntheticAiPreviewDemo';
 
-const render = (state: AiPreviewState) =>
-  renderToStaticMarkup(<AiRecommendationPreview state={state} />);
+const expectedContext: AiPreviewContext = {
+  venueId: syntheticRecommendation.venueId,
+  timeWindow: syntheticRecommendation.timeWindow,
+};
+const render = (state: AiPreviewState, context = expectedContext) =>
+  renderToStaticMarkup(<AiRecommendationPreview state={state} expectedContext={context} />);
 
-describe('synthetic AI result preview', () => {
-  it('renders the existing typed recommendation as a review-only synthetic draft', () => {
+describe('AI result preview', () => {
+  it('renders a context-matched typed recommendation as a review-only draft', () => {
     expect(OwnerRecommendationResultSchema.safeParse(syntheticRecommendation).success).toBe(true);
     const html = render({ kind: 'result', result: syntheticRecommendation });
-    expect(html).toContain('Synthetic AI preview');
-    expect(html).toContain('No live restaurant data is loaded');
+    expect(html).toContain('AI recommendation');
+    expect(html).not.toContain('No live restaurant data is loaded');
     expect(html).toContain('Draft recommendation');
     expect(html).toContain(
       syntheticRecommendation.status === 'recommendation' && syntheticRecommendation.draftAction,
@@ -59,7 +68,10 @@ describe('synthetic AI result preview', () => {
     'normalizes the displayed UTC window and preserves intraday boundaries: $start',
     ({ start, end, displayedStart, displayedEnd }) => {
       const result = { ...syntheticRecommendation, timeWindow: { start, end } };
-      const html = render({ kind: 'result', result });
+      const html = render(
+        { kind: 'result', result },
+        { ...expectedContext, timeWindow: { start, end } },
+      );
       expect(html).toContain(displayedStart);
       expect(html).toContain(displayedEnd);
       expect(html).toContain('(end excluded)');
@@ -67,13 +79,13 @@ describe('synthetic AI result preview', () => {
   );
 
   it.each([
-    ['loading', 'Loading the synthetic example', 'status'],
-    ['error', 'The example could not be displayed', 'alert'],
+    ['loading', 'Loading recommendation', 'status'],
+    ['error', 'The recommendation could not be displayed', 'alert'],
     ['insufficient-evidence', 'Not enough usable evidence', 'status'],
     ['withheld', 'Evidence withheld', 'status'],
   ] as const)('keeps %s as a local UI state, separate from the wire result', (kind, copy, role) => {
     const html = render({ kind });
-    expect(html).toContain('Synthetic AI preview');
+    expect(html).not.toMatch(/Synthetic|Fictional|choose another state|No live/);
     expect(html).toContain(copy);
     expect(html).toContain(`role="${role}"`);
     expect(html).not.toContain('Draft recommendation');
@@ -95,7 +107,7 @@ describe('synthetic AI result preview', () => {
       ...change,
     } as unknown as OwnerRecommendationResult;
     const html = render({ kind: 'result', result });
-    expect(html).toContain('The example could not be verified');
+    expect(html).toContain('The recommendation could not be verified');
     expect(html).not.toContain('Draft recommendation');
     expect(html).not.toContain('987654');
     expect(html).not.toContain('eligible');
@@ -121,5 +133,53 @@ describe('synthetic AI result preview', () => {
     const html = render({ kind: 'result', result });
     expect(html).toContain('&lt;script&gt;');
     expect(html).not.toContain('<script>');
+  });
+
+  it('keeps fictional-example notices in the synthetic caller only', () => {
+    const html = renderToStaticMarkup(<SyntheticAiPreviewDemo />);
+    expect(html).toContain('Synthetic AI preview');
+    expect(html).toContain('Fictional examples only. No live restaurant data is loaded.');
+    expect(html).toContain('Draft recommendation');
+  });
+
+  it.each([syntheticRecommendation, syntheticAbstention])(
+    'refuses a result without expected report context, including abstentions',
+    (result) => {
+      // Exercise a runtime caller that bypasses the required-result-context prop type.
+      const html = renderToStaticMarkup(
+        // @ts-expect-error Untyped runtime callers must also fail closed without context.
+        <AiRecommendationPreview state={{ kind: 'result', result }} />,
+      );
+      expect(html).toContain('The recommendation could not be verified');
+      expect(html).not.toContain('Draft recommendation');
+      expect(html).not.toContain('The report evidence needed');
+    },
+  );
+
+  it.each([
+    { venueId: '00000000-0000-4000-8000-000000000499' },
+    { venueId: 'not-a-venue' },
+    { timeWindow: { ...expectedContext.timeWindow, start: '2026-10-06T00:00:00Z' } },
+    { timeWindow: { ...expectedContext.timeWindow, end: '2026-10-13T00:00:00Z' } },
+    { timeWindow: { ...expectedContext.timeWindow, start: '2026-10-05T00:00:00.000Z' } },
+    { timeWindow: { start: 'invalid', end: expectedContext.timeWindow.end } },
+    { reportId: '00000000-0000-4000-8000-000000000499' },
+    { reportId: 'not-a-report' },
+  ])('refuses mismatched or invalid screen context: %j', (changed) => {
+    for (const result of [syntheticRecommendation, syntheticAbstention]) {
+      const html = render({ kind: 'result', result }, { ...expectedContext, ...changed });
+      expect(html).toContain('The recommendation could not be verified');
+      expect(html).not.toContain('Draft recommendation');
+      expect(html).not.toContain('The report evidence needed');
+      expect(html).not.toContain('Review the dish card wording');
+    }
+  });
+
+  it('accepts a known matching report ID without inventing one for the public report', () => {
+    const html = render(
+      { kind: 'result', result: syntheticRecommendation },
+      { ...expectedContext, reportId: syntheticRecommendation.reportId },
+    );
+    expect(html).toContain('Draft recommendation');
   });
 });

@@ -15,14 +15,17 @@ test('existing desktop AI panel mounts all six synthetic states without API or m
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI', exact: true });
   await panel.getByText('Typed AI result preview', { exact: true }).click();
   const result = panel.getByRole('region', { name: 'Synthetic AI result' });
+  const reusable = result.getByRole('region', { name: 'AI recommendation result' });
   const state = panel.getByLabel('Synthetic preview state');
   await expect(result.getByText('Synthetic AI preview', { exact: true })).toBeVisible();
+  await expect(result).toContainText('Fictional examples only. No live restaurant data is loaded.');
+  await expect(reusable).not.toContainText('No live restaurant data is loaded');
   await expect(result.getByRole('heading', { name: 'Draft recommendation' })).toBeVisible();
   await expect(result).toContainText('Review required. This preview cannot apply changes.');
   for (const [value, copy] of [
     ['abstained', 'No recommendation'],
-    ['loading', 'Loading the synthetic example'],
-    ['error', 'The example could not be displayed'],
+    ['loading', 'Loading recommendation'],
+    ['error', 'The recommendation could not be displayed'],
     ['insufficient-evidence', 'Not enough usable evidence'],
     ['withheld', 'Evidence withheld'],
   ]) {

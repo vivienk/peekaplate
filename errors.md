@@ -1845,3 +1845,33 @@ two modal-drawer browser cases are required before requesting re-review.
 Earlier passing checks at ba0a19d do not verify this integration. Both PRs #112
 and #124 remain Draft; AI-01 remains In Progress with existing integration and
 visual-review ownership. No extra scope or delivery date is assigned.
+
+## November 10 AI preview screen-context handoff
+
+The reusable component formerly rendered every schema-valid result without
+checking the report selected on screen and always included fictional-demo copy.
+The expanded component suite reproduces these gaps before the implementation:
+20 cases fail and eight pass. The component now requires the expected venue and
+exact window before showing either wire status, with optional comparison of a
+report ID already known to the caller. Missing or malformed runtime context
+fails closed. The synthetic wrapper retains all fictional notices and passes
+its fixed context; no public report ID is invented or live source connected.
+
+All 28 component cases pass after the correction. The first strict typecheck
+also caught test-helper inference, an invalid never-spread test cast and an
+exact-optional-property mismatch in the private render props. Explicit context
+typing, a checked expected-error runtime regression and an undefined-aware
+private prop resolve those without weakening result-call requirements. Console
+strict TypeScript now passes. App.tsx, ModalDrawer, public result contracts,
+deterministic validation and both existing mounts are unchanged. Full browser,
+build and final-head evidence are recorded separately, not implied by unit tests.
+
+Lint, seven workspace typechecks, context/documentation checks and the normal
+frontend/Worker dry-run build pass on this correction. The standard five-case
+browser command did not reach test execution: local web-server startup stopped
+reporting progress before readiness, and the bounded attempt was interrupted.
+It is NOT RUN evidence for those cases, not a passing run or an established
+component defect. A task-local console-only harness may verify the unchanged
+preview/drawer assertions separately; the repository's three-server CI config
+and all test assertions remain intact. Final results belong to the exact-head
+handoff and do not establish live report, authorization or design acceptance.

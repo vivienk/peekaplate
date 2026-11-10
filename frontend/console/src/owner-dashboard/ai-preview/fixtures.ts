@@ -15,6 +15,12 @@ const identity = {
   allowedEffects: [],
 };
 
+export const syntheticPreviewContext = {
+  venueId: identity.venueId,
+  timeWindow: identity.timeWindow,
+  reportId: identity.reportId,
+};
+
 export const syntheticRecommendation = OwnerRecommendationResultSchema.parse({
   ...identity,
   status: 'recommendation',

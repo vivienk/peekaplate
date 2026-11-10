@@ -15,10 +15,20 @@ preview through `ctxBar`. Final placement and visual sign-off remain separate.
 Import `AiRecommendationPreview` and `AiPreviewState` from
 [`AiRecommendationPreview.tsx`](../frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx),
 and load the adjacent `ai-preview.css` through the console stylesheet/bundle.
-Pass one local display state:
+Pass one local display state. A result requires the expected context from the
+report currently selected on screen, independently of the result being rendered:
 
 ```tsx
-<AiRecommendationPreview state={{ kind: 'result', result }} />
+<AiRecommendationPreview
+  state={{ kind: 'result', result }}
+  expectedContext={{
+    venueId: report.venue_id,
+    timeWindow: {
+      start: report.report_metadata.date_window.start_time,
+      end: report.report_metadata.date_window.end_time,
+    },
+  }}
+/>
 ```
 
 `result` is the existing shared `OwnerRecommendationResult`, with only
@@ -34,16 +44,33 @@ wire fields or statuses. Displayed report boundaries are normalized to UTC and
 retain their time of day; original offset-bearing values remain in the `time`
 elements' `dateTime` attributes.
 
+`AiPreviewContext` contains the expected venue UUID and exact start/end strings.
+The result prop requires this context in TypeScript, and missing or invalid
+runtime context fails closed. Both recommendations and abstentions must match;
+changing the selected venue or window therefore hides an old result immediately.
+UUID case is normalized by the shared contract; window strings are compared
+exactly, without treating differently formatted instants as the same identity.
+Loading/error/insufficient-evidence/withheld states may omit context because they
+show no result. Do not derive expected context from that result itself.
+
+An optional `reportId` may additionally bind a report identity already known to
+the caller. Public `owner_report.v1` has no report ID: this component does not
+invent one, derive one from a timestamp or define that producer relationship.
+The shared producer/caller identity handoff remains open with Louis. Expected
+context is a UI consistency check, not membership authorization, provenance,
+evidence validation or permission to connect live reporting/model output.
+
 The `loading`, `error`, `insufficient-evidence` and `withheld` variants belong
 to `AiPreviewState`, not to the server response schema. None has a numeric
-fallback. All variants remain explicitly synthetic. There is no live-mode
-switch, network client, backend import, free-form chat, approve/apply button
+fallback. The reusable component uses neutral recommendation/loading/error text.
+There is no live-mode switch, network client, backend import, free-form chat, approve/apply button
 or internal cohort input. UUID evidence references remain in the typed result
 for integration, rather than being presented as meaningful owner-facing prose.
 
 The separately importable component is mounted by
 [`SyntheticAiPreviewDemo.tsx`](../frontend/console/src/owner-dashboard/ai-preview/SyntheticAiPreviewDemo.tsx).
-Its collapsible state selector occupies the existing `ChatBox.ctxBar` slot in
+The demo caller owns all fictional-example notices and supplies a fixed explicit
+synthetic venue/window/report context. Its collapsible state selector occupies the existing `ChatBox.ctxBar` slot in
 the desktop panel and mobile drawer; the earlier illustrative chat is unchanged.
 Open `/owner-dashboard.html` and expand **Typed AI result preview**. All six
 examples are local and explicitly fictional. The dashboard remains excluded
@@ -60,7 +87,8 @@ model/provider choice is established by this slice.
 
 Unit tests cover the shared result examples, all local display states, invalid
 wire statuses, internal-field/effect rejection, fixed withheld copy and escaped
-text. Browser tests exercise the actual desktop panel/mobile drawer, local
+text, plus missing/mismatched venue/window context, optional known report ID and
+neutral component versus synthetic-wrapper copy. Browser tests exercise the actual desktop panel/mobile drawer, local
 state switching, absence of fetch/XHR, keyboard controls, narrow layout and
 scoped accessibility. Run through the repository verification entry points:
 

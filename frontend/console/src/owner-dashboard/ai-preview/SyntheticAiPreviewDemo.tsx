@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { type AiPreviewState, AiRecommendationPreview } from './AiRecommendationPreview';
-import { syntheticAbstention, syntheticRecommendation } from './fixtures';
+import { syntheticAbstention, syntheticPreviewContext, syntheticRecommendation } from './fixtures';
 import './ai-preview.css';
 
 const examples = {
@@ -34,7 +34,16 @@ export function SyntheticAiPreviewDemo() {
         <option value="insufficient-evidence">Insufficient evidence</option>
         <option value="withheld">Withheld</option>
       </select>
-      <AiRecommendationPreview state={examples[example]} />
+      <section aria-label="Synthetic AI result">
+        <p className="ai-preview__label">Synthetic AI preview</p>
+        <p className="ai-preview__notice">
+          Fictional examples only. No live restaurant data is loaded.
+        </p>
+        <AiRecommendationPreview
+          state={examples[example]}
+          expectedContext={syntheticPreviewContext}
+        />
+      </section>
     </details>
   );
 }

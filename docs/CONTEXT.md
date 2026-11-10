@@ -168,7 +168,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. The typed synthetic AI preview and four local states mount in the existing panel/modal drawer. Parent #105 supplies focus trapping, inert background, Escape and opener restoration; no live report/model/effects.",
+      "summary": "React/Vite staff shell with optional consent-gated technical PostHog views; these do not prove owner identity or business activity. App-local TextField wraps design-system ui/Input with linked hints/errors and a keyboard-focus outline. Labelled foundations/dashboard demos are excluded from normal production builds. The reusable typed AI preview has neutral copy and requires expected venue/exact-window context before displaying recommendation or abstention; an already-known report ID may also be checked. This is UI consistency, not authorization/provenance or a producer ID mapping. The synthetic wrapper owns fictional labels and fixed context. Both existing panel/modal-drawer mounts remain; parent #105 retains focus trapping, inert background, Escape and opener restoration. No live report/model/effects; final integration/design and real identity remain gates.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -200,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "340a1d159b332edc89a862173951047a8f1f38dfd6779e86135f13d4a4d67643"
+      "sourceFingerprint": "a5c1cc911c7aec52978f99c3be65e2211698226055663e0482eefecf81deb32f"
     },
     {
       "id": "backend",
@@ -606,6 +606,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-10",
+      "summary": "PR124 addresses the RES-03 component handoff: reusable copy is neutral while SyntheticAiPreviewDemo owns fictional labels. Both wire statuses require a runtime-checked expected venue and exact report window; optional known reportId adds a match without inventing a public owner_report identity. New regressions fail before the change and 28 component cases plus console strict types pass afterward. App/ModalDrawer and both mounts are unchanged.",
+      "modules": [
+        "console",
+        "contracts"
+      ],
+      "next": "Verify final builds/structure and the three preview/two drawer browser cases, then request Nifemi/Jeffin recheck. Context is not authorization or live readiness; Louis identity handoff, current membership, policy/model and visual/hosted acceptance remain separate. Keep PR112/124 Draft and AI-01 In Progress."
+    },
+    {
       "date": "2026-11-09",
       "summary": "AI-01 preview synchronized with owner-dashboard parent #105 dcb6fd4. The App.tsx conflict retains the parent ModalDrawer and both desktop/mobile ChatBox ctxBar={aiPreview} mounts. Parent drawer/CSS/two keyboard regressions are inherited unchanged. Result schema, synthetic fixtures, UTC-window formatting and all four local display states are unchanged. Integration verification must cover the 16 component cases plus three preview and two modal-drawer browser cases; this is not live report/model or hosted acceptance.",
       "modules": [
@@ -686,15 +695,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
-    },
-    {
-      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     }
   ]
 }
