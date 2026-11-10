@@ -2376,3 +2376,44 @@ fresh report, frozen dataset/counts and unique passing records before returning
 success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 published-menu refresh and browser verification
+
+PR85 browser CI 42857040744 failed the detail-image fallback assertion: a real
+DNS failure raced the explicitly dispatched error and consumed both fallback
+steps. The test now uses a distinct valid data image and dispatches the first
+failure synchronously, leaving no network error to race it.
+
+Two new Chromium regressions failed before the rendering fix: publication swap
+lost focused Search, and returning from a withdrawn dish had no focus target.
+The swap now restores the equivalent visible control; a missing opener falls
+back to the menu heading. Both regressions and all ten focused browser checks
+pass. These use a synthetic source seam, not hosted integrity/delivery evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T18:05:34.662Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:06:48.247Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-10T18:07:11.221Z","exitCode":1}
+```
+
+The final focus regression also covers duplicate cards: restoration selects the
+visible category opener instead of its hidden All copy. It failed before the
+visible-match correction. A context summary initially exceeded the graph limit
+and was shortened without dropping the live-release gates. The concurrent full
+check hit a 20-second workerd loopback timeout; a separate unchanged rerun passed
+all 1,121 unit and 72 script tests in 29.058 seconds. A concurrent default-worker
+browser run timed out awaiting 500 persisted outbox records (306 observed);
+single-worker verification is recorded separately rather than hiding that run.
+
+All 111 browser checks then passed with one worker in 96.794 seconds, including
+the unchanged outbox-capacity case and the three refresh focus regressions.
+The high-concurrency failures are retained above; assertions/timeouts remain unchanged.

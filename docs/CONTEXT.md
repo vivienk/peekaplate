@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
+      "summary": "Diner fixture menu, detail, search, Save and Compare share contracts/tokens. Explicit live mode fetches the pointer and bundle, maps unavailable/offline/error, refreshes tokens and preserves focus across publication swaps. Fixtures remain default; byte verification fails closed pending #117. Tracking validates observation.v2 with cached-identity reconciliation. One off-by-default consent gate covers canonical/PostHog and DNT/GPC; withdrawal retires queued work. Outbox uses atomic IndexedDB or Web-Locked localStorage with memory fallback. Fixture mode sends neither destination. Token-bound delivery handles receipts, retries and backoff. Before live activation: shared byte verification, 404 collection gating for both destinations, token/browser integration and privacy/design acceptance.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -103,10 +103,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/menuScreen.test.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/published.ts",
+        "frontend/diner/src/menu/published.test.ts",
+        "frontend/diner/src/menu/config.ts",
+        "frontend/diner/src/menu/config.test.ts",
         "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "frontend/diner/src/menu/route.ts",
+        "frontend/diner/src/menu/route.test.ts",
+        "frontend/diner/src/menu/refresh.ts",
+        "frontend/diner/src/menu/refresh.test.ts",
         "tests/e2e/menu-states.spec.ts",
+        "tests/e2e/published-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -160,7 +169,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/delivery.ts",
         "frontend/diner/src/tracking/delivery.test.ts",
         "frontend/diner/src/tracking/delivery.fixtures.test.ts",
-        "tests/e2e/tracking-delivery.spec.ts"
+        "tests/e2e/tracking-delivery.spec.ts",
+        "tests/e2e/published-refresh.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -169,7 +179,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "377a195623cab69f1ad5d26526df8a8e73b050f2b8cd6cfeb61cc548b61de4b1"
+      "sourceFingerprint": "dea1432963c10750273dfedc27a7e6e753f90eabd953c260b172bb023d365a43"
     },
     {
       "id": "console",
@@ -606,6 +616,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-10",
+      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
+    },
+    {
       "date": "2026-11-09",
       "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
       "modules": [
@@ -691,16 +709,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
-      "modules": [
-        "assets",
-        "processing",
-        "delivery"
-      ],
-      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
     }
   ]
 }
