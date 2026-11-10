@@ -603,3 +603,5 @@ migration is required. [Release and verification instructions](owner-report-stag
 record the request flow and deployment readback requirements. Record the deployed
 main SHA/version and hosted results in the release PR; prior local evidence does
 not establish hosted readiness.
+
+Current narrow release and deployment evidence: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

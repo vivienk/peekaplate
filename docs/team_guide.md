@@ -771,3 +771,5 @@ are deliberately limited to the server-approved synthetic venue; production
 and other venues remain blocked. See [request flow, status codes and release
 checks](owner-report-staging.md). Deployment evidence belongs in the narrow
 owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

@@ -59,5 +59,5 @@ nonowner/cross-tenant denial, revocation and privacy suppression. Hosted verific
 must additionally check allowed/blocked origins, genuine staff-session access,
 membership denial and unchanged provider bindings. Record the exact main SHA,
 Worker version, measured checks and any gaps in the release PR before announcing
-hosted readiness. The PR's deployment comment is the current hosted evidence;
+hosted readiness. The [release PR 135 deployment comment](https://github.com/vivienk/peekaplate/pull/135) is the current hosted evidence;
 local checks alone do not establish it.
