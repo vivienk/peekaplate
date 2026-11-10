@@ -33,6 +33,7 @@ export type MenuRefresher = {
 export function createMenuRefresher(options: MenuRefresherOptions): MenuRefresher {
   const now = options.now ?? (() => Date.now());
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let expiryTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   let running = false;
   let expiresAt = 0;
@@ -42,6 +43,17 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
       clearTimeout(timer);
       timer = null;
     }
+  };
+  const clearExpiry = () => {
+    if (expiryTimer !== null) clearTimeout(expiryTimer);
+    expiryTimer = null;
+  };
+  const stopCollection = () => {
+    if (stopped) return;
+    stopped = true;
+    clear();
+    clearExpiry();
+    options.onStop();
   };
 
   const arm = (delayMs: number) => {
@@ -75,9 +87,7 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
       }
 
       if (result.status === 'unavailable') {
-        stopped = true;
-        clear();
-        options.onStop();
+        stopCollection();
         return 'stopped';
       }
 
@@ -94,12 +104,15 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
     schedule(at) {
       if (stopped) return;
       expiresAt = at;
+      clearExpiry();
+      expiryTimer = setTimeout(stopCollection, Math.max(at - now(), 0));
       arm(Math.max(at - now() - REFRESH_LEAD_MS, MIN_DELAY_MS));
     },
     refresh,
     stop() {
       stopped = true;
       clear();
+      clearExpiry();
     },
   };
 }

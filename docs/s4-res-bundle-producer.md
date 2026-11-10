@@ -12,7 +12,7 @@ The authoritative schema is `PublicMenuContentBundleSchema` in [contracts](../pa
 
 ## 3. Integrity, IDs and handoff
 
-Bundle bytes are UTF-8 of `canonicalJson(PublicMenuContentBundleSchema.parse(bundle))`, with no trailing newline. `contentHash` is SHA-256 of those exact bytes. Consumers must hash the fetched bytes against `response.bundle.contentHash` **before** parsing, not reserialize them. `verifyPublicMenuContentBytes` and the [synthetic fixture](../packages/contracts/fixtures/public-menu-bundle.v1/README.md) implement this rule; DIN-03 adoption remains open.
+Bundle bytes are UTF-8 of `canonicalJson(PublicMenuContentBundleSchema.parse(bundle))`, with no trailing newline. `contentHash` is SHA-256 of those exact bytes. Consumers must hash the fetched bytes against `response.bundle.contentHash` **before** parsing, not reserialize them. The diner now uses `verifyPublicMenuContentBytes` by default; see the [connection and hosted acceptance procedure](diner-connection.md) and [synthetic fixture](../packages/contracts/fixtures/public-menu-bundle.v1/README.md).
 
 `derivedUuid(label, ...parts)` uses the first 16 SHA-256 bytes of `peekaplate:` + label + newline + newline-joined parts, setting version 8 and RFC variant bits. Menu revision ID uses label `menu-revision:v1` and canonical JSON of the bundle with `menu_revision_id` omitted. Ingredient IDs use `ingredient:v1`, dish revision, index and name. Content and asset approval IDs use `content-approval:v1` and `asset-approval:v1` with their respective hashes.
 
@@ -49,6 +49,6 @@ pnpm produce:bundle --request <request.json> --t0-root <asset-root> \
 ## 7. Remaining integration gates
 
 - Deployment owner: choose HTTPS asset and bundle hosts and approved staging diner CORS origins; configure immutable hosting and verify byte-for-byte delivery.
-- Harshita/Jeffin: adopt and test the shared byte verifier in DIN-03, including tamper failure and unavailable state.
+- The diner verifier, tamper rejection and publication/expiry collection gate are implemented. Record the exact deployed main SHA and hosted outcomes using the [connection checklist](diner-connection.md).
 - Confirm request-file allergens, dietary codes and alt with the restaurant until a reviewed store exists.
 - Live DIN-03 rendering, atomic replacement, withdrawal, real content and independent stakeholder sign-offs remain staging gates. See [QA report](../qa-reports/S4-RES-test-plan.md).

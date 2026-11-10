@@ -1,5 +1,10 @@
 # Local and staging operations
 
+For the November 10 diner Pages-only connection, exact-byte checks, pinned public
+asset snapshots, build settings and the release's hosted acceptance record, see
+[published diner connection](diner-connection.md). The dated records below describe
+their original releases; they do not override that newer frontend release record.
+
 <a id="observation-facts-hosted-acceptance"></a>
 
 ## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
@@ -610,3 +615,16 @@ The subsequent maintainer-authorized main merge (`ab6f9c4`) activated the regist
 [Close cleanup run 40393553935](https://github.com/vivienk/peekaplate/actions/runs/40393553935) removed both PR deployments and updated the existing comment. Provider readback found zero matching deployments; after edge propagation, both aliases and markers returned 404 at `2026-10-26T20:13:56Z`. Build/deploy job durations were 19/41 seconds and cleanup 16 seconds. See [full acceptance](previews.md#hosted-lifecycle-acceptance--october-26).
 
 These hosted writes were limited to disposable preview deployments and PR comments. Staging Pages/Worker versions, application databases, Queue/R2 infrastructure, PostHog and production were unchanged. The preview token is verified for this lifecycle, not certified for unrelated permissions or future configuration.
+
+
+## Owner-report CORS release — November 10
+
+The narrow main release adds the already-reviewed owner-report API dependency
+and PR130’s exact console origins. It preserves the owner-only, synthetic-venue,
+read-only and privacy boundaries. No extraction118/frontend promotion or new
+migration is required. [Release and verification instructions](owner-report-staging.md)
+record the request flow and deployment readback requirements. Record the deployed
+main SHA/version and hosted results in the release PR; prior local evidence does
+not establish hosted readiness.
+
+Current narrow release and deployment evidence: [PR 135](https://github.com/vivienk/peekaplate/pull/135).
