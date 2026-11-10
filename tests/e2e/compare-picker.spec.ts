@@ -69,9 +69,9 @@ test('one dish is selected at a time, with the orange border and check', async (
   await expect(bowl).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.pp-card--selected')).toHaveCount(1);
 
-  // The result screen is DIN-02.4, so Compare stays disabled and says so.
-  await expect(page.locator('.pp-picker__confirm')).toBeDisabled();
-  await expect(page.getByText('Compare results are not available yet.')).toBeVisible();
+  // Compare is enabled once a dish is selected (the result is covered in compare-result.spec.ts).
+  await expect(page.locator('.pp-picker__confirm')).toBeEnabled();
+  await expect(page.getByText('Compare results are not available yet.')).toHaveCount(0);
   await page.screenshot({
     path: 'test-results/compare-picker-selected-fixture.png',
     fullPage: true,

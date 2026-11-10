@@ -2381,3 +2381,13 @@ fresh report, frozen dataset/counts and unique passing records before returning
 success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 local outbox-capacity browser timing
+
+During DIN-02.4 verification, the local Chromium case "a full outbox drops the
+oldest events" stored 146 and then 477 of 505 events before its default 5 s poll
+expired, failing both with and without the Compare result changes (stashed run on
+the same machine). No tracking code changed; the cause is local write throughput
+under this Windows machine's load, not a behaviour regression. The test was left
+unchanged; CI remains the authority for that case. All Compare, picker, search,
+menu, save and other tracking browser cases passed locally.

@@ -58,6 +58,8 @@ export type ComparePickerOptions = {
   // Called with the selected dish. Until the Compare result screen (DIN-02.4) passes it, the
   // Compare button stays disabled and says so.
   onConfirm?: (pickedDishId: string) => void;
+  // "Compare" when starting a comparison, "Replace Dish" when replacing one side (DIN-02.4).
+  confirmLabel?: string;
 };
 
 function escapeHtml(value: string): string {
@@ -96,6 +98,7 @@ function optionMarkup(dish: CompleteDish, selected: boolean): string {
 
 export function renderComparePicker(container: HTMLElement, options: ComparePickerOptions): void {
   const { menu, keptDish, onClose, onConfirm } = options;
+  const confirmLabel = options.confirmLabel ?? 'Compare';
   const exclude = options.exclude ?? [keptDish.dishId];
   let query = '';
   let selectedId: string | null = null;
@@ -138,7 +141,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
       </section>
 
       <div class="pp-picker__footer">
-        <button class="pp-btn pp-btn--primary pp-picker__confirm" type="button" disabled>Compare</button>
+        <button class="pp-btn pp-btn--primary pp-picker__confirm" type="button" disabled>${escapeHtml(confirmLabel)}</button>
         ${onConfirm ? '' : '<p class="pp-notice">Compare results are not available yet.</p>'}
       </div>
     </div>

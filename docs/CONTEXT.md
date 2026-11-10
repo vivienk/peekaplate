@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and the Compare picker use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
+      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and Compare picker/result use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -163,7 +163,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "frontend/diner/src/compare/pickerScreen.ts",
         "frontend/diner/src/compare/pickerScreen.test.ts",
-        "tests/e2e/compare-picker.spec.ts"
+        "tests/e2e/compare-picker.spec.ts",
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/compare/resultScreen.test.ts",
+        "tests/e2e/compare-result.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -172,7 +175,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d939beec2fa15a136d02ad5461cfb56ad61c1f18e6226620437ad545dc9661b9"
+      "sourceFingerprint": "79ebf47844df3c7bb9b519ef8bd2f09fb0f64e9036e3d0ac70841564239ba007"
     },
     {
       "id": "console",
@@ -609,6 +612,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-10",
+      "summary": "S3-DIN-02.4 Compare result: frontend/diner/src/compare/resultScreen.ts. compareView(menu, comparison) is the pure view model (first = kept dish, other = picked; null for a missing, incomplete or duplicate dish). renderCompareResult shows both dishes on one subgrid so name, price, description, key ingredients, Contains, Dietary info and buttons line up, with the detail chip rules, a divider, View details, Replace and Back to Menu. menuScreen fires dish_compared start/replace through track() only when a result is displayed, keeps comparison_id across Replace (newComparisonId, v0.1h D7) and sends save_available false. View details fires dish_detail_opened with source compare_view and nav_relation from_compare; Back returns to the result without a new event.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/compare-result.spec.ts"
+      ],
+      "next": "save_available becomes the real Save state once DIN-02.2 hearts are wired. The menu_card dish_detail_opened trigger stays DIN-01.5. Design check of the result layout (Amr) and matrix field check (Sai) are pending."
+    },
+    {
       "date": "2026-11-08",
       "summary": "S3-DIN-02.3 Compare picker screen: frontend/diner/src/compare/pickerScreen.ts. pickerViewState(menu, exclude, query) is the pure view model over pickerOptions (shared searchMenu rules, incomplete and excluded dishes never offered, noOptions for a menu with no other dish). renderComparePicker shows Compare Dish, the Keeping dish, the search bar with No Result Found/Clear and the staff line, and single selection (aria-pressed, orange border and check). Close and Escape return to the detail Compare button. No request, no track() call, query never logged or put in the URL. Stacked on #121 to reuse its search markup and styles.",
       "modules": [
@@ -697,16 +713,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "After merge synchronize #82 and update its evaluation.test.ts expected rationale to omit cohort counts, regenerate evidence, then review #112. Exact ISO-string window identity, real report provenance/privacy, API membership, production policy, model/UI and hosted acceptance remain integration gates."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
     }
   ]
 }

@@ -1,5 +1,17 @@
+import {
+  type CompareAction,
+  type CompareSide,
+  type Comparison,
+  dishComparedPayload,
+  replaceExclusions,
+  replaceSide,
+  startComparison,
+} from '../compare/comparison';
 import { renderComparePicker } from '../compare/pickerScreen';
+import { type CompareResultOptions, renderCompareResult } from '../compare/resultScreen';
+import { newComparisonId, track } from '../tracking';
 import { renderDishDetail } from './dishDetail';
+import { trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
@@ -57,6 +69,15 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
+  for (const category of menu.categories) {
+    for (const dish of category.dishes) {
+      if (dish.kind === 'complete' && dish.dishId === dishId) return dish;
+    }
+  }
+  return undefined;
 }
 
 function renderLoading(container: HTMLElement): void {
@@ -193,7 +214,7 @@ function renderMenu(
 
       <p class="pp-end">End of menu</p>
       ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
-      <p class="pp-notice">Save and Compare are not available yet.</p>
+      <p class="pp-notice">Save is not available yet.</p>
     </div>
   `;
 
@@ -317,14 +338,86 @@ export function mountMenuScreen(container: HTMLElement): void {
   };
 
   // Compare on a detail opens the picker; closing it returns to that detail's Compare button.
+  // Confirming a pick starts a comparison and shows the result.
   const showPicker = (dish: CompleteDish) => {
-    if (!currentMenu) return;
+    const menu = currentMenu;
+    if (!menu) return;
     renderComparePicker(container, {
-      menu: currentMenu,
+      menu,
       keptDish: dish,
       onClose: () => {
         renderDetail(dish);
         container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
+      },
+      onConfirm: (pickedDishId) => {
+        const comparison = startComparison(menu, dish.dishId, pickedDishId, newComparisonId);
+        if (comparison) showResult(comparison, 'start');
+      },
+    });
+    window.scrollTo(0, 0);
+  };
+
+  // Shows a comparison. dish_compared fires only when a result is actually displayed after a start
+  // or a replacement; coming back from a detail or a cancelled Replace shows it again silently.
+  // The same comparison_id is kept across Replace (matrix v0.1h D7).
+  const showResult = (
+    comparison: Comparison,
+    action?: CompareAction,
+    focus?: CompareResultOptions['focus'],
+  ) => {
+    const menu = currentMenu;
+    if (!menu) return;
+    const shown = renderCompareResult(container, {
+      menu,
+      comparison,
+      focus,
+      onBackToMenu: showMenu,
+      onReplace: (side) => showReplacePicker(comparison, side),
+      onViewDetails: (dish, side) => {
+        renderDishDetail(
+          container,
+          dish,
+          () => showResult(comparison, undefined, { side, control: 'view' }),
+          menu.notice ?? null,
+          undefined,
+          true,
+        );
+        window.scrollTo(0, 0);
+        trackDishDetailOpened(menu, dish, {
+          source: 'compare_view',
+          navRelation: 'from_compare',
+          saveAvailable: false,
+        });
+      },
+    });
+    if (!shown) {
+      showMenu();
+      return;
+    }
+    window.scrollTo(0, 0);
+    if (!action) return;
+    // Save is not wired into these screens yet, so save_available stays false (Sai, Oct 27).
+    const payload = dishComparedPayload(menu, comparison, action, false);
+    if (payload) track('dish_compared', payload);
+  };
+
+  // Replace opens the picker for one side, keeping the other dish; both shown dishes are excluded.
+  const showReplacePicker = (comparison: Comparison, side: CompareSide) => {
+    const menu = currentMenu;
+    if (!menu) return;
+    const keptId = side === 'first' ? comparison.otherDishId : comparison.firstDishId;
+    const keptDish = completeDishById(menu, keptId);
+    if (!keptDish) return;
+    const back = { side, control: 'replace' } as const;
+    renderComparePicker(container, {
+      menu,
+      keptDish,
+      exclude: replaceExclusions(comparison),
+      confirmLabel: 'Replace Dish',
+      onClose: () => showResult(comparison, undefined, back),
+      onConfirm: (pickedDishId) => {
+        const next = replaceSide(menu, comparison, side, pickedDishId);
+        if (next !== comparison) showResult(next, 'replace', back);
       },
     });
     window.scrollTo(0, 0);
