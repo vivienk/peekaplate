@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+Latest diner integration: [published-menu connection](diner-connection.md). It
+explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
+configuration and reused public hosting. Its release acceptance record identifies
+the actual deployed version; older dated setup sections below are historical.
+
+
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.

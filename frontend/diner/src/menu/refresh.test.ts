@@ -107,4 +107,29 @@ describe('menu refresher', () => {
     await vi.advanceTimersByTimeAsync(30 * MIN);
     expect(load).not.toHaveBeenCalled();
   });
+
+  it('stops collection at expiry even when the refresh request never finishes', async () => {
+    const onStop = vi.fn();
+    const refresher = createMenuRefresher({
+      source: { load: () => new Promise(() => {}) },
+      getCurrent: () => menu('pub-1'),
+      onSwap: vi.fn(),
+      onStop,
+    });
+    refresher.schedule(30 * MIN);
+    await vi.advanceTimersByTimeAsync(30 * MIN);
+    expect(onStop).toHaveBeenCalledOnce();
+  });
+
+  it('replaces the old expiry deadline when a fresh verified token arrives', async () => {
+    const { onStop, refresher } = setup([]);
+    refresher.schedule(30 * MIN);
+    await vi.advanceTimersByTimeAsync(20 * MIN);
+    refresher.schedule(50 * MIN);
+    await vi.advanceTimersByTimeAsync(10 * MIN);
+    expect(onStop).not.toHaveBeenCalled();
+    refresher.stop();
+    await vi.advanceTimersByTimeAsync(50 * MIN);
+    expect(onStop).not.toHaveBeenCalled();
+  });
 });

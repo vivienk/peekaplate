@@ -2433,3 +2433,32 @@ and capture reference. They stay private and do not establish authenticity or
 approval. Focused tests pass after the fix. Eight actual CLI checks with a Python
 `prepare_t0_bundle` asset and a disposable PostgreSQL instance passed in 14.805s;
 no hosted data, resources or publication state changed.
+
+
+## Published diner connection — 2026-11-10
+
+Two focused regressions failed before implementation: the default loader rejected
+valid hashed bytes, and publication suspension did not exist. A separate timer
+regression proved collection did not stop at token expiry while refresh hung.
+The loader now uses the shared exact-byte parser; explicit suspension retires
+canonical/PostHog work without changing consent, and the expiry deadline stops
+collection independently of refresh completion. Unit and focused browser checks
+pass; release/hosted results are recorded separately.
+
+Existing Wrangler login lacked Pages permissions (Cloudflare403/10000); refreshed
+the previously authorized Worker/Pages scopes for the existing account using the
+OS credential store. An unhandled Node tooling failure also emitted a Windows
+UV_HANDLE_CLOSING assertion; no application or cloud mutation resulted. A nested
+PowerShell environment assignment expanded in the outer shell; subsequent uploads
+use an argument-array Node wrapper with the exact account in the child environment.
+No supply-chain, browser or deployment protection was weakened.
+
+The first full check also rejected `.env.example` in the context graph: that
+index intentionally excludes environment-file paths. Removed the index reference
+without relaxing its validator; the documented config example remains tracked.
+Context/docs checks then passed. No runtime or fixture behavior changed for that correction.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T22:13:05.031Z","exitCode":1}
+```

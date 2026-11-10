@@ -1,5 +1,10 @@
 # Local and staging operations
 
+For the November 10 diner Pages-only connection, exact-byte checks, pinned public
+asset snapshots, build settings and the release's hosted acceptance record, see
+[published diner connection](diner-connection.md). The dated records below describe
+their original releases; they do not override that newer frontend release record.
+
 <a id="observation-facts-hosted-acceptance"></a>
 
 ## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
