@@ -219,3 +219,29 @@ generation/calculation identity and ambiguous evidence IDs. The existing frozen
 21-case development oracle remains unchanged. Real producer-shaped input,
 membership authorization, independent evaluation and hosted acceptance remain
 separate; keep #112 Draft and AI-01 In Progress.
+
+## Internal producer-constructor seam (mock SQL)
+
+The existing `readOwnerReport()` calls a private `buildInternalReport()` before
+the shared `toOwnerReport()` disclosure projection. Three consumer tests observe
+that actual constructor through a test-only passthrough at the projection seam;
+the real projector still runs. The SQL aggregate rows and membership lookup are
+mocked, so these are not database, authorization or hosted acceptance tests.
+The test captures internal cohorts directly and never reconstructs them from
+the public response or exposes a new internal API.
+
+Normal rates, a valid zero Save rate and a small opened cohort exercise the
+actual constructor, disclosure projection, consumer adapter and deterministic
+core together. The constructor currently returns `is_stale: null`. All three
+cases therefore produce value-free missing evidence and abstention, including
+the otherwise valid zero; the tests do not manufacture verified freshness.
+Complementary suppression and removal of public cohort counts remain intact.
+Caller snapshot/evidence identities are explicitly synthetic fixtures, not a
+production identity-generation scheme.
+
+An external JSON fixture is not required for these local constructor checks.
+Actual database-backed internal output, trusted report/evidence identities,
+freshness/disclosure semantics, current membership and the real producer/caller
+handoff still require their separate verification. The existing frozen 21-case
+development oracle, production reader/SQL, shared contracts and core remain
+unchanged. #112 stays Draft and AI-01 stays In Progress.

@@ -210,7 +210,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. ES256, restore/replay and tenant checks remain. Owner reports authorize membership, bound 24h and credit ordered comparisons to both dishes once. Local/staging only: source=synthetic, configured reserved venue and server allowlist; canonical venues fail closed. Timing coverage counts openings; privacy floors count sessions; timed/opened small cohorts are complementarily suppressed. Zero openings are NOT_MEASURABLE. owner_report.v1 strips cohorts; freshness is unverified. AI-01 validates internal inputs and maps to the unchanged core: trusted caller context binds venue/dish/source/calculation/generation/window, valid zero remains and withheld states/masks stay value-free. No ID issuance, HTTP/model route or production policy. Offline evaluation requires all 21 fresh passing records. Hosted/model/rubric/producer acceptance remains unverified; collection paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. ES256, restore/replay and tenant checks remain. Owner reports authorize membership, bound 24h and credit ordered comparisons to both dishes once. Local/staging only: source=synthetic, configured reserved venue and server allowlist; canonical venues fail closed. Timing coverage counts openings; privacy floors count sessions; timed/opened small cohorts are complementarily suppressed. Zero openings are NOT_MEASURABLE. owner_report.v1 strips cohorts; mock-SQL seams retain unknown freshness. AI-01 validates internal inputs and maps to the unchanged core: trusted caller context binds venue/dish/source/calculation/generation/window, valid zero remains and withheld states/masks stay value-free. No ID issuance, HTTP/model route or production policy. Offline evaluation requires all 21 fresh passing records. Hosted/model/rubric/producer acceptance remains unverified; collection paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -303,7 +303,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-input.ts",
         "backend/src/owner-ai/report-input.test.ts",
         "backend/src/owner-ai/report-adapter.ts",
-        "backend/src/owner-ai/report-adapter.test.ts"
+        "backend/src/owner-ai/report-adapter.test.ts",
+        "backend/src/owner-ai/report-producer-seam.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -316,7 +317,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "efc31861eb3bf4b2200c4544e845a330c4d2570451b4e3402e28d432cd3420e9"
+      "sourceFingerprint": "0f72f90a8ec616bd78ed76bbb1749b2b77921a4c86af908da6a26a082b53666f"
     },
     {
       "id": "database",
@@ -621,6 +622,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
+      "summary": "Draft PR112 adds three mock-SQL consumer seam cases through the real owner report constructor and shared disclosure projector into the existing adapter/core. Normal rates, valid zero and a small opened cohort retain actual unknown freshness and abstain. Synthetic caller IDs and mock aggregate rows do not establish SQL, authorization or producer provenance.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Verify the final clean commit and retain Draft/AI-01 In Progress. A missing external JSON no longer blocks local constructor checks; real database internal output, identity/freshness/disclosure handoff, independent rubric and hosted acceptance remain separate gates."
+    },
+    {
+      "date": "2026-11-10",
       "summary": "Draft PR112 forward-merges develop e0eed262 after PR85. Upstream published-menu source, AI consumer adapter, nullable-freshness guard and frozen evaluation remain unchanged. Shared context and both failure histories are preserved. Structural checks, 172 targeted single-worker AI/report/menu-state cases and five evaluation-CLI regressions pass; failed sandbox cache and parallel import runs remain in errors.md.",
       "modules": [
         "backend",
@@ -707,15 +717,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tokens"
       ],
       "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
-      "modules": [
-        "diner",
-        "analytics"
-      ],
-      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
     }
   ]
 }

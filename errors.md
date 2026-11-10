@@ -2640,3 +2640,26 @@ single-worker rerun passes all 172 targeted AI/report/menu-state cases across
 results do not erase the preceding failed runs or establish browser/hosted
 acceptance. The known junction-limited aggregate check is not repeated; exact
 head Linux CI remains required after pushing this synchronization.
+
+## November 10 internal producer-constructor consumer test seam
+
+Three added tests call the real owner report reader/private constructor with
+mock SQL aggregate rows and observe its internal input to the real disclosure
+projector. The first unchanged run passes all three. No production defect or
+RED-to-GREEN production fix is claimed: the existing constructor intentionally
+retains unknown freshness, so normal/zero/suppressed examples abstain in AI.
+
+A separate controlled test-side probe falsely labelled only the captured
+freshness copy as verified while the real projector still received the original
+input. All three tests failed their null-freshness assertions as expected. The
+test file was restored byte-for-byte and the production source was never
+altered. This is assertion sensitivity evidence, not a failed production run,
+SQL verification, authority proof or permission to enable live recommendations.
+
+After restoration, all 52 scoped reader/input/adapter/seam cases pass across
+four files. `pnpm verify lint typecheck context:check docs:check` passes, including
+seven workspace typechecks and the existing 13-module/10-handoff graph. The
+frozen standard evaluation is checked separately on the final clean commit.
+The full junction-dependent aggregate, database and hosted checks are not rerun
+for this test/documentation-only addition; final matching-head CI remains a
+separate check.
