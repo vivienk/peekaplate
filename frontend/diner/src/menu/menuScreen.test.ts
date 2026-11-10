@@ -84,6 +84,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -181,5 +182,19 @@ describe('menu screen observer lifecycle', () => {
     await mountAndWait(container);
 
     expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+  });
+
+  it('live mode shows no fixture label and no demo restaurant name', async () => {
+    vi.stubEnv('VITE_MENU_SOURCE', 'live');
+    const container = new FakeContainer();
+
+    mountMenuScreen(container as unknown as HTMLElement);
+    // The published adapter is loaded by dynamic import, so wait for the state to appear.
+    await vi.waitFor(() =>
+      expect(container.innerHTML).toContain('We could not load the menu. Please try again.'),
+    );
+
+    expect(container.innerHTML).not.toContain('Fixture data');
+    expect(container.innerHTML).not.toContain('Ember & Stone');
   });
 });
