@@ -16,7 +16,6 @@
     "@peekaplate/analytics": "workspace:*",
     "@peekaplate/contracts": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
-    "@peekaplate/ui": "workspace:*",
-    "@peekaplate/contracts": "workspace:*"
+    "@peekaplate/ui": "workspace:*"
   }
 }

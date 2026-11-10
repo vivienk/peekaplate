@@ -995,6 +995,57 @@ export async function sha256(value: string | Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export type PublicMenuIntegrityErrorCode =
+  | 'content_hash_mismatch'
+  | 'invalid_utf8'
+  | 'invalid_json'
+  | 'invalid_bundle';
+
+export class PublicMenuIntegrityError extends Error {
+  readonly code: PublicMenuIntegrityErrorCode;
+
+  constructor(code: PublicMenuIntegrityErrorCode, message: string) {
+    super(message);
+    this.name = 'PublicMenuIntegrityError';
+    this.code = code;
+  }
+}
+
+/**
+ * Verifies fetched public menu bundle bytes against the published `contentHash`, then decodes and
+ * validates them. The hash covers the exact bytes the producer stored (UTF-8 canonical JSON, no
+ * trailing newline); consumers must hash before parsing and never re-serialize.
+ */
+export async function verifyPublicMenuContentBytes(
+  bytes: Uint8Array,
+  expectedContentHash: string,
+): Promise<PublicMenuContentBundle> {
+  if ((await sha256(bytes)) !== expectedContentHash) {
+    throw new PublicMenuIntegrityError(
+      'content_hash_mismatch',
+      'Bundle bytes do not match the published content hash',
+    );
+  }
+  let text: string;
+  try {
+    // ignoreBOM keeps a BOM in the text so it fails JSON.parse instead of being silently dropped.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    throw new PublicMenuIntegrityError('invalid_utf8', 'Bundle bytes are not valid UTF-8');
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new PublicMenuIntegrityError('invalid_json', 'Bundle bytes are not valid JSON');
+  }
+  const parsed = PublicMenuContentBundleSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new PublicMenuIntegrityError('invalid_bundle', 'Bundle does not match the v1 schema');
+  }
+  return parsed.data;
+}
+
 /**
  * Microsecond constants for observation ingest time window.
  */

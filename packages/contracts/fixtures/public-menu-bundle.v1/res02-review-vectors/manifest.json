@@ -1,0 +1,112 @@
+{
+  "fixtureVersion": "res02-bundle-exact-bytes.synthetic.v1",
+  "status": "PROPOSED_HASH_RULE_NOT_TEAM_APPROVED",
+  "source": "synthetic",
+  "artifactPurpose": "Shared immutable byte vector for producer/DIN-03 contract discussion. Not producer output or browser acceptance.",
+  "contractReference": {
+    "commit": "93194f2772e79958a6edf6ccd02ebf3094cf8d53",
+    "path": "packages/contracts/src/index.ts",
+    "schemas": [
+      "PublicMenuContentBundleSchema",
+      "PublicMenuDeliverySchema"
+    ]
+  },
+  "serializationForTheseFilesOnly": {
+    "encoding": "UTF-8",
+    "bom": false,
+    "originalTrailingNewline": false,
+    "exampleGenerator": "Python JSON sorted object keys, compact separators, ensure_ascii=False. Illustrative fixture generator, not a production canonicalization mandate.",
+    "arrayOrder": "Preserved; category/dish order is display order."
+  },
+  "proposedContentHashRule": "Lowercase SHA-256 hex of exact stored/HTTP-response-body JSON bytes, before JSON decode/parse/normalization. No hash of a parsed-and-reserialized value. Content-Encoding wire compression is outside the input: fetched response body bytes must reproduce stored JSON representation after HTTP content decoding. Disable CDN/object JSON transformations.",
+  "responseIdentity": {
+    "venueId": "a0000001-0000-4000-8000-000000000001",
+    "menuId": "b0000002-0000-4000-8000-000000000002",
+    "menuRevisionId": "c0000003-0000-4000-8000-000000000003",
+    "publicationId": "d0000040-0000-4000-8000-000000000040"
+  },
+  "originalContentHash": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+  "objectURL": "https://assets.example.test/synthetic/bundle.original.json",
+  "deploymentNotice": "example.test only, not an existing object, approved origin or CORS configuration. No tokens, credentials or real restaurant/customer content.",
+  "files": [
+    {
+      "file": "bundle.original.json",
+      "byteLength": 2706,
+      "sha256": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a"
+    },
+    {
+      "file": "bundle.same-value-pretty.json",
+      "byteLength": 4180,
+      "sha256": "6d34c344b5562a9a36a5215395f817df33a0dfae7c92950960b9195c3687a66e"
+    },
+    {
+      "file": "bundle.tampered-name.json",
+      "byteLength": 2706,
+      "sha256": "42c97d63ce7a4ce255f2b92c791945edc44d8ea72044d1848b505c7602e61427"
+    },
+    {
+      "file": "bundle.wrong-revision.json",
+      "byteLength": 2706,
+      "sha256": "23e3f195f04e97faa5150effc25260a1c9c4569af12496f8b138d619f2290b33"
+    }
+  ],
+  "cases": [
+    {
+      "id": "exact-round-trip",
+      "file": "bundle.original.json",
+      "expectedContentHash": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+      "expectedDigestMatch": true,
+      "schemaIdentityExpected": "MATCH",
+      "producerConsumerExecution": "NOT_RUN"
+    },
+    {
+      "id": "repeat-identical-bytes",
+      "file": "bundle.original.json",
+      "expectedContentHash": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+      "expectedDigestMatch": true,
+      "schemaIdentityExpected": "MATCH",
+      "producerConsumerExecution": "NOT_RUN"
+    },
+    {
+      "id": "same-value-reformatted",
+      "file": "bundle.same-value-pretty.json",
+      "expectedContentHash": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+      "expectedDigestMatch": false,
+      "schemaIdentityExpected": "DO_NOT_PARSE_OR_DISPLAY_AFTER_DIGEST_MISMATCH",
+      "producerConsumerExecution": "NOT_RUN"
+    },
+    {
+      "id": "changed-name-with-original-pointer",
+      "file": "bundle.tampered-name.json",
+      "expectedContentHash": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+      "expectedDigestMatch": false,
+      "schemaIdentityExpected": "DO_NOT_PARSE_OR_DISPLAY_AFTER_DIGEST_MISMATCH",
+      "producerConsumerExecution": "NOT_RUN"
+    },
+    {
+      "id": "matching-digest-wrong-revision",
+      "file": "bundle.wrong-revision.json",
+      "expectedContentHash": "23e3f195f04e97faa5150effc25260a1c9c4569af12496f8b138d619f2290b33",
+      "expectedDigestMatch": true,
+      "schemaIdentityExpected": "REJECT_WITH_ORIGINAL_RESPONSE_IDENTITY",
+      "note": "Test-only intentionally inconsistent pointer: digest alone cannot authorize a different content revision.",
+      "producerConsumerExecution": "NOT_RUN"
+    }
+  ],
+  "verification": {
+    "artifactBytesAndSha256": "CALCULATED_AND_RE_READ_WITH_PYTHON_STANDARD_LIBRARY",
+    "sameValuePrettyJsonEqualsOriginal": true,
+    "tamperedBytesDiffer": true,
+    "sharedZodSchemaExecution": "PASS: current a734c50 shared schemas; four content vectors, valid delivery, wrong-revision rejection",
+    "producerRoundTrip": "NOT_RUN",
+    "browserFetchDigestParseIdentity": "NOT_RUN",
+    "R2CDNCORSHosted": "NOT_RUN",
+    "localDigestAndIdentityHarness": "PASS: five proposed byte/digest/identity cases; producer/browser implementations NOT RUN"
+  },
+  "ownership": {
+    "RES02_Zhiliang": "Public response/revision/publication identity contract and review of shared handoff.",
+    "producer_Marwan": "Reviewed content construction, schema-normalize-before-final-serialization, immutable write/hash/provenance and producer tests.",
+    "DIN03": "Fetch raw bytes/digest/error state, shared schema and identity check, atomic display replacement and browser regressions.",
+    "operator": "Approved exact origins, object/API CORS, immutable hosting and no content rewriting."
+  }
+}
