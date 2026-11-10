@@ -1,0 +1,523 @@
+/* S4-FE-03 owner shell and first dashboard arrival (Figma node 2346:6206), light theme.
+ * Every value comes from @peekaplate/tokens. Four Figma values have no token yet; they are kept
+ * as the --owner-pending-* properties below, so Rania can map them into tokens.css later. */
+@import "@fontsource/inter/latin-700.css";
+
+.owner-root {
+  /* Pending tokens (Figma values with no @peekaplate/tokens equivalent yet). */
+  --owner-pending-shadow-card: 0 8px 50px rgba(28, 26, 23, 0.06); /* Owner/Shadow/Card small */
+  --owner-pending-shadow-menu: 0 4px 16px rgba(28, 26, 23, 0.05); /* Owner/Shadow/Menu card */
+  --owner-pending-title-size: 2rem; /* Figma H3/Bold 32/36; the h3 token is 24/32 */
+  --owner-pending-title-line: 2.25rem;
+  /* Figma periwinkle/100 (#e3ecfb) has no token; info-100 is the closest palette colour. */
+  --owner-chip-bg: var(--pp-color-info-100);
+
+  min-height: 100vh;
+  background: var(--pp-role-surface);
+  color: var(--pp-role-on-surface);
+  font-family: var(--pp-font-family-base);
+}
+
+.owner-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.owner-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.owner-skip {
+  position: absolute;
+  left: var(--pp-space-16);
+  top: calc(-1 * var(--pp-space-80));
+  z-index: 10;
+  padding: var(--pp-space-8) var(--pp-space-16);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+}
+.owner-skip:focus {
+  top: var(--pp-space-16);
+}
+
+.owner-root :focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
+
+.owner-root h1,
+.owner-root h2,
+.owner-root h3,
+.owner-root p {
+  margin: 0;
+  letter-spacing: normal;
+}
+/* The console's global main styles (style.css) do not apply inside the owner shell. */
+.owner-root main {
+  max-width: none;
+  margin: 0;
+}
+body:has(.owner-root) {
+  margin: 0;
+}
+
+/* Sidebar */
+.owner-sidebar {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-24);
+  padding: var(--pp-space-24) var(--pp-space-16);
+  background: var(--pp-role-surface);
+  border-right: 1px solid var(--pp-role-surface-container);
+  box-shadow: var(--owner-pending-shadow-card);
+}
+.owner-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-6);
+}
+.owner-brand__row {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+.owner-brand__name {
+  color: var(--pp-color-orange-500);
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+  font-weight: var(--pp-font-weight-bold);
+}
+.owner-brand__sub {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-footer);
+  line-height: var(--pp-line-height-footer);
+}
+.owner-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-2);
+  padding: var(--pp-space-12);
+  border: 1px solid var(--pp-role-surface);
+  border-radius: var(--pp-radius-16);
+  background: var(--pp-role-surface-container);
+  box-shadow: var(--owner-pending-shadow-menu);
+}
+.owner-identity__name {
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-identity__kind,
+.owner-nav-label {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.owner-nav-label {
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.owner-nav__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--pp-space-16) 10px 14px; /* Figma nav item padding: no spacing token */
+  border: 0;
+  border-radius: var(--pp-radius-full);
+  background: transparent;
+  color: var(--pp-role-on-surface-variant);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--pp-motion-duration-hover);
+}
+.owner-nav__item:hover {
+  background: var(--pp-role-outline-variant);
+}
+.owner-nav__item[aria-current="page"] {
+  background: var(--owner-chip-bg);
+  color: var(--pp-role-on-surface);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-nav__label {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+}
+
+/* Main column */
+.owner-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.owner-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-12);
+  min-height: 72px; /* Figma top bar height: no size token */
+  padding: 0 var(--pp-space-32);
+}
+.owner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-8);
+}
+.owner-chip {
+  padding: var(--pp-space-6) var(--pp-space-12);
+  border-radius: var(--pp-radius-full);
+  background: var(--owner-chip-bg);
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.owner-chip--surface {
+  background: var(--pp-role-surface);
+}
+.owner-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-32);
+  padding: var(--pp-space-12) var(--pp-space-32) var(--pp-space-32);
+}
+.owner-content:focus {
+  outline: none;
+}
+
+/* Status label (Figma "Status label": Success / Warning) */
+.owner-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--pp-space-6);
+  height: var(--pp-space-24);
+  padding: var(--pp-space-4) var(--pp-space-12) var(--pp-space-4) var(--pp-space-8);
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+  white-space: nowrap;
+}
+.owner-status--success {
+  background: var(--pp-color-success-50);
+  color: var(--pp-color-success-900);
+}
+.owner-status--warning {
+  background: var(--pp-color-warning-50);
+  color: var(--pp-color-warning-900);
+}
+
+/* Shared button shape: Figma "Owner dashboard_Button" is a pill with a 16px label. */
+.owner-button.pp-button {
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-button.pp-button--outline {
+  background: var(--pp-role-surface-container);
+  border-color: var(--pp-role-outline-solid);
+  color: var(--pp-role-button-action-text);
+}
+.owner-button.pp-button:disabled {
+  background: var(--pp-role-button-disabled-bg);
+  border-color: var(--pp-role-button-disabled-border);
+  color: var(--pp-role-button-disabled-text);
+}
+.owner-button.pp-button:disabled img {
+  opacity: 0.5;
+}
+
+/* Cards */
+.owner-card {
+  padding: var(--pp-space-24);
+  border: 1px solid var(--pp-role-outline-variant);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-color-white);
+  box-shadow: var(--owner-pending-shadow-menu);
+}
+.owner-card h2,
+.owner-card h3 {
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-card p,
+.owner-muted {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+}
+
+.owner-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-12);
+}
+.owner-welcome h1 {
+  font-size: var(--owner-pending-title-size);
+  line-height: var(--owner-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+}
+.owner-welcome p {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+/* Setup progress */
+.owner-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-16);
+  border-color: var(--pp-role-surface-container);
+  box-shadow: var(--owner-pending-shadow-card);
+}
+.owner-progress__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-8);
+}
+.owner-progress__head p {
+  font-weight: var(--pp-font-weight-medium);
+}
+.owner-progress__track {
+  height: var(--pp-space-8);
+  overflow: hidden;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-role-outline-variant);
+}
+.owner-progress__fill {
+  height: 100%;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+}
+.owner-progress__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-12);
+}
+
+/* Setup steps */
+.owner-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--pp-space-24);
+  align-items: start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.owner-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-20);
+}
+.owner-step__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-8);
+  min-height: var(--pp-space-24);
+}
+.owner-step__number {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-step__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-2);
+}
+.owner-step__action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Verified vs published, and the empty state */
+.owner-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--pp-space-24);
+  align-items: start;
+}
+.owner-verify,
+.owner-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-16);
+  border-color: var(--pp-color-white);
+}
+.owner-empty {
+  gap: var(--pp-space-12);
+}
+.owner-verify__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-12);
+}
+.owner-empty__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-48);
+  height: var(--pp-space-48);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-color-orange-500);
+}
+
+/* AI panel (empty state) */
+.owner-ai {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--pp-role-outline-variant);
+  background: var(--pp-color-neutral-50);
+}
+.owner-ai__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-12);
+  padding: var(--pp-space-16);
+  border-bottom: 1px solid var(--pp-role-outline-variant);
+}
+.owner-ai__title {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+.owner-ai__title h2 {
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-ai__icon {
+  display: inline-flex;
+  padding: var(--pp-space-8);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+}
+.owner-ai__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-16);
+  padding: var(--pp-space-16);
+}
+.owner-ai__body h3 {
+  margin-bottom: calc(-1 * var(--pp-space-8));
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.owner-ai__composer {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  padding: var(--pp-space-16);
+  border-top: 1px solid var(--pp-role-outline-variant);
+}
+.owner-ai__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 42px; /* Figma composer height: no size token */
+  padding: 0 var(--pp-space-16);
+  border: 1px solid var(--pp-role-outline-solid);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-neutral-50);
+  color: var(--pp-role-on-surface);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-2);
+}
+.owner-ai__input::placeholder {
+  color: var(--pp-role-on-surface-variant);
+}
+.owner-ai__send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+}
+.owner-ai__input:disabled,
+.owner-ai__send:disabled {
+  cursor: not-allowed;
+}
+
+/* Responsive: the design is desktop-only (1440); Figma's responsive note is reference only.
+ * Below 1200px the empty AI panel moves under the content; below 900px the sidebar stacks. */
+@media (max-width: 1199px) {
+  .owner-shell {
+    flex-wrap: wrap;
+  }
+  .owner-main {
+    flex-basis: calc(100% - 260px);
+  }
+  .owner-ai {
+    flex: 1 1 100%;
+    min-height: 0;
+    border-left: 0;
+    border-top: 1px solid var(--pp-role-outline-variant);
+  }
+}
+@media (max-width: 899px) {
+  .owner-shell {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+  .owner-sidebar {
+    flex: none;
+    border-right: 0;
+  }
+  .owner-topbar {
+    padding: var(--pp-space-12) var(--pp-space-16);
+  }
+  .owner-content {
+    padding: var(--pp-space-12) var(--pp-space-16) var(--pp-space-32);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-nav__item {
+    transition: none;
+  }
+}
+
+/* Preview-only demo bar (first-dashboard.html); not part of the screen. */
+.owner-demo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pp-space-16);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  background: var(--pp-color-warning-50);
+  color: var(--pp-color-warning-900);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}

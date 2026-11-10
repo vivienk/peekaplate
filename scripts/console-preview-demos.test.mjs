@@ -43,7 +43,10 @@ test('a normal console build contains no demo page', async (t) => {
   const files = await readdir(dir);
   assert.ok(files.includes('index.html'));
   assert.ok(!files.includes('foundations.html'));
-  for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /foundations/);
+  assert.ok(!files.includes('first-dashboard.html'));
+  for (const asset of await readdir(join(dir, 'assets'))) {
+    assert.doesNotMatch(asset, /foundations|firstDashboard/);
+  }
 });
 
 test('a preview build adds the demo page, labelled synthetic, noindex and without analytics', async (t) => {
@@ -55,6 +58,17 @@ test('a preview build adds the demo page, labelled synthetic, noindex and withou
   assert.match(html, /<meta name="robots" content="noindex"/);
   const scripts = (await pageScripts(dir, 'foundations.html')).join('\n');
   assert.match(scripts, /Synthetic demo/);
+  assert.doesNotMatch(scripts, /posthog/i);
+});
+
+test('a preview build adds the first dashboard demo, labelled synthetic, noindex and without analytics', async (t) => {
+  const dir = await build(t, true);
+  assert.ok((await readdir(dir)).includes('first-dashboard.html'));
+  const html = await readFile(join(dir, 'first-dashboard.html'), 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex"/);
+  const scripts = (await pageScripts(dir, 'first-dashboard.html')).join('\n');
+  assert.match(scripts, /Synthetic demo/);
+  assert.match(scripts, /Illustrative sample data/);
   assert.doesNotMatch(scripts, /posthog/i);
 });
 

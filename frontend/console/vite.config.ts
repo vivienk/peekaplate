@@ -15,7 +15,11 @@ export default defineConfig({
   ...(includeDemos && {
     build: {
       rollupOptions: {
-        input: { main: page('index.html'), foundations: page('foundations.html') },
+        input: {
+          main: page('index.html'),
+          foundations: page('foundations.html'),
+          firstDashboard: page('first-dashboard.html'),
+        },
       },
     },
   }),
