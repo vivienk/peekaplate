@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; Serialization strips cohort counts and masks reconstructive timing/open-rate/active-session cells for timed or opened cohorts of 1–9, preserving genuine zero-opening NOT_MEASURABLE states. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 adoption of the verifier and hosted acceptance remain separate gates.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -39,7 +39,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/review-persistence.ts",
         "packages/contracts/src/review-persistence.test.ts",
         "packages/contracts/src/owner-ai.ts",
-        "packages/contracts/src/owner-ai.test.ts"
+        "packages/contracts/src/owner-ai.test.ts",
+        "packages/contracts/src/public-menu-integrity.test.ts",
+        "packages/contracts/fixtures/public-menu-bundle.v1/README.md",
+        "packages/contracts/fixtures/public-menu-bundle.v1/bundle.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/expected.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/tampered.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/README.txt",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.original.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.same-value-pretty.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -47,7 +59,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "33e3df8813d870455726c017f450093c168bbf021a884424451aa032e33c4b07"
+      "sourceFingerprint": "9d8f423771bf2b136f52d89c08a034223a5bd3fe1a6a43aab2173f5602efcb88"
     },
     {
       "id": "tokens",
@@ -210,7 +222,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. Own-token ES256/claim checks and S4-DATA-04 restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Local/staging dish reports require source=synthetic, matching SYNTHETIC_REPORT_VENUE_ID and server-allowlist membership; entries are typed as strings, and canonical venues fail closed even if configured. Timing coverage counts final/total openings; privacy floors count sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate/strip owner_report.v1; freshness unverified; CORS: two exact console origins. AI-01 returns scoped drafts or abstention. Hosted acceptance pending; collection paused. Offline evaluation checks 21 frozen synthetic safety cases; rubric, provider and live report integration remain unverified.",
+      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence, with per-metric/cohort and complementary suppression. Local/staging HTTP reports require exactly one source=synthetic and a configured server-allowlisted venue; production fails closed. S4-RES CLI builds canonical immutable bundles from approved tenant-scoped dish/review facts and verified T0 assets, with explicit privileged transactional admission; no approval/publication is implied. AI-01 drafts/abstention and frozen offline evaluation remain separate. Existing ingestion/review commands are preserved. Bundle hosting, consumer adoption and live acceptance remain gated; queues stay paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -299,7 +311,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-ai.md",
         "backend/src/owner-ai/evaluation.test.ts",
         "scripts/evaluate-owner-ai.mjs",
-        "scripts/evaluate-owner-ai.test.mjs"
+        "scripts/evaluate-owner-ai.test.mjs",
+        "backend/src/bundle-producer/ids.ts",
+        "backend/src/bundle-producer/price.ts",
+        "backend/src/bundle-producer/produce.ts",
+        "backend/src/bundle-producer/produce.test.ts",
+        "backend/src/bundle-producer/repository.ts",
+        "backend/src/bundle-producer/request.ts",
+        "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/scripts/produce-menu-bundle.ts",
+        "docs/s4-res-bundle-producer.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -312,7 +333,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5a244821a9875654c3bc9651f42013a883822a32c95a2e888f6e0f3594c2a894"
+      "sourceFingerprint": "1efc3fa68783969a898f170489446ed7406de03ed6ba66c2723d8f93e5168e2a"
     },
     {
       "id": "database",
@@ -418,7 +439,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/res02-staging-acceptance.json",
         "docs/observation-staging-acceptance.json",
         "docs/observation-facts-staging-acceptance.json",
-        "scripts/console-preview-demos.test.mjs"
+        "scripts/console-preview-demos.test.mjs",
+        "scripts/node-ts-hooks.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -429,7 +451,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b4eab30f059b903b6d3d52d02bfb8495f13185023928738f40c12a631b5b4e09"
+      "sourceFingerprint": "c77e2e3cbf241493e47151008c288c66dc2c9800e9c1b9bbaf96f86451a232b2"
     },
     {
       "id": "agents",
@@ -617,6 +639,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
+      "summary": "PR117 reconciles current develop without dropping its context paths or runtime changes. The offline bundle producer hashes exact bytes, reads tenant-scoped approved facts and admits immutable handoff rows only through a privileged transaction. T0 input now rejects missing/blank capture evidence and invalid source hashes; five regressions failed before correction. Private provenance is never public content. A real prepare_t0_bundle asset passed eight actual CLI/PostgreSQL checks, including tamper rejection, runtime denial, identical retry and overwrite refusal. Local checks pass: 1198 unit/72 script, 213 SQL/86 integration, 120 browser and build; timings in qa-reports/S4-RES-test-plan.md.",
+      "modules": [
+        "backend",
+        "contracts",
+        "delivery"
+      ],
+      "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
+    },
+    {
+      "date": "2026-11-10",
       "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
       "modules": [
         "diner"
@@ -699,16 +731,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "After merge synchronize #82 and update its evaluation.test.ts expected rationale to omit cohort counts, regenerate evidence, then review #112. Exact ISO-string window identity, real report provenance/privacy, API membership, production policy, model/UI and hosted acceptance remain integration gates."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
     }
   ]
 }

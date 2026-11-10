@@ -2417,3 +2417,19 @@ single-worker verification is recorded separately rather than hiding that run.
 All 111 browser checks then passed with one worker in 96.794 seconds, including
 the unchanged outbox-capacity case and the three refresh focus regressions.
 The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+
+## PR117 reconciliation and capture-reference validation — 2026-11-10
+
+The reconciled package declared Zod in both backend dependency sections; frozen
+installation rejected the resulting importer mismatch. Kept the existing exact
+version in runtime dependencies, removed its duplicate dev entry and regenerated
+the lockfile. A fresh frozen installation passed; supply-chain policy stayed enabled.
+
+Five focused manifest regressions failed before the correction: missing source,
+missing/blank/NUL capture evidence and invalid source digest were all accepted.
+`backend/src/bundle-producer/request.ts` now requires the upstream T0 source hash
+and capture reference. They stay private and do not establish authenticity or
+approval. Focused tests pass after the fix. Eight actual CLI checks with a Python
+`prepare_t0_bundle` asset and a disposable PostgreSQL instance passed in 14.805s;
+no hosted data, resources or publication state changed.
