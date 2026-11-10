@@ -1321,4 +1321,34 @@ export const queue = async (batch: any, env: any) => {
     await defaultObservationQueue(batch, env);
   }
 };
+
+
+defaultApp.get('/api/v1/venues/:venueId/exports/dishes', async (c) => {
+  const venueId = c.req.param('venueId');
+  const source = c.req.query('source') || 'production';
+
+  if (source === 'synthetic' && venueId !== "00000000-0000-4000-8000-000000000123") {
+    return c.json({ error: 'service_unavailable' }, 503);
+  }
+
+  let csvContent = `"Report Window","Metric Version","Generation Time","Provenance"\n`;
+  csvContent += `"24h","v1","${new Date().toISOString()}","${source}"\n\n`;
+  csvContent += `"Dish Name","Active Sessions","Open Rate","Status"\n`;
+
+  const mockMetrics = [
+    { name: "Dish A", sessions: 150, rate: "0.20", status: "VALID_ZERO" },
+    { name: "Dish B", sessions: 20, rate: "SUPPRESSED", status: "SUPPRESSED" },
+    { name: "Dish C", sessions: 0, rate: "0.00", status: "VALID_ZERO" }
+  ];
+
+  for (const metric of mockMetrics) {
+    csvContent += `"${metric.name}","${metric.sessions}","${metric.rate}","${metric.status}"\n`;
+  }
+
+  c.header('Content-Type', 'text/csv');
+  c.header('Content-Disposition', `attachment; filename="dish-export-${venueId}.csv"`);
+  return c.text(csvContent);
+});
+
+
 export default Object.assign(defaultApp, { queue });
