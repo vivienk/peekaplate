@@ -16,6 +16,7 @@
       "preview_urls": false,
       "vars": {
         "APP_ENV": "staging",
+        "SYNTHETIC_REPORT_VENUE_ID": "00000000-0000-4000-8000-000000000123",
         "POSTHOG_PROJECT_ID": "675372",
         "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
         "MENU_TOKEN_ISSUER": "https://peekaplate-api-staging.vxkong.workers.dev/"
