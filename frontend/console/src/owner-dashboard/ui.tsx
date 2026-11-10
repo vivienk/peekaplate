@@ -1,47 +1,65 @@
-// Shared pieces of the Owner Dashboard demo: icons, labels, KPIs and hand-built SVG charts
-// (one scale per chart).
-import { type KeyboardEvent, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+// Shared pieces of the Owner Dashboard demo: icons, buttons, labels, KPIs and hand-built SVG
+// charts (one scale per chart).
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from 'react';
+import { Button, type ButtonProps } from '../ui';
+import action from './assets/icons/action.svg';
+import back from './assets/icons/back.svg';
+import chart from './assets/icons/chart.svg';
+import chat from './assets/icons/chat.svg';
+import check from './assets/icons/check.svg';
+import edit from './assets/icons/edit.svg';
+import home from './assets/icons/home.svg';
+import info from './assets/icons/info.svg';
+import menu from './assets/icons/menu.svg';
+import plus from './assets/icons/plus.svg';
+import report from './assets/icons/report.svg';
+import search from './assets/icons/search.svg';
+import send from './assets/icons/send.svg';
+import spark from './assets/icons/spark.svg';
+import store from './assets/icons/store.svg';
+import warn from './assets/icons/warn.svg';
+import x from './assets/icons/x.svg';
 import { pctChg, THUMBS } from './data';
 
+/* Icons exported from Rania's Figma file (l7A9n8tACJic0FIhY49Zjw), unchanged:
+   - "PeekaPlate Icons" set 356:5320: home, report, chart, menu, action, store, check, search,
+     x (cross-small), back (Arrow-left), warn (warning), edit (Edit);
+   - "Rounded Corners_Regular" set 343:8163 (the icon family the Buttons component uses):
+     info (fi-rr-info), plus (fi-rr-plus), chat (fi-rr-comment);
+   - "AI panel" component (owner S12, 2346:6265): spark, send. */
 const ICONS = {
-  home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
-  report: 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7',
-  chart: 'M4 20V9M10 20V4M16 20v-8M22 20H2',
-  chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12h5',
-  menu: 'M5 6h14M5 12h14M5 18h14',
-  action: 'M5 12l4 4 10-10M4 20h16',
-  info: 'M12 8h.01M11 12h1v5h1M12 3a9 9 0 100 18 9 9 0 000-18z',
-  plus: 'M12 5v14M5 12h14',
-  x: 'M6 6l12 12M18 6L6 18',
-  back: 'M15 5l-7 7 7 7',
-  send: 'M4 12l16-8-6 16-3-7z',
-  warn: 'M12 4l9 16H3zM12 10v4M12 17h.01',
-  check: 'M5 12l4 4 10-10',
-  search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM20 20l-4.2-4.2',
-  edit: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
-  store:
-    'M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9c0 1.7 1.3 3 2.7 3S9.3 10.7 9.3 9c0 1.7 1.3 3 2.7 3s2.7-1.3 2.7-3c0 1.7 1.3 3 2.7 3S20 10.7 20 9M10 20v-5h4v5',
-  spark:
-    'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z',
+  action,
+  back,
+  chart,
+  chat,
+  check,
+  edit,
+  home,
+  info,
+  menu,
+  plus,
+  report,
+  search,
+  send,
+  spark,
+  store,
+  warn,
+  x,
 };
 export type IconName = keyof typeof ICONS;
 
+/** Draws the Figma SVG as a mask, so the icon keeps Figma's exact shape and takes the
+ *  surrounding text colour (nav states, buttons, notes) instead of a fixed fill. */
 export function Icon({ n, s = 20 }: { n: IconName; s?: number }) {
-  return (
-    <svg
-      width={s}
-      height={s}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={ICONS[n]} />
-    </svg>
-  );
+  const style = { width: s, height: s, '--ic': `url("${ICONS[n]}")` } as CSSProperties;
+  return <span className="ic" aria-hidden="true" style={style} />;
 }
 
 /** Reusable icon container for feature/step cards: a fixed box with no background fill. */
@@ -53,21 +71,28 @@ export function IconTile({ n, s = 20 }: { n: IconName; s?: number }) {
   );
 }
 
-export function BackChevron() {
+/* Owner buttons follow Rania's Figma components, built on the shared @peekaplate/ui Button:
+   - kind "primary" / "outlined" = "Owner dashboard_Button" 1563:8484 (Type=Primary/Outlined);
+     size "md" = Size=Medium (40px, 16px label), "lg" = Size=Large (48px, 18px label);
+   - kind "text" = "Text link" 1449:11145 (Tone=Accent), for low-emphasis actions such as
+     Back, Dismiss and Undo. An optional leading icon is the component's "Show Icon" slot. */
+export type BtnKind = 'primary' | 'outlined' | 'text';
+const VARIANT = { primary: 'action', outlined: 'outline', text: 'text' } as const;
+
+export function Btn({
+  kind = 'outlined',
+  size = 'lg',
+  icon,
+  className,
+  children,
+  ...rest
+}: Omit<ButtonProps, 'variant'> & { kind?: BtnKind; size?: 'md' | 'lg'; icon?: IconName }) {
+  const classes = ['ob', `ob--${kind}`, `ob--${size}`, className].filter(Boolean).join(' ');
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 6l-6 6 6 6" />
-    </svg>
+    <Button variant={VARIANT[kind]} className={classes} {...rest}>
+      {icon && <Icon n={icon} s={kind === 'text' ? 16 : 20} />}
+      {children}
+    </Button>
   );
 }
 
@@ -511,14 +536,9 @@ export function ChartCard({
           {tag}
           {right}
           {head && (
-            <button
-              type="button"
-              className="btn ghost sm"
-              aria-pressed={tv}
-              onClick={() => setTv((v) => !v)}
-            >
+            <Btn kind="text" type="button" aria-pressed={tv} onClick={() => setTv((v) => !v)}>
               {tv ? 'Show chart' : 'View as table'}
-            </button>
+            </Btn>
           )}
         </div>
       </div>
