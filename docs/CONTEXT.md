@@ -110,6 +110,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "frontend/diner/src/menu/route.ts",
+        "frontend/diner/src/menu/route.test.ts",
         "tests/e2e/menu-states.spec.ts",
         "tests/e2e/published-states.spec.ts",
         "vitest.config.ts",
@@ -167,7 +169,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d042d2de8eb79dad0e800e6b3444727b63a62b563223964b6b45025072ed9b2c"
+      "sourceFingerprint": "f6b99e7caf2239818ff9668cf8249f3afaf4ab5df2aed212c9a467d6190ab59e"
     },
     {
       "id": "console",

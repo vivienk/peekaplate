@@ -6,6 +6,7 @@ import {
   type PublicMenuContentBundle,
   type PublicMenuDelivery,
   PublicMenuDeliverySchema,
+  PublicMenuResponseSchema,
 } from '@peekaplate/contracts';
 import { toMenu, type WireMenuBundle } from './adapter';
 import type { MenuLoadResult, MenuSource } from './types';
@@ -83,10 +84,69 @@ export function verifyContentHash(
   return false;
 }
 
-export function createPublishedMenuSource(): MenuSource {
+export type PublishedSourceOptions = {
+  apiBase: string;
+  venueId: string;
+  menuId: string;
+  // Test seams. In the app, fetch is the browser's and the hash check is the live one, which
+  // fails closed until the hash rule is agreed.
+  fetcher?: typeof fetch;
+  // Checks the exact fetched bytes against the approved contentHash BEFORE any decoding or
+  // parsing. Until the shared verifier from #117 is merged, the default fails closed.
+  verifyBytes?: (bytes: Uint8Array, expectedHash: string) => boolean | Promise<boolean>;
+};
+
+const withSignal = (signal?: AbortSignal) => (signal ? { signal } : {});
+
+export function createPublishedMenuSource(options: PublishedSourceOptions): MenuSource {
+  const doFetch: typeof fetch = options.fetcher ?? ((input, init) => fetch(input, init));
+  // Fails closed: with no verifier, no bundle is ever accepted.
+  const verifyBytes = options.verifyBytes ?? (() => false);
+  const base = options.apiBase.replace(/\/+$/, '');
+
   return {
-    async load() {
-      return { status: 'error' };
+    async load(signal) {
+      try {
+        // 1. The small publication pointer. 404 covers missing, draft and withdrawn menus.
+        const res = await doFetch(
+          `${base}/public/venues/${options.venueId}/menus/${options.menuId}`,
+          { cache: 'no-store', ...withSignal(signal) },
+        );
+        if (res.status === 404) return { status: 'unavailable' };
+        if (!res.ok) return { status: 'error' };
+        const rawResponse: unknown = await res.json();
+        const response = PublicMenuResponseSchema.parse(rawResponse);
+
+        // The answer must be for the menu that was asked for.
+        if (response.venueId !== options.venueId || response.menuId !== options.menuId) {
+          return { status: 'error' };
+        }
+
+        // 2. The immutable bundle. Public, so no credentials are sent.
+        const bundleRes = await doFetch(response.bundle.url, {
+          credentials: 'omit',
+          ...withSignal(signal),
+        });
+        if (!bundleRes.ok) return { status: 'error' };
+
+        // Raw bytes first. The hash is checked before anything is decoded or parsed.
+        const bytes = new Uint8Array(await bundleRes.arrayBuffer());
+        if (!(await verifyBytes(bytes, response.bundle.contentHash))) return { status: 'error' };
+
+        // Only verified bytes are decoded, parsed and validated.
+        const content: unknown = JSON.parse(new TextDecoder().decode(bytes));
+        const delivery = PublicMenuDeliverySchema.parse({ response: rawResponse, content });
+        return deliveryToMenu(delivery);
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        // A failed fetch is a TypeError. Bad data (a ZodError) is never reported as offline.
+        // Only an explicit `false` means offline. Node and some browsers leave onLine undefined.
+        const offline =
+          error instanceof TypeError &&
+          typeof navigator !== 'undefined' &&
+          navigator.onLine === false;
+        return { status: offline ? 'offline' : 'error' };
+      }
     },
   };
 }

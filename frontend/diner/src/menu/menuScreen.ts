@@ -3,6 +3,7 @@ import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
+import { menuRouteFromPath } from './route';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
@@ -354,7 +355,13 @@ export function mountMenuScreen(container: HTMLElement): void {
     // adapter on demand (dynamic import), so fixture builds do not carry or run it.
     const loading: Promise<MenuLoadResult> =
       mode === 'live'
-        ? import('./published').then((m) => m.createPublishedMenuSource().load())
+        ? import('./published').then((m): Promise<MenuLoadResult> | MenuLoadResult => {
+            const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
+            if (!apiBase) return { status: 'error' };
+            const route = menuRouteFromPath(window.location.pathname);
+            if (!route) return { status: 'unavailable' };
+            return m.createPublishedMenuSource({ apiBase, ...route }).load();
+          })
         : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
     const handleRetry = () => {

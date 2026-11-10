@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  createPublishedMenuSource,
   deliveryToMenu,
   parsePublishedDelivery,
   publicBundleToWire,
@@ -186,5 +187,112 @@ describe('published adapter', () => {
     expect(dish?.kind).toBe('incomplete');
     expect(dish).not.toHaveProperty('name');
     expect(dish).not.toHaveProperty('price');
+  });
+});
+
+describe('published source (mocked fetch)', () => {
+  const V = validDelivery.response.venueId;
+  const M = validDelivery.response.menuId;
+  const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  const make = (
+    handler: (url: string) => Response | Promise<Response>,
+    verifyBytes: (bytes: Uint8Array, expectedHash: string) => boolean | Promise<boolean> = () =>
+      true,
+  ) =>
+    createPublishedMenuSource({
+      apiBase: 'https://api.example.test/',
+      venueId: V,
+      menuId: M,
+      fetcher: (async (input: RequestInfo | URL) => handler(String(input))) as typeof fetch,
+      verifyBytes,
+    });
+  const ok = (url: string) =>
+    url.includes('/public/venues/') ? reply(validDelivery.response) : reply(validDelivery.content);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches the pointer, then the bundle, and returns a ready published menu', async () => {
+    const urls: string[] = [];
+    const result = await make((url) => {
+      urls.push(url);
+      return ok(url);
+    }).load();
+    expect(urls).toEqual([
+      `https://api.example.test/public/venues/${V}/menus/${M}`,
+      'https://example.test/bundle.json',
+    ]);
+    expect(result.status).toBe('ready');
+  });
+
+  it('fails closed with the live hash check', async () => {
+    const source = createPublishedMenuSource({
+      apiBase: 'https://api.example.test',
+      venueId: V,
+      menuId: M,
+      fetcher: (async (input: RequestInfo | URL) => ok(String(input))) as typeof fetch,
+    });
+    expect((await source.load()).status).toBe('error');
+  });
+
+  it('maps a 404 to unavailable', async () => {
+    expect((await make(() => reply({ error: 'not_found' }, 404)).load()).status).toBe(
+      'unavailable',
+    );
+  });
+
+  it('maps a server error to error', async () => {
+    expect((await make(() => reply({}, 500)).load()).status).toBe('error');
+  });
+
+  it('maps a failed network request to error when the browser is online', async () => {
+    vi.stubGlobal('navigator', { onLine: true });
+    const source = make(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    expect((await source.load()).status).toBe('error');
+  });
+
+  it('maps a failed network request to offline when the browser reports offline', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    const source = make(() => {
+      throw new TypeError('Failed to fetch');
+    });
+    expect((await source.load()).status).toBe('offline');
+  });
+
+  it('rejects a bundle with an unknown key', async () => {
+    const bad = { ...validDelivery.content, unknown_field: true };
+    const result = await make((url) =>
+      url.includes('/public/venues/') ? reply(validDelivery.response) : reply(bad),
+    ).load();
+    expect(result.status).toBe('error');
+  });
+
+  it('rejects a response for a different menu', async () => {
+    const other = { ...validDelivery.response, menuId: '99999999-9999-4999-8999-999999999990' };
+    const result = await make((url) =>
+      url.includes('/public/venues/') ? reply(other) : reply(validDelivery.content),
+    ).load();
+    expect(result.status).toBe('error');
+  });
+
+  it('gives the verifier the exact fetched bytes and the approved hash', async () => {
+    let seenText = '';
+    let seenHash = '';
+    const source = make(ok, (bytes, expectedHash) => {
+      seenText = new TextDecoder().decode(bytes);
+      seenHash = expectedHash;
+      return true;
+    });
+    await source.load();
+    expect(seenText).toBe(JSON.stringify(validDelivery.content));
+    expect(seenHash).toBe(validDelivery.response.bundle.contentHash);
+  });
+
+  it('does not accept a bundle when the bytes fail verification', async () => {
+    const result = await make(ok, () => false).load();
+    expect(result.status).toBe('error');
   });
 });
