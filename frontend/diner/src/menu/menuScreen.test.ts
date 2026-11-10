@@ -46,7 +46,8 @@ class FakeContainer {
     }
     return elements;
   }
-  querySelector(): HTMLElement | null {
+  // No single-element lookups in this fake; the search wiring then stays inert.
+  querySelector(): null {
     return null;
   }
   appendChild() {}

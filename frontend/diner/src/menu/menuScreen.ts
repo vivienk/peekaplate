@@ -4,6 +4,12 @@ import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
 import { menuRouteFromPath } from './route';
+import {
+  bindMenuSearch,
+  SEARCH_ALL_CATEGORY_ID,
+  searchEmptyMarkup,
+  searchPanelMarkup,
+} from './searchView';
 import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
@@ -18,7 +24,7 @@ const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
 ]);
 
 const FIXTURE_LABEL = 'Fixture data';
-const ALL_CATEGORY_ID = 'all';
+const ALL_CATEGORY_ID = SEARCH_ALL_CATEGORY_ID;
 
 let menuObserver: IntersectionObserver | null = null;
 let activeCategoryId: string | null = null;
@@ -26,6 +32,8 @@ let openerDishId: string | null = null;
 // True while the screen is showing fixture data. Only then may it show the "Fixture data"
 // label and the demo restaurant name; real menus must never show either.
 let fixtureMode = true;
+// The open search query (null when the bar is closed), kept across dish detail and back.
+let searchQuery: string | null = null;
 
 function disposeObserver(): void {
   menuObserver?.disconnect();
@@ -171,7 +179,7 @@ function renderMenu(
           <span class="pp-logo__emblem" aria-hidden="true"></span>
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
         </div>
-        <button class="pp-search" type="button" aria-label="Search menu (not available yet)" disabled>
+        <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
           <span aria-hidden="true">⌕</span>
         </button>
       </header>
@@ -180,6 +188,7 @@ function renderMenu(
           ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
           : ''
       }
+      ${searchPanelMarkup()}
 
       <nav class="pp-tabs" aria-label="Menu categories">
         ${tabs
@@ -205,27 +214,43 @@ function renderMenu(
           })
           .join('')}
       </section>
+      ${searchEmptyMarkup()}
 
       <p class="pp-end">End of menu</p>
       ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
-      <p class="pp-notice">Search, Save and Compare are not available yet.</p>
+      <p class="pp-notice">Save and Compare are not available yet.</p>
     </div>
   `;
 
   const tabButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('.pp-tab'));
   const categoryBlocks = Array.from(container.querySelectorAll<HTMLElement>('.pp-category'));
 
+  const selectCategory = (target: string | null) => {
+    activeCategoryId = target;
+    tabButtons.forEach((item) => {
+      const selected = item.dataset.categoryId === target;
+      item.classList.toggle('pp-tab--active', selected);
+      item.setAttribute('aria-pressed', String(selected));
+    });
+    categoryBlocks.forEach((block) => {
+      block.hidden = block.dataset.categoryId !== target;
+    });
+  };
+
+  const search = bindMenuSearch(container, {
+    menu,
+    query: searchQuery,
+    onQueryChange: (query) => {
+      searchQuery = query;
+    },
+    activeCategoryId: () => activeCategoryId ?? ALL_CATEGORY_ID,
+    selectAllCategories: () => selectCategory(ALL_CATEGORY_ID),
+  });
+
   tabButtons.forEach((button) => {
     button.addEventListener('click', () => {
-      const target = button.dataset.categoryId ?? null;
-      activeCategoryId = target;
-      tabButtons.forEach((item) => {
-        item.classList.toggle('pp-tab--active', item === button);
-        item.setAttribute('aria-pressed', String(item === button));
-      });
-      categoryBlocks.forEach((block) => {
-        block.hidden = block.dataset.categoryId !== target;
-      });
+      selectCategory(button.dataset.categoryId ?? null);
+      search.refresh();
     });
   });
 
@@ -311,6 +336,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   disposeObserver();
   activeCategoryId = null;
   openerDishId = null;
+  searchQuery = null;
 
   let savedScroll = 0;
   let currentMenu: Menu | null = null;

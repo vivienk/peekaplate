@@ -675,13 +675,13 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         expect(dishCheck.rows[0]?.name).toBe('Atomic Wagyu Burger');
 
         // Test idempotency replay with winning commandId
-        const winningCommandId = winnerResult.publishedRevision ? commandId1 : commandId2;
+        const winningCommandId = res1.status === 'fulfilled' ? commandId1 : commandId2;
         const replay = await approveDishDraftAtomic(
           runtimeClient,
           actorId,
           venueId,
           targetDraft.id,
-          { commandId: commandId1 },
+          { commandId: winningCommandId },
         );
         expect(replay.publishedRevision.revisionId).toBe(winnerResult.publishedRevision.revisionId);
         expect(replay.publishedRevision.dishId).toBe(winnerResult.publishedRevision.dishId);
