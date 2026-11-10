@@ -2548,3 +2548,35 @@ browser and database evidence without skipping or weakening any test.
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T07:13:17.443Z","exitCode":1}
 ```
+
+## November 10 AI report-to-core adapter development
+
+The new seam suite initially failed because the consumer mapping export did not
+exist (15 failing cases, one rejection case passing). After adding the pure
+adapter, all 16 cases pass against the unchanged deterministic core. The adapter
+binds explicit caller context and honors the shared complementary-suppression
+projection; it never generates producer identities or restores hidden values.
+An initial direct Biome check reported two test line-wrapping differences; the
+formatter corrected those without changing assertions. Backend typecheck passes.
+The frozen development oracle, shared contracts, producer SQL and model/API
+behavior are unchanged. Final aggregate checks and pinned review are recorded
+separately; this development result is not live producer or hosted acceptance.
+
+The first context refresh rejected the expanded backend summary because it
+exceeded the existing 1,000-character bound. The summary was compacted while
+retaining the parent responsibilities and source paths; the checker bound was
+not changed. Refresh and validation must pass before committing this candidate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:47:51.902Z","exitCode":1}
+```
+
+The corrected context refresh passes with all 13 modules and ten handoffs.
+`pnpm verify lint typecheck context:check docs:check` passes, including all seven
+package typechecks and links in 56 Markdown documents. `pnpm verify build`
+passes the frontend builds and Worker dry run, without deployment. `pnpm check`
+passes 1,122 application cases (four optional skips) and 71 of 72 script cases;
+its aggregate result is FAIL because the unchanged artifact-symlink security
+test cannot create a Windows junction in this sandbox (EPERM). The test remains
+intact. Linux CI must establish the complete aggregate result on the final head.

@@ -121,10 +121,10 @@ The reporting service must supply its validated internal report after
 complementary suppression. Structural validation cannot prove the underlying
 SQL, consent, suppression or freshness calculations are correct.
 
-This exported boundary has local synthetic tests. The reporting API and
-recommendation core are not yet wired to it. Stable report/evidence identities,
-dish-scoped recommendation references and mapping not_measurable into a core
-abstention remain integration dependencies. Merged PR #107 retains the reserved
+This exported boundary has local synthetic tests. The pure consumer adapter
+below maps it into the existing recommendation request; the reporting API remains
+unwired. Trusted report/evidence identity issuance and the real producer handoff
+remain integration dependencies. Merged PR #107 retains the reserved
 synthetic-venue gate; its public responses omit internal cohorts and are not the
 internal producer fixture needed by this validator.
 
@@ -173,3 +173,49 @@ Louis's precise internal producer fixture, trusted identities, post-disclosure
 cohorts and freshness handoff remain required. Keep PR112 Draft and AI-01 In
 Progress; model/provider/budget, independent rubric and hosted acceptance are
 separate gates.
+
+## November 10 report-to-core consumer adapter (#112)
+
+`toOwnerRecommendationRequest(internalReport, scope)` maps the internal validator
+into the unchanged `owner-recommendation.v1` request. Its server-only caller must
+authenticate current venue membership and supply `authorizedVenueId`, the selected
+`dishId`, and a trusted snapshot context. Never take that context from a browser
+request or treat structural validation as proof of authorization.
+
+The context contains existing core `requestId`, `reportId`, `reportVersion` and
+three metric evidence IDs, plus the bound venue/dish, source, calculation version,
+generation timestamp and exact start/end strings. The adapter checks that tuple
+against the selected report. It does not generate IDs, derive a report version
+from a timestamp or require new producer database columns. Production identity
+issuance and how one report version binds a selected dish are still a shared
+producer/caller integration decision; the tests inject labelled synthetic IDs.
+
+| Internal evidence | Existing core evidence |
+| --- | --- |
+| NORMAL / VALID_ZERO with verified freshness | Available value and its own checked cohort; numeric zero stays zero |
+| NOT_MEASURABLE | Value-free `missing`; the original report retains the denominator-specific reason |
+| SUPPRESSED / STALE / MISSING / EVIDENCE_CHECK_FAILED | Value-free suppressed / stale / missing / conflicting |
+| Unknown report freshness | All metrics missing, including otherwise valid zero |
+| Related cell hidden by shared complementary suppression | Suppressed; never restore its internal value |
+
+The adapter reuses `toOwnerReport()` to honor the shared disclosure projection
+before admitting an otherwise available metric. This is not verification of
+producer SQL, arbitrary overlapping-filter suppression or real freshness.
+Only the three existing rate keys are selected. Dish names, free-form source
+text, internal counts and producer context are not copied into public output.
+Counts remain internal inputs to the existing privacy checks.
+
+The caller can then pass the request and an approved server-owned policy to
+`buildOwnerRecommendation()`. The existing generator and exact contextual result
+validator are unchanged: an LLM paraphrase is not admitted by this adapter.
+No HTTP endpoint, provider client, live report connection, approval action or
+deployment is added. An absent approved production policy is still a live-use
+gate; synthetic test policy is not product approval.
+
+Sixteen synthetic seam cases connect this mapping to the real deterministic core,
+including valid zero, not measurable, unknown freshness, withheld cells,
+complementary suppression, foreign scope, a second dish, changed source/window/
+generation/calculation identity and ambiguous evidence IDs. The existing frozen
+21-case development oracle remains unchanged. Real producer-shaped input,
+membership authorization, independent evaluation and hosted acceptance remain
+separate; keep #112 Draft and AI-01 In Progress.

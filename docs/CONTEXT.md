@@ -200,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. ES256 claims, restore/retry/replay and tenant checks remain. Owner reports authorize membership and bound evidence to 24h; ordered eligible comparisons credit both dishes once. Local/staging requires source=synthetic, a configured reserved venue and server allowlist; canonical venues fail closed. Timing coverage counts openings; privacy floors count sessions. Timed and small opened cohorts are complementarily suppressed; zero openings are NOT_MEASURABLE. owner_report.v1 strips internal cohorts; freshness is unverified. AI-01 returns scoped drafts/abstention. Its internal input validator preserves valid zero and withholds stale/unknown freshness or unusable metrics. Offline evaluation requires a fresh complete passing 21-case artifact. Hosted/model/rubric/producer integration remains unverified; collection paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. ES256, restore/replay and tenant checks remain. Owner reports authorize membership, bound 24h and credit ordered comparisons to both dishes once. Local/staging only: source=synthetic, configured reserved venue and server allowlist; canonical venues fail closed. Timing coverage counts openings; privacy floors count sessions; timed/opened small cohorts are complementarily suppressed. Zero openings are NOT_MEASURABLE. owner_report.v1 strips cohorts; freshness is unverified. AI-01 validates internal inputs and maps to the unchanged core: trusted caller context binds venue/dish/source/calculation/generation/window, valid zero remains and withheld states/masks stay value-free. No ID issuance, HTTP/model route or production policy. Offline evaluation requires all 21 fresh passing records. Hosted/model/rubric/producer acceptance remains unverified; collection paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -291,7 +291,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/evaluate-owner-ai.mjs",
         "scripts/evaluate-owner-ai.test.mjs",
         "backend/src/owner-ai/report-input.ts",
-        "backend/src/owner-ai/report-input.test.ts"
+        "backend/src/owner-ai/report-input.test.ts",
+        "backend/src/owner-ai/report-adapter.ts",
+        "backend/src/owner-ai/report-adapter.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -304,7 +306,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d8651a48f67242aa352396f90507c895c420de947b5bdf0dc26fd6d6690e256d"
+      "sourceFingerprint": "efc31861eb3bf4b2200c4544e845a330c4d2570451b4e3402e28d432cd3420e9"
     },
     {
       "id": "database",
@@ -609,6 +611,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
+      "summary": "Draft PR112 adds a pure consumer adapter from internal report validation to the unchanged deterministic recommendation request. Synthetic caller IDs bind the exact venue/dish/source/calculation/generation/window tuple; not_measurable maps to missing and shared complementary suppression is honored. Sixteen seam cases pass; the frozen 21-case oracle and public contracts are unchanged.",
+      "modules": [
+        "backend",
+        "contracts",
+        "delivery"
+      ],
+      "next": "Verify the final clean candidate and retain Draft. Louis supplies a reproducible actual internal input; production identity issuance, membership authorization, approved policy/model scope, independent evaluation and hosted acceptance remain separate gates."
+    },
+    {
+      "date": "2026-11-10",
       "summary": "Draft PR112 synchronized with develop085ecfd after PR107 and PR82 merged. The reserved synthetic-venue report gate, frozen 21-case oracle and evaluation CLI completeness fix/five regressions are retained. A new reachable nullable-freshness input must remain value-free unavailable rather than usable AI evidence; verified-fresh valid zero is retained. Producer-issued internal fixture/identity/cohort/freshness handoff and live wiring remain separate.",
       "modules": [
         "backend",
@@ -693,16 +705,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend"
       ],
       "next": "After merge synchronize #82 and update its evaluation.test.ts expected rationale to omit cohort counts, regenerate evidence, then review #112. Exact ISO-string window identity, real report provenance/privacy, API membership, production policy, model/UI and hosted acceptance remain integration gates."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR73 reconciled with develop95fbe1a without dropping PR25 assets, diner/menu or synthetic-data changes. Prior segment/diagnostic binding, presence-aware idempotency and incomplete-field pruning verified. Re-review additionally binds source kind/location/size/retrieval instant to the retained producer artifact: four mutation regressions failed before the five-line guard and pass after it. Local real-JWT route/real-Postgres check rejects each altered source before writes and reloads honest data. See qa-reports/S3-RES-01.2-test-report.md for fresh counts/timings; no hosted migration or deployment.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
     }
   ]
 }
