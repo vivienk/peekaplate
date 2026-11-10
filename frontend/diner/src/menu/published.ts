@@ -94,6 +94,8 @@ export type PublishedSourceOptions = {
   // Checks the exact fetched bytes against the approved contentHash BEFORE any decoding or
   // parsing. Until the shared verifier from #117 is merged, the default fails closed.
   verifyBytes?: (bytes: Uint8Array, expectedHash: string) => boolean | Promise<boolean>;
+  // Called after a successful load, so the caller can hand the token to the tracking layer.
+  onDelivery?: (info: { token: string; expiresAt: number; publicationId: string }) => void;
 };
 
 const withSignal = (signal?: AbortSignal) => (signal ? { signal } : {});
@@ -136,7 +138,15 @@ export function createPublishedMenuSource(options: PublishedSourceOptions): Menu
         // Only verified bytes are decoded, parsed and validated.
         const content: unknown = JSON.parse(new TextDecoder().decode(bytes));
         const delivery = PublicMenuDeliverySchema.parse({ response: rawResponse, content });
-        return deliveryToMenu(delivery);
+        const result = deliveryToMenu(delivery);
+        if (result.status === 'ready') {
+          options.onDelivery?.({
+            token: delivery.response.menuToken,
+            expiresAt: Date.parse(delivery.response.tokenExpiresAt),
+            publicationId: delivery.response.publicationId,
+          });
+        }
+        return result;
       } catch (error) {
         if (signal?.aborted) throw error;
         // A failed fetch is a TypeError. Bad data (a ZodError) is never reported as offline.

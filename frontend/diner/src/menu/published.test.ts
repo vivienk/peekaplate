@@ -295,4 +295,24 @@ describe('published source (mocked fetch)', () => {
     const result = await make(ok, () => false).load();
     expect(result.status).toBe('error');
   });
+
+  it('reports the token, expiry and publication id after a successful load', async () => {
+    const seen: unknown[] = [];
+    const source = createPublishedMenuSource({
+      apiBase: 'https://api.example.test',
+      venueId: V,
+      menuId: M,
+      fetcher: (async (input: RequestInfo | URL) => ok(String(input))) as typeof fetch,
+      verifyBytes: () => true,
+      onDelivery: (info) => seen.push(info),
+    });
+    expect((await source.load()).status).toBe('ready');
+    expect(seen).toEqual([
+      {
+        token: 'token',
+        expiresAt: Date.parse('2026-11-01T00:00:00.000Z'),
+        publicationId: '44444444-4444-4444-8444-444444444444',
+      },
+    ]);
+  });
 });

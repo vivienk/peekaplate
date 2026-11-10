@@ -157,4 +157,28 @@ test.describe('published states and image fallbacks', () => {
     await expect(page.locator('.pp-detail__image--missing')).toHaveCount(1);
     await expect(page.locator('img.pp-detail__image')).toHaveCount(0);
   });
+
+  test('fixture mode makes no ingestion, PostHog or published-menu requests', async ({ page }) => {
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('http://127.0.0.1:5173/?scenario=demo');
+    await expect(page.locator('img.pp-card__image').first()).toBeVisible({ timeout: 10_000 });
+
+    await page.locator('.pp-card__open').first().click();
+    await expect(page.locator('.pp-detail')).toBeVisible({ timeout: 10_000 });
+
+    // Module files served by the dev server itself are fine. Only requests to another origin,
+    // or calls to the ingestion and public-menu API paths, count as network traffic.
+    const parsed = requests
+      .map((url) => new URL(url))
+      .filter((u) => u.protocol === 'http:' || u.protocol === 'https:');
+    expect(parsed.filter((u) => u.origin !== 'http://127.0.0.1:5173').map(String)).toEqual([]);
+    expect(
+      parsed.filter((u) => /^\/(observations|public\/venues\/)/.test(u.pathname)).map(String),
+    ).toEqual([]);
+    // The live adapter is loaded on demand, so fixture mode must never fetch it.
+    expect(parsed.filter((u) => u.pathname.includes('/menu/published')).map(String)).toEqual([]);
+  });
 });
