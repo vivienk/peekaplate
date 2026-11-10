@@ -791,3 +791,16 @@ These results establish synthetic fixture and validator correctness only.
 Application AI evaluation remains NOT RUN. Production integration and
 hosted privacy acceptance are not established. Outstanding product
 decisions remain PENDING.
+
+
+## Owner-report staging API — November 10
+
+The console may call the owner-report route from its exact staging origin or
+http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
+GitHub collaborator tokens do not authorize restaurant reports. Staging reports
+are deliberately limited to the server-approved synthetic venue; production
+and other venues remain blocked. See [request flow, status codes and release
+checks](owner-report-staging.md). Deployment evidence belongs in the narrow
+owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

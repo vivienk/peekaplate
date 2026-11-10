@@ -86,9 +86,24 @@ withdraw three labelled synthetic menus, then the actual deployed diner:
 - [ ] All synthetic menus are withdrawn; temporary owner membership returns to
       viewer; the genuine test session ends. API/console/Queues remain unchanged.
 
-The release PR's dated acceptance comment records observed results, exact main
-SHA and Pages deployment ID. This checklist is the procedure, not a claim that a
+The dated acceptance comment in [connection PR #136](https://github.com/vivienk/peekaplate/pull/136)
+and its linked staging release records observed results, exact main SHA and
+Pages deployment ID. This checklist is the procedure, not a claim that a
 merge alone passed it. Synthetic transport/UI checks do not certify restaurant
 content, real-device usability, actual control triggers or real PostHog readback
 and canonical/report reconciliation. Those remain the DATA-01 pilot acceptance
 work with the relevant frontend integrations.
+
+Local November 10 verification before deployment:
+
+| Check | Result | Wall time |
+|---|---|---|
+| `TEST_WORKERD=1 pnpm check` | 1,204 unit + 72 script tests; lint/types/context/docs PASS | 26.770 s after main reconciliation |
+| `pnpm exec playwright test --workers=1` | 115 Chromium tests PASS | 95.970 s |
+| `pnpm exec playwright test --config playwright.posthog.config.ts --workers=1` | 9 intercepted SDK browser tests PASS | 19.078 s |
+| `pnpm verify build` | Frontends and Worker dry-run PASS | 9.525 s |
+| `pnpm verify test:db` | 213 SQL assertions + 86 PostgreSQL/Worker tests PASS | 61.924 s |
+
+The prior main report release was reconciled without losing its synthetic-only
+configuration, runbook, report tests or error history. No API deployment is part
+of this diner release.

@@ -193,7 +193,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c306977ee463571a946c23970e2fc8dc5145f2531c1bf964538d31e6821b941f"
+      "sourceFingerprint": "67ca26d8f8931b3412a099741c73edd7989f5741e66173248787191279f0c4f2"
     },
     {
       "id": "console",
@@ -322,7 +322,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/request.ts",
         "backend/src/bundle-producer/bundle-producer.integration.ts",
         "backend/scripts/produce-menu-bundle.ts",
-        "docs/s4-res-bundle-producer.md"
+        "docs/s4-res-bundle-producer.md",
+        "docs/owner-report-staging.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -335,7 +336,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cb333fefce89c8a855a2953ac7c30fe79b384d3d44176beac3d7ac1fdcf2f8d7"
+      "sourceFingerprint": "e62b4c11cf26fa02a79a7414a2d19f17e89d360a91ac458849d3784897d3c0d0"
     },
     {
       "id": "database",
@@ -453,7 +454,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3550e660e1871ef527534196a0346ae3d9c5e9b5048ae77293f0ead7f9654177"
+      "sourceFingerprint": "b3d7142b6aa0452abd56d70a3e9ea1d762a7cd1f10a39fa3ec237bf80c3d0ea3"
     },
     {
       "id": "agents",
@@ -647,7 +648,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ],
-      "summary": "Published diner connection now uses the shared exact-byte verifier; no production bypass seam remains. New RED-to-GREEN checks cover valid default verification, publication suspension and expiry during a hung refresh. Detected withdrawal retires both destination paths without changing consent; stale loads cannot restore tokens. Pinned public-media/bundle snapshots reuse existing staging Pages without exposing private R2. Seven focused Chromium tests pass (14.653s); genuine staging staff API and pointer/hash/CORS checks passed on labelled synthetic records. Hosted app acceptance follows the reviewed main Pages-only deployment.",
+      "summary": "Published diner connection now uses the shared exact-byte verifier; no production bypass seam remains. New RED-to-GREEN checks cover valid default verification, publication suspension and expiry during a hung refresh. Detected withdrawal retires both destination paths without changing consent; stale loads cannot restore tokens. Pinned public-media/bundle snapshots reuse existing staging Pages without exposing private R2. Seven focused Chromium tests pass (14.653s); genuine staging staff API and pointer/hash/CORS checks passed on labelled synthetic records. Hosted app acceptance follows the reviewed main Pages-only deployment. Reconciles the prior main report release, retaining its synthetic-report setting/runbook and full error history; obsolete console Input index paths are replaced by current TextField/UI paths.",
       "next": "Finish independent review/full checks, merge feature/release and deploy only the reviewed main diner artifact. Record actual hosted valid/tampered/fresh-withdrawn/active-withdrawal results in the release PR; withdraw synthetic menus, restore viewer and end the test session. Keep API, console, private storage, Queues and production unchanged."
     },
     {

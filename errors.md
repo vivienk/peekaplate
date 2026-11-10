@@ -2458,7 +2458,39 @@ index intentionally excludes environment-file paths. Removed the index reference
 without relaxing its validator; the documented config example remains tracked.
 Context/docs checks then passed. No runtime or fixture behavior changed for that correction.
 
+Release reconciliation retained main's report setting and runbook. Its older
+context also named the replaced console Input files; those obsolete references
+were removed in favor of current TextField/UI paths. Source responsibilities and
+all current main test labels/error history were preserved. Fresh full checks,
+builds and disposable-database verification passed afterward. An initial PR body
+used abbreviated field labels and failed the documentation gate; the exact
+repository template labels were restored before the final CI run.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T22:13:05.031Z","exitCode":1}
 ```
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T20:59:41.487Z","exitCode":1}
+```
+
+
+## November 10 narrow report release preparation
+
+Main did not contain the owner-report route required by merged PR130. A narrow
+backport preserves the existing report/contract implementation and excludes the
+separate extraction release. Its copied database test uses main’s token(subject)
+helper instead of develop’s newer token({sub}) signature; typecheck and the
+SQL-backed HTTP suite pass after that compatibility correction. An initial lint
+check rejected Windows line endings in the edited Wrangler config; formatting
+and context refresh fixed it without changing bindings. The final full check
+passed.
+
+Wrangler was signed out and its optional secure Windows keyring helper was
+missing. The pinned helper was restored outside repository dependencies, and
+the existing scoped OAuth access refreshed into the OS credential store. No
+credential was added to files or logs. Docker was started hidden for disposable
+database tests; all nine unrelated containers remained stopped.
