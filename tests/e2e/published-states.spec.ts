@@ -123,19 +123,14 @@ test.describe('published states and image fallbacks', () => {
     const detailImg = page.locator('img.pp-detail__image');
     await expect(detailImg).toBeVisible();
 
-    // NOTE: The browser also tries to load the simulated failing detail URL and may fire its
-    // own 'error' event at an unpredictable moment, which can make this test flaky. The
-    // explicit dispatchEvent below drives the failure handler deterministically. We do not
-    // use page.route to abort the URL because the synthetic example.test load fails on DNS
-    // (slow), so it does not race the synchronous dispatch in this test flow.
-    // Set detail image src to a different failed URL to simulate distinct detail vs card images
+    // A distinct valid data URL avoids a second network error racing the explicit failure.
     await page.evaluate(() => {
       const img = document.querySelector<HTMLImageElement>('img.pp-detail__image');
-      if (img) img.src = 'https://example.test/failed-detail.jpg';
+      if (img) {
+        img.src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')}`;
+        img.dispatchEvent(new Event('error'));
+      }
     });
-
-    // Trigger error on detail image
-    await detailImg.dispatchEvent('error');
 
     // Should fall back to dish card photo URL rather than missing placeholder
     await expect(page.locator('.pp-detail__image--missing')).toHaveCount(0);

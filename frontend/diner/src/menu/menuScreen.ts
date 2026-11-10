@@ -324,7 +324,7 @@ function focusAfterRetry(container: HTMLElement, succeeded: boolean): void {
     const heading = container.querySelector<HTMLElement>('h1');
     if (heading) {
       heading.setAttribute('tabindex', '-1');
-      heading.focus();
+      heading.focus({ preventScroll: true });
     }
   } else {
     // If retry fails again, keep focus on the retry button or state text
@@ -359,7 +359,8 @@ export function mountMenuScreen(container: HTMLElement): void {
     const opener = Array.from(
       container.querySelectorAll<HTMLElement>('.pp-category:not([hidden]) .pp-card__open'),
     ).find((el) => el.dataset.openDishId === openerDishId);
-    opener?.focus({ preventScroll: true });
+    if (opener) opener.focus({ preventScroll: true });
+    else focusAfterRetry(container, true);
   };
 
   const showMenu = () => {
@@ -385,7 +386,30 @@ export function mountMenuScreen(container: HTMLElement): void {
     currentMenu = next;
     if (view !== 'menu') return;
     const scrollY = window.scrollY;
+    const focused = document.activeElement;
+    let selector: string | null = null;
+    if (focused instanceof HTMLElement && container.contains(focused)) {
+      if (focused.id) selector = `#${CSS.escape(focused.id)}`;
+      else if (focused.dataset.openDishId) {
+        selector = `[data-open-dish-id="${CSS.escape(focused.dataset.openDishId)}"]`;
+      } else if (focused.dataset.categoryId) {
+        selector = `button[data-category-id="${CSS.escape(focused.dataset.categoryId)}"]`;
+      } else {
+        selector =
+          ['.pp-search', '.pp-search-close', '.pp-search-empty__clear'].find((value) =>
+            focused.matches(value),
+          ) ?? 'h1';
+      }
+    }
     renderMenu(container, next, showDetail);
+    if (selector) {
+      const replacement = Array.from(container.querySelectorAll<HTMLElement>(selector)).find(
+        (element) => !element.closest('[hidden]'),
+      );
+      if (replacement && selector !== 'h1') {
+        replacement.focus({ preventScroll: true });
+      } else focusAfterRetry(container, true);
+    }
     window.scrollTo(0, scrollY);
   };
 
@@ -446,6 +470,7 @@ export function mountMenuScreen(container: HTMLElement): void {
               // The publication is gone. The menu on screen stays, but nothing more is delivered.
               onStop: () => {
                 menuToken = null;
+                // shortcut: live activation must also gate new events to both destinations on 404.
               },
             });
             return source.load();
