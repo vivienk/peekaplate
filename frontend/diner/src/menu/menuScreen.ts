@@ -4,6 +4,7 @@ import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
+import { createMenuRefresher, type MenuRefresher } from './refresh';
 import { menuRouteFromPath } from './route';
 import {
   bindMenuSearch,
@@ -36,6 +37,8 @@ let fixtureMode = true;
 // The current menu token and whether live tracking was switched on, kept in memory for the visit.
 let menuToken: MenuToken | null = null;
 let liveTrackingOn = false;
+// The re-read timer for the live menu. Only one exists at a time; mounting again stops the old one.
+let activeRefresher: MenuRefresher | null = null;
 // The open search query (null when the bar is closed), kept across dish detail and back.
 let searchQuery: string | null = null;
 
@@ -341,11 +344,15 @@ export function mountMenuScreen(container: HTMLElement): void {
   activeCategoryId = null;
   openerDishId = null;
   searchQuery = null;
+  activeRefresher?.stop();
+  activeRefresher = null;
 
   let savedScroll = 0;
   let currentMenu: Menu | null = null;
   let isLoading = false;
   let retryCount = 0;
+  // Which view is showing, so a swap redraws only the list and never an open dish detail.
+  let view: 'menu' | 'detail' = 'menu';
 
   const restoreOpenerFocus = () => {
     if (!openerDishId) return;
@@ -357,21 +364,36 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const showMenu = () => {
     if (!currentMenu) return;
+    view = 'menu';
     renderMenu(container, currentMenu, showDetail);
     window.scrollTo(0, savedScroll);
     restoreOpenerFocus();
   };
 
   const showDetail = (dish: CompleteDish) => {
+    view = 'detail';
     savedScroll = window.scrollY;
     disposeObserver();
     renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
     window.scrollTo(0, 0);
   };
 
+  // Called by the re-read timer when a new publication replaced the old one. The swap is a single
+  // assignment. The list is redrawn only if it is on screen; an open dish detail stays as it is
+  // and going back shows the new menu.
+  const swapMenu = (next: Menu) => {
+    currentMenu = next;
+    if (view !== 'menu') return;
+    const scrollY = window.scrollY;
+    renderMenu(container, next, showDetail);
+    window.scrollTo(0, scrollY);
+  };
+
   const loadMenu = () => {
     if (isLoading) return;
     isLoading = true;
+    activeRefresher?.stop();
+    activeRefresher = null;
     const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
     fixtureMode = mode === 'fixture';
     renderLoading(container);
@@ -394,29 +416,39 @@ export function mountMenuScreen(container: HTMLElement): void {
             if (!apiBase) return { status: 'error' };
             const route = menuRouteFromPath(window.location.pathname);
             if (!route) return { status: 'unavailable' };
-            return published
-              .createPublishedMenuSource({
-                apiBase,
-                ...route,
-                onDelivery: (info) => {
-                  menuToken = {
-                    value: info.token,
-                    expiresAt: info.expiresAt,
-                    publicationRevisionId: info.publicationId,
-                  };
-                  if (liveTrackingOn) return;
-                  liveTrackingOn = true;
-                  tracking.enableLiveTracking(
-                    delivery.createLiveDeliver({
-                      endpoint: `${apiBase.replace(/\/+$/, '')}/observations`,
-                      fetch: (input, init) => fetch(input, init),
-                      now: () => Date.now(),
-                      token: () => menuToken,
-                    }),
-                  );
-                },
-              })
-              .load();
+            const source = published.createPublishedMenuSource({
+              apiBase,
+              ...route,
+              onDelivery: (info) => {
+                menuToken = {
+                  value: info.token,
+                  expiresAt: info.expiresAt,
+                  publicationRevisionId: info.publicationId,
+                };
+                // Every verified load, first or re-read, re-arms the timer for the new expiry.
+                activeRefresher?.schedule(info.expiresAt);
+                if (liveTrackingOn) return;
+                liveTrackingOn = true;
+                tracking.enableLiveTracking(
+                  delivery.createLiveDeliver({
+                    endpoint: `${apiBase.replace(/\/+$/, '')}/observations`,
+                    fetch: (input, init) => fetch(input, init),
+                    now: () => Date.now(),
+                    token: () => menuToken,
+                  }),
+                );
+              },
+            });
+            activeRefresher = createMenuRefresher({
+              source,
+              getCurrent: () => currentMenu,
+              onSwap: swapMenu,
+              // The publication is gone. The menu on screen stays, but nothing more is delivered.
+              onStop: () => {
+                menuToken = null;
+              },
+            });
+            return source.load();
           })
         : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
