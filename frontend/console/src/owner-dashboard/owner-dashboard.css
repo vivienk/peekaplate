@@ -1,6 +1,8 @@
 /* Owner Dashboard V2 (Simplified) rebuilt on @peekaplate/tokens, light theme. Layout follows the
    design prototype; every colour, font and shadow below resolves to a token. Dev-only demo page. */
 @import "@peekaplate/tokens/tokens.css";
+/* Shared component classes (Button) so the demo reuses the design-system button. */
+@import "@peekaplate/ui/components.css";
 
 :root {
   --bg: var(--pp-role-surface);
@@ -521,6 +523,10 @@ h3 {
 .kpi .d {
   font-size: 13.5px;
   color: var(--muted);
+}
+.kpi-tag {
+  margin-top: auto;
+  padding-top: 4px;
 }
 .delta {
   font-weight: 700;
@@ -1577,7 +1583,8 @@ article.insight {
 }
 @media (min-width: 901px) {
   .app.has-ai {
-    grid-template-columns: 260px minmax(0, 1fr) 450px;
+    /* Figma's owner AI panel is 300px; 360px keeps the chat answers readable here. */
+    grid-template-columns: 260px minmax(0, 1fr) 360px;
   }
   .app.has-ai .aibtn-top {
     display: none;
@@ -1648,7 +1655,7 @@ article.insight {
 }
 @media (min-width: 901px) and (max-width: 1200px) {
   .app.has-ai {
-    grid-template-columns: 76px minmax(0, 1fr) 380px;
+    grid-template-columns: 76px minmax(0, 1fr) 320px;
   }
   .app.has-ai .side {
     padding: 16px 10px;
@@ -2684,7 +2691,6 @@ h1 {
   line-height: 1.45;
 }
 /* icons: colored glyph inside a soft circle */
-.stepc > svg,
 .note > svg,
 .rpt-act h2 svg {
   box-sizing: content-box;
@@ -2694,11 +2700,38 @@ h1 {
   color: var(--pp-color-orange-700);
   flex: none;
 }
-.stepc > svg {
-  width: 20px;
-  height: 20px;
-  padding: 8px;
+/* reusable icon container (design review 04): fixed box, no background fill */
+.icontile {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+.icontile svg {
   color: var(--pp-color-orange-700);
+}
+/* "Your menu" on the welcome page (design review 01 + 03): plain section, compact list */
+.menu-plain {
+  display: grid;
+  gap: 4px;
+}
+.menu-plain .card-h {
+  margin-bottom: 8px;
+}
+.menu-plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 560px;
+}
+.menu-plain-row {
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  padding: 10px 4px;
+}
+.menu-plain-row .num {
+  font-weight: 600;
+  color: var(--pp-color-gray-900);
 }
 .note > svg {
   width: 16px;

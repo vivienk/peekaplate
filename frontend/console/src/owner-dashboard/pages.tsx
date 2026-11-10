@@ -1,5 +1,6 @@
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
 import { type ReactNode, useState } from 'react';
+import { Button } from '../ui';
 import type { Chat } from './chat';
 import {
   type ActionState,
@@ -21,7 +22,6 @@ import {
   SESSIONS,
   type SortKey,
   T,
-  THUMBS,
   WEEKS,
   WK_ORDERS,
   WK_PREVIEWS,
@@ -33,6 +33,7 @@ import {
   Delta,
   HBars,
   Icon,
+  IconTile,
   Kpi,
   Lab,
   LineChart,
@@ -66,43 +67,46 @@ export function Welcome({ go }: { go: (p: Page) => void }) {
       </div>
       <div className="steps">
         <div className="stepc">
-          <Icon n="menu" />
+          <IconTile n="menu" />
           <h3>Your {DISH.length} dishes are listed</h3>
           <p className="muted">Each one is live on the diner menu, with a photo and description.</p>
         </div>
         <div className="stepc">
-          <Icon n="report" />
+          <IconTile n="report" />
           <h3>Reports appear in AI Insight Report</h3>
           <p className="muted">
             When a report period closes, a short summary appears with its evidence.
           </p>
         </div>
         <div className="stepc">
-          <Icon n="chat" />
+          <IconTile n="chat" />
           <h3>Ask AI any time</h3>
           <p className="muted">
             Ask about dishes, comparisons and orders. Answers show their evidence.
           </p>
         </div>
       </div>
-      <section className="card">
+      {/* Design review (Rania, Nov 9): plain section without a card border or fill, and a compact
+          vertical list instead of large stacked dish cards. */}
+      <section className="menu-plain" aria-labelledby="ym-h">
         <div className="card-h">
           <div>
-            <h3>Your menu</h3>
+            <h3 id="ym-h">Your menu</h3>
             <div className="sub">Numbers appear once diners start using the menu.</div>
           </div>
         </div>
-        <div className="dishgrid">
+        <ul className="dlist menu-plain-list">
           {DISH.map((d) => (
-            <div className="dg" key={d.id}>
-              <img src={THUMBS[d.id]} alt="" />
-              <b>{d.name}</b>
-              <span>
-                {d.cat} · {money(d.price)}
+            <li className="drow menu-plain-row" key={d.id}>
+              <Thumb id={d.id} />
+              <span className="dn">
+                {d.name}
+                <small>{d.cat}</small>
               </span>
-            </div>
+              <span className="num">{money(d.price)}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
       <div className="row">
         <button type="button" className="btn primary" onClick={() => go('menu')}>
@@ -406,15 +410,10 @@ export function Report({
             </span>
             <h1>Menu activity report</h1>
           </div>
-          <button
-            type="button"
-            className="btn sm"
-            aria-expanded={why}
-            onClick={() => setWhy((v) => !v)}
-          >
+          <Button variant="outline" aria-expanded={why} onClick={() => setWhy((v) => !v)}>
             <Icon n="info" s={16} />
             Why am I seeing this?
-          </button>
+          </Button>
         </div>
         {why && <EvidencePanel />}
       </div>

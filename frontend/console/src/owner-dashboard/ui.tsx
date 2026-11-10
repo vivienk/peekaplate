@@ -44,6 +44,15 @@ export function Icon({ n, s = 20 }: { n: IconName; s?: number }) {
   );
 }
 
+/** Reusable icon container for feature/step cards: a fixed box with no background fill. */
+export function IconTile({ n, s = 20 }: { n: IconName; s?: number }) {
+  return (
+    <span className="icontile">
+      <Icon n={n} s={s} />
+    </span>
+  );
+}
+
 export function BackChevron() {
   return (
     <svg
@@ -130,7 +139,8 @@ export function Kpi({
         {unit && <small>{unit}</small>}
       </div>
       <div className="d">{foot}</div>
-      {tag && <div>{tag}</div>}
+      {/* Pinned to the bottom so the status label lines up across cards with different text. */}
+      {tag && <div className="kpi-tag">{tag}</div>}
     </div>
   );
 }
