@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { fileURLToPath, URL } from 'node:url';
 import {
   canonicalJson,
@@ -10,13 +11,16 @@ import {
   sha256,
   toCanonicalObservation,
 } from '@peekaplate/contracts';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
+import { createStaffVerifier } from './auth';
 import app, {
   consumeJtiRateLimit,
   createApp,
   createWorker,
   handleQueueBatch,
   queue,
+  SYNTHETIC_REPORT_VENUE_ALLOWLIST,
 } from './index';
 import { ingestObservations } from './observation-ingest';
 import { ReviewCommandError } from './review-command';
@@ -126,6 +130,157 @@ describe('foundation API', () => {
     );
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: 'unauthorized' });
+  });
+});
+
+describe('owner report HTTP boundary', () => {
+  it('fails closed without one explicit synthetic source using a signed staff JWT', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const keys = await generateKeyPair('RS256');
+    const publicJwk = {
+      ...(await exportJWK(keys.publicKey)),
+      kid: 'owner-report-test-key',
+      use: 'sig',
+      alg: 'RS256',
+    };
+    const jwksServer = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ keys: [publicJwk] }));
+    });
+    await new Promise<void>((resolve) => jwksServer.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const address = jwksServer.address();
+      if (!address || typeof address === 'string') {
+        throw new Error('Test JWKS server did not provide an address.');
+      }
+      const issuer = `http://127.0.0.1:${address.port}/auth/v1`;
+      const token = await new SignJWT({ role: 'authenticated', is_anonymous: false })
+        .setProtectedHeader({ alg: 'RS256', kid: 'owner-report-test-key' })
+        .setIssuer(issuer)
+        .setAudience('authenticated')
+        .setSubject(actorId)
+        .setIssuedAt()
+        .setExpirationTime('5 minutes')
+        .sign(keys.privateKey);
+      const syntheticVenueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+      const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: syntheticVenueId, dishes: [] });
+      const app = createApp({
+        verify: createStaffVerifier({ issuer, allowLocalIssuer: true }),
+        execute: vi.fn(),
+        readOwnerReport,
+      });
+
+      for (const [query, env] of [
+        ['', { APP_ENV: 'local' }],
+        ['?source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic&source=production', { APP_ENV: 'local' }],
+        ['?source=synthetic', { APP_ENV: 'production' }],
+        ['?source=synthetic', {}],
+      ]) {
+        const response = await app.request(
+          `/api/v1/venues/${venueId}/analytics/dishes${query}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+          env,
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: 'service_unavailable' });
+      }
+      expect(readOwnerReport).not.toHaveBeenCalled();
+
+      const syntheticResponse = await app.request(
+        `/api/v1/venues/${syntheticVenueId}/analytics/dishes?source=synthetic`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: syntheticVenueId },
+      );
+      expect(syntheticResponse.status).toBe(200);
+      expect(await syntheticResponse.json()).toEqual({
+        venue_id: syntheticVenueId,
+        dishes: [],
+      });
+      expect(readOwnerReport).toHaveBeenCalledTimes(1);
+      expect(readOwnerReport).toHaveBeenCalledWith(
+        actorId,
+        syntheticVenueId,
+        expect.any(Date),
+        { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: syntheticVenueId },
+        'synthetic',
+      );
+
+      const canonicalVenueResponse = await app.request(
+        `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId },
+      );
+      expect(canonicalVenueResponse.status).toBe(503);
+      expect(await canonicalVenueResponse.json()).toEqual({ error: 'service_unavailable' });
+      expect(readOwnerReport).toHaveBeenCalledTimes(1);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        jwksServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  it('restricts the report reader to the configured synthetic venue', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+    const now = new Date('2026-11-06T12:00:00.000Z');
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const app = createApp({
+      verify,
+      execute: vi.fn(),
+      readOwnerReport,
+      now: () => now,
+    });
+
+    const response = await app.request(
+      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      {
+        headers: { Authorization: 'Bearer test-token' },
+      },
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
+    expect(verify).toHaveBeenCalledWith('Bearer test-token', {
+      APP_ENV: 'local',
+      SYNTHETIC_REPORT_VENUE_ID: venueId,
+    });
+    expect(readOwnerReport).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      now,
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
+      'synthetic',
+    );
+  });
+
+  it('rejects an unapproved venue before reading live or mixed-provenance data', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const requestedVenueId = '00000000-0000-4000-8000-000000000001';
+    const approvedSyntheticVenueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+    const readOwnerReport = vi.fn();
+    const app = createApp({
+      verify: vi.fn().mockResolvedValue(actorId),
+      execute: vi.fn(),
+      readOwnerReport,
+    });
+
+    const response = await app.request(
+      `/api/v1/venues/${requestedVenueId}/analytics/dishes?source=synthetic`,
+      { headers: { Authorization: ['Bearer', 'test-token'].join(' ') } },
+      { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: approvedSyntheticVenueId },
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    expect(readOwnerReport).not.toHaveBeenCalled();
   });
 });
 
