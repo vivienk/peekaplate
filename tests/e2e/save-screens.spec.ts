@@ -270,3 +270,85 @@ test('Save controls work by keyboard and the screens pass an accessibility scan'
   await expect(page.getByRole('heading', { name: 'Saved Dishes' })).toBeFocused();
   expect(await scan()).toEqual([]);
 });
+
+// Live menu swaps (#85). Same synthetic source seam as published-refresh.spec.ts: the real
+// rendering and refresher, with a fixture menu standing in for the published one.
+async function openLiveMenu(page: Page) {
+  await page.route('**/src/menu/menuScreen.ts*', async (route) => {
+    const response = await route.fetch();
+    const body = (await response.text())
+      .replaceAll('import.meta.env.VITE_MENU_SOURCE', '"live"')
+      .replaceAll('import.meta.env.VITE_PUBLIC_API_URL', '"http://127.0.0.1:5173"');
+    await route.fulfill({ response, body });
+  });
+  await page.route('**/src/menu/published.ts*', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: `import { createFixtureMenuSource } from '/src/menu/fixtures.ts';
+        export function createPublishedMenuSource(options) {
+          let revision = 0;
+          return { async load() {
+            const result = await createFixtureMenuSource('demo').load();
+            const menu = { ...result.menu, source: 'published', notice: null,
+              publicationRevisionId: 'synthetic-publication-' + revision++ };
+            if (window.removeDish) menu.categories = menu.categories.map(category => ({
+              ...category, dishes: category.dishes.filter(dish => dish.dishId !== window.removeDish)
+            }));
+            options.onDelivery({ token: 'synthetic-only', expiresAt: Date.now() + 1800000,
+              publicationId: menu.publicationRevisionId });
+            return { status: 'ready', menu };
+          }};
+        }`,
+    }),
+  );
+  await page.route('**/src/menu/refresh.ts*', async (route) => {
+    if (route.request().url().includes('original')) return route.continue();
+    await route.fulfill({
+      contentType: 'text/javascript',
+      body: `import { createMenuRefresher as create } from '/src/menu/refresh.ts?original';
+        export function createMenuRefresher(options) {
+          const refresher = create(options);
+          window.refreshMenu = () => refresher.refresh();
+          return refresher;
+        }`,
+    });
+  });
+  await page.goto(
+    'http://127.0.0.1:5173/venues/00000000-0000-4000-8000-000000000001/menus/00000000-0000-4000-8000-000000000002',
+  );
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+}
+
+async function swapPublication(page: Page) {
+  await page.evaluate(() => (window as unknown as { refreshMenu(): Promise<void> }).refreshMenu());
+}
+
+test('a new publication keeps Save working: focus, hearts, badge, and withdrawn dishes drop out', async ({
+  page,
+}) => {
+  await openLiveMenu(page);
+  const avocado = cardHeart(page, 'Avocado Toast');
+  await avocado.click();
+  await expect(badge(page)).toHaveText('1');
+  await avocado.focus();
+
+  await swapPublication(page);
+  await expect(avocado).toHaveAttribute('aria-pressed', 'true');
+  await expect(avocado).toBeFocused();
+  await expect(badge(page)).toHaveText('1');
+  // The redrawn hearts and header are attached again.
+  await cardHeart(page, 'Classic Eggs Benedict').click();
+  await expect(badge(page)).toHaveText('2');
+
+  // The next publication withdraws a saved dish: it leaves Saved without a toast.
+  const dishId = await avocado.getAttribute('data-save-dish-id');
+  await page.evaluate((id) => {
+    (window as unknown as { removeDish: string | null }).removeDish = id;
+  }, dishId);
+  await swapPublication(page);
+  await expect(badge(page)).toHaveText('1');
+  await expect(page.locator('.pp-toast')).toHaveCount(0);
+  await headerButton(page).click();
+  await expect(page.locator('.pp-saved__item')).toHaveCount(1);
+  await expect(page.locator('.pp-saved__item')).toContainText('Classic Eggs Benedict');
+});

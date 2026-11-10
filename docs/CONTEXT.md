@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff, publication, public-menu, analytics, retrieval and nine observation contracts; receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. S3-RES-03 owner_report.v1: metric values null unless NORMAL/VALID_ZERO (zero only), rates 0-1, mean active seconds 0-300, nothing shown unless active sessions are NORMAL and at least ten. InternalOwnerDishReportSchema adds per-metric eligible_sessions (floor ten, zero denominator NOT_MEASURABLE); toOwnerReport() strips them. RES-01.1 review candidates. AI-01 validates scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; Serialization strips cohort counts and masks reconstructive timing/open-rate/active-session cells for timed or opened cohorts of 1–9, preserving genuine zero-opening NOT_MEASURABLE states. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -47,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7b8d9cc8300af7f3009896d55e9937b34af70cc4448310548fbcb10c23ad675f"
+      "sourceFingerprint": "33e3df8813d870455726c017f450093c168bbf021a884424451aa032e33c4b07"
     },
     {
       "id": "tokens",
@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save (+#saved) and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
+      "summary": "Diner fixture menu, detail, search, Save (+#saved) and Compare share contracts/tokens. Explicit live mode fetches the pointer and bundle, maps unavailable/offline/error, refreshes tokens and preserves focus across publication swaps. Fixtures remain default; byte verification fails closed pending #117. Tracking validates observation.v2 with cached-identity reconciliation. One off-by-default consent gate covers canonical/PostHog and DNT/GPC; withdrawal retires queued work. Outbox uses atomic IndexedDB or Web-Locked localStorage with memory fallback. Fixture mode sends neither destination. Token-bound delivery handles receipts, retries and backoff. Before live activation: shared byte verification, 404 collection gating for both destinations, token/browser integration and privacy/design acceptance.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -103,10 +103,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/menuScreen.test.ts",
         "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/published.ts",
+        "frontend/diner/src/menu/published.test.ts",
+        "frontend/diner/src/menu/config.ts",
+        "frontend/diner/src/menu/config.test.ts",
         "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
+        "frontend/diner/src/menu/route.ts",
+        "frontend/diner/src/menu/route.test.ts",
+        "frontend/diner/src/menu/refresh.ts",
+        "frontend/diner/src/menu/refresh.test.ts",
         "tests/e2e/menu-states.spec.ts",
+        "tests/e2e/published-states.spec.ts",
         "vitest.config.ts",
         "frontend/diner/src/save/saved-list.ts",
         "frontend/diner/src/save/storage.ts",
@@ -160,7 +169,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/delivery.ts",
         "frontend/diner/src/tracking/delivery.test.ts",
         "frontend/diner/src/tracking/delivery.fixtures.test.ts",
-        "tests/e2e/tracking-delivery.spec.ts"
+        "tests/e2e/tracking-delivery.spec.ts",
+        "tests/e2e/published-refresh.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -169,7 +179,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0b105a8ab86fcd1106ad93cae87e291468d35043d7e78329821648fb4aad3917"
+      "sourceFingerprint": "5d1f6726077da7a01835fa8c21d6676df4377126ac8d6d896da75b1216b6ad2d"
     },
     {
       "id": "console",
@@ -200,7 +210,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical index/event/detail/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; issued browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses the configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally tests checkpoint ordering, missing/corrupt archives, archive-to-facts restoration, retry/redelivery, duplicate replay and two-session facts with owner-view exclusion. Hosted end-to-end, DLQ/crash and cross-tenant replay acceptance remain pending; normal collection stays paused. AI-01 returns scoped drafts or abstention.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. Own-token ES256/claim checks and S4-DATA-04 restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Local/staging dish reports require source=synthetic, matching SYNTHETIC_REPORT_VENUE_ID and server-allowlist membership; entries are typed as strings, and canonical venues fail closed even if configured. Timing coverage counts final/total openings; privacy floors count sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate/strip owner_report.v1; freshness unverified. AI-01 returns scoped drafts or abstention. Hosted acceptance pending; collection paused. Offline evaluation checks 21 frozen synthetic safety cases; rubric, provider and live report integration remain unverified.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -226,6 +236,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
@@ -284,7 +296,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/index.ts",
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
-        "docs/owner-ai.md"
+        "docs/owner-ai.md",
+        "backend/src/owner-ai/evaluation.test.ts",
+        "scripts/evaluate-owner-ai.mjs",
+        "scripts/evaluate-owner-ai.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -297,7 +312,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d9183d18d1b04bd1c8be8febd693e8e494ff7249595fcd950890e5aac7eba833"
+      "sourceFingerprint": "bd5a8fa229c5d598f5a52de08c2d585d6662b6ce7a9b9e3a1a4ab933060cbf26"
     },
     {
       "id": "database",
@@ -414,7 +429,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "978edb1b904966c9d49a6b47870e2218c1db493bafd4ac393cc30e6790aae3e0"
+      "sourceFingerprint": "bcd8a8b520d430934d13b514a44e265da2a33f1a214491d0f2edacb16036b4c7"
     },
     {
       "id": "agents",
@@ -601,6 +616,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-10",
+      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
+    },
+    {
       "date": "2026-11-09",
       "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
       "modules": [
@@ -668,35 +709,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database"
       ],
       "next": "RES-01.3/01.4 integrate the staff review UI with docs/review-api.md. Hosted staging must apply the reviewed forward migration and verify genuine extraction-host jobId/private_review_artifact save/reload before release; review commands never approve or publish."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR25 reconciliation preserves develop 5bfaa94, including diner menu/detail and the synthetic comparison correction. Fixed implicit presentation rights, unbounded candidate reads, decode-before-pixel-limit and lost rejected-candidate metadata with four red/green regressions. Frozen offline Python:476 PASS; pnpm check:796 unit+67 script PASS; build/package PASS;6 review-preview and12 local spatial browser checks PASS. Detailed commands/timings:qa-reports/S3-VIS-03-test-report.md. No deployment or provider calls.",
-      "modules": [
-        "assets",
-        "processing",
-        "delivery"
-      ],
-      "next": "Use the offline assets foundation for reviewed captures. Production manifest/asset publication wiring, captured-food fidelity, real-phone performance and VoiceOver/TalkBack require separate acceptance."
-    },
-    {
-      "date": "2026-11-06",
-      "summary": "S3-VIS-03 PR #25 rebased linearly onto develop d6e5a16 (was c005b0f merge). schemas.py keeps develop's box-evidence validator and adds the asset/spatial/presentation models; asset files moved to their own assets context node because the processing summary is at its cap. Presentation asset ids derive after candidate validation from the candidate PNG hash and effective model version. Rebase QA: 465 Python tests, pnpm verify, 7 CLI and 6 Chromium harness cases passed on synthetic data (qa-reports/S3-VIS-03-test-report.md).",
-      "modules": [
-        "processing",
-        "assets",
-        "delivery"
-      ],
-      "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
-    },
-    {
-      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
     }
   ]
 }

@@ -66,6 +66,7 @@ import {
   MenuTokenUnavailableError,
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
+import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -89,8 +90,13 @@ import {
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
+export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
+  '00000000-0000-4000-8000-000000000123',
+];
+
 export type Bindings = {
   APP_ENV?: string;
+  SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
@@ -156,6 +162,13 @@ type Dependencies = {
     query: Parameters<typeof readTeamAnalytics>[3],
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
+  readOwnerReport?: (
+    actorId: string,
+    venueId: string,
+    now: Date,
+    env: Bindings,
+    source: 'synthetic',
+  ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
   consumeObservationRateLimit?: (
@@ -435,6 +448,18 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  async readOwnerReport(actorId, venueId, now, env, source) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await queryOwnerReport(client, actorId, venueId, now, source);
+    } finally {
+      await client.end();
+    }
+  },
   async readPublicMenu(venueId, menuId, env) {
     const connectionString =
       env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
@@ -701,6 +726,48 @@ export function createApp(services: Dependencies = dependencies) {
     }
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
+  });
+  app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const report = await services.readOwnerReport(
+      actorId,
+      approvedSyntheticVenue.data.venueId,
+      services.now?.() ?? new Date(),
+      env,
+      'synthetic',
+    );
+    return c.json(report);
   });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
