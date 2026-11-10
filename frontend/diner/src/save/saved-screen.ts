@@ -50,7 +50,7 @@ export function renderSavedScreen(
   back.type = 'button';
   back.setAttribute('aria-label', 'Back to menu');
   back.addEventListener('click', onBack);
-  header.append(back, el('h1', 'pp-saved__title', 'Saved'));
+  header.append(back, el('h1', 'pp-saved__title', 'Saved Dishes'));
 
   // A stable toast area under the header, outside the redrawn list.
   const toastArea = el('div', 'pp-toast-area');
@@ -109,10 +109,14 @@ export function renderSavedScreen(
       missing.setAttribute('aria-hidden', 'true');
       open.append(missing);
     }
-    open.append(
+    // As Figma's DishCard_Saved (691:7715): category, name, then the price in orange.
+    const text = el('span', 'pp-saved__text');
+    text.append(
+      el('span', 'pp-saved__category', dish.categoryName),
       el('span', 'pp-saved__name', dish.name),
       el('span', 'pp-saved__price', formatPrice(dish.price)),
     );
+    open.append(text);
     open.addEventListener('click', () => onOpenDish(dish));
     row.append(open, heart(item));
     return row;
@@ -125,11 +129,16 @@ export function renderSavedScreen(
     notice.hidden = saveState.mode() !== 'session-only';
     const items = savedItems(saveState, menu);
     if (items.length === 0) {
+      // Figma Saved_Empty (722:8589). The plate-and-cutlery illustration comes in a follow-up PR.
       const empty = el('div', 'pp-saved__empty');
       const browse = el('button', 'pp-saved__browse', 'Browse menu');
       browse.type = 'button';
       browse.addEventListener('click', onBack);
-      empty.append(el('p', 'pp-saved__empty-text', 'No saved dishes yet'), browse);
+      empty.append(
+        el('p', 'pp-saved__empty-text', 'No saved dishes yet'),
+        el('p', 'pp-saved__empty-hint', 'Save dishes you like to find them here later.'),
+        browse,
+      );
       content.replaceChildren(empty);
       return 0;
     }

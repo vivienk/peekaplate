@@ -322,17 +322,17 @@ test('unsave shows the removed toast; Undo by keyboard restores the dish and sho
   const toasts = page.getByTestId('toasts');
   await card.click();
   await card.click();
-  await expect(toasts).toContainText('Removed from Saved');
+  await expect(toasts).toContainText('Removed from saved dishes');
 
   // Tapping elsewhere does not dismiss it.
   await page.getByTestId('elsewhere').click();
-  await expect(toasts).toContainText('Removed from Saved');
+  await expect(toasts).toContainText('Removed from saved dishes');
 
   const undo = toasts.getByRole('button', { name: 'Undo' });
   await undo.focus();
   await page.keyboard.press('Enter');
   await expect(card).toHaveAttribute('aria-pressed', 'true');
-  await expect(toasts).toContainText('Added back to Saved');
+  await expect(toasts).toContainText('Restored to saved dishes');
   await expect(toasts.getByRole('button', { name: 'Undo' })).toHaveCount(0);
 
   const events = await sentEvents(page);
@@ -360,11 +360,11 @@ test('Undo survives moving to another screen and still expires at the original d
   await navigateTo(page);
   const next = page.getByTestId('next-toasts');
   await expect(page.getByTestId('toasts')).toHaveCount(0);
-  await expect(next).toContainText('Removed from Saved');
+  await expect(next).toContainText('Removed from saved dishes');
   await expect(next.getByRole('button', { name: 'Undo' })).toBeVisible();
 
   await page.clock.runFor(2900);
-  await expect(next).toContainText('Removed from Saved');
+  await expect(next).toContainText('Removed from saved dishes');
   await page.clock.runFor(200);
   await expect(next).toBeEmpty();
   expect((await sentEvents(page)).map((e) => e.name)).toEqual(['dish_saved', 'dish_unsaved']);
@@ -380,7 +380,7 @@ test('Undo still works after moving screens, in either mount order', async ({ pa
   await navigateTo(page, true);
   const next = page.getByTestId('next-toasts');
   await next.getByRole('button', { name: 'Undo' }).click();
-  await expect(next).toContainText('Added back to Saved');
+  await expect(next).toContainText('Restored to saved dishes');
   await expect(card).toHaveAttribute('aria-pressed', 'true');
   expect((await sentEvents(page)).map((e) => [e.name, e.save_origin ?? null])).toEqual([
     ['dish_saved', 'direct'],
@@ -399,7 +399,7 @@ test('the removed toast disappears after 5 seconds and the restored toast after 
   await card.click();
   await card.click();
   await page.clock.runFor(4900);
-  await expect(toasts).toContainText('Removed from Saved');
+  await expect(toasts).toContainText('Removed from saved dishes');
   await page.clock.runFor(200);
   await expect(toasts).toBeEmpty();
 
@@ -407,7 +407,7 @@ test('the removed toast disappears after 5 seconds and the restored toast after 
   await card.click();
   await toasts.getByRole('button', { name: 'Undo' }).click();
   await page.clock.runFor(2900);
-  await expect(toasts).toContainText('Added back to Saved');
+  await expect(toasts).toContainText('Restored to saved dishes');
   await page.clock.runFor(200);
   await expect(toasts).toBeEmpty();
 });
@@ -551,7 +551,7 @@ test('removing the last dish shows the empty state; Undo brings it back; Browse 
   await openSavedScreen(page, ['avocadoToast']);
   await page.locator('.pp-saved__save').click();
   await expect(page.getByText('No saved dishes yet')).toBeVisible();
-  await expect(page.locator('.pp-toast-area')).toContainText('Removed from Saved');
+  await expect(page.locator('.pp-toast-area')).toContainText('Removed from saved dishes');
 
   await page.locator('.pp-toast-area').getByRole('button', { name: 'Undo' }).click();
   await expect(page.locator('.pp-saved__item')).toHaveCount(1);
