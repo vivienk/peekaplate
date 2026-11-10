@@ -184,7 +184,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. Dashboard Report data reads #107 when VITE_PUBLIC_API_URL and VITE_OWNER_REPORT_VENUE_ID are set: owner_report.v1-validated, venue-matched, no-store; 401/403/503/invalid/error never show values. No owner token until S4-FE-04.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -195,7 +195,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/input.spec.ts",
         "frontend/console/vite.config.ts",
         "frontend/console/src/foundations/TextField.tsx",
-        "frontend/console/src/foundations/field.css"
+        "frontend/console/src/foundations/field.css",
+        "frontend/console/src/owner-dashboard/report-api.ts",
+        "tests/e2e/owner-report-api.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -205,7 +207,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d78e4f61ade86a3cf4e781b880b5bc299f275dbdc030788b9dd585c0f78d9930"
+      "sourceFingerprint": "24a5dbd90faa9c9864d4efc8518b57b312f1160df288e02cd7ef517f53da6058"
     },
     {
       "id": "backend",
@@ -312,7 +314,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "bd5a8fa229c5d598f5a52de08c2d585d6662b6ce7a9b9e3a1a4ab933060cbf26"
+      "sourceFingerprint": "491719fc2a102972a54d1654b7279dd69fe24a142c855afb3df17a971cf2298f"
     },
     {
       "id": "database",
@@ -429,7 +431,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "22085adae6a8d5b882a140e025dec893aec3de4fbc8b350eb27aa0dd5305b33b"
+      "sourceFingerprint": "70ff4a49305f424c0c5e89f952a938a6e7dcc7e4e6746165b9bb4d800dcc15bc"
     },
     {
       "id": "agents",
