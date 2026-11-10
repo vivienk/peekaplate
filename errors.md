@@ -2130,3 +2130,13 @@ production behavior is unchanged. The corrected full check is recorded in the PR
 ```json
 {"kind":"manual-check-observation","check":"backend route tests and typecheck","timestamp":"2026-11-09T22:21:01Z","result":"failed","exitCode":143,"cause":"Repeated Vitest and TypeScript compiler processes were terminated with SIGTERM in the local environment; no test or compiler diagnostics were emitted."}
 ```
+
+
+## November 9 owner-report verification environment
+
+The initial read-only Docker check found the Linux engine pipe absent. Starting
+the existing Docker Desktop installation restored the engine without reset or
+data deletion. Existing i-detect containers stayed stopped. A fresh isolated
+PeekaPlate run passed 213 SQL assertions and 77 PostgreSQL/Worker tests, then
+removed its disposable database. Earlier recorded SIGTERM observations remain
+historical evidence; this passing run does not establish their root cause.

@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; serialization strips cohort counts and masks timing/open-rate/active-session cells for timed cohorts of 1–9, but retains statuses and independent counts when timed cohort is zero. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts; receipts, canonical JSON and microsecond time helpers. Queue traffic_class is server-derived and ObservationV2 normalization precedes hashing; compatibility aliases and bounded-invalid conflict copies remain supported. Contracts reject client authority and private/unknown payload fields. Menu-token issuance selects signed traffic_class. S3-RES-03 owner_report.v1 enforces per-metric ten-session cohorts; Serialization strips cohort counts and masks reconstructive timing/open-rate/active-session cells for timed or opened cohorts of 1–9, preserving genuine zero-opening NOT_MEASURABLE states. Null is_stale means freshness is unverified. RES-01.1 review candidates and AI-01 scoped evidence.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -604,6 +604,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
+      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
+    },
+    {
+      "date": "2026-11-09",
       "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
       "modules": [
         "diner"
@@ -690,16 +699,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
-    },
-    {
-      "date": "2026-11-09",
-      "summary": "Owner-report route requires source=synthetic, local/staging, a matching configured venue ID and server-allowlist membership; canonical venue IDs fail closed even if configured. Timing coverage counts final/total openings while privacy floors remain distinct sessions. Complementary masking covers 1–9 timed/opened cohorts with zero timing; zero openings remain NOT_MEASURABLE. The signed-JWT route suite passes 59 tests; test:db pgTAP passes 213 assertions, but Vitest's dish.integration worker exits 143, also reproduced with the prior route behavior. No hosted configuration or deployment.",
-      "modules": [
-        "backend",
-        "contracts",
-        "delivery"
-      ],
-      "next": "Investigate the unresolved dish.integration worker exit 143. A new synthetic report venue requires an explicit allowlist change and matching SYNTHETIC_REPORT_VENUE_ID. Keep production reads unavailable and freshness unverified until a separately reviewed release policy and accepted-online evidence exist; collection remains paused pending hosted report, native recovery and production acceptance."
     }
   ]
 }
