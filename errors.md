@@ -2140,3 +2140,239 @@ data deletion. Existing i-detect containers stayed stopped. A fresh isolated
 PeekaPlate run passed 213 SQL assertions and 77 PostgreSQL/Worker tests, then
 removed its disposable database. Earlier recorded SIGTERM observations remain
 historical evidence; this passing run does not establish their root cause.
+
+## Historical PR82 records retained during reconciliation
+
+<!-- automatic observation; not root cause -->
+```json
+
+## 2026-10-31 — AI-01 reconciliation verification limits
+
+The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
+
+Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
+
+## 2026-10-31 — Offline AI evaluation verification boundary
+
+The existing verification-runner test that invokes real pnpm failed before its
+check because automatic installation again hit the Windows store-symlink EPERM.
+The other seven runner tests passed. This is the previously recorded environment
+limit, not an AI case failure; do not disable the test. The source-pinned Vitest
+run passed all 46 AI tests, including 21 new synthetic development evaluation
+cases, and the focused strict TypeScript check passed. Full frozen installation,
+the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
+
+<!-- automatic observation; not root cause -->
+```json
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T22:28:30.144Z","exitCode":1}
+```
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-05T23:56:16.390Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
+```
+
+The develop reconciliation for PR #25 conflicted only in `docs/CONTEXT.md`. It was
+resolved from current develop: the processing node keeps develop's paths plus the
+asset/presentation paths, and the VIS-03 handoff replaces the oldest (October 28
+DIN-01.4 search) entry to stay within ten handoffs. Develop's newer handoffs,
+including the November 2 allergen-label note, are preserved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T07:52:52.132Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"eval:owner-ai","timestamp":"2026-11-08T18:48:21.578Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"eval:owner-ai","timestamp":"2026-11-08T18:48:39.517Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T18:50:24.536Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T18:51:45.062Z","exitCode":1}
+```
+
+## November 8 PR82 evaluation synchronization
+
+The merged core deliberately removes internal eligible-session counts from its
+public rationale. On the synchronized branch, five of the 21 frozen evaluation
+cases failed against the old count-bearing oracle. Updating only the expected
+template and its unused sessions argument restores all 21 cases; the internal
+9/10/11-session inputs and ten-session floor are unchanged. The combined
+core/contract/evaluation suite passes 47 cases; backend/contracts strict types
+and context/docs checks pass.
+
+Frozen installation failed before checks because Windows denied pnpm's project
+registration link. Reused-dependency runs set pnpm's dependency-status action to
+warn, preserving engine/lockfile policy and recording that installation remains
+unverified. An initial evaluation startup failed before discovery in the sandbox
+temporary directory (observation 2026-11-08T18:48:21.578Z); moving TEMP/TMP to a
+writable task folder permitted the real stale-oracle reproduction (observation
+2026-11-08T18:48:39.517Z) and passing run. RTK is unavailable in this environment.
+
+Full workspace checks remain blocked by the old installation's missing diner
+workspace contract link: typecheck observation 2026-11-08T18:50:24.536Z and test
+observation 2026-11-08T18:51:45.062Z. No source import was weakened to hide this.
+Complete the frozen installation and rerun workspace checks before treating
+them as green. Dedicated development evidence is synthetic, not independent
+rubric, live model, hosted reporting or production acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T19:03:06.421Z","exitCode":1}
+```
+
+## November 8 PR82 normal-install recheck
+
+Normal frozen installation completed in the contributor's terminal with 213
+policy-checked lock entries. The prior missing diner workspace dependency is
+resolved. With normal pnpm settings, #82 passes lint, all seven package strict
+typechecks and all 56 application test files (905 passed, four skipped).
+The remaining aggregate-check failure is observation
+2026-11-08T19:03:06.421Z: the preview security test cannot create its junction
+inside the agent sandbox; the other 66 script tests pass. Do not skip or alter
+that rejection test. Normal-terminal/Linux verification remains necessary for
+the aggregate check. Initial installation/temporary-path failures above remain
+historical observations; they are not failures in the corrected AI oracle.
+
+## November 9 append-only history reconciliation
+
+The synchronization guard and independent review found a historical paragraph
+and observation omitted by the automatic merge outside its conflict block.
+The original PR25 reconciliation paragraph and fenced failure records are
+restored at their original position from the previous PR82 head. Their
+timestamps are historical, not new test runs.
+
+## November 9 AI evaluation sync setup boundary
+
+The synchronized source preserves develop 93194f2 and the unchanged frozen AI
+evaluation. Normal pnpm startup attempted dependency reconciliation but Windows
+denied its project-registration symlink before context refresh could run.
+Context refresh itself succeeds through its existing Node entry point. Checks
+using the installed dependencies explicitly set dependency-status reporting to
+warn; they do not establish a fresh frozen installation. No engine, lockfile,
+security regression or test assertion is weakened. Normal installation and the
+full security/browser/database checks remain to be established on the new head
+in a normal terminal or Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-09T08:49:42.325Z","exitCode":1}
+```
+
+The installed-dependency recheck passes lint, seven package strict typechecks
+and all 63 application test files (1006 passed, four skipped). Of 67 script
+tests, 64 pass; two console build tests cannot resolve the newly merged pinned
+Inter font dependency before a normal installation, and the existing artifact
+symlink rejection test cannot create its junction in this sandbox. Keep all
+three tests and install the frozen dependencies before the next full check.
+This is not an aggregate-check pass or live AI/report acceptance.
+
+## November 9 normal-terminal stack verification
+
+The contributor completed normal frozen installation: eight workspace projects,
+214 policy-checked lock entries and the one newly merged Inter font package.
+Normal `pnpm check` then passed on synchronized Draft source 6c10b24: lint, all
+seven package typechecks, all 64 application test files (1026 passed, four
+skipped), all 67 script tests including both console builds and artifact-symlink
+rejection, context freshness and documentation links. The source includes the
+complete PR82 evaluation plus the existing 20 report-input cases. This resolves
+the missing-font setup issue and supplies normal-terminal evidence for the
+junction regression blocked inside the agent sandbox. The earlier failures
+remain recorded. Only reconciliation documentation changes after that run;
+no application, assertion, dependency or configuration is weakened.
+
+Both synchronized implementation heads also passed their 21-case standard
+development evaluation with a clean working tree. Independent rubric/model
+evaluation and hosted report/AI acceptance remain separate, unverified gates.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:37:25.661Z","exitCode":1}
+```
+
+## November 9 evening AI stack synchronization
+
+The #82 reconciliation imports develop 78fd475 (#121 search and #84 delivery)
+without changing the frozen AI evaluation or owner-output behavior. Complete
+paragraphs from both parent ledgers and both module path sets are retained.
+The first remote read used an incorrect source ref and then treated a fork
+branch as an upstream branch; metadata confirmed the correct fork and pinned
+SHA before review. No source or remote branch was changed by those reads.
+
+A focused Vitest startup initially failed while renaming its sandbox temporary
+SSR cache. Re-running with TEMP and TMP pointing to an ignored workspace
+output directory passed all 105 focused AI/contract/search/delivery cases;
+no assertion or test selection was removed. The normal full check then passed
+all application tests, but the existing artifact-symlink security regression
+could not create its Windows junction in this sandbox. This is the same
+execution permission boundary recorded earlier, not an aggregate-check PASS.
+The security test is retained unchanged. Lint, seven package typechecks,
+context freshness and local documentation links passed separately; Linux CI
+or a normal contributor terminal must establish the complete check.
+
+## November 9 final offline-evaluation environment
+
+The frozen offline installation could not load missing package metadata from the
+local cache. A normal frozen online installation then passed all 214 supply-chain
+policy checks without changing the lockfile or dependency policy.
+
+## November 9 evaluation CLI completeness correction
+
+A bounded temporary probe selected one of the 21 frozen cases. Vitest exited
+successfully while the generated report correctly said DEVELOPMENT_CHECK_FAIL;
+the wrapper previously propagated only the process status. It now validates the
+fresh report, frozen dataset/counts and unique passing records before returning
+success. Three CLI regression groups failed before the fix; all five pass after.
+The same partial-discovery probe now exits 1. The frozen test source was restored
+byte-for-byte, and the complete 21-case evaluation passes.
