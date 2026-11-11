@@ -5,6 +5,14 @@ explains the verified QR/link flow, valid/tampered/withdrawn states, staging bui
 configuration and reused public hosting. Its release acceptance record identifies
 the actual deployed version; older dated setup sections below are historical.
 
+**Menu upload and Save integration:** [the extraction release guide](staging-ingestion-release.md)
+explains PR118's authenticated PDF/photo upload, private processing, review-required
+drafts, and its release of PR122's Save/Saved screens. It also links exact release
+and hosted acceptance evidence. These APIs do not provide an owner upload screen,
+auto-approve extracted dishes, or finish Compare and remaining diner triggers.
+PR115 adds the [staging recovery procedure](operations.md#staging-rollback-and-recovery-s4-rel-01);
+its actual rollback drill remains separate from release smoke tests.
+
 
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 

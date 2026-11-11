@@ -5,6 +5,33 @@ architecture proposal PR44 onto the main release baseline. It adds the missing
 authenticated source-upload API and a main-SHA-guarded extraction deployment.
 It does not configure production or supply an owner upload screen.
 
+## Reconciled November 10 release scope
+
+The release retains the current main publication, review, owner-report and diner
+integrity code. It also carries PR122's connected Save/Saved screens and PR115's
+corrected recovery procedure. Saved refreshes use the current dish revision without
+another shortlist-view event; keyboard removal retains a usable focus target.
+
+The Python service uses vision-first extraction with OCR-plus-image fallback after
+provider failures. Its V1 transport marker remains compatible while
+`configuration.extraction_mode` identifies actual direct vision; this is not OCR
+evidence. Raw local vision attempts are excluded from the hosted artifact bundle.
+The earlier opt-in-only PM note remains a release decision: the final reviewed
+candidate requires explicit human approval of this vision-first staging behavior.
+
+Local review verified 501 guarded offline Python tests and wheel/sdist packaging,
+213 SQL assertions and 88 real Worker/PostgreSQL tests. Two Save browser regressions
+failed before correction and passed afterward. Final combined checks and hosted
+acceptance are recorded in [PR118](https://github.com/vivienk/peekaplate/pull/118),
+including exact commit/version IDs, timings, Queue state and cleanup. Local tests
+do not establish hosted provider accuracy or a completed rollback drill.
+
+Reuse the existing staging Worker, extraction host, Queue/DLQ and private asset
+bucket. Keep observation delivery paused and run menu delivery only within the
+approved synthetic acceptance window; restore its paused state afterward. Verify
+the live migration history before applying anything. Existing applied migrations
+are never modified or reapplied blindly.
+
 ## Upload contract
 
 `POST /venues/{venueId}/menus/uploads` is available only in local/staging.
