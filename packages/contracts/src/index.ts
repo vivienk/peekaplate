@@ -1429,6 +1429,12 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
 export {
+  type IngredientAssessment,
+  IngredientAssessmentSchema,
+  IngredientReviewHandoffSchema,
+  ingredientAssessmentForReview,
+} from './ingredient-intelligence.js';
+export {
   ALL_ALLOWED_CSV_HEADERS,
   BASE_REQUIRED_CSV_HEADERS,
   CANONICAL_REVISION_HEADERS,

@@ -2628,3 +2628,24 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 ```json
 {"id":"ERR-20261111-ORDER-TIMESTAMP","status":"resolved-locally","cause":"Calendar overflow timestamps passed regex and were normalized by Date.UTC before the original invalid string reached PostgreSQL; one bad row could roll back a mixed import. Missing route archive bindings also allowed an import without retained bytes.","prevention":"Validate calendar/time fields and PostgreSQL-compatible offsets before classification/SQL; require route storage before opening a database connection.","regression":"Six invalid date/time/offset cases failed before correction and pass afterward. Real PostgreSQL mixed-row import accepts one row and quarantines one; missing-storage regression proves no database connection.","sources":["packages/contracts/src/order-outcome.ts","backend/src/index.ts","backend/src/order-ingestion/order-ingestion.integration.ts"]}
 ```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T06:22:34.246Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-27T06:23:19.298Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-10-27T06:24:02.218Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261111-INGREDIENT-SIDECAR","status":"resolved-locally","cause":"An unconditional bounded ingredient sidecar builder raised for upstream-valid long ingredients after extraction was saved; its context also accepted vision-model text as independent grounding. Existing tests relied on platform-default encoding.","prevention":"Common finalization records sanitized analysis unavailability while retaining extraction; vision markers abstain; fixture reads/writes explicitly use UTF-8.","regression":"Real 257-character ingredient failed with ExtractionError before correction and passes afterward; vision grounding regression failed exact_rule versus missing_evidence and now passes; early vision return writes an unknown review-only sidecar.","sources":["processing/src/peekaplate_processing/run_pipeline.py","processing/src/peekaplate_processing/ingredient_intelligence.py","processing/tests/test_workflow.py","processing/tests/test_ingredient_intelligence.py"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T08:14:09.388Z","exitCode":1}
+```
