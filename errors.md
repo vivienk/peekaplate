@@ -2687,3 +2687,11 @@ The first complete Chromium run passed 136/137 cases: the withdrawal fixture inj
 ## DIN-01 withdrawal fixture fake-time follow-up
 
 Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.
+
+## PR134 comparison review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-COMPARISON-READER","status":"resolved-locally","cause":"An open rate and exposure count reconstructed a protected small opened cohort; comparison engagement incorrectly required compare_view entry instead of an ordered prior opening.","prevention":"Complementary suppression clears both-period opening-rate values/delta/count when either opened cohort is 1–9; comparisons follow established tenant/session/participant and producer-order rules.","regression":"Real PostgreSQL original reader: two failures and one pass. After correction the two regressions pass; expanded focused DB suite passes eleven cases, including the restored seventeen-session JSON fixture. Full runner passes 281 SQL assertions and 107 integration cases.","sources":["backend/src/comparison-report.ts","backend/src/comparison-report.integration.ts","tests/data05/comparison_privacy_cases.json"]}
+```
+
+The later PR134 branch no longer contained PR123 validation files. Restore only its five test/fixture/evidence files from reviewed a8cd00b, preserve develop code/context, and record new validation separately from historical results. Docker engine was stopped; Docker Desktop start restored it. Only disposable PeekaPlate test containers were launched and cleanup was verified.
