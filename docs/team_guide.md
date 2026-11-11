@@ -5,6 +5,14 @@ explains the verified QR/link flow, valid/tampered/withdrawn states, staging bui
 configuration and reused public hosting. Its release acceptance record identifies
 the actual deployed version; older dated setup sections below are historical.
 
+**Menu upload and Save integration:** [the extraction release guide](staging-ingestion-release.md)
+explains PR118's authenticated PDF/photo upload, private processing, review-required
+drafts, and its release of PR122's Save/Saved screens. It also links exact release
+and hosted acceptance evidence. These APIs do not provide an owner upload screen,
+auto-approve extracted dishes, or finish Compare and remaining diner triggers.
+PR115 adds the [staging recovery procedure](operations.md#staging-rollback-and-recovery-s4-rel-01);
+its actual rollback drill remains separate from release smoke tests.
+
 
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
@@ -359,7 +367,7 @@ For team inspection, the deployed read API lets any current repository collabora
 
 The flow is **page → consent check → PostHog → internal chart**. An hourly connection now copies those observations into a separate private area of the same Supabase database. We verified four test events arrived. Sending the same batch again produced eight stored copies, but the clean view still counted four events. The diner and console test records each appeared once, and access checks passed. The hourly schedule is enabled. A raw table keeps received copies; a view counts identical repeats once and excludes conflicting copies. It does not change trusted restaurant records. See [export setup and status](posthog-export.md). Tracking starts off, stops when withdrawn, and resets when the page reloads. Browser privacy signals can block it. The menu must work even if PostHog is unavailable.
 
-When the real menu is built, its actions must follow [Adam's taxonomy and measurement plan](https://app.clickup.com/90141746115/docs/2kydvry3-1494?view=open) and the [implementation plan](implementation_plan.md), including ingredient interactions and comparisons. Agree the names, exact triggers and content versions before wiring each control. The current v1 adapter is tested for `dish_open` and `portion_compare`; it has no real dish-control caller yet. A general dish comparison must not be labelled as physical portion measurement.
+Menu, card and detail screens now call the shared `track()` boundary; Save/Saved controls use it too. One consent choice gates independent PostHog SDK and canonical delivery. Menu refresh cannot reuse an older exposure link, and opting in starts fresh detail timing without collecting earlier seconds. These changes are tested locally in Chromium with synthetic menus and destination sinks; hosted tracking acceptance remains separate. Remaining controls must follow [Adam's taxonomy and measurement plan](https://app.clickup.com/90141746115/docs/2kydvry3-1494?view=open) and the [implementation plan](implementation_plan.md). Agree names, exact triggers and content versions before wiring each control. The historical v1 `dish_open` / `portion_compare` adapter is not the current diner path; comparison never implies a measured physical portion.
 
 These responsibilities remain separate:
 
