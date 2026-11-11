@@ -52,9 +52,35 @@ export const BANNERS = {
     title: 'An account already exists for this email',
     body: 'Sign in instead, or change the email address.',
   },
+  // Sign in with an email address that is not confirmed yet.
+  emailNotConfirmed: {
+    title: 'Confirm your email first',
+    body: 'Open the confirmation link we sent to this email address, then sign in.',
+  },
   // Owner accounts are not connected in this build: nothing was sent and nobody is signed in.
   unavailable: {
     title: 'Sign-in isn’t available yet',
     body: 'Owner accounts aren’t connected here yet, so nothing was sent.',
   },
 } satisfies Record<string, BannerCopy>;
+
+// How long to wait, in words: "30 seconds", "1 minute", "5 minutes".
+export function waitText(seconds: number): string {
+  if (seconds < 60) {
+    const whole = Math.max(1, Math.ceil(seconds));
+    return `${whole} ${whole === 1 ? 'second' : 'seconds'}`;
+  }
+  const minutes = Math.ceil(seconds / 60);
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+}
+
+// Too many attempts. With a wait from the service the owner is told how long; without one, later.
+export function rateLimitedBanner(retryAfterSeconds?: number): BannerCopy {
+  return {
+    title: 'Too many attempts',
+    body:
+      retryAfterSeconds && retryAfterSeconds > 0
+        ? `Please wait ${waitText(retryAfterSeconds)} and try again.`
+        : 'Please try again later.',
+  };
+}

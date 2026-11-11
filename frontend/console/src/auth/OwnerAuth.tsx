@@ -4,26 +4,40 @@
 import { type FormEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { TextField } from '../foundations/TextField';
 import logo from './assets/logo.png';
-import type { OwnerAuthService } from './auth-service';
+import type { OwnerAuthService, RateLimited } from './auth-service';
 import {
   BANNERS,
   type BannerCopy,
   emailError,
   fullNameError,
   newPasswordError,
+  rateLimitedBanner,
   signInPasswordError,
   TERMS_ERROR,
 } from './copy';
-import { EmailField, ErrorBanner, LockedEmailField, PasswordField, SubmitButton } from './parts';
+import {
+  BackLink,
+  EmailField,
+  ErrorBanner,
+  LockedEmailField,
+  MAIL_ILLUSTRATION,
+  PasswordField,
+  StatusPanel,
+  SubmitButton,
+} from './parts';
 import './auth.css';
 
-export type AuthStep = 'email' | 'create' | 'signin';
+export type AuthStep = 'email' | 'create' | 'signin' | 'confirm-email';
+
+// Result screens show no logo (Figma "Check your email").
+const WITHOUT_BRAND: readonly AuthStep[] = ['confirm-email'];
 
 export type OwnerAuthProps = {
   service: OwnerAuthService;
   // A real sign-in succeeded. The caller opens the owner's next setup step or the dashboard.
   onSignedIn: () => void;
-  // The provider created the account. What follows (verification, first setup step) is the caller's.
+  // The provider created an account that needs no email confirmation. The caller opens the first
+  // setup step. When confirmation is required the screens show "Check your email" instead.
   onAccountCreated: () => void;
   // Opens password recovery (S03). Without it the "Forgot password?" link is not shown.
   onForgotPassword?: () => void;
@@ -56,10 +70,12 @@ export function OwnerAuth({
       {/* Left side of the Figma frames: the food photo goes here once it is exported (decorative). */}
       <div className="pp-auth__art" aria-hidden="true" />
       <div className="pp-auth__card">
-        <p className="pp-auth__brand">
-          <img src={logo} alt="" width="32" height="32" />
-          <span>PeekaPlate</span>
-        </p>
+        {!WITHOUT_BRAND.includes(step) && (
+          <p className="pp-auth__brand">
+            <img src={logo} alt="" width="32" height="32" />
+            <span>PeekaPlate</span>
+          </p>
+        )}
         {step === 'email' && (
           <EmailStep
             key="email"
@@ -89,6 +105,9 @@ export function OwnerAuth({
             onSignedIn={onSignedIn}
             {...(onForgotPassword ? { onForgotPassword } : {})}
           />
+        )}
+        {step === 'confirm-email' && (
+          <ConfirmEmailStep key="confirm-email" email={email} focusHeading={moved} onRoute={go} />
         )}
       </div>
     </div>
@@ -150,6 +169,25 @@ function useRequest() {
   return { busy, run, running };
 }
 
+// Keeps an action blocked while the service asks the owner to wait (rate limited). Without a wait
+// from the service nothing is blocked; the banner says to try again later.
+function useCooldown() {
+  const [until, setUntil] = useState<number | null>(null);
+  useEffect(() => {
+    if (until === null) return;
+    const timer = setTimeout(() => setUntil(null), Math.max(0, until - Date.now()));
+    return () => clearTimeout(timer);
+  }, [until]);
+  return {
+    blocked: until !== null,
+    start(limit: RateLimited) {
+      if (limit.retryAfterSeconds && limit.retryAfterSeconds > 0) {
+        setUntil(Date.now() + limit.retryAfterSeconds * 1000);
+      }
+    },
+  };
+}
+
 // E1: the owner's work email decides the next step.
 function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   const heading = useHeadingFocus(focusHeading);
@@ -158,10 +196,11 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   const [error, setError] = useState<string>();
   const [banner, setBanner] = useState<BannerCopy | null>(null);
   const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (running.current) return;
+    if (running.current || cooldown.blocked) return;
     const problem = emailError(value);
     setError(problem);
     if (problem) {
@@ -174,7 +213,10 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
     if (!result) return;
     if (result.kind === 'existing_account') onRoute('signin', address);
     else if (result.kind === 'new_account') onRoute('create', address);
-    else setBanner(result.kind === 'unavailable' ? BANNERS.unavailable : BANNERS.continueFailed);
+    else if (result.kind === 'rate_limited') {
+      cooldown.start(result);
+      setBanner(rateLimitedBanner(result.retryAfterSeconds));
+    } else setBanner(result.kind === 'unavailable' ? BANNERS.unavailable : BANNERS.continueFailed);
   }
 
   return (
@@ -195,7 +237,12 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
             setError(undefined);
           }}
         />
-        <SubmitButton busy={busy} label="Continue" busyLabel="Checking…" />
+        <SubmitButton
+          busy={busy}
+          blocked={cooldown.blocked}
+          label="Continue"
+          busyLabel="Checking…"
+        />
       </form>
       <p className="pp-auth__footer">
         New to PeekaPlate? You’ll set up your account on the next step.
@@ -226,12 +273,15 @@ function CreateStep({
   const [password, setPassword] = useState('');
   const [terms, setTerms] = useState(false);
   const [errors, setErrors] = useState<CreateErrors>({});
-  const [banner, setBanner] = useState<'failed' | 'exists' | 'unavailable' | null>(null);
+  const [banner, setBanner] = useState<'failed' | 'exists' | 'unavailable' | BannerCopy | null>(
+    null,
+  );
   const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (running.current) return;
+    if (running.current || cooldown.blocked) return;
     const found: CreateErrors = {
       fullName: fullNameError(fullName),
       password: newPasswordError(password),
@@ -257,8 +307,12 @@ function CreateStep({
     );
     if (!result) return;
     if (result.kind === 'created') onCreated();
+    else if (result.kind === 'confirmation_required') onRoute('confirm-email');
     else if (result.kind === 'account_exists') setBanner('exists');
-    else setBanner(result.kind);
+    else if (result.kind === 'rate_limited') {
+      cooldown.start(result);
+      setBanner(rateLimitedBanner(result.retryAfterSeconds));
+    } else setBanner(result.kind);
   }
 
   const termsErrorId = 'pp-auth-terms-error';
@@ -284,6 +338,7 @@ function CreateStep({
       )}
       {banner === 'failed' && <ErrorBanner copy={BANNERS.createFailed} />}
       {banner === 'unavailable' && <ErrorBanner copy={BANNERS.unavailable} />}
+      {typeof banner === 'object' && banner !== null && <ErrorBanner copy={banner} />}
       <form className="pp-auth__form" noValidate onSubmit={submit}>
         <TextField
           ref={nameInput}
@@ -347,7 +402,12 @@ function CreateStep({
             </p>
           )}
         </div>
-        <SubmitButton busy={busy} label="Create account" busyLabel="Creating account…" />
+        <SubmitButton
+          busy={busy}
+          blocked={cooldown.blocked}
+          label="Create account"
+          busyLabel="Creating account…"
+        />
       </form>
       <p className="pp-auth__footer">
         Already have an account?{' '}
@@ -379,10 +439,11 @@ function SignInStep({
   const [error, setError] = useState<string>();
   const [banner, setBanner] = useState<BannerCopy | null>(null);
   const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (running.current) return;
+    if (running.current || cooldown.blocked) return;
     const problem = signInPasswordError(password);
     setError(problem);
     if (problem) {
@@ -402,6 +463,11 @@ function SignInStep({
       setBanner(BANNERS.invalidCredentials);
       setPassword('');
       passwordInput.current?.focus();
+    } else if (result.kind === 'email_not_confirmed') {
+      setBanner(BANNERS.emailNotConfirmed);
+    } else if (result.kind === 'rate_limited') {
+      cooldown.start(result);
+      setBanner(rateLimitedBanner(result.retryAfterSeconds));
     } else {
       // A temporary failure keeps both fields so the same details can be sent again.
       setBanner(result.kind === 'unavailable' ? BANNERS.unavailable : BANNERS.signInFailed);
@@ -446,7 +512,12 @@ function SignInStep({
             </button>
           )}
         </div>
-        <SubmitButton busy={busy} label="Sign in" busyLabel="Signing in…" />
+        <SubmitButton
+          busy={busy}
+          blocked={cooldown.blocked}
+          label="Sign in"
+          busyLabel="Signing in…"
+        />
       </form>
       <p className="pp-auth__footer">
         New to PeekaPlate?{' '}
@@ -460,5 +531,41 @@ function SignInStep({
         </button>
       </p>
     </>
+  );
+}
+
+// After Create account, when the provider sends a confirmation email (Sai, 11 Nov). Uses the S03
+// "Check your email" layout. The owner confirms from the email and returns to the app.
+function ConfirmEmailStep({
+  email,
+  focusHeading,
+  onRoute,
+}: {
+  email: string;
+  focusHeading: boolean;
+  onRoute: (step: AuthStep, email?: string) => void;
+}) {
+  const heading = useHeadingFocus(focusHeading);
+  return (
+    <StatusPanel
+      art={MAIL_ILLUSTRATION}
+      title="Check your email"
+      heading={heading}
+      actions={
+        <>
+          <button
+            type="button"
+            className="pp-auth-link pp-auth-link--accent"
+            onClick={() => onRoute('email')}
+          >
+            Edit email address
+          </button>
+          <BackLink onClick={() => onRoute('signin')} />
+        </>
+      }
+    >
+      We sent a confirmation link to <strong>{email}</strong>. Open it to finish creating your
+      account. Check your inbox and spam folder.
+    </StatusPanel>
   );
 }

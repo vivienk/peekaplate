@@ -20,24 +20,33 @@ const CHECK: Record<string, string> = {
   existing_account: 'Account exists → Sign in',
   new_account: 'No account → Create account',
   failed: 'Service failure',
+  rate_limited: 'Too many attempts (wait 5 s)',
   unavailable: 'Not connected',
 };
 const SIGN_IN: Record<string, string> = {
   signed_in: 'Correct details',
   invalid_credentials: 'Wrong email or password',
+  email_not_confirmed: 'Email not confirmed',
   failed: 'Service failure',
+  rate_limited: 'Too many attempts (wait 5 s)',
   unavailable: 'Not connected',
 };
 const CREATE: Record<string, string> = {
-  created: 'Account created',
+  confirmation_required: 'Created, confirmation email sent',
+  created: 'Created, no confirmation needed',
   account_exists: 'Account already exists',
   failed: 'Service failure',
+  rate_limited: 'Too many attempts (wait 5 s)',
   unavailable: 'Not connected',
 };
 
 // Long enough to see the loading state.
 const DELAY_MS = 900;
 const wait = () => new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+// The wait the synthetic service asks for when it answers "too many attempts".
+const RETRY_AFTER_SECONDS = 5;
+const answer = (kind: string) =>
+  kind === 'rate_limited' ? { kind, retryAfterSeconds: RETRY_AFTER_SECONDS } : { kind };
 
 function Choice({
   label,
@@ -68,7 +77,7 @@ function Choice({
 function Demo() {
   const [check, setCheck] = useState('existing_account');
   const [signIn, setSignIn] = useState('invalid_credentials');
-  const [create, setCreate] = useState('created');
+  const [create, setCreate] = useState('confirmation_required');
   const [done, setDone] = useState<string | null>(null);
   const [run, setRun] = useState(0);
   const [requests, setRequests] = useState(0);
@@ -79,17 +88,17 @@ function Demo() {
     async checkEmail() {
       setRequests((n) => n + 1);
       await wait();
-      return { kind: answers.current.check } as EmailCheckResult;
+      return answer(answers.current.check) as EmailCheckResult;
     },
     async signIn() {
       setRequests((n) => n + 1);
       await wait();
-      return { kind: answers.current.signIn } as SignInResult;
+      return answer(answers.current.signIn) as SignInResult;
     },
     async createAccount() {
       setRequests((n) => n + 1);
       await wait();
-      return { kind: answers.current.create } as CreateAccountResult;
+      return answer(answers.current.create) as CreateAccountResult;
     },
   };
 

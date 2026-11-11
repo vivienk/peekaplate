@@ -3,6 +3,11 @@
 // this file only. Until then every call answers "unavailable" and the screens say sign-in is not
 // available here; they never show a sign-in as successful without a real one.
 
+// Too many attempts: the provider or server is throttling requests. retryAfterSeconds is the wait
+// the service supplied, if any; the screens keep the action blocked until it has passed. There is no
+// attempt-based lockout in the frontend (Sai, 11 Nov).
+export type RateLimited = { kind: 'rate_limited'; retryAfterSeconds?: number };
+
 export type EmailCheckResult =
   // An owner account exists for this email: go to Sign in (S02).
   | { kind: 'existing_account' }
@@ -11,22 +16,32 @@ export type EmailCheckResult =
   // Network, timeout, server or provider failure. The owner can try again.
   | { kind: 'failed' }
   // Owner accounts are not connected in this build.
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  | RateLimited;
 
 export type SignInResult =
   | { kind: 'signed_in' }
   // Email and password do not match an account, including an unknown email. The screen never says
   // which one was wrong or whether an account exists (S02 handoff, section 2).
   | { kind: 'invalid_credentials' }
+  // The details are right but the email address is not confirmed yet. Confirmation is required
+  // before any authenticated access (Sai, 11 Nov).
+  | { kind: 'email_not_confirmed' }
   | { kind: 'failed' }
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  | RateLimited;
 
 export type CreateAccountResult =
+  // Created and usable straight away.
   | { kind: 'created' }
+  // Created, and a confirmation email was sent: the screen shows "Check your email". Confirming
+  // returns the owner to the app.
+  | { kind: 'confirmation_required' }
   // An account already exists for this email: the screen offers Sign in instead.
   | { kind: 'account_exists' }
   | { kind: 'failed' }
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  | RateLimited;
 
 export type SignInRequest = { email: string; password: string };
 

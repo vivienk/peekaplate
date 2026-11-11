@@ -227,20 +227,112 @@ export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: React
 }
 
 // The full-width primary button. While a request runs it shows a spinner and a "…ing" label and
-// ignores presses; it is not disabled, so keyboard focus stays on it (S02 handoff, section 4).
+// ignores presses; it is not disabled, so keyboard focus stays on it (S02 handoff, section 4). While
+// the service asks the owner to wait (rate limited) it is marked unavailable the same way.
 export function SubmitButton({
   busy,
   label,
   busyLabel,
+  blocked = false,
 }: {
   busy: boolean;
   label: string;
   busyLabel: string;
+  blocked?: boolean;
 }) {
   return (
-    <Button type="submit" className="pp-auth__submit" aria-busy={busy ? true : undefined}>
+    <Button
+      type="submit"
+      className="pp-auth__submit"
+      aria-busy={busy ? true : undefined}
+      aria-disabled={blocked && !busy ? true : undefined}
+    >
       {busy && <span className="pp-auth__spinner" aria-hidden="true" />}
       {busy ? busyLabel : label}
     </Button>
+  );
+}
+
+// "← Back to sign in" (Text link Tone=Neutral with back arrow, S03/S04 handoff).
+export function BackLink({
+  onClick,
+  disabled,
+  children = 'Back to sign in',
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <p className="pp-auth__back">
+      <button type="button" className="pp-auth-link" disabled={disabled} onClick={onClick}>
+        <span aria-hidden="true">← </span>
+        {children}
+      </button>
+    </p>
+  );
+}
+
+// The envelope from the S03 "Check your email" frame. Decorative.
+export const MAIL_ILLUSTRATION = (
+  <svg
+    className="pp-auth-status__art"
+    viewBox="0 0 240 112"
+    width="240"
+    height="112"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      d="M10 112c0-16 14-26 30-24 4-14 20-20 32-12 8-14 32-14 40 2h40c8-16 32-16 40-2 12-8 28-2 32 12 16-2 30 8 30 24Z"
+      fill="var(--pp-color-orange-100)"
+    />
+    <g stroke="var(--pp-color-gray-900)" strokeWidth="3" strokeLinejoin="round" fill="none">
+      <rect x="78" y="38" width="84" height="66" rx="5" fill="var(--pp-color-gray-50)" />
+      <path d="M80 41 120 76 160 41" />
+      <path d="M80 102 108 70M160 102 132 70" />
+    </g>
+    <g stroke="var(--pp-color-orange-500)" strokeWidth="3" strokeLinecap="round">
+      <path d="M120 4v10M98 12l5 8M142 12l-5 8" />
+    </g>
+    <circle cx="162" cy="40" r="17" fill="var(--pp-color-orange-500)" />
+    <text
+      x="162"
+      y="47"
+      textAnchor="middle"
+      fontFamily="Inter, system-ui, sans-serif"
+      fontSize="20"
+      fontWeight="600"
+      fill="var(--pp-color-gray-50)"
+    >
+      1
+    </text>
+  </svg>
+);
+
+// A centred result screen without the form: "Check your email", "Password updated", "This reset
+// link can't be used". Focus moves to its heading when it opens (S03/S04 handoff, accessibility).
+export function StatusPanel({
+  art,
+  title,
+  heading,
+  children,
+  actions,
+}: {
+  art: ReactNode;
+  title: string;
+  heading: Ref<HTMLHeadingElement>;
+  children: ReactNode;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="pp-auth-status">
+      {art}
+      <h1 className="pp-auth__title pp-auth-status__title" ref={heading} tabIndex={-1}>
+        {title}
+      </h1>
+      <p className="pp-auth__lead pp-auth-status__body">{children}</p>
+      <div className="pp-auth-status__actions">{actions}</div>
+    </div>
   );
 }

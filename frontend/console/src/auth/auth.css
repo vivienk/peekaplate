@@ -283,6 +283,58 @@
   text-align: center;
 }
 
+/* While the service asks the owner to wait, the button looks unavailable (shared disabled colours)
+ * but stays focusable. */
+.pp-auth .pp-auth__submit[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.pp-auth .pp-auth__submit[aria-disabled="true"]:active {
+  transform: none;
+}
+
+/* "← Back to sign in", centred under the form (S03/S04). */
+.pp-auth__back {
+  margin: var(--pp-space-8) 0 0;
+  text-align: center;
+}
+
+/* Result screens: illustration, centred heading and text, then the actions (S03 Check your email,
+ * S04 Password updated / link can't be used). */
+.pp-auth-status {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.pp-auth-status__art {
+  max-width: 100%;
+  height: auto;
+  margin-bottom: var(--pp-space-24);
+}
+
+.pp-auth-status__title {
+  margin-bottom: var(--pp-space-8);
+}
+
+.pp-auth-status__body {
+  max-width: 28rem;
+}
+
+.pp-auth-status__body strong {
+  color: var(--pp-role-on-surface);
+  font-weight: var(--pp-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.pp-auth-status__actions {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-4);
+  width: 100%;
+  margin-top: var(--pp-space-24);
+}
+
 /* Error Message component: Error/700 text on Error/100. */
 .pp-auth-banner {
   display: flex;

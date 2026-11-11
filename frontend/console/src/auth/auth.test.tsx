@@ -1,7 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { notConnectedAuthService } from './auth-service';
-import { BANNERS, emailError, fullNameError, newPasswordError, signInPasswordError } from './copy';
+import {
+  BANNERS,
+  emailError,
+  fullNameError,
+  newPasswordError,
+  rateLimitedBanner,
+  signInPasswordError,
+  waitText,
+} from './copy';
 import { OwnerAuth } from './OwnerAuth';
 
 describe('owner sign-in field checks (S4-FE-04.1)', () => {
@@ -33,6 +41,21 @@ describe('owner sign-in field checks (S4-FE-04.1)', () => {
   it('never says which detail was wrong or whether an account exists after a failed sign-in', () => {
     const text = `${BANNERS.invalidCredentials.title} ${BANNERS.invalidCredentials.body}`;
     expect(text).toBe('Email or password is incorrect Check your details and try again.');
+  });
+});
+
+describe('too many attempts', () => {
+  it('says how long to wait when the service gives a wait', () => {
+    expect(waitText(1)).toBe('1 second');
+    expect(waitText(4.2)).toBe('5 seconds');
+    expect(waitText(60)).toBe('1 minute');
+    expect(waitText(61)).toBe('2 minutes');
+    expect(rateLimitedBanner(30).body).toBe('Please wait 30 seconds and try again.');
+  });
+
+  it('says to try again later without a wait', () => {
+    expect(rateLimitedBanner().body).toBe('Please try again later.');
+    expect(rateLimitedBanner(0).body).toBe('Please try again later.');
   });
 });
 

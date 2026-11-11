@@ -117,10 +117,91 @@ test('Create account checks every field and focuses the first problem', async ({
   await expect(terms).toBeFocused();
 
   await terms.check();
+  await answer(page, 'Create account', 'created');
   await create.click();
   await expect(page.getByRole('button', { name: 'Creating account…' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Account created (demo)' })).toBeVisible();
   await expect(page.getByText('Demo only: nobody is signed in.')).toBeVisible();
+});
+
+async function fillCreate(page: Page) {
+  await page.getByLabel('Full name').fill('Sam Rivera');
+  await passwordField(page).fill('long-enough');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+}
+
+test('when confirmation is required, Create account shows Check your email', async ({ page }) => {
+  await openCreate(page);
+  await fillCreate(page);
+  const heading = page.getByRole('heading', { name: 'Check your email' });
+  await expect(heading).toBeFocused();
+  await expect(page.getByText(`We sent a confirmation link to ${EMAIL}.`)).toBeVisible();
+  // The result screen has no logo (Figma "Check your email").
+  await expect(page.locator('.pp-auth__brand')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Edit email address' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeFocused();
+  await expect(page.getByLabel('Email address')).toHaveValue(EMAIL);
+});
+
+test('Check your email links back to Sign in', async ({ page }) => {
+  await openCreate(page);
+  await fillCreate(page);
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeFocused();
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(EMAIL);
+});
+
+test('signing in before confirming the email asks to confirm it first', async ({ page }) => {
+  await openSignIn(page);
+  await answer(page, 'Sign in', 'email_not_confirmed');
+  await passwordField(page).fill('right-password');
+  await signInButton(page).click();
+  await expect(page.getByRole('alert')).toContainText('Confirm your email first');
+  await expect(passwordField(page)).toHaveValue('right-password');
+});
+
+test('too many attempts blocks the button for the wait the service gives', async ({ page }) => {
+  await openSignIn(page);
+  await answer(page, 'Sign in', 'rate_limited');
+  await passwordField(page).fill('some-password');
+  await signInButton(page).click();
+  await expect(page.getByRole('alert')).toHaveText(
+    /Too many attempts\s*Please wait 5 seconds and try again\./,
+  );
+  await expect(page.getByText('Requests sent: 2')).toBeVisible();
+  await expect(signInButton(page)).toHaveAttribute('aria-disabled', 'true');
+
+  // Submitting while blocked sends nothing. (Playwright's click() waits for aria-disabled to clear,
+  // so the form is submitted from the keyboard.)
+  await passwordField(page).press('Enter');
+  await signInButton(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(signInButton(page)).toBeFocused();
+  await expect(page.getByText('Requests sent: 2')).toBeVisible();
+
+  // After the wait the button works again.
+  await expect(signInButton(page)).not.toHaveAttribute('aria-disabled', { timeout: 8_000 });
+  await answer(page, 'Sign in', 'invalid_credentials');
+  await signInButton(page).click();
+  await expect(page.getByText('Requests sent: 3')).toBeVisible();
+});
+
+test('too many attempts on Enter email and Create account', async ({ page }) => {
+  await page.goto(demo);
+  await answer(page, 'Email check', 'rate_limited');
+  await continueWith(page);
+  await expect(page.getByRole('alert')).toContainText('Too many attempts');
+  await expect(page.getByRole('button', { name: 'Continue' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+
+  await openCreate(page);
+  await answer(page, 'Create account', 'rate_limited');
+  await fillCreate(page);
+  await expect(page.getByRole('alert')).toContainText('Please wait 5 seconds');
 });
 
 test('an existing account on Create account offers Sign in instead', async ({ page }) => {
@@ -246,6 +327,12 @@ test('every screen and error state passes the accessibility scan', async ({ page
   await scan();
   await page.getByRole('button', { name: 'Create account' }).click();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await scan();
+  await page.getByLabel('Full name').fill('Sam Rivera');
+  await passwordField(page).fill('long-enough');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   await scan();
 });
 
