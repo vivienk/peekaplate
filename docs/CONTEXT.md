@@ -178,6 +178,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/searchView.ts",
         "frontend/diner/src/menu/searchView.test.ts",
         "tests/e2e/search.spec.ts",
+        "tests/e2e/menu-triggers.spec.ts",
         "frontend/diner/src/tracking/delivery.ts",
         "frontend/diner/src/tracking/delivery.test.ts",
         "frontend/diner/src/tracking/delivery.fixtures.test.ts",
@@ -193,7 +194,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4a091d50f46515e04927d276e4c5c7a3a90ca2a8dd5a5c3da845c4354cc0177b"
+      "sourceFingerprint": "cb39a5bfc4cf0fdb4e5e1cd11c345cf8c488501f7db8642a7df3d027ffecbb6f"
     },
     {
       "id": "console",
@@ -642,13 +643,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-11",
-      "summary": "PR78 (S3-DIN-01.5) connects the diner screens to the shared tracking layer. menuScreen.ts calls createMenuViewedTrigger once the menu is ready, trackDishDetailOpened with the shared newOpeningId, and startOpeningClock, which sends active_ms/final checkpoints. dish_viewed fires after 50% visibility for 1 s on the visible card only, with no category_filter. Activity listens on window scroll plus click/key/pointer and is removed on leaving detail. entry_source is direct_link. The interim tracking index and clock are deleted. Nothing fires for search, placeholders, chips, tiles or loading. Tracking e2e specs load ?scenario=empty. Evidence is fixture only.",
+      "summary": "PR78 (S3-DIN-01.5) connects the diner screens to the shared tracking layer. menuScreen.ts calls createMenuViewedTrigger once the menu is ready, trackDishDetailOpened with the shared newOpeningId, and startOpeningClock, which sends active_ms/final checkpoints. dish_viewed fires after 50% visibility for 1 s on the visible card only, with no category_filter. Activity listens on window scroll plus click/key/pointer and is removed on leaving detail. entry_source is direct_link. The interim tracking index and clock are deleted. Nothing fires for search, placeholders, chips, tiles or loading. Tracking e2e specs load ?scenario=empty. Evidence is fixture only.A new e2e spec covers dish_viewed exposure rules and the scroll-driven detail clock.",
       "modules": [
         "diner"
       ],
       "paths": [
         "frontend/diner/src/menu/menuScreen.ts",
-        "frontend/diner/src/menu/events.ts"
+        "frontend/diner/src/menu/events.ts",
+        "tests/e2e/menu-triggers.spec.ts"
       ],
       "next": "Read save_available from the shared Save-state function when #122 lands. Add category_filter once matrix §3.1 is confirmed. Verify one event per real transition reaches PostHog and canonical ingestion once DIN-03 enables live tracking."
     },
