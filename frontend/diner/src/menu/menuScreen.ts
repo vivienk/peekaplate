@@ -1,4 +1,10 @@
-import { newExposureId, newOpeningId, startOpeningClock, suspendLiveTracking, track } from '../tracking';
+import {
+  newExposureId,
+  newOpeningId,
+  startOpeningClock,
+  suspendLiveTracking,
+  track,
+} from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
