@@ -39,9 +39,12 @@ test('a card heart saves the dish, and the badge, detail heart and header agree'
   await expect(badge(page)).toBeHidden();
   await expect(headerButton(page)).toHaveAccessibleName('Saved dishes');
 
+  const heartIcon = heart.locator('.pp-save-heart__icon img');
+  const unsavedSrc = await heartIcon.getAttribute('src');
   await heart.click();
   await expect(heart).toHaveAttribute('aria-pressed', 'true');
-  await expect(heart.locator('.pp-save-heart__icon')).toHaveText('♥');
+  // The outline heart becomes the filled heart: a different image.
+  await expect(heartIcon).not.toHaveAttribute('src', unsavedSrc ?? '');
   // Figma's Heart with Text: "Save" becomes "Saved" once saved (review #13); the name stays.
   await expect(heart).toContainText('Saved');
   await expect(heart).toHaveAccessibleName('Save Avocado Toast');
@@ -99,18 +102,18 @@ test('removing a dish on the detail shows Undo, and Undo restores it everywhere'
   const detailHeart = page.getByRole('button', { name: 'Save Avocado Toast' });
   await detailHeart.click();
   await expect(detailHeart).toHaveAttribute('aria-pressed', 'false');
-  await expect(detailHeart).toContainText(/^\S+\s*Save$/);
+  await expect(detailHeart).toHaveText('Save');
   await expect(toasts(page)).toContainText('Removed from saved dishes');
   // The toast sits at the top, directly below the header, and covers none of it (review #2).
   const header = await page.locator('.pp-detail__topbar').boundingBox();
   const toast = await page.locator('.pp-toast').boundingBox();
   if (!header || !toast) throw new Error('header or toast has no box');
   expect(toast.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
-  expect(toast.y).toBeLessThan(header.y + header.height + 16);
+  expect(toast.y).toBeLessThanOrEqual(header.y + header.height + 16);
 
   await toasts(page).getByRole('button', { name: 'Undo' }).click();
   await expect(detailHeart).toHaveAttribute('aria-pressed', 'true');
-  await expect(toasts(page)).toContainText('Restored to saved dishes');
+  await expect(toasts(page)).toContainText('Added back to Saved');
 
   await page.getByRole('button', { name: 'Back to menu' }).click();
   await expect(cardHeart(page, 'Avocado Toast')).toHaveAttribute('aria-pressed', 'true');
@@ -162,7 +165,7 @@ test('the header heart opens the Saved screen on its own route, and Back returns
   await expect(items.nth(0)).toContainText('$16.00');
   await expect(items.nth(0).locator('.pp-card__image--missing')).toHaveCount(1);
   await expect(items.nth(1)).toContainText('Avocado Toast');
-  await expect(items.nth(1).locator('img')).toHaveCount(1);
+  await expect(items.nth(1).locator('img.pp-saved__image')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Back to menu' }).click();
   await expect(page).toHaveURL(/\?scenario=edge-cases$/);

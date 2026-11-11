@@ -9,7 +9,7 @@ import type { SaveState } from './save-state';
 
 // Figma toast copy (frames 751:10189 and 1091:2272; Rania's PR 122 review #5, agreed by Adam).
 const REMOVED_TEXT = 'Removed from saved dishes';
-const RESTORED_TEXT = 'Restored to saved dishes';
+const RESTORED_TEXT = 'Added back to Saved';
 const UNDO_TEXT = 'Undo';
 
 // Each toast's status icon sits in a circle (review #3); the colours come from save.css.
