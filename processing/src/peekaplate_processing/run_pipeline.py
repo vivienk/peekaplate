@@ -21,6 +21,7 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult, validate_box_evidence
 from peekaplate_processing.storage import save_json
+from peekaplate_processing.ingredient_intelligence import build_review_handoff
 from peekaplate_processing.workflow import INPUT_MODES, page_batches, request_failure, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
@@ -359,11 +360,22 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         completed=True
         return report
     finally:
+        ingredient_review = {"status": "not_run"}
+        if completed and report is not None:
+            try:
+                handoff = build_review_handoff(report)
+            except (ExtractionError, ValueError):
+                ingredient_review = {"status": "unavailable", "reason": "unsupported_input"}
+                print("Ingredient review unavailable for this input; extraction retained.", file=sys.stderr, flush=True)
+            else:
+                save_json(handoff.model_dump(mode="json"), directory / "ingredient-review.json")
+                ingredient_review = {"status": "written", "file": "ingredient-review.json"}
         if vision_requested and report is not None and report.source is not None:
             save_json({"schema_version": 1, "source_id": report.source.source_id,
                        "attempts": vision_attempts}, directory / "vision-attempts.json")
         timings["total"]=round(time.perf_counter()-started, 6)
         summary={"schema_version":1, "status":report.status if completed else "failed", "input_mode":input_mode, "acquisition_mode":"images_without_ocr" if input_mode=="image" else "saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
+        summary["ingredient_review"] = ingredient_review
         if report is not None:
             summary["batches"]=report.configuration.get("llm_batches", [])
             summary["pages"]=[{"page_number":segment.page_number, "method":segment.method, "status":segment.status, "reused":pages_json is not None, "cache_hit":segment.metadata.get("cache_hit") if pages_json is None else None, "timings_seconds":segment.metadata.get("timings_seconds") if pages_json is None else None} for segment in report.segments]

@@ -474,3 +474,11 @@ create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
 an optional generated PNG with its actual prompt/model provenance. See
 [asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
 for commands, non-approval behavior, browser controls and test boundaries.
+
+## Ingredient intelligence (AI-02)
+
+Runs attempt a separate review-only `ingredient-review.json` sidecar without new model calls.
+Inputs outside its bounds retain the original extraction and record explicit sidecar
+unavailability in `timings.json`. Vision transcriptions never become independent
+ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
+the offline CLI, limits and remaining authenticated owner-review integration.

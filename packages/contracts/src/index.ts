@@ -1427,3 +1427,43 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
   queuedAt: z.string().datetime(),
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
+
+export {
+  type IngredientAssessment,
+  IngredientAssessmentSchema,
+  IngredientReviewHandoffSchema,
+  ingredientAssessmentForReview,
+} from './ingredient-intelligence.js';
+export {
+  ALL_ALLOWED_CSV_HEADERS,
+  BASE_REQUIRED_CSV_HEADERS,
+  CANONICAL_REVISION_HEADERS,
+  type ClassifyTimestampOptions,
+  type CsvParseResult,
+  classifyOrderTimestampWindow,
+  computeOrderLineChecksum,
+  DEFAULT_HISTORICAL_IMPORT_WINDOW_DAYS,
+  DEFAULT_RAW_CSV_RETENTION_DAYS,
+  ISO_EXPLICIT_TIMEZONE_PATTERN,
+  MAX_ORDER_OUTCOME_FILE_BYTES,
+  MAX_ORDER_OUTCOME_ROWS,
+  NINETY_DAYS_MICROS,
+  OPTIONAL_CSV_HEADERS,
+  OPTIONAL_PRICING_HEADERS,
+  type OrderOutcomeImportResponse,
+  OrderOutcomeImportResponseSchema,
+  type OrderOutcomeLine,
+  OrderOutcomeLineSchema,
+  type OrderOutcomeQuarantineReason,
+  OrderOutcomeQuarantineReasonSchema,
+  type OrderOutcomeType,
+  OrderOutcomeTypeSchema,
+  OrderTokenIdentifierSchema,
+  type ParsedCsvRow,
+  PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
+  POS_ITEM_HEADERS,
+  parseOrderOutcomeCsv,
+  REQUIRED_CSV_HEADERS,
+  type SanitizedRowDiagnostic,
+  SanitizedRowDiagnosticSchema,
+} from './order-outcome';

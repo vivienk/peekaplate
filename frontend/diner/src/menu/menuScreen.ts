@@ -10,8 +10,11 @@ import {
   toastAreaMarkup,
 } from '../save/screens';
 import {
+  isLiveTracking,
+  isTrackingAllowed,
   newExposureId,
   newOpeningId,
+  onTrackingAllowedChange,
   startOpeningClock,
   suspendLiveTracking,
   track,
@@ -402,11 +405,14 @@ export function mountMenuScreen(container: HTMLElement): void {
   let stopActivityListeners: (() => void) | null = null;
   let exposureObserver: IntersectionObserver | null = null;
   let stopVisibilityListener: (() => void) | null = null;
+  let stopConsentListener: (() => void) | null = null;
+  let resumeDetailTracking: (() => void) | null = null;
   const exposureTimers = new Map<HTMLElement, number>();
   const exposureIds = new Map<string, string>();
   const menuViewedTrigger = createMenuViewedTrigger();
   // QR is out of scope (Nov 1), so this is always direct_link.
   const entrySource = 'direct_link' as const;
+  const canTrackUi = () => fixtureMode || (isLiveTracking() && isTrackingAllowed());
 
   const cleanupExposure = () => {
     exposureTimers.forEach((timer) => window.clearTimeout(timer));
@@ -427,6 +433,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   };
 
   teardownTracking = () => {
+    stopConsentListener?.();
     stopDetailTracking();
     cleanupExposure();
   };
@@ -468,7 +475,8 @@ export function mountMenuScreen(container: HTMLElement): void {
           if (qualifies) {
             if (exposureTimers.has(card)) return;
             const timer = window.setTimeout(() => {
-              if (document.hidden) return;
+              if (!canTrackUi() || document.hidden || !card.isConnected || card.closest('[hidden]'))
+                return;
               const exposureId = newExposureId();
               exposureIds.set(dishId, exposureId);
               // track() never throws. category_filter is left out until matrix 3.1 is confirmed.
@@ -518,6 +526,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   // Tracking setup must never break the menu.
   const startExposureTracking = (menu: Menu) => {
+    if (!canTrackUi()) return;
     try {
       setupExposureTracking(menu);
     } catch {
@@ -533,6 +542,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     // Leaving a screen ends its tracking: exposure timers and the detail clock's final checkpoint.
     cleanupExposure();
     stopDetailTracking();
+    resumeDetailTracking = null;
     view = next;
   };
 
@@ -548,7 +558,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     window.scrollTo(0, savedScroll);
     if (focus === 'saved') container.querySelector<HTMLElement>('.pp-saved')?.focus();
     else restoreOpenerFocus();
-    menuViewedTrigger(menu, entrySource);
+    if (canTrackUi()) menuViewedTrigger(menu, entrySource);
     startExposureTracking(menu);
   };
 
@@ -583,38 +593,41 @@ export function mountMenuScreen(container: HTMLElement): void {
       return;
     }
 
-    // Menu-card opening (S3-DIN-01.5): one dish_detail_opened and one activity clock.
-    const exposureId = exposureIds.get(dish.dishId);
-    const opening: DetailOpening = {
-      source: 'menu_card',
-      saveAvailable: state.isSaveAvailable(),
-      ...(exposureId === undefined ? {} : { fromExposureId: exposureId }),
-    };
-    const openingId = trackDishDetailOpened(menu, dish, opening, track, newOpeningId);
-    if (!openingId) return;
+    // Consent begins a fresh opening; time from a disallowed stretch is never reused.
+    resumeDetailTracking = () => {
+      if (!canTrackUi()) return;
+      const exposureId = exposureIds.get(dish.dishId);
+      const opening: DetailOpening = {
+        source: 'menu_card',
+        saveAvailable: state.isSaveAvailable(),
+        ...(exposureId === undefined ? {} : { fromExposureId: exposureId }),
+      };
+      const openingId = trackDishDetailOpened(menu, dish, opening, track, newOpeningId);
+      if (!openingId) return;
+      openingClock = startOpeningClock(
+        {
+          publication_revision_id: menu.publicationRevisionId,
+          dish_id: dish.dishId,
+          dish_revision_id: dish.dishRevisionId,
+          opening_id: openingId,
+        },
+        { send: track },
+      );
 
-    openingClock = startOpeningClock(
-      {
-        publication_revision_id: menu.publicationRevisionId,
-        dish_id: dish.dishId,
-        dish_revision_id: dish.dishRevisionId,
-        opening_id: openingId,
-      },
-      { send: track },
-    );
-
-    // The page scrolls, not the container, so scroll is listened for on window.
-    const reportActivity = () => openingClock?.activity();
-    container.addEventListener('click', reportActivity);
-    container.addEventListener('keydown', reportActivity);
-    container.addEventListener('pointerdown', reportActivity);
-    window.addEventListener('scroll', reportActivity, { passive: true });
-    stopActivityListeners = () => {
-      container.removeEventListener('click', reportActivity);
-      container.removeEventListener('keydown', reportActivity);
-      container.removeEventListener('pointerdown', reportActivity);
-      window.removeEventListener('scroll', reportActivity);
+      // The page scrolls, not the container, so scroll is listened for on window.
+      const reportActivity = () => openingClock?.activity();
+      container.addEventListener('click', reportActivity);
+      container.addEventListener('keydown', reportActivity);
+      container.addEventListener('pointerdown', reportActivity);
+      window.addEventListener('scroll', reportActivity, { passive: true });
+      stopActivityListeners = () => {
+        container.removeEventListener('click', reportActivity);
+        container.removeEventListener('keydown', reportActivity);
+        container.removeEventListener('pointerdown', reportActivity);
+        window.removeEventListener('scroll', reportActivity);
+      };
     };
+    resumeDetailTracking();
   };
 
   const showSaved = (recordView = true) => {
@@ -672,6 +685,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   // assignment. The list is redrawn only if it is on screen; an open dish detail stays as it is
   // and going back shows the new menu.
   const swapMenu = (next: Menu) => {
+    exposureIds.clear();
     currentMenu = next;
     // A new publication is a successful load: withdrawn saved dishes drop out (no event).
     saveState?.reconcile(next);
@@ -737,8 +751,24 @@ export function mountMenuScreen(container: HTMLElement): void {
       } else focusAfterRetry(container, true);
     }
     window.scrollTo(0, scrollY);
+    if (canTrackUi()) menuViewedTrigger(next, entrySource);
     startExposureTracking(next);
   };
+
+  let allowedBefore = isTrackingAllowed();
+  stopConsentListener = onTrackingAllowedChange((allowed) => {
+    if (allowed === allowedBefore) return;
+    allowedBefore = allowed;
+    if (fixtureMode) return;
+    stopDetailTracking();
+    cleanupExposure();
+    exposureIds.clear();
+    if (!canTrackUi()) return;
+    if (view === 'menu' && currentMenu) {
+      menuViewedTrigger(currentMenu, entrySource);
+      startExposureTracking(currentMenu);
+    } else if (view === 'detail') resumeDetailTracking?.();
+  });
 
   const loadMenu = () => {
     if (isLoading) return;

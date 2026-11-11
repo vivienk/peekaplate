@@ -52,7 +52,9 @@ The October setup emitted `app_shell_viewed` with `surface=diner` or `surface=co
 
 The legacy `captureDishIntent(input)` adapter validates the strict v1 `DishIntentEventSchema` and preserves `dish_open` and `portion_compare`. It is not the current diner's v2 path. New diner controls call the shared `track()` boundary after the actual approved display/interaction; do not add a second direct analytics call. Console callers cannot submit diner events.
 
-The [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record) proposes broader v2 events. Menu/card exposures, ingredients, saves, comparison replacement, viewer lifecycle and owner report actions remain unwired until their controls, strict schemas and triggers are reviewed. Historical portion events cannot be renamed into generic comparison events. No two names for one action.
+The diner menu/detail and Save/Saved screens call the shared tracking boundary. DIN-01 records a readable menu once per publication, qualifying card exposures (at least 50% visible for one continuous second), and completed detail openings. It uses the shared opening clock, including final checkpoints and window-scroll activity. In live mode, consent starts a fresh opening and clock; disallowed time and exposure references are discarded. A replacement publication records its own readable menu and cannot reuse an older exposure link. Fixture mode logs locally and sends nothing.
+
+These trigger checks use real Chromium with synthetic menu responses and destination sinks; they do not establish hosted PostHog/Queue acceptance. Remaining ingredient, comparison and viewer controls need their own agreed triggers and integration evidence from the [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record). Historical portion events cannot be renamed into generic comparison events. No two names for one action.
 
 ## Legacy adapter privacy and failure behavior
 

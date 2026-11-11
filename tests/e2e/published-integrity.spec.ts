@@ -100,10 +100,7 @@ test('active withdrawal preserves browsing but stops both destinations', async (
       (type) => (window as any).reviewSent.filter((t: string) => t === type).length,
       type,
     );
-  await page.evaluate(async (publicationId) => {
-    const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
-    tracking.track('menu_viewed', { publication_revision_id: publicationId, entry_source: 'qr' });
-  }, publication);
+  // Opt-in observes the currently readable menu; do not inject a duplicate menu view.
   await page.clock.runFor(6000);
   await expect.poll(() => countOf('menu_viewed')).toBe(1);
   state.kind = 'withdrawn';
