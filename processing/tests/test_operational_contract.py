@@ -274,6 +274,7 @@ class OperationalContractTests(unittest.TestCase):
         storage = Mock(return_value=self.data)
         # 1) Public report at exact MAX_REPORT_BYTES vs MAX_REPORT_BYTES + 1
         base_report = copy.deepcopy(self.report)
+        base_report["configuration"] = {"input_mode": "ocr_image"}
         base_report["warnings"] = [""]
         validated = MenuExtractionResult.model_validate(base_report).model_dump(mode="json")
         empty_len = len(json.dumps(validated).encode("utf-8"))

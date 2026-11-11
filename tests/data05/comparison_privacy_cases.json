@@ -1,0 +1,195 @@
+{
+  "fixture_version": "data05.validation.v3",
+  "description": "Synthetic mocked-row independent period/denominator cohorts with complementary opened-cohort suppression; SQL checks are recorded separately",
+  "cases": [
+    {
+      "case_id": "PRIVACY_009",
+      "description": "Both periods have 9 sessions in every cohort",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 9,
+          "exposure_sessions": 9,
+          "opening_sessions": 9
+        },
+        "baseline": {
+          "sessions": 9,
+          "exposure_sessions": 9,
+          "opening_sessions": 9
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "engagement_rate", "save_rate"],
+        "comparison_eligibility": "INSUFFICIENT"
+      }
+    },
+    {
+      "case_id": "PRIVACY_010",
+      "description": "Both periods have 10 sessions in every cohort",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 10,
+          "exposure_sessions": 10,
+          "opening_sessions": 10
+        },
+        "baseline": {
+          "sessions": 10,
+          "exposure_sessions": 10,
+          "opening_sessions": 10
+        }
+      },
+      "expected": {
+        "insufficient_metrics": [],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    },
+    {
+      "case_id": "PRIVACY_011",
+      "description": "Both periods have 11 sessions in every cohort",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": [],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    },
+    {
+      "case_id": "PERIOD_CURRENT_009",
+      "description": "current period has 9 sessions while baseline has 11",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 9,
+          "exposure_sessions": 9,
+          "opening_sessions": 9
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "engagement_rate", "save_rate"],
+        "comparison_eligibility": "INSUFFICIENT"
+      }
+    },
+    {
+      "case_id": "PERIOD_BASELINE_009",
+      "description": "baseline period has 9 sessions while current has 11",
+      "synthetic": true,
+      "input": {
+        "baseline": {
+          "sessions": 9,
+          "exposure_sessions": 9,
+          "opening_sessions": 9
+        },
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "engagement_rate", "save_rate"],
+        "comparison_eligibility": "INSUFFICIENT"
+      }
+    },
+    {
+      "case_id": "CURRENT_EXPOSURE_SESSIONS_009",
+      "description": "Only current exposure_sessions is 9; overall and other denominator cohorts remain 11",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 9,
+          "opening_sessions": 11
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "save_rate"],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    },
+    {
+      "case_id": "CURRENT_OPENING_SESSIONS_009",
+      "description": "Only current opening_sessions is 9; overall and other denominator cohorts remain 11",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 9
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "engagement_rate"],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    },
+    {
+      "case_id": "BASELINE_EXPOSURE_SESSIONS_009",
+      "description": "Only baseline exposure_sessions is 9; overall and other denominator cohorts remain 11",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 9,
+          "opening_sessions": 11
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "save_rate"],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    },
+    {
+      "case_id": "BASELINE_OPENING_SESSIONS_009",
+      "description": "Only baseline opening_sessions is 9; overall and other denominator cohorts remain 11",
+      "synthetic": true,
+      "input": {
+        "current": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 11
+        },
+        "baseline": {
+          "sessions": 11,
+          "exposure_sessions": 11,
+          "opening_sessions": 9
+        }
+      },
+      "expected": {
+        "insufficient_metrics": ["open_rate", "engagement_rate"],
+        "comparison_eligibility": "COMPARABLE"
+      }
+    }
+  ]
+}
