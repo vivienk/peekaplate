@@ -76,19 +76,24 @@ function thumbMarkup(dish: CompleteDish, className: string): string {
     : `<span class="${className} pp-card__image--missing" aria-hidden="true"></span>`;
 }
 
+// The Figma selected-dish card: name, then the heart beside the price, and a round photo. Cards
+// alternate sides like the menu list; the selected card gets the orange border and the check on
+// the photo. Save is not offered from the picker (no Save surface exists for it), so the heart is
+// shown disabled, as on the menu before Save.
 function optionMarkup(dish: CompleteDish, selected: boolean): string {
   const name = escapeHtml(dish.name);
   return `
-    <article class="pp-card pp-picker__option${selected ? ' pp-card--selected' : ''}" data-dish-id="${escapeHtml(dish.dishId)}">
-      <span class="pp-picker__check" aria-hidden="true">✓</span>
-      <div class="pp-card__media">${thumbMarkup(dish, 'pp-card__image')}</div>
-      <div class="pp-card__body">
-        <p class="pp-card__category">${escapeHtml(dish.categoryName)}</p>
-        <h2 class="pp-card__name"><button type="button" class="pp-card__open pp-picker__choose" data-pick-dish-id="${escapeHtml(dish.dishId)}" aria-pressed="${selected}" aria-label="Compare with ${name}"><span class="pp-card__name-text">${name}</span></button></h2>
-        <p class="pp-card__price">${escapeHtml(formatPrice(dish.price))}</p>
-        <button class="pp-card__save" type="button" aria-label="Save ${name} (not available yet)" disabled>
-        <span aria-hidden="true">♡</span><span aria-hidden="true">Save</span>
-        </button>
+    <article class="pp-picker__option${selected ? ' pp-picker__option--selected' : ''}" data-dish-id="${escapeHtml(dish.dishId)}">
+      <div class="pp-picker__option-body">
+        <h2 class="pp-picker__option-name"><button type="button" class="pp-picker__choose" data-pick-dish-id="${escapeHtml(dish.dishId)}" aria-pressed="${selected}" aria-label="Compare with ${name}"><span class="pp-card__name-text">${name}</span></button></h2>
+        <div class="pp-picker__option-meta">
+          <button class="pp-picker__option-heart" type="button" aria-label="Save ${name} (not available here)" disabled><span aria-hidden="true">♡</span></button>
+          <p class="pp-picker__option-price">${escapeHtml(formatPrice(dish.price))}</p>
+        </div>
+      </div>
+      <div class="pp-picker__option-media">
+        ${thumbMarkup(dish, 'pp-picker__option-image')}
+        <span class="pp-picker__check" aria-hidden="true">✓</span>
       </div>
     </article>
   `;
@@ -131,7 +136,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
               </form>
               <p class="pp-search-staff" hidden>${SEARCH_STAFF_LINE}</p>
               <p class="pp-sr-only" id="pp-picker-status" role="status" aria-live="polite"></p>
-              <div class="pp-category pp-picker__list" role="group" aria-labelledby="pp-picker-choose-label"></div>
+              <div class="pp-picker__list" role="group" aria-labelledby="pp-picker-choose-label"></div>
               ${searchEmptyMarkup()}
             `
         }
@@ -188,7 +193,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
     selectedId = selectOption(menu, exclude, selectedId, dishId);
     for (const card of Array.from(list.querySelectorAll<HTMLElement>('.pp-picker__option'))) {
       const selected = card.dataset.dishId === selectedId;
-      card.classList.toggle('pp-card--selected', selected);
+      card.classList.toggle('pp-picker__option--selected', selected);
       card
         .querySelector<HTMLButtonElement>('.pp-picker__choose')
         ?.setAttribute('aria-pressed', String(selected));
@@ -199,7 +204,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
   // One listener for the whole list, since search re-renders the cards. The heart is ignored.
   list.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    if (target.closest('.pp-card__save')) return;
+    if (target.closest('.pp-picker__option-heart')) return;
     const card = target.closest<HTMLElement>('.pp-picker__option');
     if (card?.dataset.dishId) select(card.dataset.dishId);
   });

@@ -45,7 +45,7 @@ test('Compare on a dish detail opens the picker with that dish as Keeping', asyn
     'Salmon Poke Bowl',
     'Garden Avocado Salad',
   ]);
-  await expect(page.locator('.pp-picker__option .pp-card__save').first()).toBeDisabled();
+  await expect(page.locator('.pp-picker__option .pp-picker__option-heart').first()).toBeDisabled();
   await expectNoAxeViolations(page);
 });
 
@@ -56,10 +56,10 @@ test('one dish is selected at a time, with the orange border and check', async (
 
   await bowl.click();
   await expect(bowl).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.pp-card--selected .pp-card__name-text')).toHaveText(
+  await expect(page.locator('.pp-picker__option--selected .pp-card__name-text')).toHaveText(
     'Harvest Power Bowl',
   );
-  await expect(page.locator('.pp-card--selected .pp-picker__check')).toBeVisible();
+  await expect(page.locator('.pp-picker__option--selected .pp-picker__check')).toBeVisible();
 
   // Tapping the card body selects too, and replaces the previous choice.
   await page.locator('.pp-picker__option', { hasText: 'Garden Avocado Salad' }).click({
@@ -67,7 +67,7 @@ test('one dish is selected at a time, with the orange border and check', async (
   });
   await expect(salad).toHaveAttribute('aria-pressed', 'true');
   await expect(bowl).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('.pp-card--selected')).toHaveCount(1);
+  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(1);
 
   // The result screen is DIN-02.4, so Compare stays disabled and says so.
   await expect(page.locator('.pp-picker__confirm')).toBeDisabled();
