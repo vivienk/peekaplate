@@ -26,13 +26,9 @@ type Fixture = {
   cases: FixtureCase[];
 };
 
-const fixturePath = fileURLToPath(
-  new URL('./descriptive_signals.json', import.meta.url),
-);
+const fixturePath = fileURLToPath(new URL('./descriptive_signals.json', import.meta.url));
 
-const fixture = JSON.parse(
-  readFileSync(fixturePath, 'utf8'),
-) as Fixture;
+const fixture = JSON.parse(readFileSync(fixturePath, 'utf8')) as Fixture;
 
 const signalInputs: Record<SignalName, string> = {
   eligible_exposure_events: 'eligible_exposure_event_ids',
@@ -58,34 +54,26 @@ describe('DATA-06 independent descriptive-signal fixtures', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(fixture.cases)(
-    '$id: $description',
-    (testCase) => {
-      for (const [signal, expectedCount] of Object.entries(
-        testCase.expected,
-      )) {
-        const inputKey = signalInputs[signal as SignalName];
-        expect(inputKey).toBeDefined();
+  it.each(fixture.cases)('$id: $description', (testCase) => {
+    expect(Object.keys(testCase.expected).length).toBeGreaterThan(0);
+    for (const [signal, expectedCount] of Object.entries(testCase.expected)) {
+      const inputKey = signalInputs[signal as SignalName];
+      expect(inputKey).toBeDefined();
 
-        const eventIds = testCase.input[inputKey];
-        expect(Array.isArray(eventIds)).toBe(true);
+      const eventIds = testCase.input[inputKey];
+      expect(Array.isArray(eventIds)).toBe(true);
 
-        const distinctCount = new Set(eventIds).size;
-        expect(distinctCount).toBe(expectedCount);
-      }
-    },
-  );
+      const distinctCount = new Set(eventIds).size;
+      expect(distinctCount).toBe(expectedCount);
+    }
+  });
 
   it('does not count Undo events as direct Saves', () => {
-    const saveCase = fixture.cases.find(
-      (testCase) => testCase.id === 'D06-SAVE-01',
-    );
+    const saveCase = fixture.cases.find((testCase) => testCase.id === 'D06-SAVE-01');
 
     expect(saveCase).toBeDefined();
     expect(saveCase!.input.undo_event_ids).toHaveLength(1);
-    expect(
-      new Set(saveCase!.input.direct_save_event_ids).size,
-    ).toBe(2);
+    expect(new Set(saveCase!.input.direct_save_event_ids).size).toBe(2);
     expect(saveCase!.expected.direct_save_events).toBe(2);
   });
 });

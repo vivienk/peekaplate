@@ -146,6 +146,13 @@ Provider selection: `--provider` (or `MENU_AI_PROVIDER`) picks a registry entry:
 `qwen/qwen3.8-flash`, `z-ai/glm-5.3-flash`, `deepseek/deepseek-v4.1-flash`),
 `nara` and `openai`. MiniMax/A2Agent is not supported.
 
+The automatic vision cascade uses the Google settings above and the
+OpenRouter key with its default endpoint and distinct default models. It does
+not apply `MENU_AI_API_URL` or `MENU_AI_MODEL` to those candidates, so a generic
+endpoint cannot receive the OpenRouter key. Explicitly selected OpenRouter
+providers retain the existing `MENU_AI_*` overrides; only configure an endpoint
+trusted with the selected provider's key.
+
 Without an explicit provider, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
 when any Nara setting is present; all three must then be supplied. Use
 `https://router.bynara.id/v1` as the Nara chat base URL. Otherwise it uses
@@ -300,6 +307,21 @@ The inherited schema remains a Python draft contract; final TypeScript/backend
 integration and the ClickUp ground-truth evaluation are still separate work.
 Menu imagery is text evidence, not approved photographs of plated dishes.
 
+### Merchandise and minimum prices
+
+Text-grounded and vision extraction reject explicit wrapping-cloth product
+titles (`Furoshiki`, `Furoshiki Wrapping`, `Furoshiki Wrapping Cloth`, and
+`Wrapping Cloth`, ignoring case and whitespace). Rejections remain visible in
+the report and make the result incomplete when food drafts remain. This narrow
+check is not a general merchandise classifier; food wraps and mentions of
+cloth in descriptions are not excluded.
+
+A printed plus-qualified price such as `$25.00+` remains in `price_text`, with
+`price_amount` null and a minimum/qualified-price review warning. The text path
+also checks the dish's own source entry when a model omits the plus; it does not
+borrow another dish's price or resolve an ambiguous association. Vision output
+remains unverified transcription and cannot recover a qualifier omitted by the
+model. Review exports preserve the printed price and `needs_review` status.
 ## T0 asset preparation and delivery
 
 `peekaplate_processing.assets` prepares one captured dish photo into approved
@@ -452,3 +474,11 @@ create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
 an optional generated PNG with its actual prompt/model provenance. See
 [asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
 for commands, non-approval behavior, browser controls and test boundaries.
+
+## Ingredient intelligence (AI-02)
+
+Runs attempt a separate review-only `ingredient-review.json` sidecar without new model calls.
+Inputs outside its bounds retain the original extraction and record explicit sidecar
+unavailability in `timings.json`. Vision transcriptions never become independent
+ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
+the offline CLI, limits and remaining authenticated owner-review integration.

@@ -1,6 +1,6 @@
 # AI-01 safe recommendation core
 
-Status: local foundation for S3-AI-01. It is not an owner API, model integration, production recommendation policy or deployment record.
+Status: local foundation for S3-AI-01, with a separate GPT-6 Luna API access check. The owner recommendation path uses deterministic rules.
 
 ## Boundary
 
@@ -49,6 +49,18 @@ It does not map the still-unsettled DATA-02 response, compute real denominators,
 establish HTTP membership authorization, validate publication behavior or prove
 hosted privacy. Those boundaries remain explicitly NOT RUN / NOT VERIFIED in
 the report. Uneeza and Sai retain independent evaluation and validation.
+
+## GPT-6 Luna access check
+
+The AI-01 access check uses the first-party [OpenAI Responses API](https://developers.openai.com/api/reference/resources/responses/methods/create) with `gpt-6-luna`. It sends one fixed synthetic prompt and checks that Luna returns the expected structured status and token usage. It sends no owner reports or business data. The access check is separate from the 21-case offline development evaluation and the future recommendation comparison.
+
+After Sai and the project or billing owner authorize the request, the designated operator can load `OWNER_AI_OPENAI_API_KEY` and `OWNER_AI_OPENAI_PROJECT_ID` from the approved test project into the execution environment and run:
+
+```sh
+node scripts/probe-owner-ai-luna.mjs --run-approved-probe
+```
+
+The check requires explicit opt-in and both settings. It sends one request with a five-second client deadline, a 64-token output cap, `store: false`, and no tools, streaming, redirects or retries. It reports the outcome and, on success, numeric token usage. A failed or timed-out check does not establish provider usage. CI tests use a mocked transport.
 
 ## Remaining integration
 

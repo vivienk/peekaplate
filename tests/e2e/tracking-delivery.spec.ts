@@ -2,11 +2,12 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Real Chromium requests with synthetic receipts; this is not hosted ingestion acceptance.
 const DINER = 'http://127.0.0.1:5173/';
+const PAGE = `${DINER}?scenario=empty`; // the screen emits no events of its own
 const PUBLICATION = 'a5000000-0000-4000-8000-000000000001';
 const ENDPOINT = `${DINER}__review_observations`;
 
 async function start(page: Page, mode: 'live' | 'fixture' | 'denied' = 'live') {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await page.evaluate(
     async ({ publication, endpoint, mode }) => {
       const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { toOwnerReport } from '@peekaplate/contracts';
 import { describe, expect, it } from 'vitest';
 import { toOwnerRecommendationRequest } from './index';
@@ -88,7 +89,110 @@ const recommend = (input: unknown, context = scope()) => {
   };
 };
 
+// Recompute the shared synthetic vectors in the test; the adapter consumes issued IDs.
+function uuidV5ForFixture(namespace: string, name: string): string {
+  const bytes = createHash('sha1')
+    .update(Buffer.from(namespace.replaceAll('-', ''), 'hex'))
+    .update(name, 'utf8')
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    hex.slice(12, 16),
+    hex.slice(16, 20),
+    hex.slice(20),
+  ].join('-');
+}
+
 describe('AI-01 report-to-core consumer adapter', () => {
+  it('preserves the shared UUIDv5 report and open-rate evidence IDs through the consumer', () => {
+    const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+    const fixtureVenueId = '00000000-0000-4000-8000-000000000123';
+    const fixtureDishId = '00000000-0000-4000-8000-000000000456';
+    const reportId = 'c55d819b-5a28-5a39-aaf2-b7c1f9c52230';
+    const openRateEvidenceId = '87401dbf-4e82-53fa-832d-b3861fdce02f';
+    const reportVersion = 1;
+    const timeWindow = { start: '2026-11-01T00:00:00Z', end: '2026-11-08T00:00:00Z' };
+    const generatedAt = '2026-11-08T12:00:00Z';
+    const calculationVersion = 'calc_v1';
+    const input = report();
+    input.venue_id = fixtureVenueId;
+    input.dishes[0]!.dish_id = fixtureDishId;
+    input.report_metadata.calculation_version = calculationVersion;
+    input.report_metadata.generated_at = generatedAt;
+    input.report_metadata.date_window = {
+      start_time: timeWindow.start,
+      end_time: timeWindow.end,
+      duration_hours: 168,
+    };
+    input.report_metadata.freshness.last_event_ingested_at = '2026-11-08T00:00:00Z';
+
+    const namePrefix = [input.source, input.schema_version, fixtureVenueId];
+    const nameSuffix = [timeWindow.start, timeWindow.end, generatedAt, calculationVersion];
+    const evidenceIdFor = (metric: string) =>
+      uuidV5ForFixture(namespace, [...namePrefix, fixtureDishId, metric, ...nameSuffix].join('|'));
+    expect(
+      uuidV5ForFixture(namespace, [...namePrefix, 'all_dishes', ...nameSuffix].join('|')),
+    ).toBe(reportId);
+    expect(evidenceIdFor('open_rate')).toBe(openRateEvidenceId);
+
+    const request = toOwnerRecommendationRequest(input, {
+      authorizedVenueId: fixtureVenueId,
+      dishId: fixtureDishId,
+      snapshot: {
+        ...snapshot(),
+        reportId,
+        reportVersion,
+        venueId: fixtureVenueId,
+        dishId: fixtureDishId,
+        calculationVersion,
+        generatedAt,
+        timeWindow,
+        evidenceIds: {
+          open_rate: openRateEvidenceId,
+          engagement_rate: evidenceIdFor('engagement_rate'),
+          save_rate: evidenceIdFor('save_rate'),
+        },
+      },
+    });
+    expect(request).toMatchObject({ venueId: fixtureVenueId, reportId, reportVersion, timeWindow });
+    expect(request.evidence.find(({ metricKey }) => metricKey === 'open_rate')).toMatchObject({
+      evidenceId: openRateEvidenceId,
+      venueId: fixtureVenueId,
+      reportId,
+      reportVersion,
+      timeWindow,
+      state: 'available',
+    });
+
+    const openRatePolicy = {
+      ...policy,
+      rules: [
+        {
+          ...policy.rules[0]!,
+          metricKey: 'open_rate',
+          maximumInclusive: 0.6,
+          actionId: 'review_dish_card',
+        },
+      ],
+    };
+    const result = buildOwnerRecommendation(request, {
+      authorizedVenueId: fixtureVenueId,
+      policy: openRatePolicy,
+    });
+    expect(result).toMatchObject({
+      status: 'recommendation',
+      reportId,
+      reportVersion,
+      evidenceRefs: [openRateEvidenceId],
+    });
+    expect(validateOwnerRecommendationResult(result, request, openRatePolicy)).toEqual(result);
+  });
+
   it('connects a genuine zero to the unchanged core, trusted references and count-free result', () => {
     const input = report();
     const before = structuredClone(input);
