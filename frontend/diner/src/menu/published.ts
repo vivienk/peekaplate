@@ -1,12 +1,12 @@
 // Published-menu adapter. The Bundle v1 schemas come from @peekaplate/contracts (S3-RES-02);
-// this file only validates the delivery and maps it into the screen model. Keep all key-name
-// mapping in this file. Hash verification is a single, clearly marked step and is skipped in
-// fixture mode.
+// this file verifies exact bytes, validates delivery identity and maps approved public content.
+// Fixture mode uses its separate source and never calls this adapter.
 import {
   type PublicMenuContentBundle,
   type PublicMenuDelivery,
   PublicMenuDeliverySchema,
   PublicMenuResponseSchema,
+  verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
 import { toMenu, type WireMenuBundle } from './adapter';
 import type { MenuLoadResult, MenuSource } from './types';
@@ -73,27 +73,11 @@ export function deliveryToMenu(delivery: PublicMenuDelivery): MenuLoadResult {
   return toMenu(publicBundleToWire(delivery.content), 'published', delivery.response.publicationId);
 }
 
-// Hash check is a single, clearly marked step. Fixture mode skips it. Live mode fails closed
-// until the hash rule (UTF-8 bytes vs canonical serialization) is agreed with the producer.
-export function verifyContentHash(
-  _delivery: PublicMenuDelivery,
-  mode: 'fixture' | 'live' = 'live',
-): boolean {
-  if (mode === 'fixture') return true;
-  // INTERIM: hash rule is not agreed yet. Do not claim hash integrity is verified.
-  return false;
-}
-
 export type PublishedSourceOptions = {
   apiBase: string;
   venueId: string;
   menuId: string;
-  // Test seams. In the app, fetch is the browser's and the hash check is the live one, which
-  // fails closed until the hash rule is agreed.
   fetcher?: typeof fetch;
-  // Checks the exact fetched bytes against the approved contentHash BEFORE any decoding or
-  // parsing. Until the shared verifier from #117 is merged, the default fails closed.
-  verifyBytes?: (bytes: Uint8Array, expectedHash: string) => boolean | Promise<boolean>;
   // Called after a successful load, so the caller can hand the token to the tracking layer.
   onDelivery?: (info: { token: string; expiresAt: number; publicationId: string }) => void;
 };
@@ -102,8 +86,6 @@ const withSignal = (signal?: AbortSignal) => (signal ? { signal } : {});
 
 export function createPublishedMenuSource(options: PublishedSourceOptions): MenuSource {
   const doFetch: typeof fetch = options.fetcher ?? ((input, init) => fetch(input, init));
-  // Fails closed: with no verifier, no bundle is ever accepted.
-  const verifyBytes = options.verifyBytes ?? (() => false);
   const base = options.apiBase.replace(/\/+$/, '');
 
   return {
@@ -133,10 +115,8 @@ export function createPublishedMenuSource(options: PublishedSourceOptions): Menu
 
         // Raw bytes first. The hash is checked before anything is decoded or parsed.
         const bytes = new Uint8Array(await bundleRes.arrayBuffer());
-        if (!(await verifyBytes(bytes, response.bundle.contentHash))) return { status: 'error' };
-
-        // Only verified bytes are decoded, parsed and validated.
-        const content: unknown = JSON.parse(new TextDecoder().decode(bytes));
+        const content = await verifyPublicMenuContentBytes(bytes, response.bundle.contentHash);
+        if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
         const delivery = PublicMenuDeliverySchema.parse({ response: rawResponse, content });
         const result = deliveryToMenu(delivery);
         if (result.status === 'ready') {

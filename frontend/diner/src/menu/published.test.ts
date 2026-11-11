@@ -1,10 +1,10 @@
+import { sha256 } from '@peekaplate/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createPublishedMenuSource,
   deliveryToMenu,
   parsePublishedDelivery,
   publicBundleToWire,
-  verifyContentHash,
 } from './published';
 
 const validDelivery = {
@@ -72,6 +72,8 @@ const validDelivery = {
     ],
   },
 };
+
+validDelivery.response.bundle.contentHash = await sha256(JSON.stringify(validDelivery.content));
 
 describe('published adapter', () => {
   it('validates a valid delivery', () => {
@@ -161,21 +163,6 @@ describe('published adapter', () => {
     expect(wire.venue_id).toBe('11111111-1111-4111-8111-111111111111');
   });
 
-  it('skips the content hash check in fixture mode', () => {
-    const delivery = parsePublishedDelivery(validDelivery);
-    expect(verifyContentHash(delivery, 'fixture')).toBe(true);
-  });
-
-  it('fails the content hash check closed in live mode', () => {
-    const delivery = parsePublishedDelivery(validDelivery);
-    expect(verifyContentHash(delivery, 'live')).toBe(false);
-  });
-
-  it('fails the content hash check closed when no mode is given', () => {
-    const delivery = parsePublishedDelivery(validDelivery);
-    expect(verifyContentHash(delivery)).toBe(false);
-  });
-
   it('treats a complete dish with empty ingredients as incomplete placeholder', () => {
     const delivery = parsePublishedDelivery(validDelivery);
     const secondDish = delivery.content.categories[0]?.dishes[1];
@@ -194,23 +181,37 @@ describe('published source (mocked fetch)', () => {
   const V = validDelivery.response.venueId;
   const M = validDelivery.response.menuId;
   const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-  const make = (
-    handler: (url: string) => Response | Promise<Response>,
-    verifyBytes: (bytes: Uint8Array, expectedHash: string) => boolean | Promise<boolean> = () =>
-      true,
-  ) =>
+  const make = (handler: (url: string) => Response | Promise<Response>) =>
     createPublishedMenuSource({
       apiBase: 'https://api.example.test/',
       venueId: V,
       menuId: M,
       fetcher: (async (input: RequestInfo | URL) => handler(String(input))) as typeof fetch,
-      verifyBytes,
     });
   const ok = (url: string) =>
     url.includes('/public/venues/') ? reply(validDelivery.response) : reply(validDelivery.content);
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('accepts exact fetched bytes with the real shared verifier by default', async () => {
+    const bytes = JSON.stringify(validDelivery.content);
+    const response = structuredClone(validDelivery.response);
+    response.bundle.contentHash = await sha256(bytes);
+    const onDelivery = vi.fn();
+    const source = createPublishedMenuSource({
+      apiBase: 'https://api.example.test',
+      venueId: V,
+      menuId: M,
+      onDelivery,
+      fetcher: (async (input: RequestInfo | URL) =>
+        String(input).includes('/public/venues/')
+          ? reply(response)
+          : new Response(bytes)) as typeof fetch,
+    });
+    expect((await source.load()).status).toBe('ready');
+    expect(onDelivery).toHaveBeenCalledOnce();
   });
 
   it('fetches the pointer, then the bundle, and returns a ready published menu', async () => {
@@ -226,12 +227,18 @@ describe('published source (mocked fetch)', () => {
     expect(result.status).toBe('ready');
   });
 
-  it('fails closed with the live hash check', async () => {
+  it('fails closed when the published digest does not match', async () => {
     const source = createPublishedMenuSource({
       apiBase: 'https://api.example.test',
       venueId: V,
       menuId: M,
-      fetcher: (async (input: RequestInfo | URL) => ok(String(input))) as typeof fetch,
+      fetcher: (async (input: RequestInfo | URL) =>
+        String(input).includes('/public/venues/')
+          ? reply({
+              ...validDelivery.response,
+              bundle: { ...validDelivery.response.bundle, contentHash: '0'.repeat(64) },
+            })
+          : reply(validDelivery.content)) as typeof fetch,
     });
     expect((await source.load()).status).toBe('error');
   });
@@ -278,23 +285,36 @@ describe('published source (mocked fetch)', () => {
     expect(result.status).toBe('error');
   });
 
-  it('gives the verifier the exact fetched bytes and the approved hash', async () => {
-    let seenText = '';
-    let seenHash = '';
-    const source = make(ok, (bytes, expectedHash) => {
-      seenText = new TextDecoder().decode(bytes);
-      seenHash = expectedHash;
-      return true;
-    });
-    await source.load();
-    expect(seenText).toBe(JSON.stringify(validDelivery.content));
-    expect(seenHash).toBe(validDelivery.response.bundle.contentHash);
-  });
-
-  it('does not accept a bundle when the bytes fail verification', async () => {
-    const result = await make(ok, () => false).load();
-    expect(result.status).toBe('error');
-  });
+  it.each(['reformatted', 'tampered', 'utf8', 'json', 'schema', 'identity'])(
+    'rejects %s bytes before exposing a token',
+    async (kind) => {
+      const response = structuredClone(validDelivery.response);
+      let body: string | Uint8Array = JSON.stringify(validDelivery.content, null, 2);
+      if (kind === 'tampered')
+        body = JSON.stringify(validDelivery.content).replace('Toast', 'Changed');
+      if (kind === 'utf8') body = new Uint8Array([0xff]);
+      if (kind === 'json') body = '{';
+      if (kind === 'schema')
+        body = JSON.stringify({ ...validDelivery.content, private_field: true });
+      if (kind === 'identity')
+        body = JSON.stringify({ ...validDelivery.content, menu_revision_id: V });
+      if (!['reformatted', 'tampered'].includes(kind))
+        response.bundle.contentHash = await sha256(body);
+      const onDelivery = vi.fn();
+      const source = createPublishedMenuSource({
+        apiBase: 'https://api.example.test',
+        venueId: V,
+        menuId: M,
+        onDelivery,
+        fetcher: (async (input: RequestInfo | URL) =>
+          String(input).includes('/public/venues/')
+            ? reply(response)
+            : new Response(body as BodyInit)) as typeof fetch,
+      });
+      expect((await source.load()).status).toBe('error');
+      expect(onDelivery).not.toHaveBeenCalled();
+    },
+  );
 
   it('reports the token, expiry and publication id after a successful load', async () => {
     const seen: unknown[] = [];
@@ -303,7 +323,6 @@ describe('published source (mocked fetch)', () => {
       venueId: V,
       menuId: M,
       fetcher: (async (input: RequestInfo | URL) => ok(String(input))) as typeof fetch,
-      verifyBytes: () => true,
       onDelivery: (info) => seen.push(info),
     });
     expect((await source.load()).status).toBe('ready');

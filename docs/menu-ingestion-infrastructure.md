@@ -150,26 +150,38 @@ Example body (synthetic IDs):
   fencing and idempotent draft persistence remain necessary across retries.
 - Each invocation uses a private temporary directory and kills its pipeline
   subprocess after 700 seconds. Cleanup follows success or failure. Provider
-  calls use OCR-plus-image input, one-page batches and concurrency two. This is a processing cap, not
-  a promise that a large menu completes in that time. A hosted front proxy and
-  Worker deadline must leave room for R2 transfer and response serialization.
+  calls use direct vision extraction with OCR-plus-image fallback; OCR fallback
+  uses one-page batches and concurrency two. This cap does not promise that a
+  large menu completes in time. The hosted proxy and Worker deadline must leave
+  room for R2 transfer and response serialization.
 - `GET /health` proves service liveness/configuration, not R2/provider access or
   extraction accuracy. Access logs and public API documentation are disabled.
 
 ### Follow-up private review artifact retention (not deployed)
 
-The locally tested follow-up service explicitly selects `ocr_image`. All three modes remain
-CLI/Python options; the public HTTP request body above is unchanged. The public
-response remains `MenuExtractionResult`, not a new review/UI envelope.
+The staging service selects `vision_v4` first, falling back to `ocr_image` when
+configured vision providers fail. A vision deadline ends the run without fallback.
+The public HTTP request body and `MenuExtractionResult` response remain unchanged.
+This is a local integration choice, not approval to promote a vision-primary
+default: the recorded VIS-02 PM approval is for opt-in vision only. Default
+promotion requires separate approval; no deployment is authorized here.
 
-The host negotiates internal `X-Extraction-Artifact-Bundle: 1` with Python. Before
-temporary cleanup, Python captures the validated report, final `timings.json` and
-private `review-suggestions.json`. The bounded internal version1 bundle is limited
-to32 MB (report24 MB, suggestions8 MB, timing1 MB individual read limits). Missing
-or mismatched artifacts fail closed rather than being silently dropped. Expected
-CLI exits0/2 preserve complete/partial reports; exit1 is retained only with an
-actual failed report, still subject to source/schema validation. A process timeout
-without final artifacts remains504, not an invented successful bundle.
+The host negotiates internal `X-Extraction-Artifact-Bundle: 1` with Python.
+The four-key bundle contains the report, `review_suggestions`, final timings and
+the bundle schema version. For transport compatibility, report configuration,
+timings and the non-null suggestions envelope retain the V1 `input_mode` value
+`ocr_image`. For direct vision, `report.configuration.extraction_mode` records
+`vision_v4` as the actual pipeline. Its empty `suggestions` array means no
+OCR review suggestions apply, not that the vision model produced no output.
+Vision boxes remain approximate proposals in segment metadata, never OCR
+`box_evidence`. OCR+image fallback retains its real OCR suggestions.
+
+Local CLI vision runs can produce a private `vision-attempts.json` sidecar.
+It is not part of the four-key V1 host bundle and is not persisted by the host.
+The full bundle is limited to 32 MB (report 24 MB, OCR suggestions 8 MB,
+timing 1 MB); missing or mismatched artifacts fail closed.
+CLI exits 0/2 preserve complete/partial reports; exit 1 is retained only with an
+actual failed report. A process timeout without final artifacts remains 504.
 
 After the existing service credential and tenant/job/hash grant checks, the host
 writes a create-only object in the same private bucket:
@@ -259,11 +271,22 @@ Required service configuration: `EXTRACTION_SERVICE_SECRET` (unique random ASCII
 48+ characters) and `EXTRACTION_SOURCE_ORIGIN` set to
 `https://peekaplate-extraction-staging.vxkong.workers.dev`. The hosting Worker
 has the existing staging bucket binding and derives each source key from the
-authenticated tenant/job path. It forwards only the service settings and the
-existing pipeline's OCR/LLM variables into its container. Add that OCR and LLM configuration from its private
-environment setup. No provider keys or new private live-run inputs/outputs are
-added by this follow-up; previously authorized source fixtures have their own
-provenance notes. Never copy private evaluation folders into a release.
+authenticated tenant/job path. Its container environment is explicitly
+allowlisted. For the vision cascade, configure a Google credential as one of
+`GEMINI_API_KEY`, `GOOGLE_AI_API_KEY`, or `GOOGLE_API_KEY`, and/or configure
+`OPENROUTER_API_KEY` for the OpenRouter-backed candidates. `GEMINI_API_URL`
+and `GEMINI_MODEL` optionally override Google's defaults. Automatic OpenRouter
+cascade candidates use their default endpoint and distinct models, not
+`MENU_AI_API_URL` or `MENU_AI_MODEL`; this prevents pairing the OpenRouter key
+with a generic provider's endpoint. Explicit named provider selection retains
+the existing `MENU_AI_*` overrides, so only use an endpoint trusted with that
+provider's key.
+Existing `NARA_ROUTER_*`, generic `MENU_AI_*`, OCR and legacy settings remain
+forwarded. When no named vision credentials are configured, the pipeline can
+use the existing Nara or generic configuration. Set credentials as protected
+host secrets, not in Wrangler config or logs; never forward the source signing
+secret. Configuration here does not establish that provider access or extraction
+quality has been verified. Never copy private evaluation folders into a release.
 The application API Worker needs the same service secret and the real HTTPS
 `EXTRACTION_SERVICE_URL`. GitHub secrets are deployment inputs, not shared keys
 that collaborators can retrieve. Use protected operator setup.

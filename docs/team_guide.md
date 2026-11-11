@@ -1,5 +1,19 @@
 # PeekaPlate: team guide
 
+Latest diner integration: [published-menu connection](diner-connection.md). It
+explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
+configuration and reused public hosting. Its release acceptance record identifies
+the actual deployed version; older dated setup sections below are historical.
+
+**Menu upload and Save integration:** [the extraction release guide](staging-ingestion-release.md)
+explains PR118's authenticated PDF/photo upload, private processing, review-required
+drafts, and its release of PR122's Save/Saved screens. It also links exact release
+and hosted acceptance evidence. These APIs do not provide an owner upload screen,
+auto-approve extracted dishes, or finish Compare and remaining diner triggers.
+PR115 adds the [staging recovery procedure](operations.md#staging-rollback-and-recovery-s4-rel-01);
+its actual rollback drill remains separate from release smoke tests.
+
+
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
@@ -44,7 +58,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
-| Owner report | Research/design requirements | A report built from real, permitted evidence |
+| Owner report | Synthetic staging API checks recorded; [internal period-comparison reader](comparison-reporting.md) and privacy fixtures tested locally | Live-data reporting, comparison API/dashboard wiring and release acceptance |
 
 ClickUp's “Complete” status describes a task's recorded progress. Use the dated code and hosted evidence to confirm the deliverable. The task inventory later in this guide is the historical October 14 snapshot; the approval/publication backend now exists, while its connected screens still need their own acceptance.
 
@@ -353,7 +367,7 @@ For team inspection, the deployed read API lets any current repository collabora
 
 The flow is **page → consent check → PostHog → internal chart**. An hourly connection now copies those observations into a separate private area of the same Supabase database. We verified four test events arrived. Sending the same batch again produced eight stored copies, but the clean view still counted four events. The diner and console test records each appeared once, and access checks passed. The hourly schedule is enabled. A raw table keeps received copies; a view counts identical repeats once and excludes conflicting copies. It does not change trusted restaurant records. See [export setup and status](posthog-export.md). Tracking starts off, stops when withdrawn, and resets when the page reloads. Browser privacy signals can block it. The menu must work even if PostHog is unavailable.
 
-When the real menu is built, its actions must follow [Adam's taxonomy and measurement plan](https://app.clickup.com/90141746115/docs/2kydvry3-1494?view=open) and the [implementation plan](implementation_plan.md), including ingredient interactions and comparisons. Agree the names, exact triggers and content versions before wiring each control. The current v1 adapter is tested for `dish_open` and `portion_compare`; it has no real dish-control caller yet. A general dish comparison must not be labelled as physical portion measurement.
+Menu, card and detail screens now call the shared `track()` boundary; Save/Saved controls use it too. One consent choice gates independent PostHog SDK and canonical delivery. Menu refresh cannot reuse an older exposure link, and opting in starts fresh detail timing without collecting earlier seconds. These changes are tested locally in Chromium with synthetic menus and destination sinks; hosted tracking acceptance remains separate. Remaining controls must follow [Adam's taxonomy and measurement plan](https://app.clickup.com/90141746115/docs/2kydvry3-1494?view=open) and the [implementation plan](implementation_plan.md). Agree names, exact triggers and content versions before wiring each control. The historical v1 `dish_open` / `portion_compare` adapter is not the current diner path; comparison never implies a measured physical portion.
 
 These responsibilities remain separate:
 
@@ -785,3 +799,16 @@ These results establish synthetic fixture and validator correctness only.
 Application AI evaluation remains NOT RUN. Production integration and
 hosted privacy acceptance are not established. Outstanding product
 decisions remain PENDING.
+
+
+## Owner-report staging API — November 10
+
+The console may call the owner-report route from its exact staging origin or
+http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
+GitHub collaborator tokens do not authorize restaurant reports. Staging reports
+are deliberately limited to the server-approved synthetic venue; production
+and other venues remain blocked. See [request flow, status codes and release
+checks](owner-report-staging.md). Deployment evidence belongs in the narrow
+owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

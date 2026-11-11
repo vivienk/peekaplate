@@ -1,5 +1,10 @@
 # Local and staging operations
 
+For the November 10 diner Pages-only connection, exact-byte checks, pinned public
+asset snapshots, build settings and the release's hosted acceptance record, see
+[published diner connection](diner-connection.md). The dated records below describe
+their original releases; they do not override that newer frontend release record.
+
 <a id="observation-facts-hosted-acceptance"></a>
 
 ## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
@@ -81,6 +86,13 @@ venue—to the owner-report reader. Adding a reportable synthetic venue requires
 an explicit allowlist change as well as environment configuration;
 `source=synthetic` labels a calculation and does not convert or sanitize
 production observations. Production remains unavailable.
+
+Browser access to this route (S3-RES-03, agreed with Sai on November 10) is
+limited to two exact console origins, `https://peekaplate-console-staging.pages.dev`
+and `http://127.0.0.1:5174`, for `GET` and its `OPTIONS` preflight with the
+`Authorization` header. There is no wildcard, preview or credentialed-cookie
+access, and the diner routes keep their own allowlist. CORS does not change
+authentication, the synthetic-source rule or venue access above.
 
 The earlier index/conflict and native retry/DLQ evidence follows below as a
 historical release record; its statement that typed facts were missing applied
@@ -411,7 +423,7 @@ pnpm --filter @peekaplate/backend dev
 
 `pnpm verify test:db` builds a PostgreSQL 16 test image with pgTAP and creates a temporary Docker network/database. It installs the previous schema, preserves a synthetic venue through the forward migration, confirms a second `up` has no pending migration, runs SQL policies, then exercises the real local Worker with signed JWTs and restricted database credentials. Tests include concurrent writers, duplicate/conflicting commands, revoked membership, rollback, replay and physical connection reuse. Cleanup removes the harness container, its volumes and network. The random database host port binds only to `127.0.0.1`; credentials are disposable fixtures. Never point this harness at a shared database. A Docker daemon and image downloads are required. Image tags are pinned to versions, not immutable digests.
 
-`pnpm dev:backend` uses that disposable database setup with a loopback JWKS service and the actual Worker. It writes a synthetic owner session to ignored `work/local-session.json`; the private signing key stays in memory. Run `pnpm local:demo` in another terminal to create a dish revision. Stop with Ctrl+C; local data is intentionally discarded. Do not run it alongside the plain backend dev process on port 8787. A forcibly terminated process can leave its uniquely named `peekaplate-db-*` container/network and session file; inspect ownership before removing those exact resources. Restart after the one-hour fixture token expires.
+`pnpm dev:backend` uses that disposable database setup with a loopback JWKS service and the actual Worker. It writes a synthetic owner session to ignored `work/local-session.json`; the private signing key stays in memory. Run `pnpm local:demo` in another terminal to create a dish revision. Stop with Ctrl+C; local data is intentionally discarded. The authenticated fixture Worker listens on port 8790; the plain backend dev process uses port 8787. A forcibly terminated process can leave its uniquely named `peekaplate-db-*` container/network and session file; inspect ownership before removing those exact resources. Restart after the one-hour fixture token expires.
 
 ### Windows Docker startup recovery
 
@@ -566,6 +578,30 @@ Document and demonstrate: Queue retry and poison-message DLQ handling; create-on
 
 For a failing release, stop promotion and preserve logs without secrets or raw diner data. Prefer restoring the prior application deployment and forward-fixing schema. Do not delete an event stream or silently acknowledge unarchived observations to clear an alert.
 
+## Staging rollback and recovery (S4-REL-01)
+
+Procedure agreed with Sai on November 5 for the first staging journey release. It covers staging only; production needs its own release decision. **The drill below is NOT RUN yet**; record its results here when it is.
+
+**Before each release, record the known-good state:** Worker version ID and release SHA, diner and console Pages deployment IDs (the `main`/default deployment of each staging project, never a PR preview), the migration list, the `DINER_CORS_ALLOWED_ORIGINS` value and whether Queues are paused. On November 5 these were Worker version `60ac184a-a348-4e2c-843d-e380861771cc` (main `c6a47bd`), Pages deployments `013f89a7-d20a-42ef-b3f9-0a3612301e60` and `9ebf0f78-b3f4-47b1-857d-d04abf76ab55` (frontend `2a135fa`), eight migrations ending `20261026120000_observation_facts`, and paused Queues. Recheck the live values right before deploying; if they differ, stop and ask the infrastructure contact.
+
+**Roll back when** `/health` is not 200; missing or invalid staff tokens are not 401; another restaurant or a revoked account is not denied; a published bundle fails its hash check or shows private or another restaurant's content; a withdrawn menu or dish is still served on a fresh fetch; owner views include another tenant or `test` traffic; or Queue/DLQ or archive errors grow. First stop promotion, keep logs without secrets or raw diner data, and tell the infrastructure contact.
+
+**Undo only the affected parts, in this order:**
+
+1. **Unsafe content first:** contain unsafe dish content by withdrawing its whole menu through the staff API, `POST /venues/:venueId/menus/:menuId/withdrawals` with a fresh `commandId` and the current `expectedVersion`, and confirm a fresh public read returns 404. This endpoint does not withdraw individual dishes.
+2. **Pages:** in `peekaplate-diner-staging` or `peekaplate-console-staging`, open Deployments, choose the previous successful `main` deployment and use **Rollback to this deployment** ([Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/)).
+3. **Worker:** from `backend`, `pnpm exec wrangler rollback <known-good-version-id> --env staging`, or the Worker's Deployments → Rollback ([Worker rollbacks](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/rollbacks/)). First check that version is compatible with the current database, bindings and secrets. A Worker rollback does not restore database or storage data.
+4. **Database:** fix forward with a new reviewed migration (see [Database change procedure](#database-change-procedure)); applied migrations are never reversed.
+5. **Queues:** pause the source Queue if delivery misbehaves; never purge or acknowledge unarchived messages.
+
+**Confirm the rollback:** the active Worker version and Pages deployments match the recorded known-good IDs; `/health` returns 200, an unknown route 404 and a missing token 401; both Pages roots and their assets return 200; the withdrawn menu returns 404; cross-tenant and revoked requests are denied; Queues are paused and not growing. Record expected and actual results with times.
+
+**Drill:** run one controlled staging drill with synthetic data: roll the affected component back to the recorded previous version, run the smoke checks, then restore the approved release. Capture before and after versions, timings and smoke-test results here.
+
+**Cleanup:** withdraw synthetic test menus, remove or downgrade the test memberships added for the release, end staff sessions, re-pause Queues and stop temporary helpers. Keep append-only events, archives and audit rows; they are `test` traffic, excluded from owner reports. Record their IDs. Touch nothing else.
+
+**Contacts:** infrastructure and rollback coordination: Sai. Release go/no-go and backup: Vivien (proposed; confirm her availability and the relevant feature owners before finalizing the roster).
+
 ## PostHog hosted release — October 19, 2026
 
 Released exact main commit `2a135faa4386fc3e1002aef3d1a150930e5ff9bf` after [PR 14](https://github.com/vivienk/peekaplate/pull/14) and [PR 15](https://github.com/vivienk/peekaplate/pull/15). The user explicitly delegated setup approval; the review disclosed agent assistance. Ordinary PR review requirements remain unchanged.
@@ -603,3 +639,16 @@ The subsequent maintainer-authorized main merge (`ab6f9c4`) activated the regist
 [Close cleanup run 40393553935](https://github.com/vivienk/peekaplate/actions/runs/40393553935) removed both PR deployments and updated the existing comment. Provider readback found zero matching deployments; after edge propagation, both aliases and markers returned 404 at `2026-10-26T20:13:56Z`. Build/deploy job durations were 19/41 seconds and cleanup 16 seconds. See [full acceptance](previews.md#hosted-lifecycle-acceptance--october-26).
 
 These hosted writes were limited to disposable preview deployments and PR comments. Staging Pages/Worker versions, application databases, Queue/R2 infrastructure, PostHog and production were unchanged. The preview token is verified for this lifecycle, not certified for unrelated permissions or future configuration.
+
+
+## Owner-report CORS release — November 10
+
+The narrow main release adds the already-reviewed owner-report API dependency
+and PR130’s exact console origins. It preserves the owner-only, synthetic-venue,
+read-only and privacy boundaries. No extraction118/frontend promotion or new
+migration is required. [Release and verification instructions](owner-report-staging.md)
+record the request flow and deployment readback requirements. Record the deployed
+main SHA/version and hosted results in the release PR; prior local evidence does
+not establish hosted readiness.
+
+Current narrow release and deployment evidence: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

@@ -11,13 +11,14 @@
   "env": {
     "staging": {
       "name": "peekaplate-api-staging",
+      "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
       "account_id": "51eda1917fd22a9478808a82d2980741",
       "workers_dev": true,
       "preview_urls": false,
       "vars": {
         "APP_ENV": "staging",
+        "SYNTHETIC_REPORT_VENUE_ID": "00000000-0000-4000-8000-000000000123",
         "POSTHOG_PROJECT_ID": "675372",
-        "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
         "AUTH_ISSUER": "https://icwhkrlsecpzcomfjsso.supabase.co/auth/v1",
         "MENU_TOKEN_ISSUER": "https://peekaplate-api-staging.vxkong.workers.dev/",
         "EXTRACTION_TIMEOUT_MS": "720000"
@@ -36,18 +37,35 @@
         {
           "binding": "INGESTION_REPORTS_BUCKET",
           "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "ORDER_OUTCOME_ARCHIVE_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
+        },
+        {
+          "binding": "ORDER_IMPORT_BUCKET",
+          "bucket_name": "peekaplate-staging-assets"
         }
       ],
+      "triggers": {
+        "crons": ["0 */6 * * *"]
+      },
       "ratelimits": [
         {
           "name": "OBSERVATION_RATE_LIMITER_MINUTE",
           "namespace_id": "9014174611501",
-          "simple": { "limit": 60, "period": 60 }
+          "simple": {
+            "limit": 60,
+            "period": 60
+          }
         },
         {
           "name": "OBSERVATION_RATE_LIMITER_BURST",
           "namespace_id": "9014174611502",
-          "simple": { "limit": 10, "period": 10 }
+          "simple": {
+            "limit": 10,
+            "period": 10
+          }
         }
       ],
       "queues": {
@@ -69,6 +87,15 @@
             "max_retries": 3,
             "dead_letter_queue": "peekaplate-staging-observations-dlq",
             "retry_delay": 10
+          },
+          {
+            "queue": "peekaplate-staging-menu-ingestion",
+            "max_batch_size": 1,
+            "max_batch_timeout": 1,
+            "max_concurrency": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "peekaplate-staging-menu-ingestion-dlq",
+            "retry_delay": 60
           }
         ]
       }
