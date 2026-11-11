@@ -70,3 +70,19 @@ describe('portion handoff', () => {
     }
   });
 });
+
+it('bounds serialized manifest bytes as well as character counts', () => {
+  const layers = Array.from({ length: 6 }, (_, depth) => ({
+    url: `https://example.test/${'é'.repeat(1800)}`,
+    sha256: 'a'.repeat(64),
+    size_bytes: 100,
+    depth: depth / 5,
+  }));
+  expect(PublicPortionSchema.safeParse({ ...portion, layers }).success).toBe(false);
+  expect(
+    PublicPortionSchema.safeParse({
+      ...portion,
+      layers: layers.map((layer) => ({ ...layer, url: 'invalid' })),
+    }).success,
+  ).toBe(false);
+});

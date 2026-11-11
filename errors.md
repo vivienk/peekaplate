@@ -2506,3 +2506,15 @@ The first build completed with an EPERM diagnostic for Wrangler's default user l
 subsequent verification routes logs to a task-local writable directory. No deployment ran.
 
 Context refresh initially rejected the expanded diner summary over its 1000-character limit; condensed it while retaining release boundaries, then refreshed the fingerprints.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T00:19:37.340Z","exitCode":1}
+```
+
+The unrestricted full check passed: the earlier auth/index failures were blocked local
+listeners (EPERM) and the local-backend cleanup test also passed on rerun. No application
+change was made for these failures. All 38 browser cases passed against a stable tree,
+including the unchanged withdrawal-clock assertion. The manifest budget was tightened
+to check serialized UTF-8 bytes, with a multibyte URL regression. Browser fixtures now
+use different foreground images for different dishes and assert visible keyboard tilt.

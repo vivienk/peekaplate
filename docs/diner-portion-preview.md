@@ -18,7 +18,7 @@ is still required; no newly inspected Figma frame is claimed.
 remain valid. A public portion contains schema version 1, exact dish/revision UUIDs,
 shared width/height, and two to six layer records with HTTPS URL, SHA-256, byte length
 and depth. Exactly one depth is zero, at least one is positive, all depths are 0–1.
-Texture dimensions are limited to 2048 on each axis, URLs to 2048 characters, and total
+Texture dimensions are limited to 2048 on each axis, URLs to 2048 characters, serialized manifest bytes to 20 KB, and total
 layer bytes to 180 KB. All layers share the captured frame and must be reviewed together.
 
 The published-menu adapter copies this optional field through to the diner model. An
@@ -52,9 +52,58 @@ for layers and 20 KB for the manifest within the 400 KB total allowance.
 Run `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts`
 and `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`.
 The dedicated browser configuration runs the real diner with intercepted synthetic public
-bundles and two simple geometric PNG layers. These are test shapes, not restaurant captures.
+bundles and simple geometric PNG layers, with distinct foregrounds for two dishes. These are test shapes, not restaurant captures.
 It also checks existing menu states, publication integrity and refresh behavior.
 
 Physical-device performance, manual screen readers, captured-food fidelity, real approved
 asset hosting/publication and hosted end-to-end acceptance remain unverified. No deployment
 or production activation is part of this change.
+
+
+## Changed files
+
+- UI and navigation: `frontend/diner/src/menu/dishDetail.ts`, `menuScreen.ts`,
+  `portionPreview.ts`, `portionRenderer.ts`, and `frontend/diner/src/style.css`.
+- Data handoff: `frontend/diner/src/menu/adapter.ts`, `published.ts`, `types.ts`, `wire.ts`,
+  `packages/contracts/src/index.ts`, and `packages/contracts/src/portion.ts`.
+- Dependencies and budget: `frontend/diner/package.json`, `pnpm-lock.yaml`,
+  `scripts/check-bundle.mjs`, and `scripts/check-bundle.test.mjs`.
+- Tests: `frontend/diner/src/menu/portion.test.ts`, `tests/e2e/portion.spec.ts`,
+  `playwright.portion.config.ts`, and the three geometric PNGs in `tests/fixtures/portion/`.
+- Handoff and verification: this document, `docs/CONTEXT.md`, and `errors.md`.
+
+The implementation is isolated on `codex/diner-portion-integration`, based on develop
+`96b8de1d70ff599179f6eb5dbd7557a589c27a45`. Related PR25 (asset preparation), PR69
+(menu/detail), and PR136 (published-menu connection) are already merged into this base.
+Tracking PR77/80/84 were also confirmed merged; this change adds no tracking events.
+
+Before claiming live T1 analytics, resolve the public response's existing T0 tier semantics
+and connect actual-tier exposure observations. This is separate from rendering and is not
+silently inferred from a View Portion click.
+
+
+## Verification record — November 10, 2026
+
+Commands used Node 24.16.0 and pnpm 11.25.0. PASS means local evidence only.
+
+| Command | Result |
+| --- | --- |
+| `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts` | PASS, 210 tests on final application sources |
+| `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` | PASS, 38 tests, 1.8 minutes; includes existing menu/publication regressions |
+| `pnpm exec playwright test --config playwright.portion.config.ts tests/e2e/portion.spec.ts --workers=2` | PASS, final 12 preview cases, 1.1 minutes after distinct-image/tilt assertions and manifest byte cap |
+| `pnpm check` | PASS, 1,210 unit tests plus 73 script tests, 4 optional skips on implementation commit 70913ed, before the final manifest-byte test/refinement |
+| `pnpm verify lint typecheck build context:check docs:check` | PASS on final application sources; both frontends and Worker dry-run |
+| `git diff --check` | PASS |
+| `pnpm verify test:db` | NOT RUN; no database/migration or backend behavior change |
+| Full default browser suite, physical phones and manual screen readers | NOT RUN; focused browser configuration covers the affected diner flow |
+
+The final build's budget check reports 51,945 gzip bytes for initial diner JavaScript
+(limit 150,000) and a 324,288-byte T1 delivery allowance (limit 400,000). The emitted
+renderer file is about 125 KB gzip. No renderer appears in the initial import graph.
+The 390px preview screenshot was inspected; it displays clearly synthetic geometry.
+
+Two independent automated read-only reviews of 70913ed found no supported blocking
+architecture/correctness defects. Final refinements tighten the serialized byte cap
+and add distinct-rendered-image/keyboard evidence; they do not change navigation.
+These reviews are not human approval or production acceptance. No branch push,
+PR creation, merge or deployment was performed.

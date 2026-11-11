@@ -33,6 +33,7 @@ export const PublicPortionSchema = z
   })
   .superRefine((value, ctx) => {
     if (
+      new TextEncoder().encode(JSON.stringify(value)).byteLength > 20_000 ||
       value.layers.filter((layer) => layer.depth === 0).length !== 1 ||
       !value.layers.some((layer) => layer.depth > 0) ||
       value.layers.reduce((sum, layer) => sum + layer.size_bytes, 0) > 180_000

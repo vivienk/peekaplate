@@ -8,6 +8,7 @@ const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).dige
 const images = ['background', 'foreground'].map((name) =>
   readFileSync(`tests/fixtures/portion/${name}.png`),
 );
+const blue = readFileSync('tests/fixtures/portion/foreground-blue.png');
 type Mode =
   | 'valid'
   | 'missing'
@@ -25,13 +26,14 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
   for (const category of content.categories)
     for (const dish of category.dishes) {
       if (!dish.complete || mode === 'missing' || mode === 'no-photo') continue;
+      const dishImages = dish.name === 'Roast Chicken' ? [images[0]!, blue] : images;
       dish.portion = {
         schema_version: 1,
         dish_id: mode === 'wrong-dish' ? content.menu_id : dish.dish_id,
         dish_revision_id: mode === 'wrong-revision' ? content.menu_id : dish.dish_revision_id,
         width: mode === 'dimensions' ? 32 : 64,
         height: 64,
-        layers: images.map((bytes, depth) => ({
+        layers: dishImages.map((bytes, depth) => ({
           url: `https://assets.example.test/${dish.dish_id}/${depth}.png`,
           sha256: mode === 'hash' ? 'f'.repeat(64) : hash(bytes),
           size_bytes: bytes.length,
@@ -79,7 +81,10 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
     if ((layer && mode === 'broken') || mode === 'no-photo') return route.fulfill({ status: 404 });
     await route.fulfill({
       contentType: 'image/png',
-      body: images[layer ? Number(layer[1]) : 0]!,
+      body:
+        layer?.[1] === '1' && route.request().url().includes('000000000150')
+          ? blue
+          : images[layer ? Number(layer[1]) : 0]!,
       headers: { 'Access-Control-Allow-Origin': '*' },
     });
   });
@@ -109,8 +114,13 @@ test('menu → dish-specific 2.5D → detail → another dish, with focus and br
   expect(requested.filter((url) => /\/[01]\.png$/.test(url))).toHaveLength(2);
   expect(requested.some((url) => url.includes(content.categories[0].dishes[0].dish_id))).toBe(true);
   const stage = page.getByRole('group', { name: 'Charred Leeks portion preview' });
+  await stage.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const firstVisual = hash(await page.locator('canvas').screenshot());
   await stage.focus();
   await page.keyboard.press('ArrowRight');
+  expect(hash(await page.locator('canvas').screenshot())).not.toBe(firstVisual);
   expect(
     (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations,
   ).toEqual([]);
@@ -127,6 +137,10 @@ test('menu → dish-specific 2.5D → detail → another dish, with focus and br
   await page.locator('.pp-category:not([hidden]) .pp-card__open').last().click();
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Roast Chicken portion preview' })).toBeVisible();
+  await page.locator('.pp-detail__image-wrap').evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  expect(hash(await page.locator('canvas').screenshot())).not.toBe(firstVisual);
   await expect(page.locator('canvas')).toHaveCount(1);
   expect(requested.some((url) => url.includes(content.categories[1].dishes[0].dish_id))).toBe(true);
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
