@@ -61,8 +61,10 @@ function metric(
   currentValue: string | number | null,
   baselineValue: string | number | null,
   delta: string | number | null,
+  forceSuppression = false,
 ): MetricValues {
   const insufficient =
+    forceSuppression ||
     currentSessions < 10 ||
     baselineSessions < 10 ||
     currentDenominator < 10 ||
@@ -119,7 +121,7 @@ WITH current_period AS (
       WHERE sessions.has_opening
         AND (
           sessions.has_engagement_time
-          OR (sessions.has_comparison AND sessions.has_comparison_opening)
+          OR sessions.has_qualified_comparison
         )
     )::bigint AS engaged_sessions,
     count(*) FILTER (WHERE sessions.has_exposure AND sessions.has_save)::bigint AS saved_sessions
@@ -128,9 +130,6 @@ WITH current_period AS (
     obs.session_id,
     bool_or(fact.event_type = 'dish_viewed') AS has_exposure,
     bool_or(fact.event_type = 'dish_detail_opened') AS has_opening,
-    bool_or(
-      fact.event_type = 'dish_detail_opened' AND fact.opening_source = 'compare_view'
-    ) AS has_comparison_opening,
       bool_or(
         fact.event_type = 'dish_activity_checkpoint'
         AND fact.active_ms >= 10000
@@ -146,7 +145,29 @@ WITH current_period AS (
             AND linked_opening.occurred_at < $3::timestamptz
         )
       ) AS has_engagement_time,
-      bool_or(fact.event_type = 'dish_compared') AS has_comparison,
+      bool_or(
+        fact.event_type = 'dish_compared'
+        AND fact.comparison_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM app_private.owner_observation_v1 prior_opening
+          JOIN app_private.observation_event prior_order USING (tenant_id, event_id)
+          WHERE prior_opening.tenant_id = fact.tenant_id
+            AND prior_opening.session_id = obs.session_id
+            AND prior_opening.event_type = 'dish_detail_opened'
+            AND prior_opening.dish_id IN (fact.dish_id, fact.other_dish_id)
+            AND prior_opening.occurred_at >= $2::timestamptz
+            AND prior_opening.occurred_at < $3::timestamptz
+            AND (
+              prior_opening.occurred_at < fact.occurred_at
+              OR (
+                prior_opening.occurred_at = fact.occurred_at
+                AND prior_order.producer_id = obs.producer_id
+                AND prior_order.local_sequence < obs.local_sequence
+              )
+            )
+        )
+      ) AS has_qualified_comparison,
       bool_or(fact.event_type = 'dish_saved' AND fact.save_origin = 'direct') AS has_save
     FROM app_private.observation_event obs
     JOIN app_private.owner_observation_v1 fact USING (tenant_id, event_id)
@@ -175,7 +196,7 @@ baseline_period AS (
       WHERE sessions.has_opening
         AND (
           sessions.has_engagement_time
-          OR (sessions.has_comparison AND sessions.has_comparison_opening)
+          OR sessions.has_qualified_comparison
         )
     )::bigint AS engaged_sessions,
     count(*) FILTER (WHERE sessions.has_exposure AND sessions.has_save)::bigint AS saved_sessions
@@ -184,9 +205,6 @@ baseline_period AS (
     obs.session_id,
     bool_or(fact.event_type = 'dish_viewed') AS has_exposure,
     bool_or(fact.event_type = 'dish_detail_opened') AS has_opening,
-    bool_or(
-      fact.event_type = 'dish_detail_opened' AND fact.opening_source = 'compare_view'
-    ) AS has_comparison_opening,
       bool_or(
         fact.event_type = 'dish_activity_checkpoint'
         AND fact.active_ms >= 10000
@@ -202,7 +220,29 @@ baseline_period AS (
             AND linked_opening.occurred_at < $5::timestamptz
         )
       ) AS has_engagement_time,
-      bool_or(fact.event_type = 'dish_compared') AS has_comparison,
+      bool_or(
+        fact.event_type = 'dish_compared'
+        AND fact.comparison_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM app_private.owner_observation_v1 prior_opening
+          JOIN app_private.observation_event prior_order USING (tenant_id, event_id)
+          WHERE prior_opening.tenant_id = fact.tenant_id
+            AND prior_opening.session_id = obs.session_id
+            AND prior_opening.event_type = 'dish_detail_opened'
+            AND prior_opening.dish_id IN (fact.dish_id, fact.other_dish_id)
+            AND prior_opening.occurred_at >= $4::timestamptz
+            AND prior_opening.occurred_at < $5::timestamptz
+            AND (
+              prior_opening.occurred_at < fact.occurred_at
+              OR (
+                prior_opening.occurred_at = fact.occurred_at
+                AND prior_order.producer_id = obs.producer_id
+                AND prior_order.local_sequence < obs.local_sequence
+              )
+            )
+        )
+      ) AS has_qualified_comparison,
       bool_or(fact.event_type = 'dish_saved' AND fact.save_origin = 'direct') AS has_save
     FROM app_private.observation_event obs
     JOIN app_private.owner_observation_v1 fact USING (tenant_id, event_id)
@@ -319,6 +359,12 @@ export async function readComparisonReport(
     const dishes = result.rows.map((row) => {
       const currentSessions = count(row.current_sessions);
       const baselineSessions = count(row.baseline_sessions);
+      const currentOpenings = count(row.current_opening_sessions);
+      const baselineOpenings = count(row.baseline_opening_sessions);
+      // A visible rate and its cohort can reconstruct a protected opening count.
+      const hideOpenRate =
+        (currentOpenings > 0 && currentOpenings < 10) ||
+        (baselineOpenings > 0 && baselineOpenings < 10);
       const openRate = metric(
         currentSessions,
         baselineSessions,
@@ -327,12 +373,13 @@ export async function readComparisonReport(
         row.current_open_rate,
         row.baseline_open_rate,
         row.open_rate_delta,
+        hideOpenRate,
       );
       const engagementRate = metric(
         currentSessions,
         baselineSessions,
-        count(row.current_opening_sessions),
-        count(row.baseline_opening_sessions),
+        currentOpenings,
+        baselineOpenings,
         row.current_engagement_rate,
         row.baseline_engagement_rate,
         row.engagement_rate_delta,

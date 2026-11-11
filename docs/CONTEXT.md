@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. AI-02 has separate strict review-only ingredient/source/digest contracts, never approval. Pilot order-outcome contracts validate calendar/time fields before SQL and retain row-level quarantine.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -59,7 +59,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/ingredient-intelligence.ts",
         "packages/contracts/src/ingredient-intelligence.test.ts",
         "processing/tests/fixtures/ingredient-review.json",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "packages/contracts/src/comparison-report.ts",
+        "packages/contracts/src/comparison-report.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -67,7 +69,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7cfddf67696aa7522f178229d2d0487f42ba3066788a8b624142267162739608"
+      "sourceFingerprint": "1b54826c4b30f2e61033013c16c29a7a2b89df812e537e2cddb73391ab2ec1de"
     },
     {
       "id": "tokens",
@@ -237,7 +239,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate. Order imports remain gated by owner authority, reviewed mappings and explicit activation; hosted setup is separate.",
+      "summary": "Worker enforces staff JWT/current venue authority, commands/publication, signed menu reads, canonical ingestion/Queue consumption, menu extraction and review persistence. Owner HTTP reports remain synthetic-source/environment gated. Internal period comparisons read live tenant-scoped facts with per-period session cohorts, ordered qualifying comparisons and complementary suppression of rates/deltas/counts that expose small opened cohorts. Restored DATA05 fixtures and real PostgreSQL cases cover privacy, traffic filtering, cross-publication deduplication and denied venue access. No comparison HTTP route, deployment or production report activation is added.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -341,7 +343,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/upload.test.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/service.test.ts",
-        "backend/src/order-ingestion/order-ingestion.integration.ts"
+        "backend/src/order-ingestion/order-ingestion.integration.ts",
+        "backend/src/comparison-report.ts",
+        "backend/src/comparison-report.test.ts",
+        "backend/src/comparison-report.integration.ts",
+        "backend/src/comparison-report.data05.test.ts",
+        "tests/data05/comparison_privacy_cases.json",
+        "tests/data05/comparison_revision_cases.json",
+        "tests/data05/evidence/validation_findings.md",
+        "tests/data05/evidence/validation_results.txt",
+        "docs/comparison-reporting.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -354,7 +365,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "db4bab2f2f187ca6cd57ac96d8b74b8597f558a38b821504842a6cd751d67242"
+      "sourceFingerprint": "6fd6e788f052c56e1e135740ddcedb4a3bfccb9e8db9ac31dee8e0ecca1d8099"
     },
     {
       "id": "database",
@@ -482,7 +493,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "046be3b9ec70540e95b2849b43cef8e46a122e5970ddc4d552547c19d2128011"
+      "sourceFingerprint": "165adf5f360a470ab0c89a950818b2350792277c9273483f5f62b1b7b0261879"
     },
     {
       "id": "agents",
@@ -677,15 +688,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
-      "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
-      "modules": [
-        "diner",
-        "analytics"
-      ],
-      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
       "modules": [
         "diner"
@@ -769,6 +771,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog.md"
       ],
       "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "summary": "PR134 restores PR123 validation files lost from its later branch revision while preserving current develop. Two real PostgreSQL regressions failed before fixes: a one-session opened cohort reconstructed via open_rate/count, and valid menu-card comparison engagement reported zero. Both now pass. Nine restored mocked-row cases retain independent denominator checks with complementary suppression. The cross-publication JSON fixture now executes against SQL and yields seventeen distinct sessions. Full local DB runner passes 281 pgTAP assertions and 107 integration cases; focused reader suite passes eleven cases. Repository checks pass: 1374 unit, 74 script tests, types/lint/context/docs and both builds/Worker dry-run. No UI runtime changed.",
+      "sources": [
+        "backend/src/comparison-report.ts",
+        "backend/src/comparison-report.integration.ts",
+        "backend/src/comparison-report.data05.test.ts",
+        "docs/comparison-reporting.md"
+      ],
+      "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
     }
   ]
 }

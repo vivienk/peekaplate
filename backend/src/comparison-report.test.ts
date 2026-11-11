@@ -70,7 +70,7 @@ describe('readComparisonReport', () => {
     expect(sql).toContain("obs.traffic_class = 'live'");
     expect(sql).toContain('sessions.has_exposure AND sessions.has_opening');
     expect(sql).not.toContain("fact.opening_source = 'menu_card'");
-    expect(sql).toContain('sessions.has_comparison AND sessions.has_comparison_opening');
+    expect(sql).not.toContain("opening_source = 'compare_view'");
     expect(sql).toContain('linked_opening.occurred_at >= $2::timestamptz');
     expect(sql).toContain('linked_opening.occurred_at >= $4::timestamptz');
   });
