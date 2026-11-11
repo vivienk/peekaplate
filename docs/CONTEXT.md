@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. Pilot order-outcome contracts validate calendar/time fields before SQL and retain row-level quarantine.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -51,7 +51,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
-        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json"
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
+        "packages/contracts/src/order-outcome.ts",
+        "packages/contracts/src/order-outcome.test.ts",
+        "packages/contracts/fixtures/order-outcome.v1/handoff-fixture.json",
+        "packages/contracts/fixtures/order-outcome.v1/README.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -59,7 +63,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "9d8f423771bf2b136f52d89c08a034223a5bd3fe1a6a43aab2173f5602efcb88"
+      "sourceFingerprint": "6f29d66a7c0c8e328dcdf8d23464d9171681b0966d7a9a640b1619c1a175a662"
     },
     {
       "id": "tokens",
@@ -227,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate.",
+      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate. Order imports remain gated by owner authority, reviewed mappings and explicit activation; hosted setup is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -328,7 +332,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/s4-res-bundle-producer.md",
         "docs/owner-report-staging.md",
         "backend/src/ingestion/upload.ts",
-        "backend/src/ingestion/upload.test.ts"
+        "backend/src/ingestion/upload.test.ts",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/order-ingestion/service.test.ts",
+        "backend/src/order-ingestion/order-ingestion.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -341,12 +348,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c2c4a71024b7bfe705a7e4f570181470487fe7a7e21510c2d17af18fee264906"
+      "sourceFingerprint": "db4bab2f2f187ca6cd57ac96d8b74b8597f558a38b821504842a6cd751d67242"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
+      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted. Order imports remain gated by owner authority, reviewed mappings and explicit activation; hosted setup is separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -369,7 +376,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/staff.sql",
         "tests/db/team-analytics.sql",
         "migrations/20261030120000_review_candidate_persistence.sql",
-        "tests/db/review_persistence.sql"
+        "tests/db/review_persistence.sql",
+        "migrations/20261107120000_order_outcomes.sql",
+        "migrations/20261108120000_pos_mapping_reviewer_provenance.sql",
+        "tests/db/order_outcomes.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -380,7 +390,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
+      "sourceFingerprint": "43c52dbacf8dd0e4d28cebdbe04a449faaa4af48b4fa217446af62c7a26e6fe3"
     },
     {
       "id": "measurement",
@@ -388,7 +398,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "summary": "Venue-bound redeem codes will link sessions to POS tickets. Unknown linkage stays unknown. Planned owner readout reports coverage and suppresses cells under ten sessions; frozen blocked-switchback assignment precedes causal claims. No POS or experiment implementation exists.",
       "paths": [
         "docs/delivery.md",
-        "docs/implementation_plan.md"
+        "docs/implementation_plan.md",
+        "docs/pos-mapping-and-tracking-activation.md",
+        "packages/contracts/src/order-outcome.ts",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/order-ingestion/tracking-activation.ts",
+        "migrations/20261107120000_order_outcomes.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
@@ -397,7 +412,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "5fc2bb2fddca8d87f6d03aab9cf8e1922e1d921d9c66d2eee027e5cba8fdf853"
+      "sourceFingerprint": "61a94c827e8f542dd5f446af1da530956eb6add77d7acf3e6858d822cadf6ba1"
     },
     {
       "id": "delivery",
@@ -651,24 +666,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
-      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
-    },
-    {
-      "date": "2026-11-09",
-      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
-    },
-    {
-      "date": "2026-11-09",
       "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
       "modules": [
         "diner"
@@ -743,6 +740,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
       "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "November 8: S5-DATA-07 PR #120 review audit corrections: (A) runtime tracking activation lookup moved inside authorized tenant transaction with app.tenant_id established; (B) staff_membership FOR SHARE re-check acquired inside processing transaction before commit; (C) reviewer UUID provenance preserved via forward migration dropping restrictive FK to staff_membership; (D) canonical menu publication and withdrawal history resolved via app_private.es_event; (E) duplicate file SHA-256 re-checked under advisory lock; (F) order identity tuple formatted as JSON array [order_id, order_line_id, outcome_type]; (G) strict integer quantity validation (1-999); (H) downstream handoff fixture added with documentation; (I) raw CSV retention purge gated behind enableRawCsvPurge flag; (J) automatic tracking activation insert decoupled from publishMenu. 68/68 pgTAP assertions and 5/5 real PostgreSQL integration probes pass.",
+      "modules": [
+        "contracts",
+        "backend",
+        "database",
+        "measurement"
+      ],
+      "next": "Await explicit stakeholder sign-off on visit-matching and metric contracts before connecting outcomes to owner reports or causal attribution. No owner/editor mapping API or UI to be built for pilot."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "summary": "PR120 reconciles current develop without changing the verified menu upload/report/tracking boundaries. Pilot order imports use owner authorization, reviewed administrative POS mappings, explicit administrative tracking activation, historical publication resolution, idempotency and row quarantine. Strict calendar/time validation prevents invalid dates from reaching PostgreSQL; absent runtime archive storage fails closed. Import window90 days; raw-retention approval and purge activation remain separate.",
+      "next": "Complete final review/CI and merge into develop. Hosted migrations/bindings, reviewed pilot mappings and explicit tracking activation are operator release gates. No staging/production deployment or real POS import was performed."
     }
   ]
 }
