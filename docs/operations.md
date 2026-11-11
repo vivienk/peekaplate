@@ -588,7 +588,7 @@ Procedure agreed with Sai on November 5 for the first staging journey release. I
 
 **Undo only the affected parts, in this order:**
 
-1. **Unsafe content first:** withdraw the menu (or the dish) through the staff API, `POST /venues/:venueId/menus/:menuId/withdrawals` with the current `expectedVersion`, and confirm a fresh public read returns 404.
+1. **Unsafe content first:** contain unsafe dish content by withdrawing its whole menu through the staff API, `POST /venues/:venueId/menus/:menuId/withdrawals` with a fresh `commandId` and the current `expectedVersion`, and confirm a fresh public read returns 404. This endpoint does not withdraw individual dishes.
 2. **Pages:** in `peekaplate-diner-staging` or `peekaplate-console-staging`, open Deployments, choose the previous successful `main` deployment and use **Rollback to this deployment** ([Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/)).
 3. **Worker:** from `backend`, `pnpm exec wrangler rollback <known-good-version-id> --env staging`, or the Worker's Deployments → Rollback ([Worker rollbacks](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/rollbacks/)). First check that version is compatible with the current database, bindings and secrets. A Worker rollback does not restore database or storage data.
 4. **Database:** fix forward with a new reviewed migration (see [Database change procedure](#database-change-procedure)); applied migrations are never reversed.
