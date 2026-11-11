@@ -51,9 +51,15 @@ export function checkPortionBundle(bundle, limit = 400_000) {
     pending.push(...chunk.imports);
   }
   // PublicPortionSchema caps layer bytes at 180 KB; six URLs + metadata fit in 20 KB.
-  const total = gzipBytes + 180_000 + 20_000;
+  const fontBytes = Object.values(bundle)
+    .filter(
+      (part) =>
+        part.type === 'asset' && /inter-latin-(400|600)-normal.*\.woff2$/.test(part.fileName),
+    )
+    .reduce((sum, part) => sum + Buffer.byteLength(part.source), 0);
+  const total = gzipBytes + fontBytes + 180_000 + 20_000;
   if (total > limit) throw new Error(`T1 delivery ${total} bytes exceeds ${limit}`);
-  return { gzipBytes, assetAndManifestBudget: 200_000, total, limit };
+  return { gzipBytes, fontBytes, assetAndManifestBudget: 200_000, total, limit };
 }
 
 export function dinerBudget() {

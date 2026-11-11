@@ -52,3 +52,17 @@ test('T1 counts renderer imports plus manifest and asset allowance', () => {
   assert.throws(() => checkPortionBundle({ 'portion.js': renderer }), /Missing portion/);
   assert.equal(checkPortionBundle({}), null);
 });
+
+test('T1 includes both emitted preview font weights', () => {
+  const renderer = chunk('portion.js');
+  renderer.modules['/src/menu/portionRenderer.ts'] = {};
+  const bundle = { 'portion.js': renderer };
+  const baseline = checkPortionBundle(bundle).total;
+  bundle['font.woff2'] = {
+    type: 'asset',
+    fileName: 'assets/inter-latin-400-normal-abc.woff2',
+    source: new Uint8Array(24_000),
+  };
+  assert.equal(checkPortionBundle(bundle).total, baseline + 24_000);
+  assert.throws(() => checkPortionBundle(bundle, baseline + 23_999), /exceeds/);
+});

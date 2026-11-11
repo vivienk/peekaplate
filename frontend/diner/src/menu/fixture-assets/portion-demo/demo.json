@@ -1,0 +1,68 @@
+{
+  "recipe": "diner-demo-from-pr25-review-v1",
+  "review_manifest": {
+    "asset_id": "review_e9ac4e3d4b51c35c964967f710e9ec49",
+    "provenance": {
+      "recipe": "review-preview-v1",
+      "t0_manifest_sha256": "ec9b898653a2528c063383b92c80bc84bc7c78573c74955b246895ebfe0568bd",
+      "mask_sha256": "63ced62b268c77a0f32bf9298573dc984274c0f26cadb0919b43bd28acb31fd4",
+      "candidate_sha256": null,
+      "prompt_sha256": null,
+      "model_version": null,
+      "capture_evidence": "User-supplied photo and alpha mask; local review only, no publication approval.",
+      "html_sha256": "e71ac54692c27fe433a769aa90fea15b3845cbb05e34e81f5d8c5dd9e0b1fcc4"
+    },
+    "dish": {
+      "dish_id": "11111111-1111-4111-8111-111111111111",
+      "revision_id": "22222222-2222-4222-8222-222222222222"
+    },
+    "review": {
+      "status": "needs_review",
+      "warnings": [
+        "Review only; caller evidence and identifiers are not publication approval.",
+        "Supplied mask; no automatic segmentation. Shallow card motion, not 3D geometry."
+      ]
+    },
+    "publication": {
+      "eligible": false
+    },
+    "preview_mode": "cutout",
+    "budget_bytes": 10000000,
+    "files": {
+      "fallback.jpg": {
+        "sha256": "c9fa04a22b891373b42d405f001866f0ac04ac0844c0a62b8ffe2fcfa87c50a1",
+        "bytes": 96969
+      },
+      "cutout.png": {
+        "sha256": "171b16331cf983ca3a16a100ffb7810364db43a7f09d6389c28d6180d999f2e7",
+        "bytes": 918729
+      }
+    },
+    "total_bytes": 1023157
+  },
+  "portion": {
+    "schema_version": 1,
+    "dish_id": "11111111-1111-4111-8111-111111111111",
+    "dish_revision_id": "22222222-2222-4222-8222-222222222222",
+    "width": 640,
+    "height": 853,
+    "motion": {
+      "max_yaw_degrees": 3,
+      "max_pitch_degrees": 3
+    },
+    "layers": [
+      {
+        "url": "https://portion-demo.invalid/background.webp",
+        "sha256": "23dffaaa50e17488d190027c0223e075cbbe68234e7e8000aca3289d9b596674",
+        "size_bytes": 66,
+        "depth": 0
+      },
+      {
+        "url": "https://portion-demo.invalid/dish.webp",
+        "sha256": "6f1bf5ce44141a613c526528a93adca03e093876d155450ec8123ba4b092a218",
+        "size_bytes": 51740,
+        "depth": 0.7
+      }
+    ]
+  }
+}

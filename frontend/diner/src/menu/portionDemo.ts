@@ -1,6 +1,7 @@
+import { PublicPortionSchema } from '@peekaplate/contracts';
 import background from './fixture-assets/portion-demo/background.webp?url';
+import demo from './fixture-assets/portion-demo/demo.json';
 import foreground from './fixture-assets/portion-demo/dish.webp?url';
-import layers from './fixture-assets/portion-demo/layers.json';
 import photo from './fixture-assets/portion-demo/photo.jpg?url';
 
 // This module is dynamically imported behind DEV guards. Never a publication source.
@@ -26,4 +27,15 @@ export async function demoLayerUrl(url: string, signal: AbortSignal): Promise<st
   throw new Error('Unknown demo layer');
 }
 
-export { layers, photo };
+if (
+  demo.review_manifest.review.status !== 'needs_review' ||
+  demo.review_manifest.publication.eligible !== false ||
+  demo.portion.dish_id !== demo.review_manifest.dish.dish_id ||
+  demo.portion.dish_revision_id !== demo.review_manifest.dish.revision_id
+) {
+  throw new Error('Invalid local review fixture identity or publication boundary');
+}
+
+const portion = PublicPortionSchema.parse(demo.portion);
+
+export { photo, portion };

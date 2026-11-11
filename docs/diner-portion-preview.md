@@ -23,10 +23,36 @@ an alias scoped to preview, so other screens keep their existing typography.
 Web safe-area insets replace the design's native iOS status bar; fake device time and
 battery icons are not rendered. Food imagery remains selected-dish data.
 
-## PR25 logic integrated into the diner
+## PR25 processing and interaction integration
 
 [PR25](https://github.com/vivienk/peekaplate/pull/25) is merged as `95fbe1a` and already
-supplies the repository's offline processing modules. The relevant interaction logic
+supplies the repository's offline processing modules. The new
+`processing/src/peekaplate_processing/diner_demo.py` directly calls PR25's
+`prepare_review_preview` with a verified T0 manifest and supplied mask. That processor
+verifies the source, creates the cutout, retains the original fallback and records
+provenance. The adapter converts that cutout to bounded WebP layers and exports
+`demo.json`; `portionDemo.ts` and `fixtures.ts` consume its actual dish/revision IDs,
+dimensions, hashes and motion limits. The review manifest remains attached with
+`needs_review` and `publication.eligible=false`. No generated candidate is accepted.
+
+To regenerate from a captured T0 bundle and matching grayscale mask, use the processing
+Python environment (Pillow and Pydantic required), from the repository root:
+
+```sh
+PYTHONPATH=processing/src python -m peekaplate_processing.diner_demo \
+  --t0-manifest /path/to/t0/manifest.json \
+  --mask /path/to/supplied-mask.png \
+  --output-dir /path/to/new-demo-directory \
+  --capture-evidence 'Source capture evidence; local review only'
+```
+
+Output is create-only. Copy the generated `demo.json`, `photo.jpg`, `dish.webp` and
+`background.webp` into `frontend/diner/src/menu/fixture-assets/portion-demo/` together.
+Never relabel this output as approved public content. This integrates PR25's captured
+photo/supplied-mask path; it does not invoke optional generated presentation candidates
+or create a hosted approval/publication service.
+
+The relevant interaction logic
 from `processing/src/peekaplate_processing/harness.py` and `review_preview_html.py`
 is adapted into the diner renderer/controller, not embedded as a review-tool iframe:
 
@@ -91,6 +117,8 @@ is unchanged. The reserved `.invalid` mapping is development-wide, not an approv
 - Build: diner `package.json`, `pnpm-lock.yaml`, `scripts/check-bundle.mjs` and its tests.
 - Checks: `portion.test.ts`, `portionMotion.test.ts`, `tests/e2e/portion.spec.ts`,
   `playwright.portion.config.ts`, and geometric texture fixtures.
+- Processing: `processing/src/peekaplate_processing/diner_demo.py` and
+  `processing/tests/test_diner_demo.py`.
 - Handoff: this document, `docs/CONTEXT.md`, and sanitized observations in `errors.md`.
 
 ## Verification boundary
@@ -98,14 +126,8 @@ is unchanged. The reserved `.invalid` mapping is development-wide, not an approv
 Node 24.16.0 / pnpm 11.25.0, local isolated branch `codex/diner-portion-integration`.
 Based on develop `96b8de1`; PR25, PR69 and PR136 are already in that base.
 
-- PASS: `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts` — 213 tests.
-- PASS: `pnpm verify lint typecheck build` — all packages; Worker build is a dry-run.
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` — 42 behavior/regression cases passed; three new icon assertions needed a test-only correction for Vite SVG data URLs.
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts tests/e2e/portion.spec.ts --grep Figma --workers=2` — all four state checks passed after that correction. All 45 cases now have passing evidence.
-- PASS: `pnpm verify lint context:check docs:check` and `git diff --check`.
-- Inspected all four 390px screenshots: exact icon assets, geometry, copy, Back and retry placement. Dynamic captured imagery differs from the design sample by intent.
-- NOT RUN: physical phones, manual VoiceOver/TalkBack, genuine approved publication,
-  hosted asset loading, full default browser suite and database suite.
+Final command results and all four screenshots are recorded in
+[the PR evidence report](../qa-reports/diner-portion-preview/README.md).
 
 Local screenshots, synthetic bundle tests and a supplied-photo demo are not production
-acceptance. No push, PR creation, merge or deployment has been performed.
+acceptance. No merge or deployment is authorized by this change.

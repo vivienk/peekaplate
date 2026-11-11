@@ -2568,3 +2568,37 @@ cases passed in that run; the three state checks are rerun after this test fix.
 
 Context refresh rejects directory paths; replaced the preview-assets directory
 entry with its four exact SVG filenames before refreshing fingerprints.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T03:45:24.374Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T03:46:03.256Z","exitCode":1}
+```
+
+The initial pre-PR full test run was restricted from opening local listeners (EPERM),
+causing local backend/auth tests to fail. Re-run with local-server permissions;
+this observation is not evidence of a product failure. Context fingerprints must
+also be refreshed after the added processing bridge and evidence documentation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-11T03:50:56.915Z","exitCode":2}
+```
+
+The new generated JSON widened schema_version to number in TypeScript. Parse its
+portion through PublicPortionSchema at the DEV import boundary, validating the
+actual processor export instead of asserting a literal type.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T03:51:42.222Z","exitCode":1}
+```
+
+During the processing bridge checks, the script test invoking docs:check caught a
+link to the not-yet-written screenshot report. Added the report before rerunning.
+A concurrent browser run lost its preview status element while frontend files were
+being edited; rerun against stable source before treating this as product evidence.
