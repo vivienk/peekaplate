@@ -168,13 +168,19 @@ test('the picker sends no request, fires no tracking call and never logs the que
   await page.getByRole('button', { name: 'Open Avocado Toast' }).first().click();
   await page.getByRole('button', { name: 'Compare' }).click();
   const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  // Only the picker phase counts: the detail's own opening and its final checkpoint on leaving
+  // are DIN-01 events, so the log is read from here until just before the picker closes.
+  await page.waitForTimeout(200);
+  const pickerStart = logs.length;
   for (const query of ['benedict', 'pizza', 'gluten']) await input.fill(query);
   await input.fill('');
   await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  await page.waitForTimeout(200);
+  const pickerLogs = logs.slice(pickerStart);
   await page.getByRole('button', { name: 'Close compare' }).click();
 
   expect(requests).toEqual([]);
-  expect(logs.filter((text) => text.includes('[track]'))).toEqual([]);
+  expect(pickerLogs.filter((text) => text.includes('[track]'))).toEqual([]);
   for (const query of ['benedict', 'pizza']) {
     expect(logs.some((text) => text.toLowerCase().includes(query))).toBe(false);
   }

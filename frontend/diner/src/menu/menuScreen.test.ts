@@ -4,13 +4,16 @@ import { mountMenuScreen } from './menuScreen';
 
 const mockObserve = vi.fn();
 const mockUnobserve = vi.fn();
-const mockDisconnect = vi.fn();
+// Every observer the screen creates, so a test can check each one individually.
+const observers: MockIntersectionObserver[] = [];
 
 class MockIntersectionObserver {
   observe = mockObserve;
   unobserve = mockUnobserve;
-  disconnect = mockDisconnect;
-  constructor() {}
+  disconnect = vi.fn();
+  constructor() {
+    observers.push(this);
+  }
 }
 
 // Minimal fake container that supports innerHTML and querySelectorAll
@@ -67,11 +70,13 @@ function extractCategoryTags(html: string): string[] {
 beforeEach(() => {
   mockObserve.mockClear();
   mockUnobserve.mockClear();
-  mockDisconnect.mockClear();
+  observers.length = 0;
   vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
   vi.stubGlobal('window', {
-    location: { search: '?scenario=demo' },
+    location: { search: '?scenario=demo', hash: '' },
     scrollTo: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     get scrollY() {
       return 0;
     },
@@ -80,10 +85,14 @@ beforeEach(() => {
   vi.stubGlobal('document', {
     createElement: () => new FakeContainer(),
     body: { appendChild: vi.fn() },
+    hidden: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   } as any);
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -135,16 +144,19 @@ describe('menu screen category visibility', () => {
 });
 
 describe('menu screen observer lifecycle', () => {
-  it('disconnects the previous IntersectionObserver before creating a new one on re-render', async () => {
+  it('disconnects every previous IntersectionObserver when the screen mounts again', async () => {
     const container = new FakeContainer();
 
-    // First mount
     await mountAndWait(container);
-    const disconnectsAfterFirst = mockDisconnect.mock.calls.length;
+    const firstMount = [...observers];
+    // The dimming observer and the exposure observer.
+    expect(firstMount.length).toBeGreaterThanOrEqual(2);
 
-    // Second mount: should disconnect the previous observer before creating a new one
     await mountAndWait(container);
-    expect(mockDisconnect).toHaveBeenCalledTimes(disconnectsAfterFirst + 1);
+
+    for (const observer of firstMount) {
+      expect(observer.disconnect).toHaveBeenCalled();
+    }
   });
 
   it('calls observe on the IntersectionObserver for cards', async () => {
@@ -181,5 +193,19 @@ describe('menu screen observer lifecycle', () => {
     await mountAndWait(container);
 
     expect(container.innerHTML).toContain('We could not load the menu. Please try again.');
+  });
+
+  it('live mode shows no fixture label and no demo restaurant name', async () => {
+    vi.stubEnv('VITE_MENU_SOURCE', 'live');
+    const container = new FakeContainer();
+
+    mountMenuScreen(container as unknown as HTMLElement);
+    // The published adapter is loaded by dynamic import, so wait for the state to appear.
+    await vi.waitFor(() =>
+      expect(container.innerHTML).toContain('We could not load the menu. Please try again.'),
+    );
+
+    expect(container.innerHTML).not.toContain('Fixture data');
+    expect(container.innerHTML).not.toContain('Ember & Stone');
   });
 });

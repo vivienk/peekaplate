@@ -434,4 +434,24 @@ describe('per-metric cohort floor (internal report)', () => {
   it('the owner schema rejects cohort counts, so they cannot be sent to owners', () => {
     expect(OwnerDishReportSchema.safeParse(internal()).success).toBe(false);
   });
+
+  describe('S5-DATA-07 order outcome reporting boundary isolation', () => {
+    it('strictly isolates owner reports from order outcomes and rejects unrecognized order metrics', () => {
+      const reportWithOrderData = report({
+        dish: {
+          order_outcomes: [{ order_id: 'ORD-1', quantity: 2, outcome_type: 'ordered' }],
+        },
+      });
+      expect(OwnerDishReportSchema.safeParse(reportWithOrderData).success).toBe(false);
+
+      const reportWithOrderMetrics = report({
+        metrics: {
+          ...validMetrics(),
+          order_count: metric(5),
+          conversion_rate: metric(0.2),
+        },
+      });
+      expect(OwnerDishReportSchema.safeParse(reportWithOrderMetrics).success).toBe(false);
+    });
+  });
 });

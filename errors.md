@@ -2381,3 +2381,314 @@ fresh report, frozen dataset/counts and unique passing records before returning
 success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 published-menu refresh and browser verification
+
+PR85 browser CI 42857040744 failed the detail-image fallback assertion: a real
+DNS failure raced the explicitly dispatched error and consumed both fallback
+steps. The test now uses a distinct valid data image and dispatches the first
+failure synchronously, leaving no network error to race it.
+
+Two new Chromium regressions failed before the rendering fix: publication swap
+lost focused Search, and returning from a withdrawn dish had no focus target.
+The swap now restores the equivalent visible control; a missing opener falls
+back to the menu heading. Both regressions and all ten focused browser checks
+pass. These use a synthetic source seam, not hosted integrity/delivery evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T18:05:34.662Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:06:48.247Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-10T18:07:11.221Z","exitCode":1}
+```
+
+The final focus regression also covers duplicate cards: restoration selects the
+visible category opener instead of its hidden All copy. It failed before the
+visible-match correction. A context summary initially exceeded the graph limit
+and was shortened without dropping the live-release gates. The concurrent full
+check hit a 20-second workerd loopback timeout; a separate unchanged rerun passed
+all 1,121 unit and 72 script tests in 29.058 seconds. A concurrent default-worker
+browser run timed out awaiting 500 persisted outbox records (306 observed);
+single-worker verification is recorded separately rather than hiding that run.
+
+All 111 browser checks then passed with one worker in 96.794 seconds, including
+the unchanged outbox-capacity case and the three refresh focus regressions.
+The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+
+## PR117 reconciliation and capture-reference validation — 2026-11-10
+
+The reconciled package declared Zod in both backend dependency sections; frozen
+installation rejected the resulting importer mismatch. Kept the existing exact
+version in runtime dependencies, removed its duplicate dev entry and regenerated
+the lockfile. A fresh frozen installation passed; supply-chain policy stayed enabled.
+
+Five focused manifest regressions failed before the correction: missing source,
+missing/blank/NUL capture evidence and invalid source digest were all accepted.
+`backend/src/bundle-producer/request.ts` now requires the upstream T0 source hash
+and capture reference. They stay private and do not establish authenticity or
+approval. Focused tests pass after the fix. Eight actual CLI checks with a Python
+`prepare_t0_bundle` asset and a disposable PostgreSQL instance passed in 14.805s;
+no hosted data, resources or publication state changed.
+
+
+## Published diner connection — 2026-11-10
+
+Two focused regressions failed before implementation: the default loader rejected
+valid hashed bytes, and publication suspension did not exist. A separate timer
+regression proved collection did not stop at token expiry while refresh hung.
+The loader now uses the shared exact-byte parser; explicit suspension retires
+canonical/PostHog work without changing consent, and the expiry deadline stops
+collection independently of refresh completion. Unit and focused browser checks
+pass; release/hosted results are recorded separately.
+
+Existing Wrangler login lacked Pages permissions (Cloudflare403/10000); refreshed
+the previously authorized Worker/Pages scopes for the existing account using the
+OS credential store. An unhandled Node tooling failure also emitted a Windows
+UV_HANDLE_CLOSING assertion; no application or cloud mutation resulted. A nested
+PowerShell environment assignment expanded in the outer shell; subsequent uploads
+use an argument-array Node wrapper with the exact account in the child environment.
+No supply-chain, browser or deployment protection was weakened.
+
+The first full check also rejected `.env.example` in the context graph: that
+index intentionally excludes environment-file paths. Removed the index reference
+without relaxing its validator; the documented config example remains tracked.
+Context/docs checks then passed. No runtime or fixture behavior changed for that correction.
+
+Release reconciliation retained main's report setting and runbook. Its older
+context also named the replaced console Input files; those obsolete references
+were removed in favor of current TextField/UI paths. Source responsibilities and
+all current main test labels/error history were preserved. Fresh full checks,
+builds and disposable-database verification passed afterward. An initial PR body
+used abbreviated field labels and failed the documentation gate; the exact
+repository template labels were restored before the final CI run.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T22:13:05.031Z","exitCode":1}
+```
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T20:59:41.487Z","exitCode":1}
+```
+
+
+## November 10 narrow report release preparation
+
+Main did not contain the owner-report route required by merged PR130. A narrow
+backport preserves the existing report/contract implementation and excludes the
+separate extraction release. Its copied database test uses main’s token(subject)
+helper instead of develop’s newer token({sub}) signature; typecheck and the
+SQL-backed HTTP suite pass after that compatibility correction. An initial lint
+check rejected Windows line endings in the edited Wrangler config; formatting
+and context refresh fixed it without changing bindings. The final full check
+passed.
+
+Wrangler was signed out and its optional secure Windows keyring helper was
+missing. The pinned helper was restored outside repository dependencies, and
+the existing scoped OAuth access refreshed into the OS credential store. No
+credential was added to files or logs. Docker was started hidden for disposable
+database tests; all nine unrelated containers remained stopped.
+
+
+## Extraction release observations retained during reconciliation
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+
+## RES-02 October 31 local reconciliation checks
+
+Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
+
+The project-local store avoided the registry-link step, but dependency linking still failed with EPERM. Direct script checks passed 54/57: the preview symlink fixture was denied, the database-launcher test could not resolve uninstalled Vitest, and the real pnpm invocation retried the denied registry link. Direct pinned Biome, context validation and documentation-link checks passed. Full TypeScript/application/database/browser verification is deferred to Linux CI; no tests or runtime protections were weakened.
+
+## RES-02 public-menu integration response typing
+
+At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
+
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
+<!-- automatic observation; not root cause -->
+```
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
+```
+
+```json
+<!-- automatic observation; not root cause -->
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-07T17:47:21.301Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-11T05:40:43.763Z","exitCode":1}
+```
+
+## Save-screen integration review — November 10, 2026
+
+```json
+{"id":"ERR-20261110-SAVE-REFRESH","status":"resolved","area":"saved-screen-publication-refresh","cause":"An open Saved screen retained old dish objects after a new publication was loaded, allowing a later opening to mix publication and dish revisions.","prevention":"Refresh the Saved screen from the new menu without recording another shortlist view.","sources":["frontend/diner/src/menu/menuScreen.ts","frontend/diner/src/save/saved-screen.ts"],"regression":"The browser case Saved uses the refreshed dish revision before opening its detail failed before the fix and passed afterward."}
+```
+
+```json
+{"id":"ERR-20261110-SAVE-FOCUS","status":"resolved","area":"saved-screen-keyboard-removal","cause":"Removing a saved row replaced the focused control without assigning a new focus target.","prevention":"Retain keyboard position on a remaining row or the empty-state Browse menu button.","sources":["frontend/diner/src/save/saved-screen.ts"],"regression":"The keyboard removal browser case failed before the fix and passed afterward, including Undo recovery."}
+```
+
+```json
+{"kind":"manual-verification-observation","area":"browser-resource-contention","observation":"The first eight-worker browser run passed 126 cases but timed out in the existing 500-event outbox-capacity case. A fresh two-worker complete run passed all 127 cases; the separate SDK configuration passed all nine cases. Resource contention is a hypothesis, not a confirmed cause."}
+```
+
+```json
+{"id":"ERR-20261110-OUTBOX-CAPACITY-ASSERTION","status":"resolved","area":"browser-outbox-completion","cause":"The capacity assertion could observe 500 stored events before the remaining five asynchronous writes emitted their drop warnings, then fail an immediate warning assertion.","prevention":"Poll the joint observable state of 500 stored events and five dropped-event warnings with a bounded ten-second deadline.","sources":["tests/e2e/tracking-outbox.spec.ts"],"regression":"The unchanged full run reproduced 500 events with zero observed warnings at assertion time; the corrected browser assertion is repeated before final acceptance."}
+```
+
+```json
+{"id":"ERR-20261110-EXTRACTION-WORKER-ROUTING","status":"fix-prepared-hosted-retest-pending","area":"staging-menu-ingestion","cause":"The API global fetch to the same-account extraction workers.dev endpoint returned Cloudflare error1042 before reaching the service; staging had no public-fetch routing flag.","prevention":"Enable global_fetch_strictly_public only for staging while retaining nodejs_compat and existing service/capability authentication.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs"],"regression":"The new config regression failed before correction and passed afterward (8/8 script cases). Hosted correction remains pending final release approval."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T06:52:22.494Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:22:36.990Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:29:44.200Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:35:17.101Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-08T12:40:54.175Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T12:41:09.350Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-08T12:42:43.238Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:09:59.298Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:11:32.256Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T23:19:57.966Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-10T23:19:57.966Z"},"status":"resolved","cause":"Merge resolution in backend/src/index.ts and backend/src/index.test.ts placed import names out of alphabetical order.","prevention":"Organize imports with biome check --write after manual merge conflict resolution.","regression":"pnpm lint passes cleanly across all 354 files."}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-10T23:25:09.183Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-10T23:25:09.183Z"},"status":"resolved","cause":"Initial invocation of test:db failed because Docker Desktop daemon was not yet running at the docker socket.","prevention":"Ensure Docker Desktop daemon is started and responsive before running database test harness.","regression":"Docker Desktop daemon launched and verified via docker info; test:db verification runs in CI."}
+```
+
+```json
+{"id":"ERR-20261111-ORDER-TIMESTAMP","status":"resolved-locally","cause":"Calendar overflow timestamps passed regex and were normalized by Date.UTC before the original invalid string reached PostgreSQL; one bad row could roll back a mixed import. Missing route archive bindings also allowed an import without retained bytes.","prevention":"Validate calendar/time fields and PostgreSQL-compatible offsets before classification/SQL; require route storage before opening a database connection.","regression":"Six invalid date/time/offset cases failed before correction and pass afterward. Real PostgreSQL mixed-row import accepts one row and quarantines one; missing-storage regression proves no database connection.","sources":["packages/contracts/src/order-outcome.ts","backend/src/index.ts","backend/src/order-ingestion/order-ingestion.integration.ts"]}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-27T06:22:34.246Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-10-27T06:23:19.298Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-10-27T06:24:02.218Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261111-INGREDIENT-SIDECAR","status":"resolved-locally","cause":"An unconditional bounded ingredient sidecar builder raised for upstream-valid long ingredients after extraction was saved; its context also accepted vision-model text as independent grounding. Existing tests relied on platform-default encoding.","prevention":"Common finalization records sanitized analysis unavailability while retaining extraction; vision markers abstain; fixture reads/writes explicitly use UTF-8.","regression":"Real 257-character ingredient failed with ExtractionError before correction and passes afterward; vision grounding regression failed exact_rule versus missing_evidence and now passes; early vision return writes an unknown review-only sidecar.","sources":["processing/src/peekaplate_processing/run_pipeline.py","processing/src/peekaplate_processing/ingredient_intelligence.py","processing/tests/test_workflow.py","processing/tests/test_ingredient_intelligence.py"]}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T08:14:09.388Z","exitCode":1}
+```
+
+
+## PR78 diner trigger integration and e2e reconciliation — 2026-11-11
+
+Merging develop into the DIN-01 triggers branch produced a typecheck failure (a
+missing teardownTracking declaration and a removed entrySourceFromSearch import) and
+e2e failures. The screen now emits menu_viewed and dish_viewed itself, so specs that
+send events by hand were counting the screen's events too. Tracking specs now load
+?scenario=empty; the menu-states observer expectation is 2 (dimming and exposure);
+the published-integrity withdrawal check counts only its own menu_viewed and requires
+that no event of any type is sent or captured after withdrawal. No assertion was
+weakened and no spec was skipped.
+
+A single-worker full run once failed 18 tracking/delivery cases with deliveries stuck
+at zero; their cause was not established, and a later single-worker run passed all
+111. The full-outbox warning-count test also failed once under 8 workers and passed
+alone, so it is treated as timing-sensitive under concurrency. Prevention: give
+hand-driven tracking specs a page that emits nothing, and assert on event types, not
+totals, wherever the real screen is loaded.
+
+## DIN-01 trigger review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-DINER-TRIGGER-LIFECYCLE","status":"resolved","area":"diner-consent-and-publication-attribution","cause":"The screen started clocks and cached exposure IDs even when live collection was disallowed; a publication swap also retained those IDs and omitted its readable menu event.","prevention":"Gate UI measurement, reset clocks/references at consent changes, record the refreshed publication and discard older exposure references.","regression":"Real Chromium consent-transition and dropped-exposure cases failed before correction; four synthetic live-screen cases pass afterward. The refresh case also checks matching new dish revisions and once-per-publication menu events. No hosted provider is called.","sources":["frontend/diner/src/menu/menuScreen.ts","tests/e2e/menu-triggers-live.spec.ts"]}
+```
+
+The first complete Chromium run passed 136/137 cases: the withdrawal fixture injected a second menu view after the new consent handler had already observed the readable menu. Removed that duplicate injection while retaining all-event post-withdrawal length checks. The complete rerun passed 137/137 in 1.4 minutes; the separate SDK/privacy configuration passed 9/9 in 10.4 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T08:47:40.684Z","exitCode":1}
+```
+
+## DIN-01 withdrawal fixture fake-time follow-up
+
+Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.

@@ -39,6 +39,34 @@ afterEach(() => {
 });
 
 describe('shared dispatch', () => {
+  it('suspends both destinations on publication withdrawal without changing consent', async () => {
+    const tracking = await fresh();
+    const sink = fakeSink();
+    const canonical = recordingDeliver();
+    tracking.enableLiveTracking(canonical.deliver);
+    tracking.connectPostHog(sink);
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await tracking.suspendLiveTracking();
+    const captures = sink.capturePostHog.mock.calls.length;
+    tracking.track('menu_viewed', menuViewed);
+    tracking.setTrackingAllowed(false);
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    expect(tracking.isTrackingAllowed()).toBe(true);
+    expect(tracking.isLiveTracking()).toBe(false);
+    expect(sink.setConsent).toHaveBeenLastCalledWith(false);
+    expect(sink.capturePostHog).toHaveBeenCalledTimes(captures);
+    expect(canonical.deliver).not.toHaveBeenCalled();
+    tracking.enableLiveTracking(canonical.deliver);
+    tracking.track('menu_viewed', menuViewed);
+    await flush();
+    expect(sink.setConsent).toHaveBeenLastCalledWith(true);
+    expect(canonical.sent()).toHaveLength(1);
+    expect(sink.capturePostHog).toHaveBeenCalledTimes(captures + 1);
+  });
+
   it('fixture mode sends to neither destination', async () => {
     const tracking = await fresh();
     const sink = fakeSink();
@@ -299,6 +327,24 @@ function fakeSdk() {
 }
 
 describe('PostHog adapter wiring', () => {
+  it('publication suspension discards a capture waiting for the SDK to load', async () => {
+    const tracking = await fresh();
+    const sdk = fakeSdk();
+    let resolve!: (client: never) => void;
+    const loading = new Promise<never>((done) => {
+      resolve = done;
+    });
+    tracking.enableLiveTracking(recordingDeliver().deliver);
+    tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: () => loading });
+    tracking.setTrackingAllowed(true);
+    tracking.track('menu_viewed', menuViewed);
+    await tracking.suspendLiveTracking();
+    resolve(await sdk.loadSdk());
+    await flush();
+    expect(sdk.captures).toEqual([]);
+    expect(sdk.instances).toHaveLength(0);
+  });
+
   it('a live, consented event reaches PostHog once with the canonical event_id as its uuid', async () => {
     const tracking = await fresh();
     const sdk = fakeSdk();

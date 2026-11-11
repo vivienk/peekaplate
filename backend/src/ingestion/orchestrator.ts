@@ -151,6 +151,7 @@ export async function submitMenuIngestion(
   client: DatabaseClient,
   request: IngestionRequest,
   queueProducer?: QueueProducer | undefined,
+  options?: { inTransaction?: boolean },
 ): Promise<MenuIngestionJobRow> {
   // Input validation
   if (!request.venueId || !request.idempotencyKey) {
@@ -209,15 +210,19 @@ export async function submitMenuIngestion(
     sourceStorageKey = request.sourceStorageKey;
   }
 
-  const job = await createIngestionJob(client, {
-    id: jobId,
-    tenantId: request.venueId,
-    sourceType: request.sourceType,
-    sourceUrl: request.sourceUrl ?? null,
-    sourceHash,
-    sourceStorageKey,
-    idempotencyKey: request.idempotencyKey,
-  });
+  const job = await createIngestionJob(
+    client,
+    {
+      id: jobId,
+      tenantId: request.venueId,
+      sourceType: request.sourceType,
+      sourceUrl: request.sourceUrl ?? null,
+      sourceHash,
+      sourceStorageKey,
+      idempotencyKey: request.idempotencyKey,
+    },
+    options,
+  );
 
   if (queueProducer) {
     try {
