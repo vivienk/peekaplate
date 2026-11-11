@@ -294,6 +294,10 @@ async function openLiveMenu(page: Page) {
             if (window.removeDish) menu.categories = menu.categories.map(category => ({
               ...category, dishes: category.dishes.filter(dish => dish.dishId !== window.removeDish)
             }));
+            if (window.renameDish) menu.categories = menu.categories.map(category => ({
+              ...category, dishes: category.dishes.map(dish => dish.dishId === window.renameDish
+                ? { ...dish, name: 'Updated Avocado Toast', dishRevisionId: 'updated-dish-revision' } : dish)
+            }));
             options.onDelivery({ token: 'synthetic-only', expiresAt: Date.now() + 1800000,
               publicationId: menu.publicationRevisionId });
             return { status: 'ready', menu };
@@ -322,6 +326,40 @@ async function openLiveMenu(page: Page) {
 async function swapPublication(page: Page) {
   await page.evaluate(() => (window as unknown as { refreshMenu(): Promise<void> }).refreshMenu());
 }
+
+test('Saved uses the refreshed dish revision before opening its detail', async ({ page }) => {
+  await openLiveMenu(page);
+  const heart = cardHeart(page, 'Avocado Toast');
+  const dishId = await heart.getAttribute('data-save-dish-id');
+  await heart.click();
+  await headerButton(page).click();
+  await expect(page.locator('.pp-saved__item')).toContainText('Avocado Toast');
+  await page.evaluate((id) => {
+    (window as unknown as { renameDish: string | null }).renameDish = id;
+  }, dishId);
+  await swapPublication(page);
+  await expect(page.locator('.pp-saved__item')).toContainText('Updated Avocado Toast');
+  await page.locator('.pp-saved__open').click();
+  await expect(page.locator('.pp-detail')).toContainText('Updated Avocado Toast');
+});
+
+test('keyboard removal in Saved keeps focus on the next action and the empty-state button', async ({
+  page,
+}) => {
+  await page.goto(DINER);
+  await cardHeart(page, 'Avocado Toast').click();
+  await cardHeart(page, 'Classic Eggs Benedict').click();
+  await headerButton(page).click();
+  const hearts = page.locator('.pp-saved__save');
+  await hearts.first().focus();
+  await page.keyboard.press('Enter');
+  await expect(hearts).toHaveCount(1);
+  await expect(hearts.first()).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Browse menu' })).toBeFocused();
+  await toasts(page).getByRole('button', { name: 'Undo' }).click();
+  await expect(hearts).toHaveCount(1);
+});
 
 test('a new publication keeps Save working: focus, hearts, badge, and withdrawn dishes drop out', async ({
   page,

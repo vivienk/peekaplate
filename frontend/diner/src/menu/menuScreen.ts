@@ -9,7 +9,7 @@ import {
   saveHeartMarkup,
   toastAreaMarkup,
 } from '../save/screens';
-import { track } from '../tracking';
+import { suspendLiveTracking, track } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
@@ -52,6 +52,7 @@ let menuToken: MenuToken | null = null;
 let liveTrackingOn = false;
 // The re-read timer for the live menu. Only one exists at a time; mounting again stops the old one.
 let activeRefresher: MenuRefresher | null = null;
+let activeLoad: AbortController | null = null;
 // The open search query (null when the bar is closed), kept across dish detail and back.
 let searchQuery: string | null = null;
 
@@ -362,6 +363,10 @@ function attachSave(bind: () => () => void): () => void {
 let stopRouting: () => void = () => {};
 
 export function mountMenuScreen(container: HTMLElement): void {
+  activeLoad?.abort();
+  menuToken = null;
+  liveTrackingOn = false;
+  void suspendLiveTracking();
   disposeObserver();
   stopRouting();
   activeCategoryId = null;
@@ -439,7 +444,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     }
   };
 
-  const showSaved = () => {
+  const showSaved = (recordView = true) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
     switchScreen('saved');
@@ -447,6 +452,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       saveState,
       menu,
       send: track,
+      recordView,
       onOpenDish: (dish) => showDetail(dish, 'saved_screen'),
       onBack: leaveSaved,
     });
@@ -496,6 +502,23 @@ export function mountMenuScreen(container: HTMLElement): void {
     currentMenu = next;
     // A new publication is a successful load: withdrawn saved dishes drop out (no event).
     saveState?.reconcile(next);
+    if (view === 'saved') {
+      const focused = document.activeElement;
+      const dishId = focused?.closest<HTMLElement>('.pp-saved__item')?.dataset.dishId;
+      const wasHeart = focused?.matches('.pp-saved__save');
+      const scrollY = window.scrollY;
+      showSaved(false);
+      if (dishId) {
+        const row = Array.from(container.querySelectorAll<HTMLElement>('.pp-saved__item')).find(
+          (item) => item.dataset.dishId === dishId,
+        );
+        row
+          ?.querySelector<HTMLElement>(wasHeart ? '.pp-saved__save' : '.pp-saved__open')
+          ?.focus({ preventScroll: true });
+      }
+      window.scrollTo(0, scrollY);
+      return;
+    }
     // Only the list is redrawn. An open dish detail or Saved screen stays as it is, and going back
     // shows the new menu.
     if (view !== 'menu') return;
@@ -547,6 +570,9 @@ export function mountMenuScreen(container: HTMLElement): void {
     isLoading = true;
     activeRefresher?.stop();
     activeRefresher = null;
+    activeLoad?.abort();
+    const controller = new AbortController();
+    activeLoad = controller;
     const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
     fixtureMode = mode === 'fixture';
     renderLoading(container);
@@ -573,6 +599,7 @@ export function mountMenuScreen(container: HTMLElement): void {
               apiBase,
               ...route,
               onDelivery: (info) => {
+                if (controller.signal.aborted) return;
                 menuToken = {
                   value: info.token,
                   expiresAt: info.expiresAt,
@@ -588,21 +615,24 @@ export function mountMenuScreen(container: HTMLElement): void {
                     fetch: (input, init) => fetch(input, init),
                     now: () => Date.now(),
                     token: () => menuToken,
+                    canSend: () => !controller.signal.aborted && tracking.isLiveTracking(),
                   }),
                 );
               },
             });
             activeRefresher = createMenuRefresher({
-              source,
+              source: { load: () => source.load(controller.signal) },
               getCurrent: () => currentMenu,
               onSwap: swapMenu,
               // The publication is gone. The menu on screen stays, but nothing more is delivered.
               onStop: () => {
                 menuToken = null;
-                // shortcut: live activation must also gate new events to both destinations on 404.
+                controller.abort();
+                liveTrackingOn = false;
+                void tracking.suspendLiveTracking();
               },
             });
-            return source.load();
+            return source.load(controller.signal);
           })
         : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
 
@@ -614,6 +644,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
     loading
       .then((result: MenuLoadResult) => {
+        if (controller.signal.aborted) return;
         isLoading = false;
         if (result.status !== 'ready') {
           renderFailure(container, result.status, handleRetry);
@@ -634,6 +665,7 @@ export function mountMenuScreen(container: HTMLElement): void {
         }
       })
       .catch(() => {
+        if (controller.signal.aborted) return;
         isLoading = false;
         renderFailure(container, 'error', handleRetry);
         if (retryCount > 0) {

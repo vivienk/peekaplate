@@ -34,6 +34,7 @@ export type SavedScreenOptions = {
   // Leaves the Saved screen: the back button and "Browse menu".
   onBack: () => void;
   send?: SendEvent;
+  recordView?: boolean;
 };
 
 // Call once per readable display of the Saved screen (navigating to it, going back to it, or a
@@ -41,7 +42,7 @@ export type SavedScreenOptions = {
 // dish, Undo, the session-only switch) redraw the list without another view. Returns cleanup.
 export function renderSavedScreen(
   container: HTMLElement,
-  { saveState, menu, onOpenDish, onBack, send = noSend }: SavedScreenOptions,
+  { saveState, menu, onOpenDish, onBack, send = noSend, recordView = true }: SavedScreenOptions,
 ): () => void {
   // Not .pp-saved: that is the menu header's Saved button.
   const screen = el('div', 'pp-saved-screen');
@@ -86,6 +87,7 @@ export function renderSavedScreen(
 
   function card(item: SavedItem): HTMLLIElement {
     const row = el('li', 'pp-saved__item');
+    row.dataset.dishId = item.dish.dishId;
     if (item.kind === 'incomplete') {
       // Not openable or comparable, and no events; the heart can still remove it.
       const placeholder = el('article', 'pp-card pp-card--placeholder');
@@ -124,6 +126,11 @@ export function renderSavedScreen(
 
   // Returns how many dishes are shown, so shortlist_viewed reports the list the diner sees.
   function draw(): number {
+    const focused = document.activeElement;
+    const previousRows = Array.from(content.querySelectorAll<HTMLElement>('.pp-saved__item'));
+    const focusedRow = previousRows.findIndex(
+      (row) => focused instanceof Node && row.contains(focused),
+    );
     for (const stop of stopHearts) stop();
     stopHearts = [];
     notice.hidden = saveState.mode() !== 'session-only';
@@ -140,11 +147,18 @@ export function renderSavedScreen(
         browse,
       );
       content.replaceChildren(empty);
+      if (focusedRow >= 0) browse.focus({ preventScroll: true });
       return 0;
     }
     const list = el('ul', 'pp-saved__list');
     list.append(...items.map(card));
     content.replaceChildren(list);
+    if (focusedRow >= 0) {
+      const rows = list.querySelectorAll<HTMLElement>('.pp-saved__item');
+      rows[Math.min(focusedRow, rows.length - 1)]
+        ?.querySelector<HTMLButtonElement>('.pp-saved__save')
+        ?.focus({ preventScroll: true });
+    }
     return items.length;
   }
 
@@ -156,7 +170,7 @@ export function renderSavedScreen(
   // Not counted in session-only mode (confirmed by Adam, matrix v0.1h): unavailable-storage states
   // emit nothing, saves there fire no dish_saved, so a view would describe a list with no matching
   // events and skew the numbers.
-  if (saveState.mode() === 'persistent') {
+  if (recordView && saveState.mode() === 'persistent') {
     try {
       send('shortlist_viewed', shortlistViewedPayload(menu, shown));
     } catch {}
