@@ -2712,3 +2712,11 @@ It passed 3/3 when repeated alone, and no Save or exposure code changed in the
 Compare work. "removing a dish on the detail shows Undo" also failed once with
 "jsHandle.jsonValue: Test ended" from its console listener racing test teardown,
 then passed 3/3. Both tests were left unchanged; CI remains the authority.
+
+## PR134 comparison review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-COMPARISON-READER","status":"resolved-locally","cause":"An open rate and exposure count reconstructed a protected small opened cohort; comparison engagement incorrectly required compare_view entry instead of an ordered prior opening.","prevention":"Complementary suppression clears both-period opening-rate values/delta/count when either opened cohort is 1–9; comparisons follow established tenant/session/participant and producer-order rules.","regression":"Real PostgreSQL original reader: two failures and one pass. After correction the two regressions pass; expanded focused DB suite passes eleven cases, including the restored seventeen-session JSON fixture. Full runner passes 281 SQL assertions and 107 integration cases.","sources":["backend/src/comparison-report.ts","backend/src/comparison-report.integration.ts","tests/data05/comparison_privacy_cases.json"]}
+```
+
+The later PR134 branch no longer contained PR123 validation files. Restore only its five test/fixture/evidence files from reviewed a8cd00b, preserve develop code/context, and record new validation separately from historical results. Docker engine was stopped; Docker Desktop start restored it. Only disposable PeekaPlate test containers were launched and cleanup was verified.
