@@ -30,6 +30,37 @@ beforeAll(async () => {
      VALUES ($1, $2, 1, $3, 'Comparison fixture', '')`,
     [venueId, dishId, dishRevisionId],
   );
+  const backgroundVenue = crypto.randomUUID();
+  await admin.query('INSERT INTO app_private.venues (id, name) VALUES ($1, $2)', [
+    backgroundVenue,
+    'Synthetic unrelated comparison traffic',
+  ]);
+  await admin.query(
+    `WITH fixture AS MATERIALIZED (
+       SELECT gen_random_uuid() AS event_id FROM generate_series(1, 1000)
+     ), indexed AS (
+       INSERT INTO app_private.observation_index
+         (tenant_id, event_id, canonical_payload_checksum, schema_version, event_type,
+          authorized_publication_id, occurred_at, first_received_at, r2_archive_key, disposition)
+       SELECT $1, event_id, repeat('a', 64), 'observation.v2', 'dish_viewed',
+         $2, '2026-10-27T01:00:00Z', '2026-10-27T01:00:00Z',
+         'comparison-background/' || event_id, 'accepted' FROM fixture
+       RETURNING event_id
+     )
+     INSERT INTO app_private.observation_event
+       (tenant_id, event_id, event_type, session_id, producer_id, local_sequence,
+        publication_revision_id, traffic_class)
+     SELECT $1, event_id, 'dish_viewed', gen_random_uuid(), gen_random_uuid(), 0, $2, 'live'
+     FROM indexed`,
+    [backgroundVenue, publicationId],
+  );
+  await admin.query(
+    `INSERT INTO app_private.observation_exposure
+       (tenant_id, event_id, dish_id, dish_revision_id, exposure_id, surface, position, exposure_basis)
+     SELECT tenant_id, event_id, $2, $3, gen_random_uuid(), 'menu_list', 1, 'viewport_50pct_1s'
+     FROM app_private.observation_event WHERE tenant_id = $1`,
+    [backgroundVenue, dishId, dishRevisionId],
+  );
 });
 
 afterAll(async () => {
