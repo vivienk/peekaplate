@@ -15,7 +15,7 @@
     "build": "pnpm -r --if-present build",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "corepack pnpm -r --if-present typecheck",
     "test": "vitest run && node --test scripts/*.test.mjs",
     "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts",
     "test:db": "node scripts/test-db.mjs",

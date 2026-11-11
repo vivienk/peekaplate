@@ -19,6 +19,7 @@ import app, {
   queue,
 } from './index';
 import { ingestObservations } from './observation-ingest';
+import { OwnerInsightActionError } from './owner-insight-actions';
 import { ReviewCommandError } from './review-command';
 
 const fixtureV2 = JSON.parse(
@@ -1784,5 +1785,236 @@ describe('review candidate HTTP boundaries', () => {
         expect(await response.json()).toEqual({ error: code });
       }
     });
+  });
+});
+
+describe('owner insight action HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000101';
+  const actorId = '00000000-0000-4000-8000-000000000102';
+  const actionId = '00000000-0000-4000-8000-000000000103';
+  const menuId = '00000000-0000-4000-8000-000000000104';
+  const menuRevisionId = '00000000-0000-4000-8000-000000000105';
+  const commandId = '00000000-0000-4000-8000-000000000106';
+  const basePath = `/venues/${venueId}/owner-insight-actions`;
+
+  const action = {
+    actionId,
+    venueId,
+    insightKey: 'dish.low_conversion',
+    menuId,
+    menuRevisionId,
+    category: 'description_update',
+    status: 'planned' as const,
+    note: null,
+    version: 1,
+    createdBy: actorId,
+    updatedBy: actorId,
+    createdAt: '2026-11-10T00:00:00.000Z',
+    updatedAt: '2026-11-10T00:00:00.000Z',
+  };
+
+  it('lists actions using the verified actor, route venue and validated query', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [action],
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      listOwnerActions,
+    }).request(`${basePath}?insightKey=dish.low_conversion&limit=10`, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ schemaVersion: 1, actions: [action] });
+    expect(listOwnerActions).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      {
+        insightKey: 'dish.low_conversion',
+        limit: 10,
+      },
+      {},
+    );
+  });
+
+  it('uses the default list limit and rejects invalid or unknown query parameters', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [],
+    });
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions,
+    });
+
+    const valid = await testApp.request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+    expect(valid.status).toBe(200);
+    expect(listOwnerActions).toHaveBeenCalledWith(actorId, venueId, { limit: 50 }, {});
+
+    for (const query of [
+      '?limit=101',
+      '?unknown=value',
+      '?menuRevisionId=invalid',
+      '?limit=10&limit=20',
+    ]) {
+      const response = await testApp.request(`${basePath}${query}`, {
+        headers: { Authorization: 'Bearer signed' },
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(listOwnerActions).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an action without accepting a browser-supplied venue', async () => {
+    const createOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action,
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const request = {
+      commandId,
+      insightKey: 'dish.low_conversion',
+      menuId,
+      menuRevisionId,
+      category: 'description_update',
+      note: 'Check the current description',
+    };
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ schemaVersion: 1, action });
+    expect(createOwnerAction).toHaveBeenCalledWith(actorId, venueId, request, {});
+
+    const forged = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, venueId }),
+    });
+
+    expect(forged.status).toBe(400);
+    expect(createOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates only the action in the route venue with a validated patch', async () => {
+    const updateOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action: { ...action, status: 'active', version: 2 },
+    });
+    const patch = {
+      commandId,
+      expectedVersion: 1,
+      status: 'active',
+    };
+
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/${actionId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateOwnerAction).toHaveBeenCalledWith(actorId, venueId, actionId, patch, {});
+
+    const invalidPath = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/not-a-uuid`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(invalidPath.status).toBe(400);
+    expect(updateOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unauthenticated, malformed JSON and wrong content types before service calls', async () => {
+    const createOwnerAction = vi.fn();
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    });
+
+    const unauthenticated = await testApp.request(basePath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(unauthenticated.status).toBe(401);
+
+    const malformed = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: '{',
+    });
+    expect(malformed.status).toBe(400);
+
+    const wrongType = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'text/plain',
+      },
+      body: '{}',
+    });
+    expect(wrongType.status).toBe(415);
+
+    expect(createOwnerAction).not.toHaveBeenCalled();
+  });
+
+  it('maps owner authorization errors to their intended HTTP status', async () => {
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions: async () => {
+        throw new OwnerInsightActionError('forbidden', 403);
+      },
+    }).request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
   });
 });

@@ -1648,3 +1648,240 @@ describe('real PostgreSQL menu publication commands', () => {
     });
   });
 });
+
+describe('real PostgreSQL owner insight actions', () => {
+  function createInput(menuId: string, menuRevisionId: string) {
+    return {
+      commandId: crypto.randomUUID(),
+      insightKey: `insight-${crypto.randomUUID()}`,
+      menuId,
+      menuRevisionId,
+      category: 'description_update',
+      note: 'Update the menu description',
+    };
+  }
+
+  async function createAction(body: unknown, tenant = venue, subject = actor) {
+    return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await token(subject)}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function listActions(tenant = venue, subject = actor) {
+    return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions`, {
+      headers: { Authorization: `Bearer ${await token(subject)}` },
+    });
+  }
+
+  async function updateAction(actionId: string, body: unknown, tenant = venue, subject = actor) {
+    return fetch(
+      `http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions/${actionId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${await token(subject)}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
+  it('persists create, update and list results against the canonical menu revision', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const created = await createAction(input);
+
+    expect(created.status).toBe(201);
+    const createdBody = (await created.json()) as {
+      schemaVersion: number;
+      action: { actionId: string; status: string; version: number };
+    };
+    expect(createdBody).toMatchObject({
+      schemaVersion: 1,
+      action: {
+        status: 'planned',
+        version: 1,
+      },
+    });
+
+    const actionId = createdBody.action.actionId;
+    const updated = await updateAction(actionId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      status: 'active',
+    });
+
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toMatchObject({
+      schemaVersion: 1,
+      action: {
+        actionId,
+        status: 'active',
+        version: 2,
+      },
+    });
+
+    const listed = await listActions();
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      schemaVersion: 1,
+      actions: [
+        {
+          actionId,
+          menuId,
+          menuRevisionId: revision.menuRevisionId,
+          status: 'active',
+          version: 2,
+        },
+      ],
+    });
+
+    const persisted = await admin.query(
+      `SELECT category, status, note, version, created_by, updated_by
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, actionId],
+    );
+    expect(persisted.rows).toHaveLength(1);
+    expect(persisted.rows[0]).toMatchObject({
+      category: 'description_update',
+      status: 'active',
+      note: input.note,
+      version: 2,
+      created_by: actor,
+      updated_by: actor,
+    });
+  });
+
+  it('coalesces concurrent identical creates and replays the committed receipt', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const responses = await Promise.all([createAction(input), createAction(input)]);
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+
+    const results = await Promise.all(
+      responses.map(
+        async (response) => (await response.json()) as { action: { actionId: string } },
+      ),
+    );
+    expect(results[0]).toEqual(results[1]);
+
+    expect(results).toHaveLength(2);
+    const firstResult = results[0];
+    if (!firstResult) throw new Error('Missing first concurrent create result');
+    const actionId = firstResult.action.actionId;
+    const retry = await createAction(input);
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual(results[0]);
+
+    const actions = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(actions.rows).toEqual([{ action_id: actionId }]);
+
+    const receipts = await admin.query(
+      `SELECT idempotency_key
+       FROM app_private.es_command
+       WHERE tenant_id = $1 AND actor_id = $2
+         AND idempotency_key = $3
+         AND command_type = 'owner.insight_action.create'`,
+      [venue, actor, input.commandId],
+    );
+    expect(receipts.rows).toHaveLength(1);
+  });
+
+  it('rejects editor, viewer and cross-venue access without creating actions', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+
+    expect((await createAction(input, venue, otherActor)).status).toBe(403);
+    expect((await createAction(input, venue, viewer)).status).toBe(403);
+    expect((await createAction(input, otherVenue, actor)).status).toBe(403);
+
+    const listedAsEditor = await listActions(venue, otherActor);
+    expect(listedAsEditor.status).toBe(403);
+
+    const actions = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(actions.rows).toHaveLength(0);
+  });
+
+  it('reauthorizes a revoked owner before replaying an existing receipt', async () => {
+    const revokedActor = crypto.randomUUID();
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+
+    await admin.query(
+      `INSERT INTO app_private.staff_membership
+        (tenant_id, actor_id, permission)
+       VALUES ($1, $2, 'owner')`,
+      [venue, revokedActor],
+    );
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const first = await createAction(input, venue, revokedActor);
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { action: { actionId: string } };
+
+    await admin.query(
+      `DELETE FROM app_private.staff_membership
+       WHERE tenant_id = $1 AND actor_id = $2`,
+      [venue, revokedActor],
+    );
+
+    const retry = await createAction(input, venue, revokedActor);
+    expect(retry.status).toBe(403);
+    expect(await retry.json()).toEqual({ error: 'forbidden' });
+
+    const persisted = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(persisted.rows).toEqual([{ action_id: firstBody.action.actionId }]);
+  });
+
+  it('rejects a menu revision that is not registered for the route venue', async () => {
+    const input = createInput(crypto.randomUUID(), crypto.randomUUID());
+    const response = await createAction(input);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: 'menu_revision_not_found',
+    });
+
+    const receipts = await admin.query(
+      `SELECT idempotency_key
+       FROM app_private.es_command
+       WHERE tenant_id = $1 AND actor_id = $2
+         AND idempotency_key = $3`,
+      [venue, actor, input.commandId],
+    );
+    expect(receipts.rows).toHaveLength(0);
+  });
+});
