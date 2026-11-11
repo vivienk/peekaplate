@@ -107,6 +107,12 @@ p {
   font-weight: 500;
 }
 
+.pp-saved__icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
 .pp-logo {
   display: flex;
   flex-direction: column;
@@ -467,16 +473,39 @@ main:has(> .pp-detail) {
 }
 
 .pp-search-close {
+  display: inline-flex;
   flex: none;
   width: 32px;
   height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 0;
   border-radius: 999px;
-  background: #2d3038;
+  border: 1px solid rgba(255, 248, 237, 0.1);
+  background: rgba(255, 248, 237, 0.05);
   color: #fafafa;
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
+}
+
+.pp-search-close__icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) {
+  .pp-search-close:hover {
+    background: #f89537;
+    border-color: #f89537;
+  }
+  .pp-search-close:hover .pp-search-close__icon {
+    filter: brightness(0);
+  }
+}
+.pp-search-close:active {
+  background: #05060a;
+  border-color: #05060a;
 }
 
 .pp-search-close:focus-visible,
@@ -569,14 +598,46 @@ main:has(> .pp-detail) {
   width: 100%;
 }
 
-.pp-detail__back {
-  border: 0;
-  background: #2d3038;
-  color: #fafafa;
+.pp-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(255, 248, 237, 0.1);
   border-radius: 999px;
-  padding: 8px 12px;
+  background: rgba(255, 248, 237, 0.05);
   cursor: pointer;
-  font-size: 20px;
+}
+
+.pp-detail__back-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) {
+  .pp-back:hover:not(:disabled) {
+    background: #f89537;
+    border-color: #f89537;
+  }
+  .pp-back:hover:not(:disabled) .pp-back__icon {
+    filter: brightness(0);
+  }
+}
+.pp-back:active:not(:disabled) {
+  background: #07080e;
+  border-color: #07080e;
+}
+.pp-back:focus-visible {
+  outline: 2px solid #41b0ef;
+  outline-offset: 2px;
+}
+.pp-back:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #52555c;
 }
 
 .pp-detail__back {
@@ -734,6 +795,26 @@ main:has(> .pp-detail) {
   color: #fafafa;
 }
 
+/* Icons (decorative). */
+.pp-logo__image {
+  display: block;
+  height: 32px;
+  width: auto;
+}
+
+.pp-search__icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.pp-chip__icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
 .pp-allergy-note {
   font-size: 12px;
   color: #fca5a5;
@@ -779,10 +860,27 @@ main:has(> .pp-detail) {
 }
 
 .pp-ingredient__icon {
-  width: 36px;
+  /* width: 36px;
   height: 36px;
   background: #2d3038;
-  border-radius: 8px;
+  border-radius: 8px; */
+
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.pp-save-heart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-save-heart__icon img {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .pp-ingredient__name {

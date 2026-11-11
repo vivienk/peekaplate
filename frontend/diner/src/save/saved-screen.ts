@@ -9,6 +9,7 @@ import { mountSaveHeart, mountToastArea } from './mount';
 import type { SaveState } from './save-state';
 import { type SavedItem, savedItems, shortlistViewedPayload } from './saved-screen-model';
 import './saved-screen.css';
+import { UI_ICONS } from '../menu/icons';
 
 export const SESSION_ONLY_NOTICE = 'Saved for this session only';
 const PLACEHOLDER_TEXT = 'More information needed — pending restaurant input';
@@ -47,9 +48,16 @@ export function renderSavedScreen(
   // Not .pp-saved: that is the menu header's Saved button.
   const screen = el('div', 'pp-saved-screen');
   const header = el('header', 'pp-saved__topbar');
-  const back = el('button', 'pp-saved__back', '←');
+  const back = el('button', 'pp-back pp-saved__back');
   back.type = 'button';
   back.setAttribute('aria-label', 'Back to menu');
+  const backIcon = el('img', 'pp-back__icon');
+  backIcon.src = UI_ICONS.back;
+  backIcon.alt = '';
+  backIcon.width = 16;
+  backIcon.height = 16;
+  backIcon.setAttribute('aria-hidden', 'true');
+  back.append(backIcon);
   back.addEventListener('click', onBack);
   header.append(back, el('h1', 'pp-saved__title', 'Saved Dishes'));
 
@@ -76,7 +84,11 @@ export function renderSavedScreen(
       'aria-label',
       item.kind === 'complete' ? `Save ${item.dish.name}` : 'Remove this dish from Saved',
     );
-    const icon = el('span', '', '♥');
+    const icon = el('img', 'pp-saved__heart-icon');
+    icon.src = UI_ICONS.heart;
+    icon.alt = '';
+    icon.width = 24;
+    icon.height = 24;
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon);
     stopHearts.push(

@@ -2,8 +2,12 @@
 // screens always show the text label next to them and mark the image alt="" / aria-hidden, so a
 // missing icon never hides information. Allergen and dietary icons are keyed by the approved
 // values in ./types; ingredient icons by ingredient name, because the bundle has no icon field.
+
+import back from '../assets/icons/ui/back-navigation.svg';
+import close from '../assets/icons/ui/close.svg';
 import heart from '../assets/icons/ui/heart.svg';
 import search from '../assets/icons/ui/search.svg';
+import unsaveHeart from '../assets/icons/ui/unsave-heart.svg';
 import { ALLERGENS, DIETARY_VALUES, LEGACY_ALLERGEN_CODES } from './types';
 
 type UrlModules = Record<string, string>;
@@ -42,7 +46,7 @@ const allergenIcons = byKey(glob.allergens);
 const dietaryIcons = byKey(glob.dietary);
 const ingredientIcons = byKey(glob.ingredients);
 
-export const UI_ICONS = { heart, search } as const;
+export const UI_ICONS = { heart, search, back, unsaveHeart, close } as const;
 
 // Accepts the label screens show ("Nuts"), the code ("nuts") or a legacy code ("tree nut").
 export function allergenIcon(value: string): string | null {

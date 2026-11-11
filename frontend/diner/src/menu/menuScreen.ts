@@ -25,6 +25,7 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { UI_ICONS } from './icons';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
 import { menuRouteFromPath } from './route';
@@ -204,14 +205,17 @@ function renderMenu(
       <header class="pp-header">
         ${savedHeaderMarkup()}
         <div class="pp-logo">
-          <span class="pp-logo__emblem" aria-hidden="true"></span>
+          ${
+            menu.restaurant.logo
+              ? `<img class="pp-logo__image" src="${escapeHtml(menu.restaurant.logo.url)}" alt="" width="${menu.restaurant.logo.width}" height="${menu.restaurant.logo.height}" />`
+              : '<span class="pp-logo__emblem" aria-hidden="true"></span>'
+          }
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
-          <span aria-hidden="true">⌕</span>
+          <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="24" height="24" />
         </button>
       </header>
-      ${toastAreaMarkup()}
       ${
         import.meta.env.VITE_OWNER_SIGN_IN_URL
           ? `<p class="pp-owner-link-wrap"><a class="pp-owner-link" href="${escapeHtml(import.meta.env.VITE_OWNER_SIGN_IN_URL)}" target="_blank" rel="noopener noreferrer">Restaurant owner? Sign in</a></p>`
@@ -230,6 +234,7 @@ function renderMenu(
           )
           .join('')}
       </nav>
+      ${toastAreaMarkup()}
 
       <section class="pp-dishes" aria-live="polite">
         ${blocks

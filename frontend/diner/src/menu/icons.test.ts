@@ -57,5 +57,8 @@ describe('menu icons', () => {
   it('exposes the heart and search UI icons', () => {
     expect(UI_ICONS.heart).toMatch(svgUrl);
     expect(UI_ICONS.search).toMatch(svgUrl);
+    expect(UI_ICONS.back).toMatch(svgUrl);
+    expect(UI_ICONS.unsaveHeart).toMatch(svgUrl);
+    expect(UI_ICONS.close).toMatch(svgUrl);
   });
 });

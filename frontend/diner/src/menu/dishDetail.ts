@@ -1,4 +1,5 @@
 import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
+import { allergenIcon, dietaryIcon, ingredientIcon, UI_ICONS } from './icons';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -11,12 +12,19 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Icons are decoration only: the text label always stays, and the image is hidden from screen readers.
+function iconMarkup(src: string | null, className: string, size: number): string {
+  if (!src) return '';
+  return `<img class="${className}" src="${escapeHtml(src)}" alt="" aria-hidden="true" width="${size}" height="${size}" />`;
+}
+
 function allergenChips(dish: CompleteDish): string {
   if (dish.allergens.length === 0) return '';
   return dish.allergens
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Contains ${escapeHtml(value)}">
+          ${iconMarkup(allergenIcon(value), 'pp-chip__icon', 16)}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -30,6 +38,7 @@ function dietaryChips(dish: CompleteDish): string {
     .map(
       (value) => `
         <span class="pp-chip" aria-label="Dietary info: ${escapeHtml(value)}">
+          ${iconMarkup(dietaryIcon(value), 'pp-chip__icon', 16)}
           <span class="pp-chip__text">${escapeHtml(value)}</span>
         </span>
       `,
@@ -42,6 +51,7 @@ function ingredientTiles(dish: CompleteDish): string {
     .map(
       (ingredient) => `
         <div class="pp-ingredient" role="group" aria-label="${escapeHtml(ingredient.name)}">
+          ${iconMarkup(ingredientIcon(ingredient.name), 'pp-ingredient__icon', 32)}
           <p class="pp-ingredient__name">${escapeHtml(ingredient.name)}</p>
         </div>
       `,
@@ -67,7 +77,7 @@ export function renderDishDetail(
   container.innerHTML = `
     <div class="pp-detail">
       <header class="pp-detail__topbar">
-        <button class="pp-detail__back" type="button" aria-label="Back to menu">←</button>
+        <button class="pp-back pp-detail__back" type="button" aria-label="Back to menu"><img class="pp-detail__back-icon" src="${UI_ICONS.back}" alt="" aria-hidden="true" width="16" height="16" /></button>
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
         ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>

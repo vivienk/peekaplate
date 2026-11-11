@@ -65,7 +65,7 @@
  * below any notch or status bar (review #25).
  */
 .pp-toast-area {
-  position: sticky;
+  position: relative;
   top: max(8px, env(safe-area-inset-top));
   z-index: 10;
   height: 0;
@@ -75,7 +75,10 @@
 .pp-toast {
   --pp-toast-icon-mark: var(--pp-color-neutral-50);
   position: absolute;
-  top: 0;
+  left: 0;
+  right: 0;
+  top: 8px;
+  z-index: 10;
   inset-inline: 0;
   box-sizing: border-box;
   display: flex;
@@ -86,7 +89,7 @@
   margin: 0 auto;
   padding: 0 4px 0 12px;
   border: 1px solid;
-  border-radius: var(--pp-radius-16);
+  border-radius: var(--pp-radius-8);
   font-family: "Inter", system-ui, sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -175,10 +178,6 @@ main:has(> .pp-saved-screen) {
   padding: 12px 0;
 }
 
-.pp-saved__back {
-  font-size: 20px;
-}
-
 .pp-saved__title {
   margin: 0;
   font-size: 18px;
@@ -242,6 +241,17 @@ main:has(> .pp-saved-screen) {
 .pp-saved__save {
   color: var(--pp-color-orange-500);
   font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.pp-saved__heart-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
 }
 
 /* Empty state (Saved_Empty, 722:8589): centred in the space below the header. */
