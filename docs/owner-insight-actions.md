@@ -48,7 +48,7 @@ All routes are under `/venues/:venueId/owner-insight-actions`.
 Optional query parameters:
 - `insightKey`: exact insight-key filter.
 - `menuRevisionId`: exact menu-revision UUID filter.
-- `limit`: 1â€“100, default 50.
+- `limit`: 1 to 100, default 50.
 
 The response uses `schemaVersion: 1` and an `actions` array. Each action includes its ID, venue, insight key, menu and revision, category, status, note, version, actor metadata, and timestamps.
 
@@ -167,27 +167,25 @@ Errors use a JSON object containing an error code.
 
 ## Verification status
 
-Local verification completed:
-- Contract tests: 8 passed.
-- Owner-action service tests: 9 passed.
-- HTTP route tests: 62 passed.
-- Full Vitest suite: 64 files, 1,008 passed, 4 skipped.
-- Node script tests: 67 passed.
-- TypeScript workspace checks: 7 projects passed.
-- Biome check passed.
-- Documentation link check passed.
-- Context graph check passed: 13 modules and 10 handoffs.
-- PostgreSQL pgTAP: all 10 suites passed, including 17 owner-action assertions.
-- PostgreSQL integration tests: 5 files, 81 passed.
-- The latest database run passed all 10 pgTAP suites and all 81 PostgreSQL integration tests. The final local Worker demo smoke step timed out after the Worker reported ready; this remains a local harness verification issue.
+November 11 independent local verification on the reconciled develop candidate:
 
-The recursive workspace build completed successfully with exit code 0: backend Wrangler staging dry-run, console production build, and diner production build all succeeded. No deployment was performed.
+- PASS: pnpm exec vitest run backend/src/comparison-report.test.ts backend/src/owner-insight-actions.test.ts packages/contracts/src/owner-actions.test.ts backend/src/index.test.ts - 101 tests, 1.49 seconds.
+- PASS: pnpm verify test:db - 298 pgTAP assertions, 114 real PostgreSQL/Worker integration tests; integration phase 24.39 seconds. The local authenticated Worker smoke test also passed.
+- Additional HTTP cases prove competing updates produce one success and one version conflict, a previous update receipt does not revert later state, changed command payloads conflict, and an owner of two venues cannot list or update an action through the wrong venue.
+- The full database run initially failed six comparison-reader cases at the existing five-second statement timeout. Materializing the requested tenant/time-window fact set once removed repeated view expansion. The same full runner now passes, and the eleven focused comparison cases include 1,000 unrelated synthetic observations.
+- PASS: `pnpm check` - 1,397 unit tests (four optional skips), 74 script tests, strict types, lint, context and documentation links. Unit phase: 7.14 seconds.
+- PASS: `pnpm verify build` - both frontends and staging Worker dry-run, approximately 6.84 seconds. No deployment.
+- PASS: `pnpm exec playwright test --workers=2` - 137 Chromium cases in 1.3 minutes, including the previously reported menu-trigger consent case.
+- PASS: `pnpm exec playwright test --config playwright.posthog.config.ts --workers=2` - nine SDK/privacy cases in 13.5 seconds. The private verification wrapper used the repository runner to preserve child failures and record failures in the ledger.
+- Previous author counts and failures describe earlier revisions; the results above are the current independent run.
+
+These checks use local disposable PostgreSQL and a running local Worker. They do not establish hosted Supabase/Hyperdrive behavior or a complete owner-dashboard workflow.
 
 ## Outstanding acceptance gates
 
 - Hosted staging migration and deployment.
 - Live staging authorization and cross-tenant verification.
-- Independent architecture and security review.
+- Release review of the eventual hosted migration and API deployment.
 - Final product alignment on editor permissions.
 - Durable report-to-insight identity and mapping.
 - Full staging workflow verification.

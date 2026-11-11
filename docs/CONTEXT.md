@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff, publication, public-menu, analytics, retrieval and observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse and validates shared delivery identity. Queue traffic_class is server-derived; normalized observation.v2 rejects client authority/private fields. Owner-report v1 enforces ten-session cohorts and complementary suppression. Review, owner-AI, ingredient and order-outcome contracts remain bounded and strict. S5-DATA-10 adds versioned owner-action create/update/list contracts; insightKey remains opaque pending durable owner-report identity.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -40,9 +40,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/review-persistence.test.ts",
         "packages/contracts/src/owner-ai.ts",
         "packages/contracts/src/owner-ai.test.ts",
-        "packages/contracts/src/owner-actions.ts",
-        "packages/contracts/src/owner-actions.test.ts",
-        "docs/owner-insight-actions.md",
         "packages/contracts/src/public-menu-integrity.test.ts",
         "packages/contracts/fixtures/public-menu-bundle.v1/README.md",
         "packages/contracts/fixtures/public-menu-bundle.v1/bundle.json",
@@ -62,7 +59,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/ingredient-intelligence.ts",
         "packages/contracts/src/ingredient-intelligence.test.ts",
         "processing/tests/fixtures/ingredient-review.json",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "packages/contracts/src/comparison-report.ts",
+        "packages/contracts/src/comparison-report.test.ts",
+        "packages/contracts/src/owner-actions.ts",
+        "packages/contracts/src/owner-actions.test.ts",
+        "docs/owner-insight-actions.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -70,7 +72,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "7dfd04a4392fb587cb97172ded21f5f9d0b051a22629a58a5edfed2ba027a1c6"
+      "sourceFingerprint": "54d6c4965afe366342c51401678d530e38b5a16b9816e5d8c483681c68a0f2e5"
     },
     {
       "id": "tokens",
@@ -240,7 +242,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical observation and fact persistence; retries deduplicate and conflicting reuse is quarantined. Local recovery tests cover checkpoints, missing/corrupt archives, replay and owner-view exclusion; hosted recovery gates remain pending. Authenticated menu upload verifies current membership before bytes and locks membership through idempotent job creation. Extraction and order imports retain bounded private artifacts, owner authorization and explicit activation gates. S5-DATA-10 adds owner-only insight-action routes and transactional persistence linked to menu revisions, with idempotent receipts, optimistic version checks and tenant RLS.",
+      "summary": "Worker enforces staff JWT/current venue authority, commands/publication, signed menu reads, canonical ingestion/Queue consumption, menu extraction and review persistence. Owner HTTP reports remain synthetic-source/environment gated. Internal period comparisons read live tenant-scoped facts with per-period session cohorts, ordered qualifying comparisons and complementary suppression of rates/deltas/counts that expose small opened cohorts. Restored DATA05 fixtures and real PostgreSQL cases cover privacy, traffic filtering, cross-publication deduplication and denied venue access. No comparison HTTP route, deployment or production report activation is added. Owner-only insight actions lock membership, validate menu revision and atomically store versioned writes with command receipts.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -327,11 +329,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/recommendation.ts",
         "backend/src/owner-ai/recommendation.test.ts",
         "docs/owner-ai.md",
-        "backend/src/owner-insight-actions.ts",
-        "backend/src/owner-insight-actions.test.ts",
-        "migrations/20261109120000_owner_insight_actions.sql",
-        "tests/db/owner_insight_actions.sql",
-        "docs/owner-insight-actions.md",
         "backend/src/owner-ai/evaluation.test.ts",
         "scripts/evaluate-owner-ai.mjs",
         "scripts/evaluate-owner-ai.test.mjs",
@@ -349,7 +346,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/upload.test.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/service.test.ts",
-        "backend/src/order-ingestion/order-ingestion.integration.ts"
+        "backend/src/order-ingestion/order-ingestion.integration.ts",
+        "backend/src/comparison-report.ts",
+        "backend/src/comparison-report.test.ts",
+        "backend/src/comparison-report.integration.ts",
+        "backend/src/comparison-report.data05.test.ts",
+        "tests/data05/comparison_privacy_cases.json",
+        "tests/data05/comparison_revision_cases.json",
+        "tests/data05/evidence/validation_findings.md",
+        "tests/data05/evidence/validation_results.txt",
+        "docs/comparison-reporting.md",
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/owner-insight-actions.test.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql",
+        "docs/owner-insight-actions.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -362,12 +373,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c569674aff8a498a149e465cfbaa718ccb616abec9204394fcedc3bbbf16c1d9"
+      "sourceFingerprint": "d7ed42cb624dd53cb596dffcadb567acc8cc08bd0557247de4ace4dcb94718bf"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted. Order imports remain gated by owner authority, reviewed mappings and explicit activation; hosted setup is separate.",
+      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -393,7 +404,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/review_persistence.sql",
         "migrations/20261107120000_order_outcomes.sql",
         "migrations/20261108120000_pos_mapping_reviewer_provenance.sql",
-        "tests/db/order_outcomes.sql"
+        "tests/db/order_outcomes.sql",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -404,7 +417,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "43c52dbacf8dd0e4d28cebdbe04a449faaa4af48b4fa217446af62c7a26e6fe3"
+      "sourceFingerprint": "5fd8365667de544855c7f182fdb07f49c859235e18ac9e5457f0e9b0706b2883"
     },
     {
       "id": "measurement",
@@ -490,7 +503,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "807d411ebc1dbf19816016cb195b7fd15b3b3b12aeb7733ef8f12f1fc06cba93"
+      "sourceFingerprint": "7f792284551e981bfe468028faaef7ed3aba19b1d8512c2786e39f07922d8171"
     },
     {
       "id": "agents",
@@ -557,7 +570,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo extraction preserves source-linked review drafts, bounded OCR/model recovery, exact source spans and candidate metadata; unresolved layout conflicts abstain and originals remain unchanged. Vision-first processing keeps private bounded attempts local, sanitizes provider failures and retains extraction-mode provenance. Ingredient sidecars are review-only, with explicit unavailability and vision abstention; they never establish independent grounding or approval. Defaults and queues remain unchanged; broad layout recall and hosted release acceptance remain unverified.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -685,30 +698,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "summary": "S5-DATA-10 adds versioned owner insight-action contracts, owner-only authenticated create/update/list routes, transactional persistence, exact tenant/menu/revision linkage, forced tenant RLS, idempotent command receipts and optimistic version checks. Contract, service, HTTP and repository checks pass. The owner-action pgTAP suite passes all 17 assertions; all 81 PostgreSQL integration tests pass. The final local Worker demo smoke step timed out after the Worker reported ready. insightKey remains an opaque venue-scoped key: owner_report.v1 currently has no durable insight identifier, so semantic linkage is not yet verified. Owner-only authorization is the conservative implementation pending product alignment on editor access.",
       "modules": [
-        "contracts",
         "backend",
-        "database"
+        "processing",
+        "delivery"
       ],
-      "next": "Open the feature PR with local Worker demo smoke timeout disclosed; request architecture and security review. Before UI integration, align durable report identity and the owner/editor/viewer/revoked authorization matrix. No hosted migration or deployment is claimed."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
-      "modules": [
-        "diner",
-        "analytics"
-      ],
-      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
+      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
+      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
     },
     {
       "date": "2026-11-10",
@@ -777,6 +773,38 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog.md"
       ],
       "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "summary": "PR134 restores PR123 validation files lost from its later branch revision while preserving current develop. Two real PostgreSQL regressions failed before fixes: a one-session opened cohort reconstructed via open_rate/count, and valid menu-card comparison engagement reported zero. Both now pass. Nine restored mocked-row cases retain independent denominator checks with complementary suppression. The cross-publication JSON fixture now executes against SQL and yields seventeen distinct sessions. Full local DB runner passes 281 pgTAP assertions and 107 integration cases; focused reader suite passes eleven cases. Repository checks pass: 1374 unit, 74 script tests, types/lint/context/docs and both builds/Worker dry-run. No UI runtime changed.",
+      "sources": [
+        "backend/src/comparison-report.ts",
+        "backend/src/comparison-report.integration.ts",
+        "backend/src/comparison-report.data05.test.ts",
+        "docs/comparison-reporting.md"
+      ],
+      "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "PR142 owner-only insight-action HTTP/persistence/contracts preserve develop PR134/123. Shared context/history conflicts and stale local port/evidence docs are reconciled. New real-Worker cases cover competing updates, old receipt replay, changed command reuse and dual-owner tenant isolation. A full DB run exposed six inherited comparison-reader statement timeouts; tenant/time-scoped materialization replaces repeated view expansion while preserving period/privacy/order semantics. The full runner passes 298 SQL assertions and 114 DB/Worker cases; 11 focused comparison cases include 1000 unrelated synthetic observations. pnpm check passes 1397 unit (4 optional skips), 74 script tests, types/lint/context/docs. Both builds/Worker dry-run, 137 Chromium and 9 SDK/privacy tests pass.",
+      "sources": [
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/dish.integration.ts",
+        "backend/src/comparison-report.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "docs/owner-insight-actions.md"
+      ],
+      "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
     }
   ]
 }

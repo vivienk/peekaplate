@@ -496,7 +496,7 @@ after the correction. `pnpm verify test:db` passed the 73 SQL assertions, 20 rea
 integration cases and the fresh local startup/demo/cleanup path. This changes
 disposable local/CI startup only, without a hosted database or application change.
 
-## ERR-20261025-PREVIEW-001 Ã‚Â· Local verification prerequisites
+## ERR-20261025-PREVIEW-001 · Local verification prerequisites
 
 Initial sandboxed dependency installation could not resolve the package registry; retried with network permission. Read-only Cloudflare inventory failed first on the Python certificate store and then on the system TLS transport. No TLS verification was disabled; no provider write was attempted. These failures do not establish missing cloud projects or invalid GitHub-held credentials.
 
@@ -656,7 +656,7 @@ Sanitization now generates the marker from a checked SHA, rejects supplied
 markers and verifies both deployed aliases against that SHA before announcing
 readiness. Focused tests reject a stale HTTP 200 marker and pass the matching
 commit; provider writes are not part of these local tests.
-## ERR-20261026-PREVIEW-REPAIR Ã‚Â· Hosted resolution
+## ERR-20261026-PREVIEW-REPAIR · Hosted resolution
 
 Maintainer-authorized PR47 main merge ab6f9c4 registered the trusted workflow.
 Actual GitHub run 40393096652 uploaded the exact synthetic PR48 head, verified
@@ -1308,7 +1308,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-10-30T19:38:40.134Z","exitCode":1}
 ```
 
-## 2026-10-30 Ã¢â‚¬â€ AI-01 develop-sync verification environment limit
+## 2026-10-30 — AI-01 develop-sync verification environment limit
 
 `pnpm verify context:check docs:check` could not start the checks in the fresh
 Windows agent worktree: pnpm's automatic dependency installation failed with
@@ -1321,7 +1321,7 @@ environment, then verify the exact pushed merge revision in GitHub CI.
 <!-- automatic observation; not root cause -->
 ```json
 
-## 2026-10-31 Ã¢â‚¬â€ AI-01 reconciliation verification limits
+## 2026-10-31 — AI-01 reconciliation verification limits
 
 The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
 
@@ -1380,7 +1380,7 @@ Full frozen-install workspace validation remains delegated to Linux CI.
 {"kind":"resolution","references":{"check":"context:check","timestamp":"2026-11-02T22:42:55.035Z"},"status":"resolved","cause":"While merging develop into S3-DIN-02.2 after #68 merged, the combined diner summary came to 1140 characters, so the resolution script stopped before writing docs/CONTEXT.md, and the file was staged with its conflict markers still in it; pnpm check then failed context:check.","prevention":"Check that a conflicted file has no markers left and that the resolution script succeeded before staging it, and keep node summaries under 1000 characters.","regression":"Rewrote the diner summary to 987 characters without dropping any module facts, added the DIN-02.2 files, refreshed fingerprints; no conflict markers remain and pnpm check passes."}
 ```
 
-## 2026-11-04 Ã¢â‚¬â€ AI stack reconciliation verification
+## 2026-11-04 — AI stack reconciliation verification
 
 Frozen installation in the Windows agent worktree failed before checks with
 EPERM while pnpm registered its project symlink. A workspace-local store gave
@@ -2161,13 +2161,13 @@ historical evidence; this passing run does not establish their root cause.
 <!-- automatic observation; not root cause -->
 ```json
 
-## 2026-10-31 Ã¢â‚¬â€ AI-01 reconciliation verification limits
+## 2026-10-31 — AI-01 reconciliation verification limits
 
 The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
 
 Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
 
-## 2026-10-31 Ã¢â‚¬â€ Offline AI evaluation verification boundary
+## 2026-10-31 — Offline AI evaluation verification boundary
 
 The existing verification-runner test that invokes real pnpm failed before its
 check because automatic installation again hit the Windows store-symlink EPERM.
@@ -2453,7 +2453,7 @@ the unchanged outbox-capacity case and the three refresh focus regressions.
 The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
 
 
-## PR117 reconciliation and capture-reference validation Ã¢â‚¬â€ 2026-11-10
+## PR117 reconciliation and capture-reference validation — 2026-11-10
 
 The reconciled package declared Zod in both backend dependency sections; frozen
 installation rejected the resulting importer mismatch. Kept the existing exact
@@ -2469,7 +2469,7 @@ approval. Focused tests pass after the fix. Eight actual CLI checks with a Pytho
 no hosted data, resources or publication state changed.
 
 
-## Published diner connection Ã¢â‚¬â€ 2026-11-10
+## Published diner connection — 2026-11-10
 
 Two focused regressions failed before implementation: the default loader rejected
 valid hashed bytes, and publication suspension did not exist. A separate timer
@@ -2516,8 +2516,8 @@ repository template labels were restored before the final CI run.
 
 Main did not contain the owner-report route required by merged PR130. A narrow
 backport preserves the existing report/contract implementation and excludes the
-separate extraction release. Its copied database test uses mainÃ¢â‚¬â„¢s token(subject)
-helper instead of developÃ¢â‚¬â„¢s newer token({sub}) signature; typecheck and the
+separate extraction release. Its copied database test uses main’s token(subject)
+helper instead of develop’s newer token({sub}) signature; typecheck and the
 SQL-backed HTTP suite pass after that compatibility correction. An initial lint
 check rejected Windows line endings in the edited Wrangler config; formatting
 and context refresh fixed it without changing bindings. The final full check
@@ -2586,7 +2586,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-11T05:40:43.763Z","exitCode":1}
 ```
 
-## Save-screen integration review Ã¢â‚¬â€ November 10, 2026
+## Save-screen integration review — November 10, 2026
 
 ```json
 {"id":"ERR-20261110-SAVE-REFRESH","status":"resolved","area":"saved-screen-publication-refresh","cause":"An open Saved screen retained old dish objects after a new publication was loaded, allowing a later opening to mix publication and dish revisions.","prevention":"Refresh the Saved screen from the new menu without recording another shortlist view.","sources":["frontend/diner/src/menu/menuScreen.ts","frontend/diner/src/save/saved-screen.ts"],"regression":"The browser case Saved uses the refreshed dish revision before opening its detail failed before the fix and passed afterward."}
@@ -2687,7 +2687,7 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 ```
 
 
-## PR78 diner trigger integration and e2e reconciliation Ã¢â‚¬â€ 2026-11-11
+## PR78 diner trigger integration and e2e reconciliation — 2026-11-11
 
 Merging develop into the DIN-01 triggers branch produced a typecheck failure (a
 missing teardownTracking declaration and a removed entrySourceFromSearch import) and
@@ -2705,7 +2705,7 @@ alone, so it is treated as timing-sensitive under concurrency. Prevention: give
 hand-driven tracking specs a page that emits nothing, and assert on event types, not
 totals, wherever the real screen is loaded.
 
-## DIN-01 trigger review Ã¢â‚¬â€ November 11, 2026
+## DIN-01 trigger review — November 11, 2026
 
 ```json
 {"id":"ERR-20261111-DINER-TRIGGER-LIFECYCLE","status":"resolved","area":"diner-consent-and-publication-attribution","cause":"The screen started clocks and cached exposure IDs even when live collection was disallowed; a publication swap also retained those IDs and omitted its readable menu event.","prevention":"Gate UI measurement, reset clocks/references at consent changes, record the refreshed publication and discard older exposure references.","regression":"Real Chromium consent-transition and dropped-exposure cases failed before correction; four synthetic live-screen cases pass afterward. The refresh case also checks matching new dish revisions and once-per-publication menu events. No hosted provider is called.","sources":["frontend/diner/src/menu/menuScreen.ts","tests/e2e/menu-triggers-live.spec.ts"]}
@@ -2741,3 +2741,29 @@ Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawa
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T12:05:43.616Z","exitCode":1}
 ```
+
+## PR134 comparison review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-COMPARISON-READER","status":"resolved-locally","cause":"An open rate and exposure count reconstructed a protected small opened cohort; comparison engagement incorrectly required compare_view entry instead of an ordered prior opening.","prevention":"Complementary suppression clears both-period opening-rate values/delta/count when either opened cohort is 1–9; comparisons follow established tenant/session/participant and producer-order rules.","regression":"Real PostgreSQL original reader: two failures and one pass. After correction the two regressions pass; expanded focused DB suite passes eleven cases, including the restored seventeen-session JSON fixture. Full runner passes 281 SQL assertions and 107 integration cases.","sources":["backend/src/comparison-report.ts","backend/src/comparison-report.integration.ts","tests/data05/comparison_privacy_cases.json"]}
+```
+
+The later PR134 branch no longer contained PR123 validation files. Restore only its five test/fixture/evidence files from reviewed a8cd00b, preserve develop code/context, and record new validation separately from historical results. Docker engine was stopped; Docker Desktop start restored it. Only disposable PeekaPlate test containers were launched and cleanup was verified.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-11T19:20:50.607Z","exitCode":1}
+```
+
+## PR142 independent integration review - November 11, 2026
+
+The first full database run hit the existing five-second statement timeout in six comparison-reader cases inherited from develop; 108 other integration tests passed. An isolated eleven-case run passed in 2.80 seconds, so a standalone pass did not clear the combined-run failure. The reader now materializes its tenant/time-scoped live fact view once for both periods and linked-opening probes while preserving each period bound, ordering, consent-derived live facts and suppression rules. The full runner passes 298 SQL assertions and 114 integration cases in a 24.39-second integration phase; the local Worker smoke check passes. New HTTP coverage includes competing updates, historical receipt replay, conflicting reuse and dual-owner cross-venue isolation.
+
+The shared context/error-ledger conflict was reconciled by preserving both branches and current PR134/123 validation, then refreshing affected fingerprints. Local port documentation now matches the authenticated fixture Worker on 8790. No hosted migration or deployment occurred. Review-only helper quoting/path mistakes were corrected with explicit file paths and script files; no runtime credentials were involved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T19:29:09.584Z","exitCode":1}
+```
+
+The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.

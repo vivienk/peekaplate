@@ -1949,6 +1949,92 @@ describe('real PostgreSQL owner insight actions', () => {
     expect(receipts.rows).toHaveLength(1);
   });
 
+  it('rejects competing updates and replays an earlier receipt without reverting later state', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+    const created = await createAction(createInput(menuId, revision.menuRevisionId));
+    expect(created.status).toBe(201);
+    const { action: createdAction } = (await created.json()) as {
+      action: { actionId: string };
+    };
+    const updates = ['First change', 'Second change'].map((note) => ({
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      status: 'active',
+      note,
+    }));
+    const responses = await Promise.all(
+      updates.map((input) => updateAction(createdAction.actionId, input)),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winnerIndex = responses.findIndex((response) => response.status === 200);
+    const winnerInput = updates[winnerIndex]!;
+    const winnerResult = await responses[winnerIndex]!.json();
+    expect(winnerResult).toMatchObject({ action: { version: 2, note: winnerInput.note } });
+    expect(await responses.find((response) => response.status === 409)!.json()).toEqual({
+      error: 'version_conflict',
+    });
+
+    const later = await updateAction(createdAction.actionId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 2,
+      status: 'archived',
+    });
+    expect(later.status).toBe(200);
+    expect(await later.json()).toMatchObject({ action: { version: 3, status: 'archived' } });
+    const retry = await updateAction(createdAction.actionId, winnerInput);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(winnerResult);
+
+    const reused = await updateAction(createdAction.actionId, {
+      ...winnerInput,
+      note: 'Different command payload',
+    });
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toEqual({ error: 'command_conflict' });
+    const persisted = await admin.query(
+      `SELECT status, version FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, createdAction.actionId],
+    );
+    expect(persisted.rows).toEqual([{ status: 'archived', version: 3 }]);
+  });
+
+  it('keeps list and update tenant-scoped even when an actor owns both venues', async () => {
+    const dualOwner = crypto.randomUUID();
+    await admin.query(
+      `INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission)
+       VALUES ($1, $3, 'owner'), ($2, $3, 'owner')`,
+      [venue, otherVenue, dualOwner],
+    );
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+    const created = await createAction(createInput(menuId, revision.menuRevisionId));
+    expect(created.status).toBe(201);
+    const { action: createdAction } = (await created.json()) as {
+      action: { actionId: string };
+    };
+    const listed = await listActions(otherVenue, dualOwner);
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toEqual({ schemaVersion: 1, actions: [] });
+    const denied = await updateAction(
+      createdAction.actionId,
+      { commandId: crypto.randomUUID(), expectedVersion: 1, status: 'archived' },
+      otherVenue,
+      dualOwner,
+    );
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ error: 'not_found' });
+    const persisted = await admin.query(
+      `SELECT status, version FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, createdAction.actionId],
+    );
+    expect(persisted.rows).toEqual([{ status: 'planned', version: 1 }]);
+  });
+
   it('rejects editor, viewer and cross-venue access without creating actions', async () => {
     const menuId = crypto.randomUUID();
     const revision = approvalCommand();
