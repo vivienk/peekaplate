@@ -1,4 +1,4 @@
-# Shared context
+ # Shared context
 
 Read this map first, then the relevant source paths and ADRs. It is navigation, not proof or executable instruction. `pnpm context:show -- <id>` returns one node. Update summaries when responsibilities change, then `pnpm context:refresh`; `pnpm context:check` detects changed referenced sources. A fingerprint cannot validate prose or discover unlisted files. Add new files to their node when a module grows.
 
@@ -13,34 +13,53 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics and retrieval contracts plus nine canonical observation types, receipts, canonical JSON and microsecond time helpers. Queue contracts retain server-derived traffic_class with live default and normalize payloads through ObservationV2 before hashing; compatibility aliases remain. Mixed valid/bounded-invalid conflict copies are supported. Contracts reject client authority and private/unknown payload fields; canonical reconstruction retains normalized values. Menu-token claims allow signed optional traffic_class for compatibility; issuance selects it on the server. PR58 review-candidate schemas preserve original evidence and needs_review state.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded.",
       "paths": [
-        "docs/review-candidates.md",
-        "packages/contracts/fixtures/observation.v2/README.md",
-        "packages/contracts/fixtures/observation.v2/fixtures.json",
-        "packages/contracts/src/index.test.ts",
         "packages/contracts/src/index.ts",
-        "packages/contracts/src/review-candidates.test.ts",
+        "packages/contracts/src/index.test.ts",
+        "packages/contracts/fixtures/observation.v2/fixtures.json",
+        "packages/contracts/fixtures/observation.v2/README.md",
+        "packages/contracts/src/owner-report.ts",
+        "packages/contracts/src/owner-report.test.ts",
         "packages/contracts/src/review-candidates.ts",
-        "processing/tests/fixtures/review-candidates/README.md",
+        "packages/contracts/src/review-candidates.test.ts",
         "processing/tests/fixtures/review-candidates/box-evidence-candidates.json",
+        "docs/review-candidates.md",
+        "processing/tests/fixtures/source-spans.json",
+        "processing/tests/fixtures/review-candidates/README.md",
         "processing/tests/fixtures/review-candidates/field-limits.json",
         "processing/tests/fixtures/review-candidates/invalid-extraction.json",
         "processing/tests/fixtures/review-candidates/missing-price-candidate.json",
         "processing/tests/fixtures/review-candidates/priced-candidate.json",
-        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-candidates.json",
-        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
+        "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
+        "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
-        "processing/tests/fixtures/source-spans.json"
+        "packages/contracts/src/review-persistence.ts",
+        "packages/contracts/src/review-persistence.test.ts",
+        "packages/contracts/src/owner-ai.ts",
+        "packages/contracts/src/owner-ai.test.ts",
+        "packages/contracts/src/public-menu-integrity.test.ts",
+        "packages/contracts/fixtures/public-menu-bundle.v1/README.md",
+        "packages/contracts/fixtures/public-menu-bundle.v1/bundle.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/expected.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/tampered.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/README.txt",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.original.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.same-value-pretty.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
-        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "72da2b6de4ee9cefd4ca3ed87c7a7a9b93d6ae9ae4dbd3f7db5f7c725b4e5055"
+      "sourceFingerprint": "9d8f423771bf2b136f52d89c08a034223a5bd3fe1a6a43aab2173f5602efcb88"
     },
     {
       "id": "tokens",
@@ -56,7 +75,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "657afec34a4f9c2da845e614be17fc732469c7d06154242955706c31d8c372b1"
+      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
     },
     {
       "id": "ui",
@@ -73,12 +92,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "tokens"
       ],
-      "sourceFingerprint": "94272a255e023b6b466f5576b38e24d75f0ba3b78db119f31b7217c01a5c6a88"
+      "sourceFingerprint": "1479570f1b3584333e12b22847767167494f78c9d12d7a5aa58ff3863310c895"
     },
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Static TypeScript/Vite foundation shell remains readable without JavaScript. Optional consent-gated PostHog shell views are wired; no published menu or dish controls exist. Dish intent adapter is tested but awaits real controls. S3-DIN-01.1 adds a replaceable menu source, the only wire-to-diner adapter (copies known fields only) and \"Fixture data\"-labelled synthetic fixtures (demo, edge cases, withdrawal, 20-dish layout, empty/unavailable/error/offline); screens do not use them yet. S3-DIN-01.4 adds searchMenu(menu, query), a plain local function returning matching complete-dish IDs and whether to show the staff allergy line; the search view is not wired yet. See docs/posthog.md for activation and evidence limits.",
+      "summary": "Diner fixture menu/detail/search and Save/Compare foundations use shared contracts/tokens. Explicit live mode verifies exact fetched bundle bytes and pointer identity before rendering or exposing the token. Refresh swaps publications with focus preservation; 404 or token expiry suspends canonical/PostHog collection without changing consent, retires pending work and keeps the visible menu. Remount aborts stale loads and splits. One off-by-default consent gate enforces DNT/GPC. Atomic IndexedDB/Web-Locked localStorage outboxes retain retries with memory fallback. Fixture mode sends neither destination. PostHog SDK dispatch and token-bound canonical delivery are independent. Staging reuses pinned Pages public snapshots; private R2 stays private. Actual UI triggers, genuine browser-to-both-destinations/report reconciliation and privacy/design acceptance remain separate pilot gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -93,9 +112,79 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/adapter.ts",
         "frontend/diner/src/menu/fixtures.ts",
         "frontend/diner/src/menu/fixtures.test.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/menuScreen.test.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/published.ts",
+        "frontend/diner/src/menu/published.test.ts",
+        "frontend/diner/src/menu/config.ts",
+        "frontend/diner/src/menu/config.test.ts",
+        "frontend/diner/src/menu/dishDetail.test.ts",
         "frontend/diner/src/menu/search.ts",
         "frontend/diner/src/menu/search.test.ts",
-        "vitest.config.ts"
+        "frontend/diner/src/menu/route.ts",
+        "frontend/diner/src/menu/route.test.ts",
+        "frontend/diner/src/menu/refresh.ts",
+        "frontend/diner/src/menu/refresh.test.ts",
+        "tests/e2e/menu-states.spec.ts",
+        "tests/e2e/published-states.spec.ts",
+        "vitest.config.ts",
+        "frontend/diner/src/save/saved-list.ts",
+        "frontend/diner/src/save/storage.ts",
+        "frontend/diner/src/save/storage.test.ts",
+        "frontend/diner/src/save/save-state.ts",
+        "frontend/diner/src/save/save-state.test.ts",
+        "frontend/diner/src/save/fake-storage.ts",
+        "tests/e2e/save.spec.ts",
+        "frontend/diner/src/compare/picker.ts",
+        "frontend/diner/src/compare/picker.test.ts",
+        "frontend/diner/src/menu/price.ts",
+        "frontend/diner/src/menu/price.test.ts",
+        "frontend/diner/src/tracking/index.ts",
+        "frontend/diner/src/tracking/index.test.ts",
+        "frontend/diner/src/menu/events.ts",
+        "frontend/diner/src/menu/events.test.ts",
+        "frontend/diner/src/compare/comparison.ts",
+        "frontend/diner/src/compare/comparison.test.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "frontend/diner/src/menu/icons.test.ts",
+        "frontend/diner/src/save/events.ts",
+        "frontend/diner/src/save/feedback.ts",
+        "frontend/diner/src/save/feedback.test.ts",
+        "frontend/diner/src/save/mount.ts",
+        "frontend/diner/src/save/saved-screen.ts",
+        "frontend/diner/src/save/saved-screen-model.ts",
+        "frontend/diner/src/save/saved-screen-model.test.ts",
+        "frontend/diner/src/save/saved-screen.css",
+        "frontend/diner/src/tracking/ids.ts",
+        "frontend/diner/src/tracking/identity.ts",
+        "frontend/diner/src/tracking/envelope.ts",
+        "frontend/diner/src/tracking/core.test.ts",
+        "tests/e2e/tracking.spec.ts",
+        "frontend/diner/src/tracking/activity-clock.ts",
+        "frontend/diner/src/tracking/activity-clock.test.ts",
+        "frontend/diner/src/tracking/validate.ts",
+        "frontend/diner/src/tracking/validate.test.ts",
+        "frontend/diner/src/tracking/consent.ts",
+        "frontend/diner/src/tracking/outbox.ts",
+        "frontend/diner/src/tracking/outbox.test.ts",
+        "frontend/diner/src/tracking/batcher.ts",
+        "frontend/diner/src/tracking/batcher.test.ts",
+        "tests/e2e/tracking-outbox.spec.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "frontend/diner/src/tracking/withdrawal.test.ts",
+        "tests/e2e/tracking-storage.spec.ts",
+        "frontend/diner/src/tracking/withdrawal.ts",
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/searchView.test.ts",
+        "tests/e2e/search.spec.ts",
+        "frontend/diner/src/tracking/delivery.ts",
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts",
+        "tests/e2e/tracking-delivery.spec.ts",
+        "tests/e2e/published-refresh.spec.ts",
+        "tests/e2e/published-integrity.spec.ts",
+        "docs/diner-connection.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -104,23 +193,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "bd34d8c1a4660f6aae9970e7ae5790465c19d969e9af25f03930bed24f2ab90b"
+      "sourceFingerprint": "67ca26d8f8931b3412a099741c73edd7989f5741e66173248787191279f0c4f2"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible Input foundation adds label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. Synthetic foundations.html is included only in flagged PR preview builds; normal builds exclude it.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
         "frontend/console/index.html",
         "frontend/console/package.json",
         "frontend/console/foundations.html",
-        "frontend/console/src/foundations/Input.tsx",
-        "frontend/console/src/foundations/input.css",
         "frontend/console/src/foundations/demo.tsx",
         "tests/e2e/input.spec.ts",
-        "frontend/console/vite.config.ts"
+        "frontend/console/vite.config.ts",
+        "frontend/console/src/foundations/TextField.tsx",
+        "frontend/console/src/foundations/field.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -130,12 +219,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f72f3482ea81d6a14a73bf3458bda39bd06acac9c7037ab7363443602d3392c"
+      "sourceFingerprint": "c1af4f0e5ecec13375e3e01ebd7f7d7614fdaf64f0597cd841168a7754d6da36"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staff JWT and venue membership protect commands, retrieval and ingestion. PR45 job/attempt leases, private report persistence and draft writes compose with PR58 extraction. A staging/local-only raw PDF/PNG/JPEG upload route computes the source hash and stores canonical venue/job bytes before queue dispatch; retries retain the idempotent job. No owner upload UI is supplied. The staging menu consumer is configured for single-message/concurrency delivery with its own retry/DLQ policy. Live activation, hosted migration and full authenticated upload-to-database acceptance remain pending. Observation and publication behavior retain main release semantics.",
+      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -161,6 +250,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/dish-command.test.ts",
         "backend/src/dish-command.ts",
         "backend/src/dish.integration.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.ts",
         "backend/src/extraction-capability.ts",
         "backend/src/extraction-host.test.ts",
         "backend/src/extraction-host.ts",
@@ -206,10 +297,33 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/wrangler.jsonc",
         "docs/menu-ingestion-infrastructure.md",
         "docs/public-menu.md",
-        "pnpm-lock.yaml",
-        "processing/tests/fixtures/service-artifacts/README.md",
-        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
         "scripts/menu-ingestion-infra.test.mjs",
+        "pnpm-lock.yaml",
+        "processing/tests/fixtures/service-artifacts/representative-bundle.json",
+        "processing/tests/fixtures/service-artifacts/README.md",
+        "backend/src/consumer/owner-synthetic.integration.ts",
+        "backend/src/review-command.ts",
+        "backend/src/review-command.test.ts",
+        "backend/src/review-artifact.ts",
+        "backend/src/review-artifact.test.ts",
+        "docs/review-api.md",
+        "backend/src/owner-ai/index.ts",
+        "backend/src/owner-ai/recommendation.ts",
+        "backend/src/owner-ai/recommendation.test.ts",
+        "docs/owner-ai.md",
+        "backend/src/owner-ai/evaluation.test.ts",
+        "scripts/evaluate-owner-ai.mjs",
+        "scripts/evaluate-owner-ai.test.mjs",
+        "backend/src/bundle-producer/ids.ts",
+        "backend/src/bundle-producer/price.ts",
+        "backend/src/bundle-producer/produce.ts",
+        "backend/src/bundle-producer/produce.test.ts",
+        "backend/src/bundle-producer/repository.ts",
+        "backend/src/bundle-producer/request.ts",
+        "backend/src/bundle-producer/bundle-producer.integration.ts",
+        "backend/scripts/produce-menu-bundle.ts",
+        "docs/s4-res-bundle-producer.md",
+        "docs/owner-report-staging.md",
         "backend/src/ingestion/upload.ts",
         "backend/src/ingestion/upload.test.ts"
       ],
@@ -217,13 +331,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0003-intent-evidence.md",
         "docs/adr/0005-tenancy-and-privacy.md",
-        "docs/adr/0014-team-analytics-access.md"
+        "docs/adr/0014-team-analytics-access.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "fdc531e0155c62a5502780c18265ea219ac71a2d7f35aa1c78a7d48e3e809048"
+      "sourceFingerprint": "3b9323e5a1b112ad34c6cad1171a1db4c7477f0392e34ad448a8cdc1723b2f0c"
     },
     {
       "id": "database",
@@ -249,17 +364,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_metrics.sql",
         "tests/db/posthog.sql",
         "tests/db/staff.sql",
-        "tests/db/team-analytics.sql"
+        "tests/db/team-analytics.sql",
+        "migrations/20261030120000_review_candidate_persistence.sql",
+        "tests/db/review_persistence.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
         "docs/adr/0005-tenancy-and-privacy.md",
         "docs/adr/0013-posthog-export-boundary.md",
         "docs/adr/0014-team-analytics-access.md",
-        "docs/adr/0015-integration-contracts-and-owner-evidence.md"
+        "docs/adr/0015-integration-contracts-and-owner-evidence.md",
+        "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fd03bd91da7f51a2c74870e2995660812811ee51a84ff26697f54b4d0ec5958b"
+      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
     },
     {
       "id": "measurement",
@@ -281,7 +399,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Main remains the release source under ADR0012. This candidate carries merged PR58 and PR45 with PR44 documentation, excludes unrelated develop features, and adds a manual main-SHA-guarded extraction host/container staging workflow. Existing API deployment and production configuration are unchanged. Human review, CI, migration verification, controlled menu queue activation and authenticated owner acceptance are required before release; a green direct extraction test does not establish that flow.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -327,6 +445,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/observation-staging-acceptance.json",
         "docs/observation-facts-staging-acceptance.json",
         "scripts/console-preview-demos.test.mjs",
+        "scripts/node-ts-hooks.mjs",
         ".github/workflows/deploy-extraction-staging.yml",
         "docs/staging-ingestion-release.md"
       ],
@@ -339,7 +458,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "486d1a656843b944202c6394a986d25ea99f5d75a1b7418ff58cd95cbe987566"
+      "sourceFingerprint": "685f83f00c49f1ba1fd6f125940cb0b24094ec97c31ca832f4d6ee880d7ebfc2"
     },
     {
       "id": "agents",
@@ -372,7 +491,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "analytics",
       "status": "foundation",
-      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. Canonical owner facts and reporting remain planned.",
+      "summary": "Consented synthetic staging shell capture and restricted hourly PostHog export are verified; dish controls remain unconnected. Repeated exports retained eight raw copies/four deduplicated events. The collaborator-authorized API returns redacted diagnostics, not owner reports. The Node/GitHub CLI checker has progress, timeouts and no token prompt. Two user-run October 23 checks verified a valid outsider identity (200) and both endpoint denials (403 forbidden), including a fresh-clone repeat; sanitized evidence is in operations.md. Controlled collaborator-removal acceptance and production remain untested. @peekaplate/analytics/posthog adds the P0 capturePostHog adapter (lazy, same consent/privacy/live gate as canonical, property allowlist, separate visit ID, event_id as SDK uuid, no browser storage, withdrawal stops SDK retries; real-SDK browser checks); event-names.ts is the shared P0 allowlist. Diner uses TRK-01's gate. Canonical owner facts and reporting remain planned.",
       "paths": [
         "packages/analytics/package.json",
         "packages/analytics/tsconfig.json",
@@ -383,7 +502,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog-export.md",
         "docs/team-data-access.md",
         "scripts/verify-team-access.mjs",
-        "scripts/verify-team-access.test.mjs"
+        "scripts/verify-team-access.test.mjs",
+        "packages/analytics/src/posthog.ts",
+        "packages/analytics/src/posthog.test.ts",
+        "packages/analytics/src/event-names.ts",
+        "packages/analytics/src/event-names.test.ts",
+        "tests/e2e/posthog-adapter.spec.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -396,12 +520,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "1dd5e77257b699965de953a06b67cae41efa432a18b804d92f6e69d68988d8e0"
+      "sourceFingerprint": "ea8d828a39fd80d003c97b6e306ee6072bba4bdeb240bcebe6e8ffdae51ee574"
     },
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PR58 evidence-grounded extraction and review exports preserve schema/version pairing, failed reports and private immutable attempt bundles. The local staging candidate selects vision_v4 with OCR+image fallback; vision output and proposed boxes require review. The host stores validated artifacts before returning success. The older deployed Gemini staging service passed a two-dish synthetic extraction on November7; that does not validate this candidate image or owner upload/persistence. Paired host/container deployment and hosted archive acceptance remain pending. Text and vision draft assembly reject explicit wrapping-cloth titles and preserve plus-qualified prices as review-required text without a fixed scalar; this is a narrow product check, not general merchandise classification.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -478,7 +602,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
         "processing/src/peekaplate_processing/product_validation.py",
-        "processing/src/peekaplate_processing/vision_extraction.py",
         "processing/tests/test_product_validation.py"
       ],
       "adrs": [
@@ -488,106 +611,136 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "81c8319db3a69f8903a88a081f526f08754beb6e073139514a15aff08ff4496d"
+      "sourceFingerprint": "dd66a78aff466be74013297563e269fe188ace005694035aeffdc09a062fc38f"
+    },
+    {
+      "id": "assets",
+      "status": "foundation",
+      "summary": "Offline T0 variants preserve source bytes and revision references; spatial and supplied-mask review previews retain photo fallbacks, bounded motion and reduced-motion controls. Presentation requires explicit rights confirmation, bounded candidate reads and pre-decode pixel checks. Rejected candidates retain returned model/fidelity metadata and distinct fallback identities. Bundles are create-only, needs_review and publication.eligible=false. No automatic segmentation, image-provider calls, backend signing or diner integration; captured-food fidelity, rights and real-device acceptance remain manual.",
+      "paths": [
+        "processing/src/peekaplate_processing/assets.py",
+        "processing/src/peekaplate_processing/harness.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/src/peekaplate_processing/prepare_spatial.py",
+        "processing/src/peekaplate_processing/spatial.py",
+        "processing/tests/test_assets.py",
+        "processing/tests/test_spatial.py",
+        "docs/asset-delivery.md",
+        "processing/src/peekaplate_processing/prepare_presentation.py",
+        "processing/src/peekaplate_processing/presentation.py",
+        "processing/tests/test_presentation.py",
+        "processing/src/peekaplate_processing/review_preview.py",
+        "processing/src/peekaplate_processing/review_preview_html.py",
+        "processing/tests/test_review_preview.py",
+        "playwright.review-preview.config.ts",
+        "tests/review-preview/review-preview.spec.ts"
+      ],
+      "adrs": [
+        "docs/adr/0004-visual-tiers.md",
+        "docs/adr/0005-tenancy-and-privacy.md"
+      ],
+      "dependsOn": [
+        "processing"
+      ],
+      "sourceFingerprint": "cb75092bc3c9bd83c2a463f6c050694aecb4cf4613a507f4698d5d90fbbe27a2"
     }
   ],
   "handoffs": [
     {
       "date": "2026-11-10",
+      "summary": "PR117 reconciles current develop without dropping its context paths or runtime changes. The offline bundle producer hashes exact bytes, reads tenant-scoped approved facts and admits immutable handoff rows only through a privileged transaction. T0 input now rejects missing/blank capture evidence and invalid source hashes; five regressions failed before correction. Private provenance is never public content. A real prepare_t0_bundle asset passed eight actual CLI/PostgreSQL checks, including tamper rejection, runtime denial, identical retry and overwrite refusal. Local checks pass: 1198 unit/72 script, 213 SQL/86 integration, 120 browser and build; timings in qa-reports/S4-RES-test-plan.md.",
       "modules": [
-        "processing"
-      ],
-      "summary": "Local PR118 follow-up adds wrapping-cloth exclusion and plus-qualified price uncertainty in text and vision draft assembly, with synthetic regressions through report persistence and review export. No contracts or migrations changed.",
-      "next": "Review local patch and run frozen Linux CI; live provider and real database acceptance remain pending. No merge or deployment authorized."
-    },
-    {
-      "date": "2026-11-07",
-      "modules": [
-        "processing",
         "backend",
+        "contracts",
         "delivery"
       ],
-      "summary": "Prepare the merged PR58 extraction implementation for current main without importing unrelated develop features. Preserve failed CLI reports and private review artifacts; add a manual staging-only extraction build/deploy workflow because the API workflow does not release Python.",
-      "next": "Complete release checks and review, replace exposed Gemini credentials, then run the full signed staging extraction and verify private archive retention. Production is out of scope."
+      "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
     },
     {
-      "summary": "November 1 PR70 reconciliation preserves current develop and RES-02 hosted evidence. Prior timestamp and unauthorized-publication conflict fixes are retained; exact diner POST CORS and trusted traffic_class remain. Staging issuer keeps its deployed root URL and both rate bindings. Canonical migrations are already applied; no hosted deployment, credentials or Queue activation changes in this merge.",
-      "modules": [
-        "contracts",
-        "backend",
-        "delivery"
-      ],
-      "next": "Verify the reconciled producer, then merge into develop after current-head approval. PR31 reconciliation must preserve traffic_class plus its payload normalization and run the actual combined consumer. Typed fact writes, public-read DIN-03 CORS/renewal and hosted browser-to-destination acceptance remain release gates; keep queues paused until reviewed activation."
-    },
-    {
-      "summary": "November 1 RES-02 hosted acceptance: PR42/43 merged, reviewed main2eee264 deployed, publication migrations and private ES256 configuration verified. Genuine Supabase staff HTTP commands, idempotency/conflict/tenant checks, immutable fixture hash and remote JWKS token verification, withdrawal and revoked-owner retry passed. Final synthetic counts are3 events/3 receipts/3 outbox rows; publication withdrawn, owner reduced to viewer, session ended and temporary host/verifier removed. Preserved the first client timeout; no latency guarantee.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Use the public-menu/JWKS contract for DIN-03 and ingestion integration. Finish trusted real-content admission, screen wiring, hash-input agreement, exact deployed CORS and original-publication token renewal. Keep queues paused until consumer acceptance; production/load/recovery and dashboard acceptance remain separate. See operations.md and res02-staging-acceptance.json."
-    },
-    {
-      "summary": "November 1 RES-02 staging release preparation follows merged PR42 and PR43. Main observation-schema/cleanup history and all develop modules are retained. The existing staging Supabase project now records publication migrations20261025120000/20261025130000; application release and hosted runtime acceptance are not yet recorded. Staging token issuer is the existing Worker origin; signing key remains protected operator configuration.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "Verify and review this exact main promotion, deploy the approved main commit to staging, set its private ES256 key without exposing it, and run scoped synthetic publication/token/withdrawal and tenant tests. Record actual version/evidence. Keep production, paused queues, bundle producer and DIN-03 work outside this release acceptance."
-    },
-    {
-      "summary": "November 1 PR43 reconciliation retains PR42 command transactions and all develop diner fixture/search updates. Public reads return only an active exact approved bundle plus publication-scoped ES256 token; unknown/draft/unbundled/withdrawn menus share404. Existing code and migrations are preserved during context/error-ledger reconciliation.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "delivery"
-      ],
-      "next": "After PR42 merges, retarget PR43 to develop and verify the resulting head. Hosted release needs the reviewed main candidate, both publication migrations, signing configuration and synthetic approval/read/withdrawal evidence. Privileged bundle admission, DIN-03 integrity/CORS integration and old-publication token renewal remain separate."
-    },
-    {
-      "summary": "November 1 PR42 reconciliation preserves all develop module updates, including DIN-01.1 fixtures/adapter and DIN-01.4 local search, while retaining the reviewed RES-02 command core. Only shared context required conflict resolution; application and migration behavior is unchanged.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "diner"
-      ],
-      "next": "Verify this exact reconciled head, merge PR42, then retarget and recheck PR43 against develop. Promote an approved main candidate before hosted migration, signing configuration and synthetic publication acceptance."
-    },
-    {
-      "summary": "S3-DIN-01.4 search: searchMenu(menu, query) in frontend/diner/src/menu/search.ts returns { dishIds, allergyNotice } over the loaded menu. Name, category and ingredient names match partially ignoring case; allergen and dietary values match the whole chip via the adapter's chipKey, and an approved P0 allergen matches its code, label or alias (egg/Eggs, soya/Soy, sesame seeds/Sesame; nuts also finds Peanuts, old tree nut names kept), so \"gluten\" never finds Gluten-free. allergyNotice is true for any P0 allergen, dietary value, menu allergen or common allergy term (shellfish, gluten, mustard...), even with no results, so no results never reads as free from. Description never searched; incomplete dishes excluded; no API call, events or logging. 20 Vitest cases pass.",
+      "date": "2026-11-10",
+      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
       "modules": [
         "diner"
       ],
-      "next": "Adam to confirm whether \"gluten\" should also find Wheat dishes (today it only shows the staff line). Jeffin re-reviews PR #64 after #59; Sai reviews before merge. DIN-02.3 picker imports searchMenu and removes kept dishes from dishIds. Wire the search view to the DIN-01.2 menu screen and dish card with keyboard, result-count announcement and axe tests once they exist."
+      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
     },
     {
-      "summary": "S3-DIN-01.1 fixtures: a MenuSource interface and the only adapter that reads the draft RES-02 bundle shape (PR #43 plus fixture-only allergens, kept in wire.ts). It copies known fields only, so draft-like fields never reach screens, labels fixture menus \"Fixture data\", makes a dish without ingredients an incomplete placeholder, keeps closed-list dietary values, maps approved P0 allergen codes to display labels from one ALLERGENS list in types.ts (unlisted values stay as text-only chips, never dropped), suppresses Gluten-free when Wheat or Gluten is listed. Fixtures cover five demo dishes, every ticket edge case, a withdrawal between loads, a 20-dish layout set, a dish with no allergen or dietary data and empty/unavailable/error/offline/slow states. 24 Vitest cases pass; Menu carries venueId and menuId so DIN-02 can scope Saved dishes per restaurant.",
+      "date": "2026-11-09",
+      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
+      "modules": [
+        "backend",
+        "contracts"
+      ],
+      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
       "modules": [
         "diner"
       ],
-      "next": "Harshita and Ehab build screens and search on createFixtureMenuSource and the ./types model only; DIN-03 adds a published source behind the same interface and swaps wire.ts for @peekaplate/contracts once RES-02 merges. Search and screens show ALLERGENS labels (Eggs, Tree nuts, Peanuts); Amr confirms the Vegan/Vegetarian leaf icons. Zhiliang/Shirley to confirm restaurant logo, availability and incomplete dishes in the bundle."
-    },
-    {
-      "date": "2026-11-02",
-      "summary": "Implemented transactional typed observations and bounded private archive backfill, trusted staging test classification and exact-origin public menu CORS. Genuine issued-token browser transport now exercises actual local workerd, Queue, R2 and migrated PostgreSQL. Existing frontend/owner PR work is preserved. Hosted follow-up remains pending.",
       "paths": [
-        "backend/src/consumer/facts.ts",
-        "backend/src/consumer/backfill.ts",
-        "backend/src/dish.integration.ts",
-        "docs/observation-infrastructure.md"
+        "frontend/diner/src/tracking/delivery.ts"
       ],
-      "next": "Finish independent review and exact-main staging acceptance; preserve paused normal delivery. Reconcile frontend tracking/outbox/delivery and report API before pilot activation.",
+      "next": "DIN-03 must connect the current in-memory publication token and approved endpoint. Verify real controls reach PostHog and canonical facts independently; collection stays gated pending release acceptance."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
+      "modules": [
+        "console",
+        "tokens"
+      ],
+      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
+    },
+    {
+      "date": "2026-11-10",
       "modules": [
         "backend",
-        "contracts",
+        "processing",
         "delivery"
-      ]
+      ],
+      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
+      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
     }
   ]
 }

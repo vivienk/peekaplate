@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "@fontsource/inter": "5.3.0",
     "@peekaplate/analytics": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
     "@peekaplate/ui": "workspace:*"

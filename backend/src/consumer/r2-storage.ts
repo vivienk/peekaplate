@@ -177,6 +177,9 @@ export class FakeR2ArchiveStorage implements R2ArchiveStorage {
   public putCalls: { key: string; checksum: string }[] = [];
   public failNextPut = false;
   public failKeys = new Set<string>();
+  delete(key: string): boolean {
+    return this.objects.delete(key);
+  }
 
   async putRawPayload(key: string, rawBytes: Uint8Array, checksum: string): Promise<R2PutResult> {
     this.putCalls.push({ key, checksum });

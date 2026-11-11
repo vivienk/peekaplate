@@ -1,0 +1,413 @@
+# S3-VIS-03 QA and verified fix report
+
+Date: 2026-10-29 (updated after rebase onto `develop` `0477653`, PR #25 viewer findings, and ClickUp presentation addition)
+Base commit: `0477653153b7032192882452e2a5a70d628e85d8` (`origin/develop`, including PRs #63, #62, #61, #60, #57, #54, #48, #47, #41, #39, #38, #24, #23)
+Branch: `feat/s3-vis-03-asset-delivery`
+Pull request: [vivienk/peekaplate#25](https://github.com/vivienk/peekaplate/pull/25)
+ClickUp: [86bcnfw7r](https://app.clickup.com/t/86bcnfw7r)
+## Environment
+
+| Item | Value |
+|---|---|
+| OS | Windows 10.0.26200, x64 |
+| Python | 3.12.13 through `uv` |
+| uv | 0.11.30 |
+| Node.js | 24.16.0 |
+| pnpm | 11.25.0 |
+| Browser | Managed headless Chromium, 390x844 viewport, effective DPR 1.25 |
+| Source data | Synthetic fixtures only; repository contains no image assets |
+
+No real restaurant capture, approved layered sample, phone or screen reader was available. Those gates are recorded as `BLOCKED`, not inferred from synthetic results.
+
+## Baseline at `1355175`
+
+| Check | Result | Status |
+|---|---|---|
+| Python suite | 120 tests, 117 passed, 3 failed | `FAIL` |
+| TypeScript unit tests | 56 Vitest tests passed | `PASS` |
+| Script tests | 21 `node --test` tests passed | `PASS` |
+| T0 700x700 JPEG | exit 0, 272,193 B of 400,000 | `PASS` |
+| T0 create-only rerun | exit 2, manifest SHA-256 unchanged | `PASS` |
+| T0 3000x4000 EXIF-6 JPEG | oriented 4000x3000, card 480x360, detail 1280x960 | `PASS` |
+| T0 negatives | small budget, text input, timezone-less date and blank evidence all exit 2 with no output | `PASS` |
+| Spatial negatives | revision mismatch, opaque non-background layer and oversized PNG all exit 2 with no output | `PASS` |
+| Harness over `file://` | manifest fetch blocked, one retry, "Preview unavailable", fallback visible | `PASS` |
+| Harness over HTTP | 3 layers, spatial and fallback visible, byte total matched manifest | `PASS` |
+| Harness failure injection | layer, manifest and fallback failures reported expected errors and retries | `PASS` |
+
+The three Python failures are `test_evaluation.test_private_output_preserves_existing_result`, `test_ingestion.test_private_report_cli_returns_incomplete_exit_code` and `test_ocr_space.test_valid_engine3_cache_avoids_another_request_even_without_key`. All assert `stat().st_mode & 0o777 == 0o600`; on this NTFS volume `os.chmod(path, 0o600)` reports `0o666` (`438 != 384`). The tests come from the stacked OCR commit `33057cc`, CI runs Ubuntu, and they were deliberately not modified.
+
+## Confirmed defects and fixes
+
+### D1 — spatial asset IDs ignored layer names and depths
+
+Before the fix, `processing/src/peekaplate_processing/spatial.py:73-75` hashed only the T0 id, concatenated layer SHA-256 values, motion JSON and recipe version. Three distinct manifests produced the same synthetic id `t1_3dc672d50cc06e4178260637a0b3c3b2`: the default depths, rebalanced depths `0.55/0.7`, and `accent` renamed to `garnish`. A fresh output root therefore created a different bundle under the same id, while the original root refused it as already existing.
+
+Fix: `processing/src/peekaplate_processing/spatial.py:73-78` builds a deterministic JSON signature containing each layer's `name`, `depth` and `sha256`, then hashes it with the T0 id, motion JSON and recipe version. Layer order remains part of the manifest identity.
+
+### D2 — spatial manifests dropped capture evidence and rights confirmation
+
+`processing/src/peekaplate_processing/schemas.py:264-265` required `capture_evidence` and `rights_confirmed: true` in `LayersInput`, but `SpatialManifest` had no corresponding fields and `spatial.py` never wrote them. The delivered artifact therefore lost the validation trace that T0 stores in `AssetManifest.source.capture_evidence`.
+
+Fix: `processing/src/peekaplate_processing/schemas.py:315-316` makes both fields required in `SpatialManifest`, and `processing/src/peekaplate_processing/spatial.py:100-101` copies them from the validated layers input. No TypeScript consumer reads this manifest, and bundles are create-only, so no runtime migration is required.
+
+### P2 #1 — fallback image was not decoded or dimension-checked (`spatial.py:read_detail_bytes`)
+
+Review finding (`@hemu77`): `read_detail_bytes` verified `sha256` against the T0 manifest but did not decode the file or check its pixel dimensions, allowing a manifest with a matching hash over corrupt bytes (`b"not-a-jpeg" * 20`) or mismatched dimensions to be copied as `fallback.jpg`.
+
+Fix: `processing/src/peekaplate_processing/spatial.py:185-202` verifies `len(data) == detail.size_bytes` and `sha256`, decodes the bytes through `open_layer_image(data)`, requires `image_format == "JPEG"` and `not has_alpha`, and verifies `oriented.size == (detail.width, detail.height)` before closing the image.
+
+### P2 #2 — stored keyboard offset accumulated unbounded saturation (`harness.py:onKeyDown`)
+
+Review finding (`@hemu77`): pressing `Home`, pressing `ArrowRight` 40 times, and then pressing `ArrowLeft` once left the scene at `rotateY(3deg)` because `keyboard.yaw` accumulated `20` degrees while `render()` only clamped the displayed rotation.
+
+Fix: `processing/src/peekaplate_processing/harness.py:150-162` bounds `keyboard.yaw` and `keyboard.pitch` on every arrow keydown against the combined pointer + keyboard limits (`clamp(pointer.x*maxYaw+keyboard.yaw±step, maxYaw)-pointer.x*maxYaw` and `clamp(-pointer.y*maxPitch+keyboard.pitch±step, maxPitch)+pointer.y*maxPitch`), so reverse input responds on the first key press after saturation.
+
+### P2 #3 — manifest byte limit was checked after full-file allocation (`spatial.py:read_bounded`)
+
+Review finding (`@hemu77`): `Path(path).read_bytes()` read the entire file (`read(-1)`) before checking `len(data) > MAX_MANIFEST_BYTES`.
+
+Fix: `processing/src/peekaplate_processing/spatial.py:167-175` opens the path in binary mode and reads `source.read(MAX_MANIFEST_BYTES + 1)` (`100,001` bytes) before rejecting empty or oversized inputs.
+
+### P2 #4 — spatial budget excluded delivered `harness.html` and `spatial-manifest.json` overhead (`spatial.py:prepare_spatial_bundle`)
+
+Review finding (`@hemu77`): `total_asset_bytes` summed only layer images and `fallback.jpg` (`48,823` bytes), while the delivered directory contained `62,930` bytes (`14,107` bytes of `harness.html` + `spatial-manifest.json`), contrary to ADR 0004 ("T1 adds at most 400 KB including compressed code, manifest and textures").
+
+Fix: `processing/src/peekaplate_processing/spatial.py:77-136` encodes `harness.html` and converges `spatial-manifest.json` over 3 iterations so `measurements.total_asset_bytes` equals the exact byte sum of all delivered files (`layers/*`, `fallback.jpg`, `harness.html`, `spatial-manifest.json`), checks `total_asset_bytes > budget_bytes` before creating output directories, and writes both text artifacts via `.write_bytes(...)` for platform-independent byte totals.
+
+### Rebase reconciliation (`assets.py:read_source`)
+
+Rebasing onto `origin/develop` (`5c0cb3f`, after PR #23 and PR #24 `78ebb47`) dropped the older stacked OCR commit `33057cc`. In merged PR #24, `sources.check_size` was inlined into `sources.read_file`, so `processing/src/peekaplate_processing/assets.py:120-121` now performs the `not data or len(data) > MAX_SOURCE_BYTES` check directly. All 3 Windows POSIX `0o600` test failures from `33057cc` are gone on the rebased branch.
+
+### Follow-up PR review fixes (`harness.py` & `test_spatial.py`)
+
+- **Static fallback image source (`harness.py:35`, P2):** Added `src="./fallback.jpg"` directly to `<img id="fallback" src="./fallback.jpg" alt="Approved dish photo">` so the T0 dish photo renders even with JavaScript disabled (`naturalWidth=1280`, `naturalHeight=960` verified in Chromium).
+- **Pointer + keyboard saturation reconciliation (`harness.py:128-153`, P2):** `onPointerMove` and `render` now reconcile `keyboard.yaw = yaw - pointer.x*maxYaw` and `keyboard.pitch = pitch + pointer.y*maxPitch` after clamping the combined rotation, so `Home` → 40× `ArrowRight` → pointer right edge → 1× `ArrowLeft` immediately steps from `3deg` to `2.5deg` (`translate(2.66667px, 0px)` on `subject`).
+- **Stable integer `z-index` depth ranks (`harness.py:230-288`, P2):** Replaced `Math.round(layer.depth * 1000) + 1` with distinct `1..N` integer ranks from stable `(layer.depth, index)` sorting so closely spaced depths (`0.0`, `0.0001`, `0.0002`) receive `z-index` `1`, `2`, `3` and a delayed background never covers foreground layers.
+- **Loaded-layer harness regression (`test_spatial.py:318-513`, P3):** Exposed `globalThis.CSS = globalThis.window.CSS` (and `window.CSS.supports` in `harness.py`), asserted `layersLoaded == 3`, `spatialVisible == true`, and `subject` parallax transforms across keyboard-only and mixed pointer+keyboard saturation/reversal, and added `test_harness_preserves_depth_order_for_closely_spaced_delayed_layers`.
+
+### PR #25 viewer findings (`@vivienk`, commit `921b32d`)
+
+- **Live `prefers-reduced-motion` media-query listener (`harness.py:65-173`, P2, review 4396991434):**
+  Replaced one-time `Boolean(window.matchMedia(...).matches)` evaluation with a retained `MediaQueryList` and live `change` listener (`motionQuery.addEventListener("change", onMotionChange)` / `addListener`). Added `clearTransforms()` and `syncReducedMotion()`. When reduced motion is toggled live, existing transforms on `#layers` and child `<img>` elements are immediately cleared to `""`, rotation/pointer/keyboard offsets are zeroed, and further movement handlers exit early.
+- **Null-prototype `layerRetries` and `ranks` (`harness.py:71, 243, 285`, P3, review 4396991442):**
+  Initialized `layerRetries: Object.create(null)`, `imageDecodeMs: Object.create(null)` and `ranks = Object.create(null)`. `loadLayer` counts retries using `Object.prototype.hasOwnProperty.call(metrics.layerRetries, layer.name) ? metrics.layerRetries[layer.name] : 0`. Valid layer names such as `"constructor"` record integer `1` rather than appending string `"function Object() ... 1"`.
+
+### ClickUp task S3-VIS-03 presentation pipeline addition (`@vivienk`, comment `90140274443174`)
+
+- **Frozen presentation prompt & multimodal request builder (`presentation.py`, `presentation-prompt-v1`):**
+  Embeds Vivien Kong's verbatim prompt requesting a photorealistic square dish-and-plate PNG with genuine transparent background and clean antialiased edges. `build_multimodal_messages` packages Image 1 (dish cutout data URL) and Image 2 (reference framing data URL).
+- **Injectable `PresentationProvider` & `FilePresentationProvider` (`presentation.py`):**
+  Pluggable generation abstraction following PR #24's `OCRProvider` pattern, supporting offline candidate PNG validation.
+- **PNG, alpha, square, and transparent-corner validation (`presentation.py`):**
+  Requires square PNG (`width == height >= 512`, preferably `2048x2048`), genuine alpha channel (`min_a == 0, max_a > 0`), and fully transparent corner pixels `(0, 0)`, `(w-1, 0)`, `(0, h-1)`, `(w-1, h-1)` to eliminate opaque checkerboards, gray rectangles, or watermarks.
+- **Provenance manifest (`PresentationManifest`):**
+  `presentation-manifest.json` links source T0 `asset_id` and manifest SHA-256, source image SHA-256, cutout SHA-256, reference SHA-256, prompt SHA-256, model version, dish/revision identifiers, and optional PR #24 `draft_id`.
+- **Human review gate & fidelity notes (`schemas.py`, `presentation.py`):**
+  Manifests never self-approve (`review.status = "needs_review"`, `publication.eligible = False`). Fidelity limitation flags (`--preserved-original-viewpoint`, `--reconstructed-details-flagged`, `--fidelity-note`) persist on `manifest.prompt` and emit explicit review warnings.
+- **Automatic T0 fallback retention (`presentation.py`, `prepare_presentation.py`):**
+  When candidate generation or validation fails, or candidate byte budget is exceeded, the approved original-photo T0 detail JPEG is automatically retained as `fallback.jpg` with `fallback_retained = True`, `active_display_path = "fallback.jpg"`, `presentation = None`, and CLI exit code 2.
+
+## Regression evidence
+
+Added to `processing/tests/test_spatial.py:156-177`:
+
+- `test_asset_id_tracks_layer_names_and_depths`
+- `test_manifest_records_capture_evidence_and_rights`
+
+Red state before implementation, exactly two failures:
+
+```text
+FAIL: test_asset_id_tracks_layer_names_and_depths
+AssertionError: 't1_97984284432d9a862cb34b4d1c5356f7' == 't1_97984284432d9a862cb34b4d1c5356f7'
+
+ERROR: test_manifest_records_capture_evidence_and_rights
+AttributeError: 'SpatialManifest' object has no attribute 'capture_evidence'
+```
+
+Green state after implementation:
+
+```text
+Ran 10 tests in 8.160s
+OK
+```
+
+Added for the four P2 review findings (`processing/tests/test_spatial.py:231-395`):
+
+- `test_corrupt_or_mismatched_fallback_is_rejected_even_when_hash_matches`
+- `test_manifest_reads_are_bounded_before_allocation`
+- `test_budget_accounts_for_delivered_bundle_overhead_at_exact_boundaries`
+- `test_harness_clamps_stored_keyboard_state_and_reverses_immediately`
+
+Red state before P2 fixes (5 failures):
+
+```text
+FAIL: test_budget_accounts_for_delivered_bundle_overhead_at_exact_boundaries
+AssertionError: 48823 != 62931
+
+FAIL: test_corrupt_or_mismatched_fallback_is_rejected_even_when_hash_matches
+AssertionError: ExtractionError not raised
+
+FAIL: test_harness_clamps_stored_keyboard_state_and_reverses_immediately
+AssertionError: 'perspective(900px) rotateX(0deg) rotateY(3deg)' != 'perspective(900px) rotateX(0deg) rotateY(2.5deg)'
+
+FAIL: test_manifest_reads_are_bounded_before_allocation
+AssertionError: Lists differ: [-1] != [100001]
+```
+
+Green state after P2 fixes and rebase onto `origin/develop`:
+
+```text
+Ran 15 tests in 11.301s
+OK
+```
+
+Full Python suite on rebased branch:
+
+```text
+Ran 140 tests in 18.481s
+OK
+```
+
+## Test matrix
+
+| Case | Expected | Actual | Status | Evidence |
+|---|---|---|---|---|
+| T0 JPEG preparation | Ready bundle, source and variants hashed, review required | exit 0, 272,193 B, `needs_review`, `eligible=false` | `PASS` | Baseline manifest |
+| T0 create-only rerun | Refuse without changing bytes | exit 2, manifest SHA-256 unchanged | `PASS` | Baseline rerun |
+| T0 EXIF orientation | Orient before resizing | 4000x3000 source, 480x360 card, 1280x960 detail | `PASS` | Baseline manifest |
+| T0 invalid budget/input/date/evidence | exit 2, no output directory | All four rejected before output | `PASS` | Baseline negative runs |
+| Spatial revision mismatch | Reject, write nothing | exit 2, no output | `PASS` | `test_revision_mismatch_is_rejected` |
+| Spatial opaque non-background layer | Reject, write nothing | exit 2, no output | `PASS` | `test_layer_dimensions_alpha_and_background_rules` |
+| Spatial oversized PNG layers | Reject over budget | exit 2, no output | `PASS` | `test_motion_limits_and_budget_are_enforced` |
+| D1 name/depth collision | Different names or depths produce different ids | Regression test failed before, passes after | `PASS` | `test_asset_id_tracks_layer_names_and_depths` |
+| D2 provenance | Serialized manifest retains both validated fields | Regression test failed before, passes after | `PASS` | `test_manifest_records_capture_evidence_and_rights` |
+| P2 #1 corrupt/mismatched fallback with matching hash | Reject before output | Both corrupt bytes and half-size JPEG rejected with no output | `PASS` | `test_corrupt_or_mismatched_fallback_is_rejected_even_when_hash_matches` |
+| P2 #2 keyboard & mixed pointer+keyboard saturation reversal | 40x `ArrowRight` (+ optional right-edge pointer) then 1x `ArrowLeft` -> `2.5deg`; same for pitch | `rotateY(3deg)` -> `rotateY(2.5deg)`, `subject` `translate(2.66667px, 0px)` | `PASS` | `test_harness_clamps_stored_keyboard_state_and_reverses_immediately` + Chromium |
+| P2 #3 bounded manifest read | `source.read(100001)` before size check | Spy recorded `[100001]` for valid and oversized manifests | `PASS` | `test_manifest_reads_are_bounded_before_allocation` |
+| P2 #4 full bundle budget accounting | Reject image-only budget (`48,823`), accept exact delivered budget | Image-only and `delivered - 1` rejected; exact `delivered_bytes` accepted | `PASS` | `test_budget_accounts_for_delivered_bundle_overhead_at_exact_boundaries` |
+| Static fallback with JS disabled | Fallback photo renders without script execution | `src="./fallback.jpg"`, `naturalWidth=1280`, `naturalHeight=960` | `PASS` | `test_spatial.py` + Chromium |
+| Delayed background with close depths (`0`, `0.0001`, `0.0002`) | Background keeps lowest `z-index` even when appended last | `domOrder=["subject","accent","background"]`, `zIndices={"background":1,"subject":2,"accent":3}` | `PASS` | `test_harness_preserves_depth_order_for_closely_spaced_delayed_layers` |
+| Fixed synthetic bundle | Reprocesses successfully | T0 `t0_ab4bb80d…`, T1 `t1_1170ed2e…` (`63,595` B delivered) | `PASS` | `processing/work/qa-vis03/` |
+| Harness over HTTP | 3 layers, fallback retained, byte total matches delivered bundle | `layersLoaded=3`, both visible, `63,595 == 63,595` | `PASS` | `harness-metrics-loaded.json` |
+| Pointer/keyboard clamp & immediate reversal | Clamps at `3deg`, reverses to `2.5deg` on single opposite key | Verified in Chromium for keyboard-only and mixed pointer+keyboard | `PASS` | Chromium evaluation |
+| `Home` reset | Zero both axes | `rotateX(0deg) rotateY(0deg)` | `PASS` | Chromium evaluation |
+| Missing layer | `layer_load_failed`, retry once, fallback visible | `layerRetries.subject=1`, fallback visible | `PASS` | `harness-metrics-layer-failure.json` |
+| Missing manifest | One retry, fallback visible | `manifestRetries=1`, fallback visible | `PASS` | `harness-metrics-manifest-failure.json` |
+| Missing fallback | `fallback_load_failed` | error recorded, fallback hidden | `PASS` | `harness-metrics-fallback-failure.json` |
+| Failure recovery | Restoring each file restores the 3-layer preview | Every restore reloaded successfully | `PASS` | Browser reruns |
+| TypeScript & script tests | All unit and script tests pass | Vitest + `node --test scripts/*.test.mjs` passed | `PASS` | `pnpm verify test` |
+| Lint, typecheck, build | All tracked files pass | Biome, 5 typechecks, 3 builds passed | `PASS` | `pnpm verify lint typecheck test build` |
+| Python suite (rebased) | All tests pass on Windows | 110 tests, 110 pass, 0 failures | `PASS` | Full suite output |
+| Context/docs checks | Fresh context and valid local links | 10 modules, 10 handoffs; 43 Markdown files | `PASS` | `pnpm verify context:check docs:check` |
+| PR body check | Valid when applicable | "not applicable to this event" | `PASS` | `pnpm verify pr:check` |
+| PR mergeability | Rebased cleanly onto `origin/develop` (`5c0cb3f`) | Linear history on top of merged #23/#24/#38/#39 | `PASS` | `git log origin/develop..HEAD` |
+| Live `prefers-reduced-motion` toggle | Clears transforms, zeroes offsets, blocks movement without reload | `rotateY(0.5deg)` -> `""`, metrics `reducedMotion: true` | `PASS` | `test_harness_responds_to_live_reduced_motion_changes` + Chromium |
+| Constructor-named layer retry count | Integer count without prototype pollution | `layerRetries: {"constructor": 1}`, `typeof === "number"` | `PASS` | `test_harness_counts_numeric_retry_for_constructor_named_layer` |
+| Presentation 2048x2048 transparent PNG | Generates ready bundle, links T0/cutout/reference provenance | `pres_...` bundle, `needs_review`, `eligible=false`, `active_display_path="fallback.jpg"` | `PASS` | `test_valid_2048_transparent_presentation_bundle_links_provenance_and_stays_needs_review` |
+| Multimodal presentation payload | Exact verbatim prompt, cutout & reference data URLs | 3 content parts, prompt matched, data URLs matched | `PASS` | `test_multimodal_request_embeds_cutout_and_reference_image_bytes_with_exact_prompt` |
+| Non-square / opaque / over-budget presentation | Retains T0 fallback, records errors, CLI exits 2 | `status="fallback_retained"`, `fallback_retained=true`, `fallback.jpg` byte-identical to T0 | `PASS` | `test_opaque_non_square_or_over_budget_candidate_retains_t0_fallback` |
+| Presentation fidelity warnings | Flags persist on manifest and emit review warnings | `reconstructed_details_flagged`, `preserved_original_viewpoint`, review warnings emitted | `PASS` | `test_reconstructed_details_and_viewpoint_limitations_are_recorded_in_warnings` |
+| Rebase onto develop `0477653` | Linear history on top of latest PRs #63/#62/#61/#60/#57/#54 | Clean rebase, 140 Python tests pass | `PASS` | `git log origin/develop..HEAD` |
+
+Biome also scans untracked generated `graphify-out/` JSON. That directory was moved outside the worktree only for the lint gate and restored byte-for-byte afterward; no repository file was changed for this workaround.
+
+## Budget measurements
+
+| Fixture | Total bytes | Budget | Status |
+|---|---:|---:|---|
+| T0 700x700 JPEG | 272,193 | 400,000 | `PASS` |
+| T0 3000x4000 EXIF-6 JPEG | 330,054 | 400,000 | `PASS` |
+| T0 fixed synthetic rerun | 36,855 | 400,000 | `PASS` |
+| T1 PNG at detail-1280 | >400,000 before fallback; background 1,538 KiB, alpha subject 1,858 KiB | 400,000 | `FAIL` |
+| T1 lossy WebP q82 recorded bundle | 369,408 (92.4%) | 400,000 | `PASS` |
+| T1 fixed synthetic rerun (including `harness.html` + `spatial-manifest.json`) | 63,595 (48,823 image bytes + 14,772 harness/manifest bytes) | 400,000 | `PASS` |
+
+The PNG result is a budget/product decision, not a validation defect: refusal is correct. The ADR 0004 ceiling is unreachable with lossless PNG layers at `detail-1280`; the recorded WebP q82 trial fits at 92.4%. PM and ADR owners must choose the accepted format/quality before a real sample is prepared.
+
+## Harness evidence
+
+The fixed bundle was served with `python -m http.server 8973 --bind 127.0.0.1`. Chromium was forced to `prefers-reduced-motion: no-preference` through CDP before reload because the headless default silently zeroes every transform.
+
+Loaded metrics (rebased + all review fixes): `manifestFetchMs=2.8`, `firstRenderMs=15.3`, `layersLoaded=3`, `spatialVisible=true`, `fallbackVisible=true`, `spatialError=null`, `totalAssetBytes=63595`, `budgetBytes=400000`, `zIndices={"background":"1","subject":"2","accent":"3"}`. Mixed pointer+keyboard saturation check in Chromium: `Home` -> 40x `ArrowRight` -> pointer right edge -> 1x `ArrowLeft` (`rotateX(0deg) rotateY(2.5deg)`, `subject` `translate(2.66667px, 0px)`) -> `Home` (`rotateX(0deg) rotateY(0deg)`).
+
+Evidence files, intentionally not committed:
+
+- `processing/work/qa-vis03/harness-loaded.png`
+- `processing/work/qa-vis03/harness-metrics-loaded.json`
+- `processing/work/qa-vis03/harness-metrics-layer-failure.json`
+- `processing/work/qa-vis03/harness-metrics-manifest-failure.json`
+- `processing/work/qa-vis03/harness-metrics-fallback-failure.json`
+
+The harness requires HTTP. Opening `harness.html` through `file://` blocks the manifest `fetch`; after one retry it shows "Preview unavailable" and retains the fallback. `processing/README.md:184-186` now documents this requirement.
+
+## Independent code review
+
+A separate read-only `reviewer` agent reviewed the complete working diff before commit. Verdict: `READY TO MERGE`. It found no critical or important issues. Its one minor note was that layer order forms part of the identity because it controls equal-depth paint order; `docs/asset-delivery.md:31-32` now states that the signature uses manifest order. The reviewer confirmed the two regression tests exercise the real bundle path, the new required schema fields have no TypeScript consumer, and no out-of-scope test was weakened.
+
+## ClickUp acceptance checklist
+
+| Acceptance criterion | Status | Evidence |
+|---|---|---|
+| Process sources with immutable source/revision references and processing state | `PASS` | T0 and T1 manifests carry source hashes, `source_t0`, dish/revision and ordered processing steps |
+| Demonstrate one approved 2.5D sample when ready | `BLOCKED` | Only the labeled synthetic sample exists; no approved human-prepared capture |
+| Failures retain approved T0 photo | `PASS` | Layer, manifest and fallback failure runs retain fallback where applicable |
+| Measure mobile load/render cost against agreed budget | `BLOCKED` | Desktop headless Chromium only; no real-phone p75/p95 |
+| Avoid fabricated food imagery and unapproved substitutes | `PASS` | Synthetic geometries explicitly labeled `SYNTHETIC FIXTURE`; no generated food |
+| Verify missing images, failed downloads, rendering errors and retries | `PASS` | Three failure injections plus recovery runs |
+| Publication eligibility requires human approval | `PASS` | Every generated manifest remains `needs_review`, `eligible=false` |
+| Linked PR, CI/build and browser evidence | `PASS` | PR #25, local Python/TS/build/harness evidence in this report |
+| Independent review by Sai (`@hemu77`) | `PASS` | Reviewed `786ebb4` and `388f66d`; all inline P2/P3 findings and rebase onto `#23/#24` addressed with regression tests |
+| Rebase after PR #24 and rerun CI | `PASS` | Rebased onto `origin/develop` (`5c0cb3f`, including `#23` and `#24`); all 110 Python tests pass |
+| Real restaurant photo, phone measurement and VoiceOver/TalkBack | `BLOCKED` | No permitted capture or device available |
+| S3-ARC-01, S3-DIN-03 and S3-RES-02 alignment | `BLOCKED` | Contract freeze and downstream integration remain open |
+| PM acceptance, restaurant handoff and diner approval | `BLOCKED` | Vivien, Shirley and Adam sign-off outstanding |
+
+## Blocked and not tested
+
+`BLOCKED`:
+
+- Real permitted restaurant photo and real layered sample.
+- Real-phone startup, frame-time and thermal measurements; the recorded viewport used DPR 1.25, not a phone.
+- VoiceOver and TalkBack verification.
+- PNG-versus-WebP budget decision by PM/ADR owners.
+- External re-review sign-off by `@hemu77` on the rebased commit and human publication approvals (Vivien, Shirley, Adam).
+
+`NOT TESTED`:
+
+- Production publication API, because S3-RES-02 is not built.
+- Diner viewer integration, because S3-DIN-03 is separate.
+- Full 3D rendering, which is outside S3-VIS-03.
+- Production deployment and real-device network variability.
+
+## Publication record
+
+- Initial QA fix commit: `8fa4a0bf3a53443b7e9dce60731c6ae4fdc1c783` ([issuecomment-6388963012](https://github.com/vivienk/peekaplate/pull/25#issuecomment-6388963012))
+- Rebased + P2 review fix commit: `35098ad97affed0aa9bbb6efd73c5149fb97ecfd`
+- PR inline review replies: [r4372018203](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372018203), [r4372018339](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372018339), [r4372018465](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372018465), [r4372018903](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372018903)
+- PR rebased verification comment: https://github.com/vivienk/peekaplate/pull/25#issuecomment-6402325653
+- ClickUp task `86bcnfw7r`: rebased QA summary comment `90140273173592` posted; status and assignee deliberately unchanged.
+- Follow-up viewer & test fix commit: `72cdb4e`
+- Follow-up PR inline review replies: [r4372231047](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231047), [r4372231101](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231101), [r4372231219](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231219), [r4372231319](https://github.com/vivienk/peekaplate/pull/25#discussion_r4372231319)
+- Follow-up PR verification comment: https://github.com/vivienk/peekaplate/pull/25#issuecomment-6402612252
+- Follow-up ClickUp comment on `86bcnfw7r`: `90140273180794`
+
+
+## Rebase QA — 2026-11-06
+
+This section was written and committed **before** any test suite or CLI was run on the rebased head. Actual/Status columns were filled in by the follow-up results commit after execution. Status values: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`.
+
+- Base: `origin/develop` `d6e5a16` (PR #76). Rebased from `a9bcdb5`; backup `backup/feat/s3-vis-03-asset-delivery-pre-rebase-2026-11-06`.
+- Conflicts resolved: `schemas.py` (develop's `field_validator`, `validate_version` → `validate_box_evidence`, `_typed_equal`, `_box_evidence_links` kept; #25's `UUID` import and asset/spatial/presentation models added), `docs/CONTEXT.md`, `errors.md` (both histories kept).
+- Context: develop's `processing` node is unchanged (its summary was already at 942/1000 characters). #25's asset files now sit in a new `assets` node (`dependsOn: processing`, ADR 0004/0005). The #25 handoff replaced the oldest develop handoff (November 1 RES-02 hosted acceptance) to stay within the ten-entry cap.
+- Data: synthetic fixtures from `processing/tests/fixture_factory.py` only (`food_photo`, `layered_photo`, `cutout_photo`, `presentation_photo`). No restaurant photo, phone or screen reader.
+- Evidence directory (not committed): `processing/work/qa-vis03-20261106/`.
+
+### Acceptance criteria (rebase)
+
+| ID | Criterion |
+|---|---|
+| AC-V1 | Full Python suite passes on the rebased head; count ≥ develop-only count + #25's 3 test modules |
+| AC-V2 | Develop's schema/box-evidence tests pass on the rebased head (validator not lost in the merge) |
+| AC-V3 | `pnpm verify lint typecheck test build context:check docs:check pr:check` passes |
+| AC-V4 | Every V-CLI and V-BR case below is `PASS` (or `BLOCKED` with evidence); any `FAIL` gets a `D-n` entry, failing test, fix and re-run |
+| AC-V5 | PR #25 `MERGEABLE`, every non-skipped check on the new head `SUCCESS` |
+
+### Test cases
+
+| ID | Traces to | Layer | Preconditions / steps | Expected | Actual | Status |
+|---|---|---|---|---|---|---|
+| V-AUTO-1 | AC-V1 | unit | `uv run --project processing --frozen --extra service python -m unittest discover -s processing/tests` | All pass; count recorded | Ran 465 tests, OK (develop-only baseline at d6e5a16: 434 discovered; +31 from #25's test_assets/test_spatial/test_presentation) | `PASS` |
+| V-AUTO-2 | AC-V2 | unit | `… unittest processing.tests.test_box_evidence processing.tests.test_box_grounding_safety processing.tests.test_review_candidates` (develop modules) | All pass | test_box_evidence + test_box_grounding_safety + test_review_candidates: Ran 34 tests, OK | `PASS` |
+| V-AUTO-3 | AC-V3 | repo | `pnpm verify lint typecheck test build context:check docs:check pr:check` | All checks PASS; Vitest and script counts recorded | exit 0. Biome checked 274 files; typecheck; Vitest 46 files, 767 passed / 4 skipped (pre-existing skips on develop); node --test 67/67; build; context 13 modules/10 handoffs; docs 54 files; pr:check not applicable locally | `PASS` |
+| V-CLI-1 | T0 processing | CLI | `prepare_assets` on a 2000×1500 synthetic JPEG, `--budget-bytes 400000` | exit 0; four variants (`card-480`, `detail-1280` × WebP/JPEG); `review.status=needs_review`; `publication.eligible=false`; total ≤ 400,000 B; source copy byte-identical | exit 0; asset ['t0_47d5c89419fee335933a1b3523bad850']; variants [('card-480', 'jpeg'), ('card-480', 'webp'), ('detail-1280', 'jpeg'), ('detail-1280', 'webp')]; review needs_review; eligible False; total_variant_bytes 37254; source identical True | `PASS` |
+| V-CLI-2 | immutability | CLI | Rerun V-CLI-1 into the same output root | exit 2; existing `manifest.json` SHA-256 unchanged | exit 2; manifest 530740d14c16… -> 530740d14c16…; bundles 1 | `PASS` |
+| V-CLI-3 | validation | CLI | (a) `--budget-bytes 1000`; (b) a text file renamed `.jpg`; (c) `--captured-at` without timezone | each exit 2; no new bundle directory | a budget 1000: exit 2, bundles []; b text as .jpg: exit 2, bundles []; c naive captured-at: exit 2, bundles [] | `PASS` |
+| V-CLI-4 | 2.5D sample | CLI | `prepare_spatial` with synthetic `layered_photo` layers against the V-CLI-1 manifest, `--budget-bytes 400000` | exit 0; `measurements.total_asset_bytes` == byte sum of all delivered files | exit 0; ['t1_bdc58c596574b29c65cc762e144aa113']; total_asset_bytes 65188; delivered 65188 | `PASS` |
+| V-CLI-5 | fallback integrity | CLI | Copy of the T0 bundle whose `detail-1280.jpg` is replaced by non-JPEG bytes and the manifest hash/size patched to match | exit 2; no spatial output | exit 2; output []; msg {"status": "failed", "errors": ["Unable to decode a valid T0 fallback JPEG."]} | `PASS` |
+| V-CLI-6 | Sai's ID finding (`a9bcdb5`) | CLI | `prepare_presentation` into separate roots: (a) 512² PNG, (b) 768² PNG, (c) 512² PNG with `--model-version model-b`; (a) uses `model-a` | three different `pres_` ids; each `needs_review`, `eligible=false` | a 512 model-a: exit 0, pres_ed1bfde039239f0564a0a31da807ad08, needs_review, eligible=False; b 768 model-a: exit 0, pres_ca2923f9f692b731d463c1f6a57771ba, needs_review, eligible=False; c 512 model-b: exit 0, pres_e2863f05896398a77ccba17c8faaa57e, needs_review, eligible=False | `PASS` |
+| V-CLI-7 | T0 fallback retention | CLI | `prepare_presentation` with an opaque (no alpha) candidate | exit 2; `fallback_retained=true`; `fallback.jpg` SHA-256 == T0 `detail-1280.jpg` | exit 2; status None; fallback_retained True; active fallback.jpg; fallback identical True | `PASS` |
+| V-BR-1 | delivery | browser | Serve the V-CLI-4 bundle with `python -m http.server`; open `harness.html` in Chromium with `prefers-reduced-motion: no-preference` | `layersLoaded=3`; `spatialVisible=true`; `fallbackVisible=true`; `totalAssetBytes` == delivered bytes | layersLoaded=3; spatialVisible=true; fallbackVisible=true; totalAssetBytes=65188; spatialError=null | `PASS` |
+| V-BR-2 | no-JS fallback | browser | Same URL, JavaScript disabled | `#fallback` `naturalWidth > 0` | naturalWidth=1280 naturalHeight=960 src=./fallback.jpg | `PASS` |
+| V-BR-3 | motion clamp | browser | Focus stage; Home; ArrowRight ×40; ArrowLeft ×1 | transform ends `rotateY(2.5deg)` | perspective(900px) rotateX(0deg) rotateY(3deg) -> perspective(900px) rotateX(0deg) rotateY(2.5deg) | `PASS` |
+| V-BR-4 | reduced motion | browser | ArrowRight once, then emulate `prefers-reduced-motion: reduce` without reload | `#layers` transform cleared; `metrics.reducedMotion=true` | before "perspective(900px) rotateX(0deg) rotateY(0.5deg)"; after ""; reducedMotion=true; after key "" | `PASS` |
+| V-BR-5 | failure retention | browser | Serve with one layer file removed; then with `spatial-manifest.json` removed | layer: `layerRetries[name]=1`, fallback visible; manifest: `manifestRetries=1`, fallback visible | layer: retries={"subject":1} spatialError=layer_load_failed fallbackVisible=true; manifest: manifestRetries=1 spatialError=null fallbackVisible=true | `PASS` |
+| V-BR-6 | `file://` | browser | Open `harness.html` via `file://` | "Preview unavailable" shown; fallback visible | status="Preview unavailable â€” showing the approved dish photo."; spatialError=null; fallback rendered=true | `PASS` |
+
+Out of scope: real permitted photos, real-phone timing, VoiceOver/TalkBack and PM/restaurant/diner acceptance. These stay `BLOCKED` as in the earlier sections.
+
+### Execution summary — 2026-11-06
+
+Environment: Windows 10.0.26200 x64, Python 3.12.13 via `uv`, Node.js 24.16.0, pnpm 11.25.0, Playwright Chromium (headless, 390×844, `reducedMotion: no-preference` unless stated). Drivers: `processing/work/qa-vis03-20261106/qa_cli.py` (runs each CLI as a separate process) and `qa_browser.mjs` (bundle served with `python -m http.server`). Neither is committed.
+
+| Result | Count |
+|---|---|
+| `PASS` | 16 |
+| `FAIL` | 0 |
+| `BLOCKED` | 0 (real-photo, device and accessibility gates remain blocked as listed above) |
+| `NOT RUN` | 0 |
+
+The rebase changed no #25 source or test file: `git diff a9bcdb5 HEAD` on every #25-owned module, test and doc is empty. Develop's `schemas.py` and `fixture_factory.py` lines are preserved (`git diff origin/develop HEAD` contains no removed lines in either file).
+
+Observation O-1 (not a defect against an acceptance criterion): when the manifest fetch fails twice, the harness shows "Preview unavailable" and keeps the fallback, but `metrics.spatialError` stays `null`; only `manifestRetries=1` records the failure. Layer failures set `spatialError=layer_load_failed`. This can be raised as a diagnostics follow-up if wanted. It was not changed here.
+
+## November 4 attachment integration — November 7 verification
+
+Applied the two supplied review-preview commits on top of `9b69910`, preserving
+develop's context and the separate assets node. No production routes, database,
+provider calls or diner integration were added. Local environment: Intel macOS,
+Python 3.12.14, Pillow 12.3.0, Pydantic 2.14.1, Node 24.16.0, pnpm 11.25.0.
+
+| Result | Command / evidence |
+| --- | --- |
+| PASS | `PYTHONPATH=processing/src:processing/tests ../pr25-audit-20261107/focused-venv/bin/python -m unittest test_assets test_spatial test_presentation test_review_preview`: 38 tests, 27.958 seconds. Isolated minimal environment, not the full locked environment. |
+| PASS | `pnpm exec playwright test --config playwright.review-preview.config.ts`: six Chromium cases, including synthetic touch, live reduced motion, failed candidate, no JavaScript and missing original. |
+| PASS | `pnpm check`: lint, typechecks, 767 Vitest tests (four optional skips), 67 script tests, context and documentation. Initial loopback restriction and successful retry are recorded in errors.md. |
+| PASS | `pnpm verify build`: application builds and Worker dry run only. |
+| PASS | `UV_CACHE_DIR=../pr25-audit-20261107/uv-cache uv build --project processing`: wheel and source distribution. |
+| PASS | Previously supplied photo/cutout-alpha/generated PNG rebuilt into both review modes. Original and prompt hashes match the earlier attachment. Chromium verified load, keyboard tilt, original comparison and reset for both. No input images or generated outputs committed. |
+| PASS | Independent read-only architecture and correctness reviews found no actionable blockers in the added review-preview slice at `e5b6b4e`. Subsequent changes are documentation/evidence only. |
+| NOT RUN | Full frozen Python suite locally: the existing locked ONNX runtime has no Intel macOS wheel. Prior-head CI is not evidence for the new head; new hosted CI must complete after push. |
+| NOT RUN | Physical-phone, screen-reader and human food-fidelity/rights acceptance; production contract and diner integration remain separate. |
+
+The pre-existing presentation-helper rights-confirmation, rejected-provider
+provenance and unbounded candidate-file-read findings are not fixed by this
+addition. This verification does not approve the whole PR for merge or publication.
+
+
+## November 8 final reconciliation and verification
+
+Preserved develop `5bfaa94`, including #69's menu/detail foundation and #116's
+comparison correction. The only merge conflict was the delivery fingerprint in
+`docs/CONTEXT.md`; refreshed it from the combined sources.
+
+Four regressions failed before correction and passed afterward:
+- Omitted presentation rights must fail before output; CLI now requires
+  `--rights-confirmed`, and direct callers explicitly pass `rights_confirmed=True`.
+- A rejected PNG retains the returned model and fidelity flags/notes. Different
+  returned models keep separate fallback identities even for identical rejected bytes.
+- Candidate file reads request at most `MAX_SOURCE_BYTES + 1`; oversized inputs fail.
+- Oversized image headers fail before `image.load()`, with resources closed.
+
+Fresh Windows validation (synthetic inputs; no provider calls):
+- PASS: `uv run --project processing --frozen --extra service python processing/tests/run_offline.py`
+  — 476 tests; 38.721s test time, 61.747s command time. Socket guard active.
+- PASS: `uv run --project processing --frozen --extra service python processing/tests/run_offline.py -p test_presentation.py`
+  — 12 tests, including the strengthened bounded-read assertion; 9.401s command time.
+- PASS: `pnpm check` — 796 Vitest + 67 script tests, types/lint/context/docs; 26.164s.
+- PASS: `pnpm verify build` — apps and Worker dry-run; 6.757s. Diner initial JS 39,965 bytes gzip.
+- PASS: `uv build --project processing` — wheel and source distribution.
+- PASS: `pnpm exec playwright test --config playwright.review-preview.config.ts --workers=1`
+  — 6 Chromium checks; 3.854s command time.
+- PASS: `pnpm exec playwright test --workers=1` — 51 Chromium checks across the
+  current diner/console foundations, menu/detail, Save and SDK behavior; 59.673s.
+- PASS: private local HTTP spatial harness — 12 Chromium checks; 4.586s command time.
+  Covers decoded photo/three layers, no JavaScript, keyboard/reversal, mixed input,
+  reduced motion, missing layer/manifest/photo, unsupported CSS, depth ordering,
+  live reduced-motion toggles and a layer named `constructor` retry. Test code was
+  reused from the earlier review with current generated bundles; historical head
+  labels in that helper are not current-commit evidence.
+
+Physical-phone scrolling/performance, VoiceOver/TalkBack, permitted captured-food
+fidelity review and production asset/publication integration are NOT RUN here.
+This is an offline preparation foundation; every output remains non-publishable.

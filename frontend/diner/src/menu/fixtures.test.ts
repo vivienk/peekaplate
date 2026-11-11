@@ -93,11 +93,11 @@ describe('fixture menu source', () => {
 
   it('keeps every validated allergen, including one without an icon, for chip wrapping', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.gardenAvocadoSalad);
-    expect(dish.allergens).toEqual(['Tree nuts', 'Peanuts', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
+    expect(dish.allergens).toEqual(['Nuts', 'Peanuts', 'Soy', 'Sesame', NO_ICON_ALLERGEN]);
     expect(dish.dietary).toEqual(['Vegan', 'Vegetarian']);
   });
 
-  it('has a complete dish with no allergen or dietary data, so the section can be hidden', async () => {
+  it('has a complete dish with no allergen or dietary data, so the note shows under Contains', async () => {
     const dish = complete(await loadMenu('edge-cases'), DISH.noAllergenData);
     expect(dish.allergens).toEqual([]);
     expect(dish.dietary).toEqual([]);
@@ -199,6 +199,25 @@ describe('menu adapter', () => {
     ]);
   });
 
+  it('shows older "tree nut" data with the current Nuts label', () => {
+    const result = toMenu(
+      {
+        ...edgeCaseBundle,
+        categories: [
+          {
+            category_id: CATEGORY.breakfast,
+            name: 'B',
+            dishes: [{ ...wireDish(), allergens: ['tree nut', 'Tree nuts', 'peanut'] }],
+          },
+        ],
+      },
+      'fixture',
+      FIXTURE_PUBLICATION_REVISION_ID,
+    );
+    if (result.status !== 'ready') throw new Error('expected a ready menu');
+    expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual(['Nuts', 'Peanuts']);
+  });
+
   it('still suppresses Gluten-free when an unlisted Gluten value is given', () => {
     const wheat: WireCompleteDish = {
       dish_id: DISH.avocadoToast,
@@ -217,14 +236,13 @@ describe('menu adapter', () => {
         ...edgeCaseBundle,
         categories: [{ category_id: CATEGORY.breakfast, name: 'B', dishes: [wheat] }],
       },
-      'published',
+      'fixture',
       FIXTURE_PUBLICATION_REVISION_ID,
     );
     if (result.status !== 'ready') throw new Error('expected a ready menu');
     expect(complete(result.menu, DISH.avocadoToast).allergens).toEqual(['Gluten']);
     expect(complete(result.menu, DISH.avocadoToast).dietary).toEqual(['Vegan']);
-    expect(result.menu.notice).toBeNull();
-    expect(FIXTURE_NOTICE).toBe('Fixture data');
+    expect(result.menu.notice).toBe(FIXTURE_NOTICE);
   });
 
   it('is the only screen-facing module that reads the data shape', () => {

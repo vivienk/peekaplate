@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+Latest diner integration: [published-menu connection](diner-connection.md). It
+explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
+configuration and reused public hosting. Its release acceptance record identifies
+the actual deployed version; older dated setup sections below are historical.
+
+
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
@@ -760,3 +766,41 @@ Begin with **three representative dishes**, then expand the approved photo/text 
 Use weekly Tuesday-to-Tuesday sprint headings within the requested 15–20-day delivery window. Reconfirm capacity and dates before committing. Each ticket needs a plain title, research/design/implementation label, estimated effort, required roles, source links, acceptance examples and its prerequisite PR. Include review and integration time in the estimate.
 
 The first integrated demo should show permitted staff saving, reviewing and publishing a dish, and a diner seeing that approved version. Layout, manual content preparation and event-definition review can proceed alongside backend work. Accept tracking and reports only after their real data paths and calculations are tested; a collector alone is not a finished dashboard.
+
+## P0 v2 owner synthetic dataset — October 27, 2026
+
+The reviewed synthetic dataset package is located at
+`test-data/owner-synthetic-p0-v2/`.
+
+It provides fictional event fixtures, expected metric outputs, negative
+cases, schema validation, and reproducible automated tests for the
+PeekaPlate P0 evaluation work.
+
+Verification history:
+- October 27, 2026: 62 automated tests passed (historical result).
+- October 29, 2026 (before merging develop): 73 Python automated tests passed.
+- Full dataset validation passed: 3,300 event deliveries and 3,150 unique observations across 300 sessions.
+- Starter dataset validation passed: 22 event deliveries and 21 unique observations across 2 sessions.
+- October 29, 2026 (after merging develop): 73/73 Python tests passed in 23.302 seconds; full and starter dataset validators passed.
+- November 2, 2026: after reconciling current develop, 76/76 tests passed in 20.267 seconds; full and starter validators passed. Offline data-preparation review is cleared; product/source approvals and application integration remain separate.
+
+To reproduce the results, follow
+[test-data/owner-synthetic-p0-v2/GUIDE.md](../test-data/owner-synthetic-p0-v2/GUIDE.md).
+
+These results establish synthetic fixture and validator correctness only.
+Application AI evaluation remains NOT RUN. Production integration and
+hosted privacy acceptance are not established. Outstanding product
+decisions remain PENDING.
+
+
+## Owner-report staging API — November 10
+
+The console may call the owner-report route from its exact staging origin or
+http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
+GitHub collaborator tokens do not authorize restaurant reports. Staging reports
+are deliberately limited to the server-approved synthetic venue; production
+and other venues remain blocked. See [request flow, status codes and release
+checks](owner-report-staging.md). Deployment evidence belongs in the narrow
+owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

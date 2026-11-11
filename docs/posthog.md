@@ -4,15 +4,57 @@ This integration is a best-effort internal product-analytics channel, **not** th
 
 **Setup status, updated October 21, 2026:** the existing US project `675372`, currently named **Default project**, received synthetic events from both hosted staging sites after the approved setup release. The [internal integration dashboard](https://us.posthog.com/project/675372/dashboard/2233365) is for staging only. Repository defaults keep analytics disabled; these deployments use explicit staging configuration. The separate [Supabase export](posthog-export.md) passed a bounded transfer and repeated-interval check: eight raw copies, four unique events, one matching diner and console test record each. Restricted permissions passed; hourly staging exports are enabled.
 
-## What exists and what does not
+## Current diner tracking boundary — November 8, 2026
 
-Both current screens are placeholders. After a visitor explicitly opts in, the real screen emits `app_shell_viewed` with `surface=diner` or `surface=console`. This new technical event is not `menu_viewed`, a signed-in owner, a restaurant visit or a sale. The React effect cleans up on unmount/StrictMode remount. No analytics runs before opt-in; missing configuration hides the optional control entirely.
+The diner reuses the existing consent control with the shared TRK-01 gate injected into it. The control starts off, remains available without PostHog configuration and respects DNT/GPC. It does not construct the legacy diner analytics instance or emit `app_shell_viewed`. The console keeps its existing shell integration described below.
 
-The shared `captureDishIntent(input)` adapter validates the existing strict v1 `DishIntentEventSchema` and preserves `dish_open` and `portion_compare`. It is tested but has **no dish-control caller yet**, because those controls do not exist. When adding a real control, use the analytics instance returned by `mountAnalyticsConsent`; call `captureDishIntent` after the actual display/interaction with its pinned exposure contract. Never call it for shell renders, mere button-down, fixture menus or generic comparisons. Console callers cannot submit diner events.
+One validated `track()` call independently queues canonical observations and calls the approved PostHog SDK adapter. The canonical outbox alone owns durable buffering and batching; retrying it does not capture to PostHog again. Fixture mode sends neither destination. Live publication/token wiring and genuine browser-to-provider acceptance remain separate from these controlled browser tests.
+
+Withdrawal immediately retires the old pipeline and its queued additions. Durable clearing also runs on a cold page, and a new opt-in waits for that clear. IndexedDB reads and writes share one transaction and complete only on transaction commit. The localStorage fallback requires a shared Web Lock; without it, events stay in visit memory. Authoritative pending reads prevent stale tabs from replacing or resurrecting cleared records. Limits remain 500 events, 1 MiB and 24 hours. Already-started network requests cannot be retroactively unsent; real delivery and public notice/retention approval remain release gates.
+
+Withdrawal writes deletion-work markers to sessionStorage and localStorage before clearing both durable backends explicitly. A fallback memory store cannot confirm that IndexedDB was cleared. A later page retries pending deletion before reopening durable work; new events stay in memory if clearing or marker access fails. Separate completion tokens prevent an older clear from erasing a newer pending request. These markers contain no diner identity and never grant consent. If every marker write and backend clear fails, a later page cannot recover that withdrawal: absolute erasure is not guaranteed under total browser-storage failure. Reload still starts with collection off and stored events expire after 24 hours.
+
+Code: [shared dispatch](../frontend/diner/src/tracking/index.ts), [consent gate](../frontend/diner/src/tracking/consent.ts), [atomic outbox](../frontend/diner/src/tracking/outbox.ts), [reused control](../packages/analytics/src/consent.ts). Merge/review order remains #77 → #80 → #84; these fixes do not enable live collection by themselves.
+
+### Canonical delivery foundation (#84)
+
+DIN-03 can pass `createLiveDeliver({ endpoint, fetch, now, token })` from
+[delivery.ts](../frontend/diner/src/tracking/delivery.ts) to `enableLiveTracking`.
+The token callback reads the current in-memory published-menu token; never persist it
+with queued observations. This merge supplies the sender, not that live-menu wiring.
+
+- Each request rechecks consent, token expiry and publication. Withdrawal cancels
+  remaining split requests even if the diner immediately opts in again. A request
+  already started cannot be recalled. Fixture mode sends neither destination.
+- Valid shared-contract receipts remove accepted or permanently rejected IDs;
+  missing, contradictory or malformed receipts retain the unchanged observations.
+- A stalled request or response body aborts after ten seconds. Offline/transient
+  failures retain IDs and payloads, with exponential jittered backoff up to one
+  minute; a longer server `Retry-After` takes precedence, including HTTP dates.
+  Once a batch needs retry, unsent halves wait too.
+- `413` splits bounded batches; a single oversized event is terminal. `400` is
+  terminal `client_invalid`, and `401`/`403` are terminal unauthorized. An expired
+  or different-publication token discards unsent events under the current policy;
+  a temporarily missing token leaves them queued. No event is relabelled.
+- Canonical retries never dispatch to PostHog again. Development logs contain
+  terminal counts only. The token is sent only in the Authorization header;
+  requests omit cookies and refuse redirects.
+
+Unit tests exercise shared fixtures, malformed receipts, timeouts and split-request
+boundaries. [Chromium delivery tests](../tests/e2e/tracking-delivery.spec.ts) use
+synthetic intercepted responses with the real tracking layer and durable outbox.
+These checks do not certify hosted ingestion, PostHog funnels or live token renewal.
+Connect DIN-03, then capture browser-to-both-destinations evidence before release.
+
+## Legacy shell integration
+
+The October setup emitted `app_shell_viewed` with `surface=diner` or `surface=console` after opt-in. The console still uses that legacy path; the current diner uses the shared gate above. This technical shell event is not `menu_viewed`, a signed-in owner, a restaurant visit or a sale. The React effect cleans up on unmount/StrictMode remount. Missing configuration hides the legacy console control, but does not hide the diner's canonical consent control.
+
+The legacy `captureDishIntent(input)` adapter validates the strict v1 `DishIntentEventSchema` and preserves `dish_open` and `portion_compare`. It is not the current diner's v2 path. New diner controls call the shared `track()` boundary after the actual approved display/interaction; do not add a second direct analytics call. Console callers cannot submit diner events.
 
 The [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record) proposes broader v2 events. Menu/card exposures, ingredients, saves, comparison replacement, viewer lifecycle and owner report actions remain unwired until their controls, strict schemas and triggers are reviewed. Historical portion events cannot be renamed into generic comparison events. No two names for one action.
 
-## Privacy and failure behavior
+## Legacy adapter privacy and failure behavior
 
 - Consent is off initially and exists only in page memory; reloading requires a fresh choice. No cookie, localStorage, sessionStorage, fingerprint or cross-device identity is created. A random page-scoped ID is generated only when capture starts. Withdrawal aborts pending requests and discards identity; already transmitted events cannot be unsent.
 - DNT and GPC prevent capture and are checked for every attempt. A blocked capture attempt revokes consent. PostHog receives the network connection IP even though the payload sets `$ip=null` and disables GeoIP; project-level IP discard must also be enabled. Do not describe this as completely anonymous transport.

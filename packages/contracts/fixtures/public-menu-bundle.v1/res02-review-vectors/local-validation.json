@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "a734c508d402af20cd21ca2cce999948ff0a694e",
+  "source": "synthetic",
+  "sharedSchema": "PASS",
+  "cases": 5,
+  "records": [
+    {
+      "file": "bundle.original.json",
+      "byteLength": 2706,
+      "sha256": "358b4b4f66f2413a32f35c62a4a43915750fab0294e8a4cd95da98ef3ce4064a",
+      "sharedContentSchema": "PASS"
+    },
+    {
+      "file": "bundle.same-value-pretty.json",
+      "byteLength": 4180,
+      "sha256": "6d34c344b5562a9a36a5215395f817df33a0dfae7c92950960b9195c3687a66e",
+      "sharedContentSchema": "PASS"
+    },
+    {
+      "file": "bundle.tampered-name.json",
+      "byteLength": 2706,
+      "sha256": "42c97d63ce7a4ce255f2b92c791945edc44d8ea72044d1848b505c7602e61427",
+      "sharedContentSchema": "PASS"
+    },
+    {
+      "file": "bundle.wrong-revision.json",
+      "byteLength": 2706,
+      "sha256": "23e3f195f04e97faa5150effc25260a1c9c4569af12496f8b138d619f2290b33",
+      "sharedContentSchema": "PASS"
+    }
+  ],
+  "producer": "NOT_RUN",
+  "browser": "NOT_RUN",
+  "hosted": "NOT_VERIFIED",
+  "tokenVerification": "NOT_RUN"
+}

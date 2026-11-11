@@ -267,7 +267,7 @@ describe('RES-02 immutable diner bundle boundary', () => {
       'egg',
       'fish',
       'crustacean shellfish',
-      'tree nut',
+      'nuts',
       'peanut',
       'wheat',
       'soy',
@@ -277,6 +277,7 @@ describe('RES-02 immutable diner bundle boundary', () => {
 
     for (const code of allergenCodes) expect(PublicMenuAllergenCodeSchema.parse(code)).toBe(code);
     for (const code of dietaryCodes) expect(PublicMenuDietaryCodeSchema.parse(code)).toBe(code);
+    expect(PublicMenuAllergenCodeSchema.safeParse('tree nut').success).toBe(false);
     expect(PublicMenuAllergenCodeSchema.safeParse('Peanuts').success).toBe(false);
     expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
   });

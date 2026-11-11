@@ -1,3 +1,5 @@
+export * from './owner-ai';
+
 import { z } from 'zod';
 
 export {
@@ -183,7 +185,7 @@ export const PublicMenuAllergenCodeSchema = z.enum([
   'egg',
   'fish',
   'crustacean shellfish',
-  'tree nut',
+  'nuts',
   'peanut',
   'wheat',
   'soy',
@@ -557,6 +559,33 @@ export const TeamAnalyticsResponseSchema = z.strictObject({
 });
 export type TeamAnalyticsQuery = z.infer<typeof TeamAnalyticsQuerySchema>;
 export type TeamAnalyticsResponse = z.infer<typeof TeamAnalyticsResponseSchema>;
+export * from './owner-report';
+export {
+  type CandidateCorrectedFields,
+  CandidateCorrectedFieldsSchema,
+  type CandidateReviewRecord,
+  CandidateReviewRecordSchema,
+  type CandidateReviewScope,
+  CandidateReviewScopeSchema,
+  type ExtractionReviewScope,
+  ExtractionReviewScopeSchema,
+  type ExtractionReviewSessionResponse,
+  ExtractionReviewSessionResponseSchema,
+  type PrivateArtifactRef,
+  PrivateArtifactRefSchema,
+  type ResolvedCandidateFields,
+  ResolvedCandidateFieldsSchema,
+  type ReviewCandidateCommand,
+  ReviewCandidateCommandSchema,
+  type ReviewCandidateItemResponse,
+  ReviewCandidateItemResponseSchema,
+  type ReviewCandidateStatus,
+  ReviewCandidateStatusSchema,
+  type ReviewEditableField,
+  ReviewEditableFieldSchema,
+  type UpsertExtractionReviewSessionRequest,
+  UpsertExtractionReviewSessionRequestSchema,
+} from './review-persistence';
 
 // Observation Queue contract (ADR 0015 / S3-DATA-01 -> S3-DATA-02).
 // Internal queue message envelope format emitted by the observation producer onto Cloudflare Queues.
@@ -964,6 +993,57 @@ export async function sha256(value: string | Uint8Array): Promise<string> {
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   );
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export type PublicMenuIntegrityErrorCode =
+  | 'content_hash_mismatch'
+  | 'invalid_utf8'
+  | 'invalid_json'
+  | 'invalid_bundle';
+
+export class PublicMenuIntegrityError extends Error {
+  readonly code: PublicMenuIntegrityErrorCode;
+
+  constructor(code: PublicMenuIntegrityErrorCode, message: string) {
+    super(message);
+    this.name = 'PublicMenuIntegrityError';
+    this.code = code;
+  }
+}
+
+/**
+ * Verifies fetched public menu bundle bytes against the published `contentHash`, then decodes and
+ * validates them. The hash covers the exact bytes the producer stored (UTF-8 canonical JSON, no
+ * trailing newline); consumers must hash before parsing and never re-serialize.
+ */
+export async function verifyPublicMenuContentBytes(
+  bytes: Uint8Array,
+  expectedContentHash: string,
+): Promise<PublicMenuContentBundle> {
+  if ((await sha256(bytes)) !== expectedContentHash) {
+    throw new PublicMenuIntegrityError(
+      'content_hash_mismatch',
+      'Bundle bytes do not match the published content hash',
+    );
+  }
+  let text: string;
+  try {
+    // ignoreBOM keeps a BOM in the text so it fails JSON.parse instead of being silently dropped.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    throw new PublicMenuIntegrityError('invalid_utf8', 'Bundle bytes are not valid UTF-8');
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new PublicMenuIntegrityError('invalid_json', 'Bundle bytes are not valid JSON');
+  }
+  const parsed = PublicMenuContentBundleSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new PublicMenuIntegrityError('invalid_bundle', 'Bundle does not match the v1 schema');
+  }
+  return parsed.data;
 }
 
 /**
