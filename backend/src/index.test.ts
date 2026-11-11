@@ -12,6 +12,7 @@ import {
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { createStaffVerifier } from './auth';
 import app, {
@@ -1691,6 +1692,29 @@ describe('menu ingestion HTTP boundary', () => {
       });
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('fails closed before connecting when import archive storage is missing', async () => {
+      const connect = vi
+        .spyOn(Client.prototype, 'connect')
+        .mockRejectedValue(new Error('must not connect'));
+      try {
+        const testApp = createApp({ verify: async () => actorId, execute: vi.fn() });
+        const response = await testApp.request(
+          `/venues/${venueId}/orders/import`,
+          {
+            method: 'POST',
+            headers: { Authorization: 'Bearer synthetic-token', 'Content-Type': 'text/csv' },
+            body: validCsv,
+          },
+          { APP_ENV: 'local', LOCAL_DATABASE_URL: 'postgres://unused.test/synthetic' },
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: 'service_unavailable' });
+        expect(connect).not.toHaveBeenCalled();
+      } finally {
+        connect.mockRestore();
+      }
     });
 
     it('rejects invalid venueId UUID with 400', async () => {

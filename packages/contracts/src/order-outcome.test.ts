@@ -35,6 +35,21 @@ describe('S5-DATA-07 order outcome contracts & CSV parser', () => {
     expect(result.success).toBe(true);
   });
 
+  it.each([
+    '2026-10-32T12:00:00Z',
+    '2026-02-29T12:00:00Z',
+    '2026-11-01T24:00:00Z',
+    '2026-11-01T12:60:00Z',
+    '2026-11-01T12:00:60Z',
+    '2026-11-01T12:00:00+16:00',
+  ])('rejects invalid calendar/time fields before database use: %s', (ordered_at) => {
+    expect(OrderOutcomeLineSchema.safeParse({ ...validLine, ordered_at }).success).toBe(false);
+    expect(classifyOrderTimestampWindow(ordered_at, '2026-11-11T12:00:00Z')).toMatchObject({
+      valid: false,
+      reasonCode: 'invalid_format',
+    });
+  });
+
   it('accepts a valid line without optional price and currency', () => {
     const { unit_price, currency, ...withoutPrice } = validLine;
     const result = OrderOutcomeLineSchema.safeParse(withoutPrice);

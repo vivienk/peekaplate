@@ -241,6 +241,32 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
     expect(json.quarantinedRows).toBe(0);
     expect(json.totalRows).toBe(1);
 
+    // A malformed calendar row must not reach PostgreSQL or roll back a valid row.
+    const futureYear = new Date().getUTCFullYear() + 1;
+    const mixedCsv = [
+      'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+      `pilot_order_outcome.v1,ORD-CALENDAR-VALID,LINE-1,${futureYear}-03-01T12:00:00Z,POS-ITEM-HTTP,ordered,1`,
+      `pilot_order_outcome.v1,ORD-CALENDAR-INVALID,LINE-2,${futureYear}-02-30T12:00:00Z,POS-ITEM-HTTP,ordered,1`,
+    ].join('\n');
+    const calendarClient = new Client({ connectionString: runtimeUrl });
+    await calendarClient.connect();
+    try {
+      const mixed = await importOrderOutcomes({
+        client: calendarClient,
+        actorId: ownerId,
+        venueId,
+        csvText: mixedCsv,
+        sourceFilename: 'synthetic-calendar.csv',
+        storage: fakeStorage,
+        now: () => new Date(`${futureYear}-03-03T12:00:00Z`),
+      });
+      expect(mixed.acceptedRows).toBe(1);
+      expect(mixed.quarantinedRows).toBe(1);
+      expect(mixed.diagnostics[0]?.reasonCode).toBe('invalid_format');
+    } finally {
+      await calendarClient.end();
+    }
+
     // Test separate venue WITHOUT tracking activation: must quarantine with missing_tracking_start_evidence
     const noTrack = await createTestVenue();
     const appNoTrack = createApp({

@@ -1996,68 +1996,11 @@ Independent review identified two additional paths: failed clearing lost its pen
 Tooling corrections: a Windows rg path containing a wildcard was treated literally; use directory paths with rg's glob filter instead. A revised PR description initially omitted the repository's three required context labels; the exact body now passes scripts/check-pr.mjs before publishing.
 
 
-## November 7 S5-DATA-07 order-outcome import verification
-
-Implemented restricted CSV ingestion path (pilot_order_outcome.v1) for venue owners, tenant-scoped RLS persistence across order_outcome_import_batches, order_outcome_lines, order_outcome_quarantine, and order_outcome_conflicts with append-only triggers, immutable published menu bundle revision verification, and strict isolation from diner observations and owner reports. All 188 contracts tests, 61 backend service and HTTP tests, and 29 pgTAP database assertions pass.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:22:36.990Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:29:44.200Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:35:17.101Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-08T12:40:54.175Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T12:41:09.350Z","exitCode":2}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-08T12:42:43.238Z","exitCode":1}
-```
-
-## November 8 S5-DATA-07 PR #120 Review Corrections & Verification
-
-During review remediation verification:
-1. `test:db`: Real PostgreSQL test probes in `order-ingestion.integration.ts` initially used a sparse bundle mock missing mandatory `PublicMenuContentBundleSchema` dish fields (`price`, `ingredients`, `images`), causing expected validation rejection during ingestion. Added conformant bundle structure. pgTAP test plan in `tests/db/order_outcomes.sql` updated to 68 assertions verifying reviewer UUID audit provenance retention after membership removal (`migrations/20261108120000_pos_mapping_reviewer_provenance.sql`). All 9 pgTAP test suites (260 assertions) and all 6 integration suites (77 tests) pass.
-2. `lint`: Import sorting and line wraps in `order-ingestion.integration.ts` and `service.ts` resolved via Biome format.
-3. `typecheck`: `noUncheckedIndexedAccess` required safe indexing for `publishedActive[0]` in `service.ts`, and test `createApp` stubs required `execute` dummy property. Resolved in `service.ts` and `order-ingestion.integration.ts`.
-4. `context:check`: Context module fingerprints updated for new contracts handoff fixtures and integration paths via `pnpm context:refresh`. All checks pass clean.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:09:59.298Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:11:32.256Z","exitCode":1}
-```
-
 ## November 8 PR74 reconciliation and invalid-field focus
 
 The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
 
 The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
-
-## November 9 PR #120 Four Review Findings Resolution & Verification
-
-During integration test expansion for PR #120 review findings:
-1. `test:db`: Draft integration probe for inverted publication timestamps initially attempted an `UPDATE` on `app_private.venue_tracking_activations`, which failed due to the immutable activation trigger `enforce_venue_tracking_activation` (`Modifying venue tracking activation timestamp is prohibited`). Resolved by deriving relative monotonic event timestamps forward from the initial activation timestamp (`actDate`) without mutating historical activation records. All 10 pgTAP suites (281 assertions) and all 6 integration suites (84 tests) pass cleanly.
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -2552,22 +2495,136 @@ the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
 
+
+## Extraction release observations retained during reconciliation
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:37.257Z","exitCode":1}
+
+## RES-02 October 31 local reconciliation checks
+
+Initial context refresh rejected an overlong merged database summary; the summary was shortened while retaining both publication and canonical observation boundaries. A frozen dependency install stopped at pnpm project-registry symlink creation with Windows EPERM before tests ran; no application failure was established.
+
+The project-local store avoided the registry-link step, but dependency linking still failed with EPERM. Direct script checks passed 54/57: the preview symlink fixture was denied, the database-launcher test could not resolve uninstalled Vitest, and the real pnpm invocation retried the denied registry link. Direct pinned Biome, context validation and documentation-link checks passed. Full TypeScript/application/database/browser verification is deferred to Linux CI; no tests or runtime protections were weakened.
+
+## RES-02 public-menu integration response typing
+
+At head 7299603, Linux CI run 41232592080 passed database and browser checks but typecheck reported TS18046 on approval, publication and public-menu response JSON in the public-menu integration case. The shared runtime declarations type Response.json() as unknown. Parse those three responses with MenuApprovalSchema, MenuPublicationSchema and PublicMenuResponseSchema, matching the existing command integration tests; keep real JWT, publication and withdrawal assertions. Scoped Biome, context/docs and whitespace checks pass locally. Exact-head Linux quality and database checks must verify the correction; no application contract changed.
+
+## RES-02 November 1 context reconciliation
+
+An initial merged backend summary exceeded the context validator's existing 1,000-character limit. The backend/database summaries were shortened while retaining develop's retrieval, extraction, canonical observation and new diner fixture/search boundaries. All develop nodes and their listed paths were preserved. The existing context validator, lint, typecheck, unit/script tests, builds and documentation checks subsequently passed; the real disposable PostgreSQL/workerd suite also passed. This supersedes the earlier local-install limitation for this reconciled tree and does not establish hosted publication acceptance.
+
 <!-- automatic observation; not root cause -->
+```
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:29:52.505Z","exitCode":1}
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T08:27:17.219Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"docs:check","timestamp":"2026-10-30T22:30:16.255Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-01T20:43:37.549Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-01T20:49:13.351Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-01T21:42:36.464Z","exitCode":1}
+```
+
+```json
+<!-- automatic observation; not root cause -->
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-07T17:47:21.301Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-11T05:40:43.763Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261110-SAVE-REFRESH","status":"resolved","area":"saved-screen-publication-refresh","cause":"An open Saved screen retained old dish objects after a new publication was loaded, allowing a later opening to mix publication and dish revisions.","prevention":"Refresh the Saved screen from the new menu without recording another shortlist view.","sources":["frontend/diner/src/menu/menuScreen.ts","frontend/diner/src/save/saved-screen.ts"],"regression":"The browser case Saved uses the refreshed dish revision before opening its detail failed before the fix and passed afterward."}
+```
+
+```json
+{"id":"ERR-20261110-SAVE-FOCUS","status":"resolved","area":"saved-screen-keyboard-removal","cause":"Removing a saved row replaced the focused control without assigning a new focus target.","prevention":"Retain keyboard position on a remaining row or the empty-state Browse menu button.","sources":["frontend/diner/src/save/saved-screen.ts"],"regression":"The keyboard removal browser case failed before the fix and passed afterward, including Undo recovery."}
+```
+
+```json
+{"kind":"manual-verification-observation","area":"browser-resource-contention","observation":"The first eight-worker browser run passed 126 cases but timed out in the existing 500-event outbox-capacity case. A fresh two-worker complete run passed all 127 cases; the separate SDK configuration passed all nine cases. Resource contention is a hypothesis, not a confirmed cause."}
+```
+
+```json
+{"id":"ERR-20261110-OUTBOX-CAPACITY-ASSERTION","status":"resolved","area":"browser-outbox-completion","cause":"The capacity assertion could observe 500 stored events before the remaining five asynchronous writes emitted their drop warnings, then fail an immediate warning assertion.","prevention":"Poll the joint observable state of 500 stored events and five dropped-event warnings with a bounded ten-second deadline.","sources":["tests/e2e/tracking-outbox.spec.ts"],"regression":"The unchanged full run reproduced 500 events with zero observed warnings at assertion time; the corrected browser assertion is repeated before final acceptance."}
+```
+
+```json
+{"id":"ERR-20261110-EXTRACTION-WORKER-ROUTING","status":"fix-prepared-hosted-retest-pending","area":"staging-menu-ingestion","cause":"The API global fetch to the same-account extraction workers.dev endpoint returned Cloudflare error1042 before reaching the service; staging had no public-fetch routing flag.","prevention":"Enable global_fetch_strictly_public only for staging while retaining nodejs_compat and existing service/capability authentication.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs"],"regression":"The new config regression failed before correction and passed afterward (8/8 script cases). Hosted correction remains pending final release approval."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T06:52:22.494Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:22:36.990Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:29:44.200Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:35:17.101Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-08T12:40:54.175Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T12:41:09.350Z","exitCode":2}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-08T12:42:43.238Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:09:59.298Z","exitCode":1}
+```
+
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T20:11:32.256Z","exitCode":1}
+```
+
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T23:19:57.966Z","exitCode":1}
 ```
 
-<!-- resolution of the lint observation above -->
 ```json
 {"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-10T23:19:57.966Z"},"status":"resolved","cause":"Merge resolution in backend/src/index.ts and backend/src/index.test.ts placed import names out of alphabetical order.","prevention":"Organize imports with biome check --write after manual merge conflict resolution.","regression":"pnpm lint passes cleanly across all 354 files."}
 ```
 
-<!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-10T23:25:09.183Z","exitCode":1}
 ```
 
-<!-- resolution of the test:db observation above -->
 ```json
 {"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-10T23:25:09.183Z"},"status":"resolved","cause":"Initial invocation of test:db failed because Docker Desktop daemon was not yet running at the docker socket.","prevention":"Ensure Docker Desktop daemon is started and responsive before running database test harness.","regression":"Docker Desktop daemon launched and verified via docker info; test:db verification runs in CI."}
+```
+
+```json
+{"id":"ERR-20261111-ORDER-TIMESTAMP","status":"resolved-locally","cause":"Calendar overflow timestamps passed regex and were normalized by Date.UTC before the original invalid string reached PostgreSQL; one bad row could roll back a mixed import. Missing route archive bindings also allowed an import without retained bytes.","prevention":"Validate calendar/time fields and PostgreSQL-compatible offsets before classification/SQL; require route storage before opening a database connection.","regression":"Six invalid date/time/offset cases failed before correction and pass afterward. Real PostgreSQL mixed-row import accepts one row and quarantines one; missing-storage regression proves no database connection.","sources":["packages/contracts/src/order-outcome.ts","backend/src/index.ts","backend/src/order-ingestion/order-ingestion.integration.ts"]}
 ```

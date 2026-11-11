@@ -36,6 +36,17 @@ export const OrderTokenIdentifierSchema = z
 export const ISO_EXPLICIT_TIMEZONE_PATTERN =
   /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?)(Z|[+-]\d{2}:?\d{2})$/i;
 
+function validOrderTimestamp(value: string): boolean {
+  const match = ISO_EXPLICIT_TIMEZONE_PATTERN.exec(value);
+  if (!match || value.startsWith('0000-')) return false;
+  const civil = value.slice(0, 19).replace(/[t ]/i, 'T');
+  const date = new Date(`${civil}Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 19) !== civil) return false;
+  const zone = match[2]!.replace(':', '');
+  // PostgreSQL rejects timezone displacements outside +/-15:59.
+  return /^z$/i.test(zone) || (Number(zone.slice(1, 3)) <= 15 && Number(zone.slice(3)) <= 59);
+}
+
 export const OrderOutcomeTypeSchema = z.enum(['ordered', 'refunded', 'voided']);
 export type OrderOutcomeType = z.infer<typeof OrderOutcomeTypeSchema>;
 
@@ -49,7 +60,8 @@ export const OrderOutcomeLineSchema = z
       .regex(
         ISO_EXPLICIT_TIMEZONE_PATTERN,
         'Timestamp must be ISO 8601 with explicit timezone (Z or ±HH:MM)',
-      ),
+      )
+      .refine(validOrderTimestamp, 'Timestamp must contain valid calendar and time fields'),
     menu_revision_id: uuid,
     dish_id: uuid,
     dish_revision_id: uuid,
@@ -145,6 +157,13 @@ export function classifyOrderTimestampWindow(
   options?: ClassifyTimestampOptions,
 ): { valid: true } | { valid: false; reasonCode: OrderOutcomeQuarantineReason; message: string } {
   try {
+    if (!validOrderTimestamp(orderedAtIso)) {
+      return {
+        valid: false,
+        reasonCode: 'invalid_format',
+        message: 'Invalid calendar or time fields',
+      };
+    }
     const orderedMicros = parseIsoToMicroseconds(orderedAtIso);
     const refMicros = parseIsoToMicroseconds(referenceTimeIso);
     const diffMicros = orderedMicros - refMicros;
