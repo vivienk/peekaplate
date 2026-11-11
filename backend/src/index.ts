@@ -15,10 +15,12 @@ import {
   type ExtractionReviewSessionResponse,
   type HealthResponse,
   JobScopeSchema,
+  MAX_ORDER_OUTCOME_FILE_BYTES,
   MenuScopeSchema,
   ObservationBatchV2Schema,
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
+  type OrderOutcomeImportResponse,
   OwnerInsightActionIdSchema,
   type OwnerInsightActionListQuery,
   OwnerInsightActionListQuerySchema,
@@ -65,6 +67,7 @@ import {
   type MenuIngestionJobRow,
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
+import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -74,11 +77,18 @@ import {
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
 import {
+  cleanupOrphanedOrderImports,
+  importOrderOutcomes as importOrderOutcomesService,
+  OrderImportError,
+  type OrderOutcomeStorage,
+} from './order-ingestion/service';
+import {
   createOwnerInsightAction,
   listOwnerInsightActions,
   OwnerInsightActionError,
   updateOwnerInsightAction,
 } from './owner-insight-actions';
+import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -102,8 +112,13 @@ import {
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
+export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
+  '00000000-0000-4000-8000-000000000123',
+];
+
 export type Bindings = {
   APP_ENV?: string;
+  SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
@@ -129,6 +144,11 @@ export type Bindings = {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
   };
+  ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
+  ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
+  ORDER_IMPORT_HISTORICAL_DAYS?: string;
+  ORDER_IMPORT_RETENTION_DAYS?: string;
+  ORDER_IMPORT_GRACE_PERIOD_MS?: string;
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
   EXTRACTION_SOURCE_SIGNING_SECRET?: string;
@@ -169,6 +189,13 @@ type Dependencies = {
     query: Parameters<typeof readTeamAnalytics>[3],
     env: Bindings,
   ) => ReturnType<typeof readTeamAnalytics>;
+  readOwnerReport?: (
+    actorId: string,
+    venueId: string,
+    now: Date,
+    env: Bindings,
+    source: 'synthetic',
+  ) => ReturnType<typeof queryOwnerReport>;
   verifyTeam?: (authorization: string, env: Bindings) => Promise<void>;
   verifyMenu?: (authorization: string, env: Bindings) => Promise<MenuAuthority>;
   consumeObservationRateLimit?: (
@@ -215,6 +242,13 @@ type Dependencies = {
   extractor?: PythonExtractor;
   reportStorage?: ReportStorage;
   processQueueBatch?: typeof processIngestionQueueBatch;
+  importOrderOutcomes?: (
+    actorId: string,
+    venueId: string,
+    csvText: string,
+    sourceFilename: string,
+    env: Bindings,
+  ) => Promise<OrderOutcomeImportResponse>;
   upsertReviewSession?: (
     actorId: string,
     venueId: string,
@@ -256,15 +290,45 @@ type Dependencies = {
   ) => ReturnType<typeof listOwnerInsightActions>;
 };
 
+export async function submitAuthorizedMenuIngestion(
+  client: Client,
+  actorId: string,
+  venueId: string,
+  request: Parameters<typeof submitMenuIngestion>[1],
+  queue?: { send(message: unknown): Promise<void> },
+) {
+  await client.query('BEGIN');
+  let job: MenuIngestionJobRow;
+  try {
+    await authorizeStaffVenue(client, actorId, venueId, true);
+    job = await submitMenuIngestion(client, request, undefined, { inTransaction: true });
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  }
+  if (queue)
+    await queue.send({
+      version: 1,
+      tenantId: venueId,
+      jobId: job.id,
+      queuedAt: new Date().toISOString(),
+    });
+  return job;
+}
+
 export async function authorizeStaffVenue(
   client: Client,
   actorId: string,
   venueId: string,
+  inTransaction = false,
 ): Promise<void> {
   let started = false;
   try {
-    await client.query('BEGIN');
-    started = true;
+    if (!inTransaction) {
+      await client.query('BEGIN');
+      started = true;
+    }
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -281,7 +345,7 @@ export async function authorizeStaffVenue(
       throw new CommandError('forbidden', 403);
     }
 
-    await client.query('COMMIT');
+    if (!inTransaction) await client.query('COMMIT');
     started = false;
   } catch (error) {
     if (started) {
@@ -311,6 +375,16 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
   'https://peekaplate-diner-staging.pages.dev',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+] as const;
+
+/**
+ * Exact console-origin allowlist for the owner report route only (S3-RES-03; agreed with Sai,
+ * 10 Nov). The owner dashboard calls the report from the browser with the owner's bearer token.
+ * No wildcard, preview or other console origins; other routes keep their own lists.
+ */
+export const CONSOLE_REPORT_CORS_ALLOWED_ORIGINS = [
+  'https://peekaplate-console-staging.pages.dev',
+  'http://127.0.0.1:5174',
 ] as const;
 
 /**
@@ -474,6 +548,18 @@ const dependencies: Dependencies = {
     try {
       await client.connect();
       return await readTeamAnalytics(client, projectId, kind, query);
+    } finally {
+      await client.end();
+    }
+  },
+  async readOwnerReport(actorId, venueId, now, env, source) {
+    const connectionString =
+      env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+    if (!connectionString) throw new AuthUnavailableError();
+    const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+    try {
+      await client.connect();
+      return await queryOwnerReport(client, actorId, venueId, now, source);
     } finally {
       await client.end();
     }
@@ -671,6 +757,10 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Content-Type', 'application/jwk-set+json');
     return c.json(await services.readMenuJwks(c.env ?? {}));
   });
+  const orderImportLimit = bodyLimit({
+    maxSize: MAX_ORDER_OUTCOME_FILE_BYTES,
+    onError: (ctx) => ctx.json({ error: 'payload_too_large' }, 413),
+  });
   const reviewSessionLimit = bodyLimit({
     maxSize: 524_288,
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
@@ -680,6 +770,12 @@ export function createApp(services: Dependencies = dependencies) {
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
   app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/menus\/uploads$/.test(c.req.path))
+      return next();
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/orders\/import$/.test(c.req.path)) {
+      return orderImportLimit(c, next);
+    }
+
     if (
       c.req.method === 'PUT' &&
       /^\/venues\/[^/]+\/extractions\/[^/]+\/review-session$/.test(c.req.path)
@@ -744,6 +840,58 @@ export function createApp(services: Dependencies = dependencies) {
     }
     const result = await services.readAnalytics(projectId, kind, parsed.data, env);
     return c.json(TeamAnalyticsResponseSchema.parse(result));
+  });
+  // CORS only: authentication, the synthetic-source rule and venue access below are unchanged.
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/api/v1/venues/:venueId/analytics/dishes', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const report = await services.readOwnerReport(
+      actorId,
+      approvedSyntheticVenue.data.venueId,
+      services.now?.() ?? new Date(),
+      env,
+      'synthetic',
+    );
+    return c.json(report);
   });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
@@ -1002,6 +1150,46 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result);
   });
 
+  app.post('/venues/:venueId/menus/uploads', async (c) => {
+    if (c.env?.APP_ENV !== 'staging' && c.env?.APP_ENV !== 'local')
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    await (services.authorizeVenue ?? dependencies.authorizeVenue!)(
+      actorId,
+      scope.data.venueId,
+      c.env,
+    );
+    const storage = c.env.INGESTION_REPORTS_BUCKET;
+    const queue = c.env.INGESTION_QUEUE;
+    if (!storage || !queue) throw new AuthUnavailableError();
+    const upload = await readMenuUpload(c.req.raw);
+    const createJob = async () => {
+      const env = c.env;
+      const connectionString =
+        env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+      if (!connectionString) throw new AuthUnavailableError();
+      const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+      try {
+        await client.connect();
+        return await submitAuthorizedMenuIngestion(client, actorId, scope.data.venueId, {
+          venueId: scope.data.venueId,
+          sourceType: upload.sourceType,
+          sourceHash: upload.sourceHash,
+          idempotencyKey: upload.idempotencyKey,
+        });
+      } finally {
+        await client.end();
+      }
+    };
+    const job = await storeAndDispatchUpload(scope.data.venueId, upload, createJob, storage, queue);
+    return c.json({ job }, 202);
+  });
+
   app.post('/venues/:venueId/menus/jobs', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1032,11 +1220,16 @@ export function createApp(services: Dependencies = dependencies) {
         const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
         try {
           await client.connect();
-          await authorizeStaffVenue(client, actorId, venueId);
           const queueProducer = env.INGESTION_QUEUE
             ? { send: (msg: unknown) => env.INGESTION_QUEUE!.send(msg) }
             : undefined;
-          return await submitMenuIngestion(client, { venueId, ...req }, queueProducer);
+          return await submitAuthorizedMenuIngestion(
+            client,
+            actorId,
+            venueId,
+            { venueId, ...req },
+            queueProducer,
+          );
         } finally {
           await client.end();
         }
@@ -1164,6 +1357,89 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result);
   });
 
+  app.post('/venues/:venueId/orders/import', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const contentType = c.req.header('Content-Type') ?? '';
+    let csvText = '';
+    let sourceFilename = 'orders.csv';
+
+    if (contentType.includes('multipart/form-data')) {
+      let formData: FormData;
+      try {
+        formData = await c.req.formData();
+      } catch {
+        return c.json({ error: 'invalid_form_data' }, 400);
+      }
+      const file = formData.get('file');
+      if (!file) {
+        return c.json({ error: 'missing_file' }, 400);
+      }
+      if (typeof file === 'object' && 'text' in file) {
+        csvText = await (file as Blob).text();
+        sourceFilename = (file as File).name || 'orders.csv';
+      } else if (typeof file === 'string') {
+        csvText = file;
+      }
+    } else if (
+      contentType.includes('text/csv') ||
+      contentType.includes('text/plain') ||
+      contentType.includes('application/csv') ||
+      contentType === ''
+    ) {
+      csvText = await c.req.text();
+    } else {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    const importFn =
+      services.importOrderOutcomes ??
+      (async (actorId, venueId, csvText, sourceFilename, env) => {
+        const storage =
+          env.ORDER_OUTCOME_ARCHIVE_BUCKET ??
+          env.ORDER_IMPORT_BUCKET ??
+          env.INGESTION_REPORTS_BUCKET;
+        if (!storage) throw new AuthUnavailableError();
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          const maxHistoricalDays = env.ORDER_IMPORT_HISTORICAL_DAYS
+            ? Number.parseInt(env.ORDER_IMPORT_HISTORICAL_DAYS, 10)
+            : undefined;
+
+          return await importOrderOutcomesService({
+            client,
+            actorId,
+            venueId,
+            csvText,
+            sourceFilename,
+            maxHistoricalDays,
+            storage,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await importFn(
+      actorId,
+      scope.data.venueId,
+      csvText,
+      sourceFilename,
+      c.env ?? {},
+    );
+    return c.json(result, 200);
+  });
+
   app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1261,6 +1537,8 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof OwnerInsightActionError)
       return c.json({ error: error.code }, error.status);
     if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
+    if (error instanceof OrderImportError)
+      return c.json({ error: error.code, message: error.message }, error.status as any);
     if (error instanceof ReviewCommandError) return c.json({ error: error.code }, error.status);
     // Never log bearer tokens, request bodies or database errors containing row data.
     console.error(
@@ -1369,14 +1647,67 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue });
+  return Object.assign(app, { queue, scheduled: handleScheduled });
 }
 
 export {
   type ConsumerBindings,
   createObservationQueueHandler as createQueueHandler,
+  OrderImportError,
   type QueueHandlerServices,
 };
+
+export const handleScheduled = async (event: any, env: any) => {
+  const storage =
+    env.ORDER_OUTCOME_ARCHIVE_BUCKET ?? env.ORDER_IMPORT_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+  if (!storage || typeof storage.list !== 'function' || typeof storage.delete !== 'function') {
+    return;
+  }
+  const connectionString =
+    env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return;
+  }
+
+  const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
+    ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
+    : undefined;
+  const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
+    ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
+    : undefined;
+
+  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  try {
+    await client.connect();
+    const result = await cleanupOrphanedOrderImports({
+      storage,
+      client,
+      retentionConfig: {
+        rawCsvRetentionDays,
+        orphanGracePeriodMs,
+      },
+    });
+    if (result.deleted > 0) {
+      console.log(
+        JSON.stringify({
+          event: 'order_import_orphan_cleanup',
+          scanned: result.scanned,
+          deleted: result.deleted,
+          deletedOrphans: result.deletedOrphans,
+          deletedAgedRawCsv: result.deletedAgedRawCsv,
+          skippedActive: result.skippedActive,
+          retained: result.retained,
+        }),
+      );
+    }
+  } catch {
+    console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+  } finally {
+    await client.end().catch(() => {});
+  }
+};
+
+export const scheduled = handleScheduled;
 
 const defaultApp = createApp();
 const defaultObservationQueue = createObservationQueueHandler();
@@ -1394,4 +1725,4 @@ export const queue = async (batch: any, env: any) => {
     await defaultObservationQueue(batch, env);
   }
 };
-export default Object.assign(defaultApp, { queue });
+export default Object.assign(defaultApp, { queue, scheduled });

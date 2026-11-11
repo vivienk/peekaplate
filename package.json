@@ -17,6 +17,7 @@
     "format": "biome check --write .",
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "test": "vitest run && node --test scripts/*.test.mjs",
+    "eval:owner-ai": "node scripts/evaluate-owner-ai.mjs",
     "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts",
     "test:db": "node scripts/test-db.mjs",
     "context:check": "node scripts/context.mjs check",
@@ -24,6 +25,7 @@
     "context:show": "node scripts/context.mjs show",
     "docs:check": "node scripts/check-docs.mjs",
     "verify": "node scripts/verify.mjs",
+    "produce:bundle": "node --import ./scripts/node-ts-hooks.mjs backend/scripts/produce-menu-bundle.ts",
     "check": "node scripts/verify.mjs lint typecheck test context:check docs:check"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 import type { StructuredDishDraft } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { approveDishDraftAtomic, createApp } from '../index';
+import { approveDishDraftAtomic, createApp, submitAuthorizedMenuIngestion } from '../index';
 import { processIngestionQueueBatch, type QueueMessage, submitMenuIngestion } from './orchestrator';
 import {
   approveDishDraft,
@@ -54,6 +54,115 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
   afterAll(async () => {
     await runtimeClient?.end().catch(() => {});
     await adminClient?.end().catch(() => {});
+  });
+
+  it('uploads authorized source bytes through HTTP before queue dispatch', async () => {
+    const stored = new Map<string, unknown>();
+    const send = vi.fn(async () => {
+      expect(stored.size).toBe(1);
+    });
+    const app = createApp({ verify: async () => actorId, execute: vi.fn() });
+    const response = await app.request(
+      `https://test/venues/${venueId}/menus/uploads`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer synthetic',
+          'Content-Type': 'application/pdf',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: '%PDF-1.7 synthetic database test',
+      },
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: runtimeUrl!,
+        INGESTION_REPORTS_BUCKET: {
+          put: async (key, bytes) => {
+            stored.set(key, bytes);
+          },
+        },
+        INGESTION_QUEUE: { send },
+      },
+    );
+    expect(response.status).toBe(202);
+    const { job } = (await response.json()) as {
+      job: { id: string; source_storage_key: string; tenant_id: string };
+    };
+    expect(job.tenant_id).toBe(venueId);
+    expect(stored.has(`menu-ingestion/sources/${venueId}/${job.id}/source`)).toBe(true);
+    expect(send).toHaveBeenCalledOnce();
+    expect(
+      (
+        await adminClient.query('SELECT id FROM app_private.menu_ingestion_jobs WHERE id = $1', [
+          job.id,
+        ])
+      ).rows,
+    ).toHaveLength(1);
+  });
+
+  it('holds the membership lock through job creation and rejects a later revoked actor', async () => {
+    const raceActor = crypto.randomUUID();
+    await adminClient.query(
+      'INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1,$2,$3)',
+      [venueId, raceActor, 'owner'],
+    );
+    const writer = new Client({ connectionString: runtimeUrl });
+    await writer.connect();
+    const original = writer.query.bind(writer);
+    let release!: () => void;
+    let locked!: () => void;
+    const held = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const querySpy = vi.spyOn(writer, 'query').mockImplementation((async (...args: unknown[]) => {
+      const result = await (original as (...args: unknown[]) => Promise<unknown>)(...args);
+      if (String(args[0]).includes('FOR SHARE')) {
+        locked();
+        await gate;
+      }
+      return result;
+    }) as typeof writer.query);
+    const request = {
+      venueId,
+      sourceType: 'pdf' as const,
+      sourceHash: 'a'.repeat(64),
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const creation = submitAuthorizedMenuIngestion(writer, raceActor, venueId, request);
+    try {
+      await held;
+      await adminClient.query('BEGIN');
+      await adminClient.query("SET LOCAL lock_timeout = '100ms'");
+      await expect(
+        adminClient.query(
+          'DELETE FROM app_private.staff_membership WHERE tenant_id = $1 AND actor_id = $2',
+          [venueId, raceActor],
+        ),
+      ).rejects.toMatchObject({ code: '55P03' });
+      await adminClient.query('ROLLBACK');
+      release();
+      await creation;
+      querySpy.mockRestore();
+      await adminClient.query(
+        'DELETE FROM app_private.staff_membership WHERE tenant_id = $1 AND actor_id = $2',
+        [venueId, raceActor],
+      );
+      await expect(
+        submitAuthorizedMenuIngestion(writer, raceActor, venueId, {
+          ...request,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      ).rejects.toMatchObject({ code: 'forbidden' });
+    } finally {
+      release();
+      await creation.catch(() => {});
+      querySpy.mockRestore();
+      await adminClient.query('ROLLBACK');
+      await writer.end();
+    }
   });
 
   it('claims job and issues a unique fencing claim_token and incremented lease_generation', async () => {
@@ -675,13 +784,13 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
         expect(dishCheck.rows[0]?.name).toBe('Atomic Wagyu Burger');
 
         // Test idempotency replay with winning commandId
-        const winningCommandId = winnerResult.publishedRevision ? commandId1 : commandId2;
+        const winningCommandId = res1.status === 'fulfilled' ? commandId1 : commandId2;
         const replay = await approveDishDraftAtomic(
           runtimeClient,
           actorId,
           venueId,
           targetDraft.id,
-          { commandId: commandId1 },
+          { commandId: winningCommandId },
         );
         expect(replay.publishedRevision.revisionId).toBe(winnerResult.publishedRevision.revisionId);
         expect(replay.publishedRevision.dishId).toBe(winnerResult.publishedRevision.dishId);

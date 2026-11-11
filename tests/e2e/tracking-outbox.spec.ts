@@ -3,12 +3,13 @@ import { expect, type Page, test } from '@playwright/test';
 // S3-TRK-01.2 in a real browser: the consent gate, fixture mode, the IndexedDB outbox and batching.
 // In live mode the test passes its own sender, standing in for TRK-01.3 delivery; nothing is sent.
 const DINER = 'http://127.0.0.1:5173/';
+const PAGE = `${DINER}?scenario=empty`; // the screen emits no events of its own
 const PUBLICATION = 'a5000000-0000-4000-8000-000000000001';
 
 test('the existing consent control gates both destinations even without PostHog configuration', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true });
   await page.evaluate(() => {
     const holder = window as unknown as {
@@ -53,7 +54,7 @@ test('the existing consent control gates both destinations even without PostHog 
 test('the consent control stays off when a browser privacy signal blocks the shared gate', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true });
   await page.evaluate(() =>
     (
@@ -134,7 +135,7 @@ const hidePage = (page: Page) =>
 test('live mode with the consent gate off (the default) queues and sends nothing', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true });
   await trackMenuViewed(page, 3);
   await hidePage(page);
@@ -146,7 +147,7 @@ test('live mode with the consent gate off (the default) queues and sends nothing
 test('switching the gate on starts queuing, and a reload keeps a pending event', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true, hold: true });
   await trackMenuViewed(page, 2);
   await expect.poll(() => storedEvents(page)).toBe(2);
@@ -155,7 +156,7 @@ test('switching the gate on starts queuing, and a reload keeps a pending event',
 });
 
 test('offline keeps events; reconnecting releases them to the sender', async ({ page }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   // Load the tracking code first; going offline earlier would block fetching it.
   await startTracking(page, { live: true, consent: true });
   await page.context().setOffline(true);
@@ -170,7 +171,7 @@ test('offline keeps events; reconnecting releases them to the sender', async ({ 
 });
 
 test('hiding the page flushes the current batch', async ({ page }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await trackMenuViewed(page, 4);
   await expect.poll(() => storedEvents(page)).toBe(4);
@@ -181,7 +182,7 @@ test('hiding the page flushes the current batch', async ({ page }) => {
 test('25 queued events go as one full batch straight away, without hiding the page or waiting for the timer', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await trackMenuViewed(page, 24);
   await expect.poll(() => storedEvents(page)).toBe(24);
@@ -196,7 +197,7 @@ test('25 queued events go as one full batch straight away, without hiding the pa
 test('pauseDeliveryUntil holds every flush until the pause ends, then sends once by itself', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await trackMenuViewed(page, 1);
   await expect.poll(() => storedEvents(page)).toBe(1);
@@ -217,7 +218,7 @@ test('pauseDeliveryUntil holds every flush until the pause ends, then sends once
 test('a full outbox drops the oldest events with a developer warning, and the page keeps working', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   const warnings: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'warning') warnings.push(message.text());
@@ -226,15 +227,23 @@ test('a full outbox drops the oldest events with a developer warning, and the pa
   await startTracking(page, { live: true, consent: true });
   await page.context().setOffline(true);
   await trackMenuViewed(page, 505);
-  await expect.poll(() => storedEvents(page)).toBe(500);
-  expect(warnings.filter((text) => text.includes('outbox full'))).toHaveLength(5);
+  // Capacity is reached at event 500; wait for all five later writes and their warnings too.
+  await expect
+    .poll(
+      async () => ({
+        stored: await storedEvents(page),
+        dropped: warnings.filter((text) => text.includes('outbox full')).length,
+      }),
+      { timeout: 10_000 },
+    )
+    .toEqual({ stored: 500, dropped: 5 });
   await expect(page.locator('body')).toBeVisible();
 });
 
 test('fixture mode logs test events and batches to the console and makes no tracking request', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   const logs: string[] = [];
@@ -263,7 +272,7 @@ test('with storage blocked, other events still queue in memory under the normal 
       throw new DOMException('blocked', 'SecurityError');
     };
   });
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await trackMenuViewed(page, 2);
   await hidePage(page);
@@ -302,7 +311,7 @@ test('with Global Privacy Control on, consent given still stores and sends nothi
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'globalPrivacyControl', { get: () => true });
   });
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await connectFakePostHog(page);
   await trackMenuViewed(page, 3);
@@ -318,7 +327,7 @@ test('with Global Privacy Control on, consent given still stores and sends nothi
 test('withdrawing consent empties the stored outbox and stops both destinations', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true, hold: true });
   await connectFakePostHog(page);
   await trackMenuViewed(page, 2);
@@ -340,7 +349,7 @@ test('withdrawing consent empties the stored outbox and stops both destinations'
 test('each live event reaches PostHog once with the canonical event_id; fixture mode sends none', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await connectFakePostHog(page);
   await trackMenuViewed(page, 3);
@@ -371,7 +380,7 @@ test('each live event reaches PostHog once with the canonical event_id; fixture 
 // Save's hearts are wired to the real track(); only localStorage (Save's store) is blocked, so the
 // IndexedDB outbox still works.
 async function saveAndUnsaveThroughTracking(page: Page, blockSaveStorage: boolean) {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await startTracking(page, { live: true, consent: true });
   await page.evaluate(async (blockSaveStorage) => {
     const load = (path: string) => import(/* @vite-ignore */ path);
@@ -439,7 +448,7 @@ test('when Save storage fails, no Save or Unsave success event reaches delivery'
 // A failed send keeps the event, and its retry, even after a reload, carries the identical
 // envelope: same event_id, session_id, producer_id, local_sequence, timestamps and payload.
 test('a retried event keeps its identity, even across a reload', async ({ page }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await page.evaluate(async () => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
     tracking.enableLiveTracking(async (batch: unknown[]) => {

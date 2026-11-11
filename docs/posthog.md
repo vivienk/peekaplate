@@ -16,13 +16,45 @@ Withdrawal writes deletion-work markers to sessionStorage and localStorage befor
 
 Code: [shared dispatch](../frontend/diner/src/tracking/index.ts), [consent gate](../frontend/diner/src/tracking/consent.ts), [atomic outbox](../frontend/diner/src/tracking/outbox.ts), [reused control](../packages/analytics/src/consent.ts). Merge/review order remains #77 → #80 → #84; these fixes do not enable live collection by themselves.
 
+### Canonical delivery foundation (#84)
+
+DIN-03 can pass `createLiveDeliver({ endpoint, fetch, now, token })` from
+[delivery.ts](../frontend/diner/src/tracking/delivery.ts) to `enableLiveTracking`.
+The token callback reads the current in-memory published-menu token; never persist it
+with queued observations. This merge supplies the sender, not that live-menu wiring.
+
+- Each request rechecks consent, token expiry and publication. Withdrawal cancels
+  remaining split requests even if the diner immediately opts in again. A request
+  already started cannot be recalled. Fixture mode sends neither destination.
+- Valid shared-contract receipts remove accepted or permanently rejected IDs;
+  missing, contradictory or malformed receipts retain the unchanged observations.
+- A stalled request or response body aborts after ten seconds. Offline/transient
+  failures retain IDs and payloads, with exponential jittered backoff up to one
+  minute; a longer server `Retry-After` takes precedence, including HTTP dates.
+  Once a batch needs retry, unsent halves wait too.
+- `413` splits bounded batches; a single oversized event is terminal. `400` is
+  terminal `client_invalid`, and `401`/`403` are terminal unauthorized. An expired
+  or different-publication token discards unsent events under the current policy;
+  a temporarily missing token leaves them queued. No event is relabelled.
+- Canonical retries never dispatch to PostHog again. Development logs contain
+  terminal counts only. The token is sent only in the Authorization header;
+  requests omit cookies and refuse redirects.
+
+Unit tests exercise shared fixtures, malformed receipts, timeouts and split-request
+boundaries. [Chromium delivery tests](../tests/e2e/tracking-delivery.spec.ts) use
+synthetic intercepted responses with the real tracking layer and durable outbox.
+These checks do not certify hosted ingestion, PostHog funnels or live token renewal.
+Connect DIN-03, then capture browser-to-both-destinations evidence before release.
+
 ## Legacy shell integration
 
 The October setup emitted `app_shell_viewed` with `surface=diner` or `surface=console` after opt-in. The console still uses that legacy path; the current diner uses the shared gate above. This technical shell event is not `menu_viewed`, a signed-in owner, a restaurant visit or a sale. The React effect cleans up on unmount/StrictMode remount. Missing configuration hides the legacy console control, but does not hide the diner's canonical consent control.
 
 The legacy `captureDishIntent(input)` adapter validates the strict v1 `DishIntentEventSchema` and preserves `dish_open` and `portion_compare`. It is not the current diner's v2 path. New diner controls call the shared `track()` boundary after the actual approved display/interaction; do not add a second direct analytics call. Console callers cannot submit diner events.
 
-The [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record) proposes broader v2 events. Menu/card exposures, ingredients, saves, comparison replacement, viewer lifecycle and owner report actions remain unwired until their controls, strict schemas and triggers are reviewed. Historical portion events cannot be renamed into generic comparison events. No two names for one action.
+The diner menu/detail and Save/Saved screens call the shared tracking boundary. DIN-01 records a readable menu once per publication, qualifying card exposures (at least 50% visible for one continuous second), and completed detail openings. It uses the shared opening clock, including final checkpoints and window-scroll activity. In live mode, consent starts a fresh opening and clock; disallowed time and exposure references are discarded. A replacement publication records its own readable menu and cannot reuse an older exposure link. Fixture mode logs locally and sends nothing.
+
+These trigger checks use real Chromium with synthetic menu responses and destination sinks; they do not establish hosted PostHog/Queue acceptance. Remaining ingredient, comparison and viewer controls need their own agreed triggers and integration evidence from the [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record). Historical portion events cannot be renamed into generic comparison events. No two names for one action.
 
 ## Legacy adapter privacy and failure behavior
 

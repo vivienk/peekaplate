@@ -2,6 +2,7 @@
 // renders into a container and navigates through callbacks; it is built with DOM methods, so dish
 // text is never parsed as markup. Copy and look are provisional until the Figma Saved frames are
 // applied.
+import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
 import type { SendEvent } from './events';
 import { mountSaveHeart, mountToastArea } from './mount';
@@ -25,10 +26,6 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
-function money(dish: CompleteDish): string {
-  return `${dish.price.currency} ${dish.price.amount}`.trim();
-}
-
 export type SavedScreenOptions = {
   saveState: SaveState;
   menu: Menu;
@@ -37,6 +34,7 @@ export type SavedScreenOptions = {
   // Leaves the Saved screen: the back button and "Browse menu".
   onBack: () => void;
   send?: SendEvent;
+  recordView?: boolean;
 };
 
 // Call once per readable display of the Saved screen (navigating to it, going back to it, or a
@@ -44,15 +42,16 @@ export type SavedScreenOptions = {
 // dish, Undo, the session-only switch) redraw the list without another view. Returns cleanup.
 export function renderSavedScreen(
   container: HTMLElement,
-  { saveState, menu, onOpenDish, onBack, send = noSend }: SavedScreenOptions,
+  { saveState, menu, onOpenDish, onBack, send = noSend, recordView = true }: SavedScreenOptions,
 ): () => void {
-  const screen = el('div', 'pp-saved');
+  // Not .pp-saved: that is the menu header's Saved button.
+  const screen = el('div', 'pp-saved-screen');
   const header = el('header', 'pp-saved__topbar');
   const back = el('button', 'pp-saved__back', '←');
   back.type = 'button';
   back.setAttribute('aria-label', 'Back to menu');
   back.addEventListener('click', onBack);
-  header.append(back, el('h1', 'pp-saved__title', 'Saved'));
+  header.append(back, el('h1', 'pp-saved__title', 'Saved Dishes'));
 
   // A stable toast area under the header, outside the redrawn list.
   const toastArea = el('div', 'pp-toast-area');
@@ -62,7 +61,9 @@ export function renderSavedScreen(
   const notice = el('p', 'pp-saved__notice', SESSION_ONLY_NOTICE);
   notice.setAttribute('role', 'status');
   const content = el('div', 'pp-saved__content');
-  screen.append(header, toastArea, notice, content);
+  // Fixture or other non-published data keeps its visible label here too, as on the menu.
+  const dataNotice = menu.notice ? [el('p', 'pp-notice', menu.notice)] : [];
+  screen.append(header, ...dataNotice, toastArea, notice, content);
   container.replaceChildren(screen);
 
   const stopToasts = mountToastArea(toastArea, saveState);
@@ -75,7 +76,7 @@ export function renderSavedScreen(
       'aria-label',
       item.kind === 'complete' ? `Save ${item.dish.name}` : 'Remove this dish from Saved',
     );
-    const icon = el('span', '', '♡');
+    const icon = el('span', '', '♥');
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon);
     stopHearts.push(
@@ -86,6 +87,7 @@ export function renderSavedScreen(
 
   function card(item: SavedItem): HTMLLIElement {
     const row = el('li', 'pp-saved__item');
+    row.dataset.dishId = item.dish.dishId;
     if (item.kind === 'incomplete') {
       // Not openable or comparable, and no events; the heart can still remove it.
       const placeholder = el('article', 'pp-card pp-card--placeholder');
@@ -96,6 +98,7 @@ export function renderSavedScreen(
     const { dish } = item;
     const open = el('button', 'pp-saved__open');
     open.type = 'button';
+    // A dish without an image gets the menu card's empty image box (DIN-01), so rows line up.
     if (dish.images) {
       const image = el('img', 'pp-saved__image');
       image.src = dish.images.card.url;
@@ -103,11 +106,19 @@ export function renderSavedScreen(
       image.width = dish.images.card.width;
       image.height = dish.images.card.height;
       open.append(image);
+    } else {
+      const missing = el('span', 'pp-saved__image pp-card__image--missing');
+      missing.setAttribute('aria-hidden', 'true');
+      open.append(missing);
     }
-    open.append(
+    // As Figma's DishCard_Saved (691:7715): category, name, then the price in orange.
+    const text = el('span', 'pp-saved__text');
+    text.append(
+      el('span', 'pp-saved__category', dish.categoryName),
       el('span', 'pp-saved__name', dish.name),
-      el('span', 'pp-saved__price', money(dish)),
+      el('span', 'pp-saved__price', formatPrice(dish.price)),
     );
+    open.append(text);
     open.addEventListener('click', () => onOpenDish(dish));
     row.append(open, heart(item));
     return row;
@@ -115,22 +126,39 @@ export function renderSavedScreen(
 
   // Returns how many dishes are shown, so shortlist_viewed reports the list the diner sees.
   function draw(): number {
+    const focused = document.activeElement;
+    const previousRows = Array.from(content.querySelectorAll<HTMLElement>('.pp-saved__item'));
+    const focusedRow = previousRows.findIndex(
+      (row) => focused instanceof Node && row.contains(focused),
+    );
     for (const stop of stopHearts) stop();
     stopHearts = [];
     notice.hidden = saveState.mode() !== 'session-only';
     const items = savedItems(saveState, menu);
     if (items.length === 0) {
+      // Figma Saved_Empty (722:8589). The plate-and-cutlery illustration comes in a follow-up PR.
       const empty = el('div', 'pp-saved__empty');
       const browse = el('button', 'pp-saved__browse', 'Browse menu');
       browse.type = 'button';
       browse.addEventListener('click', onBack);
-      empty.append(el('p', 'pp-saved__empty-text', 'No saved dishes yet'), browse);
+      empty.append(
+        el('p', 'pp-saved__empty-text', 'No saved dishes yet'),
+        el('p', 'pp-saved__empty-hint', 'Save dishes you like to find them here later.'),
+        browse,
+      );
       content.replaceChildren(empty);
+      if (focusedRow >= 0) browse.focus({ preventScroll: true });
       return 0;
     }
     const list = el('ul', 'pp-saved__list');
     list.append(...items.map(card));
     content.replaceChildren(list);
+    if (focusedRow >= 0) {
+      const rows = list.querySelectorAll<HTMLElement>('.pp-saved__item');
+      rows[Math.min(focusedRow, rows.length - 1)]
+        ?.querySelector<HTMLButtonElement>('.pp-saved__save')
+        ?.focus({ preventScroll: true });
+    }
     return items.length;
   }
 
@@ -142,7 +170,7 @@ export function renderSavedScreen(
   // Not counted in session-only mode (confirmed by Adam, matrix v0.1h): unavailable-storage states
   // emit nothing, saves there fire no dish_saved, so a view would describe a list with no matching
   // events and skew the numbers.
-  if (saveState.mode() === 'persistent') {
+  if (recordView && saveState.mode() === 'persistent') {
     try {
       send('shortlist_viewed', shortlistViewedPayload(menu, shown));
     } catch {}
