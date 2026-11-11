@@ -2494,3 +2494,26 @@ missing. The pinned helper was restored outside repository dependencies, and
 the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-11T05:40:43.763Z","exitCode":1}
+```
+
+## Save-screen integration review — November 10, 2026
+
+```json
+{"id":"ERR-20261110-SAVE-REFRESH","status":"resolved","area":"saved-screen-publication-refresh","cause":"An open Saved screen retained old dish objects after a new publication was loaded, allowing a later opening to mix publication and dish revisions.","prevention":"Refresh the Saved screen from the new menu without recording another shortlist view.","sources":["frontend/diner/src/menu/menuScreen.ts","frontend/diner/src/save/saved-screen.ts"],"regression":"The browser case Saved uses the refreshed dish revision before opening its detail failed before the fix and passed afterward."}
+```
+
+```json
+{"id":"ERR-20261110-SAVE-FOCUS","status":"resolved","area":"saved-screen-keyboard-removal","cause":"Removing a saved row replaced the focused control without assigning a new focus target.","prevention":"Retain keyboard position on a remaining row or the empty-state Browse menu button.","sources":["frontend/diner/src/save/saved-screen.ts"],"regression":"The keyboard removal browser case failed before the fix and passed afterward, including Undo recovery."}
+```
+
+```json
+{"kind":"manual-verification-observation","area":"browser-resource-contention","observation":"The first eight-worker browser run passed 126 cases but timed out in the existing 500-event outbox-capacity case. A fresh two-worker complete run passed all 127 cases; the separate SDK configuration passed all nine cases. Resource contention is a hypothesis, not a confirmed cause."}
+```
+
+```json
+{"id":"ERR-20261110-OUTBOX-CAPACITY-ASSERTION","status":"resolved","area":"browser-outbox-completion","cause":"The capacity assertion could observe 500 stored events before the remaining five asynchronous writes emitted their drop warnings, then fail an immediate warning assertion.","prevention":"Poll the joint observable state of 500 stored events and five dropped-event warnings with a bounded ten-second deadline.","sources":["tests/e2e/tracking-outbox.spec.ts"],"regression":"The unchanged full run reproduced 500 events with zero observed warnings at assertion time; the corrected browser assertion is repeated before final acceptance."}
+```

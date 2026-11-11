@@ -97,7 +97,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu/detail/search and Save/Compare foundations use shared contracts/tokens. Explicit live mode verifies exact fetched bundle bytes and pointer identity before rendering or exposing the token. Refresh swaps publications with focus preservation; 404 or token expiry suspends canonical/PostHog collection without changing consent, retires pending work and keeps the visible menu. Remount aborts stale loads and splits. One off-by-default consent gate enforces DNT/GPC. Atomic IndexedDB/Web-Locked localStorage outboxes retain retries with memory fallback. Fixture mode sends neither destination. PostHog SDK dispatch and token-bound canonical delivery are independent. Staging reuses pinned Pages public snapshots; private R2 stays private. Actual UI triggers, genuine browser-to-both-destinations/report reconciliation and privacy/design acceptance remain separate pilot gates.",
+      "summary": "Save, Unsave, Undo, badge and Saved routing are connected to real menu/detail screens. Saved refreshes current dish revisions without a new shortlist view, and keyboard removal retains focus. Verified publication loading, cancellation, expiry and withdrawal tracking suspension remain enforced. Compare and remaining real UI tracking acceptance are separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -184,7 +184,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
-        "docs/diner-connection.md"
+        "docs/diner-connection.md",
+        "frontend/diner/src/save/screens.ts",
+        "frontend/diner/src/save/save.css",
+        "tests/e2e/save-screens.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -193,7 +196,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "67ca26d8f8931b3412a099741c73edd7989f5741e66173248787191279f0c4f2"
+      "sourceFingerprint": "eeaf24948b1da79d6308dde121b2064c9388f79bbea2af33968849a0102fcf56"
     },
     {
       "id": "console",
@@ -642,17 +645,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "modules": [
-        "diner",
-        "analytics",
-        "contracts",
-        "delivery"
-      ],
-      "summary": "Published diner connection now uses the shared exact-byte verifier; no production bypass seam remains. New RED-to-GREEN checks cover valid default verification, publication suspension and expiry during a hung refresh. Detected withdrawal retires both destination paths without changing consent; stale loads cannot restore tokens. Pinned public-media/bundle snapshots reuse existing staging Pages without exposing private R2. Seven focused Chromium tests pass (14.653s); genuine staging staff API and pointer/hash/CORS checks passed on labelled synthetic records. Hosted app acceptance follows the reviewed main Pages-only deployment. Reconciles the prior main report release, retaining its synthetic-report setting/runbook and full error history; obsolete console Input index paths are replaced by current TextField/UI paths.",
-      "next": "Finish independent review/full checks, merge feature/release and deploy only the reviewed main diner artifact. Record actual hosted valid/tampered/fresh-withdrawn/active-withdrawal results in the release PR; withdraw synthetic menus, restore viewer and end the test session. Keep API, console, private storage, Queues and production unchanged."
-    },
-    {
-      "date": "2026-11-10",
       "summary": "PR117 reconciles current develop without dropping its context paths or runtime changes. The offline bundle producer hashes exact bytes, reads tenant-scoped approved facts and admits immutable handoff rows only through a privileged transaction. T0 input now rejects missing/blank capture evidence and invalid source hashes; five regressions failed before correction. Private provenance is never public content. A real prepare_t0_bundle asset passed eight actual CLI/PostgreSQL checks, including tamper rejection, runtime denial, identical retry and overwrite refusal. Local checks pass: 1198 unit/72 script, 213 SQL/86 integration, 120 browser and build; timings in qa-reports/S4-RES-test-plan.md.",
       "modules": [
         "backend",
@@ -736,6 +728,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
+      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
     }
   ]
 }
