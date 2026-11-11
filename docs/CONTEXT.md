@@ -97,7 +97,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu/detail/search and Save/Compare foundations use shared contracts/tokens. Explicit live mode verifies exact fetched bundle bytes and pointer identity before rendering or exposing the token. Refresh swaps publications with focus preservation; 404 or token expiry suspends canonical/PostHog collection without changing consent, retires pending work and keeps the visible menu. Remount aborts stale loads and splits. One off-by-default consent gate enforces DNT/GPC. Atomic IndexedDB/Web-Locked localStorage outboxes retain retries with memory fallback. Fixture mode sends neither destination. PostHog SDK dispatch and token-bound canonical delivery are independent. Staging reuses pinned Pages public snapshots; private R2 stays private. Actual UI triggers, genuine browser-to-both-destinations/report reconciliation and privacy/design acceptance remain separate pilot gates.",
+      "summary": "Save, Unsave, Undo, badge and Saved routing are connected to real menu/detail screens. Saved refreshes current dish revisions without a new shortlist view, and keyboard removal retains focus. Verified publication loading, cancellation, expiry and withdrawal tracking suspension remain enforced. Compare and remaining real UI tracking acceptance are separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -184,7 +184,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
-        "docs/diner-connection.md"
+        "docs/diner-connection.md",
+        "frontend/diner/src/save/screens.ts",
+        "frontend/diner/src/save/save.css",
+        "tests/e2e/save-screens.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -193,7 +196,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "67ca26d8f8931b3412a099741c73edd7989f5741e66173248787191279f0c4f2"
+      "sourceFingerprint": "b46985deb25b3eb63bccdd587b074c4f724883680fde2bf5dac55526c1cc4ca1"
     },
     {
       "id": "console",
@@ -648,16 +651,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "summary": "PR117 reconciles current develop without dropping its context paths or runtime changes. The offline bundle producer hashes exact bytes, reads tenant-scoped approved facts and admits immutable handoff rows only through a privileged transaction. T0 input now rejects missing/blank capture evidence and invalid source hashes; five regressions failed before correction. Private provenance is never public content. A real prepare_t0_bundle asset passed eight actual CLI/PostgreSQL checks, including tamper rejection, runtime denial, identical retry and overwrite refusal. Local checks pass: 1198 unit/72 script, 213 SQL/86 integration, 120 browser and build; timings in qa-reports/S4-RES-test-plan.md.",
-      "modules": [
-        "backend",
-        "contracts",
-        "delivery"
-      ],
-      "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
-    },
-    {
-      "date": "2026-11-10",
       "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
       "modules": [
         "diner"
@@ -741,6 +734,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "Reconciled current release foundations; regression and release verification are in progress.",
       "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
+      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
     }
   ]
 }

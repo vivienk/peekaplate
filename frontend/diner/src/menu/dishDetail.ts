@@ -1,3 +1,4 @@
+import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -68,11 +69,9 @@ export function renderDishDetail(
       <header class="pp-detail__topbar">
         <button class="pp-detail__back" type="button" aria-label="Back to menu">←</button>
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
-        <button class="pp-detail__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-          <span aria-hidden="true">♡</span>
-          <span>Save</span>
-        </button>
+        ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>
+      ${toastAreaMarkup()}
       ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
 
       <div class="pp-detail__image-wrap">
@@ -128,7 +127,7 @@ export function renderDishDetail(
           <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
           <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
         </div>
-        <p class="pp-notice">View Portion, Save and Compare are not available yet.</p>
+        <p class="pp-notice">View Portion and Compare are not available yet.</p>
       </section>
     </div>
   `;
