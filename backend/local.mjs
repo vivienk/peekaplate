@@ -35,8 +35,20 @@ async function demo() {
       signal: AbortSignal.timeout(10_000),
     },
   );
-  const result = await response.json();
-  if (!response.ok) throw new Error(`Local command failed (${response.status}): ${result.error}`);
+  const responseText = await response.text();
+  let result;
+
+  try {
+    result = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Local command returned non-JSON (${response.status} ${response.headers.get('content-type')}): ${responseText.slice(0, 500) || '<empty body>'}`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(`Local command failed (${response.status}): ${result.error ?? responseText}`);
+  }
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -91,7 +103,7 @@ async function develop(smoke) {
       config: fileURLToPath(new URL('./wrangler.jsonc', import.meta.url)),
       local: true,
       ip: '127.0.0.1',
-      port: 8787,
+      port: 8790,
       inspectorPort: 0,
       logLevel: 'error',
       vars: { APP_ENV: 'local', AUTH_ISSUER: issuer, LOCAL_DATABASE_URL: database.runtimeUrl },

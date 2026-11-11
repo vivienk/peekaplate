@@ -58,7 +58,7 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
 | Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
-| Owner report | Research/design requirements | A report built from real, permitted evidence |
+| Owner report | Synthetic staging API checks recorded; [internal period-comparison reader](comparison-reporting.md) and privacy fixtures tested locally | Live-data reporting, comparison API/dashboard wiring and release acceptance |
 
 ClickUp's “Complete” status describes a task's recorded progress. Use the dated code and hosted evidence to confirm the deliverable. The task inventory later in this guide is the historical October 14 snapshot; the approval/publication backend now exists, while its connected screens still need their own acceptance.
 

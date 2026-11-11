@@ -2033,6 +2033,21 @@ The new Chromium regression failed because the invalid input had identical focus
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-09T22:02:13.045Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-09T22:03:37.435Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-09T22:05:51.845Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T10:41:49.339Z","exitCode":1}
 ```
 
@@ -2601,7 +2616,26 @@ pass. These use a synthetic source seam, not hosted integrity/delivery evidence.
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T18:54:58.242Z","exitCode":1}
+```
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:06:48.247Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T18:57:05.858Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T21:12:23.770Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T10:49:17.398Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -2959,3 +2993,49 @@ The first complete Chromium run passed 136/137 cases: the withdrawal fixture inj
 ## DIN-01 withdrawal fixture fake-time follow-up
 
 Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T11:51:00.081Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-11T11:59:55.115Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T12:03:29.832Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T12:05:43.616Z","exitCode":1}
+```
+
+## PR134 comparison review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-COMPARISON-READER","status":"resolved-locally","cause":"An open rate and exposure count reconstructed a protected small opened cohort; comparison engagement incorrectly required compare_view entry instead of an ordered prior opening.","prevention":"Complementary suppression clears both-period opening-rate values/delta/count when either opened cohort is 1–9; comparisons follow established tenant/session/participant and producer-order rules.","regression":"Real PostgreSQL original reader: two failures and one pass. After correction the two regressions pass; expanded focused DB suite passes eleven cases, including the restored seventeen-session JSON fixture. Full runner passes 281 SQL assertions and 107 integration cases.","sources":["backend/src/comparison-report.ts","backend/src/comparison-report.integration.ts","tests/data05/comparison_privacy_cases.json"]}
+```
+
+The later PR134 branch no longer contained PR123 validation files. Restore only its five test/fixture/evidence files from reviewed a8cd00b, preserve develop code/context, and record new validation separately from historical results. Docker engine was stopped; Docker Desktop start restored it. Only disposable PeekaPlate test containers were launched and cleanup was verified.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-11T19:20:50.607Z","exitCode":1}
+```
+
+## PR142 independent integration review - November 11, 2026
+
+The first full database run hit the existing five-second statement timeout in six comparison-reader cases inherited from develop; 108 other integration tests passed. An isolated eleven-case run passed in 2.80 seconds, so a standalone pass did not clear the combined-run failure. The reader now materializes its tenant/time-scoped live fact view once for both periods and linked-opening probes while preserving each period bound, ordering, consent-derived live facts and suppression rules. The full runner passes 298 SQL assertions and 114 integration cases in a 24.39-second integration phase; the local Worker smoke check passes. New HTTP coverage includes competing updates, historical receipt replay, conflicting reuse and dual-owner cross-venue isolation.
+
+The shared context/error-ledger conflict was reconciled by preserving both branches and current PR134/123 validation, then refreshing affected fingerprints. Local port documentation now matches the authenticated fixture Worker on 8790. No hosted migration or deployment occurred. Review-only helper quoting/path mistakes were corrected with explicit file paths and script files; no runtime credentials were involved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-11T19:29:09.584Z","exitCode":1}
+```
+
+The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
