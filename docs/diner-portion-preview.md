@@ -107,3 +107,30 @@ architecture/correctness defects. Final refinements tighten the serialized byte 
 and add distinct-rendered-image/keyboard evidence; they do not change navigation.
 These reviews are not human approval or production acceptance. No branch push,
 PR creation, merge or deployment was performed.
+
+
+## Browser-observed Figma alignment — November 10, 2026
+
+The user requested browser inspection after the Figma connector quota was exhausted.
+Observed section 482:503 in the supplied PeekaPlate file: Ready 258:6000,
+Fallback 221:260, Failed 165:2413, Loading 846:7146.
+The preview now uses the dish-name header, 250px centered visual, hides detail cards,
+and uses the design's loading, drag, photo fallback and failed/retry copy.
+Native status-bar artwork is omitted; the web layout respects safe-area insets.
+Retry reloads the selected dish photo and attempts the renderer without pushing history.
+Keyboard controls and reduced-motion behavior remain available.
+
+Visual limitations: Figma SVG export/clipboard retrieval did not return usable files.
+The hand hint icon and failed-image illustration are therefore still absent; their space
+is retained. The loading ring uses CSS and the existing Back arrow is retained.
+This is a layout/state integration, not pixel-perfect design acceptance.
+No generated or Figma sample food replaces published dish-specific assets.
+
+Changed in this refinement: `frontend/diner/src/menu/portionPreview.ts`,
+`frontend/diner/src/style.css`, `tests/e2e/portion.spec.ts`, and this handoff/context/error ledger.
+
+Refinement checks: PASS 210 focused unit tests; PASS 38 browser tests including
+photo retry without extra history; PASS lint, typecheck and build (Worker dry-run).
+Initial JavaScript is 52,220 gzip bytes; T1 allowance remains 324,288 bytes.
+The browser screenshot was inspected at 390px. Exact exported icons and manual
+phone/screen-reader acceptance remain outstanding.

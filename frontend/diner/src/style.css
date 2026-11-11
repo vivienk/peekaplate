@@ -893,17 +893,38 @@ main:has(> .pp-detail) {
   }
 }
 
-/* Portion preview keeps the existing detail shell and photo fallback. */
+/* Figma 482:503: preview states reuse the mounted dish and its history entry. */
+.pp-detail--preview {
+  position: relative;
+  min-height: 100svh;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
 .pp-detail--preview .pp-detail__save,
-.pp-detail--preview .pp-allergen-section,
-.pp-detail--preview .pp-ingredients,
-.pp-detail--preview .pp-detail__actions,
-.pp-detail--preview .pp-detail__section > .pp-notice {
+.pp-detail--preview .pp-detail__section,
+.pp-detail--preview > .pp-notice:not(.pp-portion__status) {
   display: none;
+}
+.pp-detail--preview .pp-detail__topbar {
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 54px;
+  box-sizing: border-box;
+}
+.pp-detail--preview .pp-detail__title {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.pp-detail--preview .pp-detail__back {
+  width: 42px;
+  height: 42px;
+  padding: 0;
 }
 .pp-detail--preview .pp-detail__image-wrap {
   position: relative;
-  aspect-ratio: 1;
+  width: 250px;
+  max-width: 100%;
+  height: 250px;
+  padding: 0;
+  margin: max(48px, calc(50svh - 233px)) auto 0;
   touch-action: pan-y;
 }
 .pp-detail--preview .pp-detail__image {
@@ -924,21 +945,86 @@ main:has(> .pp-detail) {
   outline: 2px solid var(--pp-role-on-surface);
   outline-offset: 4px;
 }
-.pp-detail--preview .pp-detail__image-wrap {
-  animation: pp-portion-enter 420ms ease-out;
+.pp-detail--preview .pp-portion__status {
+  margin: 36px 0 0;
+  font-size: 18px;
+  line-height: 28px;
+  text-align: center;
+  white-space: pre-line;
+  color: #b5b6ba;
 }
-@keyframes pp-portion-enter {
-  from {
-    opacity: 0.6;
-    transform: scale(0.96);
-  }
+.pp-portion__status strong,
+.pp-portion__status span {
+  display: block;
+}
+.pp-portion__status strong {
+  color: #fafafa;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status {
+  margin-top: 114px;
+  color: #fafafa;
+  font-weight: 600;
+}
+.pp-detail[data-portion-state="loading"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fafafa;
+  font-weight: 600;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image {
+  filter: blur(8px);
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 32px);
+  top: calc(50% - 32px);
+  width: 64px;
+  height: 64px;
+  box-sizing: border-box;
+  border: 3px solid #71737a;
+  border-top-color: #fafafa;
+  border-radius: 50%;
+  animation: pp-portion-spin 1s linear infinite;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
+  height: 150px;
+  visibility: hidden;
+  margin-top: max(48px, calc(50svh - 229px));
+}
+.pp-detail[data-portion-state="failed"] .pp-portion__status {
+  margin-top: 32px;
+}
+.pp-portion__retry {
+  display: block;
+  width: calc(100% - 40px);
+  height: 40px;
+  margin: 48px 20px 0;
+  border: 0;
+  border-radius: 999px;
+  background: #f89537;
+  color: #421708;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pp-portion__retry[hidden] {
+  display: none;
+}
+@keyframes pp-portion-spin {
   to {
-    opacity: 1;
-    transform: scale(1);
+    transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pp-detail--preview .pp-detail__image-wrap {
+  .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
     animation: none;
   }
+}
+
+.pp-detail[data-portion-state="ready"] .pp-detail__image-wrap {
+  margin-top: max(48px, calc(50svh - 256px));
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap {
+  margin-top: max(48px, calc(50svh - 229px));
 }

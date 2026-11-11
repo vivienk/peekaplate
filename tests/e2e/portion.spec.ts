@@ -109,7 +109,7 @@ test('menu → dish-specific 2.5D → detail → another dish, with focus and br
   await page.locator('.pp-card__open').first().click();
   expect(requested).toEqual([]);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
-  await expect(page.locator('.pp-portion__status')).toContainText('2.5D preview.');
+  await expect(page.locator('.pp-portion__status')).toContainText('Drag to tilt the plate');
   await expect(page.locator('canvas')).toHaveCount(1);
   expect(requested.filter((url) => /\/[01]\.png$/.test(url))).toHaveLength(2);
   expect(requested.some((url) => url.includes(content.categories[0].dishes[0].dish_id))).toBe(true);
@@ -159,11 +159,20 @@ for (const mode of [
   test(`graceful fallback: ${mode}`, async ({ page }) => {
     await openMenu(page, mode);
     await openPortion(page);
-    await expect(page.locator('.pp-portion__status')).toContainText('Preview unavailable');
+    await expect(page.locator('.pp-portion__status')).toContainText(
+      mode === 'no-photo' ? 'Couldn’t load preview.' : 'Interactive preview unavailable',
+    );
     await expect(page.locator('canvas')).toHaveCount(0);
-    if (mode === 'no-photo')
-      await expect(page.locator('.pp-portion__status')).toContainText('Dish photo unavailable');
-    else await expect(page.locator('img.pp-detail__image')).toBeVisible();
+    if (mode === 'no-photo') {
+      const historyLength = await page.evaluate(() => history.length);
+      await page.route('https://assets.example.test/**', (route) =>
+        route.fulfill({ contentType: 'image/png', body: images[0]! }),
+      );
+      await page.getByRole('button', { name: 'Try again', exact: true }).click();
+      await expect(page.locator('.pp-portion__status')).toContainText('Showing photo instead');
+      await expect(page.locator('img.pp-detail__image')).toBeVisible();
+      expect(await page.evaluate(() => history.length)).toBe(historyLength);
+    } else await expect(page.locator('img.pp-detail__image')).toBeVisible();
     await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
     await expect(page.locator('.pp-detail__name')).toHaveText('Charred Leeks');
   });
@@ -180,9 +189,12 @@ test('closing during loading disposes late work and repeated opens keep one canv
   await page.waitForTimeout(9500);
   await expect(page.locator('canvas')).toHaveCount(0);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
-  await expect(page.locator('.pp-portion__status')).toContainText('Preview unavailable', {
-    timeout: 10000,
-  });
+  await expect(page.locator('.pp-portion__status')).toContainText(
+    'Interactive preview unavailable',
+    {
+      timeout: 10000,
+    },
+  );
 });
 
 test('WebGL failure and context loss restore the photo', async ({ page }) => {
@@ -197,7 +209,9 @@ test('WebGL failure and context loss restore the photo', async ({ page }) => {
         ?.getExtension('WEBGL_lose_context')
         ?.loseContext(),
     );
-  await expect(page.locator('.pp-portion__status')).toContainText('Preview unavailable');
+  await expect(page.locator('.pp-portion__status')).toContainText(
+    'Interactive preview unavailable',
+  );
   await expect(page.locator('img.pp-detail__image')).toBeVisible();
 });
 
@@ -222,7 +236,9 @@ test('unavailable WebGL keeps the photo and reload retires a stale preview', asy
   });
   await openMenu(page);
   await openPortion(page);
-  await expect(page.locator('.pp-portion__status')).toContainText('Preview unavailable');
+  await expect(page.locator('.pp-portion__status')).toContainText(
+    'Interactive preview unavailable',
+  );
   await expect(page.locator('img.pp-detail__image')).toBeVisible();
   await page.reload();
   await expect(page.locator('.pp-card__open').first()).toBeVisible();

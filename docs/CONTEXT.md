@@ -200,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ced98bf0ab8a247a41f5aa82c9b4c303cd6b25541d4b169673d8112993b68a90"
+      "sourceFingerprint": "f0b81ada8447f951436ff186c55216a07f02a454ce7e0aa6a3528a468ee873c0"
     },
     {
       "id": "console",
@@ -649,7 +649,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "summary": "View Portion now enters a preview state in the existing diner detail shell. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
+      "summary": "View Portion reuses the diner detail shell with Figma-aligned centered preview states, dish-name header and same-entry photo retry. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
       "modules": [
         "diner",
         "contracts"

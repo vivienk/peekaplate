@@ -11,6 +11,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   const stage = container.querySelector<HTMLElement>('.pp-detail__image-wrap');
   const status = container.querySelector<HTMLElement>('.pp-portion__status');
   if (!root || !open || !back || !title || !stage || !status) return () => {};
+  const retry = document.createElement('button');
+  retry.type = 'button';
+  retry.className = 'pp-portion__retry';
+  retry.textContent = 'Try again';
+  retry.hidden = true;
+  status.after(retry);
   const key = crypto.randomUUID();
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
@@ -31,33 +37,46 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     stage.removeAttribute('tabindex');
     stage.removeAttribute('role');
     stage.removeAttribute('aria-label');
+    stage.removeAttribute('aria-description');
+  };
+  const setState = (state: 'loading' | 'ready' | 'fallback' | 'failed') => {
+    root.dataset.portionState = state;
+    retry.hidden = state !== 'failed';
+    stage.setAttribute('aria-busy', String(state === 'loading'));
   };
   const fallback = () => {
     stop();
     if (!active || disposed) return;
-    status.textContent = stage.querySelector('img')
-      ? 'Preview unavailable — showing the dish photo.'
-      : 'Preview unavailable. Dish photo unavailable.';
+    const hasPhoto = !!stage.querySelector('img');
+    setState(hasPhoto ? 'fallback' : 'failed');
+    status.replaceChildren();
+    if (hasPhoto) {
+      const heading = document.createElement('strong');
+      heading.textContent = 'Interactive preview unavailable';
+      const message = document.createElement('span');
+      message.textContent = 'Showing photo instead';
+      status.append(heading, message);
+    } else {
+      status.textContent = 'Couldn’t load preview.\nPlease try again.';
+    }
   };
   const photoObserver = new MutationObserver(() => {
-    if (
-      active &&
-      status.textContent?.startsWith('Preview unavailable') &&
-      !stage.querySelector('img')
-    ) {
-      status.textContent = 'Preview unavailable. Dish photo unavailable.';
+    if (active && root.dataset.portionState === 'fallback' && !stage.querySelector('img')) {
+      fallback();
     }
   });
   photoObserver.observe(stage, { childList: true });
-  const show = async () => {
-    if (active || disposed) return;
+  const show = async (retrying = false) => {
+    if ((active && !retrying) || disposed) return;
+    stop();
     active = true;
     closing = false;
     root.classList.add('pp-detail--preview');
-    title.textContent = 'Portion preview';
+    title.textContent = dish.name;
     back.setAttribute('aria-label', 'Back to dish details');
     status.hidden = false;
-    status.textContent = 'Loading portion preview…';
+    setState('loading');
+    status.textContent = 'Loading Interactive preview...';
     back.focus({ preventScroll: true });
     window.scrollTo(0, 0);
     const parsed = PublicPortionSchema.safeParse(dish.portion);
@@ -86,9 +105,14 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       stage.tabIndex = 0;
       stage.setAttribute('role', 'group');
       stage.setAttribute('aria-label', `${dish.name} portion preview`);
+      stage.setAttribute(
+        'aria-description',
+        'Use arrow keys for a slight tilt. Escape returns to dish details.',
+      );
+      setState('ready');
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
-        : '2.5D preview. Drag or use arrow keys for a slight tilt. Escape returns to dish details.';
+        : 'Drag to tilt the plate';
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();
     }
@@ -99,6 +123,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     closing = false;
     stop();
     root.classList.remove('pp-detail--preview');
+    delete root.dataset.portionState;
+    stage.removeAttribute('aria-busy');
+    retry.hidden = true;
     title.textContent = 'Dish details';
     back.setAttribute('aria-label', 'Back to menu');
     status.hidden = true;
@@ -162,6 +189,27 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     y = 0;
     renderer?.update(0, 0);
   };
+  const retryPreview = () => {
+    const photo = dish.images?.detail ?? dish.images?.card;
+    if (photo && !stage.querySelector('img')) {
+      const img = document.createElement('img');
+      img.className = 'pp-detail__image';
+      img.alt = photo.alt;
+      img.addEventListener(
+        'error',
+        () => {
+          img.remove();
+          if (active && root.dataset.portionState === 'fallback') fallback();
+        },
+        { once: true },
+      );
+      stage.querySelector('.pp-detail__image--missing')?.remove();
+      stage.append(img);
+      img.src = photo.url;
+    }
+    void show(true);
+  };
+  retry.addEventListener('click', retryPreview);
   open.addEventListener('click', openPreview);
   back.addEventListener('click', backClick, true);
   window.addEventListener('popstate', pop);
@@ -175,6 +223,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     disposed = true;
     stop();
     photoObserver.disconnect();
+    retry.removeEventListener('click', retryPreview);
+    retry.remove();
     open.removeEventListener('click', openPreview);
     back.removeEventListener('click', backClick, true);
     window.removeEventListener('popstate', pop);

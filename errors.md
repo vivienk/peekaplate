@@ -2518,3 +2518,11 @@ change was made for these failures. All 38 browser cases passed against a stable
 including the unchanged withdrawal-clock assertion. The manifest budget was tightened
 to check serialized UTF-8 bytes, with a multibyte URL regression. Browser fixtures now
 use different foreground images for different dishes and assert visible keyboard tilt.
+
+
+### 2026-11-10 — portion preview browser check runtime
+
+Local browser server startup failed because the temporary Node 24.16 runtime was no
+longer present and the shell resolved Node 24.14. Restored the required official
+runtime in /private/tmp and reran the focused browser checks. No application failure
+was observed in that startup attempt.
