@@ -19,6 +19,37 @@
   font-family: var(--pp-font-family-base);
 }
 
+/*
+ * Wide screens follow the Figma frames: the card sits on the right (96px from the edge at 1440)
+ * and the left side is kept for the food photo. Until the photo is exported the left side shows the
+ * page background; adding it means setting a background image on .pp-auth__art.
+ */
+.pp-auth__art {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .pp-auth {
+    position: relative;
+    justify-content: flex-end;
+    padding-inline: var(--pp-space-48) clamp(var(--pp-space-48), 6.67vw, 6rem);
+  }
+
+  .pp-auth__art {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    display: block;
+    width: 50%;
+    background: no-repeat left center / contain;
+    pointer-events: none;
+  }
+
+  .pp-auth__card {
+    position: relative;
+  }
+}
+
 .pp-auth *,
 .pp-auth *::before,
 .pp-auth *::after {

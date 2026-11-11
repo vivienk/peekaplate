@@ -257,3 +257,14 @@ test('on a phone the card fills the width without sideways scrolling', async ({ 
   const card = await page.locator('.pp-auth__card').boundingBox();
   expect(card?.x).toBe(16);
 });
+
+test('on a wide screen the card sits on the right, leaving the left side for the photo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1024 });
+  await page.goto(demo);
+  const card = await page.locator('.pp-auth__card').boundingBox();
+  expect(card?.x).toBeGreaterThanOrEqual(720);
+  expect(Math.round((card?.x ?? 0) + (card?.width ?? 0))).toBe(1440 - 96);
+  await expect(page.locator('.pp-auth__art')).toHaveAttribute('aria-hidden', 'true');
+});

@@ -53,6 +53,8 @@ export function OwnerAuth({
 
   return (
     <div className="pp-auth">
+      {/* Left side of the Figma frames: the food photo goes here once it is exported (decorative). */}
+      <div className="pp-auth__art" aria-hidden="true" />
       <div className="pp-auth__card">
         <p className="pp-auth__brand">
           <img src={logo} alt="" width="32" height="32" />
