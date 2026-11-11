@@ -310,6 +310,53 @@ export const MAIL_ILLUSTRATION = (
   </svg>
 );
 
+// S04 "Password updated": an orange circle with a tick. Decorative.
+export const DONE_ILLUSTRATION = (
+  <svg
+    className="pp-auth-status__art"
+    viewBox="0 0 72 72"
+    width="72"
+    height="72"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <circle cx="36" cy="36" r="36" fill="var(--pp-color-orange-500)" />
+    <path
+      d="M24 37l8 8 16-17"
+      fill="none"
+      stroke="var(--pp-color-gray-50)"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// S04 "This reset link can't be used": a broken link on Error/700 with a light halo. Decorative.
+export const BROKEN_LINK_ILLUSTRATION = (
+  <svg
+    className="pp-auth-status__art"
+    viewBox="0 0 72 72"
+    width="72"
+    height="72"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <circle cx="36" cy="36" r="36" fill="var(--pp-color-error-100)" />
+    <circle cx="36" cy="36" r="27" fill="var(--pp-color-error-700)" />
+    <g
+      fill="none"
+      stroke="var(--pp-color-gray-900)"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M33 29l3-3a6 6 0 0 1 8.5 8.5l-3 3M39 43l-3 3a6 6 0 0 1-8.5-8.5l3-3" />
+      <path d="M25 25l22 22" />
+    </g>
+  </svg>
+);
+
 // A centred result screen without the form: "Check your email", "Password updated", "This reset
 // link can't be used". Focus moves to its heading when it opens (S03/S04 handoff, accessibility).
 export function StatusPanel({

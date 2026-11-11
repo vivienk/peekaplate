@@ -43,6 +43,24 @@ export type CreateAccountResult =
   | { kind: 'unavailable' }
   | RateLimited;
 
+// S03: request a password reset link. "sent" must be the answer whether or not an account exists
+// for the address, so the screen never reveals which emails are registered (S03 handoff, section 4).
+// resendAfterSeconds is how long "Resend email" stays unavailable, if the service says.
+export type ResetLinkResult =
+  | { kind: 'sent'; resendAfterSeconds?: number }
+  | { kind: 'failed' }
+  | { kind: 'unavailable' }
+  | RateLimited;
+
+// S04: set a new password from the reset link. email, when known, lets "Sign in" open S02 directly.
+export type ResetPasswordResult =
+  | { kind: 'updated'; email?: string }
+  // The link is invalid, expired or already used (S04 handoff, section 2).
+  | { kind: 'invalid_link' }
+  | { kind: 'failed' }
+  | { kind: 'unavailable' }
+  | RateLimited;
+
 export type SignInRequest = { email: string; password: string };
 
 export type CreateAccountRequest = {
@@ -58,6 +76,9 @@ export interface OwnerAuthService {
   checkEmail(email: string): Promise<EmailCheckResult>;
   signIn(request: SignInRequest): Promise<SignInResult>;
   createAccount(request: CreateAccountRequest): Promise<CreateAccountResult>;
+  requestPasswordReset(email: string): Promise<ResetLinkResult>;
+  // Uses the recovery session from the reset link; the link itself never reaches the screens.
+  resetPassword(newPassword: string): Promise<ResetPasswordResult>;
 }
 
 // The service used until the provider is connected. It sends nothing anywhere.
@@ -65,4 +86,6 @@ export const notConnectedAuthService: OwnerAuthService = {
   checkEmail: async () => ({ kind: 'unavailable' }),
   signIn: async () => ({ kind: 'unavailable' }),
   createAccount: async () => ({ kind: 'unavailable' }),
+  requestPasswordReset: async () => ({ kind: 'unavailable' }),
+  resetPassword: async () => ({ kind: 'unavailable' }),
 };

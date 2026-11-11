@@ -335,6 +335,49 @@
   margin-top: var(--pp-space-24);
 }
 
+/* S03 Check email: full-width outlined Resend button, its status line, and the "or" divider. */
+.pp-auth .pp-auth__resend {
+  width: 100%;
+  min-height: var(--pp-auth-pending-button-height);
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-paragraph-1);
+}
+
+.pp-auth .pp-auth__resend[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.pp-auth-status__note {
+  min-height: var(--pp-line-height-small);
+  margin: var(--pp-space-4) 0 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+.pp-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+  width: 100%;
+  margin: var(--pp-space-16) 0 var(--pp-space-4);
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth-divider::before,
+.pp-auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--pp-role-outline-solid);
+}
+
+/* The status screens' primary button sits under the text, full width. */
+.pp-auth-status__actions .pp-auth__submit {
+  margin-top: 0;
+}
+
 /* Error Message component: Error/700 text on Error/100. */
 .pp-auth-banner {
   display: flex;

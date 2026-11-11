@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. Owner sign-in UI (src/auth: E1/S01/S02) calls only OwnerAuthService, unconnected (unavailable) until the provider is wired; preview-only synthetic owner-sign-in demo.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. Owner sign-in and recovery UI (src/auth: E1/S01-S04) calls only OwnerAuthService, unconnected (unavailable) until the provider is wired; preview-only synthetic owner-sign-in demo.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -235,7 +235,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/copy.ts",
         "frontend/console/src/auth/auth.css",
         "frontend/console/src/auth/demo.tsx",
-        "tests/e2e/owner-auth.spec.ts"
+        "tests/e2e/owner-auth.spec.ts",
+        "tests/e2e/owner-recovery.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -245,7 +246,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c0b23b6d4b3a5898dff32d645c037350c216eb1f7b4eadbbab2f801e88918296"
+      "sourceFingerprint": "71fd69db5fa0991a5af0f1cc7b1131cccbe1742a4bf6997cbfa46bece0dea63f"
     },
     {
       "id": "backend",
@@ -511,7 +512,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "009589de7b73f7a22ec0b93ffacbda2117143b02ba2bf974c784121d96e649e5"
+      "sourceFingerprint": "5cd946c2c800cf14dcdb539c522eacbeb2d451c2018ca4a0ea395c7e6f72285f"
     },
     {
       "id": "agents",

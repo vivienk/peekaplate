@@ -32,6 +32,12 @@ export function fullNameError(value: string): string | undefined {
   return value.trim() ? undefined : 'Enter your full name';
 }
 
+// S04 checks only that a new password was entered; its rules are not confirmed yet (S04 handoff,
+// section 3). The provider makes the final decision.
+export function resetPasswordError(value: string): string | undefined {
+  return value ? undefined : 'Enter a new password';
+}
+
 export const TERMS_ERROR = 'Agree to the terms to create your account';
 
 export type BannerCopy = { title: string; body: string };
@@ -57,6 +63,10 @@ export const BANNERS = {
     title: 'Confirm your email first',
     body: 'Open the confirmation link we sent to this email address, then sign in.',
   },
+  // S03 handoff, section 5.
+  resetLinkFailed: { title: 'We couldn’t send the reset link', body: 'Please try again.' },
+  // S04 handoff, section 6.
+  resetFailed: { title: 'We couldn’t reset your password', body: 'Please try again.' },
   // Owner accounts are not connected in this build: nothing was sent and nobody is signed in.
   unavailable: {
     title: 'Sign-in isn’t available yet',

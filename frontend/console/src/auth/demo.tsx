@@ -8,9 +8,11 @@ import type {
   CreateAccountResult,
   EmailCheckResult,
   OwnerAuthService,
+  ResetLinkResult,
+  ResetPasswordResult,
   SignInResult,
 } from './auth-service';
-import { OwnerAuth } from './OwnerAuth';
+import { type AuthStep, OwnerAuth } from './OwnerAuth';
 import './demo.css';
 
 const root = document.getElementById('root');
@@ -40,13 +42,31 @@ const CREATE: Record<string, string> = {
   unavailable: 'Not connected',
 };
 
+const RESET_LINK: Record<string, string> = {
+  sent: 'Sent (resend after 5 s)',
+  failed: 'Service failure',
+  rate_limited: 'Too many attempts (wait 5 s)',
+  unavailable: 'Not connected',
+};
+const RESET: Record<string, string> = {
+  updated: 'Password updated',
+  invalid_link: 'Link expired or invalid',
+  failed: 'Service failure',
+  rate_limited: 'Too many attempts (wait 5 s)',
+  unavailable: 'Not connected',
+};
+
 // Long enough to see the loading state.
 const DELAY_MS = 900;
 const wait = () => new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 // The wait the synthetic service asks for when it answers "too many attempts".
 const RETRY_AFTER_SECONDS = 5;
 const answer = (kind: string) =>
-  kind === 'rate_limited' ? { kind, retryAfterSeconds: RETRY_AFTER_SECONDS } : { kind };
+  kind === 'rate_limited'
+    ? { kind, retryAfterSeconds: RETRY_AFTER_SECONDS }
+    : kind === 'sent'
+      ? { kind, resendAfterSeconds: RETRY_AFTER_SECONDS }
+      : { kind };
 
 function Choice({
   label,
@@ -78,11 +98,18 @@ function Demo() {
   const [check, setCheck] = useState('existing_account');
   const [signIn, setSignIn] = useState('invalid_credentials');
   const [create, setCreate] = useState('confirmation_required');
+  const [resetLink, setResetLink] = useState('sent');
+  const [reset, setReset] = useState('updated');
   const [done, setDone] = useState<string | null>(null);
-  const [run, setRun] = useState(0);
+  // Each start remounts the screens; the step is where they open (the reset email opens S04).
+  const [start, setStart] = useState<{ run: number; step: AuthStep }>({ run: 0, step: 'email' });
   const [requests, setRequests] = useState(0);
-  const answers = useRef({ check, signIn, create });
-  answers.current = { check, signIn, create };
+  const answers = useRef({ check, signIn, create, resetLink, reset });
+  answers.current = { check, signIn, create, resetLink, reset };
+  const restart = (step: AuthStep) => {
+    setDone(null);
+    setStart((current) => ({ run: current.run + 1, step }));
+  };
 
   const service: OwnerAuthService = {
     async checkEmail() {
@@ -99,6 +126,16 @@ function Demo() {
       setRequests((n) => n + 1);
       await wait();
       return answer(answers.current.create) as CreateAccountResult;
+    },
+    async requestPasswordReset() {
+      setRequests((n) => n + 1);
+      await wait();
+      return answer(answers.current.resetLink) as ResetLinkResult;
+    },
+    async resetPassword() {
+      setRequests((n) => n + 1);
+      await wait();
+      return answer(answers.current.reset) as ResetPasswordResult;
     },
   };
 
@@ -118,6 +155,22 @@ function Demo() {
             value={create}
             onChange={setCreate}
           />
+          <Choice
+            label="Reset link answer"
+            options={RESET_LINK}
+            value={resetLink}
+            onChange={setResetLink}
+          />
+          <Choice label="Reset password answer" options={RESET} value={reset} onChange={setReset} />
+          <button type="button" onClick={() => restart('reset')}>
+            Open reset link from email
+          </button>
+          <button type="button" onClick={() => restart('reset-invalid')}>
+            Open expired reset link
+          </button>
+          <button type="button" onClick={() => restart('email')}>
+            Start again
+          </button>
           <p className="pp-auth-demo__count">Requests sent: {requests}</p>
         </div>
       </aside>
@@ -128,24 +181,18 @@ function Demo() {
             Demo only: nobody is signed in. In the product this opens the owner’s first unfinished
             setup step, or the dashboard once setup is complete.
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setDone(null);
-              setRun((n) => n + 1);
-            }}
-          >
+          <button type="button" onClick={() => restart('email')}>
             Start again
           </button>
         </main>
       ) : (
         <main>
           <OwnerAuth
-            key={run}
+            key={start.run}
             service={service}
+            initialStep={start.step}
             onSignedIn={() => setDone('Sign-in accepted (demo)')}
             onAccountCreated={() => setDone('Account created (demo)')}
-            onForgotPassword={() => window.alert('Password recovery (S03) is not built yet.')}
           />
         </main>
       )}
