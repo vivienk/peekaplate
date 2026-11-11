@@ -47,7 +47,7 @@ async function open(page: Page, status: (n: number) => number) {
       body: '{}',
     });
   });
-  await page.goto(diner);
+  await page.goto(`${diner}/?scenario=empty`);
   const before = await storage(page);
   await page.addScriptTag({
     type: 'module',

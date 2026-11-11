@@ -2552,6 +2552,8 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-11T05:40:43.763Z","exitCode":1}
 ```
 
+## Save-screen integration review — November 10, 2026
+
 ```json
 {"id":"ERR-20261110-SAVE-REFRESH","status":"resolved","area":"saved-screen-publication-refresh","cause":"An open Saved screen retained old dish objects after a new publication was loaded, allowing a later opening to mix publication and dish revisions.","prevention":"Refresh the Saved screen from the new menu without recording another shortlist view.","sources":["frontend/diner/src/menu/menuScreen.ts","frontend/diner/src/save/saved-screen.ts"],"regression":"The browser case Saved uses the refreshed dish revision before opening its detail failed before the fix and passed afterward."}
 ```
@@ -2649,3 +2651,39 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T08:14:09.388Z","exitCode":1}
 ```
+
+
+## PR78 diner trigger integration and e2e reconciliation — 2026-11-11
+
+Merging develop into the DIN-01 triggers branch produced a typecheck failure (a
+missing teardownTracking declaration and a removed entrySourceFromSearch import) and
+e2e failures. The screen now emits menu_viewed and dish_viewed itself, so specs that
+send events by hand were counting the screen's events too. Tracking specs now load
+?scenario=empty; the menu-states observer expectation is 2 (dimming and exposure);
+the published-integrity withdrawal check counts only its own menu_viewed and requires
+that no event of any type is sent or captured after withdrawal. No assertion was
+weakened and no spec was skipped.
+
+A single-worker full run once failed 18 tracking/delivery cases with deliveries stuck
+at zero; their cause was not established, and a later single-worker run passed all
+111. The full-outbox warning-count test also failed once under 8 workers and passed
+alone, so it is treated as timing-sensitive under concurrency. Prevention: give
+hand-driven tracking specs a page that emits nothing, and assert on event types, not
+totals, wherever the real screen is loaded.
+
+## DIN-01 trigger review — November 11, 2026
+
+```json
+{"id":"ERR-20261111-DINER-TRIGGER-LIFECYCLE","status":"resolved","area":"diner-consent-and-publication-attribution","cause":"The screen started clocks and cached exposure IDs even when live collection was disallowed; a publication swap also retained those IDs and omitted its readable menu event.","prevention":"Gate UI measurement, reset clocks/references at consent changes, record the refreshed publication and discard older exposure references.","regression":"Real Chromium consent-transition and dropped-exposure cases failed before correction; four synthetic live-screen cases pass afterward. The refresh case also checks matching new dish revisions and once-per-publication menu events. No hosted provider is called.","sources":["frontend/diner/src/menu/menuScreen.ts","tests/e2e/menu-triggers-live.spec.ts"]}
+```
+
+The first complete Chromium run passed 136/137 cases: the withdrawal fixture injected a second menu view after the new consent handler had already observed the readable menu. Removed that duplicate injection while retaining all-event post-withdrawal length checks. The complete rerun passed 137/137 in 1.4 minutes; the separate SDK/privacy configuration passed 9/9 in 10.4 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T08:47:40.684Z","exitCode":1}
+```
+
+## DIN-01 withdrawal fixture fake-time follow-up
+
+Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.

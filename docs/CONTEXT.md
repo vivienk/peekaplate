@@ -105,7 +105,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Save, Unsave, Undo, badge and Saved routing are connected to real menu/detail screens. Saved refreshes current dish revisions without a new shortlist view, and keyboard removal retains focus. Verified publication loading, cancellation, expiry and withdrawal tracking suspension remain enforced. Compare and remaining real UI tracking acceptance are separate.",
+      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -195,7 +195,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/diner-connection.md",
         "frontend/diner/src/save/screens.ts",
         "frontend/diner/src/save/save.css",
-        "tests/e2e/save-screens.spec.ts"
+        "tests/e2e/save-screens.spec.ts",
+        "tests/e2e/menu-triggers.spec.ts",
+        "tests/e2e/menu-triggers-live.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -204,7 +206,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "eeaf24948b1da79d6308dde121b2064c9388f79bbea2af33968849a0102fcf56"
+      "sourceFingerprint": "c490fa8f10072b47814a00ac93adce4e94b665344350af58a06f09a43ed1b723"
     },
     {
       "id": "console",
@@ -480,7 +482,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "4c1a462327b649fa6cadf9044003985a87a217d5b08cc50dc6fc2c56ea8a1253"
+      "sourceFingerprint": "046be3b9ec70540e95b2849b43cef8e46a122e5970ddc4d552547c19d2128011"
     },
     {
       "id": "agents",
@@ -542,7 +544,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ea8d828a39fd80d003c97b6e306ee6072bba4bdeb240bcebe6e8ffdae51ee574"
+      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
     },
     {
       "id": "processing",
@@ -675,15 +677,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
-      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
-      "modules": [
-        "console",
-        "tokens"
-      ],
-      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
       "modules": [
         "diner",
@@ -763,6 +756,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "PR120 reconciles current develop without changing the verified menu upload/report/tracking boundaries. Pilot order imports use owner authorization, reviewed administrative POS mappings, explicit administrative tracking activation, historical publication resolution, idempotency and row quarantine. Strict calendar/time validation prevents invalid dates from reaching PostgreSQL; absent runtime archive storage fails closed. Import window90 days; raw-retention approval and purge activation remain separate.",
       "next": "Complete final review/CI and merge into develop. Hosted migrations/bindings, reviewed pilot mappings and explicit tracking activation are operator release gates. No staging/production deployment or real POS import was performed."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR78 reconciles develop while preserving ingredient/order-import work. Screens use the merged track, ID and clock modules; interim tracking remains removed. Local browser regressions reproduce preconsent timing/dangling exposure failures before fixes and pass afterward. Consent transitions create fresh eligible openings; refreshed publications cannot reuse old exposure IDs and record one menu view. Existing publication-withdrawal assertions still reject every post-withdrawal event. Local pnpm check/build pass: 1357 unit, 74 script, 137 Chromium and nine SDK/privacy cases; browser runs took 1.4 min and 10.4 s. CI exposed a withdrawal-fixture fake-time wait; the bounded poll now advances the delivery clock without weakening counts.",
+      "sources": [
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "docs/posthog.md"
+      ],
+      "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
     }
   ]
 }
