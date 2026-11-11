@@ -896,17 +896,20 @@ main:has(> .pp-detail) {
   }
 }
 
-/* Compare picker (S3-DIN-02.3, Figma "Compare Dish"). */
+/* Compare picker (S3-DIN-02.3, Figma "Compare Dish"). Spacing follows the frame's auto layout:
+   24px between sections, 8px from a label to its content, 12px between cards. */
 .pp-picker {
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
   width: 100%;
   max-width: 390px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 0 16px 96px;
+  padding: 0 16px;
   background: #2a2d36;
   color: #fafafa;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--pp-font-family-base);
 }
 
 .pp-picker button,
@@ -927,11 +930,24 @@ main:has(> .pp-detail) {
   outline-offset: 2px;
 }
 
+.pp-picker__keeping {
+  margin-top: 24px;
+}
+
+.pp-picker__choose-section {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+  padding-bottom: 24px;
+}
+
+/* Section headings: Figma 14/24, semibold, uppercase. */
 .pp-picker__label {
-  margin: 16px 0 8px;
+  margin: 0 0 8px;
   color: #a8a59e;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 24px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -963,64 +979,171 @@ main:has(> .pp-detail) {
 
 .pp-picker__hint,
 .pp-picker__none {
-  margin: 0 0 12px;
+  margin: 0 0 16px;
   color: #a8a59e;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 20px;
 }
 
+/* Figma "Search_ compare screen": a 44px pill with the icon inset 16px. */
 .pp-picker__search {
-  margin-bottom: 4px;
+  margin: 0;
+}
+
+.pp-picker__search .pp-search-bar__icon {
+  left: 16px;
+  font-size: 18px;
+}
+
+.pp-picker__search .pp-search-input {
+  height: 44px;
+  padding: 10px 16px 10px 44px;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .pp-picker__list {
-  padding: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
 }
 
 .pp-picker__list[hidden] {
   display: none;
 }
 
+/* Selected-dish card (Figma): text on one side, a round photo on the other, alternating. */
 .pp-picker__option {
-  position: relative;
-  cursor: pointer;
-  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   box-sizing: border-box;
+  padding: 16px;
+  border: 2px solid rgba(113, 115, 122, 0.3);
+  border-radius: 16px;
+  background: #2d3038;
+  cursor: pointer;
+}
+
+.pp-picker__option:nth-child(even) {
+  flex-direction: row-reverse;
+}
+
+.pp-picker__option--selected {
+  border-color: #f89537;
+}
+
+.pp-picker__option-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pp-picker__option-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.pp-picker__choose {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fafafa;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pp-picker__option-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-picker__option-heart {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fafafa;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.pp-picker__option-heart:disabled {
+  cursor: not-allowed;
+}
+
+.pp-picker__option-price {
+  margin: 0;
+  color: #f89537;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.pp-picker__option-media {
+  position: relative;
+  flex: 0 0 140px;
+}
+
+.pp-picker__option-image {
+  display: block;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  object-fit: cover;
 }
 
 .pp-picker__check {
   display: none;
   position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-  width: 24px;
-  height: 24px;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   background: #f89537;
   color: #421708;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 24px;
+  line-height: 28px;
   text-align: center;
 }
 
-.pp-card--selected {
-  border-color: #f89537;
+.pp-picker__option:nth-child(even) .pp-picker__check {
+  right: auto;
+  left: 0;
 }
 
-.pp-card--selected .pp-picker__check {
+.pp-picker__option--selected .pp-picker__check {
   display: block;
 }
 
+@media (max-width: 360px) {
+  .pp-picker__option-media {
+    flex-basis: 104px;
+  }
+  .pp-picker__option-image {
+    width: 104px;
+    height: 104px;
+  }
+}
+
+/* The Compare action stays in the picker's column, pinned to the bottom of the viewport while the
+   list scrolls, and never covers content outside the picker. */
 .pp-picker__footer {
-  position: fixed;
-  left: 0;
-  right: 0;
+  position: sticky;
   bottom: 0;
+  z-index: 2;
   box-sizing: border-box;
-  max-width: 390px;
-  margin: 0 auto;
+  margin: auto -16px 0;
   padding: 12px 16px 16px;
   background: #2a2d36;
   border-top: 1px solid rgba(113, 115, 122, 0.3);
@@ -1029,25 +1152,28 @@ main:has(> .pp-detail) {
 
 .pp-picker__confirm {
   width: 100%;
+  min-height: 48px;
 }
 
 .pp-picker__footer .pp-notice {
   margin: 8px 0 0;
 }
 
-/* Compare result (S3-DIN-02.4, Figma "Compare result allergens"). The dishes share the grid rows
-   (subgrid), so name, price, description, ingredients, Contains, Dietary info and the buttons line
-   up across both, while each dish stays one group in reading order. */
+/* Compare result (S3-DIN-02.4, Figma "Compare result allergens"): a dish header, then bordered
+   sections with the two dishes side by side and a divider, so every row lines up. */
 .pp-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   box-sizing: border-box;
   width: 100%;
   max-width: 390px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 0 16px 112px;
+  padding: 0 16px;
   background: #2a2d36;
   color: #fafafa;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--pp-font-family-base);
 }
 
 .pp-compare button {
@@ -1060,35 +1186,21 @@ main:has(> .pp-detail) {
   padding: 0;
 }
 
-.pp-compare__grid {
+.pp-compare__pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
-  grid-template-rows: repeat(8, auto);
   column-gap: 12px;
-  margin-top: 16px;
-}
-
-.pp-compare__dish {
-  display: grid;
-  grid-row: 1 / span 8;
-  grid-template-rows: subgrid;
-  row-gap: 8px;
-  align-content: start;
-  min-width: 0;
-}
-
-.pp-compare__dish--first {
-  grid-column: 1;
-}
-
-.pp-compare__dish--other {
-  grid-column: 3;
 }
 
 .pp-compare__divider {
-  grid-column: 2;
-  grid-row: 1 / span 8;
   background: rgba(113, 115, 122, 0.3);
+}
+
+.pp-compare__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .pp-compare__image {
@@ -1096,15 +1208,15 @@ main:has(> .pp-detail) {
   width: 100%;
   height: auto;
   aspect-ratio: 1;
-  border-radius: 12px;
+  border-radius: 999px;
   object-fit: cover;
 }
 
 .pp-compare__name {
   margin: 4px 0 0;
   font-size: 16px;
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: 700;
+  line-height: 24px;
   overflow-wrap: anywhere;
 }
 
@@ -1113,50 +1225,87 @@ main:has(> .pp-detail) {
   color: #f89537;
   font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
+}
+
+/* Figma comparison grouping: a bordered section with its own padding. */
+.pp-compare__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(113, 115, 122, 0.3);
+  border-radius: 16px;
+}
+
+/* Section headings: Figma 14/24, Inter semibold, uppercase. */
+.pp-compare__label {
+  margin: 0;
+  color: #a8a59e;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .pp-compare__description,
 .pp-compare__ingredient-names {
   margin: 0;
   color: #d4d1ca;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 22px;
   overflow-wrap: anywhere;
 }
 
-.pp-compare__label {
-  margin: 0 0 4px;
-  color: #a8a59e;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.pp-compare__group:empty {
-  display: block;
-}
-
-.pp-compare__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.pp-compare__action-row {
   margin-top: 4px;
 }
 
-.pp-compare__actions .pp-btn {
+.pp-compare__actions {
+  align-items: center;
+  gap: 12px;
+}
+
+/* Figma: an outlined pill "View details →" and a text-style orange "Replace". */
+.pp-compare__view {
+  flex: none;
+  width: 100%;
   min-height: 44px;
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: 14px;
+}
+
+.pp-compare__replace {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: #f89537;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .pp-compare__staff {
-  margin: 16px 0 0;
+  margin: 0;
   padding: 0;
+}
+
+/* Back to Menu stays in the column, pinned to the bottom while the result scrolls. */
+.pp-compare__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: auto -16px 0;
+  padding: 12px 16px 16px;
+  background: #2a2d36;
+  border-top: 1px solid rgba(113, 115, 122, 0.3);
 }
 
 .pp-compare__back {
   width: 100%;
+  min-height: 48px;
 }
 
 .pp-compare__close:focus-visible,
@@ -1165,4 +1314,10 @@ main:has(> .pp-detail) {
 .pp-compare__replace:focus-visible {
   outline: 2px solid #f89537;
   outline-offset: 2px;
+}
+
+/* Chips keep their own height when the other dish's side of the row is taller. */
+.pp-compare__cell .pp-chip-group {
+  flex: none;
+  align-items: flex-start;
 }

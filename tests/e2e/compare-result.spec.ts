@@ -59,22 +59,31 @@ test('confirming a pick shows both dishes side by side and fires dish_compared s
   await compare(page, 'Avocado Toast', 'Harvest Power Bowl');
 
   await expect(sideNames(page)).toHaveText(['Avocado Toast', 'Harvest Power Bowl']);
-  const first = page.locator('.pp-compare__dish--first');
-  const other = page.locator('.pp-compare__dish--other');
+  // Every header, section and action cell carries data-side, so a side is all of its cells.
+  const first = page.locator('[data-side="first"]');
+  const other = page.locator('[data-side="other"]');
   await expect(first.locator('.pp-compare__price')).toHaveText('$14.00');
   await expect(other.locator('.pp-compare__price')).toHaveText('$18.00');
   await expect(first.locator('.pp-compare__description')).toContainText('Smashed avocado');
   await expect(other.locator('.pp-compare__ingredient-names')).toHaveText(
     'Quinoa, Grilled chicken, Sweet potato, Avocado, Kale',
   );
-  await expect(page.locator('.pp-compare__divider')).toBeVisible();
+  // One divider in the header, each section and the action row.
+  await expect(page.locator('.pp-compare__divider').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'View details of Avocado Toast' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Replace Harvest Power Bowl' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to Menu' })).toBeVisible();
 
-  // Harvest Power Bowl lists no allergens, so its Contains group shows nothing.
-  await expect(first.getByText('Contains')).toBeVisible();
-  await expect(other.getByText('Contains')).toHaveCount(0);
+  // Bordered sections with their headings; Harvest Power Bowl lists no allergens, so its side of
+  // Contains shows nothing.
+  for (const heading of ['Description', 'Key ingredients', 'Contains', 'Dietary info']) {
+    await expect(page.getByRole('heading', { level: 3, name: heading })).toBeVisible();
+  }
+  await expect(first.locator('.pp-compare__contains .pp-chip')).toHaveCount(2);
+  await expect(other.locator('.pp-compare__contains .pp-chip')).toHaveCount(0);
+  // Figma buttons: outlined "View details →" and a text-style Replace.
+  await expect(first.locator('.pp-compare__view')).toHaveClass(/pp-btn--outlined/);
+  await expect(first.locator('.pp-compare__replace')).not.toHaveClass(/pp-btn/);
   await expect(other.getByText('Gluten-free')).toBeVisible();
   await expect(
     page.getByText('For allergy questions, please ask the restaurant staff.'),
@@ -86,12 +95,20 @@ test('confirming a pick shows both dishes side by side and fires dish_compared s
     compare_action: 'start',
     dish_id: 'a1000000-0000-4000-8000-000000000001',
     other_dish_id: 'a1000000-0000-4000-8000-000000000002',
-    save_available: false,
+    // Save is wired now (#122), and storage works in this browser.
+    save_available: true,
   });
   expect(start?.payload.comparison_id).toMatch(/^[0-9a-f-]{36}$/);
   expect(start?.payload.dish_revision_id).not.toBe(start?.payload.other_dish_revision_id);
-  // Opening and using the picker fired nothing before the result was shown.
-  expect(events.map((e) => e.type)).toEqual(['dish_compared']);
+  // Opening and using the picker fired nothing before the result was shown. The menu and detail
+  // events before it are DIN-01's own (menu_viewed, dish_viewed, the opening and its checkpoint).
+  const din01 = new Set([
+    'menu_viewed',
+    'dish_viewed',
+    'dish_detail_opened',
+    'dish_activity_checkpoint',
+  ]);
+  expect(events.map((e) => e.type).filter((type) => !din01.has(type))).toEqual(['dish_compared']);
 
   await page.screenshot({ path: 'test-results/compare-result-fixture.png', fullPage: true });
   await expectNoAxeViolations(page);
@@ -178,8 +195,12 @@ test('View details opens the dish detail from compare_view and Back returns to t
   await expect(page.locator('.pp-detail__compare')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Replace/ })).toHaveCount(0);
 
-  await expect.poll(() => events.filter((e) => e.type === 'dish_detail_opened').length).toBe(1);
-  expect(events.find((e) => e.type === 'dish_detail_opened')?.payload).toMatchObject({
+  // The first detail (opened from the menu card) has its own DIN-01 opening; only the
+  // compare_view one comes from Compare.
+  const fromCompare = () =>
+    events.filter((e) => e.type === 'dish_detail_opened' && e.payload.source === 'compare_view');
+  await expect.poll(() => fromCompare().length).toBe(1);
+  expect(fromCompare()[0]?.payload).toMatchObject({
     dish_id: 'a1000000-0000-4000-8000-000000000002',
     source: 'compare_view',
     nav_relation: 'from_compare',
@@ -211,12 +232,14 @@ test('allergen and dietary rows line up across the two dishes, with no horizonta
   await compare(page, 'Harvest Power Bowl', 'Garden Avocado Salad');
   const top = (side: 'first' | 'other', part: string) =>
     page
-      .locator(`.pp-compare__dish--${side} .pp-compare__${part}`)
+      .locator(
+        `[data-side="${side}"].pp-compare__${part}, [data-side="${side}"] .pp-compare__${part}`,
+      )
       .evaluate((el) => el.getBoundingClientRect().top);
-  for (const part of ['name', 'price', 'ingredients', 'contains', 'dietary', 'actions']) {
+  for (const part of ['name', 'price', 'ingredient-names', 'contains', 'dietary', 'actions']) {
     expect(await top('first', part)).toBeCloseTo(await top('other', part), 0);
   }
-  const salad = page.locator('.pp-compare__dish--other');
+  const salad = page.locator('[data-side="other"]');
   await expect(salad.getByText('Mustard')).toBeVisible();
   const chipTops = await salad
     .locator('.pp-compare__contains .pp-chip')
@@ -233,7 +256,7 @@ test('allergen and dietary rows line up across the two dishes, with no horizonta
 
 test('a Wheat dish never shows Gluten-free on the result', async ({ page }) => {
   await compare(page, 'Berry Pancake Stack', 'Avocado Toast', 'edge-cases');
-  const pancakes = page.locator('.pp-compare__dish--first');
+  const pancakes = page.locator('[data-side="first"]');
   await expect(pancakes.getByText('Wheat')).toBeVisible();
   await expect(pancakes.getByText('Gluten-free')).toHaveCount(0);
 });

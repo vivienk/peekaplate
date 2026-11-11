@@ -1,9 +1,9 @@
-// Compare result screen (S3-DIN-02.4, Figma "Compare result allergens"). Two dishes side by side,
-// each with name, price, description, key ingredient names and the same "Contains" and
-// "Dietary info" chips as dish detail, a divider between them, "View details" and "Replace" per
-// dish, and "Back to Menu". The two dishes share one grid (subgrid rows), so each row lines up
-// across them while every dish stays one readable group in DOM order. The screen itself sends
-// nothing: the caller fires dish_compared when a valid comparison is displayed.
+// Compare result screen (S3-DIN-02.4, Figma "Compare result allergens"). A header with both
+// dishes (photo, name, price), then bordered sections (Description, Key ingredients, Contains,
+// Dietary info) that each show the two dishes side by side with a divider, so every row lines up.
+// Chips use the dish-detail rules. Each dish has "View details" and a text-style "Replace", and
+// "Back to Menu" leaves Compare. The screen itself sends nothing: the caller fires dish_compared
+// when a valid comparison is displayed.
 import { completeDishes } from '../menu/adapter';
 import { allergenChips, dietaryChips } from '../menu/dishDetail';
 import { formatPrice } from '../menu/price';
@@ -59,42 +59,54 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function sideMarkup(view: CompareSideView): string {
+function headerCell(view: CompareSideView): string {
   const { dish, side } = view;
-  const name = escapeHtml(dish.name);
   const image = dish.images?.card;
   const imageMarkup = image
     ? `<img class="pp-compare__image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt)}" width="${image.width}" height="${image.height}" />`
     : `<span class="pp-compare__image pp-card__image--missing" aria-hidden="true"></span>`;
   return `
-    <article class="pp-compare__dish pp-compare__dish--${side}" data-side="${side}" data-dish-id="${escapeHtml(dish.dishId)}" aria-labelledby="pp-compare-name-${side}">
+    <div class="pp-compare__cell pp-compare__dish" data-side="${side}" data-dish-id="${escapeHtml(dish.dishId)}">
       <div class="pp-compare__media">${imageMarkup}</div>
-      <h2 class="pp-compare__name" id="pp-compare-name-${side}">${name}</h2>
+      <h2 class="pp-compare__name" id="pp-compare-name-${side}">${escapeHtml(dish.name)}</h2>
       <p class="pp-compare__price">${escapeHtml(formatPrice(dish.price))}</p>
-      <p class="pp-compare__description">${escapeHtml(dish.description)}</p>
-      <div class="pp-compare__ingredients">
-        <p class="pp-compare__label">Key ingredients</p>
-        <p class="pp-compare__ingredient-names">${view.ingredientNames.map(escapeHtml).join(', ')}</p>
-      </div>
-      <div class="pp-compare__group pp-compare__contains">
-        ${
-          view.hasAllergens
-            ? `<p class="pp-compare__label">Contains</p><div class="pp-chip-group">${allergenChips(dish)}</div>`
-            : ''
-        }
-      </div>
-      <div class="pp-compare__group pp-compare__dietary">
-        ${
-          view.hasDietary
-            ? `<p class="pp-compare__label">Dietary info</p><div class="pp-chip-group">${dietaryChips(dish)}</div>`
-            : ''
-        }
-      </div>
-      <div class="pp-compare__actions">
-        <button class="pp-btn pp-btn--outlined pp-compare__view" type="button" aria-label="View details of ${name}">View details</button>
-        <button class="pp-btn pp-btn--outlined pp-compare__replace" type="button" aria-label="Replace ${name}">Replace</button>
-      </div>
-    </article>
+    </div>
+  `;
+}
+
+// One bordered section (Figma comparison grouping): a heading, then both dishes side by side with
+// the divider between them. Each cell starts with the dish name for screen readers, so reading the
+// section in order never leaves it unclear which dish a value belongs to.
+function sectionMarkup(
+  key: string,
+  title: string,
+  views: readonly CompareSideView[],
+  cell: (view: CompareSideView) => string,
+): string {
+  const cells = views
+    .map(
+      (view) => `
+        <div class="pp-compare__cell" data-side="${view.side}">
+          <span class="pp-sr-only">${escapeHtml(view.dish.name)}: </span>${cell(view)}
+        </div>
+      `,
+    )
+    .join('<div class="pp-compare__divider" aria-hidden="true"></div>');
+  return `
+    <section class="pp-compare__section pp-compare__section--${key}" aria-labelledby="pp-compare-${key}">
+      <h3 class="pp-compare__label" id="pp-compare-${key}">${title}</h3>
+      <div class="pp-compare__pair">${cells}</div>
+    </section>
+  `;
+}
+
+function actionsCell(view: CompareSideView): string {
+  const name = escapeHtml(view.dish.name);
+  return `
+    <div class="pp-compare__cell pp-compare__actions" data-side="${view.side}">
+      <button class="pp-btn pp-btn--outlined pp-compare__view" type="button" aria-label="View details of ${name}">View details <span aria-hidden="true">→</span></button>
+      <button class="pp-compare__replace" type="button" aria-label="Replace ${name}">Replace</button>
+    </div>
   `;
 }
 
@@ -117,17 +129,43 @@ export function renderCompareResult(
       </header>
       ${menu.notice ? `<p class="pp-notice">${escapeHtml(menu.notice)}</p>` : ''}
 
-      <div class="pp-compare__grid">
-        ${sideMarkup(view[0])}
+      <div class="pp-compare__pair pp-compare__header">
+        ${headerCell(view[0])}
         <div class="pp-compare__divider" aria-hidden="true"></div>
-        ${sideMarkup(view[1])}
+        ${headerCell(view[1])}
+      </div>
+
+      ${sectionMarkup('description', 'Description', view, (v) => `<p class="pp-compare__description">${escapeHtml(v.dish.description)}</p>`)}
+      ${sectionMarkup('ingredients', 'Key ingredients', view, (v) => `<p class="pp-compare__ingredient-names">${v.ingredientNames.map(escapeHtml).join(', ')}</p>`)}
+      ${
+        view.some((v) => v.hasAllergens)
+          ? sectionMarkup('contains', 'Contains', view, (v) =>
+              v.hasAllergens
+                ? `<div class="pp-chip-group pp-compare__contains">${allergenChips(v.dish)}</div>`
+                : '<div class="pp-compare__contains"></div>',
+            )
+          : ''
+      }
+      ${
+        view.some((v) => v.hasDietary)
+          ? sectionMarkup('dietary', 'Dietary info', view, (v) =>
+              v.hasDietary
+                ? `<div class="pp-chip-group pp-compare__dietary">${dietaryChips(v.dish)}</div>`
+                : '<div class="pp-compare__dietary"></div>',
+            )
+          : ''
+      }
+
+      <div class="pp-compare__pair pp-compare__action-row">
+        ${actionsCell(view[0])}
+        <div class="pp-compare__divider" aria-hidden="true"></div>
+        ${actionsCell(view[1])}
       </div>
       <p class="pp-allergy-note pp-compare__staff">${COMPARE_STAFF_LINE}</p>
 
-      <div class="pp-picker__footer pp-compare__footer">
+      <div class="pp-compare__footer">
         <button class="pp-btn pp-btn--primary pp-compare__back" type="button">Back to Menu</button>
-        <p class="pp-notice">Save is not available yet.</p>
-      </div>
+              </div>
     </div>
   `;
 
@@ -144,20 +182,20 @@ export function renderCompareResult(
     }
   });
   for (const sideView of view) {
-    const article = container.querySelector<HTMLElement>(
-      `.pp-compare__dish[data-side="${sideView.side}"]`,
+    const actions = container.querySelector<HTMLElement>(
+      `.pp-compare__actions[data-side="${sideView.side}"]`,
     );
-    article
+    actions
       ?.querySelector<HTMLButtonElement>('.pp-compare__view')
       ?.addEventListener('click', () => onViewDetails(sideView.dish, sideView.side));
-    article
+    actions
       ?.querySelector<HTMLButtonElement>('.pp-compare__replace')
       ?.addEventListener('click', () => onReplace(sideView.side));
   }
 
   const target = focus
     ? container.querySelector<HTMLElement>(
-        `.pp-compare__dish[data-side="${focus.side}"] .pp-compare__${focus.control}`,
+        `.pp-compare__actions[data-side="${focus.side}"] .pp-compare__${focus.control}`,
       )
     : container.querySelector<HTMLElement>('.pp-compare .pp-detail__title');
   target?.focus();

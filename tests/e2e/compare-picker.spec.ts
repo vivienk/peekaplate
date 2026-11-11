@@ -45,7 +45,7 @@ test('Compare on a dish detail opens the picker with that dish as Keeping', asyn
     'Salmon Poke Bowl',
     'Garden Avocado Salad',
   ]);
-  await expect(page.locator('.pp-picker__option .pp-card__save').first()).toBeDisabled();
+  await expect(page.locator('.pp-picker__option .pp-picker__option-heart').first()).toBeDisabled();
   await expectNoAxeViolations(page);
 });
 
@@ -56,10 +56,10 @@ test('one dish is selected at a time, with the orange border and check', async (
 
   await bowl.click();
   await expect(bowl).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.pp-card--selected .pp-card__name-text')).toHaveText(
+  await expect(page.locator('.pp-picker__option--selected .pp-card__name-text')).toHaveText(
     'Harvest Power Bowl',
   );
-  await expect(page.locator('.pp-card--selected .pp-picker__check')).toBeVisible();
+  await expect(page.locator('.pp-picker__option--selected .pp-picker__check')).toBeVisible();
 
   // Tapping the card body selects too, and replaces the previous choice.
   await page.locator('.pp-picker__option', { hasText: 'Garden Avocado Salad' }).click({
@@ -67,7 +67,7 @@ test('one dish is selected at a time, with the orange border and check', async (
   });
   await expect(salad).toHaveAttribute('aria-pressed', 'true');
   await expect(bowl).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('.pp-card--selected')).toHaveCount(1);
+  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(1);
 
   // Compare is enabled once a dish is selected (the result is covered in compare-result.spec.ts).
   await expect(page.locator('.pp-picker__confirm')).toBeEnabled();
@@ -168,13 +168,19 @@ test('the picker sends no request, fires no tracking call and never logs the que
   await page.getByRole('button', { name: 'Open Avocado Toast' }).first().click();
   await page.getByRole('button', { name: 'Compare' }).click();
   const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  // Only the picker phase counts: the detail's own opening and its final checkpoint on leaving
+  // are DIN-01 events, so the log is read from here until just before the picker closes.
+  await page.waitForTimeout(200);
+  const pickerStart = logs.length;
   for (const query of ['benedict', 'pizza', 'gluten']) await input.fill(query);
   await input.fill('');
   await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  await page.waitForTimeout(200);
+  const pickerLogs = logs.slice(pickerStart);
   await page.getByRole('button', { name: 'Close compare' }).click();
 
   expect(requests).toEqual([]);
-  expect(logs.filter((text) => text.includes('[track]'))).toEqual([]);
+  expect(pickerLogs.filter((text) => text.includes('[track]'))).toEqual([]);
   for (const query of ['benedict', 'pizza']) {
     expect(logs.some((text) => text.toLowerCase().includes(query))).toBe(false);
   }

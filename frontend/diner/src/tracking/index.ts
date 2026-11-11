@@ -97,6 +97,7 @@ const consoleDeliver: Deliver = async (batch) => {
 const holdDeliver: Deliver = async () => [];
 
 let mode: 'fixture' | 'live' = 'fixture';
+let liveSuspended = false;
 let liveDeliver: Deliver = holdDeliver;
 let identity: Identity | null = null;
 const pipelines: Partial<Record<'fixture' | 'live', Pipeline>> = {};
@@ -104,7 +105,7 @@ let clearing: Promise<void> = Promise.resolve();
 
 // For the PostHog adapter's isLive check: fixture mode never reaches PostHog.
 export function isLiveTracking(): boolean {
-  return mode === 'live';
+  return mode === 'live' && !liveSuspended;
 }
 
 // Withdrawal (consent withdrawn or a privacy signal) stops pending canonical sends: the live sender
@@ -113,22 +114,25 @@ export function isLiveTracking(): boolean {
 // storage failure cannot guarantee erasure (docs/posthog.md). Decided by Sai (5 Nov), matching the
 // PostHog adapter, which drops its own queued events.
 const WITHDRAWAL_CLEARS_QUEUE = true;
+function clearLivePipeline() {
+  markWithdrawal();
+  const old = pipelines.live;
+  delete pipelines.live;
+  const retired = old?.clear();
+  void retired?.catch(() => {});
+  clearing = clearing
+    .then(async () => {
+      await retired?.catch(() => {});
+      await clearPendingWithdrawal();
+    })
+    .catch(() => {});
+}
 onTrackingAllowedChange((allowed) => {
-  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) {
-    markWithdrawal();
-    const old = pipelines.live;
-    delete pipelines.live;
-    const retired = old?.clear();
-    void retired?.catch(() => {});
-    clearing = clearing
-      .then(async () => {
-        await retired?.catch(() => {});
-        await clearPendingWithdrawal();
-      })
-      .catch(() => {});
-  } else if (allowed) resumeLiveDelivery();
+  if (!allowed && WITHDRAWAL_CLEARS_QUEUE) clearLivePipeline();
+  else if (allowed) resumeLiveDelivery();
 });
-const consentedDeliver: Deliver = async (batch) => (isTrackingAllowed() ? liveDeliver(batch) : []);
+const consentedDeliver: Deliver = async (batch) =>
+  isLiveTracking() && isTrackingAllowed() ? liveDeliver(batch) : [];
 
 // The PostHog side of the shared dispatch. Jeffin's adapter (packages/analytics,
 // createPostHogAdapter) returns exactly this shape. It gets only the event type, the validated
@@ -152,7 +156,7 @@ export function connectPostHog(sink: PostHogSink): () => void {
   postHog = sink;
   const sync = (allowed: boolean) => {
     try {
-      sink.setConsent(allowed);
+      sink.setConsent(allowed && !liveSuspended);
     } catch {}
   };
   sync(isTrackingAllowed());
@@ -201,8 +205,22 @@ function captureToPostHog(envelope: Envelope) {
 // sender. Fixture builds never call it, so they never send.
 export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
   mode = 'live';
+  liveSuspended = false;
   liveDeliver = deliver;
+  try {
+    postHog?.setConsent(isTrackingAllowed());
+  } catch {}
   resumeLiveDelivery();
+}
+
+// Publication withdrawal stops new work at both destinations without changing the user's choice.
+export function suspendLiveTracking(): Promise<void> {
+  liveSuspended = true;
+  try {
+    postHog?.setConsent(false);
+  } catch {}
+  if (mode === 'live') clearLivePipeline();
+  return clearing;
 }
 
 // Opens the durable outbox once live tracking is on and allowed, so events kept from an earlier
@@ -210,7 +228,7 @@ export function enableLiveTracking(deliver: Deliver = holdDeliver): void {
 // Everything stored was collected with consent: withdrawal empties the outbox.
 function resumeLiveDelivery(): void {
   try {
-    if (mode === 'live' && isTrackingAllowed()) pipeline();
+    if (isLiveTracking() && isTrackingAllowed()) pipeline();
   } catch {}
 }
 
@@ -250,7 +268,7 @@ function pipeline(): Pipeline {
 export function track(eventName: string, payload: TrackPayload): void {
   try {
     // Live events need consent before anything happens, so a declined event uses no sequence number.
-    if (mode === 'live' && !isTrackingAllowed()) return;
+    if (mode === 'live' && (liveSuspended || !isTrackingAllowed())) return;
     const now = () => Date.now();
     const uuid = () => crypto.randomUUID();
     identity ??= createIdentity({

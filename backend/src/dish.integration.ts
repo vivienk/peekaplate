@@ -12,6 +12,7 @@ import {
   OwnerDishReportSchema,
   PublicMenuResponseSchema,
   ReviewCandidateItemResponseSchema,
+  verifyPublicMenuContentBytes,
 } from '@peekaplate/contracts';
 import { chromium } from '@playwright/test';
 import { createRemoteJWKSet, exportJWK, generateKeyPair, type JWK, jwtVerify, SignJWT } from 'jose';
@@ -19,6 +20,9 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createStaffVerifier } from './auth';
+import { produceMenuBundle } from './bundle-producer/produce';
+import { admitMenuBundleHandoff, loadApprovedDishSources } from './bundle-producer/repository';
+import { MenuBundleRequestSchema, T0AssetManifestSchema } from './bundle-producer/request';
 import { createDishRevision, replayDish } from './dish-command';
 import { type Bindings, createApp, SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './index';
 import { replayPublication, replayReview } from './publication-command';
@@ -1449,6 +1453,141 @@ describe('real PostgreSQL menu publication commands', () => {
       await browser?.close();
       await new Promise<void>((resolve) => browserServer.close(() => resolve()));
     }
+
+    const withdrawal = await requestPublication(menuId, 'withdrawals', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+    });
+    expect(withdrawal.status).toBe(200);
+    expect((await requestPublicMenu(menuId)).status).toBe(404);
+  });
+
+  it('publishes a producer-built bundle: admit, approve, publish, public read, withdraw', async () => {
+    const menuId = crypto.randomUUID();
+    const dishId = crypto.randomUUID();
+    const revisionId = crypto.randomUUID();
+    const jobId = crypto.randomUUID();
+    const assetId = `t0_${'a'.repeat(32)}`;
+    await admin.query(
+      `INSERT INTO app_private.dish_current (tenant_id, dish_id, version, revision_id, name, description)
+       VALUES ($1, $2, 1, $3, 'Producer dish', 'Approved producer description.')`,
+      [venue, dishId, revisionId],
+    );
+    await admin.query(
+      `INSERT INTO app_private.menu_ingestion_jobs (id, tenant_id, source_type, idempotency_key)
+       VALUES ($1, $2, 'text', $3)`,
+      [jobId, venue, `producer-${jobId}`],
+    );
+    await admin.query(
+      `INSERT INTO app_private.dish_drafts
+         (id, tenant_id, job_id, draft_id, draft_index, name, price_amount, price_currency,
+          ingredients, source_id, source_text, evidence, review_status, reviewed_by, reviewed_at,
+          published_dish_id)
+       VALUES ($1, $2, $3, 'draft-1', 0, 'Producer dish', 18, 'USD', '["Tomato", "Basil"]'::jsonb,
+               'source-1', 'Producer dish 18', '{}'::jsonb, 'accepted', $4, now(), $5)`,
+      [crypto.randomUUID(), venue, jobId, actor, dishId],
+    );
+    const manifest = T0AssetManifestSchema.parse({
+      schema_version: 1,
+      asset_id: assetId,
+      tier: 'T0',
+      source: {
+        sha256: 'b'.repeat(64),
+        capture_evidence: 'Synthetic fixture; not a real restaurant capture.',
+      },
+      dish: { dish_id: dishId, revision_id: revisionId },
+      variants: [
+        ['card-480', 'webp', 480, 360],
+        ['card-480', 'jpeg', 480, 360],
+        ['detail-1280', 'webp', 1280, 960],
+        ['detail-1280', 'jpeg', 1280, 960],
+      ].map(([name, format, width, height], index) => ({
+        name,
+        format,
+        path: `${name}.${format === 'webp' ? 'webp' : 'jpg'}`,
+        sha256: String(index).repeat(64),
+        size_bytes: 1000,
+        width,
+        height,
+      })),
+    });
+    const bundleRequest = MenuBundleRequestSchema.parse({
+      schema_version: 1,
+      venue_id: venue,
+      menu_id: menuId,
+      restaurant: { name: 'Synthetic venue', logo: null },
+      bundle_base_url: 'https://bundles.example.test/menus',
+      asset_base_url: 'https://assets.example.test/t0',
+      categories: [
+        {
+          category_id: crypto.randomUUID(),
+          name: 'Mains',
+          dishes: [
+            {
+              dish_id: dishId,
+              allergens: null,
+              dietary: ['vegetarian'],
+              image_alt: 'Tomato and basil dish',
+              t0_asset_id: assetId,
+            },
+          ],
+        },
+      ],
+    });
+    const produced = await produceMenuBundle(
+      bundleRequest,
+      await loadApprovedDishSources(admin, venue, [dishId]),
+      new Map([[assetId, { manifest }]]),
+    );
+    expect(produced.diagnostics).toEqual([]);
+    expect(produced.bundle.categories[0]?.dishes[0]?.complete).toBe(true);
+    expect(
+      await admitMenuBundleHandoff(admin, {
+        tenantId: venue,
+        menuId,
+        menuRevisionId: produced.menuRevisionId,
+        contentApprovalId: produced.contentApprovalId,
+        contentHash: produced.contentHash,
+        assetApprovalId: produced.assetApprovalId,
+        assetManifestHash: produced.assetManifestHash,
+        bundleUrl: produced.bundleUrl,
+      }),
+    ).toBe('inserted');
+
+    const approval = MenuApprovalSchema.parse(
+      await (
+        await requestPublication(menuId, 'approvals', {
+          commandId: crypto.randomUUID(),
+          expectedVersion: 0,
+          menuRevisionId: produced.menuRevisionId,
+          contentApprovalId: produced.contentApprovalId,
+          assetApprovalId: produced.assetApprovalId,
+        })
+      ).json(),
+    );
+    const publish = await requestPublication(menuId, 'publications', {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    });
+    expect(publish.status).toBe(200);
+
+    const response = await requestPublicMenu(menuId);
+    expect(response.status).toBe(200);
+    const body = PublicMenuResponseSchema.parse(await response.json());
+    expect(body.menuRevisionId).toBe(produced.menuRevisionId);
+    expect(body.bundle).toEqual({
+      url: produced.bundleUrl,
+      contentHash: produced.contentHash,
+      assetManifestHash: produced.assetManifestHash,
+    });
+    await expect(
+      verifyPublicMenuContentBytes(produced.bytes, body.bundle.contentHash),
+    ).resolves.toMatchObject({
+      venue_id: venue,
+      menu_id: menuId,
+      menu_revision_id: body.menuRevisionId,
+    });
 
     const withdrawal = await requestPublication(menuId, 'withdrawals', {
       commandId: crypto.randomUUID(),
