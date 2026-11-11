@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-// The synthetic foundations demo is built only for PR previews (deploy-preview.yml sets
+// The synthetic foundations and owner sign-in demos are built only for PR previews (deploy-preview.yml sets
 // PEEKAPLATE_PREVIEW_DEMOS), so reviewers can open it from the preview link. Staging and
 // production builds never set it and contain only the console. Not a VITE_ variable, so it never
 // reaches client code.
@@ -15,7 +15,11 @@ export default defineConfig({
   ...(includeDemos && {
     build: {
       rollupOptions: {
-        input: { main: page('index.html'), foundations: page('foundations.html') },
+        input: {
+          main: page('index.html'),
+          foundations: page('foundations.html'),
+          ownerSignIn: page('owner-sign-in.html'),
+        },
       },
     },
   }),

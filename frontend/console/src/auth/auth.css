@@ -1,0 +1,315 @@
+/*
+ * Owner sign-in screens (S4-FE-04.1): E1 Enter email, S01 Create account, S02 Sign in. Values are
+ * design tokens on the light theme. Two Figma values have no token yet and are kept as
+ * --pp-auth-pending-* until they do: the 32/40 title and the 48px primary button height.
+ */
+.pp-auth {
+  --pp-auth-pending-title-size: 2rem;
+  --pp-auth-pending-title-line: 2.5rem;
+  --pp-auth-pending-button-height: 3rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--pp-space-48) var(--pp-space-16);
+  background: var(--pp-role-surface);
+  color: var(--pp-role-on-surface);
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-auth *,
+.pp-auth *::before,
+.pp-auth *::after {
+  box-sizing: border-box;
+}
+
+.pp-auth__card {
+  width: 100%;
+  max-width: 38rem;
+  padding: var(--pp-space-48);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-role-surface-container);
+  box-shadow: var(--pp-shadow-small);
+}
+
+/* The logo and wordmark. A logotype has no contrast requirement (WCAG 1.4.3). */
+.pp-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+  margin: 0 0 var(--pp-space-40);
+  color: var(--pp-color-orange-500);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth__header {
+  margin-bottom: var(--pp-space-32);
+}
+
+.pp-auth__title {
+  margin: 0 0 var(--pp-space-12);
+  font-size: var(--pp-auth-pending-title-size);
+  line-height: var(--pp-auth-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.pp-auth__title:focus {
+  outline: none;
+}
+
+.pp-auth__title:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 4px;
+  border-radius: var(--pp-radius-4);
+}
+
+.pp-auth__lead {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth__form {
+  display: grid;
+  gap: var(--pp-space-24);
+}
+
+/* Password field with "Forgot password?" under it on the right. */
+.pp-auth__password {
+  display: grid;
+  gap: var(--pp-space-8);
+}
+
+.pp-auth__forgot {
+  justify-self: end;
+}
+
+/* Input with a control inside it (show/hide, Change). */
+.pp-auth-field__box {
+  position: relative;
+}
+
+.pp-auth .pp-auth-field__input {
+  padding-inline-end: var(--pp-space-48);
+}
+
+.pp-auth-field__toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--pp-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: 0;
+  border-radius: var(--pp-radius-8);
+  background: transparent;
+  color: var(--pp-role-on-surface);
+  cursor: pointer;
+}
+
+.pp-auth-field__toggle:focus-visible,
+.pp-auth-link:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The email from the first screen, shown read-only (Figma: grey box with "Change"). */
+.pp-auth .pp-auth-field__locked {
+  --pp-input-edge: var(--pp-role-input-border-disabled);
+  padding-inline-end: 6rem;
+  background-color: var(--pp-role-input-bg-disabled);
+  color: var(--pp-role-on-surface);
+}
+
+.pp-auth-field__change {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--pp-space-4);
+  padding-inline: var(--pp-space-12);
+}
+
+/* Text links are buttons: they change the screen, never the page address. */
+.pp-auth-link {
+  min-height: 2.75rem;
+  padding: 0 var(--pp-space-4);
+  border: 0;
+  border-radius: var(--pp-radius-4);
+  background: transparent;
+  color: var(--pp-role-on-surface);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+  font-weight: var(--pp-font-weight-medium);
+  cursor: pointer;
+}
+
+.pp-auth-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.pp-auth-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Text link Tone=Accent. Orange/800 keeps 4.5:1 on the light surfaces. */
+.pp-auth-link--accent {
+  color: var(--pp-color-orange-800);
+}
+
+.pp-auth-link--strong {
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth-terms__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-12);
+}
+
+.pp-auth-terms__box {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: var(--pp-space-2) 0 0;
+  accent-color: var(--pp-color-orange-800);
+  cursor: pointer;
+}
+
+.pp-auth-terms__box:focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
+
+.pp-auth-terms__box[aria-invalid="true"] {
+  outline: 1.5px solid var(--pp-role-input-border-error);
+  outline-offset: 1px;
+}
+
+.pp-auth-terms__label {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth-terms__error {
+  padding-inline-start: var(--pp-space-32);
+}
+
+/* Primary button: full width, pill, 48px, with a spinner while a request runs. */
+.pp-auth .pp-auth__submit {
+  width: 100%;
+  min-height: var(--pp-auth-pending-button-height);
+  margin-top: var(--pp-space-8);
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-paragraph-1);
+}
+
+/* While a request runs the button keeps its default colour (Figma loading variant), even under the
+ * pointer. */
+.pp-auth .pp-auth__submit[aria-busy="true"] {
+  background-color: var(--pp-role-button-action-bg);
+  cursor: progress;
+}
+
+.pp-auth .pp-auth__submit[aria-busy="true"]:active {
+  transform: none;
+}
+
+.pp-auth__spinner {
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--pp-radius-full);
+  animation: pp-auth-spin 0.8s linear infinite;
+}
+
+@keyframes pp-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-auth__spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.pp-auth__footer {
+  margin: var(--pp-space-16) 0 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+  text-align: center;
+}
+
+/* Error Message component: Error/700 text on Error/100. */
+.pp-auth-banner {
+  display: flex;
+  gap: var(--pp-space-12);
+  margin-bottom: var(--pp-space-24);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-12);
+  background: var(--pp-color-error-100);
+  color: var(--pp-color-error-700);
+}
+
+.pp-auth-banner__icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.pp-auth-banner__text {
+  display: grid;
+  gap: var(--pp-space-2);
+}
+
+.pp-auth-banner__title,
+.pp-auth-banner__body {
+  margin: 0;
+}
+
+.pp-auth-banner__title {
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth-banner__body {
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+}
+
+.pp-auth-banner__action {
+  justify-self: start;
+  min-height: 2.75rem;
+  padding-inline: 0;
+  color: var(--pp-color-error-800);
+  font-weight: var(--pp-font-weight-semibold);
+  text-decoration: underline;
+}
+
+/* Phones: the card fills the width with the page's 16px gutter. */
+@media (max-width: 40rem) {
+  .pp-auth {
+    align-items: flex-start;
+    padding: var(--pp-space-24) var(--pp-space-16);
+  }
+
+  .pp-auth__card {
+    padding: var(--pp-space-24);
+  }
+
+  .pp-auth__brand {
+    margin-bottom: var(--pp-space-32);
+  }
+}

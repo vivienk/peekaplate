@@ -43,7 +43,10 @@ test('a normal console build contains no demo page', async (t) => {
   const files = await readdir(dir);
   assert.ok(files.includes('index.html'));
   assert.ok(!files.includes('foundations.html'));
-  for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /foundations/);
+  assert.ok(!files.includes('owner-sign-in.html'));
+  for (const asset of await readdir(join(dir, 'assets'))) {
+    assert.doesNotMatch(asset, /foundations|demo/);
+  }
 });
 
 test('a preview build adds the demo page, labelled synthetic, noindex and without analytics', async (t) => {
@@ -54,6 +57,17 @@ test('a preview build adds the demo page, labelled synthetic, noindex and withou
   const html = await readFile(join(dir, 'foundations.html'), 'utf8');
   assert.match(html, /<meta name="robots" content="noindex"/);
   const scripts = (await pageScripts(dir, 'foundations.html')).join('\n');
+  assert.match(scripts, /Synthetic demo/);
+  assert.doesNotMatch(scripts, /posthog/i);
+});
+
+// S4-FE-04.1: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
+test('a preview build adds the owner sign-in demo, labelled synthetic, noindex and without analytics', async (t) => {
+  const dir = await build(t, true);
+  assert.ok((await readdir(dir)).includes('owner-sign-in.html'));
+  const html = await readFile(join(dir, 'owner-sign-in.html'), 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex"/);
+  const scripts = (await pageScripts(dir, 'owner-sign-in.html')).join('\n');
   assert.match(scripts, /Synthetic demo/);
   assert.doesNotMatch(scripts, /posthog/i);
 });
