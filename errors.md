@@ -2602,3 +2602,7 @@ During the processing bridge checks, the script test invoking docs:check caught 
 link to the not-yet-written screenshot report. Added the report before rerunning.
 A concurrent browser run lost its preview status element while frontend files were
 being edited; rerun against stable source before treating this as product evidence.
+
+Visual inspection of the generated ready screenshot caught the adapter's light
+backdrop against the dark Figma preview. Match the existing preview surface color
+and assert the lossless backdrop pixel in the processor export regression test.

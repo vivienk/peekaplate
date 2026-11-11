@@ -31,7 +31,7 @@ def prepare_diner_demo(*, t0_manifest_path, mask_path, output_dir, capture_evide
             buffer = io.BytesIO()
             cutout.save(buffer, format='WEBP', quality=85, method=6)
             foreground = buffer.getvalue()
-        with Image.new('RGB', (width, height), '#fafafa') as background:
+        with Image.new('RGB', (width, height), '#2a2d36') as background:
             buffer = io.BytesIO()
             background.save(buffer, format='WEBP', lossless=True)
             backdrop = buffer.getvalue()

@@ -50,6 +50,8 @@ class DinerDemoTests(unittest.TestCase):
             self.assertEqual(layer['size_bytes'], path.stat().st_size)
             with Image.open(path) as image:
                 self.assertEqual(image.size, (portion['width'], portion['height']))
+        with Image.open(self.out/'background.webp') as image:
+            self.assertEqual(image.getpixel((0, 0)), (42, 45, 54))
         with Image.open(self.out/'dish.webp') as image:
             self.assertEqual(image.getpixel((0, 0))[3], 0)
             self.assertEqual(image.getpixel((320, 400))[3], 255)
