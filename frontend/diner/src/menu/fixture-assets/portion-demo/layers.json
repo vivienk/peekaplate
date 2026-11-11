@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://portion-demo.invalid/background.webp",
+    "sha256": "8b5c174c1855d1e2b694d79fad3f18e6b83403ff7d7f69f9ab0da11e795ffdf9",
+    "size_bytes": 66,
+    "depth": 0
+  },
+  {
+    "url": "https://portion-demo.invalid/dish.webp",
+    "sha256": "804e4249d6651a2b2568953e05f1a2eb3713b7b44000f39768122af0fdbaacad",
+    "size_bytes": 53094,
+    "depth": 0.7
+  }
+]

@@ -250,3 +250,24 @@ test('unavailable WebGL keeps the photo and reload retires a stale preview', asy
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
 });
+
+test('local captured-dish demo loads real textures and tilts without route mocks', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await expect(page.locator('.pp-logo__name')).toBeVisible();
+  await openPortion(page);
+  await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
+  const canvas = page.locator('canvas');
+  const before = hash(await canvas.screenshot());
+  const bounds = (await canvas.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width - 2, bounds.y + 2, { steps: 8 });
+  expect(hash(await canvas.screenshot())).not.toBe(before);
+  await page.screenshot({ path: 'test-results/captured-dish-demo.png' });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
+});

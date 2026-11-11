@@ -188,6 +188,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/diner-connection.md",
         "frontend/diner/src/menu/portionPreview.ts",
         "frontend/diner/src/menu/portionRenderer.ts",
+        "frontend/diner/src/menu/portionDemo.ts",
         "frontend/diner/src/menu/portion.test.ts",
         "tests/e2e/portion.spec.ts",
         "playwright.portion.config.ts",
@@ -200,7 +201,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "5f430fde98c71cfa5e6fa570b6ef3bf1ff6c3327f40b013f6beb8be0d3c0206e"
+      "sourceFingerprint": "fae9ceb3d0127b9a8719f6a757ea37928ade1eba3e3eebcd9952882e5ff5ae26"
     },
     {
       "id": "console",
@@ -649,7 +650,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "summary": "View Portion reuses the diner detail shell with Figma-aligned centered preview states, dish-name header and same-entry photo retry. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
+      "summary": "View Portion reuses the diner detail shell with Figma-aligned preview states and photo retry. DEV-only portion-demo supplies a captured-photo tilt fixture without publication activation. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
       "modules": [
         "diner",
         "contracts"

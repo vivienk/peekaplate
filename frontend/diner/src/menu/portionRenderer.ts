@@ -14,7 +14,11 @@ import {
 export type PortionRenderer = { update(x: number, y: number): void; dispose(): void };
 
 async function readLayer(layer: PublicPortion['layers'][number], signal: AbortSignal) {
-  const response = await fetch(layer.url, { signal, credentials: 'omit', redirect: 'error' });
+  const url =
+    import.meta.env.DEV && layer.url.startsWith('https://portion-demo.invalid/')
+      ? (await import('./portionDemo')).demoLayerUrl(layer.url)
+      : layer.url;
+  const response = await fetch(url, { signal, credentials: 'omit', redirect: 'error' });
   if (!response.ok || !response.body) throw new Error('Layer unavailable');
   const reader = response.body.getReader();
   const bytes = new Uint8Array(layer.size_bytes);

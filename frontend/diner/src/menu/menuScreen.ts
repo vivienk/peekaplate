@@ -17,6 +17,7 @@ import type { CompleteDish, Menu, MenuLoadResult } from './types';
 
 const SCENARIO_NAMES: ReadonlySet<FixtureScenario> = new Set<FixtureScenario>([
   'demo',
+  'portion-demo',
   'edge-cases',
   'withdrawal',
   'layout-20',

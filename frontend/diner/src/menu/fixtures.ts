@@ -271,6 +271,7 @@ export const layoutBundle = bundle(4, layoutCategories);
 export const emptyBundle = bundle(5, { breakfast: [], brunchBowls: [], salads: [] });
 
 export type FixtureScenario =
+  | 'portion-demo'
   | 'demo'
   | 'edge-cases'
   | 'withdrawal'
@@ -309,6 +310,47 @@ export function createFixtureMenuSource(
       const ready = (b: WireMenuBundle): MenuLoadResult =>
         toMenu(b, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
       switch (scenario) {
+        case 'portion-demo': {
+          if (!import.meta.env.DEV) return { status: 'unavailable' };
+          const { layers, photo } = await import('./portionDemo');
+          const bundle = structuredClone(demoBundle);
+          const category = bundle.categories[0]!;
+          const dish = category.dishes[0]!;
+          if (!dish.complete) throw new Error('Demo requires a complete fixture');
+          bundle.restaurant = { name: 'Local tilt demo', logo: null };
+          category.name = 'Captured photo demo';
+          category.dishes = [dish];
+          bundle.categories = [category];
+          dish.name = 'Captured dish · tilt demo';
+          dish.description =
+            'Local demonstration using a captured photo and supplied mask. Shallow tilt only, not reconstructed 3D or a portion measurement. Menu details and price are demo placeholders.';
+          dish.price = { amount: '0.00', currency: 'USD' };
+          dish.ingredients = [
+            {
+              ingredient_id: dish.ingredients[0]!.ingredient_id,
+              name: 'Ingredients not verified — demo only',
+              description: null,
+            },
+          ];
+          dish.allergens = [];
+          dish.dietary = [];
+          const image = {
+            url: photo,
+            width: 640,
+            height: 853,
+            alt: 'User-supplied captured dish photograph, local demo only',
+          };
+          dish.images = { card: image, detail: image };
+          dish.portion = {
+            schema_version: 1,
+            dish_id: dish.dish_id,
+            dish_revision_id: dish.dish_revision_id,
+            width: 640,
+            height: 853,
+            layers,
+          };
+          return ready(bundle);
+        }
         case 'demo':
           return ready(demoBundle);
         case 'edge-cases':

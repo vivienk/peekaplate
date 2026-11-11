@@ -2533,3 +2533,13 @@ Read-only review found the new retry skipped the card fallback and removed the
 missing placeholder on final failure. Restored the existing detail-to-card-to-
 placeholder sequence; the no-photo browser case now recovers only the card while
 the detail image remains unavailable. Targeted regression passes.
+
+### 2026-11-10 — local tilt demo test selector
+
+The new browser check matched both the accessible heading and visible restaurant
+name. Scoped the assertion to the visible logo name; application rendering was
+not the failure. Rerun verifies actual local texture loading and pointer tilt.
+
+The menu boundary test also caught the new demo module importing the wire shape.
+Moved fixture construction into fixtures.ts; the demo module now exports only
+assets and local URL resolution, preserving the existing adapter boundary.

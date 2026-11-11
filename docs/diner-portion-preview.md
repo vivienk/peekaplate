@@ -140,3 +140,23 @@ The correction preserves detail → card → missing-placeholder behavior, inclu
 late image failures after Back. PASS: targeted no-photo browser regression with
 only the card recovered; PASS final lint/typecheck/context/docs checks. The full
 12 preview cases passed immediately before this bounded retry correction.
+
+## Working local captured-dish demo
+
+Run the diner dev server and open `http://127.0.0.1:5173/?scenario=portion-demo`.
+Select **Captured dish · tilt demo**, then **View Portion**. Hold and drag on the
+photo, or focus it and use arrow keys. Reduced-motion preferences disable tilt.
+The photo and mask come from the prior user-supplied local review capture, with
+no generated food pixels. It is a shallow whole-card tilt, not reconstructed 3D.
+
+`portionDemo.ts` and its assets are imported only behind Vite DEV guards. Live
+menu selection remains unchanged. The public HTTPS contract, hash/size validation
+and asset budget remain enforced. A reserved `.invalid` fixture origin is mapped
+to local asset URLs only in development. Production builds omit the demo module
+and imagery; the demo scenario reports unavailable outside development.
+
+Demo verification: PASS 139 menu unit tests; PASS unmocked local captured-dish
+browser test (real texture loads, pointer drag changes canvas pixels, Back restores
+focus); PASS lint/typecheck/build/context/docs. Inspected the 390px screenshot.
+Production output inspection confirms no demo module, reserved URL mapping or
+photo assets. No deployment or publication performed.
