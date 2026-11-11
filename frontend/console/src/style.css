@@ -1,5 +1,10 @@
 @import "@peekaplate/tokens/tokens.css";
 @import "@peekaplate/ui/components.css";
+/* Inter, self-hosted, console only: the Latin files for the three weights Rania asked for
+   (400, 500, 600). Other weights and scripts fall back to the system font. */
+@import "@fontsource/inter/latin-400.css";
+@import "@fontsource/inter/latin-500.css";
+@import "@fontsource/inter/latin-600.css";
 
 :root {
   font-family: system-ui, sans-serif;

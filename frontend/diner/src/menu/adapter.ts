@@ -10,6 +10,8 @@ import {
 } from './types';
 import type { WireDish, WireImage, WireMenuBundle } from './wire';
 
+export type { WireDish, WireImage, WireMenuBundle } from './wire';
+
 export const FIXTURE_NOTICE = 'Fixture data';
 
 // Chip labels compare without case, hyphens or spaces, so "gluten free" equals "Gluten-free".
@@ -51,6 +53,7 @@ function toDish(dish: WireDish, categoryId: string, categoryName: string): Dish 
       categoryId,
     };
   }
+  // null and [] both mean "not confirmed"; the detail screen then shows the staff note under Contains.
   const labels = (dish.allergens ?? []).map(allergenLabel);
   const allergens = [...new Map(labels.map((a) => [chipKey(a), a])).values()];
   const glutenFreeExcluded = allergens.some((a) => EXCLUDES_GLUTEN_FREE.has(chipKey(a)));

@@ -1,0 +1,243 @@
+{
+  "schema_version": 2,
+  "pipeline_version": "3",
+  "status": "incomplete",
+  "source": {
+    "source_id": "src_doc_v2",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "kind": "pdf",
+    "location": "https://example.com/menu-v2.pdf",
+    "retrieved_at": "2026-10-27T12:00:00.000Z",
+    "size_bytes": 4096,
+    "snapshot_base64": "c29tZSBwZGYgZGF0YQ=="
+  },
+  "started_at": "2026-10-27T12:00:00.000Z",
+  "finished_at": "2026-10-27T12:00:06.000Z",
+  "extraction_mode": "ai",
+  "extraction_model": "gpt-4o",
+  "ocr_engine": 3,
+  "library_versions": {
+    "pymupdf": "1.24.0"
+  },
+  "configuration": {
+    "timings_seconds": {
+      "acquisition": 1.25,
+      "inference": 4.8
+    },
+    "llm_batches": [
+      {
+        "batch": 1,
+        "duration": 4.8,
+        "items": 5
+      }
+    ]
+  },
+  "segments": [
+    {
+      "segment_id": "seg_p1",
+      "page_number": 1,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "Tomato Soup 8.50 / 12.50 CAD\nGarden Salad 0.00 CAD\nChef Surprise",
+      "native_text": null,
+      "error": null,
+      "warnings": [],
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_p2",
+      "page_number": 2,
+      "method": "pdf_native",
+      "status": "ready",
+      "text": "24/7 FEAST PLATTER 1595 PHP\nSpecial Ribs extra tender",
+      "native_text": null,
+      "error": null,
+      "warnings": [],
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_p3",
+      "page_number": 3,
+      "method": "pdf_native",
+      "status": "skipped",
+      "text": "",
+      "native_text": null,
+      "error": null,
+      "warnings": ["Blank page skipped"],
+      "metadata": {}
+    },
+    {
+      "segment_id": "seg_p4",
+      "page_number": 4,
+      "method": "ocr_space_engine3",
+      "status": "failed",
+      "text": "",
+      "native_text": null,
+      "error": "OCR timeout on page 4",
+      "warnings": [],
+      "metadata": {}
+    }
+  ],
+  "drafts": [
+    {
+      "candidate_id": "cand:soup_v2",
+      "draft_id": "draft:soup_v2",
+      "draft_index": 0,
+      "name": "Tomato Soup",
+      "description": "Rich slow-cooked tomato soup",
+      "category": "Starters",
+      "subcategory": "Soups",
+      "category_page_number": 1,
+      "price_text": "8.50 / 12.50 CAD",
+      "price_amount": null,
+      "price_currency": "CAD",
+      "ingredients": ["tomatoes", "cream", "basil"],
+      "source_id": "src_doc_v2",
+      "source_text": "Tomato Soup 8.50 / 12.50 CAD",
+      "image_id": null,
+      "review_warnings": ["Grouped price options; human review required."],
+      "status": "needs_review"
+    },
+    {
+      "candidate_id": "cand:salad_v2",
+      "draft_id": "draft:salad_v2",
+      "draft_index": 1,
+      "name": "Garden Salad",
+      "description": "Crisp garden salad",
+      "category": "Starters",
+      "subcategory": "Salads",
+      "category_page_number": 1,
+      "price_text": "0.00 CAD",
+      "price_amount": "0.00",
+      "price_currency": "CAD",
+      "ingredients": ["lettuce", "cucumber"],
+      "source_id": "src_doc_v2",
+      "source_text": "Garden Salad 0.00 CAD",
+      "image_id": null,
+      "review_warnings": [],
+      "status": "needs_review"
+    },
+    {
+      "candidate_id": "cand:surprise_v2",
+      "draft_id": "draft:surprise_v2",
+      "draft_index": 2,
+      "name": "Chef Surprise",
+      "description": null,
+      "category": "Specials",
+      "subcategory": null,
+      "category_page_number": 1,
+      "price_text": null,
+      "price_amount": null,
+      "price_currency": null,
+      "ingredients": null,
+      "source_id": "src_doc_v2",
+      "source_text": "Chef Surprise",
+      "image_id": null,
+      "review_warnings": ["Missing price; check with server."],
+      "status": "needs_review"
+    },
+    {
+      "candidate_id": "cand:feast_v2",
+      "draft_id": "draft:feast_v2",
+      "draft_index": 3,
+      "name": "24/7 FEAST PLATTER",
+      "description": "Full combo platter",
+      "category": "Platters",
+      "subcategory": "Combos",
+      "category_page_number": 2,
+      "price_text": "1595",
+      "price_amount": "1595",
+      "price_currency": "PHP",
+      "ingredients": ["ribs", "chicken", "fries"],
+      "source_id": "src_doc_v2",
+      "source_text": "24/7 FEAST PLATTER 1595 PHP",
+      "image_id": null,
+      "review_warnings": [],
+      "status": "needs_review"
+    },
+    {
+      "candidate_id": "cand:ribs_v2",
+      "draft_id": "draft:ribs_v2",
+      "draft_index": 4,
+      "name": "Special Ribs",
+      "description": "Tender ribs",
+      "category": "Mains",
+      "subcategory": "Ribs",
+      "category_page_number": 2,
+      "price_text": null,
+      "price_amount": null,
+      "price_currency": null,
+      "ingredients": ["pork ribs"],
+      "source_id": "src_doc_v2",
+      "source_text": "Special Ribs extra tender",
+      "image_id": null,
+      "review_warnings": [],
+      "status": "needs_review"
+    }
+  ],
+  "evidence": [
+    {
+      "draft_id": "draft:soup_v2",
+      "draft_index": 0,
+      "spans": [
+        {
+          "segment_id": "seg_p1",
+          "start": 0,
+          "end": 28
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:salad_v2",
+      "draft_index": 1,
+      "spans": [
+        {
+          "segment_id": "seg_p1",
+          "start": 29,
+          "end": 50
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:surprise_v2",
+      "draft_index": 2,
+      "spans": [
+        {
+          "segment_id": "seg_p1",
+          "start": 51,
+          "end": 64
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:feast_v2",
+      "draft_index": 3,
+      "spans": [
+        {
+          "segment_id": "seg_p2",
+          "start": 0,
+          "end": 27
+        }
+      ]
+    },
+    {
+      "draft_id": "draft:ribs_v2",
+      "draft_index": 4,
+      "spans": [
+        {
+          "segment_id": "seg_p2",
+          "start": 28,
+          "end": 40
+        },
+        {
+          "segment_id": "seg_p2",
+          "start": 41,
+          "end": 53
+        }
+      ]
+    }
+  ],
+  "capture_requests": [],
+  "warnings": ["Reused saved page text; missing pages were not retried."],
+  "errors": ["Page 4: OCR timeout on page 4"]
+}

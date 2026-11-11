@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!!**/dist", "!!work", "!!pnpm-lock.yaml"] },
+  "files": {
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!work",
+      "!!pnpm-lock.yaml",
+      "!!packages/contracts/fixtures/public-menu-bundle.v1"
+    ]
+  },
   "formatter": { "enabled": true, "indentStyle": "space", "lineWidth": 100 },
   "linter": { "enabled": true, "rules": { "preset": "none" } },
   "javascript": { "formatter": { "quoteStyle": "single" } },
