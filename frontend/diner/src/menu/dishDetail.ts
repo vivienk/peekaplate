@@ -1,3 +1,4 @@
+import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { formatPrice } from './price';
 import type { CompleteDish } from './types';
 
@@ -68,11 +69,9 @@ export function renderDishDetail(
       <header class="pp-detail__topbar">
         <button class="pp-detail__back" type="button" aria-label="Back to menu">←</button>
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
-        <button class="pp-detail__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-          <span aria-hidden="true">♡</span>
-          <span>Save</span>
-        </button>
+        ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>
+      ${toastAreaMarkup()}
       ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
 
       <div class="pp-detail__image-wrap">
@@ -128,7 +127,7 @@ export function renderDishDetail(
           <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
           <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
         </div>
-        <p class="pp-notice">View Portion, Save and Compare are not available yet.</p>
+        <p class="pp-notice">View Portion and Compare are not available yet.</p>
       </section>
     </div>
   `;
@@ -136,4 +135,26 @@ export function renderDishDetail(
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
   backButton?.addEventListener('click', onBack);
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
+
+  const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');
+  if (detailImg) {
+    let triedCard = false;
+    const handleFailure = () => {
+      const cardFallback = dish.images?.card;
+      if (!triedCard && cardFallback && detailImg.getAttribute('src') !== cardFallback.url) {
+        triedCard = true;
+        detailImg.src = cardFallback.url;
+        detailImg.alt = cardFallback.alt;
+        return;
+      }
+      const missing = document.createElement('div');
+      missing.className = 'pp-detail__image pp-detail__image--missing';
+      missing.setAttribute('aria-hidden', 'true');
+      detailImg.replaceWith(missing);
+    };
+    detailImg.addEventListener('error', handleFailure);
+    if (detailImg.complete && detailImg.naturalWidth === 0) {
+      handleFailure();
+    }
+  }
 }
