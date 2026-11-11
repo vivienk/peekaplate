@@ -18,7 +18,7 @@ The repository contains diner and staff-console shells and a staff-command slice
 
 ## Technology and architecture
 
-Staging observation infrastructure is provisioned: the source Queue and DLQ are connected, the existing private R2 bucket is reused, and synthetic delivery/retry/DLQ and create-only archive checks pass. Delivery remains paused until the real consumer is reviewed and integrated. The staging producer/R2 bindings are live; this does not establish a working feature consumer. See the [infrastructure handoff](docs/observation-infrastructure.md) for exact resources, retention, test evidence and Teeyansh's next steps.
+The staging observation producer and real Queue consumer are deployed. Genuine signed-menu browser transport, private R2 archival, transactional typed facts, archive backfill, deduplication and tenant/test exclusion passed bounded synthetic checks on November 2. Both Queues are empty and paused while real diner controls, consent/outbox delivery and owner-report integration remain unfinished. See the [infrastructure handoff](docs/observation-infrastructure.md) and [hosted evidence](docs/operations.md#observation-facts-hosted-acceptance) for the exact release and limits.
 
 | Component | Technology | Current scope |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ Staging observation infrastructure is provisioned: the source Queue and DLQ are 
 | Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
 | Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
 | Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
-| Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [PDF/image extraction](processing/README.md) and deployed staging Python service; hosted authorization/private R2 checks passed. [Provider extraction and VIS-01 integration](docs/menu-ingestion-infrastructure.md) remain separate |
+| Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [PDF/image extraction](processing/README.md), deployed staging Python service and [T0/2.5D/presentation asset preparation](docs/asset-delivery.md); hosted authorization/private R2 checks passed. [Provider extraction and VIS-01 integration](docs/menu-ingestion-infrastructure.md) remain separate |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
 Frontends and backend share contracts. Frontends do not import backend internals or hold database credentials. Authorization belongs to the backend; venue authority must derive from verified identity and membership. Database policies support this boundary; they do not authenticate callers.
@@ -35,7 +35,7 @@ Frontends and backend share contracts. Frontends do not import backend internals
 The accepted architecture separates two event paths:
 
 - **Domain events:** selected content, approval, publication, availability and experiment workflows use PostgreSQL event streams. Authorized commands commit events, current projections, retry results and outbox work atomically. Replay rebuilds projections without external effects.
-- **Diner observations (planned):** a browser outbox sends stable event IDs to an ingest Worker. Queue acceptance precedes the client receipt; a consumer creates the R2 archive before indexing in PostgreSQL and acknowledging queue delivery. Exposure records identify the menu actually displayed. Unlinked order outcomes remain unknown.
+- **Diner observations:** the deployed ingest Worker checks signed menu authority and awaits Queue acceptance before issuing a receipt. The consumer creates private R2 evidence, then writes the index and typed detail atomically in PostgreSQL before acknowledging delivery. Genuine-token browser transport passed synthetic staging checks; the real diner outbox/screens remain separate work. Exposure records identify the displayed publication. Unlinked order outcomes remain unknown.
 
 Visual tiers are progressive enhancements: **T0** is the complete photo/text menu; **T1** adds shallow movement to reviewed photo cutouts; **T2** separates captured plating stages with limited viewpoints. Three.js is planned to load after an explicit tap. Menu access must survive analytics or viewer failure. The [frontend design reference](docs/frontend-design.md) records evolving design direction, not approved venue content or a completed visual specification.
 
@@ -64,7 +64,7 @@ PostHog provides optional internal product analytics. The shared `packages/analy
 
 The existing US PostHog project is reserved for synthetic staging checks. Synthetic events from both hosted staging sites have been read back in PostHog after the reviewed release. Consent starts off, resets on reload and respects browser privacy signals. Missing or mismatched configuration disables capture. Read [setup, verification and remaining release gates](docs/posthog.md) before enabling it. Ingredient interactions, selections and comparisons must follow the agreed taxonomy when their actual controls ship.
 
-PostgreSQL remains the application source of truth. [ADR 0003](docs/adr/0003-intent-evidence.md) governs the planned durable diner-evidence path. PostHog is a best-effort analytics copy; it does not replace that path. The [private Supabase export](docs/posthog-export.md) adds a separate analytics landing table and a duplicate-safe internal view; staging transfer and a repeated interval are verified: eight raw copies resolve to four unique observations. The hourly schedule is enabled. The planned owner dashboard reads validated Supabase projections through an authorized backend, without waiting for hourly PostHog exports. Its freshness target still needs implementation and measurement. Use one PostHog sending route per action, never both browser and server mirrors. Serving owner reports from PostHog would require a new reviewed ADR, verified formulas and backend-enforced restaurant access. A chart filter is not tenant isolation.
+PostgreSQL remains the application source of truth. [ADR 0003](docs/adr/0003-intent-evidence.md) governs the durable diner-evidence path. PostHog is a best-effort analytics copy; it does not replace that path. The [private Supabase export](docs/posthog-export.md) adds a separate analytics landing table and a duplicate-safe internal view; staging transfer and a repeated interval are verified: eight raw copies resolve to four unique observations. The hourly schedule is enabled. The planned owner dashboard reads validated Supabase projections through an authorized backend, without waiting for hourly PostHog exports. Its freshness target still needs implementation and measurement. Use one PostHog sending route per action, never both browser and server mirrors. Serving owner reports from PostHog would require a new reviewed ADR, verified formulas and backend-enforced restaurant access. A chart filter is not tenant isolation.
 
 As checked on October 19, 2026, PostHog lists one million analytics events per month in its free allowance. For illustration, 300 menu visits/day × 40 events/visit × 30 days = 360,000 events; this is a planning example, not measured traffic. Track test traffic too. Check [current pricing and limits](https://posthog.com/pricing) before relying on the allowance. The organization's actual billing plan and spending limits require an administrator to confirm; this setup purchased no upgrade.
 
@@ -158,5 +158,6 @@ See [PostHog setup and evidence limits](docs/posthog.md) for consent, separate s
 Python processing uses `uv sync --project processing --extra service --frozen` and
 `uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`.
 The local package and review boundaries are described in the
-[processing guide](processing/README.md) and [delivery handoff](docs/ocr-delivery.md).
+[processing guide](processing/README.md), [delivery handoff](docs/ocr-delivery.md) and
+[T0/2.5D/presentation asset preparation](docs/asset-delivery.md).
 Python tests and package builds run in CI alongside the repository checks.

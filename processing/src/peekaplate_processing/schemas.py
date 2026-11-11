@@ -1,7 +1,11 @@
+import math
+import unicodedata
 from decimal import Decimal
 from datetime import datetime
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 
@@ -19,6 +23,9 @@ class DishDraft(BaseModel):
     name:str=Field(min_length=1, max_length=160)
     description:str|None=Field(default=None, min_length=1, max_length=4000)
     category:NonEmptyText|None=None
+    subcategory:NonEmptyText|None=Field(default=None, exclude_if=lambda value:value is None)
+    category_page_number:int|None=Field(default=None, ge=1, exclude_if=lambda value:value is None)
+    price_text:NonEmptyText|None=Field(default=None, max_length=160, exclude_if=lambda value:value is None)
 
     price_amount:Decimal|None=Field(
         default=None,
@@ -77,6 +84,34 @@ class SourceSpan(BaseModel):
     end:int=Field(gt=0)
 
 
+class BoxEvidence(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    page_number:int=Field(ge=1, strict=True)
+    box:dict[str, int|float]
+    text:str=Field(strict=True)
+    saved_region_index:int=Field(ge=0, strict=True)
+
+    @field_validator("text")
+    @classmethod
+    def validate_literal(cls, value):
+        if not value.strip() or any(unicodedata.category(c) == "Cc" for c in value):
+            raise ValueError("Box text must be a nonblank literal without control characters.")
+        return value
+
+    @field_validator("box", mode="before")
+    @classmethod
+    def validate_coordinates(cls, value):
+        if not isinstance(value, dict) or set(value) != {"left", "top", "width", "height"}:
+            raise ValueError("Box coordinates must contain exactly left/top/width/height.")
+        for key, number in value.items():
+            if (type(number) not in (int, float) or (type(number) is float and not math.isfinite(number))
+                    or number < 0 or (key in {"width", "height"} and number == 0)):
+                raise ValueError("Box coordinates must be finite nonnegative numbers with positive size.")
+        return value
+
+
 class DraftEvidence(BaseModel):
 
     model_config=ConfigDict(extra="forbid")
@@ -84,6 +119,7 @@ class DraftEvidence(BaseModel):
     draft_id:NonEmptyText
     draft_index:int=Field(ge=0)
     spans:list[SourceSpan]=Field(min_length=1)
+    box_evidence:list[BoxEvidence]=Field(default_factory=list, exclude_if=lambda value:not value)
 
 
 class CaptureCandidate(BaseModel):
@@ -118,8 +154,8 @@ class MenuExtractionResult(BaseModel):
 
     model_config=ConfigDict(extra="forbid")
 
-    schema_version:Literal[1]=1
-    pipeline_version:Literal["2"]="2"
+    schema_version:Literal[1, 2]=2
+    pipeline_version:Literal["2", "3"]="3"
     status:Literal["complete", "incomplete", "failed"]="failed"
     source:SourceRecord|None=None
     started_at:datetime
@@ -135,3 +171,405 @@ class MenuExtractionResult(BaseModel):
     capture_requests:list[CaptureRequest]=Field(default_factory=list)
     warnings:list[str]=Field(default_factory=list)
     errors:list[str]=Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_version(self):
+        if (self.schema_version, self.pipeline_version) not in {(1, "2"), (2, "3")}:
+            raise ValueError("Extraction schema and pipeline versions do not match.")
+        if self.schema_version == 1 and any(
+            draft.subcategory is not None or draft.category_page_number is not None or draft.price_text is not None
+            for draft in self.drafts
+        ):
+            raise ValueError("Category hierarchy and printed price fields require extraction schema 2.")
+        validate_box_evidence(self)
+        return self
+
+
+def _typed_equal(left, right):
+    """Python equality alone permits bool/int and int/float provenance tampering."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(_typed_equal(left[k], right[k]) for k in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(_typed_equal(a, b) for a, b in zip(left, right))
+    return left == right
+
+
+def _box_evidence_links(source, segments, records):
+    """Validate exact saved OCR facts and joins, not semantic dish/price association.
+
+    records contains (candidate ID, original draft, source spans, box records).
+    Returns public maps by segment ID. No inputs are changed.
+    """
+    expected = {}
+    if not any(boxes for _, _, _, boxes in records) and not any(
+        "candidate_box_evidence" in segment.metadata for segment in segments
+    ):
+        return expected
+    if source is None or source.source_id != f"sha256:{source.sha256}":
+        raise ValueError("Box evidence requires a valid source join.")
+    by_id = {segment.segment_id: segment for segment in segments}
+    if len(by_id) != len(segments) or len({key for key, _, _, _ in records}) != len(records):
+        raise ValueError("Box evidence requires unique segment and candidate identifiers.")
+    for key, draft, spans, boxes in records:
+        if not isinstance(key, str) or not key.strip() or draft.source_id != source.source_id:
+            raise ValueError("Box candidate source/identifier does not match the extraction.")
+        cited = {}
+        passages = []
+        for raw_span in spans:
+            span = SourceSpan.model_validate(raw_span.model_dump() if isinstance(raw_span, SourceSpan) else raw_span)
+            segment = by_id.get(span.segment_id)
+            if (segment is None or segment.status != "ready" or segment.error is not None
+                    or not 0 <= span.start < span.end <= len(segment.text)):
+                raise ValueError("Box evidence must cite valid ready source spans.")
+            cited[segment.segment_id] = segment
+            passages.append(segment.text[span.start:span.end])
+        if not spans or "\n".join(passages) != draft.source_text:
+            raise ValueError("Box candidate spans must reconstruct the original source text.")
+        seen_indices, seen_regions = set(), set()
+        for raw in boxes:
+            # Revalidate dumps: Pydantic otherwise trusts existing instances,
+            # including model_copy/model_construct and nested mutations.
+            box = BoxEvidence.model_validate(raw.model_dump() if isinstance(raw, BoxEvidence) else raw)
+            matches = [segment for segment in cited.values() if segment.page_number == box.page_number
+                       and type(segment.page_number) is int and segment.method == "ocr_space_engine3"
+                       and segment.status == "ready" and segment.error is None]
+            if len(matches) != 1:
+                raise ValueError("Each box must resolve to exactly one cited ready OCR segment of its page.")
+            segment = matches[0]
+            metadata = segment.metadata
+            if (metadata.get("ocr_coordinate_space") != "uploaded_image_pixels"
+                    or metadata.get("ocr_region_status") != "available"):
+                raise ValueError("Box evidence requires available uploaded-image geometry.")
+            width, height = metadata.get("upload_width"), metadata.get("upload_height")
+            if any(type(n) not in (int, float) or (type(n) is float and not math.isfinite(n)) or n <= 0 for n in (width, height)):
+                raise ValueError("Box evidence requires actual upload dimensions.")
+            coords = box.box
+            if coords["left"] + coords["width"] > width or coords["top"] + coords["height"] > height:
+                raise ValueError("Box evidence exceeds the upload dimensions.")
+            regions = metadata.get("ocr_regions")
+            if not isinstance(regions, list) or box.saved_region_index >= len(regions):
+                raise ValueError("Box evidence has no saved region at its index.")
+            if not _typed_equal(regions[box.saved_region_index], {"text": box.text, **coords}):
+                raise ValueError("Box evidence must exactly match its saved region literal and typed coordinates.")
+            index_identity = (segment.segment_id, box.saved_region_index)
+            region_identity = (segment.segment_id, *(coords[k] for k in ("left", "top", "width", "height")))
+            if index_identity in seen_indices or region_identity in seen_regions:
+                raise ValueError("Duplicate box indices or regions within a candidate are not allowed.")
+            seen_indices.add(index_identity)
+            seen_regions.add(region_identity)
+            expected.setdefault(segment.segment_id, {}).setdefault(key, []).append(box.model_dump(mode="json"))
+    for segment in segments:
+        if "candidate_box_evidence" in segment.metadata:
+            actual = segment.metadata["candidate_box_evidence"]
+            if (not isinstance(actual, dict) or not actual
+                    or not _typed_equal(actual, expected.get(segment.segment_id, {}))):
+                raise ValueError("Existing public candidate box links do not match the exact evidence joins.")
+    return expected
+
+
+def validate_box_evidence(report:MenuExtractionResult):
+    """Revalidate provenance even on existing models; return maps by segment ID.
+
+    Call before report save or export. Proves source/region joins, not that OCR
+    is correct or semantically belongs to a dish/price. Does not mutate inputs.
+    Legacy reports without boxes or public maps are unchanged.
+    """
+    if any(not isinstance(e.box_evidence, list) for e in report.evidence):
+        raise ValueError("Box evidence must be a list of exact records.")
+    if not any(e.box_evidence for e in report.evidence) and not any(
+        "candidate_box_evidence" in segment.metadata for segment in report.segments
+    ):
+        return {}
+    by_index = {e.draft_index: e for e in report.evidence}
+    if (len(by_index) != len(report.evidence) or set(by_index) != set(range(len(report.drafts)))
+            or any(type(e.draft_index) is not int for e in report.evidence)):
+        raise ValueError("Every box-backed draft must have exactly one evidence record.")
+    return _box_evidence_links(report.source, report.segments, [
+        (by_index[i].draft_id, draft, by_index[i].spans, by_index[i].box_evidence)
+        for i, draft in enumerate(report.drafts)
+    ])
+
+
+class DishRef(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    dish_id:UUID
+    revision_id:UUID
+
+
+class AssetVariant(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:Literal["card-480", "detail-1280"]
+    format:Literal["webp", "jpeg"]
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    quality:int=Field(ge=1, le=100)
+
+
+class AssetSource(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(ge=1, le=12_000_000)
+    format:Literal["JPEG", "PNG", "WEBP", "TIFF", "BMP", "GIF"]
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    path:NonEmptyText
+    captured_at:datetime|None=None
+    capture_evidence:NonEmptyText
+
+
+class ProcessingState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["ready"]
+    engine:Literal["pillow"]
+    engine_version:NonEmptyText
+    started_at:datetime
+    completed_at:datetime
+    steps:list[NonEmptyText]=Field(min_length=1)
+
+
+class ReviewState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["needs_review"]="needs_review"
+    warnings:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PublicationState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    eligible:Literal[False]=False
+    reason:NonEmptyText="Human approval and backend publication are required."
+
+
+class AssetMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    total_variant_bytes:int=Field(gt=0)
+    budget_bytes:int|None=Field(default=None, gt=0)
+    budget_status:Literal["within_budget", "not_configured"]
+
+
+class AssetManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^t0_[0-9a-f]{32}$")
+    recipe_version:Literal["t0-v1"]="t0-v1"
+    tier:Literal["T0"]="T0"
+    source:AssetSource
+    dish:DishRef
+    variants:list[AssetVariant]=Field(min_length=4, max_length=4)
+    processing:ProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:AssetMeasurements
+
+
+class MotionLimits(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    max_yaw_degrees:float=Field(ge=0, le=3)
+    max_pitch_degrees:float=Field(ge=0, le=3)
+
+    @model_validator(mode="after")
+    def require_motion(self):
+        if max(self.max_yaw_degrees, self.max_pitch_degrees)<=0:
+            raise ValueError("At least one motion limit must be greater than zero.")
+        return self
+
+
+class LayerInput(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:str=Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,63}$")
+    file:NonEmptyText
+    depth:float=Field(ge=0, le=1)
+
+
+class LayersInput(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    tier:Literal["T1"]="T1"
+    dish:DishRef
+    motion:MotionLimits
+    layers:list[LayerInput]=Field(min_length=2, max_length=6)
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+
+
+class SpatialLayer(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    name:NonEmptyText
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    format:Literal["PNG", "WEBP", "JPEG"]
+    depth:float=Field(ge=0, le=1)
+
+
+class SpatialFallback(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    tier:Literal["T0"]="T0"
+    path:Literal["fallback.jpg"]="fallback.jpg"
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+
+
+class SpatialMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    total_asset_bytes:int=Field(gt=0)
+    budget_bytes:int=Field(gt=0)
+    budget_status:Literal["within_budget"]
+
+
+class SpatialManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^t1_[0-9a-f]{32}$")
+    recipe_version:Literal["t1-v1"]="t1-v1"
+    tier:Literal["T1"]="T1"
+    source_t0:NonEmptyText
+    source_t0_manifest_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    dish:DishRef
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+    motion:MotionLimits
+    layers:list[SpatialLayer]
+    fallback:SpatialFallback
+    processing:ProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:SpatialMeasurements
+    harness:Literal["harness.html"]="harness.html"
+
+
+class PresentationInputAsset(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    role:Literal["cutout", "reference"]
+    path:NonEmptyText
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(ge=1, le=12_000_000)
+    width:int=Field(gt=0)
+    height:int=Field(gt=0)
+    format:Literal["PNG", "WEBP", "JPEG"]
+    has_alpha:bool
+
+
+class PresentationAsset(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    path:Literal["presentation.png"]="presentation.png"
+    sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes:int=Field(gt=0)
+    width:int=Field(ge=512)
+    height:int=Field(ge=512)
+    format:Literal["PNG"]="PNG"
+    has_alpha:Literal[True]=True
+    transparent_corners:Literal[True]=True
+
+    @model_validator(mode="after")
+    def require_square(self):
+        if self.width!=self.height:
+            raise ValueError("Presentation asset must be square.")
+        return self
+
+
+class PresentationPromptSpec(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    prompt_version:Literal["presentation-prompt-v1"]="presentation-prompt-v1"
+    prompt_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    model_version:NonEmptyText
+    preserved_original_viewpoint:bool=False
+    reconstructed_details_flagged:bool=False
+    fidelity_notes:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PresentationProcessingState(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    status:Literal["ready", "fallback_retained"]
+    engine:Literal["pillow"]="pillow"
+    engine_version:NonEmptyText
+    started_at:datetime
+    completed_at:datetime
+    steps:list[NonEmptyText]=Field(min_length=1)
+    validation_errors:list[NonEmptyText]=Field(default_factory=list)
+
+
+class PresentationMeasurements(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    presentation_bytes:int=Field(ge=0)
+    fallback_bytes:int=Field(gt=0)
+    total_bundle_bytes:int=Field(gt=0)
+    budget_bytes:int|None=Field(default=None, gt=0)
+    budget_status:Literal["within_budget", "exceeded_fallback_retained", "not_configured"]
+
+
+class PresentationManifest(BaseModel):
+
+    model_config=ConfigDict(extra="forbid")
+
+    schema_version:Literal[1]=1
+    asset_id:str=Field(pattern=r"^pres_[0-9a-f]{32}$")
+    recipe_version:Literal["presentation-v1"]="presentation-v1"
+    tier:Literal["T0-presentation"]="T0-presentation"
+    source_t0:NonEmptyText
+    source_t0_manifest_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    source_sha256:str=Field(pattern=r"^[0-9a-f]{64}$")
+    dish:DishRef
+    draft_id:NonEmptyText|None=None
+    capture_evidence:NonEmptyText
+    rights_confirmed:Literal[True]
+    cutout:PresentationInputAsset
+    reference:PresentationInputAsset
+    prompt:PresentationPromptSpec
+    presentation:PresentationAsset|None=None
+    fallback:SpatialFallback
+    fallback_retained:bool
+    active_display_path:Literal["presentation.png", "fallback.jpg"]="fallback.jpg"
+    processing:PresentationProcessingState
+    review:ReviewState
+    publication:PublicationState
+    measurements:PresentationMeasurements

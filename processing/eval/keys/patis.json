@@ -1,0 +1,508 @@
+{
+  "status": "AGENT-DRAFTED, UNREVIEWED. Transcribed by the AI assistant from crops of the clean original image only (no overlays or model outputs). Must be verified by a human before it counts as reviewed ground truth.",
+  "fields": "name, category (main heading), price_text (printed), price_amount (single unambiguous price, else null)",
+  "source": "patis.webp",
+  "items": [
+    {
+      "name": "Le Petit Pickle",
+      "category": "COCKTAILS",
+      "price_text": "11",
+      "price_amount": "11"
+    },
+    {
+      "name": "Spritz Royale",
+      "category": "COCKTAILS",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Le Jardin",
+      "category": "COCKTAILS",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Café Pastis",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Le Dirty Martini",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Lady Marmalade",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Nouveau Carré",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Eiffel Sour",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Fumée du Diable",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "St. Germain Spritz",
+      "category": "COCKTAILS",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Sparkling Rosé",
+      "category": "WINE",
+      "price_text": "verre 17 / bottle 80",
+      "price_amount": null
+    },
+    {
+      "name": "Blanc",
+      "category": "WINE",
+      "price_text": "verre 15 / carafe 45",
+      "price_amount": null
+    },
+    {
+      "name": "Rosé",
+      "category": "WINE",
+      "price_text": "verre 15 / carafe 45",
+      "price_amount": null
+    },
+    {
+      "name": "Rouge",
+      "category": "WINE",
+      "price_text": "verre 15 / carafe 45",
+      "price_amount": null
+    },
+    {
+      "name": "Coffee",
+      "category": "BOISSONS",
+      "price_text": "5.50",
+      "price_amount": "5.50"
+    },
+    {
+      "name": "Cafe au Lait",
+      "category": "BOISSONS",
+      "price_text": "6",
+      "price_amount": "6"
+    },
+    {
+      "name": "Espresso",
+      "category": "BOISSONS",
+      "price_text": "5.50",
+      "price_amount": "5.50"
+    },
+    {
+      "name": "Macchiato",
+      "category": "BOISSONS",
+      "price_text": "6",
+      "price_amount": "6"
+    },
+    {
+      "name": "Cappuccino",
+      "category": "BOISSONS",
+      "price_text": "6.50",
+      "price_amount": "6.50"
+    },
+    {
+      "name": "Latte",
+      "category": "BOISSONS",
+      "price_text": "6.50",
+      "price_amount": "6.50"
+    },
+    {
+      "name": "Matcha Latte",
+      "category": "BOISSONS",
+      "price_text": "7",
+      "price_amount": "7"
+    },
+    {
+      "name": "Chai Latte",
+      "category": "BOISSONS",
+      "price_text": "7",
+      "price_amount": "7"
+    },
+    {
+      "name": "Délice au Chocolat",
+      "category": "BOISSONS",
+      "price_text": "7",
+      "price_amount": "7"
+    },
+    {
+      "name": "Selection of Hot Tea",
+      "category": "BOISSONS",
+      "price_text": "6",
+      "price_amount": "6"
+    },
+    {
+      "name": "Homemade Granola",
+      "category": "HORS D'OEUVRES",
+      "price_text": "12",
+      "price_amount": "12"
+    },
+    {
+      "name": "6 Oysters",
+      "category": "HORS D'OEUVRES",
+      "price_text": "25",
+      "price_amount": "25"
+    },
+    {
+      "name": "Scallop Crudo",
+      "category": "HORS D'OEUVRES",
+      "price_text": "21",
+      "price_amount": "21"
+    },
+    {
+      "name": "Smoked Salmon",
+      "category": "HORS D'OEUVRES",
+      "price_text": "22",
+      "price_amount": "22"
+    },
+    {
+      "name": "Shrimp Cocktail",
+      "category": "HORS D'OEUVRES",
+      "price_text": "24",
+      "price_amount": "24"
+    },
+    {
+      "name": "Tuna Crudo",
+      "category": "HORS D'OEUVRES",
+      "price_text": "25",
+      "price_amount": "25"
+    },
+    {
+      "name": "Sardines en Conserve",
+      "category": "HORS D'OEUVRES",
+      "price_text": "20",
+      "price_amount": "20"
+    },
+    {
+      "name": "Crispy Artichokes",
+      "category": "HORS D'OEUVRES",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Pâté de Campagne",
+      "category": "HORS D'OEUVRES",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Steak Tartare",
+      "category": "HORS D'OEUVRES",
+      "price_text": "20/39",
+      "price_amount": null
+    },
+    {
+      "name": "Onion Soup",
+      "category": "HORS D'OEUVRES",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Escargots",
+      "category": "HORS D'OEUVRES",
+      "price_text": "20",
+      "price_amount": "20"
+    },
+    {
+      "name": "Salade Verte",
+      "category": "SALADES",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Salade Niçoise",
+      "category": "SALADES",
+      "price_text": "31",
+      "price_amount": "31"
+    },
+    {
+      "name": "Warm Shrimp Salade",
+      "category": "SALADES",
+      "price_text": "28",
+      "price_amount": "28"
+    },
+    {
+      "name": "Croque Monsieur / Croque Madame",
+      "category": "SANDWICHES",
+      "price_text": "22",
+      "price_amount": "22"
+    },
+    {
+      "name": "Steak Sandwich",
+      "category": "SANDWICHES",
+      "price_text": "34",
+      "price_amount": "34"
+    },
+    {
+      "name": "Grilled Chicken Sandwich",
+      "category": "SANDWICHES",
+      "price_text": "24",
+      "price_amount": "24"
+    },
+    {
+      "name": "Cheeseburger à l'Américaine",
+      "category": "SANDWICHES",
+      "price_text": "29",
+      "price_amount": "29"
+    },
+    {
+      "name": "Buttermilk Pancakes",
+      "category": "BRUNCH",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "French Toast",
+      "category": "BRUNCH",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Eggs Any Style",
+      "category": "BRUNCH",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Avocado Tartine",
+      "category": "BRUNCH",
+      "price_text": "20",
+      "price_amount": "20"
+    },
+    {
+      "name": "Eggs Benedict",
+      "category": "BRUNCH",
+      "price_text": "24",
+      "price_amount": "24"
+    },
+    {
+      "name": "Eggs Norwegian",
+      "category": "BRUNCH",
+      "price_text": "26",
+      "price_amount": "26"
+    },
+    {
+      "name": "Quiche Florentine",
+      "category": "BRUNCH",
+      "price_text": "17",
+      "price_amount": "17"
+    },
+    {
+      "name": "Gruyère Omelette",
+      "category": "BRUNCH",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Egg White Omelette",
+      "category": "BRUNCH",
+      "price_text": "19",
+      "price_amount": "19"
+    },
+    {
+      "name": "Steel Cut Oatmeal",
+      "category": "BRUNCH",
+      "price_text": "12",
+      "price_amount": "12"
+    },
+    {
+      "name": "Trout Amandine",
+      "category": "ENTRÉES",
+      "price_text": "33",
+      "price_amount": "33"
+    },
+    {
+      "name": "Chicken Paillard",
+      "category": "ENTRÉES",
+      "price_text": "29",
+      "price_amount": "29"
+    },
+    {
+      "name": "Bar Steak",
+      "category": "ENTRÉES",
+      "price_text": "39",
+      "price_amount": "39"
+    },
+    {
+      "name": "Moules Frites",
+      "category": "ENTRÉES",
+      "price_text": "29",
+      "price_amount": "29"
+    },
+    {
+      "name": "Grilled Branzino",
+      "category": "ENTRÉES",
+      "price_text": "38",
+      "price_amount": "38"
+    },
+    {
+      "name": "Passionfruit Tart",
+      "category": "DESSERTS",
+      "price_text": "15",
+      "price_amount": "15"
+    },
+    {
+      "name": "Baba au Rhum",
+      "category": "DESSERTS",
+      "price_text": "13",
+      "price_amount": "13"
+    },
+    {
+      "name": "Profiteroles",
+      "category": "DESSERTS",
+      "price_text": "16",
+      "price_amount": "16"
+    },
+    {
+      "name": "Paris Brest",
+      "category": "DESSERTS",
+      "price_text": "16",
+      "price_amount": "16"
+    },
+    {
+      "name": "Crème Brûlée",
+      "category": "DESSERTS",
+      "price_text": "15",
+      "price_amount": "15"
+    },
+    {
+      "name": "Dark Chocolate Mousse",
+      "category": "DESSERTS",
+      "price_text": "14",
+      "price_amount": "14"
+    },
+    {
+      "name": "Sticky Toffee Pudding",
+      "category": "DESSERTS",
+      "price_text": "15",
+      "price_amount": "15"
+    },
+    {
+      "name": "Artisanal Sorbet & Ice Cream",
+      "category": "DESSERTS",
+      "price_text": "9",
+      "price_amount": "9"
+    },
+    {
+      "name": "Pastry Basket",
+      "category": "VIENNOISERIE",
+      "price_text": "18",
+      "price_amount": "18"
+    },
+    {
+      "name": "Croissant",
+      "category": "VIENNOISERIE",
+      "price_text": "4",
+      "price_amount": "4"
+    },
+    {
+      "name": "Almond Croissant",
+      "category": "VIENNOISERIE",
+      "price_text": "7",
+      "price_amount": "7"
+    },
+    {
+      "name": "Pain au Chocolat",
+      "category": "VIENNOISERIE",
+      "price_text": "4.50",
+      "price_amount": "4.50"
+    },
+    {
+      "name": "Éclair",
+      "category": "VIENNOISERIE",
+      "price_text": "4",
+      "price_amount": "4"
+    },
+    {
+      "name": "Lemon Loaf",
+      "category": "VIENNOISERIE",
+      "price_text": "4",
+      "price_amount": "4"
+    },
+    {
+      "name": "Scone",
+      "category": "VIENNOISERIE",
+      "price_text": "4",
+      "price_amount": "4"
+    },
+    {
+      "name": "Kouign-Amann",
+      "category": "VIENNOISERIE",
+      "price_text": "5",
+      "price_amount": "5"
+    },
+    {
+      "name": "Avocado",
+      "category": "GARNITURES",
+      "price_text": "5",
+      "price_amount": "5"
+    },
+    {
+      "name": "Bacon",
+      "category": "GARNITURES",
+      "price_text": "12",
+      "price_amount": "12"
+    },
+    {
+      "name": "Pork Sausage",
+      "category": "GARNITURES",
+      "price_text": "10",
+      "price_amount": "10"
+    },
+    {
+      "name": "Turkey Sausage",
+      "category": "GARNITURES",
+      "price_text": "10",
+      "price_amount": "10"
+    },
+    {
+      "name": "Sautéed Spinach",
+      "category": "GARNITURES",
+      "price_text": "12",
+      "price_amount": "12"
+    },
+    {
+      "name": "Pommes Tapées",
+      "category": "GARNITURES",
+      "price_text": "9",
+      "price_amount": "9"
+    },
+    {
+      "name": "Pommes Frites",
+      "category": "GARNITURES",
+      "price_text": "12.50",
+      "price_amount": "12.50"
+    },
+    {
+      "name": "Haricots Verts",
+      "category": "GARNITURES",
+      "price_text": "11",
+      "price_amount": "11"
+    },
+    {
+      "name": "Fromages Pastis",
+      "category": "FROMAGES PASTIS",
+      "price_text": "8 EACH",
+      "price_amount": null,
+      "accept_amount": "8",
+      "note": "8 per cheese; selection of 3 or 5"
+    }
+  ],
+  "unreadable": []
+}

@@ -1,5 +1,222 @@
 # Local and staging operations
 
+<a id="observation-facts-hosted-acceptance"></a>
+
+## Observation facts and genuine-token transport — November 2, 2026 (Phoenix)
+
+PRs [#97](https://github.com/vivienk/peekaplate/pull/97) and
+[#98](https://github.com/vivienk/peekaplate/pull/98) added atomic typed facts and
+private archive recovery. The first hosted browser attempt then exposed a 503:
+the Worker could not fetch its own public JWKS route (Cloudflare 1042).
+PRs [#99](https://github.com/vivienk/peekaplate/pull/99) and
+[#100](https://github.com/vivienk/peekaplate/pull/100) fix verification using the
+configured public signing key, preserving signature and claim checks.
+
+Reviewed main `c6a47bdc7da792f2eb41080fcccb1547c166603e` passed
+[main CI](https://github.com/vivienk/peekaplate/actions/runs/41492170073) and was
+deployed through the approved Wrangler operator route. Active Worker version:
+`60ac184a-a348-4e2c-843d-e380861771cc`. Existing bindings, signing/extraction/team
+secrets and all eight migration entries were preserved; no migration, new
+resource, plan upgrade, Pages rebuild or production deployment was required.
+
+Six bounded hosted checks passed, with eight browser HTTP subchecks:
+
+- Backfilled exactly three earlier synthetic accepted observations from their
+  original private R2 archives. A second inspection found no missing facts.
+- Brave fetched the active synthetic menu, checked the immutable bundle hash
+  and used its genuinely issued token at `POST /observations`.
+- Initial acceptance, an in-batch retry and redelivery produced one new typed
+  fact. Changed reuse of the event ID preserved the original and produced
+  checksum-matched conflict quarantine evidence.
+- Wrong-publication and browser-supplied venue authority were rejected;
+  missing authentication returned 401.
+- Final readback found four index/event rows: three Save details and one menu
+  view. All were `test`; owner views, cross-tenant reads and reads without
+  tenant context returned zero. Original and conflict archive metadata matched.
+- Both Queues were empty and paused after verification.
+
+Cleanup passed: the real staff withdrawal returned 200 (menu version 4), fresh
+public reads return 404, the only synthetic test membership is back to viewer,
+and the staff session ended. The temporary synthetic bundle Worker was removed
+and both read-only proxies stopped. Append-only archive/database evidence remains.
+
+A desktop freeze interrupted the verifier after five passed checks. The source
+Queue was explicitly re-paused, then the last check ran read-only against the
+same IDs; no browser event was replayed to manufacture a passing result. Check
+durations in the [sanitized record](observation-facts-staging-acceptance.json)
+include provider work/waits and are not a performance benchmark.
+
+Local release verification also passed: `pnpm verify lint typecheck test build
+context:check docs:check test:db test:e2e` — 472 unit tests, 58 script tests,
+189 SQL assertions, 46 Worker/database tests and 13 browser tests in 94.747
+seconds. These are distinct suites; do not add them as one product-coverage score.
+
+**Boundary:** this is a real hosted transport harness with synthetic data,
+not proof of connected diner controls or owner dashboards. Normal collection
+stays paused for real screen/consent/outbox delivery and report acceptance.
+Native process-crash recovery, full DLQ replay, load, restore and production
+acceptance remain separate. Keep append-only synthetic evidence for audit.
+
+### Next backend integration order
+
+This is dependency order, not approval to merge an unreviewed head. Reconcile
+each branch with current develop, preserve the observation handler and rerun
+its relevant tests before release.
+
+| Work | Order / dependency | Remaining gate |
+| --- | --- | --- |
+| Menu extraction | Resolve [#44](https://github.com/vivienk/peekaplate/pull/44) decisions, then [#58](https://github.com/vivienk/peekaplate/pull/58) → [#45](https://github.com/vivienk/peekaplate/pull/45) | Current #58 has new commits; producer/adapter compatibility, job migration, provider settings and hosted menu Queue acceptance need review |
+| Owner review persistence | [#73](https://github.com/vivienk/peekaplate/pull/73) consumes #58's review-candidate contract; it can reconcile in parallel with #45 | Review/correction API and its own migration acceptance; correcting a draft does not publish it |
+| Owner reports / AI | [#72](https://github.com/vivienk/peekaplate/pull/72) contract → report SQL/API implementation → integration with [#46](https://github.com/vivienk/peekaplate/pull/46) | #72 is schema only; #46's safety core is not a live model/report API |
+| Real diner tracking | [#65](https://github.com/vivienk/peekaplate/pull/65) → [#77](https://github.com/vivienk/peekaplate/pull/77) → [#80](https://github.com/vivienk/peekaplate/pull/80) → [#84](https://github.com/vivienk/peekaplate/pull/84), with actual menu controls/published adapter | Several are drafts; consent, stored retries, real Save/compare transitions and browser-to-owner acceptance remain |
+| Visual assets | [#25](https://github.com/vivienk/peekaplate/pull/25), in parallel | Its asset-ID/review gates are independent of observation transport |
+
+### Synthetic owner-report read boundary
+
+The local/staging dish-report route remains unavailable unless the server has an
+operator-configured `SYNTHETIC_REPORT_VENUE_ID` that is also in the backend's
+server-maintained synthetic venue allowlist. Requests are accepted only for
+that UUID, and the backend passes that configured UUID—not a caller-selected
+venue—to the owner-report reader. Adding a reportable synthetic venue requires
+an explicit allowlist change as well as environment configuration;
+`source=synthetic` labels a calculation and does not convert or sanitize
+production observations. Production remains unavailable.
+
+The earlier index/conflict and native retry/DLQ evidence follows below as a
+historical release record; its statement that typed facts were missing applied
+to that earlier release only.
+
+<a id="observation-consumer-hosted-acceptance"></a>
+
+## Observation consumer hosted acceptance — November 1, 2026 (Phoenix)
+
+PR [#70](https://github.com/vivienk/peekaplate/pull/70) supplied the producer;
+PR [#31](https://github.com/vivienk/peekaplate/pull/31) reconciled its contracts
+with the actual consumer. [Release #94](https://github.com/vivienk/peekaplate/pull/94)
+promoted the reviewed tree through main. Main `35e989d7c533c858decf0a95d5ac987fbb8223ad`
+passed [CI](https://github.com/vivienk/peekaplate/actions/runs/41401657326) and
+was deployed by the approved Wrangler operator route. The active staging API
+version is `3db23304-c53a-4fee-b0ba-260c3afe4060`.
+
+The existing observation Queue, DLQ, private R2 bucket and Hyperdrive were
+reused. The temporary source HTTP pull consumer was replaced with the API's
+real Worker consumer. Batch size 10, maximum wait 30 seconds, retries 3,
+retry delay 10 seconds and the existing DLQ route were verified by provider
+readback. Existing signing/extraction/team secrets were preserved. No migration,
+new Queue, database, subscription or production deployment was needed.
+
+Ten hosted checks passed in 236.252 seconds, including intentional batching and
+retry waits; this is a functional test duration, not a latency benchmark:
+
+- Real restricted Hyperdrive login, eleven forced-RLS observation tables and
+  no index/fact rows without tenant context.
+- Both Queues empty before starting; actual producer Queue acceptance followed
+  by the deployed consumer's R2 archive, canonical checksum and database index.
+- Duplicate redelivery drains without another index/conflict row. Changed
+  payload reuse preserves the original and creates distinct quarantine evidence.
+- Mixed authorized/unauthorized-publication conflict copies reach safe durable
+  quarantine without raw unauthorized fields or canonical promotion.
+- Controlled one-time archive/database exceptions return retry, then recover
+  using real R2/PostgreSQL. These exceptions were injected around the remote
+  consumer's dependencies, not into the deployed Queue worker.
+- A malformed synthetic message passes through the deployed consumer's native
+  retry/DLQ route. Only the exact run-owned message was acknowledged in the DLQ.
+- Final readback: 3 canonical index rows, 3 conflict rows, 6 preserved private
+  archives, 0 cross-tenant rows and 0 owner-view rows. Both Queues are empty and
+  paused; the temporary authenticated remote proxy is stopped.
+
+Fifteen public staging HTTP checks also passed: health/JWKS, observation
+401/413 responses, exact-origin preflight, protected staff/team routes, the
+withdrawn synthetic publication and existing Pages roots. See the
+[sanitized acceptance record](observation-staging-acceptance.json).
+On November 2, both existing authenticated collaborator analytics reads also
+returned 200 with the required reporting window; no response data or credentials
+were retained. Their request IDs are included in the same record.
+
+**Boundary:** the accepted producer test used an operator-scoped synthetic
+authority and the actual ingestion function. It did not supply a genuine diner
+menu token to the public HTTP endpoint. That browser/token path, real diner
+controls, typed-fact writes/backfill, owner metrics, native process-crash recovery,
+load, backup restoration and production acceptance remain separate. The consumer
+currently writes index/conflict records only; it does not populate the owner
+views. Keep normal collection paused until the remaining integration passes.
+Preserve the labelled synthetic archives and exclude them from future analytics.
+
+<a id="res02-hosted-acceptance"></a>
+
+## RES-02 publication hosted acceptance — November 1, 2026 (Phoenix)
+
+PRs [#42](https://github.com/vivienk/peekaplate/pull/42) and
+[#43](https://github.com/vivienk/peekaplate/pull/43) merged into develop after
+preserving its newer fixture/search work and both error histories.
+[Release #86](https://github.com/vivienk/peekaplate/pull/86) promoted the reviewed
+code to main. The approved operator deployment used exact main commit
+`2eee264869548f6d461ff0fff43719c31a8f69e3`; its
+[main CI](https://github.com/vivienk/peekaplate/actions/runs/41391864863) passed.
+No GitHub protection setting was changed. Production and paused queues were unchanged.
+
+| Release item | Verified result |
+| --- | --- |
+| Staging API | `https://peekaplate-api-staging.vxkong.workers.dev` |
+| Active Worker version after signing configuration | `5529d2e4-7def-4b2c-9ff7-b30a55f2facd` |
+| Public signing-key ID | `staging-res02-20261101-7cfdaca9` |
+| Existing Supabase project | `icwhkrlsecpzcomfjsso`, used as staging under ADR 0012 |
+| Publication migrations | `20261025120000`, `20261025130000`; both committed and recorded in history |
+| New table access | Five forced-RLS tables; no direct browser SELECT; runtime cannot insert trusted subjects or bundle handoffs |
+
+The ES256 private JWK is stored only in the staging Worker's protected secret.
+The issuer is its existing HTTPS origin; JWKS exposes only the public key.
+The new secret created configuration versions without changing the release code.
+
+### Hosted checks and reconciliation
+
+A genuine Supabase test-user session called the deployed staff HTTP endpoints,
+using two labelled synthetic venues and an incomplete synthetic dish placeholder.
+An authorized operator admitted the exact trusted subject and temporary immutable
+HTTPS bundle. This does not implement the production admission pipeline.
+
+- **PASS:** owner approval, publication and withdrawal through the actual API;
+  identical retries return the original results; conflicting command reuse and
+  stale versions return 409.
+- **PASS:** another venue's approval returns 403; browser tenant overrides return
+  400; the other venue cannot read this publication.
+- **PASS:** draft/unknown and withdrawn menus return 404. The published menu
+  returns the exact approved pointer; its fetched synthetic bytes match the hash
+  and shared delivery schema. Remote JWKS verification confirms ES256, issuer,
+  audience, venue/publication scope and the 1,800-second token lifetime.
+- **PASS:** database readback shows exactly three events, three receipts and
+  three outbox rows, with publication/availability version 2 and status withdrawn.
+  Retries and the interrupted test added no duplicate commands or events.
+- **PASS:** after the synthetic permission changed from owner to viewer, retrying
+  the already-approved command returns 403. The verification session then ended
+  with 204. No existing restaurant permissions changed.
+- **PASS:** 12 baseline API checks; authenticated collaborator event/summary
+  reads and both existing staging Pages HTML roots still return the expected results.
+- **PASS:** the temporary fixture Worker was deleted and its URL returns 404;
+  the local verifier stopped. Synthetic append-only history remains labelled and
+  withdrawn for audit, with owner authority removed.
+
+The completed staff sequence contains 18 checks. The first attempt stopped on a
+20-second client timeout during a public read; an independent retry returned 200
+in 747 ms. The resumed run passed using the same command IDs. The interrupted
+evidence is retained in the [sanitized acceptance record](res02-staging-acceptance.json).
+The timeout's cause is unconfirmed; this is no load/latency guarantee.
+
+Local reconciled verification passed 308 Vitest tests, 57 script tests, 169 SQL
+assertions, 26 real PostgreSQL/workerd tests and 13 browser regressions; release
+and main CI also passed. Hosted checks complement those tests, rather than
+turning them into a completed diner or production acceptance result.
+
+### Handoff boundary
+
+DIN-03 and ingestion work can integrate against the real public-menu/JWKS
+contract. The trusted real-content producer, staff/diner screen wiring,
+production hash-input agreement, exact deployed CORS allowlist and original-
+publication token renewal remain their documented dependencies. No observation
+consumer, retention/recovery/load drill, owner dashboard or production launch
+was accepted by this test. The existing vendor project-branch label
+"PRODUCTION" does not change ADR 0012's use of this project as staging.
+
 ## OCR credential activation — October 28, 2026 (Phoenix)
 
 `OCR_SPACE_API_KEY` is configured in GitHub's existing protected `staging`
@@ -217,6 +434,75 @@ The venue in the URL selects a resource; only verified staff membership grants a
 Hosted verification requires a configured `AUTH_ISSUER` ending in `/auth/v1`, HTTPS JWKS, audience/role `authenticated`, an expiry, a UUID subject and RS256/ES256 signatures. Anonymous sessions are rejected. The `APP_ENV=local` option permits only loopback HTTP issuers and selects `LOCAL_DATABASE_URL`; neither setting belongs in staging. Hosted connections use the `HYPERDRIVE` binding. Logs contain a generated request ID and failure category, never bearer tokens or database row errors. `/health` remains liveness only and does not report database readiness. `/events` remains unavailable.
 
 `pnpm test:e2e` starts local apps itself. Install Chromium once with `pnpm exec playwright install chromium`. CI installs system dependencies too. Four tests cover no-JavaScript diner content, the console/real local Worker health path, and axe accessibility plus narrow-screen overflow on both shells. Traces are retained on failure; there is no routine DOM dump. They do not exercise a live restaurant, staff login, queue or GPU viewer. Use `pnpm verify test:e2e` and `pnpm verify test:db` to record failed-check observations as described in [contributing](../CONTRIBUTING.md#local-checks).
+
+## Observation schema release — October 31, 2026
+
+The hosted preflight found the four previous versions intact in
+`public.schema_migrations`. The missing canonical relations were a release/apply
+gap: the two reviewed migrations had merged into `develop` but had not reached
+`main` or been applied online. This focused release carries the unchanged SQL
+and SQL tests from [PR #32](https://github.com/vivienk/peekaplate/pull/32) and
+[PR #50](https://github.com/vivienk/peekaplate/pull/50); it preserves earlier files.
+
+The operator applied only each file's `migrate:up` body, index before facts, in
+one transaction with its history inserts. The apply script had a known-baseline
+guard, transaction-scoped advisory lock and lock/statement timeouts. It was
+rehearsed against the exact four-migration baseline in a separate disposable
+PostgreSQL instance, including a no-op second application. The intentionally
+refusing `migrate:down` sections were excluded. Future changes must use new
+forward migrations rather than editing these applied files.
+
+**Hosted verification PASS at 2026-10-31T22:03:59.865746Z:**
+
+- History contains `202610130001`, `20261014210000`, `20261020070000`,
+  `20261021130000`, `20261023120000` and `20261026120000`.
+- Eleven observation tables have enabled and forced RLS, eleven tenant policies
+  and eleven append-only triggers.
+- `peekaplate_runtime` has SELECT/INSERT and lacks UPDATE/DELETE/TRUNCATE on
+  these tables. Both owner views have security-invoker/security-barrier options
+  and runtime read-only grants.
+- Effective table/view privileges are denied to the checked `anon`,
+  `authenticated` and PostHog export roles. No private schema was exposed through
+  the browser API or a shared administrator credential.
+- Existing venue, domain-event, command and outbox counts matched the preflight.
+  New canonical index and fact tables were empty; schema presence is not proof
+  of event ingestion.
+
+Local verification:
+
+- PASS: `pnpm verify test:db` — 135 pgTAP assertions, 14 database integration
+  tests and the local demo/cleanup, 32.235 seconds.
+- PASS: separate disposable exact-baseline upgrade/retry rehearsal — six history
+  entries, preserved existing venue, eleven forced-RLS tables, 6.453 seconds.
+- PASS locally: rollback-only runtime probes for accepted facts, duplicate
+  denial, conflict recording, fact-parent integrity, live-only views, denied
+  mutation and cross-tenant/missing-context access; zero retained probe venues.
+
+The existing Hyperdrive binding was also tested using real remote Worker
+execution at `2026-10-31T23:30:53.206Z`, 5.201 seconds. The database identified
+the connection as `peekaplate_staging_login`, with neither superuser nor
+RLS-bypass privileges. That login could read the new tables/views, had the
+expected restricted SELECT/INSERT grants, and returned zero rows without tenant
+context. The read-only transaction was rolled back and the temporary remote
+development session stopped. The live API deployment was not replaced. See
+[Cloudflare's remote Hyperdrive development procedure](https://developers.cloudflare.com/hyperdrive/configuration/local-development/#use-wrangler-dev---remote).
+
+**Hosted write-probe limitation:** the managed Supabase SQL Editor role
+cannot `SET LOCAL ROLE peekaplate_runtime` (SQLSTATE 42501). That rollback-only
+probe did not pass and is not a credential or migration failure. Do not grant
+new role membership merely to make the editor impersonate the runtime. The
+read-only Hyperdrive check above verifies the actual connection and grants;
+hosted write/conflict behavior and browser-to-Queue/R2/database acceptance remain
+separate checks. Empty-table reads do not demonstrate cross-tenant behavior on
+populated hosted tables; that behavior passed only in disposable local tests.
+
+The existing project is the staging candidate under ADR 0012 even though its
+Supabase branch is labelled `main / PRODUCTION`. This operation does not create
+a separate production database or deploy production. No Worker, Queue, R2 or
+credential configuration changed. Teeyansh can proceed with schema mapping and
+consumer integration; activation still requires the compatible reviewed
+producer/consumer release and live-flow acceptance. Louis's separate owner-report
+contract work on `develop` is untouched.
 
 ## Database change procedure
 
