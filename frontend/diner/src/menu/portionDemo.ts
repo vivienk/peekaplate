@@ -21,7 +21,7 @@ export async function demoLayerUrl(url: string, signal: AbortSignal): Promise<st
       if (signal.aborted) abort();
     });
   }
-  if (state === 'fallback' || state === 'failed') throw new Error('Demo layer unavailable');
+  if (state === 'photo' || state === 'failed') throw new Error('Demo layer unavailable');
   if (url === 'https://portion-demo.invalid/background.webp') return background;
   if (url === 'https://portion-demo.invalid/dish.webp') return foreground;
   throw new Error('Unknown demo layer');

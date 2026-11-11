@@ -69,7 +69,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     }
   });
   photoObserver.observe(stage, { childList: true });
-  const show = async (retrying = false) => {
+  const show = async (retrying = false, forceCss = false) => {
     if ((active && !retrying) || disposed) return;
     stop();
     active = true;
@@ -97,7 +97,15 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     try {
       const { mount } = await import('./portionRenderer');
       if (controller.signal.aborted) return;
-      const mounted = await mount(stage, parsed.data, controller.signal, fallback);
+      const mounted = await mount(
+        stage,
+        parsed.data,
+        controller.signal,
+        () => {
+          if (attempt === controller && !controller.signal.aborted) void show(true, true);
+        },
+        forceCss,
+      );
       if (controller.signal.aborted || disposed) {
         mounted.dispose();
         return;

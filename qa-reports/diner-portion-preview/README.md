@@ -43,3 +43,21 @@ in file l7A9n8tACJic0FIhY49Zjw. Exact exported artwork is included. The web prev
 safe-area insets instead of a simulated native status bar.
 
 No merge or deployment. Local evidence is not hosted publication acceptance.
+
+## Interactive cutout fallback correction — November 10
+
+`previewState=fallback` now selects the PR25 CSS interactive cutout, not a forced
+asset failure. `previewState=photo` exercises the original-photo state. The same
+CSS path is used when WebGL cannot initialize or its context is lost; it retains
+900px perspective, bounded rotation, depth-ranked parallax and the existing inputs.
+Both renderers share bounded fetch, SHA-256 verification and retry behavior. CSS
+images additionally validate decoded dimensions and release object URLs on Back.
+
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` — 49 tests; new interactive-fallback regression failed before the correction and passed afterward.
+- PASS: `pnpm verify lint typecheck test build` — 1,214 unit tests passed / 4 skipped; 74 script tests passed; app builds and Worker dry-run passed.
+- PASS: `pnpm verify context:check docs:check` and `git diff --check`.
+- PASS: inspected production JS excludes DEV fixture host/identity.
+- T1 delivery budget including fonts and asset allowance: 373,379 / 400,000 bytes.
+- NOT RUN: physical phones, manual screen readers or hosted publication acceptance.
+
+This correction is local only. No PR, workflow setting change or deployment.

@@ -62,11 +62,11 @@ is adapted into the diner renderer/controller, not embedded as a review-tool ifr
   smooth return to center and live reduced-motion changes.
 - One delayed retry for a failed layer fetch/decode before photo fallback; all work stays
   inside the eight-second attempt deadline and is cancelled on Back/disposal.
-- Original photo retention for missing/invalid layers, failed WebGL and context loss.
+- PR25 CSS interactive cutout on unavailable WebGL or context loss. Original photo retention for missing/invalid layers or unsupported CSS transforms.
   Missing photos show the Failed screen. Try again repeats the selected dish's load,
   including detail → card → missing-placeholder photo recovery, without pushing history.
 
-The Three.js renderer remains lazy, event-driven and bounded. It disposes its canvas,
+The Three.js renderer remains lazy, event-driven and bounded. Its CSS fallback uses PR25 perspective(900px), bounded rotation and depth-ranked layers without WebGL. Both paths verify exact bytes, hashes and decoded dimensions. It disposes its canvas,
 textures, geometry, bitmaps, observers and short animation frames. No idle animation loop.
 Photo fallback requires no WebGL. No actual-size, weight or nutrition claim is added.
 
@@ -94,11 +94,12 @@ dish, then View Portion:
 
 - Ready: `http://127.0.0.1:5173/?scenario=portion-demo`
 - Loading then Ready: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=loading`
-- Photo fallback: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
+- Interactive cutout fallback (no WebGL): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
+- Photo fallback (missing cutout assets): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=photo`
 - Failed: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=failed`
 
 The loading scenario deliberately delays each local layer by three seconds; it then
-completes normally. Fallback/failed scenarios deliberately keep failing so their
+completes normally. Photo/failed scenarios deliberately keep failing so their
 screens remain inspectable, including repeated Try again. The ready scenario is the
 working captured-photo tilt demo. These use actual state transitions, not static mockups.
 
@@ -110,7 +111,7 @@ is unchanged. The reserved `.invalid` mapping is development-wide, not an approv
 ## Changed files
 
 - Flow/UI: `frontend/diner/src/menu/dishDetail.ts`, `menuScreen.ts`, `portionPreview.ts`,
-  `portionRenderer.ts`, `portionMotion.ts`, `portionDemo.ts`, `fixtures.ts`, `style.css`,
+  `portionRenderer.ts`, `portionCssRenderer.ts`, `portionAssets.ts`, `portionMotion.ts`, `portionDemo.ts`, `fixtures.ts`, `style.css`,
   `preview-assets/*`, and local `fixture-assets/portion-demo/*`.
 - Data: `adapter.ts`, `published.ts`, `types.ts`, `wire.ts`,
   `packages/contracts/src/index.ts` and `packages/contracts/src/portion.ts`.

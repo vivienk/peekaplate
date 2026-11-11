@@ -200,7 +200,7 @@ test('closing during loading disposes late work and repeated opens keep one canv
   );
 });
 
-test('WebGL failure and context loss restore the photo', async ({ page }) => {
+test('WebGL context loss restores the interactive PR25 cutout', async ({ page }) => {
   await openMenu(page);
   await openPortion(page);
   await expect(page.locator('canvas')).toHaveCount(1);
@@ -212,10 +212,9 @@ test('WebGL failure and context loss restore the photo', async ({ page }) => {
         ?.getExtension('WEBGL_lose_context')
         ?.loseContext(),
     );
-  await expect(page.locator('.pp-portion__status')).toContainText(
-    'Interactive preview unavailable',
-  );
-  await expect(page.locator('img.pp-detail__image')).toBeVisible();
+  await expect(page.locator('.pp-portion__status')).toContainText('Drag to tilt the plate');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
 });
 
 test('reduced motion renders without requiring motion or WebGL for navigation', async ({
@@ -229,7 +228,9 @@ test('reduced motion renders without requiring motion or WebGL for navigation', 
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
 });
 
-test('unavailable WebGL keeps the photo and reload retires a stale preview', async ({ page }) => {
+test('unavailable WebGL keeps an interactive cutout and reload retires a stale preview', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (kind: string, ...args: unknown[]) {
@@ -239,10 +240,8 @@ test('unavailable WebGL keeps the photo and reload retires a stale preview', asy
   });
   await openMenu(page);
   await openPortion(page);
-  await expect(page.locator('.pp-portion__status')).toContainText(
-    'Interactive preview unavailable',
-  );
-  await expect(page.locator('img.pp-detail__image')).toBeVisible();
+  await expect(page.locator('.pp-portion__status')).toContainText('Drag to tilt the plate');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
   await page.reload();
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
@@ -275,7 +274,9 @@ test('local captured-dish demo loads real textures and tilts without route mocks
 for (const state of ['loading', 'ready', 'fallback', 'failed'] as const) {
   test(`Figma ${state} state uses exported artwork and preserves Back`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`http://127.0.0.1:5173/?scenario=portion-demo&previewState=${state}`);
+    await page.goto(
+      `http://127.0.0.1:5173/?scenario=portion-demo&previewState=${state === 'fallback' ? 'photo' : state}`,
+    );
     await openPortion(page);
     await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', state);
     const art =
@@ -341,3 +342,43 @@ test('live reduced-motion preference immediately centers and updates instruction
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
 });
+
+test('PR25 interactive cutout fallback stays tiltable without WebGL', async ({ page }) => {
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback');
+  await openPortion(page);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  const card = page.locator('.pp-portion__css');
+  await expect(card).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+  const stage = page.getByRole('group', { name: 'Captured dish · tilt demo portion preview' });
+  await stage.press('ArrowRight');
+  await expect(card).toHaveCSS('transform', /matrix3d/);
+  await expect(card).toHaveAttribute('style', /rotateY\(0.5deg\)/);
+  await stage.press('Home');
+  await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await stage.press('ArrowRight');
+  await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
+});
+
+for (const mode of ['hash', 'dimensions', 'no-photo'] as const) {
+  test(`PR25 CSS fallback still rejects invalid assets: ${mode}`, async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (kind: string, ...args: unknown[]) {
+        if (kind === 'webgl' || kind === 'webgl2') return null;
+        return original.apply(this, [kind, ...args] as Parameters<typeof original>);
+      } as typeof original;
+    });
+    await openMenu(page, mode);
+    await openPortion(page);
+    await expect(page.locator('.pp-detail')).toHaveAttribute(
+      'data-portion-state',
+      mode === 'no-photo' ? 'failed' : 'fallback',
+    );
+    await expect(page.locator('.pp-portion__css')).toHaveCount(0);
+  });
+}

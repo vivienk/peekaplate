@@ -2606,3 +2606,11 @@ being edited; rerun against stable source before treating this as product eviden
 Visual inspection of the generated ready screenshot caught the adapter's light
 backdrop against the dark Figma preview. Match the existing preview surface color
 and assert the lossless backdrop pixel in the processor export regression test.
+
+### 2026-11-10 — interactive cutout fallback versus photo failure state
+
+The demo named fallback deliberately rejected layers and displayed a static photo,
+while the requested PR25 fallback is its CSS interactive cutout. A new browser
+regression failed before correction. Added the PR25 CSS card path for unavailable
+WebGL/context loss, retained byte/hash/dimension verification and retry/cancellation,
+and moved deliberate photo failure to previewState=photo. No publication changes.
