@@ -306,3 +306,19 @@ uv run --frozen python -m unittest discover -s tests
 The inherited schema remains a Python draft contract; final TypeScript/backend
 integration and the ClickUp ground-truth evaluation are still separate work.
 Menu imagery is text evidence, not approved photographs of plated dishes.
+
+### Merchandise and minimum prices
+
+Text-grounded and vision extraction reject explicit wrapping-cloth product
+titles (`Furoshiki`, `Furoshiki Wrapping`, `Furoshiki Wrapping Cloth`, and
+`Wrapping Cloth`, ignoring case and whitespace). Rejections remain visible in
+the report and make the result incomplete when food drafts remain. This narrow
+check is not a general merchandise classifier; food wraps and mentions of
+cloth in descriptions are not excluded.
+
+A printed plus-qualified price such as `$25.00+` remains in `price_text`, with
+`price_amount` null and a minimum/qualified-price review warning. The text path
+also checks the dish's own source entry when a model omits the plus; it does not
+borrow another dish's price or resolve an ambiguous association. Vision output
+remains unverified transcription and cannot recover a qualifier omitted by the
+model. Review exports preserve the printed price and `needs_review` status.

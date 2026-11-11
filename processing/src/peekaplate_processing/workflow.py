@@ -24,6 +24,7 @@ from peekaplate_processing.menu_context import MONEY_MARKER, PRICE_GROUP, TRAILI
 from peekaplate_processing.menu_layout import box_price_text_is_missing, corroborate_box_price, entry_price, section_price_context
 from peekaplate_processing.timing import measure
 from peekaplate_processing.review_suggestions import suggestion_record
+from peekaplate_processing.product_validation import MINIMUM_PRICE_WARNING, NON_FOOD_ERROR, is_wrapping_cloth, minimum_price_literals
 
 INPUT_MODES=("ocr", "ocr_image", "image", "vision_v4")
 MAX_VISION_BATCH_BYTES=16_000_000
@@ -80,6 +81,8 @@ categories, prices and ingredients from the source; use null when unknown or
 ambiguous. Do not infer allergens, ingredients or currency. Currency requires an
 explicit three-letter code. Each dish must cite its page_number. Return an empty
 dishes list for pages without dishes. Never approve or publish content.
+Exclude non-food merchandise such as wrapping cloths. Preserve a trailing price
+qualifier such as "$25.00+" in price_text and leave price_amount null.
 
 Return one JSON object containing a dishes array, without Markdown or prose.
 Include every required field for every dish, even when its value is null.
@@ -196,6 +199,8 @@ def check_grounding(dish: ExtractedDish, text: str):
 
 def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), section_names=(), ocr_metadata=None, return_box_evidence=False):
     source_name=verified_source_name(dish.name, text)
+    if is_wrapping_cloth(source_name):
+        raise ExtractionError(NON_FOOD_ERROR)
     name_replaced=source_name != dish.name
     if name_replaced:
         dish=dish.model_copy(update={"name":source_name})
@@ -277,6 +282,30 @@ def grounded_draft(dish: ExtractedDish, text: str, *, dish_names=(), section_nam
         if dish.price_text is None and len(pairs) == 1:
             updates["price_text"]=pairs[0].group()
         warnings.append("Multiple printed prices; option meanings require human review.")
+    # Check the item's source scope as well as retained model price text: a
+    # model or layout recovery may have dropped the trailing plus. Never borrow
+    # a qualifier from another dish or upgrade an ambiguous price association.
+    qualified = minimum_price_literals(updates.get("price_text", dish.price_text))
+    source_qualified = minimum_price_literals(local_entry_block) if not ambiguous else []
+    retained_price = updates.get("price_text", dish.price_text) or updates.get("price_amount", dish.price_amount) or ""
+    retained_numbers = {Decimal(value) for value in re.findall(r"\d+(?:\.\d+)?", retained_price)}
+    source_qualified = [literal for literal in source_qualified
+                        if {Decimal(value) for value in re.findall(r"\d+(?:\.\d+)?", literal)} == retained_numbers]
+    # Equal numbers do not prove equal price occurrences. A fixed base price
+    # and a same-value add-on can coexist inside this one entry. Do not replace
+    # the base with the add-on's qualifier when a plain occurrence remains.
+    unqualified_scope = local_entry_block
+    for literal in source_qualified:
+        unqualified_scope = unqualified_scope.replace(literal, "")
+    if any(Decimal(match.group()) in retained_numbers
+           and not nonprice_unit(unqualified_scope, match.start(), match.end())
+           for match in re.finditer(r"(?<![\w.,])\d+(?:\.\d+)?(?!\w|[.,]\d)", unqualified_scope)):
+        source_qualified = []
+    if qualified or source_qualified:
+        updates["price_amount"] = None
+        if len(source_qualified) == 1 and not supplied_pair and not matching_pairs:
+            updates["price_text"] = source_qualified[0]
+        warnings.append(MINIMUM_PRICE_WARNING)
     if dish.ingredients == []: updates["ingredients"] = None
     if updates.get("price_text", dish.price_text) is None and updates.get("price_amount", dish.price_amount) is None:
         if any(w in text.lower() for w in ("bistro to share", "all-day trio", "choose 1", "starter +", "combo", "bundle")):

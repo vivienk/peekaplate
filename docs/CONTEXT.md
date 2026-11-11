@@ -401,7 +401,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PR58 evidence-grounded extraction and review exports preserve schema/version pairing, failed reports and private immutable attempt bundles. The local staging candidate selects vision_v4 with OCR+image fallback; vision output and proposed boxes require review. The host stores validated artifacts before returning success. The older deployed Gemini staging service passed a two-dish synthetic extraction on November7; that does not validate this candidate image or owner upload/persistence. Paired host/container deployment and hosted archive acceptance remain pending.",
+      "summary": "PR58 evidence-grounded extraction and review exports preserve schema/version pairing, failed reports and private immutable attempt bundles. The local staging candidate selects vision_v4 with OCR+image fallback; vision output and proposed boxes require review. The host stores validated artifacts before returning success. The older deployed Gemini staging service passed a two-dish synthetic extraction on November7; that does not validate this candidate image or owner upload/persistence. Paired host/container deployment and hosted archive acceptance remain pending. Text and vision draft assembly reject explicit wrapping-cloth titles and preserve plus-qualified prices as review-required text without a fixed scalar; this is a narrow product check, not general merchandise classification.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -476,7 +476,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
-        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "processing/src/peekaplate_processing/product_validation.py",
+        "processing/src/peekaplate_processing/vision_extraction.py",
+        "processing/tests/test_product_validation.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -485,10 +488,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "55304267f69cec5ee031bd6656e24ca1225b8173f57be5d4ac256e0b1b032ca6"
+      "sourceFingerprint": "81c8319db3a69f8903a88a081f526f08754beb6e073139514a15aff08ff4496d"
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "processing"
+      ],
+      "summary": "Local PR118 follow-up adds wrapping-cloth exclusion and plus-qualified price uncertainty in text and vision draft assembly, with synthetic regressions through report persistence and review export. No contracts or migrations changed.",
+      "next": "Review local patch and run frozen Linux CI; live provider and real database acceptance remain pending. No merge or deployment authorized."
+    },
     {
       "date": "2026-11-07",
       "modules": [
@@ -577,14 +588,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "delivery"
       ]
-    },
-    {
-      "summary": "Hosted backfill restored three labelled synthetic records and independent archive/tenant readback passed. Genuine browser exposed a503 caused by self-JWKS fetch (Cloudflare1042); bounded regression reproduces and local configured-public-key verification fixes it without relaxing authentication.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Review/deploy the token self-fetch fix, repeat hosted browser/Queue/facts acceptance, then restore synthetic viewer permission and withdraw the fixture. Normal collection remains paused."
     }
   ]
 }

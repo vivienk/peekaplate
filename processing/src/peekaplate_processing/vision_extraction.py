@@ -24,6 +24,7 @@ class VisionCaptureLimitError(Exception):
     """The private attempt history cannot be represented safely."""
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from peekaplate_processing.product_validation import MINIMUM_PRICE_WARNING, NON_FOOD_ERROR, is_wrapping_cloth, minimum_price_literals
 from peekaplate_processing.schemas import (
     DishDraft,
     DraftEvidence,
@@ -87,6 +88,7 @@ class V4Batch(BaseModel):
 
 V4_VISION_PROMPT = """Detect all distinct food and drink items from this menu page image.
 Copy text exactly as printed. Never invent descriptions, prices or currencies; use null when absent.
+Exclude non-food merchandise such as wrapping cloths. Preserve plus-qualified prices in price_text; they are not fixed prices.
 For each item, output:
 - name: dish title
 - description: printed item description (e.g. ingredients, sides, details), or null if none
@@ -346,6 +348,9 @@ def build_v4_result(
         ref = by_page_img[p_num].get("image_reference", {})
         width, height = ref.get("width"), ref.get("height")
         clean_name = d.name.strip()[:160]
+        if is_wrapping_cloth(clean_name):
+            errors.append(f"Page {p_num}: {NON_FOOD_ERROR}")
+            continue
         clean_price_text = d.price_text.strip()[:160] if d.price_text and d.price_text.strip() else None
         clean_currency = d.price_currency.strip().upper() if d.price_currency and re.fullmatch(r"[A-Za-z]{3}", d.price_currency.strip()) else None
         try:
@@ -360,7 +365,7 @@ def build_v4_result(
                 ingredients=None,
                 source_id=source.source_id,
                 source_text=clean_name,
-                review_warnings=[VISION_REVIEW_WARNING],
+                review_warnings=[VISION_REVIEW_WARNING, *([MINIMUM_PRICE_WARNING] if minimum_price_literals(clean_price_text) else [])],
             )
         except ValueError as exc:
             errors.append(f"Page {p_num}: dish {clean_name!r} rejected by the draft schema ({type(exc).__name__}).")
