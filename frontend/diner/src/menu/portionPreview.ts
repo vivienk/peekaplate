@@ -195,14 +195,22 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       const img = document.createElement('img');
       img.className = 'pp-detail__image';
       img.alt = photo.alt;
-      img.addEventListener(
-        'error',
-        () => {
-          img.remove();
-          if (active && root.dataset.portionState === 'fallback') fallback();
-        },
-        { once: true },
-      );
+      let triedCard = false;
+      img.addEventListener('error', () => {
+        if (disposed) return;
+        const card = dish.images?.card;
+        if (!triedCard && card && img.getAttribute('src') !== card.url) {
+          triedCard = true;
+          img.src = card.url;
+          img.alt = card.alt;
+          return;
+        }
+        const missing = document.createElement('div');
+        missing.className = 'pp-detail__image pp-detail__image--missing';
+        missing.setAttribute('aria-hidden', 'true');
+        img.replaceWith(missing);
+        if (active && root.dataset.portionState === 'fallback') fallback();
+      });
       stage.querySelector('.pp-detail__image--missing')?.remove();
       stage.append(img);
       img.src = photo.url;

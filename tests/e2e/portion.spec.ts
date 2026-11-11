@@ -166,11 +166,14 @@ for (const mode of [
     if (mode === 'no-photo') {
       const historyLength = await page.evaluate(() => history.length);
       await page.route('https://assets.example.test/**', (route) =>
-        route.fulfill({ contentType: 'image/png', body: images[0]! }),
+        route.request().url().includes('/detail-')
+          ? route.fulfill({ status: 404 })
+          : route.fulfill({ contentType: 'image/png', body: images[0]! }),
       );
       await page.getByRole('button', { name: 'Try again', exact: true }).click();
       await expect(page.locator('.pp-portion__status')).toContainText('Showing photo instead');
       await expect(page.locator('img.pp-detail__image')).toBeVisible();
+      await expect(page.locator('img.pp-detail__image')).toHaveAttribute('src', /card-480/);
       expect(await page.evaluate(() => history.length)).toBe(historyLength);
     } else await expect(page.locator('img.pp-detail__image')).toBeVisible();
     await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();

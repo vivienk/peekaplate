@@ -2526,3 +2526,10 @@ Local browser server startup failed because the temporary Node 24.16 runtime was
 longer present and the shell resolved Node 24.14. Restored the required official
 runtime in /private/tmp and reran the focused browser checks. No application failure
 was observed in that startup attempt.
+
+### 2026-11-10 — retry photo recovery review
+
+Read-only review found the new retry skipped the card fallback and removed the
+missing placeholder on final failure. Restored the existing detail-to-card-to-
+placeholder sequence; the no-photo browser case now recovers only the card while
+the detail image remains unavailable. Targeted regression passes.

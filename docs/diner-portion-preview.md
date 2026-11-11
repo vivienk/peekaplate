@@ -134,3 +134,9 @@ photo retry without extra history; PASS lint, typecheck and build (Worker dry-ru
 Initial JavaScript is 52,220 gzip bytes; T1 allowance remains 324,288 bytes.
 The browser screenshot was inspected at 390px. Exact exported icons and manual
 phone/screen-reader acceptance remain outstanding.
+
+Final narrow review identified a retry that skipped the smaller photo fallback.
+The correction preserves detail → card → missing-placeholder behavior, including
+late image failures after Back. PASS: targeted no-photo browser regression with
+only the card recovered; PASS final lint/typecheck/context/docs checks. The full
+12 preview cases passed immediately before this bounded retry correction.
