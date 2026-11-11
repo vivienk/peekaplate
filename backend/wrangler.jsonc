@@ -11,6 +11,7 @@
   "env": {
     "staging": {
       "name": "peekaplate-api-staging",
+      "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
       "account_id": "51eda1917fd22a9478808a82d2980741",
       "workers_dev": true,
       "preview_urls": false,

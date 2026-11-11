@@ -341,7 +341,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "3b9323e5a1b112ad34c6cad1171a1db4c7477f0392e34ad448a8cdc1723b2f0c"
+      "sourceFingerprint": "c2c4a71024b7bfe705a7e4f570181470487fe7a7e21510c2d17af18fee264906"
     },
     {
       "id": "database",
@@ -461,7 +461,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "3b6e417a3d8abefa583655980effdfdb81b393e88064363b8030f9195edede20"
+      "sourceFingerprint": "4c1a462327b649fa6cadf9044003985a87a217d5b08cc50dc6fc2c56ea8a1253"
     },
     {
       "id": "agents",
@@ -650,14 +650,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-10",
-      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
-    },
-    {
       "date": "2026-11-09",
       "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
       "modules": [
@@ -742,6 +734,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
       "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
+      "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
     }
   ]
 }

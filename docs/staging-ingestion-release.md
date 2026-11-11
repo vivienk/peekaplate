@@ -34,6 +34,12 @@ are never modified or reapplied blindly.
 
 ## Upload contract
 
+The staging API enables `global_fetch_strictly_public` so its authenticated HTTPS
+request reaches the extraction Worker on the same account. Without it Cloudflare
+returns error1042 before the extraction service or model runs. This staging-only
+flag preserves the existing service authentication, signed source capability and
+production configuration. See [Cloudflare fetch routing](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#global-fetch-strictly-public).
+
 `POST /venues/{venueId}/menus/uploads` is available only in local/staging.
 Send a valid staff bearer token, `Idempotency-Key` (16–128 ASCII letters, digits,
 underscore or hyphen), and raw PDF, PNG or JPEG bytes with the matching MIME type.

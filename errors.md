@@ -2567,3 +2567,12 @@ An initial merged backend summary exceeded the context validator's existing 1,00
 ```json
 {"id":"ERR-20261110-OUTBOX-CAPACITY-ASSERTION","status":"resolved","area":"browser-outbox-completion","cause":"The capacity assertion could observe 500 stored events before the remaining five asynchronous writes emitted their drop warnings, then fail an immediate warning assertion.","prevention":"Poll the joint observable state of 500 stored events and five dropped-event warnings with a bounded ten-second deadline.","sources":["tests/e2e/tracking-outbox.spec.ts"],"regression":"The unchanged full run reproduced 500 events with zero observed warnings at assertion time; the corrected browser assertion is repeated before final acceptance."}
 ```
+
+```json
+{"id":"ERR-20261110-EXTRACTION-WORKER-ROUTING","status":"fix-prepared-hosted-retest-pending","area":"staging-menu-ingestion","cause":"The API global fetch to the same-account extraction workers.dev endpoint returned Cloudflare error1042 before reaching the service; staging had no public-fetch routing flag.","prevention":"Enable global_fetch_strictly_public only for staging while retaining nodejs_compat and existing service/capability authentication.","sources":["backend/wrangler.jsonc","scripts/menu-ingestion-infra.test.mjs"],"regression":"The new config regression failed before correction and passed afterward (8/8 script cases). Hosted correction remains pending final release approval."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T06:52:22.494Z","exitCode":1}
+```
