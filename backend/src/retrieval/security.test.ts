@@ -63,6 +63,11 @@ describe('S3-VIS-04 Security & SSRF Protection Boundary', () => {
       expect(isProhibitedIPv6('::ffff:192.168.1.1')).toBe(true);
       expect(isProhibitedIPv6('::ffff:169.254.169.254')).toBe(true);
       expect(isProhibitedIPv6('::ffff:8.8.8.8')).toBe(false);
+
+      // Hexadecimal IPv4-mapped forms must also reject private addresses.
+      expect(isProhibitedIPv6('::ffff:7f00:1')).toBe(true); // 127.0.0.1
+      expect(isProhibitedIPv6('::ffff:c0a8:101')).toBe(true); // 192.168.1.1
+      expect(isProhibitedIPv6('::ffff:808:808')).toBe(false); // 8.8.8.8
     });
   });
 

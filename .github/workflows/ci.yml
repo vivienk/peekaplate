@@ -48,7 +48,11 @@ jobs:
               - 'backend/**'
               - 'packages/contracts/**'
               - 'packages/analytics/**'
+              - 'packages/tokens/**'
               - 'tests/e2e/**'
+              - 'tests/review-preview/**'
+              - 'processing/src/peekaplate_processing/review_preview*.py'
+              - 'playwright.review-preview.config.ts'
               - 'scripts/check-bundle*'
               - 'scripts/verify*'
               - 'playwright.config.ts'
@@ -78,8 +82,8 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/peekaplate-uv"
           "$RUNNER_TEMP/peekaplate-uv/bin/pip" install --disable-pip-version-check uv==0.12.10
-          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --frozen
-          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --frozen python -m unittest discover -s processing/tests
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" sync --project processing --extra service --frozen
+          "$RUNNER_TEMP/peekaplate-uv/bin/uv" run --project processing --extra service --frozen python -m unittest discover -s processing/tests
           "$RUNNER_TEMP/peekaplate-uv/bin/uv" build --project processing
       - run: pnpm verify build
       - name: Context freshness
@@ -106,6 +110,8 @@ jobs:
         with:
           node-version: 24.16.0
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for the real token-to-fact database regression
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:db
 
   browser:
@@ -124,6 +130,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify test:e2e
+      - name: Offline dish review preview
+        run: pnpm exec playwright test --config playwright.review-preview.config.ts
 
   ci:
     if: always()

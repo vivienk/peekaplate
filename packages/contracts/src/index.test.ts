@@ -1,15 +1,52 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ApproveDishDraftRequestSchema,
+  ApproveMenuRevisionSchema,
   BoundedRetrievalResultSchema,
   CreateDishRevisionSchema,
+  canonicalJson,
+  classifyObservationTimeWindow,
   DishIntentEventSchema,
   EvidencePassageSchema,
+  ExtractionBoxCoordinatesSchema,
+  ExtractionBoxEvidenceSchema,
+  ExtractionDishDraftSchema,
+  ExtractionDraftEvidenceSchema,
+  ExtractionSourceRecordSchema,
+  ExtractionSourceSegmentSchema,
+  ExtractionSourceSpanSchema,
+  FIVE_MINUTES_MICROS,
   HealthResponseSchema,
   MAX_AGGREGATE_PASSAGE_CHARS,
   MAX_PASSAGE_CHARS,
   MAX_PASSAGES,
+  MENU_TOKEN_AUDIENCE,
+  MENU_TOKEN_TTL_SECONDS,
+  MenuExtractionResultSchema,
+  MenuIngestionQueueMessageSchema,
+  MenuPublicationSchema,
+  ObservationBatchV2Schema,
+  ObservationConflictQueueMessageSchema,
+  ObservationConflictV1QueueEnvelopeSchema,
+  ObservationQueueEnvelopeSchema,
+  ObservationQueueMessageSchema,
+  ObservationReceiptSchema,
+  ObservationV2QueueEnvelopeSchema,
+  ObservationV2Schema,
+  PublicMenuAllergenCodeSchema,
+  PublicMenuContentBundleSchema,
+  PublicMenuDeliverySchema,
+  PublicMenuDietaryCodeSchema,
+  PublishMenuSchema,
+  parseIsoToMicroseconds,
   RetrievalRequestSchema,
   SourceReferenceSchema,
+  StructuredDishDraftSchema,
+  SubmitMenuIngestionRequestSchema,
+  sha256,
+  TWENTY_FOUR_HOURS_MICROS,
+  toCanonicalObservation,
+  WithdrawMenuSchema,
 } from './index';
 
 const event = {
@@ -109,6 +146,307 @@ describe('dish command boundary', () => {
   });
 });
 
+describe('RES-02 review and publication boundary', () => {
+  const commandId = '00000000-0000-4000-8000-000000000001';
+  const approvalId = '00000000-0000-4000-8000-000000000002';
+  const approval = {
+    commandId,
+    expectedVersion: 0,
+    menuRevisionId: '00000000-0000-4000-8000-000000000003',
+    contentApprovalId: '00000000-0000-4000-8000-000000000006',
+    assetApprovalId: '00000000-0000-4000-8000-000000000007',
+  };
+
+  it('pins the exact immutable menu and asset revisions under review', () => {
+    expect(ApproveMenuRevisionSchema.parse(approval)).toEqual(approval);
+  });
+
+  it('keeps approval, publication and withdrawal as separate commands', () => {
+    expect(PublishMenuSchema.parse({ commandId, expectedVersion: 0, approvalId })).toEqual({
+      commandId,
+      expectedVersion: 0,
+      approvalId,
+    });
+    expect(WithdrawMenuSchema.parse({ commandId, expectedVersion: 1 })).toEqual({
+      commandId,
+      expectedVersion: 1,
+    });
+  });
+
+  it('rejects claimed authority, unknown fields and malformed immutable references', () => {
+    for (const patch of [
+      { venueId: approvalId },
+      { actorId: approvalId },
+      { permission: 'owner' },
+      { expectedVersion: -1 },
+      { menuRevisionId: 'not-a-uuid' },
+      { contentApprovalId: 'not-a-uuid' },
+      { assetApprovalId: 'not-a-uuid' },
+    ]) {
+      expect(ApproveMenuRevisionSchema.safeParse({ ...approval, ...patch }).success).toBe(false);
+    }
+  });
+
+  it('represents withdrawn content explicitly without changing its publication identity', () => {
+    const publication = {
+      menuId: '00000000-0000-4000-8000-000000000004',
+      publicationId: '00000000-0000-4000-8000-000000000005',
+      version: 2,
+      approvalId,
+      publicationHash: 'c'.repeat(64),
+      availabilityVersion: 2,
+      status: 'withdrawn' as const,
+    };
+    expect(MenuPublicationSchema.parse(publication)).toEqual(publication);
+  });
+});
+
+describe('RES-02 immutable diner bundle boundary', () => {
+  const bundle = {
+    schema_version: 1,
+    venue_id: '00000000-0000-4000-8000-000000000101',
+    menu_id: '00000000-0000-4000-8000-000000000102',
+    menu_revision_id: '00000000-0000-4000-8000-000000000103',
+    restaurant: {
+      name: 'Synthetic Test Kitchen',
+      logo: null,
+    },
+    categories: [
+      {
+        category_id: '00000000-0000-4000-8000-000000000105',
+        name: 'Mains',
+        dishes: [
+          {
+            dish_id: '00000000-0000-4000-8000-000000000106',
+            dish_revision_id: '00000000-0000-4000-8000-000000000107',
+            complete: true,
+            name: 'Garden Bowl',
+            description: 'Synthetic fixture content.',
+            price: { amount: '12.50', currency: 'USD' },
+            ingredients: [
+              {
+                ingredient_id: '00000000-0000-4000-8000-000000000108',
+                name: 'Tomato',
+                description: null,
+              },
+            ],
+            allergens: ['sesame'],
+            dietary: ['vegan', 'gluten-free'],
+            images: {
+              card: {
+                url: 'https://assets.example.test/dishes/card.webp',
+                width: 640,
+                height: 480,
+                alt: 'Synthetic garden bowl fixture',
+              },
+              detail: {
+                url: 'https://assets.example.test/dishes/detail.webp',
+                width: 1280,
+                height: 960,
+                alt: 'Synthetic garden bowl fixture',
+              },
+            },
+          },
+          {
+            dish_id: '00000000-0000-4000-8000-000000000109',
+            dish_revision_id: '00000000-0000-4000-8000-000000000110',
+            complete: false,
+          },
+        ],
+      },
+    ],
+  } as const;
+
+  it('accepts an ordered T0 bundle with complete and deliberately incomplete dishes', () => {
+    expect(PublicMenuContentBundleSchema.parse(bundle)).toEqual(bundle);
+  });
+
+  it('accepts every approved allergen and dietary code and rejects display labels as wire values', () => {
+    const allergenCodes = [
+      'milk',
+      'egg',
+      'fish',
+      'crustacean shellfish',
+      'nuts',
+      'peanut',
+      'wheat',
+      'soy',
+      'sesame',
+    ] as const;
+    const dietaryCodes = ['vegan', 'vegetarian', 'gluten-free'] as const;
+
+    for (const code of allergenCodes) expect(PublicMenuAllergenCodeSchema.parse(code)).toBe(code);
+    for (const code of dietaryCodes) expect(PublicMenuDietaryCodeSchema.parse(code)).toBe(code);
+    expect(PublicMenuAllergenCodeSchema.safeParse('tree nut').success).toBe(false);
+    expect(PublicMenuAllergenCodeSchema.safeParse('Peanuts').success).toBe(false);
+    expect(PublicMenuDietaryCodeSchema.safeParse('Vegan').success).toBe(false);
+  });
+
+  it('keeps an unknown allergen review state distinct from a reviewed empty declaration', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    const withAllergenState = (allergens: null | []) => ({
+      ...bundle,
+      categories: [
+        {
+          ...bundle.categories[0],
+          dishes: [{ ...completeDish, allergens }],
+        },
+      ],
+    });
+
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState(null)).success).toBe(true);
+    expect(PublicMenuContentBundleSchema.safeParse(withAllergenState([])).success).toBe(true);
+  });
+
+  it('rejects partial claims, unknown allergens and insecure image URLs', () => {
+    const incompleteDish = bundle.categories[0].dishes[1];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...incompleteDish, price: { amount: '8.00', currency: 'USD' } }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['gluten'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, description: '   ' }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                images: {
+                  ...completeDish.images,
+                  card: {
+                    ...completeDish.images.card,
+                    url: 'http://assets.example.test/card.webp',
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a pre-publication bundle only for its exact published menu revision', () => {
+    const response = {
+      schemaVersion: 1,
+      venueId: bundle.venue_id,
+      menuId: bundle.menu_id,
+      menuRevisionId: bundle.menu_revision_id,
+      publicationId: '00000000-0000-4000-8000-000000000104',
+      publicationHash: 'a'.repeat(64),
+      availabilityVersion: 1,
+      tier: 'T0',
+      bundle: {
+        url: 'https://assets.example.test/menu.json',
+        contentHash: 'b'.repeat(64),
+        assetManifestHash: 'c'.repeat(64),
+      },
+      menuToken: 'synthetic-token',
+      tokenExpiresAt: '2026-10-27T00:30:00.000Z',
+    } as const;
+    expect(PublicMenuDeliverySchema.safeParse({ response, content: bundle }).success).toBe(true);
+    expect(
+      PublicMenuDeliverySchema.safeParse({
+        response: {
+          ...response,
+          menuRevisionId: '00000000-0000-4000-8000-000000000999',
+        },
+        content: bundle,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects duplicate identities and invalid money, allergen or dietary values independently', () => {
+    const completeDish = bundle.categories[0].dishes[0];
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [bundle.categories[0], { ...bundle.categories[0], name: 'Duplicate category' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [completeDish, { ...completeDish, dish_revision_id: bundle.menu_revision_id }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [
+              {
+                ...completeDish,
+                price: { amount: '12.500', currency: 'usd' },
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, allergens: ['wheat', 'wheat'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      PublicMenuContentBundleSchema.safeParse({
+        ...bundle,
+        categories: [
+          {
+            ...bundle.categories[0],
+            dishes: [{ ...completeDish, dietary: ['vegan', 'vegan'] }],
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});
 describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
   const sampleText = 'Roasted Tomato Soup with Basil: $12.50. Fresh vine tomatoes simmered.';
   const samplePassage = {
@@ -408,5 +746,1372 @@ describe('S3-VIS-04 bounded menu evidence retrieval contract boundary', () => {
       retrieved_at: '2026-10-22T20:00:00.000Z',
     };
     expect(SourceReferenceSchema.safeParse(refWithProvenance).success).toBe(true);
+  });
+
+  describe('S3-VIS-01 / VIS-02 menu extraction and structured draft contracts', () => {
+    const validSpan = {
+      segment_id: 'seg_page_1',
+      start: 0,
+      end: 12,
+    };
+
+    const validEvidence = {
+      draft_id: 'draft:abc123def456',
+      draft_index: 0,
+      spans: [validSpan],
+    };
+
+    const validDishDraft = {
+      name: 'Tomato Soup',
+      description: 'Fresh tomatoes, onion, and basil',
+      category: 'Starters',
+      price_amount: '8.50',
+      price_currency: 'CAD',
+      ingredients: ['tomatoes', 'onion', 'basil'],
+      source_id: 'src_doc_1',
+      source_text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+      image_id: null,
+      review_warnings: ['Verify price grounding.'],
+      status: 'needs_review' as const,
+    };
+
+    const validSourceRecord = {
+      source_id: 'src_doc_1',
+      sha256: 'a'.repeat(64),
+      kind: 'pdf' as const,
+      location: 'https://example.com/menu.pdf',
+      retrieved_at: '2026-10-24T12:00:00.000Z',
+      size_bytes: 1024,
+      snapshot_base64: 'c29tZSBwZGYgY29udGVudA==',
+    };
+
+    const validSegment = {
+      segment_id: 'seg_page_1',
+      page_number: 1,
+      method: 'pdf_native' as const,
+      status: 'ready' as const,
+      text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+      native_text: null,
+      error: null,
+      warnings: [],
+      metadata: {},
+    };
+
+    const validExtractionResult = {
+      schema_version: 1 as const,
+      pipeline_version: '2' as const,
+      status: 'complete' as const,
+      source: validSourceRecord,
+      started_at: '2026-10-24T12:00:00.000Z',
+      finished_at: '2026-10-24T12:00:05.000Z',
+      extraction_mode: 'ai' as const,
+      extraction_model: 'chatgpt-4o-latest',
+      ocr_engine: 3 as const,
+      library_versions: { pymupdf: '1.24.0' },
+      configuration: { batch_pages: 10 },
+      segments: [validSegment],
+      drafts: [validDishDraft],
+      evidence: [validEvidence],
+      capture_requests: [],
+      warnings: [],
+      errors: [],
+    };
+
+    it('validates a complete extraction result from the merged Python producer', () => {
+      const parsed = MenuExtractionResultSchema.parse(validExtractionResult);
+      expect(parsed.schema_version).toBe(1);
+      expect(parsed.pipeline_version).toBe('2');
+      expect(parsed.status).toBe('complete');
+      expect(parsed.drafts).toHaveLength(1);
+      expect(parsed.drafts[0]?.name).toBe('Tomato Soup');
+      expect(parsed.drafts[0]?.price_amount).toBe('8.50');
+      expect(parsed.drafts[0]?.status).toBe('needs_review');
+    });
+
+    it('preserves null and unknown fields on minimal drafts without fabricating values', () => {
+      const minimalDraft = {
+        name: 'Daily Special',
+        source_id: 'src_doc_1',
+        source_text: 'Daily Special — market price',
+      };
+      const parsed = ExtractionDishDraftSchema.parse(minimalDraft);
+      expect(parsed.description).toBeNull();
+      expect(parsed.category).toBeNull();
+      expect(parsed.price_amount).toBeNull();
+      expect(parsed.price_currency).toBeNull();
+      expect(parsed.ingredients).toBeNull();
+      expect(parsed.image_id).toBeNull();
+      expect(parsed.review_warnings).toEqual([]);
+      expect(parsed.status).toBe('needs_review');
+    });
+
+    it('preserves zero-price and large decimal string prices without precision loss', () => {
+      const draftZero = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: '0.00',
+      });
+      expect(draftZero.price_amount).toBe('0.00');
+
+      const draftThousands = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: '1200.50',
+      });
+      expect(draftThousands.price_amount).toBe('1200.50');
+
+      // Numeric input is normalized to string representation
+      const draftNumeric = ExtractionDishDraftSchema.parse({
+        ...validDishDraft,
+        price_amount: 14.99,
+      });
+      expect(draftNumeric.price_amount).toBe('14.99');
+    });
+
+    it('accepts supported versions (1/2 and 2/3) and rejects unsupported versions', () => {
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 1,
+          pipeline_version: '2',
+        }).success,
+      ).toBe(true);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 2,
+          pipeline_version: '3',
+        }).success,
+      ).toBe(true);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          schema_version: 99,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        MenuExtractionResultSchema.safeParse({
+          ...validExtractionResult,
+          pipeline_version: '4',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects unauthorized approval or published status on drafts', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          status: 'approved',
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          status: 'published',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects malformed source spans where start >= end or negative', () => {
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: 5,
+          end: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: 10,
+          end: 5,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionSourceSpanSchema.safeParse({
+          segment_id: 'seg_1',
+          start: -1,
+          end: 5,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects invalid currency patterns and negative prices', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_currency: 'cad', // must be uppercase
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_currency: '$', // not ISO 3-letter
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          price_amount: '-5.00',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects extra unexpected fields under strict schema enforcement', () => {
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          unexpected_extra_field: 'unsupported',
+        }).success,
+      ).toBe(false);
+
+      expect(
+        ExtractionDishDraftSchema.safeParse({
+          ...validDishDraft,
+          model_confidence: 0.99, // unsupported confidence field
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates persistence-ready StructuredDishDraft structure', () => {
+      const structuredDraft = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        name: 'Tomato Soup',
+        description: 'Fresh tomatoes, onion, and basil',
+        category: 'Starters',
+        price_amount: '8.50',
+        price_currency: 'CAD',
+        ingredients: ['tomatoes', 'onion', 'basil'],
+        source_id: 'src_doc_1',
+        source_text: 'Tomato Soup — tomatoes, onion, basil — 8.50 CAD',
+        image_id: null,
+        code_point_spans: [validSpan],
+        utf16_spans: [validSpan],
+        review_warnings: ['Verify price grounding.'],
+        status: 'needs_review' as const,
+      };
+
+      const parsed = StructuredDishDraftSchema.parse(structuredDraft);
+      expect(parsed.draft_id).toBe('draft:abc123def456');
+      expect(parsed.price_amount).toBe('8.50');
+      expect(parsed.status).toBe('needs_review');
+    });
+
+    it('validates SubmitMenuIngestionRequestSchema and ApproveDishDraftRequestSchema', () => {
+      const validSubmission = {
+        sourceType: 'url' as const,
+        sourceUrl: 'https://example.com/menu',
+        idempotencyKey: 'key_123',
+      };
+      expect(SubmitMenuIngestionRequestSchema.parse(validSubmission)).toEqual(validSubmission);
+
+      expect(
+        SubmitMenuIngestionRequestSchema.safeParse({
+          sourceType: 'url',
+          sourceUrl: 'not-a-url',
+          idempotencyKey: 'key_123',
+        }).success,
+      ).toBe(false);
+
+      const validApproval = {
+        commandId: '0199b409-a700-7000-8000-000000000001',
+        expectedVersion: 0,
+      };
+      expect(ApproveDishDraftRequestSchema.parse(validApproval)).toEqual(validApproval);
+      expect(ApproveDishDraftRequestSchema.safeParse({}).success).toBe(false);
+      expect(ApproveDishDraftRequestSchema.safeParse({ expectedVersion: 0 }).success).toBe(false);
+      expect(
+        ApproveDishDraftRequestSchema.safeParse({
+          commandId: 'not-a-uuid',
+          expectedVersion: 0,
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates valid OCR box evidence from PR #58 and retains fractional bounding boxes', () => {
+      const validBox = {
+        left: 10.25,
+        top: 20.0,
+        width: 30.5,
+        height: 12.0,
+      };
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: validBox,
+      };
+
+      // Valid Box Coordinates
+      expect(ExtractionBoxCoordinatesSchema.parse(validBox)).toEqual(validBox);
+
+      // Valid Box Evidence
+      expect(ExtractionBoxEvidenceSchema.parse(validBoxRecord)).toEqual(validBoxRecord);
+
+      // Valid Draft Evidence with box_evidence
+      const evidenceWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        spans: [validSpan],
+        box_evidence: [validBoxRecord],
+      };
+      expect(ExtractionDraftEvidenceSchema.parse(evidenceWithBox)).toEqual(evidenceWithBox);
+
+      // Extraction result with box_evidence parses cleanly
+      const resultWithBox = {
+        ...validExtractionResult,
+        evidence: [evidenceWithBox],
+      };
+      const parsed = MenuExtractionResultSchema.parse(resultWithBox);
+      expect(parsed.evidence[0]?.box_evidence).toHaveLength(1);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.left).toBe(10.25);
+      expect(parsed.evidence[0]?.box_evidence?.[0]?.box.width).toBe(30.5);
+
+      // Persistence StructuredDishDraft with box_evidence
+      const structuredWithBox = {
+        draft_id: 'draft:abc123def456',
+        draft_index: 0,
+        name: 'Tomato Soup',
+        description: null,
+        category: null,
+        price_amount: '8.50',
+        price_currency: 'CAD',
+        ingredients: null,
+        source_id: 'src_doc_1',
+        source_text: 'Tomato Soup 8.50 CAD',
+        image_id: null,
+        code_point_spans: [validSpan],
+        utf16_spans: [validSpan],
+        box_evidence: [validBoxRecord],
+        review_warnings: [],
+        status: 'needs_review' as const,
+      };
+      expect(StructuredDishDraftSchema.parse(structuredWithBox).box_evidence).toEqual([
+        validBoxRecord,
+      ]);
+    });
+
+    it('rejects malformed OCR box evidence according to the strict contract', () => {
+      const validBoxRecord = {
+        page_number: 1,
+        saved_region_index: 0,
+        text: '8.50',
+        box: {
+          left: 10.25,
+          top: 20.0,
+          width: 30.5,
+          height: 12.0,
+        },
+      };
+
+      // Missing required coordinate
+      const missingLeft = { ...validBoxRecord, box: { top: 20, width: 30, height: 12 } };
+      expect(ExtractionBoxEvidenceSchema.safeParse(missingLeft).success).toBe(false);
+
+      // Invalid coordinate types
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: '10.25' },
+        }).success,
+      ).toBe(false);
+
+      // Non-finite coordinates (NaN / Infinity)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: Number.NaN },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: Number.POSITIVE_INFINITY },
+        }).success,
+      ).toBe(false);
+
+      // Negative coordinates
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, left: -1 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, top: -0.5 },
+        }).success,
+      ).toBe(false);
+
+      // Zero or negative width / height
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, width: 0 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, height: -5 },
+        }).success,
+      ).toBe(false);
+
+      // Invalid page_number (must be integer >= 1)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 0 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: -1 }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, page_number: 1.5 }).success,
+      ).toBe(false);
+
+      // Invalid saved_region_index (must be integer >= 0)
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: -1 })
+          .success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, saved_region_index: 0.5 })
+          .success,
+      ).toBe(false);
+
+      // Blank or control characters in text
+      expect(ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '' }).success).toBe(
+        false,
+      );
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '   ' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\n50' }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({ ...validBoxRecord, text: '8\x7f50' }).success,
+      ).toBe(false);
+
+      // Extra unexpected fields forbidden under strict schema
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          box: { ...validBoxRecord.box, extra_coord: 100 },
+        }).success,
+      ).toBe(false);
+      expect(
+        ExtractionBoxEvidenceSchema.safeParse({
+          ...validBoxRecord,
+          unexpected_extra_prop: 'rejected',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('validates MenuIngestionQueueMessageSchema', () => {
+      const validQueueMessage = {
+        version: 1 as const,
+        tenantId: '0199b409-a700-7000-8000-000000000001',
+        jobId: '0199b409-a700-7000-8000-000000000002',
+        queuedAt: new Date().toISOString(),
+      };
+      expect(MenuIngestionQueueMessageSchema.parse(validQueueMessage)).toEqual(validQueueMessage);
+
+      expect(
+        MenuIngestionQueueMessageSchema.safeParse({
+          ...validQueueMessage,
+          version: 2,
+        }).success,
+      ).toBe(false);
+
+      expect(
+        MenuIngestionQueueMessageSchema.safeParse({
+          ...validQueueMessage,
+          tenantId: 'not-a-uuid',
+        }).success,
+      ).toBe(false);
+    });
+  });
+});
+
+describe('observation.v2 contract', () => {
+  const base = {
+    schema_version: 'observation.v2',
+    event_id: '10000000-0000-4000-8000-000000000001',
+    type: 'dish_saved',
+    session_id: '20000000-0000-4000-8000-000000000001',
+    producer_id: '30000000-0000-4000-8000-000000000001',
+    local_sequence: 1,
+    occurred_at: '2026-10-24T16:00:00.000Z',
+    publication_revision_id: '40000000-0000-4000-8000-000000000001',
+    payload: {
+      dish_id: '50000000-0000-4000-8000-000000000001',
+      dish_revision_id: '60000000-0000-4000-8000-000000000001',
+      save_origin: 'direct',
+      save_surface: 'dish_detail',
+      shortlist_size: 1,
+    },
+  };
+
+  it('accepts the string schema version and approved Save fields', () => {
+    expect(ObservationV2Schema.parse(base)).toEqual(base);
+    expect(
+      ObservationBatchV2Schema.parse({ contract: 'observation.v2', events: [base] }).events,
+    ).toHaveLength(1);
+  });
+
+  it('accepts and rejects a fixture for every P0 event payload', () => {
+    const dishId = base.payload.dish_id;
+    const dishRevisionId = base.payload.dish_revision_id;
+    const otherDishId = '50000000-0000-4000-8000-000000000002';
+    const otherDishRevisionId = '60000000-0000-4000-8000-000000000002';
+    const exposureId = '70000000-0000-4000-8000-000000000001';
+    const openingId = '80000000-0000-4000-8000-000000000001';
+    const fixtures = [
+      {
+        valid: { ...base, type: 'menu_viewed', payload: { entry_source: 'qr' } },
+        invalid: { ...base, type: 'menu_viewed', payload: { entry_source: 'table_qr' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 1,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_viewed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            exposure_id: exposureId,
+            surface: 'menu_list',
+            position: 0,
+            exposure_basis: 'viewport_50pct_1s',
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'menu_card',
+            from_exposure_id: exposureId,
+            nav_relation: 'none',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_opened',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            source: 'direct_link',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_000,
+            final: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_activity_checkpoint',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 300_001,
+            final: true,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: { dish_id: dishId, dish_revision_id: dishRevisionId, opening_id: openingId },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_detail_closed',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            opening_id: openingId,
+            active_ms: 1,
+          },
+        },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: otherDishId,
+            other_dish_revision_id: otherDishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_compared',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            other_dish_id: dishId,
+            other_dish_revision_id: dishRevisionId,
+            comparison_id: '90000000-0000-4000-8000-000000000001',
+            compare_action: 'start',
+            save_available: true,
+          },
+        },
+      },
+      {
+        valid: base,
+        invalid: { ...base, payload: { ...base.payload, save_origin: 'toast' } },
+      },
+      {
+        valid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'compare_view',
+            shortlist_size: 0,
+          },
+        },
+        invalid: {
+          ...base,
+          type: 'dish_unsaved',
+          payload: {
+            dish_id: dishId,
+            dish_revision_id: dishRevisionId,
+            unsave_surface: 'toast',
+            shortlist_size: 0,
+          },
+        },
+      },
+      {
+        valid: { ...base, type: 'shortlist_viewed', payload: { shortlist_size: 1 } },
+        invalid: {
+          ...base,
+          type: 'shortlist_viewed',
+          payload: { shortlist_size: 1, dish_id: dishId },
+        },
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      expect(ObservationV2Schema.safeParse(fixture.valid).success).toBe(true);
+      expect(ObservationV2Schema.safeParse(fixture.invalid).success).toBe(false);
+    }
+  });
+
+  it('rejects numeric versions, client authority, unknown fields and removed event types', () => {
+    for (const candidate of [
+      { ...base, schema_version: 2 },
+      { ...base, venue_id: base.event_id },
+      { ...base, received_at: base.occurred_at },
+      { ...base, type: 'ingredient_viewed' },
+      { ...base, payload: { ...base.payload, search_text: 'soup' } },
+    ]) {
+      expect(ObservationV2Schema.safeParse(candidate).success).toBe(false);
+    }
+  });
+
+  it('keeps Save, Unsave and Undo in the approved event vocabulary', () => {
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        payload: { ...base.payload, save_origin: 'undo', save_surface: 'saved_screen' },
+      }).success,
+    ).toBe(true);
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        type: 'dish_unsaved',
+        payload: {
+          dish_id: base.payload.dish_id,
+          dish_revision_id: base.payload.dish_revision_id,
+          unsave_surface: 'saved_screen',
+          shortlist_size: 0,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ObservationV2Schema.safeParse({
+        ...base,
+        type: 'dish_unsaved',
+        payload: {
+          dish_id: base.payload.dish_id,
+          dish_revision_id: base.payload.dish_revision_id,
+          unsave_surface: 'compare_view',
+          shortlist_size: 0,
+        },
+      }).success,
+    ).toBe(true);
+    expect(ObservationV2Schema.safeParse({ ...base, type: 'undo' }).success).toBe(false);
+  });
+});
+
+describe('observation receipt contract', () => {
+  const eventId = '10000000-0000-4000-8000-000000000001';
+
+  it('accepts only coherent accepted, retry and rejected dispositions', () => {
+    for (const receipt of [
+      { event_id: eventId, status: 'accepted', reason_code: null, retryable: false },
+      {
+        event_id: eventId,
+        status: 'accepted',
+        reason_code: 'duplicate_in_batch',
+        retryable: false,
+      },
+      { event_id: eventId, status: 'retry', reason_code: null, retryable: true },
+      {
+        event_id: eventId,
+        status: 'rejected',
+        reason_code: 'schema_invalid',
+        retryable: false,
+      },
+      { event_id: null, status: 'rejected', reason_code: 'schema_invalid', retryable: false },
+    ]) {
+      expect(ObservationReceiptSchema.safeParse(receipt).success).toBe(true);
+    }
+  });
+
+  it('rejects contradictory status, reason and retryability combinations', () => {
+    for (const receipt of [
+      { event_id: eventId, status: 'accepted', reason_code: 'schema_invalid', retryable: false },
+      { event_id: eventId, status: 'accepted', reason_code: null, retryable: true },
+      { event_id: null, status: 'accepted', reason_code: null, retryable: false },
+      { event_id: eventId, status: 'retry', reason_code: 'too_old', retryable: true },
+      { event_id: eventId, status: 'retry', reason_code: null, retryable: false },
+      { event_id: null, status: 'retry', reason_code: null, retryable: true },
+      { event_id: eventId, status: 'rejected', reason_code: null, retryable: false },
+      { event_id: eventId, status: 'rejected', reason_code: 'too_old', retryable: true },
+      { event_id: null, status: 'rejected', reason_code: 'too_old', retryable: false },
+    ]) {
+      expect(ObservationReceiptSchema.safeParse(receipt).success).toBe(false);
+    }
+  });
+});
+
+describe('observation Queue contracts', () => {
+  const event = {
+    schema_version: 'observation.v2' as const,
+    event_id: '10000000-0000-4000-8000-000000000001',
+    type: 'shortlist_viewed' as const,
+    session_id: '20000000-0000-4000-8000-000000000001',
+    producer_id: '30000000-0000-4000-8000-000000000001',
+    local_sequence: 2,
+    occurred_at: '2026-10-24T16:00:00.000Z',
+    publication_revision_id: '40000000-0000-4000-8000-000000000001',
+    payload: { shortlist_size: 2 },
+  };
+
+  it('validates the flattened observation payload against its event type', () => {
+    const message = {
+      kind: 'observation.v2',
+      tenantId: '50000000-0000-4000-8000-000000000001',
+      eventId: event.event_id,
+      sessionId: event.session_id,
+      schemaVersion: event.schema_version,
+      occurredAt: event.occurred_at,
+      type: event.type,
+      authorizedPublicationId: event.publication_revision_id,
+      producerId: event.producer_id,
+      localSequence: event.local_sequence,
+      payload: event.payload,
+      firstReceivedAt: '2026-10-24T16:00:01.000Z',
+    };
+    expect(ObservationQueueMessageSchema.safeParse(message).success).toBe(true);
+    expect(
+      ObservationQueueMessageSchema.safeParse({
+        ...message,
+        payload: { shortlist_size: 2, search_text: 'private' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('bounds conflict evidence to validated events or fixed safe metadata', () => {
+    const message = {
+      kind: 'observation_conflict.v1',
+      tenantId: '50000000-0000-4000-8000-000000000001',
+      eventId: event.event_id,
+      authorizedPublicationId: event.publication_revision_id,
+      firstReceivedAt: '2026-10-24T16:00:01.000Z',
+      reasonCode: 'event_id_conflict',
+      copies: [
+        { validation: 'valid', canonicalChecksum: 'a'.repeat(64), event },
+        {
+          validation: 'invalid',
+          canonicalChecksum: 'b'.repeat(64),
+          metadata: {
+            schemaVersionStatus: 'other',
+            eventType: 'shortlist_viewed',
+            occurredAt: event.occurred_at,
+            publicationStatus: 'matches_authority',
+            payloadObject: true,
+          },
+        },
+      ],
+    };
+    expect(ObservationConflictQueueMessageSchema.safeParse(message).success).toBe(true);
+    expect(
+      ObservationConflictQueueMessageSchema.safeParse({
+        ...message,
+        copies: [message.copies[0], { ...message.copies[1], search_text: 'private' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('ObservationQueueEnvelopeSchema contract boundary', () => {
+  const tenantId = '50000000-0000-4000-8000-000000000001';
+  const eventId = '10000000-0000-4000-8000-000000000001';
+  const pubId = '40000000-0000-4000-8000-000000000001';
+  const sessionId = '20000000-0000-4000-8000-000000000001';
+  const producerId = '30000000-0000-4000-8000-000000000001';
+
+  const validNormal = {
+    kind: 'observation.v2' as const,
+    tenantId,
+    eventId,
+    authorizedPublicationId: pubId,
+    sessionId,
+    schemaVersion: 'observation.v2' as const,
+    occurredAt: '2026-10-24T12:00:00.000Z',
+    type: 'dish_viewed' as const,
+    producerId,
+    localSequence: 1,
+    payload: {
+      dish_id: '60000000-0000-4000-8000-000000000001',
+      dish_revision_id: '70000000-0000-4000-8000-000000000001',
+      exposure_id: '80000000-0000-4000-8000-000000000001',
+      surface: 'menu_list' as const,
+      position: 1,
+      exposure_basis: 'viewport_50pct_1s' as const,
+    },
+    firstReceivedAt: '2026-10-24T12:00:01.000Z',
+  };
+
+  const validConflictPayload = {
+    kind: 'observation_conflict.v1' as const,
+    tenantId,
+    eventId,
+    authorizedPublicationId: pubId,
+    firstReceivedAt: '2026-10-24T12:00:01.000Z',
+    reasonCode: 'event_id_conflict' as const,
+    copies: [
+      {
+        validation: 'valid' as const,
+        canonicalChecksum: 'a'.repeat(64),
+        event: {
+          schema_version: 'observation.v2' as const,
+          event_id: eventId,
+          session_id: sessionId,
+          producer_id: producerId,
+          local_sequence: 1,
+          occurred_at: '2026-10-24T12:00:00.000Z',
+          publication_revision_id: pubId,
+          type: 'shortlist_viewed' as const,
+          payload: { shortlist_size: 1 },
+        },
+      },
+      {
+        validation: 'invalid' as const,
+        canonicalChecksum: 'b'.repeat(64),
+        metadata: {
+          schemaVersionStatus: 'other' as const,
+          eventType: 'shortlist_viewed' as const,
+          occurredAt: '2026-10-24T12:00:00.000Z',
+          publicationStatus: 'matches_authority' as const,
+          payloadObject: true,
+        },
+      },
+    ],
+  };
+
+  it('validates canonical normal observation.v2 envelopes', () => {
+    const parsed = ObservationQueueEnvelopeSchema.parse(validNormal);
+    expect(parsed.kind).toBe('observation.v2');
+    expect(parsed.tenantId).toBe(tenantId);
+    expect(parsed.eventId).toBe(eventId);
+    expect(parsed.authorizedPublicationId).toBe(pubId);
+
+    // Accepts ISO datetime with explicit timezone offset (e.g., +02:00, -04:00)
+    const withOffset = {
+      ...validNormal,
+      occurredAt: '2026-10-24T14:00:00+02:00',
+      firstReceivedAt: '2026-10-24T08:00:00-04:00',
+    };
+    const parsedOffset = ObservationQueueEnvelopeSchema.parse(withOffset);
+    expect(parsedOffset.kind).toBe('observation.v2');
+    if (parsedOffset.kind === 'observation.v2') {
+      expect(parsedOffset.occurredAt).toBe('2026-10-24T14:00:00+02:00');
+    }
+  });
+
+  it('validates canonical conflict observation_conflict.v1 envelopes', () => {
+    const parsedPayload = ObservationQueueEnvelopeSchema.parse(validConflictPayload);
+    expect(parsedPayload.kind).toBe('observation_conflict.v1');
+    expect(parsedPayload.tenantId).toBe(tenantId);
+    if (parsedPayload.kind === 'observation_conflict.v1') {
+      expect(parsedPayload.copies).toHaveLength(2);
+    }
+  });
+
+  it('rejects browser-facing snake_case formats at the queue boundary', () => {
+    const snakeCase = {
+      tenant_id: tenantId,
+      event_id: eventId,
+      authorized_publication_id: pubId,
+      schema_version: 'observation.v2',
+      occurred_at: '2026-10-24T12:00:00.000Z',
+      type: 'dish_viewed',
+      payload: {},
+    };
+    expect(ObservationQueueEnvelopeSchema.safeParse(snakeCase).success).toBe(false);
+  });
+
+  it('rejects unknown envelope kinds and unsupported schema versions', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        kind: 'observation.v3',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        schemaVersion: 'observation.v1',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validConflictPayload,
+        kind: 'unknown_conflict',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects invalid UUIDs and unauthorized/malformed identifiers', () => {
+    for (const badUuid of ['not-a-uuid', '12345', '', 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz']) {
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          tenantId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          eventId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          authorizedPublicationId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          sessionId: badUuid,
+        }).success,
+      ).toBe(false);
+      expect(
+        ObservationQueueEnvelopeSchema.safeParse({
+          ...validNormal,
+          producerId: badUuid,
+        }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects unknown observation types', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        type: 'unsupported_event_type',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown extra properties on strict objects', () => {
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validNormal,
+        extraInjectedField: 'unauthorized',
+      }).success,
+    ).toBe(false);
+
+    expect(
+      ObservationQueueEnvelopeSchema.safeParse({
+        ...validConflictPayload,
+        extraInjectedField: 'unauthorized',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('canonical observation checksum and identity', () => {
+  const envelope = {
+    kind: 'observation.v2' as const,
+    tenantId: '50000000-0000-4000-8000-000000000001',
+    eventId: '10000000-0000-4000-8000-000000000001',
+    sessionId: '20000000-0000-4000-8000-000000000001',
+    schemaVersion: 'observation.v2' as const,
+    occurredAt: '2026-10-24T12:00:00.000Z',
+    type: 'dish_viewed' as const,
+    authorizedPublicationId: '40000000-0000-4000-8000-000000000001',
+    producerId: '30000000-0000-4000-8000-000000000001',
+    localSequence: 1,
+    payload: {
+      dish_id: '60000000-0000-4000-8000-000000000001',
+      dish_revision_id: '70000000-0000-4000-8000-000000000001',
+      exposure_id: '80000000-0000-4000-8000-000000000001',
+      surface: 'menu_list' as const,
+      position: 1,
+      exposure_basis: 'viewport_50pct_1s' as const,
+    },
+    firstReceivedAt: '2026-10-24T12:00:01.000Z',
+  };
+
+  it('DEF-03 regression: canonicalJson omits undefined object properties and serializes undefined array items as null', () => {
+    // Undefined property omitted deterministically
+    const withUndefined = { a: undefined, b: 'hello', c: 123 };
+    const withoutUndefined = { b: 'hello', c: 123 };
+    expect(canonicalJson(withUndefined)).toBe('{"b":"hello","c":123}');
+    expect(canonicalJson(withUndefined)).toBe(canonicalJson(withoutUndefined));
+
+    // Nested undefined property omitted
+    const nestedWithUndefined = { top: { optional: undefined, fixed: true } };
+    expect(canonicalJson(nestedWithUndefined)).toBe('{"top":{"fixed":true}}');
+
+    // Array with undefined element becomes null
+    expect(canonicalJson([undefined, 1, 'two'])).toBe('[null,1,"two"]');
+
+    // Number -0 normalized to 0
+    expect(canonicalJson(-0)).toBe('0');
+    expect(canonicalJson({ val: -0 })).toBe('{"val":0}');
+
+    // Non-finite numbers rejected
+    expect(() => canonicalJson(NaN)).toThrow(/Non-finite numbers/);
+    expect(() => canonicalJson(Infinity)).toThrow(/Non-finite numbers/);
+
+    // Circular references rejected
+    const circular: Record<string, unknown> = { key: 'val' };
+    circular.loop = circular;
+    expect(() => canonicalJson(circular)).toThrow(/Circular reference/);
+  });
+
+  it('reconstructs complete canonical observation and computes matching checksum', async () => {
+    const obs = toCanonicalObservation(envelope);
+    expect(obs.schema_version).toBe('observation.v2');
+    expect(obs.event_id).toBe(envelope.eventId);
+    expect(obs.session_id).toBe(envelope.sessionId);
+    expect(obs.occurred_at).toBe(envelope.occurredAt);
+    expect(obs.publication_revision_id).toBe(envelope.authorizedPublicationId);
+    expect(obs.type).toBe('dish_viewed');
+
+    const canonicalStr = canonicalJson(obs);
+    const hash = await sha256(canonicalStr);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+
+    // Producer and consumer generate matching canonical checksums for the same valid observation
+    const producerEvent = {
+      schema_version: 'observation.v2' as const,
+      event_id: envelope.eventId,
+      session_id: envelope.sessionId,
+      producer_id: envelope.producerId,
+      local_sequence: envelope.localSequence,
+      occurred_at: envelope.occurredAt,
+      publication_revision_id: envelope.authorizedPublicationId,
+      type: envelope.type,
+      payload: envelope.payload,
+    };
+    const producerCanonical = canonicalJson(producerEvent);
+    const producerHash = await sha256(producerCanonical);
+    expect(hash).toBe(producerHash);
+  });
+
+  it('detects top-level field differences when payload is identical', async () => {
+    const baseObs = toCanonicalObservation(envelope);
+    const baseHash = await sha256(canonicalJson(baseObs));
+
+    // 1. Different occurredAt
+    const diffOccurred = toCanonicalObservation({
+      ...envelope,
+      occurredAt: '2026-10-24T12:05:00.000Z',
+    });
+    const hashDiffOccurred = await sha256(canonicalJson(diffOccurred));
+    expect(hashDiffOccurred).not.toBe(baseHash);
+
+    // 2. Different sessionId
+    const diffSession = toCanonicalObservation({
+      ...envelope,
+      sessionId: '20000000-0000-4000-8000-000000000099',
+    });
+    const hashDiffSession = await sha256(canonicalJson(diffSession));
+    expect(hashDiffSession).not.toBe(baseHash);
+
+    // 3. Different authorizedPublicationId
+    const diffPub = toCanonicalObservation({
+      ...envelope,
+      authorizedPublicationId: '40000000-0000-4000-8000-000000000099',
+    });
+    const hashDiffPub = await sha256(canonicalJson(diffPub));
+    expect(hashDiffPub).not.toBe(baseHash);
+
+    // 4. Different producerId
+    const diffProducer = toCanonicalObservation({
+      ...envelope,
+      producerId: '30000000-0000-4000-8000-000000000099',
+    });
+    const hashDiffProducer = await sha256(canonicalJson(diffProducer));
+    expect(hashDiffProducer).not.toBe(baseHash);
+
+    // 5. Different localSequence
+    const diffSeq = toCanonicalObservation({
+      ...envelope,
+      localSequence: 2,
+    });
+    const hashDiffSeq = await sha256(canonicalJson(diffSeq));
+    expect(hashDiffSeq).not.toBe(baseHash);
+  });
+
+  it('aligns menu token constants with PR #43', () => {
+    expect(MENU_TOKEN_AUDIENCE).toBe('peekaplate-observations');
+    expect(MENU_TOKEN_TTL_SECONDS).toBe(1800);
+  });
+
+  it('validates traffic_class in ObservationQueueMessageSchema and defaults to live', () => {
+    const parsedDefault = ObservationQueueMessageSchema.parse(envelope);
+    expect(parsedDefault.traffic_class).toBe('live');
+
+    const parsedTest = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'test',
+    });
+    expect(parsedTest.traffic_class).toBe('test');
+
+    const parsedDemo = ObservationQueueMessageSchema.parse({
+      ...envelope,
+      traffic_class: 'demo',
+    });
+    expect(parsedDemo.traffic_class).toBe('demo');
+
+    expect(() =>
+      ObservationQueueMessageSchema.parse({
+        ...envelope,
+        traffic_class: 'staging',
+      }),
+    ).toThrow();
+  });
+
+  it('matches PR #31 deterministic JSON serialization rules', () => {
+    // Normalizes -0 to 0
+    expect(canonicalJson({ zero: -0 })).toBe('{"zero":0}');
+
+    // Rejects non-finite numbers
+    expect(() => canonicalJson({ num: Number.NaN })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+    expect(() => canonicalJson({ num: Number.POSITIVE_INFINITY })).toThrow(
+      'Non-finite numbers cannot be canonicalized',
+    );
+
+    // Omits undefined, functions and symbols in objects
+    expect(
+      canonicalJson({
+        a: 1,
+        b: undefined,
+        c: () => {},
+        d: Symbol('test'),
+      }),
+    ).toBe('{"a":1}');
+
+    // Turns undefined, functions and symbols into null in arrays
+    expect(canonicalJson([1, undefined, () => {}, Symbol('test'), 2])).toBe('[1,null,null,null,2]');
+
+    // Sorts keys using localeCompare
+    expect(canonicalJson({ b: 2, a: 1, c: 3 })).toBe('{"a":1,"b":2,"c":3}');
+
+    // Detects circular references
+    const circular: Record<string, unknown> = { a: 1 };
+    circular.self = circular;
+    expect(() => canonicalJson(circular)).toThrow('Circular reference detected');
+  });
+
+  describe('canonical microsecond timestamp parsing and window classification', () => {
+    const baseReceived = '2026-11-01T12:00:00.000Z';
+
+    it('parses ISO timestamps to exact microseconds matching PostgreSQL timestamptz', () => {
+      // Millisecond precision
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0, 123)) * 1000n,
+      );
+
+      // Microsecond precision (6 digits)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.123456Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 123456n,
+      );
+
+      // Sub-microsecond rounding: banker round-to-even (.0000005 -> .000000)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000005Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+
+      // Sub-microsecond rounding: 7th digit 6 > 5 rounds up (.0000006 -> .000001)
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.0000006Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Timezone offsets
+      expect(parseIsoToMicroseconds('2026-11-01T14:00:00.000+02:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+      expect(parseIsoToMicroseconds('2026-11-01T08:00:00.000-04:00')).toBe(
+        parseIsoToMicroseconds('2026-11-01T12:00:00.000Z'),
+      );
+
+      // Longer fractional seconds (nanoseconds, 9 digits): .000000499 rounds down to .000000
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000499Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n,
+      );
+      // .000000501 rounds up to .000001
+      expect(parseIsoToMicroseconds('2026-11-01T12:00:00.000000501Z')).toBe(
+        BigInt(Date.UTC(2026, 10, 1, 12, 0, 0)) * 1000n + 1n,
+      );
+
+      // Invalid timestamps
+      expect(() => parseIsoToMicroseconds('not-a-timestamp')).toThrow('Invalid ISO timestamp');
+      expect(() => parseIsoToMicroseconds('')).toThrow('Invalid ISO timestamp');
+    });
+
+    it('classifies reviewer reproduction cases identically to PR #31 and PostgreSQL', () => {
+      // Case 1: 5 minutes + 1 microsecond -> rejected as future_time
+      const resCase1 = classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived);
+      expect(resCase1).toEqual({ disposition: 'rejected', reasonCode: 'future_time' });
+
+      // Case 2: 7-digit fractional seconds .9999999Z rounds up onto inclusive 24h lower boundary -> accepted
+      const resCase2 = classifyObservationTimeWindow('2026-10-31T11:59:59.9999999Z', baseReceived);
+      expect(resCase2).toEqual({ disposition: 'accepted' });
+    });
+
+    it('classifies exact microsecond boundaries matching PR #31', () => {
+      // Exact lower boundary (firstReceivedAt - 24 hours): accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary + 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-10-31T12:00:00.000001Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Lower boundary - 1 microsecond: rejected as too_old
+      expect(classifyObservationTimeWindow('2026-10-31T11:59:59.999999Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'too_old',
+      });
+
+      // Exact upper boundary (firstReceivedAt + 5 minutes): accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000000Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // Upper boundary + 1 microsecond: rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.000001Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // Upper boundary - 1 microsecond: accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:04:59.999999Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+    });
+
+    it('handles 7-digit and sub-microsecond fractional precision with banker rounding', () => {
+      // .0000004 rounds down to .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000004Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000005 rounds to even 0 -> .000000 -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000005Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .00000050 trailing zero still tie -> accepted
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000050Z', baseReceived)).toEqual({
+        disposition: 'accepted',
+      });
+
+      // .0000006 rounds up to .000001 -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.0000006Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+
+      // .00000051 non-zero digit after 5 rounds up -> rejected as future_time
+      expect(classifyObservationTimeWindow('2026-11-01T12:05:00.00000051Z', baseReceived)).toEqual({
+        disposition: 'rejected',
+        reasonCode: 'future_time',
+      });
+    });
+
+    it('exports microsecond constants matching PR #31', () => {
+      expect(TWENTY_FOUR_HOURS_MICROS).toBe(86_400_000_000n);
+      expect(FIVE_MINUTES_MICROS).toBe(300_000_000n);
+    });
+  });
+});
+
+describe('observation canonical queue schema export verification', () => {
+  it('exports canonical ObservationQueueMessageSchema and ObservationConflictQueueMessageSchema', () => {
+    expect(ObservationQueueMessageSchema).toBeDefined();
+    expect(ObservationConflictQueueMessageSchema).toBeDefined();
+    expect(ObservationQueueEnvelopeSchema).toBeDefined();
   });
 });

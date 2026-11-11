@@ -1,5 +1,12 @@
 # Menu extraction
 
+The optional staging HTTP service wraps this same pipeline; it does not replace
+the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
+for the request contract, Docker commands, secrets, limits and activation gates.
+Install `uv sync --project processing --extra service --frozen` before running
+the complete test suite, including HTTP boundary tests. CLI-only use does not
+need the service extra. No hosted service is implied by this package.
+
 Local PDF/image acquisition plus your LangGraph orchestrator/worker pattern.
 OCR.space code and the existing dish/source schema are retained. The old custom
 LLM client, review/evaluation layer, website reader and pipeline were removed.
@@ -23,17 +30,84 @@ under `work/` remain outside Git.
    LangGraph `Send` dispatches batches. The CLI defaults to one request at a time;
    `--llm-concurrency 2` allows two overlapping calls, with dispatches spaced
    at least 3.1 seconds apart.
-5. **Synthesizer:** combine worker results in page order using Python. No LLM call.
+5. **Synthesizer:** combine worker results in page order using Python. Carry an
+   explicit category into a supported continuation page and retain the heading's
+   source page. Missing/failed pages, unclear continuation and mixed main sections
+   clear this context. No additional LLM call.
 
-The LLM sees only `{"pages": [{"page_number": 1, "text": "..."}]}` plus its schema
-and extraction instructions. The prompt includes the exact generated JSON schema
+The default `--input-mode ocr_image` sends target page images together with
+acquired source text. `--input-mode ocr` preserves the earlier text-only path.
+Both receive up to 3,000 characters of previous-page `context_pages` when available.
+`--input-mode image` sends target images and a labelled previous-page image,
+without OCR or native-text extraction. It produces private unvalidated suggestions,
+not fabricated text-grounded candidates. See [input modes](../docs/processing-v3.md#input-modes-and-private-review-artifacts).
+
+The model receives the existing dish schema and extraction instructions. Context
+pages cannot produce dishes. The prompt includes the exact generated JSON schema
 and a complete synthetic input/output example, showing separate `price_amount`
 and `price_currency` keys and required unknown fields set to null. This reinforces
-provider-side schema requests; local strict validation remains mandatory. It does not receive OCR overlays or source images.
-Names/prices/attributes are checked literally against their cited page. Original
+provider-side schema requests; local strict validation remains mandatory. OCR overlay coordinates stay local; only the selected vision modes receive source images.
+Names/attributes are matched against their cited page while tolerating wrapped
+OCR headings. Price evidence is limited to the associated entry; ambiguous entry
+boundaries and explicit calorie/portion units cannot support a numeric price. Original
 page text is attached by code as evidence, avoiding model-generated source quotes.
 This is page-level evidence, not proof of correct dish/price associations.
 Unknown facts stay null and every dish remains `needs_review`.
+
+New results use **schema 2 / pipeline 3**, with `subcategory`, `price_text` for
+printed price options and `category_page_number` for heading provenance. Never
+pick a single price or invent option labels for `345 / 545`. The final run timing
+breakdown is in `timings.json`; see [pipeline changes and timing](../docs/processing-v3.md).
+
+The RES-01.1 exporter supports both earlier **schema 1 / pipeline 2** and current
+**schema 2 / pipeline 3** reports. Preparing saved results for the review API/UI
+needs no provider calls:
+
+```sh
+uv run --frozen python -m peekaplate_processing.review_candidates \
+  --input work/my-run/extraction.json --output work/my-run/review-candidates.json
+```
+
+This keeps original dishes, stable IDs, source/page evidence, processing failures
+and warnings. It checks the handoff data; human review still decides correctness.
+See [the review handoff guide](../docs/review-candidates.md) for the flow, schema,
+synthetic examples and manual tests.
+
+The matching shared review schema preserves hierarchy, heading provenance and
+printed price options. Vision groups split before calls to honor the16 MB budget including context;
+`--batch-pages` remains a maximum of10 by default, with no silent image resampling.
+Private raw/cleared/rejected values are kept separately in
+`review-suggestions.json`; they are not silently substituted into grounded originals. VIS-01 and review API consumers still need explicit
+version-2 integration; mixed version pairs are rejected rather than relabeled.
+
+The [bounded missing-ParsedText-price fallback](../docs/processing-v3.md#missing-parsedtext-prices-and-exact-box-links)
+can corroborate a model reading only when its canonical entry is unique and has no
+numeric evidence, and complete exact OCR row cells agree. Conflicts, signed/unit
+values and competing numeric titles abstain. Exact page/index/literal/fractional
+box records accompany the draft; the exporter validates them and adds candidate-ID
+links to existing segment metadata without changing `SourceSpan[]` or shared TS
+schemas. Private decisions identify box support explicitly; all outputs still need
+human review. Empty box evidence is omitted for legacy wire compatibility.
+Adjacent/wrapped title runs and known column boundaries can recover additional
+rows. Explicit source/geometry section context can distinguish repeated names;
+unknown context stays ambiguous. Narrow model-only trailing trademark replacement
+and structured terminal-contact boundaries never rewrite the saved source.
+
+[Targeted recovery](../docs/processing-v3.md#explicit-targeted-recovery) is explicit
+and capped, never automatic. `peekaplate_processing.recover_pages` reacquires only
+selected failed OCR pages, one HTTP attempt each, with a preserved attempt manifest.
+`run_pipeline --target-pages ... --max-model-requests ...` processes only selected
+saved ready pages and keeps incomplete coverage explicit; it never merges old
+candidates. Both require fresh output paths and can incur provider charges only
+when deliberately invoked. Tests/replays use no live providers. Cropped-model
+acquisition and hosted acceptance remain deferred.
+
+A separate [private OCR-box prototype](../docs/processing-v3.md#private-ocr-box-prototype)
+compares saved single-image overlays with saved image-model readings offline. It
+writes its own unvalidated transcript/proposals; it never populates standard draft
+prices, changes RES evidence or joins suggestion IDs to final candidates. The
+service does not retain it automatically. No new provider call or verification
+model is involved; keep inputs and output private.
 
 **LLM verification is yours to add.** No verification/review agent is included.
 Add your verification node after `synthesizer` in `workflow.py` when ready.
@@ -48,7 +122,8 @@ currently OCR.space Engine 3-compatible only: returned `settings` must contain
 the integer `OCREngine=3`. Both input paths reject incompatible settings before
 accepting text, so another engine cannot silently produce Engine 3 evidence.
 Supporting a different provider requires an explicit evidence-contract update.
-The default provider, CLI flags and environment names are unchanged.
+The provider and credential environment names are unchanged. The new input-mode
+flag deliberately defaults to OCR plus image; existing text-only callers can select `ocr`.
 
 From `processing`, configure your private `.env` using `.env.example`:
 
@@ -65,17 +140,20 @@ uv run --frozen python -m peekaplate_processing.run_pipeline \
   --input work/test-menus/Dennys_Menu.pdf --run-dir work/dennys-redesign-001
 ```
 
-A2Agent takes precedence when any of `a2agent_api_key`, `a2agent_url` or
-`a2agent_api_MODEL` is configured; all three are then required. These names are
-case sensitive and match the existing private `.env`. For MiniMax M3 use
-`https://api.a2agent.me/v1` and `minimax-m3`, as documented in the
-[A2Agent quickstart](https://docs.a2agent.me/quickstart) and
-[MiniMax catalog](https://a2agent.me/models/minimax-m3). Nara-only/OpenRouter-only
-parameters are not sent to A2Agent. Availability and strict-schema support still
-need the one-request live check below. Leave all A2Agent fields blank to select
-the existing providers.
+Provider selection: `--provider` (or `MENU_AI_PROVIDER`) picks a registry entry:
+`google_studio`/`gemini` (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_API_URL`),
+`qwen`, `glm`, `deepseek` and `openrouter` (`OPENROUTER_API_KEY`; OpenRouter models
+`qwen/qwen3.8-flash`, `z-ai/glm-5.3-flash`, `deepseek/deepseek-v4.1-flash`),
+`nara` and `openai`. MiniMax/A2Agent is not supported.
 
-Otherwise, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
+The automatic vision cascade uses the Google settings above and the
+OpenRouter key with its default endpoint and distinct default models. It does
+not apply `MENU_AI_API_URL` or `MENU_AI_MODEL` to those candidates, so a generic
+endpoint cannot receive the OpenRouter key. Explicitly selected OpenRouter
+providers retain the existing `MENU_AI_*` overrides; only configure an endpoint
+trusted with the selected provider's key.
+
+Without an explicit provider, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
 when any Nara setting is present; all three must then be supplied. Use
 `https://router.bynara.id/v1` as the Nara chat base URL. Otherwise it uses
 `MENU_AI_API_KEY`, `MENU_AI_API_URL` and `MENU_AI_MODEL` from `.env`.
@@ -149,9 +227,10 @@ uv run --frozen python -m peekaplate_processing.run_pipeline \
   --llm-timeout 90
 ```
 
-For the approved smaller-batch trial, add `--batch-pages 2` and choose a fresh
-run directory. A 35-page document produces up to 18 sequential requests
+For an explicitly selected smaller-batch trial, add `--batch-pages 2` and choose
+a fresh run directory. A 35-page document then produces up to 18 requests
 (17 pairs and one final page), compared with four at the default size of ten.
+Add `--llm-concurrency 2` only when two overlapping calls are intended.
 This reduces work per request but may increase total calls and pacing overhead;
 live performance must be measured. Deadlines, strict validation and page-level
 evidence are unchanged. Invalid batch sizes are rejected before acquisition.
@@ -228,11 +307,178 @@ The inherited schema remains a Python draft contract; final TypeScript/backend
 integration and the ClickUp ground-truth evaluation are still separate work.
 Menu imagery is text evidence, not approved photographs of plated dishes.
 
+### Merchandise and minimum prices
+
+Text-grounded and vision extraction reject explicit wrapping-cloth product
+titles (`Furoshiki`, `Furoshiki Wrapping`, `Furoshiki Wrapping Cloth`, and
+`Wrapping Cloth`, ignoring case and whitespace). Rejections remain visible in
+the report and make the result incomplete when food drafts remain. This narrow
+check is not a general merchandise classifier; food wraps and mentions of
+cloth in descriptions are not excluded.
+
+A printed plus-qualified price such as `$25.00+` remains in `price_text`, with
+`price_amount` null and a minimum/qualified-price review warning. The text path
+also checks the dish's own source entry when a model omits the plus; it does not
+borrow another dish's price or resolve an ambiguous association. Vision output
+remains unverified transcription and cannot recover a qualifier omitted by the
+model. Review exports preserve the printed price and `needs_review` status.
+## T0 asset preparation and delivery
+
+`peekaplate_processing.assets` prepares one captured dish photo into approved
+delivery variants. `python -m peekaplate_processing.prepare_assets` writes a
+bundle directory that contains the byte-identical source, four variants and
+`manifest.json`:
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.prepare_assets \
+  --input work/photos/dish.jpg \
+  --dish-id 11111111-1111-4111-8111-111111111111 \
+  --revision-id 22222222-2222-4222-8222-222222222222 \
+  --capture-evidence "Permitted capture; see the private capture log." \
+  --captured-at 2026-10-01T12:00:00+00:00 \
+  --output-root work/vis03/<revision-id>/t0 \
+  --budget-bytes 400000
+```
+
+`--dish-id` and `--revision-id` are caller-supplied backend identifiers and are
+never verified against the backend. `--capture-evidence` is required and must
+identify the capture; `--captured-at` is optional but must carry a timezone and
+must not be in the future. `--budget-bytes` is optional: when omitted the
+manifest records `not_configured` and no threshold is invented. Exit codes: 0
+ready, 2 failed. Unexpected errors propagate so CI fails loudly.
+
+The bundle is content-addressed: `asset_id` is `t0_` plus the first 32 hex of
+the SHA-256 over source bytes, dish ID, revision ID and the recipe version.
+There is no timestamp in the identity, so the same source and revision always
+produce the same `asset_id`. Preparation is create-only: an existing bundle
+directory is refused and its `manifest.json` is left untouched. Use one output
+root per revision.
+
+Variants are `card-480` and `detail-1280`, each as WebP (quality 82) and JPEG
+(quality 85). Images are never upscaled; a source smaller than the detail edge
+produces smaller variants and a warning. Orientation is normalized, alpha is
+flattened to RGB on white, and the original bytes are preserved as `source.*`.
+The manifest records source and variant SHA-256 values, byte sizes, pixel
+dimensions, processing steps, warnings and measurements.
+
+Preparation never approves anything. `review.status` is always `needs_review`
+and `publication.eligible` is always `false`. Rights, dish facts, revision
+currency and publication eligibility stay human decisions. The manifest is a
+proposed handoff for the S3-ARC-01 TypeScript contract; do not consume it in
+the application until that contract is frozen.
+
+## 2.5D feasibility sample
+
+`peekaplate_processing.spatial` validates a human-prepared layered sample
+against an approved T0 bundle. It never generates layers or food imagery.
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.prepare_spatial \
+  --t0-manifest work/vis03/<revision-id>/t0/<asset_id>/manifest.json \
+  --layers work/vis03/layers.json \
+  --output-root work/vis03/<revision-id>/spatial \
+  --budget-bytes 400000
+```
+
+`--budget-bytes` is mandatory for spatial assets; the verification run uses the
+ADR 0004 T1 ceiling of 400,000 bytes, which is provisional until the render
+budget is measured in this repository. The layers manifest is caller-supplied
+JSON with `schema_version: 1`, `tier: "T1"`, the `dish` reference, `motion`
+limits of at most ±3°, a `layers[]` list of bare filenames with `depth` values,
+`capture_evidence` and `rights_confirmed: true`. Layer files must sit beside the
+layers manifest.
+
+Validation is strict on purpose. Layer dimensions must equal the T0
+`detail-1280` variant exactly, one layer must be the opaque background
+(`depth: 0`), every other layer must carry an alpha channel, names must be
+unique and the dish revision must match the T0 manifest. A mismatch, an
+oversized sample or an unusable manifest fails with exit code 2 and writes
+nothing.
+
+The bundle contains the copied layers, `fallback.jpg` (the approved T0 detail
+variant, verified against its manifest size/hash and decoded as an opaque JPEG
+matching the detail dimensions), `spatial-manifest.json` and `harness.html`.
+`measurements.total_asset_bytes` and the `--budget-bytes` gate include all
+delivered files in the bundle directory (`layers/*`, `fallback.jpg`,
+`harness.html` and `spatial-manifest.json`). The harness is a dependency-free
+static page labelled "Feasibility harness — not the diner viewer". It keeps the
+T0 photo visible at all times (`<img id="fallback" src="./fallback.jpg">` renders
+even when JavaScript is disabled), fades layers in after decode, and drives both
+rotation and layer parallax from the combined pointer and arrow-key input,
+reconciling the stored keyboard offsets on both keydown and pointer updates so
+reverse arrow keys respond immediately after saturation and `Home` resets to
+zero. Paint order assigns distinct integer `z-index` ranks (`1..N`) from stable
+depth ordering, so closely spaced or delayed background layers cannot cover the
+foreground. It honours `prefers-reduced-motion` with a live media-query listener
+that immediately clears transforms, zeroes input offsets, and prevents movement
+without page reload, counts layer retries using a prototype-safe `Object.create(null)`
+map (`metrics.layerRetries`), and degrades to the T0 photo when 3D CSS or a layer
+is unavailable. It records `window.__peekaplateSpatialMetrics` with fetch, decode,
+frame-timing, viewport, fallback and retry state, and offers a copy button for
+the same JSON.
+
+Serve the bundle over HTTP (`python -m http.server` inside the bundle directory)
+because browsers block the manifest `fetch` from `file://`, where the harness
+reports "Preview unavailable" after one retry.
+
+The harness is a feasibility measurement, not a diner renderer and not a phone
+benchmark. Real captured-dish review, rights review and publication approval
+remain human gates.
+
+## Dish presentation prompt and validation (optional extension)
+
+`peekaplate_processing.presentation` implements the post-cutout presentation
+pipeline requested in ClickUp task S3-VIS-03. `prepare_presentation` pairs an
+approved T0 photo with a dish cutout, framing reference image and the frozen
+presentation prompt (`presentation-prompt-v1`), and validates square transparent
+PNG candidates (`width == height >= 512`, preferably `2048x2048`):
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.prepare_presentation \
+  --t0-manifest work/vis03/<revision-id>/t0/<asset_id>/manifest.json \
+  --cutout work/vis03/cutout.png \
+  --reference work/vis03/reference.jpg \
+  --candidate-png work/vis03/candidate-2048.png \
+  --output-root work/vis03/<revision-id>/presentation \
+  --capture-evidence "Permitted studio capture; see the private capture log." \
+  --rights-confirmed \
+  --draft-id "draft-dish-42" \
+  --model-version "offline-candidate-v1" \
+  --budget-bytes 5000000
+```
+
+Inputs and outputs:
+- The CLI requires `--rights-confirmed`; Python callers must explicitly pass
+  `rights_confirmed=True`. Human review still verifies the assertion.
+- Candidate reads are bounded to 12 MB; pixel limits are checked before decoding.
+- Failed candidates retain their returned model identifier and fidelity notes in the fallback manifest.
+- Cutout input must be PNG or WEBP with transparent background (`min_a == 0, max_a > 0`).
+- Reference image can be PNG, WEBP, or JPEG.
+- Candidate presentation image must be a square PNG with an alpha channel and transparent corners
+  `(0, 0)`, `(w-1, 0)`, `(0, h-1)`, `(w-1, h-1)` to reject opaque backgrounds or watermarks.
+- `presentation-manifest.json` links the source T0 `asset_id` and SHA-256, source JPEG SHA-256,
+  cutout and reference SHA-256, prompt SHA-256, model version, dish/revision identifiers, and optional `draft_id`.
+- `asset_id` is derived after validation and includes the candidate PNG SHA-256 (or a distinct
+  fallback identity), the effective model version and the prompt version/SHA-256, so different
+  candidates or models never share an id; identical content is refused as already existing.
+- Manifests never self-approve: `review.status` is `needs_review` and `publication.eligible` is `false`.
+  Flags (`--reconstructed-details-flagged`, `--preserved-original-viewpoint`, `--fidelity-note`)
+  persist on `manifest.prompt` and add explicit review warnings.
+- On generation/validation failure, the approved T0 detail photo is automatically retained as
+  `fallback.jpg` with `fallback_retained = True`, `active_display_path = "fallback.jpg"`, and CLI exit code 2.
+
+### Supplied-mask and candidate-PNG review
+
+Use `python -m peekaplate_processing.review_preview --help` for the offline,
+create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
+an optional generated PNG with its actual prompt/model provenance. See
+[asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
+for commands, non-approval behavior, browser controls and test boundaries.
+
 ## Ingredient intelligence (AI-02)
 
-Pipeline runs also save `ingredient-review.json`, a separately versioned,
-review-only sidecar. Exact ingredient rules retain original text, source spans,
-unknowns and mandatory owner confirmation. This does not approve or publish a
-menu. Existing extractions can be analyzed offline without another model call;
-see [the AI-02 guide](../docs/ingredient-intelligence.md) for the command,
-contract, limitations and remaining RES-01 integration.
+Runs attempt a separate review-only `ingredient-review.json` sidecar without new model calls.
+Inputs outside its bounds retain the original extraction and record explicit sidecar
+unavailability in `timings.json`. Vision transcriptions never become independent
+ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
+the offline CLI, limits and remaining authenticated owner-review integration.

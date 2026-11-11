@@ -10,8 +10,17 @@ completed hosted owner-review feature.
 ingredient phrases. `run_pipeline` now writes `ingredient-review.json` alongside
 its unchanged `extraction.json`. AI-02 does not change the extraction prompt,
 train a model, complete recipes, call an API, or write database/publication state.
-The separately versioned sidecar preserves compatibility with VIS-02's strict
-v1 extraction schema.
+The separately versioned sidecar accepts supported schema1/pipeline2 and
+schema2/pipeline3 extraction reports. It is generated through common finalization,
+including the vision-first early return. Inputs outside its bounds retain their
+original extraction; no partial/empty sidecar is substituted, and `timings.json`
+records `ingredient_review.status=unavailable`. Explicit offline CLI validation
+still fails on unsupported input. Sidecar storage errors remain visible.
+
+Vision-model transcription is not independent ingredient grounding. Such inputs
+retain unknown classifications, even when text and proposed boxes exist. The
+private hosted V1 artifact bundle remains unchanged; it does not transport this
+new local sidecar, and the owner UI does not yet consume it.
 
 For an existing extraction, run from the repository root:
 
@@ -93,22 +102,24 @@ Schema validation and a matching digest do not authenticate a producer, verify
 rule accuracy or grant tenant access. The adapter is a data boundary, not an
 HTTP route, importer, storage service or owner authorization system.
 
-The current `develop` console is a shell; RES-01's authenticated review API,
-correction persistence and UI are not merged. Do not claim an integrated owner
-confirmation flow from these unit tests. The required completion sequence is:
+The merged extraction-review APIs and correction persistence already exist (see
+[review candidates](review-candidates.md)). This ingredient sidecar is not wired
+into those APIs or the owner UI. The remaining AI-02 integration sequence is:
 
 1. Import the trusted extraction and sidecar under server-derived venue authority.
 2. Show originals, evidence, unresolved reasons and every proposed label in RES-01.
 3. Persist owner decisions separately through the canonical command/event path,
    with current membership, expected revision, command identity and audit data.
-4. Recompute on ingredient/source corrections; invalidate prior confirmation on
+4. Recompute from the effective corrected fields/current revision on ingredient/source corrections; invalidate prior confirmation on
    revision, evidence or policy changes. Unknowns require explicit investigation.
 5. Require applicable owner-confirmed claims before RES-02 publication. Never
    copy this sidecar directly into a public menu or approve it on draft save.
 
 Existing `CreateDishRevisionSchema` rejects added classification/approval fields.
 This change adds no new public payload, SQL migration or tenant-authority field.
-It does not merge the pending ingestion, owner-agent or publication PRs.
+It does not add ingredient-classification approval or public publication fields.
+The internal FDA `tree_nut` category is review-only; it is not a replacement for
+the public bundle's `nuts` field or permission to copy classifications into it.
 
 ## Optional reference services
 
@@ -139,7 +150,7 @@ existing 35-page synthetic pipeline test also checks one sidecar assessment per
 draft with unchanged IDs. These tests demonstrate behavior, not field accuracy
 on reviewed restaurant datasets.
 
-Remaining P0 acceptance: RES-01 live import/persistence/UI, authenticated owner
-confirmation and revision invalidation, RES-02 enforcement, representative
+Remaining P0 acceptance: ingredient-specific live import/UI, authenticated owner
+confirmation and correction invalidation, publication enforcement, representative
 reviewed ground truth and independent product/domain acceptance. Merge, deploy
 and production readiness are separate from this implementation.

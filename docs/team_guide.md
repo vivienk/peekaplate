@@ -1,8 +1,22 @@
 # PeekaPlate: team guide
 
-Infrastructure and team analytics access updated October 22, 2026. The team research and board inventory below remains the dated October 14 snapshot.
+Latest diner integration: [published-menu connection](diner-connection.md). It
+explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
+configuration and reused public hosting. Its release acceptance record identifies
+the actual deployed version; older dated setup sections below are historical.
 
-PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, and one tested way to save a staff member's draft dish change.
+**Menu upload and Save integration:** [the extraction release guide](staging-ingestion-release.md)
+explains PR118's authenticated PDF/photo upload, private processing, review-required
+drafts, and its release of PR122's Save/Saved screens. It also links exact release
+and hosted acceptance evidence. These APIs do not provide an owner upload screen,
+auto-approve extracted dishes, or finish Compare and remaining diner triggers.
+PR115 adds the [staging recovery procedure](operations.md#staging-rollback-and-recovery-s4-rel-01);
+its actual rollback drill remains separate from release smoke tests.
+
+
+Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
+
+PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
 
 **We do not have a finished menu app yet.** The current design shows where the screens are going. The code so far provides the foundation those screens will use.
 
@@ -39,17 +53,120 @@ The visual experience is one part of this loop. Accurate food information, a usa
 | Diner screen | A basic staging page | A real restaurant menu based on the design |
 | Staff screen | A starter page | Sign-in, editing, review, approval and publishing screens |
 | Saving a dish | Backend draft-save flow tested locally and online with Supabase identity | Connecting it to the staff screen |
+| Approving and publishing | Owner-only backend commands and public-menu/token reads deployed and tested with synthetic data | Trusted real-content admission, review/publish screens and diner integration |
 | Food visuals | Design direction and written rules | Reviewed assets and the optional interactive viewer |
-| Diner tracking | Initial rules for event data | Collecting, storing and reporting actual browsing actions |
+| Diner tracking | Deployed Queue/R2 pipeline, transactional typed facts and archive recovery; genuine-token browser transport passed in staging | Real diner controls, consent/outbox/delivery, owner-report API and pilot acceptance; normal collection remains paused |
 | PostHog analytics | Opt-in shell views, private hourly Supabase export and collaborator read API verified in staging; genuine outsider denial also passed | Complete the controlled collaborator-removal check and monitor exports; real menu events remain separate work |
-| Python processing | Accepted extension in the architecture | Implement, test and choose a runtime for the first specific job |
+| Python processing | Deployed Python service, protected OCR.space key and one passing fresh OCR-only provider check | Configure the AI step, connect the reviewed VIS-01 migration/consumer and test the complete menu-to-draft flow |
 | Owner report | Research/design requirements | A report built from real, permitted evidence |
 
-ClickUp's “Complete” status describes a task's recorded progress. It is not proof that a feature works in the code. For example, the approval-path task is marked complete, while approval and publication are still missing from this repository. That mismatch needs to be reconciled with the actual deliverable.
+ClickUp's “Complete” status describes a task's recorded progress. Use the dated code and hosted evidence to confirm the deliverable. The task inventory later in this guide is the historical October 14 snapshot; the approval/publication backend now exists, while its connected screens still need their own acceptance.
+
+### Approving a menu and making it available
+
+The backend now separates three actions: **approve** the exact reviewed version,
+**publish** it for diners, and **withdraw** it from new reads. A permitted owner
+can call these APIs in staging. Retrying the same request remembers its original
+answer; it does not create another copy. Another restaurant cannot approve it.
+Removing owner permission also blocks an old approval retry.
+
+The public menu API returns an approved menu-file link and a short-lived token.
+That token identifies the venue and publication for the observation pipeline;
+it does not give a diner staff access. A withdrawn menu returns 404 on a fresh read.
+The token expires after 30 minutes; token renewal remains separate work.
+
+This flow passed on the real staging Worker and Supabase with labelled synthetic
+data. The test menu is now withdrawn, the temporary file host is removed, and
+the test account no longer has owner permission there. One interrupted public
+read and its successful retry are recorded honestly; no latency guarantee is claimed.
+Read the [hosted acceptance record](operations.md#res02-hosted-acceptance) for
+the exact release, database checks and remaining work.
+
+| File | What it does |
+| --- | --- |
+| [publication-command.ts](../backend/src/publication-command.ts) | Checks current owner permission and saves approval, publication or withdrawal with its history and retry result in one transaction |
+| [public-menu.ts](../backend/src/public-menu.ts) | Reads an active approved publication, signs its short-lived token and exposes the public verification key |
+| [public-menu contract](public-menu.md) | Tells the diner and tracking developers which fields to use and which integrations still need building |
+| [acceptance evidence](res02-staging-acceptance.json) | Records the synthetic HTTP outcomes, database counts and cleanup without credentials or a person's account ID |
+
+The existing staging pages remain starter screens. Real restaurant menu admission,
+screen connections, content-hash agreement and CORS integration are still separate
+tasks. The queues remain paused until their real consumers pass acceptance.
 
 ### Where to open staging
 
-The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md) is now provisioned and tested with synthetic messages. Think of the Queue as the waiting room, R2 as the original evidence archive and the DLQ as the recovery tray for work that repeatedly fails. Both Queues are paused while Teeyansh's real consumer is unfinished. They retain messages for 24 hours even while paused, so real collection must remain off. The staging binding configuration needs its reviewed release before the API Worker can use it; actual archive-to-database processing remains separate work.
+**Observation database setup:** the two reviewed migrations from PRs #32 and #50
+are now applied to the existing staging Supabase database. They add the event
+index, conflicting-event records, typed event tables and two private owner
+views. The October 31 audit verified six migration-history entries, including
+the four earlier versions. Two publication migrations were added on November 1,
+bringing the recorded application history to eight entries. The hosted audit verified tenant row rules, restricted
+runtime grants and denied browser/exporter access; existing record counts were
+unchanged. See the [database release record](operations.md#observation-schema-release--october-31-2026)
+for evidence and limits. Teeyansh can continue integration against these tables.
+The receiving endpoint and real Queue consumer are now deployed and have passed
+the bounded tests below. Complete diner-to-report acceptance remains separate.
+
+### Receiving and processing diner actions
+
+The backend follows this path:
+
+```text
+Browser action → signed-token checks → Queue → private R2 evidence
+→ database index + typed detail, together → Queue acknowledgement
+→ owner-report calculations, once their API is connected
+```
+
+A typed detail puts an action into useful columns: which dish was opened,
+which dishes were compared, or where Save/Unsave happened. The index prevents
+retries from counting twice. Both are now written in one database transaction;
+if the detail fails, the item retries. The backfill tool recovers missing facts
+from their original private files and never invents historical values.
+
+Staging tokens label observations as **test**. Owner views exclude test/demo
+data, so verification cannot inflate restaurant numbers. In staging, Brave
+fetched a published menu, verified its file hash and sent a genuine issued token.
+The real Queue consumer stored one new fact despite repeated delivery, while
+changed event reuse went into quarantine. Three earlier observations were also
+recovered from their original private archives without changing their timestamps.
+The real diner screens, consent/outbox delivery
+and owner-report API still have their own PRs and acceptance checks. Their work
+has not been replaced by this transport harness.
+
+The current hosted release/evidence is in
+[Operations](operations.md#observation-facts-hosted-acceptance). Keep normal
+collection paused until the complete browser-to-owner acceptance passes. See
+[fact recovery instructions](observation-infrastructure.md#recover-missing-facts)
+for the restricted operator command. Production has not been deployed.
+
+### Other staging services
+
+**Menu extraction setup:** its own Queue and failed-job Queue now exist, and both
+passed real synthetic delivery tests. Reports will use the existing private R2
+bucket. The new Python HTTP service wraps the existing OCR/extraction code and
+has local tests and a Docker build. Vivien's Workers Paid upgrade is active,
+and the protected API deployment succeeded: menu Queue/R2 bindings are live.
+The Python host is now deployed and its private connection is configured.
+Live tests confirmed Python health, signed source reads from private R2,
+wrong-job denial and source-hash conflict handling. The Queue-to-R2/retry/DLQ
+checks also passed against real Cloudflare resources. Teeyansh can continue
+integration using the runtime bindings; nobody needs to put internal keys in
+frontend code or receive them in chat. On October 28, the OCR.space key was added
+to GitHub's protected staging environment and the extraction Worker's secret store.
+A fresh OCR-only test read three made-up dishes and their prices in 4.654 seconds.
+This proves that the OCR provider accepted the key for that image; it does not
+prove the complete hosted menu-processing flow. The AI step still needs its
+provider configuration, and menu-to-draft acceptance remains pending. The queues stay
+paused until that passes. Follow the
+[VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
+interfaces and who does what next. Provisioned infrastructure is not a completed
+menu-processing feature.
+
+The [observation infrastructure handoff](observation-infrastructure.md) lists
+the attached real consumer, bindings and remaining work. These Queues retain
+messages for 24 hours even while paused, so real collection must remain off
+until the next integration is accepted. The menu-extraction Queues are a
+separate pipeline and retain their own acceptance requirements.
 
 **Staging is our shared online test environment.** It lets the team test the same version before real restaurant use. We are keeping these existing names; no domain purchase or rename is needed.
 
@@ -72,7 +189,7 @@ The [observation Queue, DLQ and private R2 setup](observation-infrastructure.md)
 | Supabase PostgreSQL | Keeps lasting application records | Stores restaurants, staff permissions, dish drafts, history, retry results and pending work. |
 | Cloudflare Hyperdrive | Manages Worker connections to PostgreSQL | Uses a restricted staging login. It is not another database. Query caching is disabled for this command path. |
 | Cloudflare R2 | Stores files such as photos and prepared visual assets | Existing staging and production buckets are reserved. Staging is private; uploads and approved asset delivery are not connected yet. |
-| Cloudflare Queues | Holds accepted observations until processing finishes | Planned with event ingestion; not running in the current flow. A failed-message queue will hold work needing recovery. |
+| Cloudflare Queues | Holds work until processing finishes | Separate staging observation and menu-extraction queues/DLQs are provisioned. They remain paused until their real consumers pass acceptance. |
 | Docker | Gives developers a disposable test database | Used locally and in CI. The shared database is hosted by Supabase. |
 
 The **current tested save path** is:
@@ -102,7 +219,12 @@ Photo files belong in file storage; the database will hold their references, own
 
 Today, Pages receives manually uploaded builds. The Worker can now be deployed through the protected **Deploy staging Worker** GitHub workflow: Vivien requested the release, a different permitted reviewer approved it, and the workflow passed its checks and deployed it. It runs on manual request, not every push. Production is not configured. Provider screens may label a default branch or deployment “production”; these projects and the database are being used for staging. A production-named R2 bucket alone does not make a production system.
 
-The Worker now runs main release `afe45db`. The diner and console pages were last released with PostHog setup at `2a135fa`; this Worker deployment did not rebuild those pages. Subsequent documentation commits do not change running applications. [Operations](operations.md#team-analytics-hosted-verification--october-22-2026) records the current Worker version and test evidence; the older deployment record preserves the earlier staff-command checks.
+The current November 2 Worker release is main `c6a47bd`; its provider version
+and hosted observation results are in [Operations](operations.md#observation-facts-hosted-acceptance).
+It preserves the earlier `2eee264` publication release and `afe45db` staff/API
+history. The diner and console pages were last released with PostHog setup at
+`2a135fa`; this backend deployment did not rebuild those pages. Later docs-only
+commits do not change running applications.
 
 ### Verified behavior, access and costs
 
@@ -122,8 +244,8 @@ There are two kinds here:
 
 | Kind | Plain example | Why keep it? | Built yet? |
 | --- | --- | --- | --- |
-| A staff action that changes the product | An authorized person saved a new version of Tomato Soup | Know what changed and preserve its history | Yes, for draft dish revisions |
-| An observation of diner behavior | A session opened Tomato Soup's details | Understand how the menu was used | No; the collection flow is planned |
+| A staff action that changes the product | An authorized person saved a new version of Tomato Soup | Know what changed and preserve its history | Yes: draft dish revisions and menu approval/publication/withdrawal |
+| An observation of diner behavior | A session opened Tomato Soup's details | Understand how the menu was used | Receiving, Queue processing and typed database storage are tested; real screen tracking is still being connected |
 
 ### The events we save today
 
@@ -140,13 +262,21 @@ Those records are saved together. If one fails, none of that change should remai
 
 History also lets us rebuild the current dish from previous changes. That is **replay**. Rebuilding must not send a notification or repeat an outside action. The current code tests rebuilding a dish's data; a complete operational recovery tool is still future work.
 
-### The diner events we will add
+### Diner observations and the remaining screen integration
 
 Suppose a diner opens the soup details while their connection is unreliable. The future tracking flow needs to remember the observation, retry safely and avoid counting it twice. It must also identify the exact menu and dish version that person saw.
 
-The plan is for the browser to send observations to a receiving service. Accepted observations wait in a **queue**, which holds work until it can be processed. A background consumer will save an archive in Cloudflare R2, then add searchable information to PostgreSQL, our database. Only then should it mark that queued work finished. Failed work needs a recovery path.
+The receiving service and background consumer now implement that backend path:
+accepted observations wait in a **queue**, then the consumer saves evidence in
+Cloudflare R2 and indexes it in PostgreSQL before marking the work finished.
+The staged synthetic tests passed; real browser controls and token delivery
+are still being connected.
 
-This flow is not running yet. A queue is not needed to save today's dish revision: that change is saved directly in the database transaction. Keeping the two paths separate prevents a browsing action from being mistaken for permission to change a restaurant's menu.
+Normal collection stays paused while real diner tracking, consent/outbox
+delivery and owner-report integration remain unfinished. Saving a staff dish
+revision uses its own direct database transaction;
+it does not wait for this Queue. Keeping the paths separate prevents a browsing
+action from being mistaken for permission to change a restaurant's menu.
 
 ## 4. Follow a dish change through the code
 
@@ -223,7 +353,7 @@ Staff supplies a dish photo
 
 The two languages exchange structured messages, like a form with agreed field names. Developers call this a **data contract**. It includes a job reference, the approved input and the expected result. TypeScript types do not automatically work in Python, so developers test that both sides understand the same messages. A job must not gain permission simply by supplying a restaurant ID, and a repeated result must not create duplicate changes.
 
-Python needs its own environment and tests: **uv** manages its dependencies and **pytest** runs its tests. Those tools will be added with the first real task. There is no Python service deployed today, and the current `pnpm` commands only run the existing JavaScript/TypeScript toolchain.
+Python has its own environment and tests: **uv** manages the locked dependencies and Python's **unittest** runs the existing regression suite. The staging FastAPI/Uvicorn service runs in a Cloudflare Container because the pipeline uses native PyMuPDF. CI tests and builds that package alongside the TypeScript checks. The OCR key is configured privately; contributors call the authorized backend rather than retrieving a shared key from GitHub. The complete upload-to-draft connection still needs feature acceptance.
 
 For a small compatible job, a separate **Cloudflare Python Worker** may be enough. Cloudflare supports Python, but some libraries and workloads do not fit its runtime. Heavier work may need a container or specialist compute service with a separately agreed cost. Calling an AI provider is different from hosting an image model ourselves. The first Python ticket must check those requirements before choosing where it runs. See the [supported Python packages](https://developers.cloudflare.com/workers/languages/python/packages/).
 
@@ -310,7 +440,7 @@ Link completed deliverables and PRs back to their ClickUp tickets during normal 
 
 The dependency plan is the final section of this guide. The commands and setup procedure are in [operations.md](operations.md). Do not start a later step just because a design task with a similar name is marked complete.
 
-For the next demo, be precise about what can be shown: a tested draft-save backend, the current prototype, and the remaining steps connecting them. An online menu, staff sign-in and restaurant analytics should only be described as working after those flows exist and have been exercised.
+For the next demo, be precise about what can be shown: tested draft-save and menu approval/publication backends, the current prototype, and the remaining screen connections. A connected diner menu, staff sign-in screen and restaurant analytics should only be described as working after those flows exist and have been exercised.
 
 ## Reference: the project files
 
@@ -504,7 +634,7 @@ Read on October 14, 2026: all 24 top-level tasks and seven sprint-scope subtasks
 | [Design Agent MVP + human-review workflow](https://app.clickup.com/t/90141746115/86bcex9a1) | In progress | Eirene Woo, Shirley Rosario, Vivien Kong | Specify source-to-draft processing, confidence, correction and human review |
 | [Specify multimodal dish-processing pipeline](https://app.clickup.com/t/90141746115/86bcex5tt) | In progress | Eirene Woo, Shirley Rosario, Vivien Kong | Define source fields, structured outputs, validation and fallback; not a running pipeline |
 | [Define AI evaluation rubric + guardrails](https://app.clickup.com/t/90141746115/86bcex5vm) | To do | Unassigned | Define accuracy, severity, confidence and mandatory human-review rules |
-| [Implement minimum human-review / approval path](https://app.clickup.com/t/90141746115/86bcexenj) | Complete | Sai Hemanth Kilaru | Board status requires reconciliation: the repo creates draft revisions, but does not implement approval or publication |
+| [Implement minimum human-review / approval path](https://app.clickup.com/t/90141746115/86bcexenj) | Complete | Sai Hemanth Kilaru | Historical board snapshot; the backend approval/publication APIs now have a November 1 staging acceptance record above. Connected screen acceptance remains separate |
 | [Implement 2D → 3D / spatial dish generation slice](https://app.clickup.com/t/90141746115/86bcexezr) | To do | Vivien Kong, Adam H | Investigate asset feasibility, quality and fallback; older generation wording needs alignment with the visual ADR |
 | [Define diner behavior event taxonomy + measurement plan](https://app.clickup.com/t/90141746115/86bcex5w6) | In progress | Adam H | Define event names, fields and what can be measured versus inferred |
 | [Behavioral events capture](https://app.clickup.com/t/90141746115/86bcexfnc) | To do | Eirene Woo, Vivien Kong | Specify event properties and funnels; the ingest/queue/archive path still needs implementation |
@@ -644,3 +774,41 @@ Begin with **three representative dishes**, then expand the approved photo/text 
 Use weekly Tuesday-to-Tuesday sprint headings within the requested 15–20-day delivery window. Reconfirm capacity and dates before committing. Each ticket needs a plain title, research/design/implementation label, estimated effort, required roles, source links, acceptance examples and its prerequisite PR. Include review and integration time in the estimate.
 
 The first integrated demo should show permitted staff saving, reviewing and publishing a dish, and a diner seeing that approved version. Layout, manual content preparation and event-definition review can proceed alongside backend work. Accept tracking and reports only after their real data paths and calculations are tested; a collector alone is not a finished dashboard.
+
+## P0 v2 owner synthetic dataset — October 27, 2026
+
+The reviewed synthetic dataset package is located at
+`test-data/owner-synthetic-p0-v2/`.
+
+It provides fictional event fixtures, expected metric outputs, negative
+cases, schema validation, and reproducible automated tests for the
+PeekaPlate P0 evaluation work.
+
+Verification history:
+- October 27, 2026: 62 automated tests passed (historical result).
+- October 29, 2026 (before merging develop): 73 Python automated tests passed.
+- Full dataset validation passed: 3,300 event deliveries and 3,150 unique observations across 300 sessions.
+- Starter dataset validation passed: 22 event deliveries and 21 unique observations across 2 sessions.
+- October 29, 2026 (after merging develop): 73/73 Python tests passed in 23.302 seconds; full and starter dataset validators passed.
+- November 2, 2026: after reconciling current develop, 76/76 tests passed in 20.267 seconds; full and starter validators passed. Offline data-preparation review is cleared; product/source approvals and application integration remain separate.
+
+To reproduce the results, follow
+[test-data/owner-synthetic-p0-v2/GUIDE.md](../test-data/owner-synthetic-p0-v2/GUIDE.md).
+
+These results establish synthetic fixture and validator correctness only.
+Application AI evaluation remains NOT RUN. Production integration and
+hosted privacy acceptance are not established. Outstanding product
+decisions remain PENDING.
+
+
+## Owner-report staging API — November 10
+
+The console may call the owner-report route from its exact staging origin or
+http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
+GitHub collaborator tokens do not authorize restaurant reports. Staging reports
+are deliberately limited to the server-approved synthetic venue; production
+and other venues remain blocked. See [request flow, status codes and release
+checks](owner-report-staging.md). Deployment evidence belongs in the narrow
+owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).

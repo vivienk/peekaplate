@@ -161,11 +161,15 @@ def _context(report, index):
     if sum(e.draft_id == evidence.draft_id for e in report.evidence) != 1:
         return None, []
     contexts = []
+    if report.configuration.get("v4_vision") or report.configuration.get("extraction_mode") == "vision_v4":
+        return evidence.draft_id, []
     for span in evidence.spans:
         segments = [s for s in report.segments if s.segment_id == span.segment_id]
         if len(segments) != 1:
             return evidence.draft_id, []
         segment = segments[0]
+        if segment.metadata.get("text_origin") == "vision_model_transcription":
+            return evidence.draft_id, []
         if segment.status != "ready" or not 0 <= span.start < span.end <= len(segment.text):
             return evidence.draft_id, []
         text = segment.text[span.start:span.end]

@@ -8,6 +8,7 @@ A PR preview is a temporary copy of the diner and console pages built from one p
 2. Find the **Preview** comment posted by `github-actions[bot]`. It links to both apps:
    - Diner: `https://pr-<number>.peekaplate-diner-preview.pages.dev`
    - Console: `https://pr-<number>.peekaplate-console-preview.pages.dev`
+   - Console component demo (synthetic values, for design review): `https://pr-<number>.peekaplate-console-preview.pages.dev/foundations.html`. Only preview builds include it (`PEEKAPLATE_PREVIEW_DEMOS`); staging and production builds do not.
 3. Each new push to the PR rebuilds the preview and updates the same comment. Check that its commit matches the latest PR commit before reviewing.
 4. Report findings as PR review comments, with the link, browser and screen size.
 
@@ -29,11 +30,11 @@ Analytics are disabled in every preview build. Trusted response headers addition
 
 ## How it works
 
-[`.github/workflows/deploy-preview.yml`](../.github/workflows/deploy-preview.yml) runs on `pull_request_target` from the repository's trusted default branch (`main`), with three isolated jobs. Both this workflow and `scripts/preview.mjs` must exist on `main`, even for PRs targeting `develop`. It does not use PR-authored workflow code. There are no path filters, so closing a PR always schedules cleanup:
+[`.github/workflows/deploy-preview.yml`](../.github/workflows/deploy-preview.yml) runs on `pull_request_target` from the repository's trusted default branch (`main`), with three isolated jobs. Both this workflow and `scripts/preview.mjs` must exist on `main`, even for PRs targeting `develop`. It does not use PR-authored workflow code. There are no path filters, so closing a PR without merging always schedules cleanup:
 
 - **build** runs for same-repository PRs. It checks out the exact PR head SHA with persisted Git credentials disabled, installs dependencies, builds both apps with analytics disabled and uploads the files as a three-day artifact. It has no deployment credentials.
 - **deploy** runs no PR code. It checks out the trusted default-branch commit, rejects server-side functions, Workers, redirects, configuration, symlinks and a supplied `peekaplate-preview.json`, then writes trusted headers and that commit marker using the requested PR head SHA. It verifies both target projects and uploads static files with Wrangler under the `pr-<number>` branch alias. Both aliases must return the expected SHA in their marker before the PR comment is updated; HTTP 200 alone can belong to an older build. Marker checks retry up to six times with ten seconds between attempts.
-- **cleanup** runs when the PR closes or merges. It deletes every deployment for that PR's branch alias from both projects and marks the comment as removed.
+- **cleanup** runs when the PR closes without merging. It deletes every deployment for that PR's branch alias from both projects and marks the comment as removed. A merged PR keeps its last successfully deployed preview at the same link.
 
 The normal **CI** workflow remains the required build and test check. **PR preview** is separate and not required, so a credentials or provider outage cannot block merges.
 
@@ -48,10 +49,11 @@ Limitation: a Cloudflare Pages token is account-wide, so it could also edit the 
 
 ## Retention
 
-- When a PR closes or merges, cleanup attempts to delete all matching preview deployments, including active aliases via the provider API. Failures remain visible and require retry. Cleanup runs even when new previews are disabled.
+- Merged PRs keep their last successfully deployed preview at the same `pr-<number>` link. It is not updated again and never shows the current `develop`. It may be older than the merged commit: if the final head's optional preview failed or had not finished when the PR merged, the link still shows the previous successful build. Before treating it as the merged revision, compare the "Built from" SHA in the preview comment with the PR's final commit.
+- When a PR closes without merging, cleanup attempts to delete all matching preview deployments, including active aliases via the provider API. Failures remain visible and require retry. Cleanup runs even when new previews are disabled.
 - Built artifacts expire after three days.
-- If cleanup fails, run **PR preview** manually from the Actions tab and enter the PR number. Its `cleanup` job deletes that PR's deployments.
-- Review both preview projects monthly in the Cloudflare dashboard and delete deployments whose PRs are closed.
+- If cleanup fails, run **PR preview** manually from the Actions tab and enter the PR number. Its `cleanup` job deletes that PR's deployments, including a merged PR's kept preview.
+- Review both preview projects monthly in the Cloudflare dashboard and delete deployments of closed, unmerged PRs.
 
 ## Setup
 

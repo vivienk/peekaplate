@@ -136,12 +136,20 @@ class IngredientIntelligenceTests(unittest.TestCase):
             with self.assertRaises(ExtractionError):
                 build_review_handoff(report_for(ingredients))
 
+    def test_vision_transcription_is_not_independent_ingredient_grounding(self):
+        report = report_for(['milk'])
+        report.segments[0].metadata['text_origin'] = 'vision_model_transcription'
+        assessment = build_review_handoff(report).assessments[0]
+        self.assertEqual(assessment.ingredients[0].reason, 'missing_evidence')
+        self.assertEqual(assessment.allergens['milk'].status, 'unknown')
+        self.assertEqual(assessment.dietary['vegan'].status, 'unknown')
+
     def test_offline_cli_round_trip_and_no_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             source, target = Path(directory) / 'extraction.json', Path(directory) / 'review.json'
-            source.write_text(report_for(['milk']).model_dump_json())
+            source.write_text(report_for(['milk']).model_dump_json(), encoding='utf-8')
             main(['--input', str(source), '--output', str(target)])
-            saved = IngredientReviewHandoff.model_validate_json(target.read_text())
+            saved = IngredientReviewHandoff.model_validate_json(target.read_text(encoding='utf-8'))
             self.assertEqual(saved.assessments[0].allergens['milk'].status, 'possible_presence')
             old = target.read_bytes()
             with self.assertRaises(SystemExit):
@@ -149,9 +157,9 @@ class IngredientIntelligenceTests(unittest.TestCase):
             self.assertEqual(old, target.read_bytes())
 
     def test_shared_fixture_matches_python_output(self):
-        fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review.json').read_text())
+        fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review.json').read_text(encoding='utf-8'))
         self.assertEqual(fixture, build_review_handoff(report_for(['milk', 'house sauce'])).model_dump(mode='json'))
 
     def test_shared_unicode_boundary_fixture(self):
-        fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review-unicode.json').read_text())
+        fixture = json.loads((Path(__file__).parent / 'fixtures/ingredient-review-unicode.json').read_text(encoding='utf-8'))
         self.assertEqual(fixture, build_review_handoff(report_for(['𠮷' * 256])).model_dump(mode='json'))

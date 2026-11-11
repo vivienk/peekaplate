@@ -13,6 +13,9 @@
     "vite": "8.3.4"
   },
   "dependencies": {
-    "@peekaplate/analytics": "workspace:*"
+    "@peekaplate/analytics": "workspace:*",
+    "@peekaplate/contracts": "workspace:*",
+    "@peekaplate/tokens": "workspace:*",
+    "@peekaplate/ui": "workspace:*"
   }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "@peekaplate/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components.css": "./src/components.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@peekaplate/tokens": "workspace:*"
+  }
+}

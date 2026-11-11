@@ -5,6 +5,39 @@ import { parseHtmlSource, parsePlainTextSource } from './parser';
 import { extractPassageFromSegment, rankAndBoundPassages, tokenizeQuery } from './ranker';
 import { retrieveMenuEvidence } from './retriever';
 
+function createTestPdf(text: string): Uint8Array {
+  const escapedText = text.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  const stream = `BT /F1 12 Tf 50 750 Td (${escapedText}) Tj ET`;
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`,
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+
+  for (let i = 0; i < objects.length; i++) {
+    offsets.push(new TextEncoder().encode(pdf).length);
+    pdf += `${i + 1} 0 obj\n${objects[i]}\nendobj\n`;
+  }
+
+  const xrefOffset = new TextEncoder().encode(pdf).length;
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+
+  for (const offset of offsets.slice(1)) {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  }
+
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return new TextEncoder().encode(pdf);
+}
+
 describe('S3-VIS-04 Bounded Menu Evidence Retrieval Engine', () => {
   const sampleMenuHtml = `
     <!DOCTYPE html>
@@ -131,6 +164,123 @@ Sourdough bread topped with mashed hass avocado, radish, and chili flakes: $11.5
   });
 
   describe('retrieveMenuEvidence end-to-end', () => {
+    it('follows a discovered PDF menu link within the configured source limit', async () => {
+      const pdfBytes = createTestPdf('Tuscan White Bean Soup: $11.50');
+
+      const mockFetch: typeof fetch = async (input) => {
+        const url = String(input);
+
+        if (url === 'https://trattoria.example.com/menu') {
+          return new Response(sampleMenuHtml, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          });
+        }
+
+        if (url === 'https://trattoria.example.com/menu-winter-2026.pdf') {
+          return new Response(pdfBytes.slice().buffer as ArrayBuffer, {
+            status: 200,
+            headers: { 'Content-Type': 'application/pdf' },
+          });
+        }
+
+        throw new Error(`Unexpected URL fetched: ${url}`);
+      };
+
+      const result = await retrieveMenuEvidence(
+        {
+          query: 'Tuscan White Bean Soup',
+          candidate_urls: ['https://trattoria.example.com/menu'],
+        },
+        {
+          customFetch: mockFetch,
+          allowLocalTestDestinations: true,
+          maxFetchedSources: 2,
+        },
+      );
+
+      expect(result.status).toBe('success');
+      expect(result.passages.some((p) => p.text.includes('Tuscan White Bean Soup'))).toBe(true);
+    });
+
+    it('deduplicates candidate URLs before applying the source limit', async () => {
+      const pdfBytes = createTestPdf('Saffron Lobster Ravioli: $29.00');
+      const fetchedUrls: string[] = [];
+
+      const mockFetch: typeof fetch = async (input) => {
+        const url = String(input);
+        fetchedUrls.push(url);
+
+        if (url === 'https://trattoria.example.com/menu') {
+          return new Response(sampleMenuHtml, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html' },
+          });
+        }
+
+        if (url === 'https://trattoria.example.com/menu-winter-2026.pdf') {
+          return new Response(pdfBytes.slice().buffer as ArrayBuffer, {
+            status: 200,
+            headers: { 'Content-Type': 'application/pdf' },
+          });
+        }
+
+        throw new Error(`Unexpected URL fetched: ${url}`);
+      };
+
+      const result = await retrieveMenuEvidence(
+        {
+          query: 'Saffron Lobster Ravioli',
+          candidate_urls: [
+            'https://trattoria.example.com/menu',
+            'https://trattoria.example.com/menu',
+          ],
+        },
+        {
+          customFetch: mockFetch,
+          allowLocalTestDestinations: true,
+          maxFetchedSources: 2,
+        },
+      );
+
+      expect(fetchedUrls).toEqual([
+        'https://trattoria.example.com/menu',
+        'https://trattoria.example.com/menu-winter-2026.pdf',
+      ]);
+      expect(result.status).toBe('success');
+      expect(
+        result.passages.some((passage) => passage.text.includes('Saffron Lobster Ravioli')),
+      ).toBe(true);
+    });
+
+    it('does not fetch discovered links when the source budget is exhausted', async () => {
+      const fetchedUrls: string[] = [];
+
+      const mockFetch: typeof fetch = async (input) => {
+        const url = String(input);
+        fetchedUrls.push(url);
+
+        return new Response(sampleMenuHtml, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        });
+      };
+
+      await retrieveMenuEvidence(
+        {
+          query: 'Tuscan White Bean Soup',
+          candidate_urls: ['https://trattoria.example.com/menu'],
+        },
+        {
+          customFetch: mockFetch,
+          allowLocalTestDestinations: true,
+          maxFetchedSources: 1,
+        },
+      );
+
+      expect(fetchedUrls).toEqual(['https://trattoria.example.com/menu']);
+    });
+
     it('retrieves relevant evidence from HTML menu with high confidence', async () => {
       const request: RetrievalRequestInput = {
         query: 'Tuscan White Bean Soup',

@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./retrieval": "./src/retrieval/index.ts"
+    "./retrieval": "./src/retrieval/index.ts",
+    "./owner-ai": "./src/owner-ai/index.ts"
   },
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
@@ -18,9 +19,12 @@
     "@peekaplate/contracts": "workspace:*",
     "hono": "4.13.13",
     "jose": "6.2.12",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "unpdf": "1.8.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261026.1",
     "@types/pg": "8.23.1",
     "wrangler": "4.149.0"
   }

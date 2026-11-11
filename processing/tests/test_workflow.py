@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from fixture_factory import make_pdf
+from peekaplate_processing.model_providers import create_cascading_clients, create_model_client
 from peekaplate_processing.run_pipeline import configured_llm, run_pipeline
 from peekaplate_processing.workflow import DishBatch, ExtractedDish
 from peekaplate_processing.errors import ExtractionError
@@ -37,7 +38,7 @@ class FakeLLM:
         assert schema == DishBatch.model_json_schema() and kwargs == {"method":"json_schema", "strict":True, "include_raw":True}
         return self
     def invoke(self, messages):
-        data = json.loads(messages[1][1]); assert set(data) == {"pages"}
+        data = json.loads(messages[1][1]); assert set(data) in ({"pages"}, {"pages", "context_pages"})
         self.calls.append(data["pages"])
         if len(self.calls) == self.fail_batch: raise RuntimeError("private provider response and secret")
         dishes = []
@@ -49,11 +50,31 @@ class FakeLLM:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_valid_long_ingredient_preserves_extraction_when_sidecar_is_out_of_bounds(self):
+        phrase = 'x' * 257
+        class LongIngredient(FakeLLM):
+            def invoke(self, messages):
+                answer = super().invoke(messages)
+                answer['parsed'].dishes[0].ingredients = [phrase]
+                answer['raw'].content = answer['parsed'].model_dump_json()
+                return answer
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'menu.pdf'
+            # Fit the complete phrase inside the page, rather than testing clipped text.
+            path.write_bytes(make_pdf([{'text': 'Dish 1 8.50 CAD Ingredients: ' + phrase}]).replace(b'/F1 12 Tf', b'/F1  2 Tf'))
+            folder = Path(directory) / 'run'
+            report = run_pipeline(path, folder, llm=LongIngredient(), input_mode='ocr')
+            self.assertEqual(report.status, 'complete', report.errors)
+            self.assertEqual(report.drafts[0].ingredients, [phrase])
+            self.assertEqual(json.loads((folder/'extraction.json').read_text())['status'], 'complete')
+            self.assertFalse((folder/'ingredient-review.json').exists())
+            self.assertEqual(json.loads((folder/'timings.json').read_text())['ingredient_review']['status'], 'unavailable')
+
     def run_case(self, directory, count, llm):
         path = Path(directory)/"menu.pdf"
         path.write_bytes(make_pdf([{"text":f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, count+1)]))
         with patch("peekaplate_processing.workflow.asyncio.sleep"):
-            return run_pipeline(path, Path(directory)/"run", llm=llm)
+            return run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=10, llm_concurrency=1,input_mode="ocr")
 
     def test_35_pages_dispatch_10_10_10_5_and_keep_source_spans(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -81,6 +102,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(report.drafts), 11)
         self.assertTrue(any("Batch 2" in e for e in report.errors))
         self.assertNotIn("secret", str(report.errors))
+
+    def test_provider_extraction_error_is_sanitized(self):
+        class Broken(FakeLLM):
+            async def ainvoke(self, messages):
+                raise ExtractionError("synthetic-provider-secret")
+        with tempfile.TemporaryDirectory() as directory:
+            report = self.run_case(directory, 1, Broken())
+            saved = (Path(directory)/"run/extraction.json").read_text()
+        self.assertEqual(report.status, "failed")
+        for output in (str(report.errors), saved):
+            self.assertNotIn("synthetic-provider-secret", output)
+            self.assertIn("ExtractionError", output)
 
     def test_existing_output_directory_refuses_before_any_llm_call(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -131,6 +164,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(str(model.openai_api_base), "https://openrouter.ai/api/v1")
         self.assertEqual(model.max_retries, 0)
         self.assertEqual(model.extra_body["reasoning"], {"enabled": False})
+
+    def test_cascade_keeps_openrouter_key_separate_from_generic_endpoint_and_model(self):
+        settings = {
+            "OPENROUTER_API_KEY": "synthetic-openrouter-key",
+            "MENU_AI_API_KEY": "synthetic-generic-key",
+            "MENU_AI_API_URL": "https://generic.example.test/v1/chat/completions",
+            "MENU_AI_MODEL": "generic-model",
+        }
+        with patch.dict(os.environ, settings, clear=True):
+            clients = create_cascading_clients()
+            generic = configured_llm()
+            explicit = create_model_client("openrouter")
+        self.assertEqual([name for name, _ in clients], ["qwen", "glm", "openrouter"])
+        self.assertEqual(
+            [client.model_name for _, client in clients],
+            ["qwen/qwen3.8-flash", "z-ai/glm-5.3-flash", "google/gemini-3-flash-preview"],
+        )
+        for _, client in clients:
+            self.assertEqual(str(client.openai_api_base), "https://openrouter.ai/api/v1")
+            self.assertEqual(client.openai_api_key.get_secret_value(), "synthetic-openrouter-key")
+        self.assertEqual(str(generic.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(generic.openai_api_key.get_secret_value(), "synthetic-generic-key")
+        self.assertEqual(generic.model_name, "generic-model")
+        self.assertEqual(str(explicit.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(explicit.model_name, "generic-model")
 
     def test_nara_settings_take_precedence_without_openrouter_parameters(self):
         settings = {"MENU_AI_API_KEY":"old-synthetic", "MENU_AI_API_URL":"https://openrouter.ai/api/v1/chat/completions", "MENU_AI_MODEL":"old-model", "NARA_ROUTER_KEY":"synthetic", "NARA_ROUTER_URL":"https://router.bynara.id/v1", "NARA_ROUTER_MODEL":"minimax-m3.1-flash:free"}
@@ -237,7 +295,7 @@ class WorkflowTests(unittest.TestCase):
             llm = ChatOpenAI(model="synthetic", api_key="synthetic", base_url="https://example.test/v1", http_client=client, http_async_client=httpx.AsyncClient(transport=httpx.MockTransport(respond)), max_retries=0)
             result = run_sdk_test(build_menu_graph(llm).ainvoke({"pages": [{"page_number": 1, "text": "Soup 8.50 CAD"}], "batches": [], "worker_findings": []}))["final_report"]
         self.assertEqual(result["errors"], [])
-        self.assertEqual(result["dishes"], [dish])
+        self.assertEqual(result["dishes"], [ExtractedDish.model_validate(dish).model_dump()])
 
     def test_price_alias_and_missing_required_keys_are_rejected(self):
         from pydantic import ValidationError
@@ -280,13 +338,13 @@ class WorkflowTests(unittest.TestCase):
             first = self.run_case(directory, 1, llm)
             saved = Path(directory)/"run/pages.json"
             with patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR when pages are reused")):
-                second = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved)
+                second = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
                 self.assertEqual(second.status, "complete", second.errors)
                 self.assertEqual(second.drafts, first.drafts)
                 other = Path(directory)/"other.pdf"
                 other.write_bytes(make_pdf([{"text": "Different source"}]))
                 with self.assertRaisesRegex(ExtractionError, "match"):
-                    run_pipeline(other, Path(directory)/"third", llm=FakeLLM(), pages_json=saved)
+                    run_pipeline(other, Path(directory)/"third", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
 
     def test_reused_failed_page_stays_incomplete_without_repeating_ocr(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -296,7 +354,7 @@ class WorkflowTests(unittest.TestCase):
             data["segments"][1].update(status="failed", text="", error="OCR unavailable")
             saved.write_text(json.dumps(data))
             with patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR")):
-                report = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved)
+                report = run_pipeline(Path(directory)/"menu.pdf", Path(directory)/"second", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
         self.assertEqual(report.status, "incomplete")
         self.assertEqual(len(report.drafts), 1)
         self.assertIn("Page 2: OCR unavailable", report.errors)
@@ -364,23 +422,7 @@ class WorkflowTests(unittest.TestCase):
                 saved.write_text(json.dumps(invalid))
                 with self.subTest(index=index), patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("No OCR")):
                     with self.assertRaises(ExtractionError):
-                        run_pipeline(Path(directory)/"menu.pdf", Path(directory)/f"bad{index}", llm=FakeLLM(), pages_json=saved)
-
-    def test_a2agent_settings_override_nara_and_generic_without_provider_extras(self):
-        settings = {"a2agent_api_key": "synthetic-a2", "a2agent_url": "https://api.a2agent.me/v1/chat/completions", "a2agent_api_MODEL": "minimax-m3", "NARA_ROUTER_KEY": "synthetic-nara", "NARA_ROUTER_URL": "https://router.bynara.id/v1", "NARA_ROUTER_MODEL": "old-model", "MENU_AI_API_KEY": "synthetic-old", "MENU_AI_API_URL": "https://openrouter.ai/api/v1", "MENU_AI_MODEL": "old-model"}
-        with patch.dict(os.environ, settings, clear=True):
-            model = configured_llm()
-        self.assertEqual(str(model.openai_api_base), "https://api.a2agent.me/v1")
-        self.assertEqual(model.model_name, "minimax-m3")
-        self.assertEqual(model.openai_api_key.get_secret_value(), "synthetic-a2")
-        self.assertEqual(model.extra_body, {})
-        self.assertIsNone(model.reasoning_effort)
-        self.assertEqual(model.max_retries, 0)
-
-    def test_partial_a2agent_configuration_fails_instead_of_using_nara(self):
-        with patch.dict(os.environ, {"a2agent_api_key": "synthetic", "NARA_ROUTER_KEY": "synthetic-nara", "NARA_ROUTER_URL": "https://router.bynara.id/v1", "NARA_ROUTER_MODEL": "old-model"}, clear=True):
-            with self.assertRaisesRegex(ExtractionError, "a2agent_url"):
-                configured_llm()
+                        run_pipeline(Path(directory)/"menu.pdf", Path(directory)/f"bad{index}", llm=FakeLLM(), pages_json=saved,input_mode="ocr")
 
     def test_real_sdk_accepts_only_complete_json_with_optional_outer_code_fence(self):
         import httpx
@@ -401,7 +443,7 @@ class WorkflowTests(unittest.TestCase):
                     asyncio.run(client.aclose())
                 if expected is None:
                     self.assertEqual(result["errors"], [])
-                    self.assertEqual(result["dishes"], [dish])
+                    self.assertEqual(result["dishes"], [ExtractedDish.model_validate(dish).model_dump()])
                 else:
                     self.assertIn(expected, str(result["errors"]))
                     self.assertEqual(result["dishes"], [])
@@ -454,7 +496,7 @@ class WorkflowTests(unittest.TestCase):
         valid = json.dumps({"dishes": [dish]})
         for content in ["<think>synthetic notes</think>\n\n" + valid, "<think>ignore this JSON: {\"dishes\": []}</think>\n```json\n" + valid + "\n```"]:
             with self.subTest(content=content):
-                self.assertEqual(parse_dish_content(content).model_dump(), {"dishes": [dish]})
+                self.assertEqual(parse_dish_content(content).model_dump(), DishBatch(dishes=[ExtractedDish.model_validate(dish)]).model_dump())
         for content in ["<think>unfinished " + valid, "<think>notes</think>", "<think>" + valid + "</think>", "<think>notes</think>" + valid[:-1], "<think>notes</think>" + valid + " extra prose"]:
             with self.subTest(content=content), self.assertRaises(ExtractionError):
                 parse_dish_content(content)
@@ -465,7 +507,7 @@ class WorkflowTests(unittest.TestCase):
             path.write_bytes(make_pdf([{"text": f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, 36)]))
             llm = FakeLLM()
             with patch("peekaplate_processing.workflow.asyncio.sleep"):
-                report = run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=2)
+                report = run_pipeline(path, Path(directory)/"run", llm=llm, batch_pages=2,input_mode="ocr")
             self.assertEqual(report.status, "complete", report.errors)
             self.assertEqual([len(p) for p in llm.calls], [2]*17+[1])
             self.assertEqual([p["page_number"] for batch in llm.calls for p in batch], list(range(1,36)))
@@ -554,7 +596,7 @@ class WorkflowTests(unittest.TestCase):
             path = Path(directory)/"menu.pdf"
             path.write_bytes(make_pdf([{"text": "\n".join(f"Dish {i} variant {v} 8.50 CAD" for v in range(5))} for i in range(1,36)]))
             with patch("peekaplate_processing.workflow.asyncio.sleep"):
-                report = run_pipeline(path, Path(directory)/"run", llm=Many(), batch_pages=2)
+                report = run_pipeline(path, Path(directory)/"run", llm=Many(), batch_pages=2,input_mode="ocr")
         self.assertEqual(report.status, "complete", report.errors)
         self.assertEqual(len(report.drafts), 175)
         self.assertEqual(len(report.evidence), 175)
@@ -715,3 +757,54 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result["errors"], [])
         self.assertTrue(any("could not be cached" in w for w in result["warnings"]))
         self.assertNotIn("private storage error", str(result))
+
+    def test_workflow_corroborates_box_evidence_when_text_omits_prices(self):
+        from peekaplate_processing.workflow import run_menu_graph, DishBatch, ExtractedDish
+        from types import SimpleNamespace
+        class MultiColumnLLM(FakeLLM):
+            def invoke(self, messages):
+                dishes = [
+                    ExtractedDish(
+                        page_number=1,
+                        name="PLAIN CHEESE",
+                        description=None,
+                        category=None,
+                        subcategory=None,
+                        price_text="6.00 33.00",
+                        price_amount=None,
+                        price_currency=None,
+                        ingredients=None,
+                    )
+                ]
+                batch = DishBatch(dishes=dishes)
+                return {
+                    "parsed": batch,
+                    "raw": SimpleNamespace(response_metadata={"finish_reason": "stop"}, content=batch.model_dump_json()),
+                    "parsing_error": None,
+                }
+        metadata = {
+            "ocr_region_status": "available",
+            "ocr_coordinate_space": "uploaded_image_pixels",
+            "upload_width": 1000,
+            "upload_height": 1000,
+            "ocr_regions": [
+                {"text": "PLAIN CHEESE", "left": 50, "top": 100, "width": 200, "height": 30},
+                {"text": "6.00", "left": 600, "top": 100, "width": 70, "height": 30},
+                {"text": "33.00", "left": 700, "top": 100, "width": 70, "height": 30},
+            ]
+        }
+        # In OCR text, prices are missing or dropped from the text segment:
+        pages = [{"page_number": 1, "text": "PLAIN CHEESE", "ocr_metadata": metadata}]
+        result = run_menu_graph(MultiColumnLLM(), pages)
+        self.assertEqual(len(result["dishes"]), 1)
+        dish = result["dishes"][0]
+        self.assertEqual(dish["name"], "PLAIN CHEESE")
+        self.assertEqual(dish["price_text"], "6.00 / 33.00")
+        self.assertIsNone(dish["price_amount"])
+        # Check warnings carry the box corroboration note
+        self.assertTrue(any("Price grounded via OCR box evidence; verify row alignment." in w for w in result["warnings"]))
+        # Check box_evidence in the dish item
+        self.assertIn("box_evidence", dish)
+        self.assertEqual(len(dish["box_evidence"]), 2)
+        self.assertEqual(dish["box_evidence"][0]["text"], "6.00")
+        self.assertEqual(dish["box_evidence"][1]["text"], "33.00")
