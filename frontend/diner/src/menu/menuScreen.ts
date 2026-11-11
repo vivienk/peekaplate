@@ -1,7 +1,12 @@
+import { suspendLiveTracking } from '../tracking';
+import type { MenuToken } from '../tracking/delivery';
+import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { formatPrice } from './price';
+import { createMenuRefresher, type MenuRefresher } from './refresh';
+import { menuRouteFromPath } from './route';
 import {
   bindMenuSearch,
   SEARCH_ALL_CATEGORY_ID,
@@ -27,6 +32,15 @@ const ALL_CATEGORY_ID = SEARCH_ALL_CATEGORY_ID;
 let menuObserver: IntersectionObserver | null = null;
 let activeCategoryId: string | null = null;
 let openerDishId: string | null = null;
+// True while the screen is showing fixture data. Only then may it show the "Fixture data"
+// label and the demo restaurant name; real menus must never show either.
+let fixtureMode = true;
+// The current menu token and whether live tracking was switched on, kept in memory for the visit.
+let menuToken: MenuToken | null = null;
+let liveTrackingOn = false;
+// The re-read timer for the live menu. Only one exists at a time; mounting again stops the old one.
+let activeRefresher: MenuRefresher | null = null;
+let activeLoad: AbortController | null = null;
 // The open search query (null when the bar is closed), kept across dish detail and back.
 let searchQuery: string | null = null;
 
@@ -58,31 +72,52 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// INTERIM: loading and error states have no restaurant name from the data, so a live menu uses
+// a neutral heading. Design confirmation pending (open question 3 in the DIN-03 ticket).
+function stateHeading(): string {
+  return fixtureMode ? demoBundle.restaurant.name : 'Menu';
+}
+
+function fixtureNotice(): string {
+  return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
+}
+
 function renderLoading(container: HTMLElement): void {
   container.innerHTML = `
-    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
+    <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--loading" role="status" aria-live="polite">
       <div class="pp-spinner" aria-hidden="true"></div>
       <p class="pp-loading-text">Loading menu…</p>
-      <p class="pp-notice">${FIXTURE_LABEL}</p>
+      ${fixtureNotice()}
     </div>
   `;
 }
 
-function renderFailure(container: HTMLElement, status: MenuLoadResult['status']): void {
+function renderFailure(
+  container: HTMLElement,
+  status: MenuLoadResult['status'],
+  onRetry?: () => void,
+): void {
   const messages: Record<string, string> = {
     empty: 'No dishes are available right now.',
     unavailable: 'This menu is unavailable right now.',
     error: 'We could not load the menu. Please try again.',
     offline: 'You appear to be offline. Please check your connection.',
   };
+  const showRetry = (status === 'error' || status === 'offline') && Boolean(onRetry);
   container.innerHTML = `
-    <h1 class="pp-sr-only">${escapeHtml(demoBundle.restaurant.name)}</h1>
+    <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
-      <p class="pp-notice">${FIXTURE_LABEL}</p>
+      ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
+      ${fixtureNotice()}
     </div>
   `;
+  if (showRetry && onRetry) {
+    container.querySelector<HTMLButtonElement>('[data-retry]')?.addEventListener('click', () => {
+      onRetry();
+    });
+  }
 }
 
 function renderCard(dish: CompleteDish): string {
@@ -270,55 +305,223 @@ function renderMenu(
       .querySelector<HTMLButtonElement>('.pp-card__open')
       ?.addEventListener('click', () => open(dish));
   });
+
+  container.querySelectorAll<HTMLImageElement>('img.pp-card__image').forEach((img) => {
+    const handleFailure = () => {
+      const missing = document.createElement('div');
+      missing.className = 'pp-card__image pp-card__image--missing';
+      missing.setAttribute('aria-hidden', 'true');
+      img.replaceWith(missing);
+    };
+    img.addEventListener('error', handleFailure);
+    if (img.complete && img.naturalWidth === 0) {
+      handleFailure();
+    }
+  });
+}
+
+function focusAfterRetry(container: HTMLElement, succeeded: boolean): void {
+  if (succeeded) {
+    // Focus the hidden h1 that names the restaurant to establish context for screen reader users
+    const heading = container.querySelector<HTMLElement>('h1');
+    if (heading) {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({ preventScroll: true });
+    }
+  } else {
+    // If retry fails again, keep focus on the retry button or state text
+    const retryBtn = container.querySelector<HTMLButtonElement>('[data-retry]');
+    if (retryBtn) {
+      retryBtn.focus();
+    } else {
+      const stateText = container.querySelector<HTMLElement>('.pp-state-text');
+      stateText?.setAttribute('tabindex', '-1');
+      stateText?.focus();
+    }
+  }
 }
 
 export function mountMenuScreen(container: HTMLElement): void {
+  activeLoad?.abort();
+  menuToken = null;
+  liveTrackingOn = false;
+  void suspendLiveTracking();
   disposeObserver();
   activeCategoryId = null;
   openerDishId = null;
   searchQuery = null;
-  renderLoading(container);
-
-  const scenario = scenarioFromQuery();
-  const delayMs = delayFromQuery();
-  const source = createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs });
+  activeRefresher?.stop();
+  activeRefresher = null;
 
   let savedScroll = 0;
   let currentMenu: Menu | null = null;
+  let isLoading = false;
+  let retryCount = 0;
+  // Which view is showing, so a swap redraws only the list and never an open dish detail.
+  let view: 'menu' | 'detail' = 'menu';
 
   const restoreOpenerFocus = () => {
     if (!openerDishId) return;
     const opener = Array.from(
       container.querySelectorAll<HTMLElement>('.pp-category:not([hidden]) .pp-card__open'),
     ).find((el) => el.dataset.openDishId === openerDishId);
-    opener?.focus({ preventScroll: true });
+    if (opener) opener.focus({ preventScroll: true });
+    else focusAfterRetry(container, true);
   };
 
   const showMenu = () => {
     if (!currentMenu) return;
+    view = 'menu';
     renderMenu(container, currentMenu, showDetail);
     window.scrollTo(0, savedScroll);
     restoreOpenerFocus();
   };
 
   const showDetail = (dish: CompleteDish) => {
+    view = 'detail';
     savedScroll = window.scrollY;
     disposeObserver();
     renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
     window.scrollTo(0, 0);
   };
 
-  void source
-    .load()
-    .then((result: MenuLoadResult) => {
-      if (result.status !== 'ready') {
-        renderFailure(container, result.status);
-        return;
+  // Called by the re-read timer when a new publication replaced the old one. The swap is a single
+  // assignment. The list is redrawn only if it is on screen; an open dish detail stays as it is
+  // and going back shows the new menu.
+  const swapMenu = (next: Menu) => {
+    currentMenu = next;
+    if (view !== 'menu') return;
+    const scrollY = window.scrollY;
+    const focused = document.activeElement;
+    let selector: string | null = null;
+    if (focused instanceof HTMLElement && container.contains(focused)) {
+      if (focused.id) selector = `#${CSS.escape(focused.id)}`;
+      else if (focused.dataset.openDishId) {
+        selector = `[data-open-dish-id="${CSS.escape(focused.dataset.openDishId)}"]`;
+      } else if (focused.dataset.categoryId) {
+        selector = `button[data-category-id="${CSS.escape(focused.dataset.categoryId)}"]`;
+      } else {
+        selector =
+          ['.pp-search', '.pp-search-close', '.pp-search-empty__clear'].find((value) =>
+            focused.matches(value),
+          ) ?? 'h1';
       }
-      currentMenu = result.menu;
-      renderMenu(container, currentMenu, showDetail);
-    })
-    .catch(() => {
-      renderFailure(container, 'error');
-    });
+    }
+    renderMenu(container, next, showDetail);
+    if (selector) {
+      const replacement = Array.from(container.querySelectorAll<HTMLElement>(selector)).find(
+        (element) => !element.closest('[hidden]'),
+      );
+      if (replacement && selector !== 'h1') {
+        replacement.focus({ preventScroll: true });
+      } else focusAfterRetry(container, true);
+    }
+    window.scrollTo(0, scrollY);
+  };
+
+  const loadMenu = () => {
+    if (isLoading) return;
+    isLoading = true;
+    activeRefresher?.stop();
+    activeRefresher = null;
+    activeLoad?.abort();
+    const controller = new AbortController();
+    activeLoad = controller;
+    const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
+    fixtureMode = mode === 'fixture';
+    renderLoading(container);
+
+    // Re-reading scenario and delay from the query on each load allows retry recovery
+    // in tests while maintaining identical behavior in production where the query is static.
+    const scenario = scenarioFromQuery();
+    const delayMs = delayFromQuery();
+
+    // Fixture mode calls load() synchronously, exactly as before. Live mode loads the published
+    // adapter on demand (dynamic import), so fixture builds do not carry or run it.
+    const loading: Promise<MenuLoadResult> =
+      mode === 'live'
+        ? Promise.all([
+            import('./published'),
+            import('../tracking'),
+            import('../tracking/delivery'),
+          ]).then(([published, tracking, delivery]): Promise<MenuLoadResult> | MenuLoadResult => {
+            const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
+            if (!apiBase) return { status: 'error' };
+            const route = menuRouteFromPath(window.location.pathname);
+            if (!route) return { status: 'unavailable' };
+            const source = published.createPublishedMenuSource({
+              apiBase,
+              ...route,
+              onDelivery: (info) => {
+                if (controller.signal.aborted) return;
+                menuToken = {
+                  value: info.token,
+                  expiresAt: info.expiresAt,
+                  publicationRevisionId: info.publicationId,
+                };
+                // Every verified load, first or re-read, re-arms the timer for the new expiry.
+                activeRefresher?.schedule(info.expiresAt);
+                if (liveTrackingOn) return;
+                liveTrackingOn = true;
+                tracking.enableLiveTracking(
+                  delivery.createLiveDeliver({
+                    endpoint: `${apiBase.replace(/\/+$/, '')}/observations`,
+                    fetch: (input, init) => fetch(input, init),
+                    now: () => Date.now(),
+                    token: () => menuToken,
+                    canSend: () => !controller.signal.aborted && tracking.isLiveTracking(),
+                  }),
+                );
+              },
+            });
+            activeRefresher = createMenuRefresher({
+              source: { load: () => source.load(controller.signal) },
+              getCurrent: () => currentMenu,
+              onSwap: swapMenu,
+              // The publication is gone. The menu on screen stays, but nothing more is delivered.
+              onStop: () => {
+                menuToken = null;
+                controller.abort();
+                liveTrackingOn = false;
+                void tracking.suspendLiveTracking();
+              },
+            });
+            return source.load(controller.signal);
+          })
+        : createFixtureMenuSource(scenario, delayMs === undefined ? {} : { delayMs }).load();
+
+    const handleRetry = () => {
+      if (isLoading) return;
+      retryCount++;
+      loadMenu();
+    };
+
+    loading
+      .then((result: MenuLoadResult) => {
+        if (controller.signal.aborted) return;
+        isLoading = false;
+        if (result.status !== 'ready') {
+          renderFailure(container, result.status, handleRetry);
+          if (retryCount > 0) {
+            focusAfterRetry(container, false);
+          }
+          return;
+        }
+        currentMenu = result.menu;
+        renderMenu(container, currentMenu, showDetail);
+        if (retryCount > 0) {
+          focusAfterRetry(container, true);
+        }
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        isLoading = false;
+        renderFailure(container, 'error', handleRetry);
+        if (retryCount > 0) {
+          focusAfterRetry(container, false);
+        }
+      });
+  };
+
+  loadMenu();
 }
