@@ -1,6 +1,8 @@
 /* Owner Dashboard V2 (Simplified) rebuilt on @peekaplate/tokens, light theme. Layout follows the
    design prototype; every colour, font and shadow below resolves to a token. Dev-only demo page. */
 @import "@peekaplate/tokens/tokens.css";
+/* Shared component classes (Button) so the demo reuses the design-system button. */
+@import "@peekaplate/ui/components.css";
 
 :root {
   --bg: var(--pp-role-surface);
@@ -255,7 +257,7 @@ h3 {
   outline: 2px solid var(--nav-ink);
   outline-offset: 3px;
 }
-.nav svg {
+.nav .ic {
   flex: none;
 }
 .side-foot {
@@ -304,76 +306,6 @@ h3 {
 .chip.sample {
   background: var(--panel);
   color: var(--muted);
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1.5px solid var(--ink);
-  background: transparent;
-  color: var(--ink);
-  font-weight: 700;
-  border-radius: 99px;
-  padding: 10px 22px;
-  min-height: 46px;
-  font-size: 15px;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s,
-    background 0.2s;
-}
-.btn:hover {
-  transform: translateY(-1px);
-  background: color-mix(in srgb, var(--pp-color-white) 60%, transparent);
-}
-.btn.primary {
-  background: var(--coral);
-  border-color: var(--coral);
-  color: var(--ink);
-  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--pp-color-orange-500) 90%, transparent);
-}
-.btn.primary:hover {
-  background: var(--coral);
-}
-.btn.ghost {
-  border-color: transparent;
-  background: transparent;
-  font-weight: 600;
-}
-.btn.ghost:hover {
-  background: var(--panel);
-}
-.btn.danger:hover {
-  background: var(--coral-soft);
-  border-color: var(--coral-ink);
-}
-.btn.sm {
-  padding: 6px 16px;
-  min-height: 38px;
-  font-size: 14px;
-}
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-.aibtn {
-  background: var(--ink);
-  color: var(--pp-color-white);
-  border-color: var(--ink);
-}
-.aibtn:hover {
-  background: var(--ink);
-  color: var(--pp-color-white);
-  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--pp-color-gray-900) 70%, transparent);
-}
-.aibtn .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--coral);
 }
 
 .card {
@@ -521,6 +453,10 @@ h3 {
 .kpi .d {
   font-size: 13.5px;
   color: var(--muted);
+}
+.kpi-tag {
+  margin-top: auto;
+  padding-top: 4px;
 }
 .delta {
   font-weight: 700;
@@ -939,7 +875,7 @@ article.insight {
   background: var(--good-soft);
   color: var(--good);
 }
-.note svg {
+.note .ic {
   flex: none;
   margin-top: 2px;
 }
@@ -1465,7 +1401,7 @@ article.insight {
   gap: 8px;
   align-content: start;
 }
-.stepc svg {
+.stepc .ic {
   color: var(--ink);
 }
 .dishgrid {
@@ -1577,7 +1513,8 @@ article.insight {
 }
 @media (min-width: 901px) {
   .app.has-ai {
-    grid-template-columns: 260px minmax(0, 1fr) 450px;
+    /* Figma's owner AI panel is 300px; 360px keeps the chat answers readable here. */
+    grid-template-columns: 260px minmax(0, 1fr) 360px;
   }
   .app.has-ai .aibtn-top {
     display: none;
@@ -1648,7 +1585,7 @@ article.insight {
 }
 @media (min-width: 901px) and (max-width: 1200px) {
   .app.has-ai {
-    grid-template-columns: 76px minmax(0, 1fr) 380px;
+    grid-template-columns: 76px minmax(0, 1fr) 320px;
   }
   .app.has-ai .side {
     padding: 16px 10px;
@@ -1893,15 +1830,6 @@ p {
   letter-spacing: 0.04em;
   padding: 3px 9px;
 }
-.btn {
-  font-size: 14px;
-  font-weight: 600;
-}
-.btn.sm {
-  font-size: 13px;
-  padding: 6px 14px;
-  min-height: 36px;
-}
 .card-h .sub {
   font-size: 13px;
 }
@@ -2057,22 +1985,6 @@ p {
   display: grid;
   gap: 14px;
 }
-.back-link {
-  all: unset;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--coral-ink);
-  justify-self: start;
-  border-radius: 8px;
-}
-.back-link:focus-visible {
-  outline: 3px solid var(--ink);
-  outline-offset: 3px;
-}
 .rpt-title {
   display: flex;
   justify-content: space-between;
@@ -2147,9 +2059,6 @@ p {
   align-items: center;
   gap: 6px;
   color: var(--ink);
-}
-.rpt-act h2 svg {
-  color: var(--coral);
 }
 .rpt-rec {
   font-size: 15px;
@@ -2231,16 +2140,6 @@ h3 {
   font-size: 12px;
   font-weight: 500;
   padding: 3px 10px;
-}
-.btn,
-.back-link {
-  font-weight: 600;
-}
-.btn {
-  font-size: 14px;
-}
-.btn.sm {
-  font-size: 13.5px;
 }
 .nav button {
   font-size: 14px;
@@ -2438,17 +2337,6 @@ h3 {
   font-weight: 600;
   color: var(--muted);
 }
-.sq-head button {
-  all: unset;
-  cursor: pointer;
-  color: var(--coral-ink);
-  font-weight: 600;
-  border-radius: 6px;
-}
-.sq-head button:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
 .chatbox.ai .qchip {
   font-size: 14px;
   font-weight: 400;
@@ -2510,7 +2398,7 @@ h3 {
   min-width: 240px;
   flex: 0 1 300px;
 }
-.dsearch > svg {
+.dsearch > .ic {
   position: absolute;
   left: 14px;
   color: var(--muted);
@@ -2567,11 +2455,6 @@ h3 {
 .dtable .tbl th {
   padding: 10px 6px;
 }
-.dtable .tbl td:first-child .btn {
-  /* Long dish names wrap so every column fits next to the AI panel at 1440px. */
-  min-width: 8em;
-  padding: 4px 8px;
-}
 .dtable .tbl td:first-child .row {
   gap: 4px;
 }
@@ -2586,24 +2469,12 @@ h3 {
 .dtable .tbl td.r {
   white-space: nowrap;
 }
-/* buttons: slightly smaller text; white text on orange */
-.btn {
-  font-size: 13px;
-  font-weight: 600;
-}
-.btn.sm {
-  font-size: 12.5px;
-}
+/* tabs and segmented controls: slightly smaller text */
 .tabs button {
   font-size: 13px;
 }
 .seg button {
   font-size: 12.5px;
-}
-.btn.primary,
-.btn.primary:hover,
-.btn.primary:disabled {
-  color: var(--pp-color-white);
 }
 .ctlrow {
   display: flex;
@@ -2613,10 +2484,6 @@ h3 {
 }
 .ctlrow .dsearch {
   flex: 0 1 360px;
-}
-.ctlrow .btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 /* chatbot: smaller text */
 .chatbox.ai .aih-top h3 {
@@ -2683,44 +2550,203 @@ h1 {
   font-size: 14px;
   line-height: 1.45;
 }
-/* icons: colored glyph inside a soft circle */
-.stepc > svg,
-.note > svg,
-.rpt-act h2 svg {
-  box-sizing: content-box;
-  padding: 6px;
-  border-radius: 50%;
-  background: var(--pp-color-orange-100);
-  color: var(--pp-color-orange-700);
+/* Icons: Rania's Figma SVG files drawn as a mask in the current text colour (see ui.tsx). No
+   fill behind icons (design review 04). */
+.ic {
+  display: inline-block;
   flex: none;
+  background-color: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat;
+  mask: var(--ic) center / contain no-repeat;
 }
-.stepc > svg {
-  width: 20px;
-  height: 20px;
-  padding: 8px;
+.note > .ic {
   color: var(--pp-color-orange-700);
+  margin-top: 1px;
 }
-.note > svg {
-  width: 16px;
-  height: 16px;
-  padding: 6px;
-  background: var(--pp-color-white);
-  margin-top: -2px;
-}
-.note.good > svg {
-  background: var(--pp-color-white);
+.note.good > .ic {
   color: var(--pp-color-success-700);
 }
-.note.warn > svg,
-.note.coral > svg {
-  background: var(--pp-color-white);
+.note.warn > .ic,
+.note.coral > .ic {
   color: var(--coral-ink);
 }
-.rpt-act h2 svg {
-  width: 16px;
-  height: 16px;
-  padding: 6px;
+.rpt-act h2 .ic {
+  color: var(--pp-color-orange-700);
   margin-right: 2px;
+}
+
+/* Buttons: Rania's Figma components on top of the shared @peekaplate/ui Button.
+   "Owner dashboard_Button" 1563:8484. Medium 40px (8/16 padding, 16/24 label), Large 48px
+   (12/20 padding, 18/28 label), pill, 8px icon gap.
+   Primary: color/button/primary/background Orange/500, content Orange/950; hover Orange/300,
+   pressed Orange/700. Outlined: color/surface-container with 1px color/outline-solid, content
+   Orange/950; hover Orange/500 fill; pressed Neutral/950 with light text. Focus: 2px
+   color/border/focus (Info/600). Disabled: Neutral/200 fill, Neutral/300 border, Neutral/400
+   text. */
+.ob.pp-button {
+  --ob-pending-surface-container: #fffcfa; /* Figma Semantic Light color/surface-container;
+     no Cream token in tokens.css yet (Harshita's lane), so it stays local and pending. */
+  /* Figma fixes the height and draws the 1px stroke inside it: 7 + 24 + 7 + 2 = 40px. */
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 7px var(--pp-space-16);
+  gap: var(--pp-space-8);
+  border-radius: var(--pp-radius-full);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: var(--pp-font-weight-semibold);
+  text-align: center;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.ob--lg.pp-button {
+  /* 9 + 28 + 9 + 2 = 48px, the Figma Large height. */
+  min-height: 48px;
+  padding: 9px var(--pp-space-20);
+  font-size: 18px;
+  line-height: 28px;
+}
+.ob--lg.ob--outlined.pp-button {
+  font-weight: var(--pp-font-weight-bold);
+}
+.ob--primary.pp-button {
+  background-color: var(--pp-color-orange-500);
+  border-color: transparent;
+  color: var(--pp-color-orange-950);
+}
+.ob--primary.pp-button:hover:not(:disabled) {
+  background-color: var(--pp-color-orange-300);
+}
+.ob--primary.pp-button:active:not(:disabled) {
+  background-color: var(--pp-color-orange-700);
+}
+.ob--outlined.pp-button {
+  background-color: var(--ob-pending-surface-container);
+  border-color: var(--pp-color-neutral-500);
+  color: var(--pp-color-orange-950);
+}
+.ob--outlined.pp-button:hover:not(:disabled) {
+  background-color: var(--pp-color-orange-500);
+}
+.ob--outlined.pp-button:active:not(:disabled) {
+  background-color: var(--pp-color-neutral-950);
+  border-color: var(--pp-color-neutral-950);
+  color: var(--ob-pending-surface-container);
+}
+.ob.pp-button:focus-visible {
+  outline: 2px solid var(--pp-color-info-600);
+  outline-offset: 2px;
+}
+.ob--primary.pp-button:disabled,
+.ob--outlined.pp-button:disabled {
+  background-color: var(--pp-color-neutral-200);
+  border-color: var(--pp-color-neutral-300);
+  color: var(--pp-color-neutral-400);
+  transform: none;
+}
+/* "Text link" 1449:11145, Tone=Accent: 16/24 Medium in color/link (Orange/800); active
+   color/on-primary-container (Orange/900); focus 1px color/border/focus, radius 4. */
+.ob--text.pp-button {
+  /* Figma Text link is 28px tall: 2 + 24 + 2. */
+  min-height: 0;
+  padding: 2px var(--pp-space-4);
+  gap: 6px;
+  border: 0;
+  border-radius: var(--pp-radius-4);
+  background: none;
+  color: var(--pp-color-orange-800);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: var(--pp-font-weight-medium);
+  text-align: left;
+}
+.ob--text.pp-button:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ob--text.pp-button:active:not(:disabled) {
+  background: none;
+  color: var(--pp-color-orange-900);
+  transform: none;
+}
+.ob--text.pp-button:focus-visible {
+  outline: 1px solid var(--pp-color-info-600);
+  outline-offset: 0;
+}
+.ob--text.pp-button:disabled {
+  background: none;
+  color: var(--pp-color-neutral-400);
+}
+.back-link {
+  justify-self: start;
+}
+/* Dish names in the Dish performance table wrap so every column still fits at 1440px. */
+.dtable .tbl td:first-child .ob {
+  min-width: 8em;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--pp-color-gray-900);
+}
+.dtable .tbl td:first-child .row {
+  gap: 4px;
+}
+.sq-head .ob--text.pp-button {
+  font-size: 12px;
+  line-height: 16px;
+  padding: 2px 4px;
+}
+
+/* reusable icon container (design review 04): fixed box, no background fill */
+.icontile {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+.icontile .ic {
+  color: var(--pp-color-orange-700);
+}
+/* "Your menu" on the welcome page (design review 01 + 03): plain section, compact list */
+.menu-plain {
+  display: grid;
+  gap: 4px;
+}
+.menu-plain .card-h {
+  margin-bottom: 8px;
+}
+.menu-plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 680px;
+}
+.menu-plain-row {
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 12px 4px;
+}
+.menu-plain-row .thumb {
+  width: 60px;
+  height: 60px;
+}
+.menu-plain-row .thumb img {
+  width: 54px;
+  height: 54px;
+}
+.menu-plain-row .dn {
+  font-size: 16px;
+}
+.menu-plain-row .dn small {
+  font-size: 14px;
+}
+.menu-plain-row .num {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--pp-color-gray-900);
 }
 .chatbox.ai .composer {
   grid-template-columns: minmax(0, 1fr);
@@ -2815,7 +2841,7 @@ h1 {
   width: 32px;
   height: 32px;
 }
-.chatbox.ai .sendbtn svg {
+.chatbox.ai .sendbtn .ic {
   width: 15px;
   height: 15px;
 }

@@ -3,7 +3,7 @@
 import { type FormEvent, useRef, useState } from 'react';
 import { CATS, DISH, INSIGHTS, imgOf, type MenuItem, money, suggestIng } from './data';
 import type { Acts } from './pages';
-import { Icon, Note } from './ui';
+import { Btn, Icon, Note } from './ui';
 
 export type EditState =
   | { step: 'list' }
@@ -39,10 +39,9 @@ export function MenuList({
         <span className="eyebrow">Menu</span>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <h1>Your dishes</h1>
-          <button type="button" className="btn primary" onClick={startAdd}>
-            <Icon n="plus" s={16} />
+          <Btn kind="primary" size="lg" icon="plus" type="button" onClick={startAdd}>
             Add dish
-          </button>
+          </Btn>
         </div>
         <p className="lede">
           Edit a dish or add a new one. Changes are reviewed and approved by you before they can go
@@ -94,22 +93,19 @@ export function MenuList({
               </span>
               <span className="row" style={{ flexWrap: 'nowrap' }}>
                 {m.status === 'ready' && m.id && (
-                  <button
-                    type="button"
-                    className="btn primary sm"
-                    onClick={() => m.id && publish(m.id)}
-                  >
+                  <Btn kind="primary" size="md" type="button" onClick={() => m.id && publish(m.id)}>
                     Publish
-                  </button>
+                  </Btn>
                 )}
-                <button
+                <Btn
+                  kind="outlined"
+                  size="md"
                   type="button"
-                  className="btn sm"
                   onClick={() => m.id && startEdit(m.id)}
                   aria-label={`Edit ${m.name}`}
                 >
                   Edit
-                </button>
+                </Btn>
               </span>
             </div>
           );
@@ -192,10 +188,9 @@ export function DishForm({
   return (
     <form className="stack" onSubmit={submit} noValidate>
       <div>
-        <button type="button" className="btn ghost sm" onClick={cancel}>
-          <Icon n="back" s={16} />
+        <Btn kind="text" icon="back" type="button" onClick={cancel}>
           Back to Menu
-        </button>
+        </Btn>
       </div>
       <div className="pagehead">
         <span className="eyebrow">{orig ? 'Edit dish' : 'Add dish'} · Step 1 of 3</span>
@@ -280,9 +275,11 @@ export function DishForm({
             />
             {err('f-desc') && <span className="err">{err('f-desc')?.[1]}</span>}
             <div className="row">
-              <button
+              <Btn
+                kind="outlined"
+                size="md"
+                icon="spark"
                 type="button"
-                className="btn sm"
                 onClick={() => {
                   const ing = dr.ing.length ? dr.ing : suggestIng(dr.name);
                   setAiDraft(
@@ -290,9 +287,8 @@ export function DishForm({
                   );
                 }}
               >
-                <Icon n="spark" s={15} />
                 Draft with AI
-              </button>
+              </Btn>
               <span className="hint">AI drafts need your approval.</span>
             </div>
           </div>
@@ -303,19 +299,20 @@ export function DishForm({
               </div>
               <p>{aiDraft}</p>
               <div className="row">
-                <button
+                <Btn
+                  kind="primary"
+                  size="md"
                   type="button"
-                  className="btn primary sm"
                   onClick={() => {
                     set({ desc: aiDraft, aiUsed: true, aiReviewed: false });
                     setAiDraft(null);
                   }}
                 >
                   Use this draft
-                </button>
-                <button type="button" className="btn sm" onClick={() => setAiDraft(null)}>
+                </Btn>
+                <Btn kind="outlined" size="md" type="button" onClick={() => setAiDraft(null)}>
                   Discard
-                </button>
+                </Btn>
               </div>
             </div>
           )}
@@ -371,12 +368,14 @@ export function DishForm({
                 }}
                 aria-invalid={!!err('f-ing')}
               />
-              <button type="button" className="btn sm" onClick={addTag}>
+              <Btn kind="outlined" size="md" type="button" onClick={addTag}>
                 Add
-              </button>
-              <button
+              </Btn>
+              <Btn
+                kind="outlined"
+                size="md"
+                icon="spark"
                 type="button"
-                className="btn sm"
                 onClick={() => {
                   const s = suggestIng(dr.name).filter((x) => !dr.ing.includes(x));
                   set({
@@ -387,9 +386,8 @@ export function DishForm({
                   });
                 }}
               >
-                <Icon n="spark" s={15} />
                 Suggest with AI
-              </button>
+              </Btn>
             </div>
             {err('f-ing') && <span className="err">{err('f-ing')?.[1]}</span>}
             <span className="hint">Ingredients are hidden from diners until you approve them.</span>
@@ -441,9 +439,9 @@ export function DishForm({
                   });
               }}
             />
-            <button type="button" className="btn" onClick={() => fileRef.current?.click()}>
+            <Btn kind="outlined" size="lg" type="button" onClick={() => fileRef.current?.click()}>
               {imgOf(dr) ? 'Replace photo' : 'Upload photo'}
-            </button>
+            </Btn>
             {err('f-photo') && (
               <span className="err" id="f-photo-e">
                 {err('f-photo')?.[1]}
@@ -484,12 +482,12 @@ export function DishForm({
         </div>
       </div>
       <div className="row">
-        <button className="btn primary" type="submit">
+        <Btn kind="primary" size="lg" type="submit">
           Review changes
-        </button>
-        <button type="button" className="btn" onClick={cancel}>
+        </Btn>
+        <Btn kind="outlined" size="lg" type="button" onClick={cancel}>
           Cancel
-        </button>
+        </Btn>
       </div>
     </form>
   );
@@ -574,15 +572,15 @@ export function Review({
       </div>
       {dr.aiUsed && <Note icon="info">Includes AI-drafted content that you reviewed.</Note>}
       <div className="row">
-        <button type="button" className="btn primary" onClick={() => confirm(ingOk)}>
+        <Btn kind="primary" size="lg" type="button" onClick={() => confirm(ingOk)}>
           Approve and save
-        </button>
-        <button type="button" className="btn" onClick={back}>
+        </Btn>
+        <Btn kind="outlined" size="lg" type="button" onClick={back}>
           Back to edit
-        </button>
-        <button type="button" className="btn ghost" onClick={cancel}>
+        </Btn>
+        <Btn kind="text" type="button" onClick={cancel}>
           Cancel, save nothing
-        </button>
+        </Btn>
       </div>
     </div>
   );
@@ -610,13 +608,13 @@ export function Saved({
       </Note>
       <div className="row">
         {m.status !== 'live' && (
-          <button type="button" className="btn primary" onClick={() => m.id && publish(m.id)}>
+          <Btn kind="primary" size="lg" type="button" onClick={() => m.id && publish(m.id)}>
             Publish to diner menu
-          </button>
+          </Btn>
         )}
-        <button type="button" className="btn" onClick={backToMenu}>
+        <Btn kind="outlined" size="lg" type="button" onClick={backToMenu}>
           Back to Menu
-        </button>
+        </Btn>
       </div>
     </div>
   );
