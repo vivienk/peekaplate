@@ -101,8 +101,19 @@ test('active withdrawal preserves browsing but stops both destinations', async (
       type,
     );
   // Opt-in observes the currently readable menu; do not inject a duplicate menu view.
+  expect(
+    await page.evaluate(
+      () => (window as any).reviewCaptured.filter((type: string) => type === 'menu_viewed').length,
+    ),
+  ).toBe(1);
   await page.clock.runFor(6000);
-  await expect.poll(() => countOf('menu_viewed')).toBe(1);
+  // IDB can finish opening after runFor; its newly armed batch timer still needs fake time.
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(1000);
+      return countOf('menu_viewed');
+    })
+    .toBe(1);
   state.kind = 'withdrawn';
   await page.clock.fastForward(25 * 60_000 + 1000);
   await expect

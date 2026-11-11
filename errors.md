@@ -2683,3 +2683,7 @@ The first complete Chromium run passed 136/137 cases: the withdrawal fixture inj
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T08:47:40.684Z","exitCode":1}
 ```
+
+## DIN-01 withdrawal fixture fake-time follow-up
+
+Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.
