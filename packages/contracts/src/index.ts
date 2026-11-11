@@ -1,6 +1,14 @@
+export * from './owner-actions';
 export * from './owner-ai';
 
 import { z } from 'zod';
+
+export {
+  type ComparisonReport,
+  ComparisonReportSchema,
+  ComparisonStatus,
+  type ComparisonStatus as ComparisonStatusValue,
+} from './comparison-report';
 
 export {
   type ReviewCandidate,
