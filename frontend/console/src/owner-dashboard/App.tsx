@@ -28,7 +28,7 @@ import {
   Welcome,
 } from './pages';
 import { ReportData } from './report-data';
-import { BackChevron, Icon, type IconName } from './ui';
+import { Btn, Icon, type IconName } from './ui';
 
 function Controls({
   sim,
@@ -68,12 +68,12 @@ function Controls({
             </label>
           ))}
           <div className="row">
-            <button type="button" className="btn sm" onClick={showWelcome}>
+            <Btn kind="outlined" size="md" type="button" onClick={showWelcome}>
               Show welcome
-            </button>
-            <button type="button" className="btn sm" onClick={restart}>
+            </Btn>
+            <Btn kind="outlined" size="md" type="button" onClick={restart}>
               Restart
-            </button>
+            </Btn>
           </div>
         </div>
       )}
@@ -301,10 +301,15 @@ export function App() {
     body = (
       <>
         <div className="backrow">
-          <button type="button" className="back-link" onClick={() => go('overview')}>
-            <BackChevron />
+          <Btn
+            kind="text"
+            icon="back"
+            type="button"
+            className="back-link"
+            onClick={() => go('overview')}
+          >
             Back to Dashboard
-          </button>
+          </Btn>
         </div>
         {body}
       </>
@@ -357,15 +362,16 @@ export function App() {
             <span className="chip sample">Illustrative sample data</span>
             <span className="chip">{REST.period}</span>
           </div>
-          <button
-            type="button"
-            className="btn aibtn aibtn-top"
+          <Btn
+            kind="primary"
+            size="md"
+            icon="spark"
+            className="aibtn-top"
             onClick={() => setChatOpen(true)}
             aria-haspopup="dialog"
           >
-            <span className="dot" />
             Ask AI
-          </button>
+          </Btn>
         </div>
         <main id="content">{body}</main>
       </div>

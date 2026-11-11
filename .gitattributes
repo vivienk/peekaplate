@@ -3,3 +3,4 @@
 *.jpg binary
 *.webp binary
 *.pdf binary
+packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/** -text whitespace=cr-at-eol

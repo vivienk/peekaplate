@@ -21,18 +21,18 @@ import {
   SESSIONS,
   type SortKey,
   T,
-  THUMBS,
   WEEKS,
   WK_ORDERS,
   WK_PREVIEWS,
   WK_TIME,
 } from './data';
 import {
-  BackChevron,
+  Btn,
   ChartCard,
   Delta,
   HBars,
   Icon,
+  IconTile,
   Kpi,
   Lab,
   LineChart,
@@ -66,48 +66,51 @@ export function Welcome({ go }: { go: (p: Page) => void }) {
       </div>
       <div className="steps">
         <div className="stepc">
-          <Icon n="menu" />
+          <IconTile n="menu" />
           <h3>Your {DISH.length} dishes are listed</h3>
           <p className="muted">Each one is live on the diner menu, with a photo and description.</p>
         </div>
         <div className="stepc">
-          <Icon n="report" />
+          <IconTile n="report" />
           <h3>Reports appear in AI Insight Report</h3>
           <p className="muted">
             When a report period closes, a short summary appears with its evidence.
           </p>
         </div>
         <div className="stepc">
-          <Icon n="chat" />
+          <IconTile n="chat" />
           <h3>Ask AI any time</h3>
           <p className="muted">
             Ask about dishes, comparisons and orders. Answers show their evidence.
           </p>
         </div>
       </div>
-      <section className="card">
+      {/* Design review (Rania, Nov 9): plain section without a card border or fill, and a compact
+          vertical list instead of large stacked dish cards. */}
+      <section className="menu-plain" aria-labelledby="ym-h">
         <div className="card-h">
           <div>
-            <h3>Your menu</h3>
+            <h3 id="ym-h">Your menu</h3>
             <div className="sub">Numbers appear once diners start using the menu.</div>
           </div>
         </div>
-        <div className="dishgrid">
+        <ul className="dlist menu-plain-list">
           {DISH.map((d) => (
-            <div className="dg" key={d.id}>
-              <img src={THUMBS[d.id]} alt="" />
-              <b>{d.name}</b>
-              <span>
-                {d.cat} · {money(d.price)}
+            <li className="drow menu-plain-row" key={d.id}>
+              <Thumb id={d.id} />
+              <span className="dn">
+                {d.name}
+                <small>{d.cat}</small>
               </span>
-            </div>
+              <span className="num">{money(d.price)}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
       <div className="row">
-        <button type="button" className="btn primary" onClick={() => go('menu')}>
+        <Btn kind="primary" size="lg" type="button" onClick={() => go('menu')}>
           Review my menu
-        </button>
+        </Btn>
       </div>
     </div>
   );
@@ -230,9 +233,9 @@ export function Overview({
               <div>
                 <h3>Your dishes</h3>
               </div>
-              <button type="button" className="btn sm" onClick={() => go('perf')}>
+              <Btn kind="outlined" size="md" type="button" onClick={() => go('perf')}>
                 Dish performance
-              </button>
+              </Btn>
             </div>
             <div className="dlist">
               {(empty ? DISH : sorted).map((d) => (
@@ -293,9 +296,14 @@ export function Overview({
                     </div>
                     <b style={{ fontWeight: 700 }}>{i.title}</b>
                     <div className="row" style={{ gap: 8 }}>
-                      <button type="button" className="btn sm" onClick={() => openInsight(i.id)}>
+                      <Btn
+                        kind="outlined"
+                        size="md"
+                        type="button"
+                        onClick={() => openInsight(i.id)}
+                      >
                         Read insight
-                      </button>
+                      </Btn>
                     </div>
                   </div>
                 ))}
@@ -309,9 +317,9 @@ export function Overview({
             )}
             {!empty && (
               <div className="row" style={{ marginTop: 16 }}>
-                <button type="button" className="btn primary" onClick={() => go('report')}>
+                <Btn kind="primary" size="lg" type="button" onClick={() => go('report')}>
                   Open the AI Insight Report
-                </button>
+                </Btn>
               </div>
             )}
           </section>
@@ -323,9 +331,9 @@ export function Overview({
             </div>
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <span>{planned} planned</span>
-              <button type="button" className="btn sm" onClick={() => go('actions')}>
+              <Btn kind="outlined" size="md" type="button" onClick={() => go('actions')}>
                 View actions
-              </button>
+              </Btn>
             </div>
           </section>
         </div>
@@ -392,10 +400,15 @@ export function Report({
   return (
     <div className="stack">
       <div className="rpt-head">
-        <button type="button" className="back-link" onClick={() => go('overview')}>
-          <BackChevron />
+        <Btn
+          kind="text"
+          icon="back"
+          type="button"
+          className="back-link"
+          onClick={() => go('overview')}
+        >
           Back to Dashboard
-        </button>
+        </Btn>
         <div className="rpt-title">
           <div>
             <span
@@ -406,15 +419,15 @@ export function Report({
             </span>
             <h1>Menu activity report</h1>
           </div>
-          <button
-            type="button"
-            className="btn sm"
+          <Btn
+            kind="outlined"
+            size="md"
+            icon="info"
             aria-expanded={why}
             onClick={() => setWhy((v) => !v)}
           >
-            <Icon n="info" s={16} />
             Why am I seeing this?
-          </button>
+          </Btn>
         </div>
         {why && <EvidencePanel />}
       </div>
@@ -487,26 +500,28 @@ export function Report({
             <label htmlFor="rep-ed">Edit the wording</label>
             <textarea id="rep-ed" value={t} onChange={(e) => setT(e.target.value)} />
             <div className="row">
-              <button
+              <Btn
+                kind="primary"
+                size="md"
                 type="button"
-                className="btn primary sm"
                 onClick={() => {
                   set({ text: t });
                   setMode('view');
                 }}
               >
                 Save wording
-              </button>
-              <button
+              </Btn>
+              <Btn
+                kind="outlined"
+                size="md"
                 type="button"
-                className="btn sm"
                 onClick={() => {
                   setT(a.text);
                   setMode('view');
                 }}
               >
                 Cancel
-              </button>
+              </Btn>
             </div>
           </div>
         ) : (
@@ -519,38 +534,36 @@ export function Report({
             </p>
             {a.status === 'suggested' ? (
               <div className="row">
-                <button type="button" className="btn sm" onClick={() => setMode('edit')}>
-                  <Icon n="edit" s={15} />
-                  Edit wording
-                </button>
-                <button
+                <Btn
+                  kind="outlined"
+                  size="md"
+                  icon="edit"
                   type="button"
-                  className="btn primary sm"
+                  onClick={() => setMode('edit')}
+                >
+                  Edit wording
+                </Btn>
+                <Btn
+                  kind="primary"
+                  size="md"
+                  icon="check"
+                  type="button"
                   onClick={() => set({ status: 'approved' })}
                 >
-                  <Icon n="check" s={15} />
                   Approve
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost sm"
-                  onClick={() => set({ status: 'dismissed' })}
-                >
+                </Btn>
+                <Btn kind="text" type="button" onClick={() => set({ status: 'dismissed' })}>
                   Dismiss
-                </button>
+                </Btn>
               </div>
             ) : (
               <div className="row">
                 <span className="muted">
                   {a.status === 'approved' ? 'Approved. Nothing is sent to diners.' : 'Dismissed.'}
                 </span>
-                <button
-                  type="button"
-                  className="btn ghost sm"
-                  onClick={() => set({ status: 'suggested' })}
-                >
+                <Btn kind="text" type="button" onClick={() => set({ status: 'suggested' })}>
                   Undo
-                </button>
+                </Btn>
               </div>
             )}
           </>
@@ -874,9 +887,9 @@ export function Perf({
                   <td>
                     <div className="row" style={{ flexWrap: 'nowrap' }}>
                       <Thumb id={d.id} />
-                      <button
+                      <Btn
+                        kind="text"
                         type="button"
-                        className="btn ghost sm"
                         style={{ fontWeight: 600, textAlign: 'left' }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -884,7 +897,7 @@ export function Perf({
                         }}
                       >
                         {d.name}
-                      </button>
+                      </Btn>
                     </div>
                   </td>
                   <td className="r num">{d.open}</td>
@@ -945,9 +958,10 @@ export function Perf({
             </button>
           )}
         </div>
-        <button
-          type="button"
-          className="btn aibtn sm"
+        <Btn
+          kind="primary"
+          size="md"
+          icon="spark"
           disabled={!selDish}
           title={selDish ? '' : 'Search for one dish, or open a dish, to ask about it'}
           onClick={() => {
@@ -957,9 +971,8 @@ export function Perf({
             }
           }}
         >
-          <span className="dot" />
           Ask AI about this dish
-        </button>
+        </Btn>
       </div>
       {body}
     </div>
@@ -984,10 +997,9 @@ export function DishDetail({
   return (
     <div className="stack">
       <div>
-        <button type="button" className="btn ghost sm" onClick={() => go('perf')}>
-          <Icon n="back" s={16} />
+        <Btn kind="text" icon="back" type="button" onClick={() => go('perf')}>
           Back to Dish performance
-        </button>
+        </Btn>
       </div>
       <div className="row" style={{ gap: 18, alignItems: 'center' }}>
         <Thumb id={d.id} lg />
@@ -1004,20 +1016,20 @@ export function DishDetail({
           </div>
         </div>
         <div className="row">
-          <button
-            type="button"
-            className="btn aibtn"
+          <Btn
+            kind="primary"
+            size="lg"
+            icon="spark"
             onClick={() => {
               chat.ask(`dish:${d.id}`, true);
               openChat();
             }}
           >
-            <span className="dot" />
             Ask AI about this dish
-          </button>
-          <button type="button" className="btn" onClick={() => editDish(d.id)}>
+          </Btn>
+          <Btn kind="outlined" size="lg" type="button" onClick={() => editDish(d.id)}>
             Edit dish
-          </button>
+          </Btn>
         </div>
       </div>
       <div className="kpis">
@@ -1123,9 +1135,9 @@ export function DishDetail({
             {rel.map((i) => (
               <div key={i.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 600 }}>{i.title}</span>
-                <button type="button" className="btn sm" onClick={() => go('report')}>
+                <Btn kind="outlined" size="md" type="button" onClick={() => go('report')}>
                   Open report
-                </button>
+                </Btn>
               </div>
             ))}
           </div>
@@ -1195,36 +1207,43 @@ export function Actions({
             </div>
             <div className="row">
               {a.status === 'suggested' && (
-                <button type="button" className="btn sm primary" onClick={() => openInsight(i.id)}>
+                <Btn kind="primary" size="md" type="button" onClick={() => openInsight(i.id)}>
                   Review in report
-                </button>
+                </Btn>
               )}
-              <button type="button" className="btn sm" onClick={() => openInsight(i.id)}>
+              <Btn kind="outlined" size="md" type="button" onClick={() => openInsight(i.id)}>
                 Open insight
-              </button>
+              </Btn>
               {a.status === 'planned' && (
                 <>
-                  <button
+                  <Btn
+                    kind="primary"
+                    size="md"
                     type="button"
-                    className="btn sm primary"
                     onClick={() => setAct(i.id, { ...a, status: 'done', date: 'Oct 11, 2026' })}
                   >
                     Log as done
-                  </button>
-                  <button type="button" className="btn sm" onClick={() => editDish(i.dish, i.id)}>
+                  </Btn>
+                  <Btn
+                    kind="outlined"
+                    size="md"
+                    type="button"
+                    onClick={() => editDish(i.dish, i.id)}
+                  >
                     Edit this dish
-                  </button>
+                  </Btn>
                 </>
               )}
               {a.status === 'done' && <span className="muted">Logged {a.date}</span>}
               {(a.status === 'planned' || a.status === 'done' || a.status === 'dismissed') && (
-                <button
+                <Btn
+                  kind="outlined"
+                  size="md"
                   type="button"
-                  className="btn sm"
                   onClick={() => setAct(i.id, { ...a, status: 'suggested' })}
                 >
                   Reset
-                </button>
+                </Btn>
               )}
             </div>
           </section>

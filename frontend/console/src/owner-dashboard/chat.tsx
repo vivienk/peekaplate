@@ -2,7 +2,7 @@
 // sent to any model or server.
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { type Answer, INSIGHTS, QUESTIONS, QUICK, REST, SEC } from './data';
-import { Icon, Lab } from './ui';
+import { Btn, Icon, Lab } from './ui';
 
 export type Message =
   | { role: 'user'; id: string; text: string }
@@ -92,14 +92,13 @@ export function ChatBox({
             </span>
             <h3>PeekaPlate AI</h3>
             {drawer && (
-              <button
+              <Btn
+                kind="text"
+                icon="x"
                 type="button"
-                className="btn ghost sm"
                 onClick={onClose}
                 aria-label="Close chat"
-              >
-                <Icon n="x" s={18} />
-              </button>
+              ></Btn>
             )}
           </div>
           <div className="aih-chips">
@@ -147,9 +146,9 @@ export function ChatBox({
         {ui && (
           <div className="sq-head">
             <span>Suggested questions</span>
-            <button type="button" onClick={() => setMore((m) => !m)}>
+            <Btn kind="text" onClick={() => setMore((m) => !m)}>
               {more ? 'Show fewer questions' : 'Show more questions'}
-            </button>
+            </Btn>
           </div>
         )}
         <div className="followups">
@@ -187,10 +186,9 @@ export function ChatBox({
               <Icon n="send" s={17} />
             </button>
           ) : (
-            <button className="btn primary" type="submit" disabled={busy}>
-              <Icon n="send" s={16} />
+            <Btn kind="primary" size="lg" icon="send" type="submit" disabled={busy}>
               Ask
-            </button>
+            </Btn>
           )}
         </form>
       </div>

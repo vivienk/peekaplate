@@ -1498,9 +1498,20 @@ original failure observation above rather than treating a rerun as its diagnosis
 ```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T22:28:30.144Z","exitCode":1}
 ```
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-05T23:56:16.390Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:02.888Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T02:49:39.709Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -1510,13 +1521,39 @@ original failure observation above rather than treating a rerun as its diagnosis
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:23:21.522Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:32.645Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:25:08.929Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T11:38:52.513Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T16:29:32.539Z","exitCode":1}
+```
+
+## November 6 owner-report route verification
+
+The initial owner-report request returned 503 because its query referenced
+`menu_dish` and `dish_saved`, and joined opening activity through columns absent
+from the applied fact-view schema. The query now joins tenant-scoped
+`dish_current` and `owner_opening_activity_v1` and derives direct saves from
+`owner_observation_v1`; the multi-tenant integration test covers owner, editor,
+and cross-tenant access. After installing the missing local Playwright system
+libraries, `pnpm verify test:db` passed all 73 tests and pgTAP assertions.
+Backend typecheck and Biome checks pass.
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -1571,15 +1608,100 @@ original failure observation above rather than treating a rerun as its diagnosis
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
 ```
 
+<!-- resolution of the test:e2e observation above -->
 ```json
 {"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
 ```
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T18:22:03.506Z","exitCode":1}
+```
+
+<!-- resolution of the test:db timeout observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T18:22:03.506Z"},"status":"resolved","cause":"The first disposable-database run timed out at 15 seconds in the existing browser-backed publication test; the precise trigger was not reproduced. That test runs before the owner-report integration case, so it did not exercise the changed report query.","prevention":"Do not change the unrelated timeout without a repeatable cause; rerun the full disposable-database check when this failure occurs.","regression":"A full pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions. The owner-report integration fixture asserts 12 exposed sessions, duplicate interactions, 14 unique open sessions, linked comparisons, and bounded computed rates; the focused owner-report suite passes all 7 tests."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-06T20:07:27.669Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above with final-adjustment validation -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-06T20:07:27.669Z"
+  },
+  "status": "resolved",
+  "area": "owner-report-final-validation",
+  "cause": "The first database verification exceeded the existing 15-second timeout in the browser-backed publication test; no reproducible trigger was established.",
+  "prevention": "Keep the timeout unchanged unless a reproducible cause is found; retry the full database verification after a transient timeout.",
+  "regression": {
+    "lint": {
+      "command": "pnpm exec biome check --write backend/src",
+      "result": "passed"
+    },
+    "ownerReportUnit": {
+      "command": "pnpm exec vitest run backend/src/owner-report.test.ts",
+      "result": "passed",
+      "tests": 8
+    },
+    "database": {
+      "command": "pnpm verify test:db",
+      "firstAttempt": "timed out in the publication integration test",
+      "retry": "passed",
+      "integrationTests": 73,
+      "pgTapAssertions": 192
+    }
+  }
+}
+```
+
+```json
+{
+  "kind": "manual-check-resolution",
+  "check": "pnpm --filter @peekaplate/backend typecheck",
+  "status": "resolved",
+  "cause": "The new source-override test accessed the owner-report result while its public helper type is unknown.",
+  "prevention": "Parse the returned payload through OwnerDishReportSchema before asserting contract fields.",
+  "regression": "Backend typecheck passes after schema parsing was added."
+}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T01:21:58.772Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-07T01:21:58.772Z"
+  },
+  "status": "resolved",
+  "area": "owner-report-precision-validation",
+  "cause": "The first database attempt hit the existing 15-second timeout in an unrelated browser-backed publication test; no reproducible trigger was established.",
+  "prevention": "Keep the timeout unchanged and retry after an intermittent timeout.",
+  "regression": {
+    "command": "pnpm verify test:db",
+    "result": "passed on retry: 73 integration tests and 192 pgTAP assertions",
+    "ownerReportFixture": "Covers a future opening, an out-of-window activity checkpoint and a comparison-only session."
+  }
+}
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
 ```
 
@@ -1626,6 +1748,111 @@ endpoint documentation moved to `docs/review-api.md`, so the later #58 merge doe
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T15:09:42.414Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{
+  "kind": "resolution",
+  "references": {
+    "check": "test:db",
+    "timestamp": "2026-11-07T15:09:42.414Z"
+  },
+  "status": "resolved",
+  "area": "ingestion-concurrency-integration",
+  "cause": "The concurrency test always replayed commandId1 even when commandId2 had won, so the replay deterministically failed after the losing request was selected.",
+  "prevention": "Select the replay command ID from the fulfilled request instead of inferring the winner from the always-present published revision.",
+  "regression": {
+    "command": "pnpm verify test:db",
+    "result": "passed after correction: 73 integration tests and 192 pgTAP assertions"
+  }
+}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T18:18:19.716Z","exitCode":1}
+```
+
+<!-- resolution of the lint observation above -->
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-06T02:49:02.888Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the diagnostic from failed checks and rerun the recorded check after correcting any reported issue.","regression":"pnpm exec biome check --write backend/src passed; Biome checked 63 files with no fixes needed."}
+```
+
+<!-- resolution of the lint observation above -->
+```json
+{"kind":"resolution","references":{"check":"lint","timestamp":"2026-11-06T02:49:39.709Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the diagnostic from failed checks and rerun the recorded check after correcting any reported issue.","regression":"pnpm exec biome check --write backend/src passed; Biome checked 63 files with no fixes needed."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:23:21.522Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:25:08.929Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-06T16:29:32.539Z"},"status":"resolved","cause":"The original observation records a nonzero exit but no diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. The first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T18:18:19.716Z"},"status":"resolved","cause":"The observation does not preserve the failing diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain the failing test output and rerun the complete database verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: 73 integration tests and 192 pgTAP assertions. A first attempt timed out in the menu-publication test; no persistent failure reproduced."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T19:04:39.841Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-07T20:12:12.443Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T19:04:39.841Z"},"status":"resolved","cause":"The automatic observation records a nonzero exit but no failing-test diagnostic, so its specific trigger cannot be confirmed.","prevention":"Retain full failure output for failed database checks and rerun the complete verification after addressing any reproducible failure.","regression":"pnpm verify test:db passed on retry: all 73 integration tests and 192 pgTAP assertions passed. A separate first attempt during this task hit a 15-second timeout in the menu-publication integration test; the retry passed."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-07T20:12:12.443Z"},"status":"resolved","cause":"The publication integration test exceeded its 15-second timeout; the precise trigger was not established.","prevention":"Keep the timeout unchanged unless a reproducible cause is found; retain diagnostics and rerun the full database verification after a timeout.","regression":"The immediate pnpm verify test:db retry passed all 73 integration tests and 192 pgTAP assertions."}
+```
+
+<!-- manual observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z","result":"failed"}
+```
+
+<!-- resolution of the context refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-07T20:33:56.000Z"},"status":"resolved","cause":"The backend context summary exceeded the 1000-character validation limit after documenting the deferred freshness state.","prevention":"Keep module summaries within the context validator's 1000-character limit.","regression":"Shortened the backend summary; pnpm context:refresh and pnpm context:check pass."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:36:28.688Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:38:33.628Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T12:39:30.614Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"pnpm verify test:db","timestamp":"2026-11-08T12:40:55.000Z"},"status":"resolved","cause":"The new integration fixtures exposed stale expectations: the existing sample has ten timed openings, additional report fixtures make the report contain multiple dishes, and 10/11-session boundary fixtures without timing correctly triggered complementary suppression. The initial unrelated menu-publication timeout did not recur.","prevention":"Assert report rows by dish ID, seed timing when testing the active-session floor independently, and keep the mixed 10-active/9-timed case separate.","regression":"pnpm verify test:db passes all 73 integration tests, including ordered pair attribution, premature comparisons, duplicate pair events and complementary timing suppression."}
+```
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T07:52:52.132Z","exitCode":1}
 ```
 
@@ -1716,6 +1943,40 @@ The dependent #82 evaluation still expects the earlier count-bearing rationale;
 its branch must update that expectation when synchronized, then rerun evidence.
 No live model, provider or production call was made.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T13:10:53.709Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T13:11:24.309Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-08T13:13:25.120Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T13:15:04.455Z","exitCode":2}
+```
+
+<!-- resolution of the typecheck observation above -->
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-08T13:10:53.709Z"},"status":"resolved","cause":"The generic reportSchema callback accessed named metric fields that are not exposed by the generic Zod-inferred metrics type.","prevention":"Validate the named complementary-suppression cells by iterating the metric entries and an explicit required-name list rather than direct generic property access.","regression":"pnpm verify typecheck passes across all workspace projects; focused owner-report tests pass 48/48."}
+```
+
+<!-- resolution of the typecheck observation above -->
+```json
+{"kind":"resolution","references":{"check":"typecheck","timestamp":"2026-11-08T13:15:04.455Z"},"status":"resolved","cause":"The generic reportSchema callback accessed named metric fields that are not exposed by the generic Zod-inferred metrics type.","prevention":"Validate the named complementary-suppression cells by iterating the metric entries and an explicit required-name list rather than direct generic property access.","regression":"pnpm verify typecheck passes across all workspace projects; focused owner-report tests pass 48/48."}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-08T13:13:25.120Z"},"status":"resolved","cause":"The merged review-persistence integration helpers passed a string to token(), whose argument is an object containing a string sub claim; jose rejected the undefined subject.","prevention":"Pass { sub: subject } to token() in every integration request helper and direct token fixture.","regression":"pnpm verify test:db passes all 77 integration tests and 213 pgTAP assertions."}
+```
 
 ## November 8 PR77 cached-page identity correction
 
@@ -1740,6 +2001,499 @@ Tooling corrections: a Windows rg path containing a wildcard was treated literal
 The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
 
 The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T10:41:49.339Z","exitCode":1}
+```
+
+<!-- resolution of the test:db observation above -->
+```json
+{"kind":"resolution","references":{"check":"test:db","timestamp":"2026-11-09T10:41:49.339Z"},"status":"resolved","cause":"The new fail-closed route correctly returned 503 to the real-PostgreSQL owner-report fixture because its synthetic request omitted the required source selector.","prevention":"Synthetic integration callers must explicitly set source=synthetic; do not weaken the route gate to preserve implicit behavior.","regression":"The real Worker fixture now requests source=synthetic; pnpm verify test:db passes all 77 integration tests and 213 pgTAP assertions."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-09T10:39:08.000Z","result":"failed"}
+```
+
+<!-- resolution of the context:refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-09T10:39:08.000Z"},"status":"resolved","cause":"The backend context summary grew to 1118 characters, exceeding the validator's 1000-character limit.","prevention":"Keep module summaries within the context validator's limit and shorten summaries before refreshing fingerprints.","regression":"Shortened the summary; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-09T10:51:07.985Z","result":"failed"}
+```
+
+<!-- resolution of the context:refresh observation above -->
+```json
+{"kind":"resolution","references":{"check":"pnpm context:refresh","timestamp":"2026-11-09T10:51:07.985Z"},"status":"resolved","cause":"Adding the trusted environment and provenance gate grew the backend summary to 1047 characters, above the 1000-character limit.","prevention":"Keep changed module summaries below the validator limit; put full acceptance detail in the bounded handoff.","regression":"Condensed the backend summary; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
+```
+
+```json
+{"kind":"manual-check-resolution","check":"pinned owner-report release-gate review","status":"resolved","area":"owner-report-source-provenance","reviewBase":"e93be2926644ecd912a92a5c9ab56b0226f6caef","reviewHead":"982edce382b55d63d98465d42080a9c279febd23","cause":"A caller-controlled source=synthetic query reached the default reader, whose source default and calculation metadata were production.","prevention":"Require trusted local/staging APP_ENV as well as one exact synthetic selector, propagate the synthetic source to the reader, and label its calculation version accordingly.","regression":"The signed-JWT test proves source=synthetic is blocked in production without a reader call; local synthetic responses pass. Unit and real-PostgreSQL tests assert source=synthetic and synthetic.v1; full test and test:db suites pass."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"push active PR branch","timestamp":"2026-11-09T11:05:29.425Z","result":"blocked","cause":"GitHub credentials are unavailable; no remote update occurred."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T18:53:26.478Z","exitCode":1}
+```
+
+<!-- resolution of the transient database-test timeout above -->
+```json
+{"kind":"manual-check-resolution","resolves":"test:db automatic observation 2026-11-09T18:53:26.478Z","timestamp":"2026-11-09T18:55:00Z","status":"resolved","cause":"The first disposable-database run had one existing publication-route integration test exceed its 15-second timeout; the full identical rerun passed all 77 Worker/PostgreSQL integration tests and 213 pgTAP assertions. The failure was transient and unrelated to the owner-report changes.","regression":"The repeat pnpm verify test:db run passed; the changed owner-report opening coverage and unapproved-venue cases are included in that suite."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-09T18:55:48.510Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-09T18:56:50.603Z","exitCode":1}
+```
+
+<!-- resolution of the formatting and context observations above -->
+```json
+{"kind":"manual-check-resolution","resolves":"lint automatic observation 2026-11-09T18:55:48.510Z","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The contract serializer edit needed the repository formatter; a subsequent context check also found its source fingerprint stale because formatting ran after the prior refresh.","regression":"Formatted packages/contracts/src/owner-report.ts, refreshed context fingerprints, and reran pnpm check successfully: lint, typecheck, 1005 unit tests, 67 script tests, context:check and docs:check passed."}
+```
+
+<!-- resolution of the stale fingerprint observation -->
+```json
+{"kind":"manual-check-resolution","resolves":"context:check automatic observation 2026-11-09T18:56:50.603Z","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The contract formatter changed a fingerprinted file after context:refresh; the graph was refreshed afterward.","regression":"The final pnpm check passed context:check with 13 modules and 10 handoffs."}
+```
+
+<!-- resolution of the context-refresh summary validation failure -->
+```json
+{"kind":"manual-check-resolution","resolves":"initial pnpm context:refresh invalid-summary result in this work","timestamp":"2026-11-09T18:59:17Z","status":"resolved","cause":"The backend context summary exceeded the repository's 1000-character validation limit; it was shortened without changing behavior or dropping the new boundary.","regression":"pnpm context:refresh passed, followed by pnpm check and its context:check."}
+```
+
+## November 9 PR84 delivery reconciliation
+
+The first focused delivery check after merging develop failed because its two
+outbox.pending assertions still treated the now-authoritative asynchronous read
+as an array. Awaiting those reads restores the existing 429/backoff regression.
+Independent regressions also reproduced malformed receipt deletion and split
+requests continuing after withdrawal, token changes and Retry-After; the fixes
+validate shared receipts and recheck each request boundary. Stalled headers/body
+are bounded by a ten-second abort and retain the same event for retry. Focused
+unit and synthetic Chromium delivery checks provide local evidence only.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-09T18:50:34.903Z","exitCode":2}
+```
+
+The first full PR84 typecheck rejected an incomplete Response cast in the new
+body-timeout test. The fixture now overrides json on a real Response instead;
+production behavior is unchanged. The corrected full check is recorded in the PR.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T21:15:33.687Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T21:16:08.966Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T21:27:07.612Z","exitCode":1}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm context:refresh","timestamp":"2026-11-09T21:14:02Z","result":"failed"}
+```
+
+<!-- resolution of the context-refresh handoff-limit observation above -->
+```json
+{"kind":"manual-check-resolution","resolves":"context:refresh manual observation 2026-11-09T21:14:02Z","timestamp":"2026-11-09T21:31:34Z","status":"resolved","cause":"Merging current develop with the feature context retained twelve handoffs, above the graph's ten-handoff limit.","prevention":"Keep only the ten most relevant handoffs when reconciling the graph; preserve current implementation handoffs and retain older history in Git.","regression":"Removed two superseded November 5 handoffs; pnpm context:refresh and pnpm context:check pass for 13 modules and 10 handoffs."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"pnpm --filter @peekaplate/backend typecheck","timestamp":"2026-11-09T22:00:41Z","result":"failed","exitCode":143,"cause":"The full backend typecheck and an isolated dish.integration.ts dependency-graph compile were terminated with SIGTERM in the local environment; no compiler diagnostics were emitted."}
+```
+
+<!-- manual-check observation; not root cause -->
+```json
+{"kind":"manual-check-observation","check":"backend route tests and typecheck","timestamp":"2026-11-09T22:21:01Z","result":"failed","exitCode":143,"cause":"Repeated Vitest and TypeScript compiler processes were terminated with SIGTERM in the local environment; no test or compiler diagnostics were emitted."}
+```
+
+
+## November 9 owner-report verification environment
+
+The initial read-only Docker check found the Linux engine pipe absent. Starting
+the existing Docker Desktop installation restored the engine without reset or
+data deletion. Existing i-detect containers stayed stopped. A fresh isolated
+PeekaPlate run passed 213 SQL assertions and 77 PostgreSQL/Worker tests, then
+removed its disposable database. Earlier recorded SIGTERM observations remain
+historical evidence; this passing run does not establish their root cause.
+
+## Historical PR82 records retained during reconciliation
+
+<!-- automatic observation; not root cause -->
+```json
+
+## 2026-10-31 — AI-01 reconciliation verification limits
+
+The shell could not locate the repository-requested RTK wrapper; native commands were used. An initial context refresh was invoked from the workspace parent instead of the repository and did not run. The reconciled backend summary then exceeded the context length bound and was shortened without removing the AI integration boundary. Frozen dependency installation remains blocked by Windows symlink EPERM, before tests could start. Direct checks and CI must be reported separately; no protection or test was disabled.
+
+Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
+
+## 2026-10-31 — Offline AI evaluation verification boundary
+
+The existing verification-runner test that invokes real pnpm failed before its
+check because automatic installation again hit the Windows store-symlink EPERM.
+The other seven runner tests passed. This is the previously recorded environment
+limit, not an AI case failure; do not disable the test. The source-pinned Vitest
+run passed all 46 AI tests, including 21 new synthetic development evaluation
+cases, and the focused strict TypeScript check passed. Full frozen installation,
+the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
+
+<!-- automatic observation; not root cause -->
+```json
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-10-31T21:38:10.001Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-05T22:28:30.144Z","exitCode":1}
+```
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-05T23:56:16.390Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-06T17:52:39.440Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z","exitCode":1}
+```
+
+```json
+{"kind":"resolution","references":{"check":"test:e2e","timestamp":"2026-11-04T20:42:58.972Z"},"status":"resolved","cause":"The S3-DIN-02.2 toast timing tests used page.clock.install(), whose fake clock keeps running in real time; under load (a 7.3 s run while merging develop into S3-DIN-02.5) real time alone expired the 5-second removed toast before the test checked it.","prevention":"Pause the installed clock (page.clock.pauseAt) in timing tests so time only moves through runFor.","regression":"Both toast timing tests now use installPausedClock; a probe that waited 6 s of real time failed with a running clock and passed with the paused one, and the tests passed 10/10 when repeated."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-07T16:24:15.985Z","exitCode":1}
+```
+
+The develop reconciliation for PR #25 conflicted only in `docs/CONTEXT.md`. It was
+resolved from current develop: the processing node keeps develop's paths plus the
+asset/presentation paths, and the VIS-03 handoff replaces the oldest (October 28
+DIN-01.4 search) entry to stay within ten handoffs. Develop's newer handoffs,
+including the November 2 allergen-label note, are preserved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-03T16:45:56.191Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-04T07:51:53.059Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-04T07:52:52.132Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"eval:owner-ai","timestamp":"2026-11-08T18:48:21.578Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"eval:owner-ai","timestamp":"2026-11-08T18:48:39.517Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T18:50:24.536Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T18:51:45.062Z","exitCode":1}
+```
+
+## November 8 PR82 evaluation synchronization
+
+The merged core deliberately removes internal eligible-session counts from its
+public rationale. On the synchronized branch, five of the 21 frozen evaluation
+cases failed against the old count-bearing oracle. Updating only the expected
+template and its unused sessions argument restores all 21 cases; the internal
+9/10/11-session inputs and ten-session floor are unchanged. The combined
+core/contract/evaluation suite passes 47 cases; backend/contracts strict types
+and context/docs checks pass.
+
+Frozen installation failed before checks because Windows denied pnpm's project
+registration link. Reused-dependency runs set pnpm's dependency-status action to
+warn, preserving engine/lockfile policy and recording that installation remains
+unverified. An initial evaluation startup failed before discovery in the sandbox
+temporary directory (observation 2026-11-08T18:48:21.578Z); moving TEMP/TMP to a
+writable task folder permitted the real stale-oracle reproduction (observation
+2026-11-08T18:48:39.517Z) and passing run. RTK is unavailable in this environment.
+
+Full workspace checks remain blocked by the old installation's missing diner
+workspace contract link: typecheck observation 2026-11-08T18:50:24.536Z and test
+observation 2026-11-08T18:51:45.062Z. No source import was weakened to hide this.
+Complete the frozen installation and rerun workspace checks before treating
+them as green. Dedicated development evidence is synthetic, not independent
+rubric, live model, hosted reporting or production acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T19:03:06.421Z","exitCode":1}
+```
+
+## November 8 PR82 normal-install recheck
+
+Normal frozen installation completed in the contributor's terminal with 213
+policy-checked lock entries. The prior missing diner workspace dependency is
+resolved. With normal pnpm settings, #82 passes lint, all seven package strict
+typechecks and all 56 application test files (905 passed, four skipped).
+The remaining aggregate-check failure is observation
+2026-11-08T19:03:06.421Z: the preview security test cannot create its junction
+inside the agent sandbox; the other 66 script tests pass. Do not skip or alter
+that rejection test. Normal-terminal/Linux verification remains necessary for
+the aggregate check. Initial installation/temporary-path failures above remain
+historical observations; they are not failures in the corrected AI oracle.
+
+## November 9 append-only history reconciliation
+
+The synchronization guard and independent review found a historical paragraph
+and observation omitted by the automatic merge outside its conflict block.
+The original PR25 reconciliation paragraph and fenced failure records are
+restored at their original position from the previous PR82 head. Their
+timestamps are historical, not new test runs.
+
+## November 9 AI evaluation sync setup boundary
+
+The synchronized source preserves develop 93194f2 and the unchanged frozen AI
+evaluation. Normal pnpm startup attempted dependency reconciliation but Windows
+denied its project-registration symlink before context refresh could run.
+Context refresh itself succeeds through its existing Node entry point. Checks
+using the installed dependencies explicitly set dependency-status reporting to
+warn; they do not establish a fresh frozen installation. No engine, lockfile,
+security regression or test assertion is weakened. Normal installation and the
+full security/browser/database checks remain to be established on the new head
+in a normal terminal or Linux CI.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-09T08:49:42.325Z","exitCode":1}
+```
+
+The installed-dependency recheck passes lint, seven package strict typechecks
+and all 63 application test files (1006 passed, four skipped). Of 67 script
+tests, 64 pass; two console build tests cannot resolve the newly merged pinned
+Inter font dependency before a normal installation, and the existing artifact
+symlink rejection test cannot create its junction in this sandbox. Keep all
+three tests and install the frozen dependencies before the next full check.
+This is not an aggregate-check pass or live AI/report acceptance.
+
+## November 9 normal-terminal stack verification
+
+The contributor completed normal frozen installation: eight workspace projects,
+214 policy-checked lock entries and the one newly merged Inter font package.
+Normal `pnpm check` then passed on synchronized Draft source 6c10b24: lint, all
+seven package typechecks, all 64 application test files (1026 passed, four
+skipped), all 67 script tests including both console builds and artifact-symlink
+rejection, context freshness and documentation links. The source includes the
+complete PR82 evaluation plus the existing 20 report-input cases. This resolves
+the missing-font setup issue and supplies normal-terminal evidence for the
+junction regression blocked inside the agent sandbox. The earlier failures
+remain recorded. Only reconciliation documentation changes after that run;
+no application, assertion, dependency or configuration is weakened.
+
+Both synchronized implementation heads also passed their 21-case standard
+development evaluation with a clean working tree. Independent rubric/model
+evaluation and hosted report/AI acceptance remain separate, unverified gates.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:37:25.661Z","exitCode":1}
+```
+
+## November 9 evening AI stack synchronization
+
+The #82 reconciliation imports develop 78fd475 (#121 search and #84 delivery)
+without changing the frozen AI evaluation or owner-output behavior. Complete
+paragraphs from both parent ledgers and both module path sets are retained.
+The first remote read used an incorrect source ref and then treated a fork
+branch as an upstream branch; metadata confirmed the correct fork and pinned
+SHA before review. No source or remote branch was changed by those reads.
+
+A focused Vitest startup initially failed while renaming its sandbox temporary
+SSR cache. Re-running with TEMP and TMP pointing to an ignored workspace
+output directory passed all 105 focused AI/contract/search/delivery cases;
+no assertion or test selection was removed. The normal full check then passed
+all application tests, but the existing artifact-symlink security regression
+could not create its Windows junction in this sandbox. This is the same
+execution permission boundary recorded earlier, not an aggregate-check PASS.
+The security test is retained unchanged. Lint, seven package typechecks,
+context freshness and local documentation links passed separately; Linux CI
+or a normal contributor terminal must establish the complete check.
+
+## November 9 final offline-evaluation environment
+
+The frozen offline installation could not load missing package metadata from the
+local cache. A normal frozen online installation then passed all 214 supply-chain
+policy checks without changing the lockfile or dependency policy.
+
+## November 9 evaluation CLI completeness correction
+
+A bounded temporary probe selected one of the 21 frozen cases. Vitest exited
+successfully while the generated report correctly said DEVELOPMENT_CHECK_FAIL;
+the wrapper previously propagated only the process status. It now validates the
+fresh report, frozen dataset/counts and unique passing records before returning
+success. Three CLI regression groups failed before the fix; all five pass after.
+The same partial-discovery probe now exits 1. The frozen test source was restored
+byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 published-menu refresh and browser verification
+
+PR85 browser CI 42857040744 failed the detail-image fallback assertion: a real
+DNS failure raced the explicitly dispatched error and consumed both fallback
+steps. The test now uses a distinct valid data image and dispatches the first
+failure synchronously, leaving no network error to race it.
+
+Two new Chromium regressions failed before the rendering fix: publication swap
+lost focused Search, and returning from a withdrawn dish had no focus target.
+The swap now restores the equivalent visible control; a missing opener falls
+back to the menu heading. Both regressions and all ten focused browser checks
+pass. These use a synthetic source seam, not hosted integrity/delivery evidence.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T18:05:34.662Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:06:48.247Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-10T18:07:11.221Z","exitCode":1}
+```
+
+The final focus regression also covers duplicate cards: restoration selects the
+visible category opener instead of its hidden All copy. It failed before the
+visible-match correction. A context summary initially exceeded the graph limit
+and was shortened without dropping the live-release gates. The concurrent full
+check hit a 20-second workerd loopback timeout; a separate unchanged rerun passed
+all 1,121 unit and 72 script tests in 29.058 seconds. A concurrent default-worker
+browser run timed out awaiting 500 persisted outbox records (306 observed);
+single-worker verification is recorded separately rather than hiding that run.
+
+All 111 browser checks then passed with one worker in 96.794 seconds, including
+the unchanged outbox-capacity case and the three refresh focus regressions.
+The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+
+## PR117 reconciliation and capture-reference validation — 2026-11-10
+
+The reconciled package declared Zod in both backend dependency sections; frozen
+installation rejected the resulting importer mismatch. Kept the existing exact
+version in runtime dependencies, removed its duplicate dev entry and regenerated
+the lockfile. A fresh frozen installation passed; supply-chain policy stayed enabled.
+
+Five focused manifest regressions failed before the correction: missing source,
+missing/blank/NUL capture evidence and invalid source digest were all accepted.
+`backend/src/bundle-producer/request.ts` now requires the upstream T0 source hash
+and capture reference. They stay private and do not establish authenticity or
+approval. Focused tests pass after the fix. Eight actual CLI checks with a Python
+`prepare_t0_bundle` asset and a disposable PostgreSQL instance passed in 14.805s;
+no hosted data, resources or publication state changed.
+
+
+## Published diner connection — 2026-11-10
+
+Two focused regressions failed before implementation: the default loader rejected
+valid hashed bytes, and publication suspension did not exist. A separate timer
+regression proved collection did not stop at token expiry while refresh hung.
+The loader now uses the shared exact-byte parser; explicit suspension retires
+canonical/PostHog work without changing consent, and the expiry deadline stops
+collection independently of refresh completion. Unit and focused browser checks
+pass; release/hosted results are recorded separately.
+
+Existing Wrangler login lacked Pages permissions (Cloudflare403/10000); refreshed
+the previously authorized Worker/Pages scopes for the existing account using the
+OS credential store. An unhandled Node tooling failure also emitted a Windows
+UV_HANDLE_CLOSING assertion; no application or cloud mutation resulted. A nested
+PowerShell environment assignment expanded in the outer shell; subsequent uploads
+use an argument-array Node wrapper with the exact account in the child environment.
+No supply-chain, browser or deployment protection was weakened.
+
+The first full check also rejected `.env.example` in the context graph: that
+index intentionally excludes environment-file paths. Removed the index reference
+without relaxing its validator; the documented config example remains tracked.
+Context/docs checks then passed. No runtime or fixture behavior changed for that correction.
+
+Release reconciliation retained main's report setting and runbook. Its older
+context also named the replaced console Input files; those obsolete references
+were removed in favor of current TextField/UI paths. Source responsibilities and
+all current main test labels/error history were preserved. Fresh full checks,
+builds and disposable-database verification passed afterward. An initial PR body
+used abbreviated field labels and failed the documentation gate; the exact
+repository template labels were restored before the final CI run.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-10T22:13:05.031Z","exitCode":1}
+```
+
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-10T20:59:41.487Z","exitCode":1}
+```
+
+
+## November 10 narrow report release preparation
+
+Main did not contain the owner-report route required by merged PR130. A narrow
+backport preserves the existing report/contract implementation and excludes the
+separate extraction release. Its copied database test uses main’s token(subject)
+helper instead of develop’s newer token({sub}) signature; typecheck and the
+SQL-backed HTTP suite pass after that compatibility correction. An initial lint
+check rejected Windows line endings in the edited Wrangler config; formatting
+and context refresh fixed it without changing bindings. The final full check
+passed.
+
+Wrangler was signed out and its optional secure Windows keyring helper was
+missing. The pinned helper was restored outside repository dependencies, and
+the existing scoped OAuth access refreshed into the OS credential store. No
+credential was added to files or logs. Docker was started hidden for disposable
+database tests; all nine unrelated containers remained stopped.
 
 ## November 9 AI preview dependency setup boundary
 
@@ -1875,3 +2629,18 @@ component defect. A task-local console-only harness may verify the unchanged
 preview/drawer assertions separately; the repository's three-server CI config
 and all test assertions remain intact. Final results belong to the exact-head
 handoff and do not establish live report, authorization or design acceptance.
+
+## November 11 AI preview synchronization with the compact owner panel
+
+The focused Playwright command waited for console-server readiness and was
+stopped before the five preview/drawer cases started. A separate Chromium
+smoke loaded the built preview assets through browser request interception.
+At 1440px it confirmed the 360px panel, the keyboard selector and all six
+synthetic states. At 390px it confirmed the preview in ModalDrawer, focus
+containment, Escape and opener restoration, and a result without horizontal
+overflow. The smoke observed zero fetch or XHR requests. The repository's
+Playwright cases, including the scoped axe check, await CI on the merge revision.
+
+Direct context/docs checks, Biome, console TypeScript, 33 component/contract
+tests, and both normal and preview console builds pass. The preview build
+contains the dashboard demo, and the normal build excludes it.

@@ -16,6 +16,36 @@ Withdrawal writes deletion-work markers to sessionStorage and localStorage befor
 
 Code: [shared dispatch](../frontend/diner/src/tracking/index.ts), [consent gate](../frontend/diner/src/tracking/consent.ts), [atomic outbox](../frontend/diner/src/tracking/outbox.ts), [reused control](../packages/analytics/src/consent.ts). Merge/review order remains #77 → #80 → #84; these fixes do not enable live collection by themselves.
 
+### Canonical delivery foundation (#84)
+
+DIN-03 can pass `createLiveDeliver({ endpoint, fetch, now, token })` from
+[delivery.ts](../frontend/diner/src/tracking/delivery.ts) to `enableLiveTracking`.
+The token callback reads the current in-memory published-menu token; never persist it
+with queued observations. This merge supplies the sender, not that live-menu wiring.
+
+- Each request rechecks consent, token expiry and publication. Withdrawal cancels
+  remaining split requests even if the diner immediately opts in again. A request
+  already started cannot be recalled. Fixture mode sends neither destination.
+- Valid shared-contract receipts remove accepted or permanently rejected IDs;
+  missing, contradictory or malformed receipts retain the unchanged observations.
+- A stalled request or response body aborts after ten seconds. Offline/transient
+  failures retain IDs and payloads, with exponential jittered backoff up to one
+  minute; a longer server `Retry-After` takes precedence, including HTTP dates.
+  Once a batch needs retry, unsent halves wait too.
+- `413` splits bounded batches; a single oversized event is terminal. `400` is
+  terminal `client_invalid`, and `401`/`403` are terminal unauthorized. An expired
+  or different-publication token discards unsent events under the current policy;
+  a temporarily missing token leaves them queued. No event is relabelled.
+- Canonical retries never dispatch to PostHog again. Development logs contain
+  terminal counts only. The token is sent only in the Authorization header;
+  requests omit cookies and refuse redirects.
+
+Unit tests exercise shared fixtures, malformed receipts, timeouts and split-request
+boundaries. [Chromium delivery tests](../tests/e2e/tracking-delivery.spec.ts) use
+synthetic intercepted responses with the real tracking layer and durable outbox.
+These checks do not certify hosted ingestion, PostHog funnels or live token renewal.
+Connect DIN-03, then capture browser-to-both-destinations evidence before release.
+
 ## Legacy shell integration
 
 The October setup emitted `app_shell_viewed` with `surface=diner` or `surface=console` after opt-in. The console still uses that legacy path; the current diner uses the shared gate above. This technical shell event is not `menu_viewed`, a signed-in owner, a restaurant visit or a sale. The React effect cleans up on unmount/StrictMode remount. Missing configuration hides the legacy console control, but does not hide the diner's canonical consent control.

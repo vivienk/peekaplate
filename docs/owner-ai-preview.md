@@ -3,12 +3,11 @@
 This slice renders the existing `owner-recommendation.v1` public result inside
 the development/PR-preview dashboard from #105. It does not connect a live
 report or model, authorize a restaurant, approve advice, or execute changes.
-The selected design surface is #105's existing owner AI panel and mobile
-drawer, initially based on `583677a` and synchronized with its `dcb6fd4`
-modal-drawer fix. The component uses its light design tokens. The existing
-`ModalDrawer` retains focus trapping, inert background, Escape/close behavior
-and opener-focus restoration while the nested `ChatBox` receives the synthetic
-preview through `ctxBar`. Final placement and visual sign-off remain separate.
+The dashboard uses #105's compact desktop AI panel and Figma-style controls
+at `cdce61d`, building on the `dcb6fd4` modal-drawer fix. Both `ChatBox` mounts
+receive the synthetic preview through `ctxBar`. The mobile `ModalDrawer`
+manages focus trapping, inert background, Escape and close behavior, and
+opener-focus restoration. Final placement and visual sign-off remain separate.
 
 ## Integration boundary
 
