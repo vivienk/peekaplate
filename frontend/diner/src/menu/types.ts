@@ -1,3 +1,4 @@
+import type { PublicPortion } from '@peekaplate/contracts';
 // The diner's internal menu model: what screens, search and event triggers read. Screens import
 // this module only; the data format lives in ./wire and is read only by the adapter.
 export const DIETARY_VALUES = ['Vegan', 'Vegetarian', 'Gluten-free'] as const;
@@ -37,6 +38,7 @@ export type IncompleteDish = {
 };
 
 export type CompleteDish = {
+  portion?: PublicPortion;
   kind: 'complete';
   dishId: string;
   dishRevisionId: string;

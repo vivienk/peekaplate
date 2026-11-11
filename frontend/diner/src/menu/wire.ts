@@ -1,3 +1,4 @@
+import type { PublicPortion } from '@peekaplate/contracts';
 // Wire shape mirrors the draft S3-RES-02 PublicMenuContentBundleSchema (PR #43). Only the adapter
 // and fixtures read it; screens use ./types. Replace with @peekaplate/contracts once RES-02 merges.
 export type WireImage = { url: string; width: number; height: number; alt: string };
@@ -7,6 +8,7 @@ export type WireIngredient = { ingredient_id: string; name: string; description:
 export type WireIncompleteDish = { dish_id: string; dish_revision_id: string; complete: false };
 
 export type WireCompleteDish = {
+  portion?: PublicPortion;
   dish_id: string;
   dish_revision_id: string;
   complete: true;

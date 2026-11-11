@@ -29,11 +29,39 @@ export function checkInitialBundle(bundle, limit = 150_000) {
   return { chunks: visited.size, gzipBytes, limit };
 }
 
+// ADR 0004 T1 total: compressed tap-loaded code + bounded manifest + decoded-input bytes.
+export function checkPortionBundle(bundle, limit = 400_000) {
+  const pending = Object.values(bundle)
+    .filter(
+      (part) =>
+        part.type === 'chunk' &&
+        Object.keys(part.modules).some((name) => name.endsWith('/menu/portionRenderer.ts')),
+    )
+    .map((part) => part.fileName);
+  if (!pending.length) return null;
+  const visited = new Set();
+  let gzipBytes = 0;
+  while (pending.length) {
+    const name = pending.pop();
+    if (visited.has(name)) continue;
+    visited.add(name);
+    const chunk = bundle[name];
+    if (chunk?.type !== 'chunk') throw new Error(`Missing portion chunk: ${name}`);
+    gzipBytes += gzipSync(chunk.code).length;
+    pending.push(...chunk.imports);
+  }
+  // PublicPortionSchema caps layer bytes at 180 KB; six URLs + metadata fit in 20 KB.
+  const total = gzipBytes + 180_000 + 20_000;
+  if (total > limit) throw new Error(`T1 delivery ${total} bytes exceeds ${limit}`);
+  return { gzipBytes, assetAndManifestBudget: 200_000, total, limit };
+}
+
 export function dinerBudget() {
   return {
     name: 'peekaplate-diner-budget',
     generateBundle(_options, bundle) {
       console.log(`Diner initial JS: ${JSON.stringify(checkInitialBundle(bundle))}`);
+      console.log(`Diner T1 delivery: ${JSON.stringify(checkPortionBundle(bundle))}`);
     },
   };
 }

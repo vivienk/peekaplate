@@ -892,3 +892,53 @@ main:has(> .pp-detail) {
     height: 160px;
   }
 }
+
+/* Portion preview keeps the existing detail shell and photo fallback. */
+.pp-detail--preview .pp-detail__save,
+.pp-detail--preview .pp-allergen-section,
+.pp-detail--preview .pp-ingredients,
+.pp-detail--preview .pp-detail__actions,
+.pp-detail--preview .pp-detail__section > .pp-notice {
+  display: none;
+}
+.pp-detail--preview .pp-detail__image-wrap {
+  position: relative;
+  aspect-ratio: 1;
+  touch-action: pan-y;
+}
+.pp-detail--preview .pp-detail__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pp-portion__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pp-portion--ready > .pp-detail__image {
+  visibility: hidden;
+}
+.pp-detail--preview .pp-detail__image-wrap:focus-visible {
+  outline: 2px solid var(--pp-role-on-surface);
+  outline-offset: 4px;
+}
+.pp-detail--preview .pp-detail__image-wrap {
+  animation: pp-portion-enter 420ms ease-out;
+}
+@keyframes pp-portion-enter {
+  from {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-detail--preview .pp-detail__image-wrap {
+    animation: none;
+  }
+}

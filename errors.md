@@ -2494,3 +2494,15 @@ missing. The pinned helper was restored outside repository dependencies, and
 the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
+
+
+## Diner portion integration — November 10, 2026
+
+Initial browser verification was contaminated by editing imported source while Vite tests
+were running: hot reload reset the detail view during Back/Forward and destroyed an axe
+execution context. Rerun against an unchanged tree; do not treat those as application
+regressions. A separate existing withdrawal-clock assertion needs an isolated rerun.
+The first build completed with an EPERM diagnostic for Wrangler's default user log path;
+subsequent verification routes logs to a task-local writable directory. No deployment ran.
+
+Context refresh initially rejected the expanded diner summary over its 1000-character limit; condensed it while retaining release boundaries, then refreshed the fingerprints.

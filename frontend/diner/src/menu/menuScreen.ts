@@ -341,7 +341,11 @@ function focusAfterRetry(container: HTMLElement, succeeded: boolean): void {
   }
 }
 
+let disposeDetail: (() => void) | undefined;
+
 export function mountMenuScreen(container: HTMLElement): void {
+  disposeDetail?.();
+  disposeDetail = undefined;
   activeLoad?.abort();
   menuToken = null;
   liveTrackingOn = false;
@@ -371,6 +375,8 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const showMenu = () => {
     if (!currentMenu) return;
+    disposeDetail?.();
+    disposeDetail = undefined;
     view = 'menu';
     renderMenu(container, currentMenu, showDetail);
     window.scrollTo(0, savedScroll);
@@ -381,7 +387,8 @@ export function mountMenuScreen(container: HTMLElement): void {
     view = 'detail';
     savedScroll = window.scrollY;
     disposeObserver();
-    renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
+    disposeDetail?.();
+    disposeDetail = renderDishDetail(container, dish, showMenu, currentMenu?.notice ?? null);
     window.scrollTo(0, 0);
   };
 

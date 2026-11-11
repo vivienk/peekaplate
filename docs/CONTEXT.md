@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded.",
+      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. Complete public dishes optionally carry the bounded PublicPortionSchema; processing review manifests are not public assets.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -51,7 +51,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
-        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json"
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
+        "packages/contracts/src/portion.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -59,7 +60,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "9d8f423771bf2b136f52d89c08a034223a5bd3fe1a6a43aab2173f5602efcb88"
+      "sourceFingerprint": "c2bd0deb934289630523bf65270c3a3aea194a1023f8cc9ed76326cbc369a39c"
     },
     {
       "id": "tokens",
@@ -97,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu/detail/search and Save/Compare foundations use shared contracts/tokens. Explicit live mode verifies exact fetched bundle bytes and pointer identity before rendering or exposing the token. Refresh swaps publications with focus preservation; 404 or token expiry suspends canonical/PostHog collection without changing consent, retires pending work and keeps the visible menu. Remount aborts stale loads and splits. One off-by-default consent gate enforces DNT/GPC. Atomic IndexedDB/Web-Locked localStorage outboxes retain retries with memory fallback. Fixture mode sends neither destination. PostHog SDK dispatch and token-bound canonical delivery are independent. Staging reuses pinned Pages public snapshots; private R2 stays private. Actual UI triggers, genuine browser-to-both-destinations/report reconciliation and privacy/design acceptance remain separate pilot gates.",
+      "summary": "Diner menu/detail/search and Save/Compare foundations use shared contracts/tokens. Live mode verifies exact bundle bytes and pointer identity before rendering/token use. Refresh swaps publications with focus preservation; withdrawal/expiry suspends tracking while retaining browsing. Remount aborts stale loads. Consent enforces DNT/GPC; durable outboxes retain retries with memory fallback. Fixture mode sends neither destination. PostHog and canonical delivery remain independent. View Portion reuses the detail shell with optional revision-bound public layers, a tap-loaded Three.js renderer, photo fallback and back/focus restoration. Real reviewed spatial asset production/approval/publication, UI observation triggers, hosted reconciliation, design and device acceptance remain separate gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -184,7 +185,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
-        "docs/diner-connection.md"
+        "docs/diner-connection.md",
+        "frontend/diner/src/menu/portionPreview.ts",
+        "frontend/diner/src/menu/portionRenderer.ts",
+        "frontend/diner/src/menu/portion.test.ts",
+        "tests/e2e/portion.spec.ts",
+        "playwright.portion.config.ts",
+        "docs/diner-portion-preview.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -193,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "67ca26d8f8931b3412a099741c73edd7989f5741e66173248787191279f0c4f2"
+      "sourceFingerprint": "39b70274fe7c221777ba8f4306cd7eb88b27138d4ceb15b68dbbc963219a3a4d"
     },
     {
       "id": "console",
@@ -336,7 +343,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e62b4c11cf26fa02a79a7414a2d19f17e89d360a91ac458849d3784897d3c0d0"
+      "sourceFingerprint": "c12e0afddb4eecb9c3089dfb0a101f046094fa3e565e174da49a4ac4614e71a9"
     },
     {
       "id": "database",
@@ -454,7 +461,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b3d7142b6aa0452abd56d70a3e9ea1d762a7cd1f10a39fa3ec237bf80c3d0ea3"
+      "sourceFingerprint": "e5575f6140bdf10b839c347874346d598150917ba20442c4bdb5380b66cfd2b1"
     },
     {
       "id": "agents",
@@ -642,6 +649,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
+      "summary": "View Portion now enters a preview state in the existing diner detail shell. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
+      "modules": [
+        "diner",
+        "contracts"
+      ],
+      "next": "Complete reviewed spatial asset producer/approval binding and immutable publication handoff; confirm final design, physical-device performance and screen readers before live acceptance."
+    },
+    {
+      "date": "2026-11-10",
       "modules": [
         "diner",
         "analytics",
@@ -728,14 +744,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "analytics"
       ],
       "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
     }
   ]
 }
