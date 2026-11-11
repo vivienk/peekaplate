@@ -34,7 +34,7 @@ included in this PR. This proves the new tests detect that specific adapter-leve
 privacy regression; it does not validate SQL or hosted suppression.
 
 ## Pending Validation
-1. Database-backed integration tests were not executed because test database connections are not configured.
+1. This independent validation has not executed database-backed comparison checks. The repository can provision disposable PostgreSQL through `pnpm verify test:db`; a missing local connection string is not an infrastructure blocker. Standard CI database results must remain separate from these mocked-row fixtures.
 2. Cross-revision deduplication fixture expects 17 distinct sessions from two groups of 10 with 3 overlapping sessions. This expectation has not been verified against backend SQL.
 3. Confirm with Louis and Zhiliang whether publication-revision-specific aggregation is within DATA-05 scope.
 
@@ -50,3 +50,7 @@ This report does not constitute self-certification or final acceptance.
 The branch incorporates its existing `s5-data-05-periodic-comparison` dependency
 for reproducible tests. Approval of this validation slice does not approve that
 implementation branch, authorize a deployment or certify DATA-05 completion.
+
+## November 11 merge reconciliation
+
+The validation branch now includes PR134 implementation commit `c344b7e000bc8d01eeb0ab4e7a3ed80197af7c5c`. All 17 focused tests pass again (550 ms Vitest duration). The target remains `s5-data-05-periodic-comparison`; this merge neither merges PR134 into develop nor approves its reporting implementation. Historical mutation evidence above was not rerun.

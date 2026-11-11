@@ -90,8 +90,13 @@ import {
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
 
+export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
+  '00000000-0000-4000-8000-000000000123',
+];
+
 export type Bindings = {
   APP_ENV?: string;
+  SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
   HYPERDRIVE?: { connectionString: string };
@@ -739,10 +744,25 @@ export function createApp(services: Dependencies = dependencies) {
     ) {
       return c.json({ error: 'service_unavailable' }, 503);
     }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
     if (!services.readOwnerReport) throw new AuthUnavailableError();
     const report = await services.readOwnerReport(
       actorId,
-      scope.data.venueId,
+      approvedSyntheticVenue.data.venueId,
       services.now?.() ?? new Date(),
       env,
       'synthetic',

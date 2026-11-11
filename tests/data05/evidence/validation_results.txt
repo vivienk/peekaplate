@@ -21,3 +21,14 @@ All independent privacy tests use synthetic mocked database rows.
 
 Repository check: pnpm check PASS, 1023 unit + 67 script tests, 26.991 seconds.
 Lint, strict types, context freshness and local documentation links also PASS.
+
+Current-base reconciliation - 2026-11-11
+Implementation base: c344b7e000bc8d01eeb0ab4e7a3ed80197af7c5c (PR134).
+Same focused command: PASS, 3 files, 17 tests, 550 ms Vitest duration.
+pnpm check: PASS, 1081 unit tests (4 optional skips), 67 script tests,
+lint, strict types, context freshness and local documentation links.
+Unit phase: 5.41 s; script phase: 1.31 s.
+Reporting source and shared comparison contract are unchanged relative to this base.
+Merge target remains s5-data-05-periodic-comparison, not develop.
+Historical mutation check above was NOT RERUN.
+Local comparison SQL/cross-revision integration and hosted privacy remain NOT RUN.

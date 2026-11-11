@@ -243,12 +243,23 @@ const OWNER_REPORT_QUERY = `
         AS average_active_seconds
     FROM opening_metrics openings
     GROUP BY openings.dish_id
+  ),
+  opening_coverage_metrics AS (
+    SELECT
+      openings.dish_id,
+      COUNT(*) AS total_openings,
+      COUNT(*) FILTER (WHERE openings.has_final_checkpoint) AS timed_openings
+    FROM opening_metrics openings
+    GROUP BY openings.dish_id
   )
   SELECT
     metrics.*,
-    timing.average_active_seconds
+    timing.average_active_seconds,
+    coverage.total_openings,
+    coverage.timed_openings
   FROM dish_metrics metrics
-  LEFT JOIN timing_metrics timing USING (dish_id);
+  LEFT JOIN timing_metrics timing USING (dish_id)
+  LEFT JOIN opening_coverage_metrics coverage USING (dish_id);
 `;
 
 type ReportRow = Record<string, unknown>;
@@ -264,7 +275,7 @@ function rateMetric(
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (denominator === 0)
     return { value: null, status: 'NOT_MEASURABLE', eligible_sessions: eligibleSessions };
-  if (denominator < 10)
+  if (eligibleSessions < 10)
     return { value: null, status: 'SUPPRESSED', eligible_sessions: eligibleSessions };
   if (numerator === 0)
     return { value: 0, status: 'VALID_ZERO', eligible_sessions: eligibleSessions };
@@ -349,8 +360,8 @@ function buildInternalReport(
             belowDishFloor,
           ),
           timing_coverage: rateMetric(
-            timedSessions,
-            openEligibleSessions,
+            Number(row.timed_openings),
+            Number(row.total_openings),
             belowDishFloor,
             openEligibleSessions,
           ),

@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { unstable_dev } from 'wrangler';
 import { createStaffVerifier } from './auth';
 import { createDishRevision, replayDish } from './dish-command';
-import { type Bindings, createApp } from './index';
+import { type Bindings, createApp, SYNTHETIC_REPORT_VENUE_ALLOWLIST } from './index';
 import { replayPublication, replayReview } from './publication-command';
 import { verifyReviewArtifact } from './review-artifact';
 import { upsertExtractionReviewSession } from './review-command';
@@ -31,7 +31,7 @@ const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
 if (!runtimeUrl || !adminUrl)
   throw new Error('Run pnpm verify test:db with its disposable database');
 const admin = new Client({ connectionString: adminUrl });
-const venue = crypto.randomUUID();
+const venue = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
 const otherVenue = crypto.randomUUID();
 const actor = crypto.randomUUID();
 const otherActor = crypto.randomUUID();
@@ -311,6 +311,7 @@ beforeAll(async () => {
   menuTokenIssuer = `http://127.0.0.1:${address.port}`;
   env = {
     APP_ENV: 'local',
+    SYNTHETIC_REPORT_VENUE_ID: venue,
     AUTH_ISSUER: `http://127.0.0.1:${address.port}/auth/v1`,
     LOCAL_DATABASE_URL: runtimeUrl,
     MENU_TOKEN_ISSUER: menuTokenIssuer,
@@ -344,6 +345,7 @@ beforeAll(async () => {
     logLevel: 'error',
     vars: {
       APP_ENV: 'local',
+      SYNTHETIC_REPORT_VENUE_ID: venue,
       AUTH_ISSUER: env.AUTH_ISSUER!,
       LOCAL_DATABASE_URL: runtimeUrl!,
       POSTHOG_PROJECT_ID: '675372',
@@ -1851,7 +1853,7 @@ describe('Multi-tenant owner report isolation', () => {
       engagement_rate: { value: 0.429, status: 'NORMAL' },
       save_rate: { value: 0.167, status: 'NORMAL' },
       avg_interaction_time_seconds: { value: 6.5, status: 'NORMAL' },
-      timing_coverage: { value: 0.714, status: 'NORMAL' },
+      timing_coverage: { value: 0.625, status: 'NORMAL' },
     });
     expect(JSON.stringify(ownerReport)).not.toContain('eligible_sessions');
 
@@ -2016,6 +2018,72 @@ describe('Multi-tenant owner report isolation', () => {
       save_rate: { value: 0, status: 'VALID_ZERO' },
     });
 
+    const openingCoverageDishId = crypto.randomUUID();
+    const openingCoverageDishResponse = await request(
+      openingCoverageDishId,
+      command({ name: 'Opening coverage dish' }),
+    );
+    expect(openingCoverageDishResponse.status).toBe(200);
+    const openingCoverageDish = (await openingCoverageDishResponse.json()) as {
+      revisionId: string;
+    };
+    const openingCoverageSessions: Array<{ sessionId: string; exposureId: string }> = [];
+    for (let index = 0; index < 10; index++) {
+      const sessionId = crypto.randomUUID();
+      const exposureId = await addExposure(
+        sessionId,
+        openingCoverageDishId,
+        openingCoverageDish.revisionId,
+      );
+      openingCoverageSessions.push({ sessionId, exposureId });
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposureId,
+        5_000,
+        undefined,
+        undefined,
+        openingCoverageDishId,
+        openingCoverageDish.revisionId,
+      );
+      await addOpening(
+        sessionId,
+        'menu_card',
+        exposureId,
+        undefined,
+        undefined,
+        undefined,
+        openingCoverageDishId,
+        openingCoverageDish.revisionId,
+      );
+    }
+    const openingCoverageReport = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    expect(
+      openingCoverageReport.dishes.find((item) => item.dish_id === openingCoverageDishId)?.metrics
+        .timing_coverage,
+    ).toEqual({ value: 0.5, status: 'NORMAL' });
+
+    const repeatedOpening = openingCoverageSessions[0]!;
+    await addOpening(
+      repeatedOpening.sessionId,
+      'menu_card',
+      repeatedOpening.exposureId,
+      undefined,
+      undefined,
+      undefined,
+      openingCoverageDishId,
+      openingCoverageDish.revisionId,
+    );
+    const repeatedOpeningReport = OwnerDishReportSchema.parse(
+      await (await requestReport(venue, actor)).json(),
+    );
+    expect(
+      repeatedOpeningReport.dishes.find((item) => item.dish_id === openingCoverageDishId)?.metrics
+        .timing_coverage,
+    ).toEqual({ value: 0.476, status: 'NORMAL' });
+
     const testOnlySessions = Array.from({ length: 12 }, () => crypto.randomUUID());
     for (const sessionId of testOnlySessions) {
       const exposureId = await addExposure(sessionId, dishId, dish.revisionId, 'test');
@@ -2093,10 +2161,8 @@ describe('Multi-tenant owner report isolation', () => {
     expect(otherTenantResponse.status).toBe(403);
 
     const otherOwnerResponse = await requestReport(otherVenue, otherVenueOwner);
-    expect(otherOwnerResponse.status).toBe(200);
-    const otherOwnerReport = OwnerDishReportSchema.parse(await otherOwnerResponse.json());
-    expect(otherOwnerReport.venue_id).toBe(otherVenue);
-    expect(otherOwnerReport.report_metadata.report_status).toBe('EMPTY');
+    expect(otherOwnerResponse.status).toBe(503);
+    expect(await otherOwnerResponse.json()).toEqual({ error: 'service_unavailable' });
 
     const revokedActor = crypto.randomUUID();
     await admin.query(

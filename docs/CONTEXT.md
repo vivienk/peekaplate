@@ -47,7 +47,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "09ecb6107dcfddfd5b167dbc4f116a90b911492ba6a222f23f41998f6274578c"
+      "sourceFingerprint": "d2d71694e2b8639a8eca7aeeb554adab91506662f63f2ab9ac6213501b5ccde3"
     },
     {
       "id": "tokens",
@@ -85,7 +85,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu, detail, search helpers, Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Live menu/token delivery, hosted funnels and privacy-text/design acceptance remain integration gates.",
+      "summary": "Diner fixture menu, detail, a header search bar filtering shown cards (staff allergy line), Save and Compare use shared contracts/tokens. Tracking validates observation.v2 before sequence allocation. Cached restores reconcile tab identity. One off-by-default consent control gates canonical and PostHog paths, including DNT/GPC; console keeps its existing control. Withdrawal retires queued work; persistent deletion markers retry both storage backends before reopening. Canonical outbox uses atomic IndexedDB updates or Web-Locked localStorage; unavailable coordination falls back to visit memory. Batches retain immutable IDs, limits and receipt-driven removal; pending reads are authoritative and stopped senders cannot restart. Fixture mode sends neither destination. PostHog uses its SDK adapter independently; retries are canonical only. Token-bound delivery handles receipts, retries and backoff. Live menu wiring, hosted funnels and privacy-text/design acceptance remain gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -153,7 +153,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/dispatch.test.ts",
         "frontend/diner/src/tracking/withdrawal.test.ts",
         "tests/e2e/tracking-storage.spec.ts",
-        "frontend/diner/src/tracking/withdrawal.ts"
+        "frontend/diner/src/tracking/withdrawal.ts",
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/searchView.test.ts",
+        "tests/e2e/search.spec.ts",
+        "frontend/diner/src/tracking/delivery.ts",
+        "frontend/diner/src/tracking/delivery.test.ts",
+        "frontend/diner/src/tracking/delivery.fixtures.test.ts",
+        "tests/e2e/tracking-delivery.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -162,7 +169,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "870fe0fba2eaad666945c79cabf89660579ff75a4b17435a7b6549a29a050095"
+      "sourceFingerprint": "377a195623cab69f1ad5d26526df8a8e73b050f2b8cd6cfeb61cc548b61de4b1"
     },
     {
       "id": "console",
@@ -193,7 +200,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes tenant-scoped canonical observation/fact persistence. Hosted baseline c6a47bd passed six synthetic checks and backfilled three facts; browser requests reached Queue/R2/Postgres. Retries deduplicate; conflicting reuse is quarantined. Own-token verification uses configured public JWK after hosted self-fetch1042, retaining ES256/claim checks. S4-DATA-04 locally covers archive restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; ordered comparisons credit both opened dishes once. Dish reports require one source=synthetic in local/staging; otherwise 503 before reads. Synthetic reports use synthetic.v1. Small/complementary timing cohorts are suppressed; owner_report.v1 is validated and stripped. Freshness remains unverified pending pipeline evidence. AI-01 returns scoped drafts or abstention. Hosted acceptance remains pending; collection stays paused.",
+      "summary": "Create-only R2 precedes tenant-scoped canonical facts; retries dedupe and conflicts quarantine. Own-token ES256/claim checks and S4-DATA-04 restore/retry, duplicate replay and tenant isolation. Owner reports authorize membership and bound evidence to 24h; comparisons credit both opened dishes once. Local/staging dish reports require source=synthetic, matching SYNTHETIC_REPORT_VENUE_ID and server-allowlist membership; entries are typed as strings, and canonical venues fail closed even if configured. Timing coverage counts final/total openings; privacy floors count sessions. Timed and 1–9 opened cohorts are complementarily suppressed; zero openings remain NOT_MEASURABLE. Reports validate/strip owner_report.v1; freshness unverified. AI-01 returns scoped drafts or abstention. Hosted acceptance pending; collection paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -297,7 +304,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "348f4c80a59b94aa606e055d675a243adf99e4096748a9c357453339b8735a94"
+      "sourceFingerprint": "600d75c49ce94411842c8029fb187a438becd3187350de8d97ad9834b14e2bf5"
     },
     {
       "id": "database",
@@ -414,7 +421,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "978edb1b904966c9d49a6b47870e2218c1db493bafd4ac393cc30e6790aae3e0"
+      "sourceFingerprint": "bc0b22b11331184b34694a3c5f63b68b767008e634b4cdcb3a90956c2f0c6a0c"
     },
     {
       "id": "agents",
@@ -476,7 +483,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "4e68c26c4a071754c151ccb2d6e4539801050c0361716178627499c5b0d41c73"
+      "sourceFingerprint": "ea8d828a39fd80d003c97b6e306ee6072bba4bdeb240bcebe6e8ffdae51ee574"
     },
     {
       "id": "processing",
@@ -601,19 +608,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-09",
-      "summary": "PR123 fixes the mocked-row DATA05 validation gap. JSON fixtures drive nine independent period/denominator cases; affected metrics hide values, delta and eligible counts while unaffected metrics retain exact results. All 17 focused tests pass. A temporary OR-to-AND denominator regression passes the old 11 tests but fails the four new one-sided cases; production source is restored unchanged. Evidence is UTF-8 and distinguishes current from historical results.",
+      "date": "2026-11-08",
+      "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
       "modules": [
-        "backend"
+        "diner"
       ],
       "paths": [
-        "backend/src/comparison-report.data05.test.ts",
-        "tests/data05/comparison_privacy_cases.json",
-        "tests/data05/comparison_revision_cases.json",
-        "tests/data05/evidence/validation_findings.md",
-        "tests/data05/evidence/validation_results.txt"
+        "frontend/diner/src/menu/searchView.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/search.spec.ts"
       ],
-      "next": "Uneeza should pull and rerun the focused suite before merge. Retain the existing implementation base; validation approval does not approve its dependency. SQL cross-revision deduplication and hosted privacy remain unverified."
+      "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
     },
     {
       "date": "2026-11-08",
@@ -681,23 +686,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Sai re-review of the presentation id fix and Vivien merge. T0 priority 1: three permitted real dish photos with approved variants handed to the Bundle v1 producer. Presentation and 2.5D stay optional, needs_review and publication.eligible=false until S3-ARC-01 freeze; real-phone and VoiceOver/TalkBack checks remain manual gates."
     },
     {
-      "summary": "November 5 PR45 menu ingestion stabilization (Teeyansh): Unified S3-VIS-01 menu ingestion orchestration layer for URL, PDF, and photo intake. Reconciled with PR #44 (ADR 0016) and PR #58 (artifact bundle). Strict intake validation rejects unmaterialized URLs (HTTP 400 unsupported_source_type); queued URL jobs fail deterministically with persisted diagnostics and retry safely without premature ACK if R2 storage fails. Added ExtractionBoxEvidenceSchema for fractional OCR boxes. Enforced atomic lease fencing in failIngestionJob and durable failure diagnostic persistence in reportStorage before terminal ACK. 192 pgTAP assertions and 64 real PostgreSQL integration tests pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "next": "Await PR #44 and PR #58 merges to develop; keep staging menu queues paused until controlled staging acceptance."
-    },
-    {
       "date": "2026-11-09",
-      "summary": "Owner-report gate permits only one source=synthetic in trusted local/staging; production fails closed even with that selector. Reader labels reports synthetic.v1. Zero timed cohort is NOT_MEASURABLE and no longer triggers complementary suppression of active counts or independent metrics; cohorts1–9 remain blinded. Signed-JWT and real-PostgreSQL regressions cover source provenance. Zero-cohort contract cases preserve active_sessions 10/150 and valid statuses; focused contract tests40 PASS, database tests77 and pgTAP213 PASS.",
+      "summary": "Owner-report route requires source=synthetic, local/staging, a matching configured venue ID and server-allowlist membership; canonical venue IDs fail closed even if configured. Timing coverage counts final/total openings while privacy floors remain distinct sessions. Complementary masking covers 1–9 timed/opened cohorts with zero timing; zero openings remain NOT_MEASURABLE. The signed-JWT route suite passes 59 tests; test:db pgTAP passes 213 assertions, but Vitest's dish.integration worker exits 143, also reproduced with the prior route behavior. No hosted configuration or deployment.",
       "modules": [
         "backend",
         "contracts",
         "delivery"
       ],
-      "next": "Keep production reads unavailable until a separately reviewed release policy changes. Keep freshness unverified until accepted-online observation-to-summary evidence and its agreed delay policy are verified; collection stays paused pending hosted report, native recovery and production acceptance gates."
+      "next": "Investigate the unresolved dish.integration worker exit 143. A new synthetic report venue requires an explicit allowlist change and matching SYNTHETIC_REPORT_VENUE_ID. Keep production reads unavailable and freshness unverified until a separately reviewed release policy and accepted-online evidence exist; collection remains paused pending hosted report, native recovery and production acceptance."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR123 reconciles the current PR134 implementation branch without promoting it to develop. Nine JSON-driven mocked-row privacy cases vary period and denominator cohorts independently; all 17 focused contract/reader/validation tests pass in 550 ms. Reporting implementation remains unchanged relative to c344b7e. Historical mutation evidence is retained, not rerun. The cross-revision fixture remains an unexecuted SQL expectation.",
+      "sources": [
+        "backend/src/comparison-report.data05.test.ts",
+        "tests/data05/comparison_privacy_cases.json",
+        "tests/data05/comparison_revision_cases.json",
+        "tests/data05/evidence/validation_findings.md"
+      ],
+      "next": "Run repository checks and exact-head CI, obtain final-commit approval and merge only into s5-data-05-periodic-comparison. PR134 remains a separate draft for develop review. Database-specific comparison acceptance, hosted privacy and product decisions are not certified by these mocks."
     }
   ]
 }
