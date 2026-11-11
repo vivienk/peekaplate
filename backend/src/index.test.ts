@@ -15,6 +15,7 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { describe, expect, it, vi } from 'vitest';
 import { createStaffVerifier } from './auth';
 import app, {
+  CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   consumeJtiRateLimit,
   createApp,
   createWorker,
@@ -281,6 +282,130 @@ describe('owner report HTTP boundary', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: 'service_unavailable' });
     expect(readOwnerReport).not.toHaveBeenCalled();
+  });
+
+  it('allows only the exact console origins to call the report route from a browser', async () => {
+    const actorId = '00000000-0000-4000-8000-000000000003';
+    const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const reportApp = createApp({ verify, execute: vi.fn(), readOwnerReport });
+    const env = { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId };
+    const path = `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`;
+    const preflight = (origin: string) =>
+      reportApp.request(
+        path,
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: origin,
+            'Access-Control-Request-Method': 'GET',
+            'Access-Control-Request-Headers': 'Authorization',
+          },
+        },
+        env,
+      );
+    const get = (origin: string, authorization?: string) =>
+      reportApp.request(
+        path,
+        { headers: { Origin: origin, ...(authorization ? { Authorization: authorization } : {}) } },
+        env,
+      );
+
+    expect(CONSOLE_REPORT_CORS_ALLOWED_ORIGINS).toEqual([
+      'https://peekaplate-console-staging.pages.dev',
+      'http://127.0.0.1:5174',
+    ]);
+    for (const origin of CONSOLE_REPORT_CORS_ALLOWED_ORIGINS) {
+      const allowed = await preflight(origin);
+      expect(allowed.status).toBe(204);
+      expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      expect(allowed.headers.get('Access-Control-Allow-Methods')).toContain('GET');
+      expect(allowed.headers.get('Access-Control-Allow-Methods')).not.toContain('POST');
+      expect(allowed.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+      expect(allowed.headers.get('Access-Control-Max-Age')).toBe('86400');
+      expect(allowed.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+      expect(allowed.headers.get('Vary')).toContain('Origin');
+
+      const report = await get(origin, 'Bearer test-token');
+      expect(report.status).toBe(200);
+      expect(report.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+      expect(await report.json()).toEqual({ venue_id: venueId, dishes: [] });
+    }
+    // A preflight never reaches authentication or the report reader.
+    expect(verify).toHaveBeenCalledTimes(CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.length);
+    expect(readOwnerReport).toHaveBeenCalledTimes(CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.length);
+
+    for (const origin of [
+      'https://attacker.example.com',
+      'https://peekaplate-console-staging.pages.dev.evil.com',
+      'https://pr-128.peekaplate-console-preview.pages.dev',
+      'http://localhost:5174',
+      'http://127.0.0.1:5175',
+      // The diner origins keep their own routes; they cannot read owner reports.
+      'https://diner.peekaplate.com',
+      'http://127.0.0.1:5173',
+    ]) {
+      const blocked = await preflight(origin);
+      expect(blocked.headers.get('Access-Control-Allow-Origin')).toBeNull();
+      expect(
+        (await get(origin, 'Bearer test-token')).headers.get('Access-Control-Allow-Origin'),
+      ).toBeNull();
+    }
+  });
+
+  it('keeps authentication and venue checks unchanged for an allowed console origin', async () => {
+    const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+    const verify = vi.fn().mockResolvedValue('00000000-0000-4000-8000-000000000003');
+    const readOwnerReport = vi.fn();
+    const reportApp = createApp({ verify, execute: vi.fn(), readOwnerReport });
+    const origin = 'https://peekaplate-console-staging.pages.dev';
+    const env = { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId };
+
+    const noToken = await reportApp.request(
+      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      { headers: { Origin: origin } },
+      env,
+    );
+    expect(noToken.status).toBe(401);
+    expect(noToken.headers.get('Access-Control-Allow-Origin')).toBe(origin);
+
+    const otherVenue = await reportApp.request(
+      '/api/v1/venues/00000000-0000-4000-8000-000000000001/analytics/dishes?source=synthetic',
+      { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
+      env,
+    );
+    expect(otherVenue.status).toBe(503);
+
+    const noSyntheticSource = await reportApp.request(
+      `/api/v1/venues/${venueId}/analytics/dishes`,
+      { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
+      env,
+    );
+    expect(noSyntheticSource.status).toBe(503);
+    expect(readOwnerReport).not.toHaveBeenCalled();
+  });
+
+  it('does not add the console origins to the diner routes', async () => {
+    const consoleOrigin = 'https://peekaplate-console-staging.pages.dev';
+    const dinerApp = createApp({ verify: vi.fn(), execute: vi.fn() });
+    const observationsPreflight = await dinerApp.request('/observations', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: consoleOrigin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Authorization, Content-Type',
+      },
+    });
+    expect(observationsPreflight.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    const menuPreflight = await dinerApp.request(
+      '/public/venues/00000000-0000-4000-8000-000000000001/menus/00000000-0000-4000-8000-000000000002',
+      {
+        method: 'OPTIONS',
+        headers: { Origin: consoleOrigin, 'Access-Control-Request-Method': 'GET' },
+      },
+    );
+    expect(menuPreflight.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 });
 

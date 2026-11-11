@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+Latest diner integration: [published-menu connection](diner-connection.md). It
+explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
+configuration and reused public hosting. Its release acceptance record identifies
+the actual deployed version; older dated setup sections below are historical.
+
+
 Current staging status updated November 2, 2026; genuine-token observation transport, typed facts and backfill were verified November 2. Publication acceptance was verified November 1. VIS-01 infrastructure and OCR evidence remain dated October 28. The original foundation walkthrough and task snapshot below retain their historical handoff dates. Use the current staging sections and Operations for deployed behavior and remaining work.
 
 PeekaPlate is meant to help a restaurant explain its food and learn how people use its menu. The team has been researching that idea and designing the experience. Sai started the code setup. We now have the project structure, checks for new code, a tested draft-save path and backend commands to approve, publish and withdraw an exact menu version.
@@ -785,3 +791,16 @@ These results establish synthetic fixture and validator correctness only.
 Application AI evaluation remains NOT RUN. Production integration and
 hosted privacy acceptance are not established. Outstanding product
 decisions remain PENDING.
+
+
+## Owner-report staging API — November 10
+
+The console may call the owner-report route from its exact staging origin or
+http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
+GitHub collaborator tokens do not authorize restaurant reports. Staging reports
+are deliberately limited to the server-approved synthetic venue; production
+and other venues remain blocked. See [request flow, status codes and release
+checks](owner-report-staging.md). Deployment evidence belongs in the narrow
+owner-report release PR; merging into develop alone does not deploy the Worker.
+
+Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).
