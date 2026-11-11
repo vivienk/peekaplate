@@ -7,6 +7,13 @@ const config = JSON.parse(
 );
 const staging = config.env.staging;
 
+test('staging extraction requests can reach the same-account public Worker', () => {
+  assert.ok(staging.compatibility_flags.includes('global_fetch_strictly_public'));
+  assert.ok(staging.compatibility_flags.includes('nodejs_compat'));
+  assert.deepEqual(config.compatibility_flags, ['nodejs_compat']);
+  assert.equal(config.env.production?.compatibility_flags, undefined);
+});
+
 test('the extraction application uses the provider-required Durable Object scheduler', () => {
   const host = JSON.parse(
     readFileSync(new URL('../backend/wrangler.extraction.jsonc', import.meta.url), 'utf8'),
