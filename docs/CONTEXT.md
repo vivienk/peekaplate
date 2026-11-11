@@ -97,7 +97,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture menu/detail/search and Save/Compare foundations use shared contracts/tokens. Explicit live mode verifies exact fetched bundle bytes and pointer identity before rendering or exposing the token. Refresh swaps publications with focus preserved; 404 or token expiry suspends canonical/PostHog collection without changing consent and keeps the visible menu. Remount aborts stale loads. Screens call the shared track() for menu_viewed, dish_viewed (50% for 1 s, visible card only) and dish_detail_opened, with IDs and activity clock from tracking/; entry_source is direct_link and save_available stays false until #122. One off-by-default consent gate (DNT/GPC) covers canonical and PostHog; outboxes retry with memory fallback. Fixture mode sends neither destination. Genuine browser-to-both-destinations and privacy/design acceptance remain pilot gates.",
+      "summary": "Diner fixture menu/detail/search, with Save, Unsave, Undo, badge and Saved routing connected to the real screens. Saved refreshes current dish revisions without a new shortlist view; keyboard removal retains focus. Explicit live mode verifies exact bundle bytes before rendering or exposing the token; refresh swaps publications, and 404 or expiry suspends canonical/PostHog collection while the menu stays. Screens call the shared track() for menu_viewed, dish_viewed (50% for 1 s, visible card only) and dish_detail_opened, with IDs and activity clock from tracking/; entry_source is direct_link. One off-by-default consent gate covers canonical and PostHog. Compare and remaining UI tracking acceptance are separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -185,7 +185,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
-        "docs/diner-connection.md"
+        "docs/diner-connection.md",
+        "frontend/diner/src/save/screens.ts",
+        "frontend/diner/src/save/save.css",
+        "tests/e2e/save-screens.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -194,7 +197,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "cb39a5bfc4cf0fdb4e5e1cd11c345cf8c488501f7db8642a7df3d027ffecbb6f"
+      "sourceFingerprint": "826d1db49924ea613ac79dea74c0ed8395837d9b2d102ea8be045a1f49f166e8"
     },
     {
       "id": "console",
@@ -225,7 +228,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence, with per-metric/cohort and complementary suppression. Local/staging HTTP reports require exactly one source=synthetic and a configured server-allowlisted venue; production fails closed. S4-RES CLI builds canonical immutable bundles from approved tenant-scoped dish/review facts and verified T0 assets, with explicit privileged transactional admission; no approval/publication is implied. AI-01 drafts/abstention and frozen offline evaluation remain separate. Existing ingestion/review commands are preserved. Diner verification/hosting are described in the diner node; full pilot acceptance remains gated and queues stay paused.",
+      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -324,7 +327,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/bundle-producer.integration.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
-        "docs/owner-report-staging.md"
+        "docs/owner-report-staging.md",
+        "backend/src/ingestion/upload.ts",
+        "backend/src/ingestion/upload.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -337,7 +342,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e62b4c11cf26fa02a79a7414a2d19f17e89d360a91ac458849d3784897d3c0d0"
+      "sourceFingerprint": "c2c4a71024b7bfe705a7e4f570181470487fe7a7e21510c2d17af18fee264906"
     },
     {
       "id": "database",
@@ -398,7 +403,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "ADR0012 promotes reviewed main through staging and production separately. Main c6a47bd deployed as staging version60ac184a-a348-4e2c-843d-e380861771cc; CI and six genuine-token transport/facts/backfill checks pass. Three historical test records plus one new browser menu-view are preserved; Queues end empty/paused. Desktop freeze required explicit re-pause and a read-only continuation, without event resubmission. Existing resources/secrets retained; no migration or production deploy. Real controls/outbox/report, load/recovery and production remain gated. Merged PRs keep their last successfully deployed preview; closed unmerged PRs are still cleaned up. Earlier acceptance records remain historical.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -444,7 +449,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/observation-staging-acceptance.json",
         "docs/observation-facts-staging-acceptance.json",
         "scripts/console-preview-demos.test.mjs",
-        "scripts/node-ts-hooks.mjs"
+        "scripts/node-ts-hooks.mjs",
+        ".github/workflows/deploy-extraction-staging.yml",
+        "docs/staging-ingestion-release.md"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -455,7 +462,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b3d7142b6aa0452abd56d70a3e9ea1d762a7cd1f10a39fa3ec237bf80c3d0ea3"
+      "sourceFingerprint": "4c1a462327b649fa6cadf9044003985a87a217d5b08cc50dc6fc2c56ea8a1253"
     },
     {
       "id": "agents",
@@ -522,7 +529,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo modes keep ocr, default ocr_image and ungrounded image-only; pipeline3/schema2 and legacy1/2 remain compatible. Bounded wrapped titles/columns and corroborated text/geometry sections permit only complete price groups; conflicts, crossing/unclaimed cells and unresolved repeats abstain. Whole-entry guards and narrow name/footer views never rewrite source. Atomic assembly preserves exact fractional page/index/literal joins in existing candidate-ID segment metadata; SourceSpan/TS schemas and legacy empty-field omission stay unchanged. Originals stay unvalidated. Opt-in OCR recovery validates failed Engine3 pages and caps1–4 single attempts, stopping on failure. Selected-page model recovery preflights1–4 requests, retains history/incomplete coverage and never merges old candidates. Defaults/queues stay unchanged. Measured gains are modest; broad layout recall, fresh-provider, consumer and human acceptance remain unverified.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -597,7 +604,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
-        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "processing/src/peekaplate_processing/product_validation.py",
+        "processing/tests/test_product_validation.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -606,7 +615,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "afa65c7c4e5294a5ed18c6b93b782ae654cff17a5bdf1ccfd5cab2db55efc288"
+      "sourceFingerprint": "dd66a78aff466be74013297563e269fe188ace005694035aeffdc09a062fc38f"
     },
     {
       "id": "assets",
@@ -641,48 +650,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-11",
-      "summary": "PR78 (S3-DIN-01.5) connects the diner screens to the shared tracking layer. menuScreen.ts calls createMenuViewedTrigger once the menu is ready, trackDishDetailOpened with the shared newOpeningId, and startOpeningClock, which sends active_ms/final checkpoints. dish_viewed fires after 50% visibility for 1 s on the visible card only, with no category_filter. Activity listens on window scroll plus click/key/pointer and is removed on leaving detail. entry_source is direct_link. The interim tracking index and clock are deleted. Nothing fires for search, placeholders, chips, tiles or loading. Tracking e2e specs load ?scenario=empty. Evidence is fixture only.A new e2e spec covers dish_viewed exposure rules and the scroll-driven detail clock.",
-      "modules": [
-        "diner"
-      ],
-      "paths": [
-        "frontend/diner/src/menu/menuScreen.ts",
-        "frontend/diner/src/menu/events.ts",
-        "tests/e2e/menu-triggers.spec.ts"
-      ],
-      "next": "Read save_available from the shared Save-state function when #122 lands. Add category_filter once matrix §3.1 is confirmed. Verify one event per real transition reaches PostHog and canonical ingestion once DIN-03 enables live tracking."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
-        "diner",
-        "analytics",
-        "contracts",
-        "delivery"
-      ],
-      "summary": "Published diner connection now uses the shared exact-byte verifier; no production bypass seam remains. New RED-to-GREEN checks cover valid default verification, publication suspension and expiry during a hung refresh. Detected withdrawal retires both destination paths without changing consent; stale loads cannot restore tokens. Pinned public-media/bundle snapshots reuse existing staging Pages without exposing private R2. Seven focused Chromium tests pass (14.653s); genuine staging staff API and pointer/hash/CORS checks passed on labelled synthetic records. Hosted app acceptance follows the reviewed main Pages-only deployment. Reconciles the prior main report release, retaining its synthetic-report setting/runbook and full error history; obsolete console Input index paths are replaced by current TextField/UI paths.",
-      "next": "Finish independent review/full checks, merge feature/release and deploy only the reviewed main diner artifact. Record actual hosted valid/tampered/fresh-withdrawn/active-withdrawal results in the release PR; withdraw synthetic menus, restore viewer and end the test session. Keep API, console, private storage, Queues and production unchanged."
-    },
-    {
-      "date": "2026-11-10",
-      "summary": "PR117 reconciles current develop without dropping its context paths or runtime changes. The offline bundle producer hashes exact bytes, reads tenant-scoped approved facts and admits immutable handoff rows only through a privileged transaction. T0 input now rejects missing/blank capture evidence and invalid source hashes; five regressions failed before correction. Private provenance is never public content. A real prepare_t0_bundle asset passed eight actual CLI/PostgreSQL checks, including tamper rejection, runtime denial, identical retry and overwrite refusal. Local checks pass: 1198 unit/72 script, 213 SQL/86 integration, 120 browser and build; timings in qa-reports/S4-RES-test-plan.md.",
-      "modules": [
-        "backend",
-        "contracts",
-        "delivery"
-      ],
-      "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
-    },
-    {
-      "date": "2026-11-10",
-      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
-    },
     {
       "date": "2026-11-09",
       "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
@@ -727,21 +694,60 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-08",
-      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
-      "modules": [
-        "console",
-        "tokens"
-      ],
-      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
       "modules": [
         "diner",
         "analytics"
       ],
       "next": "Review the final PR80 commit after PR77; update PR84 against the corrected outbox while preserving Deliver and retry-pause APIs. Run genuine published-menu/token to canonical/PostHog acceptance before enabling pilot collection; local browser sinks are not hosted acceptance."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
+      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
+      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
+    },
+    {
+      "date": "2026-11-10",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
+      "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
+    },
+    {
+      "date": "2026-11-11",
+      "summary": "PR78 (S3-DIN-01.5) connects the diner screens to the shared tracking layer. menuScreen.ts calls createMenuViewedTrigger once the menu is readable, trackDishDetailOpened with the shared newOpeningId, and startOpeningClock, which sends active_ms/final checkpoints. dish_viewed fires after 50% visibility for 1 s on the visible card only, with no category_filter. Activity listens on window scroll plus click/key/pointer and is removed on leaving detail. entry_source is direct_link and save_available reads the shared Save state. The interim tracking index and clock are deleted. Nothing fires for search, placeholders, chips, tiles or loading. Tracking e2e specs load ?scenario=empty. A new e2e spec covers dish_viewed exposure and the detail clock. Evidence is fixture only.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/events.ts",
+        "tests/e2e/menu-triggers.spec.ts"
+      ],
+      "next": "Add category_filter once matrix §3.1 is confirmed. Verify one event per real transition reaches PostHog and canonical ingestion once live tracking is enabled."
     }
   ]
 }

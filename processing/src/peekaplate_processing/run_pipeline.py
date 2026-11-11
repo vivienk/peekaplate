@@ -21,14 +21,14 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult, validate_box_evidence
 from peekaplate_processing.storage import save_json
-from peekaplate_processing.workflow import INPUT_MODES, page_batches, run_menu_graph
+from peekaplate_processing.workflow import INPUT_MODES, page_batches, request_failure, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
 from peekaplate_processing.vision import image_source, normalize_page_selection, page_images
 from peekaplate_processing.preflight import assess_image
 from peekaplate_processing.review_suggestions import private_result
 
-from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result
+from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result, VisionCaptureLimitError
 
 from peekaplate_processing.model_providers import create_model_client, create_cascading_clients, PROVIDER_REGISTRY
 
@@ -101,16 +101,16 @@ def saved_page_text(source, pages_json, *, recovery=False):
     )
 
 
-def _vision_with_retry(client, images, timeout, *, wait_seconds=2.0):
+def _vision_with_retry(client, images, timeout, *, wait_seconds=2.0, attempts=None, provider="default"):
     """One short retry for transient 429s (shared upstream pools); daily quotas move straight on."""
     try:
-        return extract_vision_v4(client, images, timeout=timeout)
+        return extract_vision_v4(client, images, timeout=timeout, attempts=attempts, provider=provider)
     except openai.RateLimitError as error:
         if "per day" in str(error).lower() or "perday" in str(error).lower():
             raise
         print(f"Rate limited; retrying once in {wait_seconds:g}s...", file=sys.stderr, flush=True)
         time.sleep(wait_seconds)
-        return extract_vision_v4(client, images, timeout=timeout)
+        return extract_vision_v4(client, images, timeout=timeout, attempts=attempts, provider=provider)
 
 
 def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None):
@@ -143,9 +143,12 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     timings={}
     report=None
     completed=False
+    vision_requested = input_mode == "vision_v4"
+    vision_attempts = []
     try:
         fallback_warnings = []
         prepared_images = []
+        prepared_image_errors = []
         if pages_json is None:
             try:
                 source_bytes = read_file(source)
@@ -157,6 +160,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 if check.rejected:
                     print("Preflight rejected the image; no OCR or model request was made.", file=sys.stderr, flush=True)
                     report = image_source(source)
+                    report.configuration["input_mode"] = input_mode
                     report.errors.extend(check.errors)
                     report.configuration["preflight"] = check.metadata()
                     report.status = "failed"
@@ -172,6 +176,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
             with measure(timings, "source_images"):
                 images, image_errors = page_images(report.source, directory)
                 prepared_images = images
+                prepared_image_errors = image_errors
             report.errors.extend(image_errors)
 
             # Explicit provider, else cascade google_studio -> qwen -> glm -> openrouter
@@ -184,8 +189,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 if llm is None:
                     try:
                         llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=None)
-                    except ExtractionError as config_err:
-                        fallback_warnings.append(f"No vision provider configured: {config_err}")
+                    except ExtractionError:
+                        fallback_warnings.append("No vision provider configured.")
                 if llm is not None:
                     client_candidates = [("default", llm)]
 
@@ -194,9 +199,14 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout)
+                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout, attempts=vision_attempts, provider=p_name)
                     if not v4_dishes:
-                        raise ExtractionError("Vision extraction produced 0 dishes.")
+                        failure = "Vision extraction produced 0 dishes."
+                        print(f"Provider '{p_name}' failed: {failure} Trying next provider in cascade...", file=sys.stderr, flush=True)
+                        fallback_warnings.append(f"Provider '{p_name}' failed: {failure}")
+                        continue
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        v4_errors.append("Private vision response capture was truncated.")
                     v4_report = build_v4_result(report.source, images, v4_dishes, started_dt, errors=image_errors + v4_errors)
                     v4_report.warnings.extend(fallback_warnings)
                     v4_report.extraction_model = getattr(p_client, "model_name", None)
@@ -206,31 +216,54 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     completed = True
                     v4_success = True
                     return report
-                except TimeoutError as deadline_err:
+                except TimeoutError:
                     # The budget is spent: no further provider or OCR request may start.
-                    print(f"Provider '{p_name}' exceeded the deadline; stopping without fallback.", file=sys.stderr, flush=True)
+                    print(f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline; stopping without fallback.", file=sys.stderr, flush=True)
+                    report.configuration["input_mode"] = input_mode
                     report.warnings.extend(fallback_warnings)
-                    report.errors.append(f"Provider '{p_name}': {deadline_err} No fallback request was started.")
+                    report.errors.append(f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline. No fallback request was started.")
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        report.errors.append("Private vision response capture was truncated.")
                     report.status = "failed"
                     report.finished_at = datetime.now(timezone.utc)
                     with measure(timings, "extraction_write"):
                         save_json(report.model_dump(mode="json"), directory / "extraction.json")
                     completed = True
                     return report
+                except VisionCaptureLimitError:
+                    raise
                 except Exception as prov_err:
-                    print(f"Provider '{p_name}' failed ({prov_err}); trying next provider in cascade...", file=sys.stderr, flush=True)
-                    fallback_warnings.append(f"Provider '{p_name}' failed: {prov_err}")
+                    failure = request_failure(prov_err)
+                    print(f"Provider '{p_name}' failed: {failure} Trying next provider in cascade...", file=sys.stderr, flush=True)
+                    fallback_warnings.append(f"Provider '{p_name}' failed: {failure}")
 
             if not v4_success:
-                print("All vision providers failed; cleanly falling back to OCR mode...", file=sys.stderr, flush=True)
+                print("All vision providers failed; preparing OCR fallback...", file=sys.stderr, flush=True)
+                # Instantiate a fresh client so its async transport is not bound to a closed loop.
+                try:
+                    llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
+                    if llm is None:
+                        raise ExtractionError("OCR fallback client unavailable.")
+                except Exception:
+                    report.configuration["input_mode"] = "vision_v4"
+                    report.warnings.extend(fallback_warnings)
+                    report.errors.append("OCR fallback could not be initialized; no OCR request was started.")
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        report.errors.append("Private vision response capture was truncated.")
+                    report.status = "failed"
+                    report.finished_at = datetime.now(timezone.utc)
+                    with measure(timings, "extraction_write"):
+                        save_json(report.model_dump(mode="json"), directory / "extraction.json")
+                    completed = True
+                    return report
                 input_mode = "ocr_image"
-                # Instantiate a fresh client for the OCR graph so its async transport is not bound to a closed loop
-                llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         if llm is None:
             llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
             report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
+        if prepared_images:
+            report.errors.extend(prepared_image_errors)
         report.warnings.extend(fallback_warnings)
         if target_pages is not None:
             by_number={segment.page_number:segment for segment in report.segments}
@@ -301,6 +334,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                         continue
                     report.drafts.append(draft)
                     report.evidence.append(evidence)
+        if any(attempt["truncated"] for attempt in vision_attempts):
+            report.errors.append("Private vision response capture was truncated.")
         validate_box_evidence(report)
         if input_mode=="image":
             report.warnings.append("Image-only suggestions are private and unvalidated; no OCR-grounded candidates or text spans were created.")
@@ -324,6 +359,9 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         completed=True
         return report
     finally:
+        if vision_requested and report is not None and report.source is not None:
+            save_json({"schema_version": 1, "source_id": report.source.source_id,
+                       "attempts": vision_attempts}, directory / "vision-attempts.json")
         timings["total"]=round(time.perf_counter()-started, 6)
         summary={"schema_version":1, "status":report.status if completed else "failed", "input_mode":input_mode, "acquisition_mode":"images_without_ocr" if input_mode=="image" else "saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
         if report is not None:

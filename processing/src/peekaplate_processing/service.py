@@ -32,6 +32,7 @@ JOB_TIMEOUT_SECONDS = 700
 MAX_BUNDLE_BYTES = 32_000_000
 
 
+
 def read_result(path, limit):
     with path.open("rb") as handle:
         content=handle.read(limit+1)
@@ -101,7 +102,7 @@ def run_extraction(data, kind, timeout, *, include_artifacts=False):
         completed = subprocess.run(
             [sys.executable, "-m", "peekaplate_processing.run_pipeline",
              "--input", str(source), "--run-dir", str(root / "result"),
-             "--input-mode", "ocr_image", "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache"],
+             "--input-mode", "vision_v4", "--batch-pages", "1", "--llm-concurrency", "2", "--no-llm-cache"],
             cwd=root, env=env, timeout=timeout, check=False,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
@@ -112,8 +113,21 @@ def run_extraction(data, kind, timeout, *, include_artifacts=False):
             raise subprocess.CalledProcessError(completed.returncode,"extraction")
         if not include_artifacts:
             return report
-        return {"schema_version":1,"report":report,
-                "review_suggestions":read_result(root/"result/review-suggestions.json",8_000_000),
+        mode = report.get("configuration", {}).get("input_mode")
+        if mode == "vision_v4":
+            source_id = report.get("source", {}).get("source_id", "")
+            status = report.get("status", "failed")
+            suggestions = {
+                "schema_version": 1,
+                "source_id": source_id,
+                "input_mode": "ocr_image",
+                "status": status,
+                "suggestions": [],
+            }
+        else:
+            suggestions = read_result(root / "result/review-suggestions.json", 8_000_000)
+        return {"schema_version": 1, "report": report,
+                "review_suggestions":suggestions,
                 "timings":read_result(root/"result/timings.json",1_000_000)}
 
 
@@ -162,11 +176,11 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
         try:
             # Run blocking SDK/process work off the event loop so health stays responsive.
             from starlette.concurrency import run_in_threadpool
-            return await run_in_threadpool(process, job, capability, artifact_version=="1")
+            return await run_in_threadpool(process, job, capability, artifact_version)
         finally:
             slot.release()
 
-    def process(job, capability, include_artifacts):
+    def process(job, capability, artifact_version):
         try:
             data = source_reader(job, capability)
             if data is None or not 0 < len(data) <= MAX_SOURCE_BYTES:
@@ -179,7 +193,7 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
                 return reply({"error": "unsupported_source"}, 422)
             if kind != ("pdf" if job.source_type == "pdf" else "image"):
                 return reply({"error": "source_kind_mismatch"}, 422)
-            result=runner(data,kind,JOB_TIMEOUT_SECONDS,include_artifacts=True) if include_artifacts and runner is run_extraction else runner(data,kind,JOB_TIMEOUT_SECONDS)
+            result=runner(data,kind,JOB_TIMEOUT_SECONDS,include_artifacts=True) if artifact_version and runner is run_extraction else runner(data,kind,JOB_TIMEOUT_SECONDS)
             bundle=result if isinstance(result,dict) and "report" in result else None
             report = MenuExtractionResult.model_validate(bundle["report"] if bundle else result)
             if (not report.source or report.source.sha256 != job.source_hash
@@ -190,24 +204,63 @@ def create_app(settings=None, *, source_reader=None, runner=run_extraction):
             encoded = report.model_dump(mode="json")
             if len(json.dumps(encoded).encode("utf-8")) > MAX_REPORT_BYTES:
                 return reply({"error": "report_too_large"}, 502)
-            if include_artifacts:
-                if not bundle or set(bundle)!={"schema_version","report","review_suggestions","timings"} or type(bundle["schema_version"]) is not int or bundle["schema_version"]!=1:
-                    raise ValueError("Missing private artifact bundle.")
-                private,timings=bundle["review_suggestions"],bundle["timings"]
-                if (not isinstance(private,dict) or not isinstance(timings,dict)
-                        or type(private.get("schema_version")) is not int or private["schema_version"]!=1
-                        or private.get("source_id")!=report.source.source_id or private.get("input_mode")!="ocr_image"
-                        or private.get("status") not in {"complete","incomplete","failed"}
-                        or not isinstance(private.get("suggestions"),list)
-                        or any(not isinstance(item,dict) or item.get("status")!="unvalidated" for item in private["suggestions"])
-                        or type(timings.get("schema_version")) is not int or timings["schema_version"]!=1
-                        or timings.get("input_mode")!="ocr_image" or timings.get("status")!=report.status
-                        or not isinstance(timings.get("timings_seconds"),dict)):
-                    raise ValueError("Invalid private artifact scope or version.")
-                bundle={**bundle,"report":encoded}
-                if len(json.dumps(bundle).encode("utf-8"))>MAX_BUNDLE_BYTES:
-                    return reply({"error":"bundle_too_large"},502)
-                return reply(bundle,**{"X-Extraction-Artifact-Bundle":"1"})
+            if artifact_version:
+                if not bundle or type(bundle.get("schema_version")) is not int or bundle["schema_version"] != 1:
+                    raise ValueError("Missing or invalid private artifact bundle.")
+                if set(bundle) != {"schema_version", "report", "review_suggestions", "timings"}:
+                    raise ValueError("Invalid private artifact keys.")
+                private, timings = bundle["review_suggestions"], bundle["timings"]
+                if (not isinstance(timings, dict)
+                        or type(timings.get("schema_version")) is not int
+                        or timings["schema_version"] != 1
+                        or timings.get("status") != report.status
+                        or not isinstance(timings.get("timings_seconds"), dict)):
+                    raise ValueError("Invalid timings.")
+                config = encoded.setdefault("configuration", {})
+                mode = config.get("input_mode")
+                extraction_mode = config.get("extraction_mode")
+                if mode == "vision_v4" or extraction_mode == "vision_v4":
+                    if timings.get("input_mode") not in {"ocr_image", "vision_v4"}:
+                        raise ValueError("Invalid direct vision timings input mode.")
+                    timings["input_mode"] = "ocr_image"
+                    if (not isinstance(private, dict)
+                            or type(private.get("schema_version")) is not int
+                            or private["schema_version"] != 1
+                            or private.get("source_id") != report.source.source_id
+                            or private.get("input_mode") not in {"ocr_image", "vision_v4"}
+                            or private.get("status") not in {"complete", "incomplete", "failed"}
+                            or private.get("status") != report.status
+                            or not isinstance(private.get("suggestions"), list)
+                            or len(private["suggestions"]) != 0):
+                        raise ValueError("Invalid direct vision review suggestions.")
+                    private["input_mode"] = "ocr_image"
+                    config["extraction_mode"] = "vision_v4"
+                    config["input_mode"] = "ocr_image"
+                elif mode == "ocr_image":
+                    if config.get("extraction_mode") == "vision_v4":
+                        raise ValueError("OCR report cannot claim direct vision extraction_mode.")
+                    if timings.get("input_mode") != "ocr_image":
+                        raise ValueError("Invalid OCR timings input mode.")
+                    if (not isinstance(private, dict)
+                            or type(private.get("schema_version")) is not int
+                            or private["schema_version"] != 1
+                            or private.get("source_id") != report.source.source_id
+                            or private.get("input_mode") != "ocr_image"
+                            or private.get("status") not in {"complete", "incomplete", "failed"}
+                            or not isinstance(private.get("suggestions"), list)
+                            or any(not isinstance(item, dict) or item.get("status") != "unvalidated" for item in private["suggestions"])):
+                        raise ValueError("Invalid OCR review suggestions.")
+                else:
+                    raise ValueError("Invalid input mode for private artifact bundle.")
+                bundle = {
+                    "schema_version": 1,
+                    "report": encoded,
+                    "review_suggestions": private,
+                    "timings": timings,
+                }
+                if len(json.dumps(bundle).encode("utf-8")) > MAX_BUNDLE_BYTES:
+                    return reply({"error": "bundle_too_large"}, 502)
+                return reply(bundle, **{"X-Extraction-Artifact-Bundle": "1"})
             return reply(encoded)
         except subprocess.TimeoutExpired:
             return reply({"error": "extraction_timeout"}, 504)

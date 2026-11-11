@@ -73,8 +73,10 @@ beforeEach(() => {
   observers.length = 0;
   vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
   vi.stubGlobal('window', {
-    location: { search: '?scenario=demo' },
+    location: { search: '?scenario=demo', hash: '' },
     scrollTo: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
     get scrollY() {
       return 0;
     },
