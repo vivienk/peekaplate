@@ -332,6 +332,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/evaluation.test.ts",
         "scripts/evaluate-owner-ai.mjs",
         "scripts/evaluate-owner-ai.test.mjs",
+        "scripts/probe-owner-ai-luna.mjs",
+        "scripts/probe-owner-ai-luna.test.mjs",
         "backend/src/bundle-producer/ids.ts",
         "backend/src/bundle-producer/price.ts",
         "backend/src/bundle-producer/produce.ts",
@@ -359,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "562cc31e116c1071db89f3f1df6ca7a4d7ea5c2c268fbd7cffb67e4def62b32c"
+      "sourceFingerprint": "9dd7626e38f005b831afd5a94328ef0263b563377b9116e9f0b46553da701f5f"
     },
     {
       "id": "database",
@@ -487,7 +489,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "046be3b9ec70540e95b2849b43cef8e46a122e5970ddc4d552547c19d2128011"
+      "sourceFingerprint": "3155336db55546325dcaebc54bb40319f0e06e9b97f584a0d7c485d668a2a1a1"
     },
     {
       "id": "agents",
