@@ -161,6 +161,20 @@ body:has(.owner-root) {
   align-items: center;
   gap: var(--pp-space-12);
 }
+/* S6-FE-14: pages that open only after publication stay visible but locked. */
+.owner-nav__item[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+.owner-nav__item[aria-disabled="true"]:hover {
+  background: transparent;
+}
+.owner-nav-hint {
+  margin: var(--pp-space-12) 0 0;
+  padding: 0 14px;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
 
 /* Main column */
 .owner-main {
@@ -341,6 +355,7 @@ body:has(.owner-root) {
   min-height: var(--pp-space-24);
 }
 .owner-step__number {
+  white-space: nowrap;
   color: var(--pp-role-on-surface-variant);
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
@@ -354,6 +369,53 @@ body:has(.owner-root) {
 .owner-step__action {
   display: flex;
   justify-content: flex-end;
+}
+.owner-step__locked {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  min-height: 48px; /* same height as the step buttons, so cards stay aligned */
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+/* S6-FE-14 success pop-up (replaces the old S11 confirmation screen) */
+.owner-dialog {
+  width: min(440px, calc(100vw - 2 * var(--pp-space-16)));
+  padding: var(--pp-space-32);
+  border: 1px solid var(--pp-role-outline-variant);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  box-shadow: var(--owner-pending-shadow-card);
+  text-align: center;
+}
+.owner-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-16);
+}
+.owner-dialog::backdrop {
+  background: rgba(28, 26, 23, 0.4); /* no scrim token yet */
+}
+.owner-dialog h2 {
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+  font-weight: var(--pp-font-weight-bold);
+}
+.owner-dialog p {
+  color: var(--pp-role-on-surface-variant);
+}
+.owner-dialog__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-48);
+  height: var(--pp-space-48);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-success-50);
 }
 
 /* Verified vs published, and the empty state */

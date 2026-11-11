@@ -1,10 +1,19 @@
-// S12 first dashboard arrival (Figma "Owner / 12 First-time Dashboard New", node 2346:6206).
-// Shown before full dashboard access: setup progress, the next action, the three setup steps,
-// verified-vs-published status and an honest empty state. It never shows metrics.
+// S12 first dashboard arrival (Figma "Owner / 12 First-time Dashboard New", node 2346:6206) and
+// S6-FE-14 onboarding. Shown until publication is confirmed: setup progress, the next action, the
+// three setup steps, verified-vs-published status and an honest empty state. It never shows
+// metrics. The sidebar stays locked and the AI panel stays off (no API calls) until publication.
 import { Button } from '../ui';
 import { Icon, type IconName } from './icons';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
-import { type OwnerSetup, type StepId, setupProgress, setupSteps, type Tone } from './setup';
+import { PublishSuccessDialog } from './PublishSuccessDialog';
+import {
+  availablePages,
+  type OwnerSetup,
+  type StepId,
+  setupProgress,
+  setupSteps,
+  type Tone,
+} from './setup';
 
 function StatusLabel({
   text,
@@ -30,12 +39,24 @@ export interface FirstDashboardProps {
   onNavigate: (page: OwnerPage) => void;
   /** True only on labelled previews with fictional data. */
   sample?: boolean;
+  /** True right after the API confirmed publication: shows the success pop-up. */
+  showPublishSuccess?: boolean;
+  /** Closes the success pop-up and returns to the dashboard. */
+  onClosePublishSuccess?: () => void;
 }
 
-export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstDashboardProps) {
+export function FirstDashboard({
+  setup,
+  onOpenStep,
+  onNavigate,
+  sample,
+  showPublishSuccess,
+  onClosePublishSuccess,
+}: FirstDashboardProps) {
   const steps = setupSteps(setup);
   const progress = setupProgress(setup);
   const percent = Math.round((progress.done / progress.total) * 100);
+  const onboarding = !setup.published;
 
   const topbar = (
     <>
@@ -67,12 +88,13 @@ export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstD
           )}
         </div>
       </div>
-      <div className="owner-ai__body">
+      {/* Onboarding: fixed text only. This panel makes no API calls until publication. */}
+      <div className="owner-ai__body" data-ai-state={onboarding ? 'onboarding' : 'empty'}>
         <p className="owner-muted">
           Ask about dish activity or your reports. Answers use only the records shown on these
           pages.
         </p>
-        <h3>No questions yet</h3>
+        <h3>{onboarding ? 'AI turns on after you publish' : 'No questions yet'}</h3>
         <p className="owner-muted" id="owner-ai-empty">
           There are no reports or dish activity to ask about yet. Once your menu is published and
           diners start using PeekaPlate, you can ask questions here.
@@ -98,19 +120,25 @@ export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstD
 
   return (
     <OwnerShell
+      venueId={setup.venueId}
       restaurantName={setup.restaurantName}
       current="setup"
       onNavigate={onNavigate}
+      available={availablePages(setup)}
       setupIncomplete={progress.next !== null}
       topbar={topbar}
       aside={aside}
     >
       <div className="owner-welcome">
         <h1>Welcome to PeekaPlate</h1>
-        <p>
-          Finish setting up {setup.restaurantName}. Nothing is shown to diners until you review it
-          and choose to publish.
-        </p>
+        {onboarding ? (
+          <p>
+            Finish setting up {setup.restaurantName}. Nothing is shown to diners until you review it
+            and choose to publish.
+          </p>
+        ) : (
+          <p>{setup.restaurantName} is published. Your dashboard pages are now open.</p>
+        )}
       </div>
 
       <section className="owner-card owner-progress" aria-labelledby="owner-progress-title">
@@ -175,16 +203,24 @@ export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstD
               <p>{step.description}</p>
             </div>
             <div className="owner-step__action">
-              <Button
-                variant="outline"
-                className="owner-button"
-                disabled={step.action.disabled}
-                onClick={() => onOpenStep(step.id)}
-                aria-label={`${step.action.label}: ${step.title}`}
-              >
-                <Icon name="edit" size={22} />
-                {step.action.label}
-              </Button>
+              {step.action ? (
+                <Button
+                  variant="outline"
+                  className="owner-button"
+                  onClick={() => onOpenStep(step.id)}
+                  aria-label={`${step.action.label}: ${step.title}`}
+                >
+                  <Icon name="edit" size={22} />
+                  {step.action.label}
+                </Button>
+              ) : (
+                step.lockedReason && (
+                  <p className="owner-step__locked">
+                    <Icon name="lock" size={16} />
+                    {step.lockedReason}
+                  </p>
+                )
+              )}
             </div>
           </li>
         ))}
@@ -194,15 +230,20 @@ export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstD
         <section className="owner-card owner-verify" aria-labelledby="owner-verify-title">
           <h2 id="owner-verify-title">Verified is not the same as published</h2>
           <div className="owner-verify__row">
-            {setup.detailsVerified ? (
+            {setup.detailsStatus === 'verified' ? (
               <StatusLabel text="Verified" tone="success" />
             ) : (
-              <StatusLabel text="Not verified" tone="warning" />
+              <StatusLabel
+                text={setup.detailsStatus === 'submitted' ? 'Waiting' : 'Not verified'}
+                tone="warning"
+              />
             )}
             <p>
-              {setup.detailsVerified
+              {setup.detailsStatus === 'verified'
                 ? "We've checked your restaurant details. This does not make anything visible to diners."
-                : 'We check your restaurant details before anything is shown to diners.'}
+                : setup.detailsStatus === 'submitted'
+                  ? "We've received your restaurant details and are checking them."
+                  : 'We check your restaurant details before anything is shown to diners.'}
             </p>
           </div>
           <div className="owner-verify__row">
@@ -229,6 +270,12 @@ export function FirstDashboard({ setup, onOpenStep, onNavigate, sample }: FirstD
           </p>
         </section>
       </div>
+      {showPublishSuccess && setup.published && onClosePublishSuccess && (
+        <PublishSuccessDialog
+          restaurantName={setup.restaurantName}
+          onClose={onClosePublishSuccess}
+        />
+      )}
     </OwnerShell>
   );
 }

@@ -1,23 +1,36 @@
-// S4-FE-03 first dashboard arrival (Figma "Owner / 12 First-time Dashboard New", node 2346:6206).
+// Owner onboarding rules (S4-FE-03 first dashboard, S6-FE-14 onboarding and published-state
+// navigation; Figma "Owner / 12 First-time Dashboard New", node 2346:6206).
 // Pure setup-state rules, so every label on the screen comes from the restaurant's real setup
-// facts and nothing is invented. The live API (RES-03) supplies OwnerSetup; this file has no I/O.
+// facts and nothing is invented. The owner API supplies OwnerSetup; this file has no I/O.
 
 export type StepId = 'details' | 'menu' | 'publish';
 
+/** Pages of the owner workspace (the sidebar). */
+export type OwnerPage = 'setup' | 'overview' | 'report' | 'performance' | 'menu' | 'actions';
+
+/**
+ * Where the S05 restaurant details are:
+ * - missing: the owner has not sent them yet;
+ * - submitted: sent, waiting for the PeekaPlate team to check them;
+ * - verified: checked by the team (this never makes anything visible to diners).
+ */
+export type DetailsStatus = 'missing' | 'submitted' | 'verified';
+
 /** Facts about one restaurant's onboarding, as persisted by the owner API. */
 export interface OwnerSetup {
+  /** The venue these facts belong to; every owner API call is scoped to it. */
+  venueId: string;
   restaurantName: string;
-  /** S05 restaurant details were checked by the PeekaPlate team. */
-  detailsVerified: boolean;
+  detailsStatus: DetailsStatus;
   /** At least one dish was saved through S06–S10. */
   menuAdded: boolean;
-  /** The owner chose to publish the menu to diners. */
+  /** Publication of the menu to diners was confirmed by the API (Step 3). */
   published: boolean;
   /** Label of the latest report period, only when a report exists (never a placeholder). */
   reportPeriod?: string | null;
 }
 
-export type StepState = 'done' | 'current' | 'locked';
+export type StepState = 'done' | 'waiting' | 'current' | 'locked';
 export type Tone = 'success' | 'warning';
 
 export interface StepView {
@@ -28,8 +41,13 @@ export interface StepView {
   state: StepState;
   /** Status pill shown on the card, or null when the step has nothing to report yet. */
   status: { text: string; tone: Tone } | null;
-  /** Button on the card: edit a finished step, start an open one, or wait for a locked one. */
-  action: { label: string; disabled: boolean };
+  /**
+   * Button on the card, or null when the owner may not act on the step. Finished steps only offer
+   * Edit where editing is allowed; a locked step has no button, so there is no early publish control.
+   */
+  action: { label: 'Start' | 'Edit'; disabled: false } | null;
+  /** Why a locked step is locked (shown instead of a button). */
+  lockedReason: string | null;
 }
 
 const STEP_TEXT: Record<StepId, { title: string; description: string; startLabel: string }> = {
@@ -47,26 +65,55 @@ const STEP_TEXT: Record<StepId, { title: string; description: string; startLabel
   },
   publish: {
     title: 'Review and publish',
-    description: 'Available after your menu is added. Nothing is published unless you choose to.',
+    description:
+      'Available after your details are verified and your menu is added. Nothing is published unless you choose to.',
     startLabel: 'Review and publish',
   },
 };
 
 const ORDER: StepId[] = ['details', 'menu', 'publish'];
 
+export function isVerified(setup: OwnerSetup): boolean {
+  return setup.detailsStatus === 'verified';
+}
+
+/** Publishing opens only when the team verified the details and at least one dish exists. */
+export function canPublish(setup: OwnerSetup): boolean {
+  return isVerified(setup) && setup.menuAdded && !setup.published;
+}
+
 function stateOf(id: StepId, setup: OwnerSetup): StepState {
-  if (id === 'details') return setup.detailsVerified ? 'done' : 'current';
+  if (id === 'details') {
+    if (setup.detailsStatus === 'verified') return 'done';
+    return setup.detailsStatus === 'submitted' ? 'waiting' : 'current';
+  }
   if (id === 'menu') return setup.menuAdded ? 'done' : 'current';
   if (setup.published) return 'done';
-  return setup.menuAdded ? 'current' : 'locked';
+  return canPublish(setup) ? 'current' : 'locked';
 }
 
 function statusOf(id: StepId, state: StepState): StepView['status'] {
+  if (state === 'waiting') return { text: 'Waiting for verification', tone: 'warning' };
   if (id === 'details' && state === 'done') return { text: 'Verified', tone: 'success' };
   if (id === 'menu' && state === 'done') return { text: 'Added', tone: 'success' };
   if (id === 'publish' && state === 'done') return { text: 'Published', tone: 'success' };
   if (id === 'publish' && state === 'current') return { text: 'Not published', tone: 'warning' };
   return null;
+}
+
+function lockedReasonOf(setup: OwnerSetup): string {
+  if (!isVerified(setup) && !setup.menuAdded)
+    return 'Opens after your details are verified and your menu is added.';
+  if (!isVerified(setup)) return 'Opens after we verify your restaurant details.';
+  return 'Opens after you add your menu.';
+}
+
+function actionOf(id: StepId, state: StepState): StepView['action'] {
+  if (state === 'locked') return null;
+  // Publishing cannot be edited from here; the published menu is changed through the Menu page.
+  if (id === 'publish' && state === 'done') return null;
+  if (state === 'done' || state === 'waiting') return { label: 'Edit', disabled: false };
+  return { label: 'Start', disabled: false };
 }
 
 export function setupSteps(setup: OwnerSetup): StepView[] {
@@ -80,10 +127,8 @@ export function setupSteps(setup: OwnerSetup): StepView[] {
       description: text.description,
       state,
       status: statusOf(id, state),
-      action:
-        state === 'done'
-          ? { label: 'Edit', disabled: false }
-          : { label: 'Start', disabled: state === 'locked' },
+      action: actionOf(id, state),
+      lockedReason: state === 'locked' ? lockedReasonOf(setup) : null,
     };
   });
 }
@@ -91,9 +136,9 @@ export function setupSteps(setup: OwnerSetup): StepView[] {
 export interface SetupProgress {
   done: number;
   total: number;
-  /** The first open step the owner can act on now, or null when setup is finished. */
+  /** The first open step the owner can act on now, or null when nothing is open. */
   next: { id: StepId; label: string } | null;
-  /** A finished step the owner may want to return to (Figma: "Review restaurant details"). */
+  /** Details the owner may want to return to (Figma: "Review restaurant details"). */
   review: { id: StepId; label: string } | null;
 }
 
@@ -104,11 +149,31 @@ export function setupProgress(setup: OwnerSetup): SetupProgress {
     done: steps.filter((step) => step.state === 'done').length,
     total: steps.length,
     next: nextStep ? { id: nextStep.id, label: STEP_TEXT[nextStep.id].startLabel } : null,
-    review: setup.detailsVerified ? { id: 'details', label: 'Review restaurant details' } : null,
+    review:
+      setup.detailsStatus === 'missing'
+        ? null
+        : { id: 'details', label: 'Review restaurant details' },
   };
 }
 
-/** The first-time arrival is shown until the menu is published. */
+/** The first-time arrival (onboarding) lasts until publication is confirmed. */
 export function isFirstTimeArrival(setup: OwnerSetup): boolean {
   return !setup.published;
+}
+
+const ALL_PAGES: readonly OwnerPage[] = [
+  'setup',
+  'overview',
+  'report',
+  'performance',
+  'menu',
+  'actions',
+];
+
+/**
+ * Sidebar pages the owner may open. Before Step 3 publication only Restaurant Setup is open; the
+ * restricted pages unlock only after the API confirms publication.
+ */
+export function availablePages(setup: OwnerSetup): ReadonlySet<OwnerPage> {
+  return new Set(setup.published ? ALL_PAGES : (['setup'] as const));
 }
