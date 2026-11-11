@@ -81,6 +81,7 @@ test('active withdrawal preserves browsing but stops both destinations', async (
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
   await page.evaluate(async () => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    // Record event types: the real screen also sends its own dish_viewed events.
     const sent: string[] = [];
     const captured: string[] = [];
     Object.assign(window, { reviewSent: sent, reviewCaptured: captured });
@@ -88,18 +89,23 @@ test('active withdrawal preserves browsing but stops both destinations', async (
       capturePostHog: (type: string) => captured.push(type),
       setConsent: () => {},
     });
-    tracking.enableLiveTracking(async (batch: { event_id: string }[]) => {
-      sent.push(...batch.map((e) => e.event_id));
+    tracking.enableLiveTracking(async (batch: { event_id: string; type: string }[]) => {
+      sent.push(...batch.map((e) => e.type));
       return batch.map((e) => e.event_id);
     });
     tracking.setTrackingAllowed(true);
   });
+  const countOf = (type: string) =>
+    page.evaluate(
+      (type) => (window as any).reviewSent.filter((t: string) => t === type).length,
+      type,
+    );
   await page.evaluate(async (publicationId) => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
     tracking.track('menu_viewed', { publication_revision_id: publicationId, entry_source: 'qr' });
   }, publication);
   await page.clock.runFor(6000);
-  await expect.poll(() => page.evaluate(() => (window as any).reviewSent.length)).toBe(1);
+  await expect.poll(() => countOf('menu_viewed')).toBe(1);
   state.kind = 'withdrawn';
   await page.clock.fastForward(25 * 60_000 + 1000);
   await expect
@@ -109,16 +115,21 @@ test('active withdrawal preserves browsing but stops both destinations', async (
       ),
     )
     .toBe(false);
+  // Whatever was delivered before withdrawal; nothing of any type may follow it.
+  const sentAtWithdrawal = await page.evaluate(() => (window as any).reviewSent.length);
+  const capturedAtWithdrawal = await page.evaluate(() => (window as any).reviewCaptured.length);
   await page.evaluate(async (publicationId) => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
     tracking.track('menu_viewed', { publication_revision_id: publicationId, entry_source: 'qr' });
   }, publication);
   await page.clock.runFor(6000);
   const recorded = await page.evaluate(() => ({
-    sent: (window as any).reviewSent,
-    captured: (window as any).reviewCaptured,
+    sent: (window as any).reviewSent as string[],
+    captured: (window as any).reviewCaptured as string[],
   }));
-  expect(recorded.sent).toHaveLength(1);
-  expect(recorded.captured).toEqual(['menu_viewed']);
+  expect(recorded.sent.filter((type) => type === 'menu_viewed')).toHaveLength(1);
+  expect(recorded.captured.filter((type) => type === 'menu_viewed')).toHaveLength(1);
+  expect(recorded.sent).toHaveLength(sentAtWithdrawal);
+  expect(recorded.captured).toHaveLength(capturedAtWithdrawal);
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
 });
