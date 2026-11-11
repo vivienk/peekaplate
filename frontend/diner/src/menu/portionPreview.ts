@@ -1,4 +1,5 @@
 import { PublicPortionSchema } from '@peekaplate/contracts';
+import { createPortionMotion } from './portionMotion';
 import type { PortionRenderer } from './portionRenderer';
 import type { CompleteDish } from './types';
 
@@ -26,10 +27,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let attempt: AbortController | undefined;
   let renderer: PortionRenderer | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let x = 0;
-  let y = 0;
+  const motion = createPortionMotion();
+  let drag: { id: number; x: number; y: number } | undefined;
   const stop = () => {
     clearTimeout(timer);
+    motion.key('Home');
+    drag = undefined;
     attempt?.abort();
     renderer?.dispose();
     renderer = undefined;
@@ -162,32 +165,55 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       return;
     }
     if (event.target !== stage || reduced.matches || !renderer) return;
-    const delta = (
-      {
-        ArrowLeft: [-0.25, 0],
-        ArrowRight: [0.25, 0],
-        ArrowUp: [0, -0.25],
-        ArrowDown: [0, 0.25],
-        Home: [-x, -y],
-      } as Record<string, number[]>
-    )[event.key];
-    if (!delta) return;
+    const next = motion.key(event.key);
+    if (!next) return;
     event.preventDefault();
-    x = Math.max(-1, Math.min(1, x + (delta[0] ?? 0)));
-    y = Math.max(-1, Math.min(1, y + (delta[1] ?? 0)));
-    renderer.update(x, y);
+    renderer.update(next.x, next.y, 150);
+  };
+  const pointerdown = (event: PointerEvent) => {
+    if (active && renderer && !reduced.matches && event.pointerType !== 'mouse') {
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    }
   };
   const pointer = (event: PointerEvent) => {
-    if (!active || !renderer || reduced.matches || !event.buttons) return;
+    if (!active || !renderer || reduced.matches) return;
     const bounds = stage.getBoundingClientRect();
-    x = Math.max(-1, Math.min(1, ((event.clientX - bounds.left) / bounds.width) * 2 - 1));
-    y = Math.max(-1, Math.min(1, ((event.clientY - bounds.top) / bounds.height) * 2 - 1));
-    renderer.update(x, y);
+    if (!bounds.width || !bounds.height) return;
+    let x: number;
+    let y: number;
+    if (event.pointerType === 'mouse') {
+      x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+      y = ((event.clientY - bounds.top) / bounds.height) * 2 - 1;
+    } else {
+      if (!drag || drag.id !== event.pointerId) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      // PR25 touch behavior: horizontal drag tilts; vertical gestures keep native scrolling.
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+        reset();
+        return;
+      }
+      x = dx / (bounds.width * 0.35);
+      y = 0;
+    }
+    const next = motion.pointer(x, y);
+    renderer.update(next.x, next.y, 55);
   };
   const reset = () => {
-    x = 0;
-    y = 0;
-    renderer?.update(0, 0);
+    motion.key('Home');
+    drag = undefined;
+    renderer?.update(0, 0, reduced.matches ? 0 : 300);
+  };
+  const motionChanged = () => {
+    reset();
+    if (active && root.dataset.portionState === 'ready') {
+      status.textContent = reduced.matches
+        ? '2.5D preview. Motion is reduced.'
+        : 'Drag to tilt the plate';
+    }
+  };
+  const pointerup = (event: PointerEvent) => {
+    if (drag?.id === event.pointerId) reset();
   };
   const retryPreview = () => {
     const photo = dish.images?.detail ?? dish.images?.card;
@@ -222,11 +248,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   back.addEventListener('click', backClick, true);
   window.addEventListener('popstate', pop);
   document.addEventListener('keydown', keydown);
+  stage.addEventListener('pointerdown', pointerdown);
   stage.addEventListener('pointermove', pointer);
-  stage.addEventListener('pointerup', reset);
+  window.addEventListener('pointerup', pointerup);
+  stage.addEventListener('blur', reset);
   stage.addEventListener('pointercancel', reset);
   stage.addEventListener('pointerleave', reset);
-  reduced.addEventListener('change', reset);
+  reduced.addEventListener('change', motionChanged);
   return () => {
     disposed = true;
     stop();
@@ -237,11 +265,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     back.removeEventListener('click', backClick, true);
     window.removeEventListener('popstate', pop);
     document.removeEventListener('keydown', keydown);
+    stage.removeEventListener('pointerdown', pointerdown);
     stage.removeEventListener('pointermove', pointer);
-    stage.removeEventListener('pointerup', reset);
+    window.removeEventListener('pointerup', pointerup);
+    stage.removeEventListener('blur', reset);
     stage.removeEventListener('pointercancel', reset);
     stage.removeEventListener('pointerleave', reset);
-    reduced.removeEventListener('change', reset);
+    reduced.removeEventListener('change', motionChanged);
     if (history.state?.ppPortion === key) {
       const { ppPortion: _retired, ...rest } = history.state;
       history.replaceState(rest, '');

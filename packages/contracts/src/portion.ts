@@ -9,6 +9,12 @@ export const PublicPortionSchema = z
     dish_revision_id: z.uuid(),
     width: z.number().int().positive().max(2048),
     height: z.number().int().positive().max(2048),
+    motion: z
+      .strictObject({
+        max_yaw_degrees: z.number().min(0).max(3),
+        max_pitch_degrees: z.number().min(0).max(3),
+      })
+      .optional(),
     layers: z
       .array(
         z.strictObject({

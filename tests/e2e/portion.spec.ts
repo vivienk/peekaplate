@@ -271,3 +271,73 @@ test('local captured-dish demo loads real textures and tilts without route mocks
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
 });
+
+for (const state of ['loading', 'ready', 'fallback', 'failed'] as const) {
+  test(`Figma ${state} state uses exported artwork and preserves Back`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`http://127.0.0.1:5173/?scenario=portion-demo&previewState=${state}`);
+    await openPortion(page);
+    await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', state);
+    const art =
+      state === 'ready'
+        ? page.locator('.pp-portion__status')
+        : page.locator('.pp-detail__image-wrap');
+    if (state !== 'fallback') {
+      const style = await art.evaluate(
+        (el, pseudo) => {
+          const css = getComputedStyle(el, pseudo);
+          return { image: css.backgroundImage, width: css.width, height: css.height };
+        },
+        state === 'ready' ? '::before' : '::after',
+      );
+      expect(style.image).toMatch(/image\/svg\+xml|\.svg/);
+      expect(style.width).toBe(state === 'ready' ? '46px' : state === 'loading' ? '64px' : '150px');
+      expect(style.height).toBe(style.width);
+    }
+    await page.screenshot({ path: `test-results/figma-portion-${state}.png` });
+    if (state === 'failed') {
+      const length = await page.evaluate(() => history.length);
+      await page.getByRole('button', { name: 'Try again', exact: true }).click();
+      await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'failed');
+      expect(await page.evaluate(() => history.length)).toBe(length);
+    }
+    await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
+  });
+}
+
+test('PR25 transient layer failure retries once and recovers', async ({ page }) => {
+  await openMenu(page);
+  let attempts = 0;
+  await page.route('https://assets.example.test/**/1.png', (route) => {
+    attempts++;
+    return attempts === 1
+      ? route.fulfill({ status: 503 })
+      : route.fulfill({
+          contentType: 'image/png',
+          body: images[1]!,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        });
+  });
+  await openPortion(page);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  expect(attempts).toBe(2);
+});
+
+test('live reduced-motion preference immediately centers and updates instructions', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await openPortion(page);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  const stage = page.getByRole('group', { name: 'Charred Leeks portion preview' });
+  await stage.focus();
+  await stage.press('ArrowRight');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.pp-portion__status')).toContainText('Motion is reduced');
+  const still = hash(await page.locator('canvas').screenshot());
+  await stage.press('ArrowRight');
+  expect(hash(await page.locator('canvas').screenshot())).toBe(still);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
+});

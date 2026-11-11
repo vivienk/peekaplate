@@ -60,7 +60,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "bfffe7a1423bb048ff1e3a01cfcf972d8048200b9fdbd48231710e5407042837"
+      "sourceFingerprint": "c596f230dfb82225605d149350fc15c2b504d2d1735027fd10cc1657d146b7b1"
     },
     {
       "id": "tokens",
@@ -189,6 +189,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionPreview.ts",
         "frontend/diner/src/menu/portionRenderer.ts",
         "frontend/diner/src/menu/portionDemo.ts",
+        "frontend/diner/src/menu/portionMotion.ts",
+        "frontend/diner/src/menu/portionMotion.test.ts",
+        "frontend/diner/src/menu/preview-assets/back.svg",
+        "frontend/diner/src/menu/preview-assets/hand-touch.svg",
+        "frontend/diner/src/menu/preview-assets/loading.svg",
+        "frontend/diner/src/menu/preview-assets/image-not-found.svg",
         "frontend/diner/src/menu/portion.test.ts",
         "tests/e2e/portion.spec.ts",
         "playwright.portion.config.ts",
@@ -201,7 +207,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "fae9ceb3d0127b9a8719f6a757ea37928ade1eba3e3eebcd9952882e5ff5ae26"
+      "sourceFingerprint": "31d4be4461d8b1cc1ba9932bf0b3cf9edb437e3f763d9dd699cd39f0f15bc0b5"
     },
     {
       "id": "console",
@@ -344,7 +350,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c12e0afddb4eecb9c3089dfb0a101f046094fa3e565e174da49a4ac4614e71a9"
+      "sourceFingerprint": "396322b96ea24f5f42865a5db96de84550a0523a1ed6d6861729a887ea1a8a0d"
     },
     {
       "id": "database",
@@ -462,7 +468,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e5575f6140bdf10b839c347874346d598150917ba20442c4bdb5380b66cfd2b1"
+      "sourceFingerprint": "7a6aa9b60ccf154f4e0a7bac8740c00e5ba4781f70b46c913ef58b4df2255c4b"
     },
     {
       "id": "agents",
@@ -650,7 +656,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-10",
-      "summary": "View Portion reuses the diner detail shell with Figma-aligned preview states and photo retry. DEV-only portion-demo supplies a captured-photo tilt fixture without publication activation. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
+      "summary": "View Portion implements four Figma states with exact artwork, PR25 bounded parallax/combined input, live reduced motion and one layer retry. DEV-only captured-photo scenarios demonstrate loading, ready, photo fallback and failed states without publication activation. Optional revision-bound public layers are hashed, decoded and rendered only after a tap; missing assets retain the photo and back path. No deployment or producer/publication activation. See docs/diner-portion-preview.md for verification and remaining gates.",
       "modules": [
         "diner",
         "contracts"

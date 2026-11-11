@@ -1,162 +1,111 @@
 # Diner portion preview
 
-The View Portion button now switches the existing dish-detail shell into its preview state.
-It retains the selected dish name, price, description and original photograph. Back, Escape
-and browser Back restore the same detail DOM, scroll and CTA focus; menu return retains the
-existing category/search behavior. No separate preview page or review-tool iframe is used.
+## Flow and four Figma states
 
-Reference: existing `dishDetail.ts` at develop `96b8de1`, DIN-04/DIN-04A in the
-[implementation plan](implementation_plan.md), and [ADR 0004](adr/0004-visual-tiers.md).
-That base contains a disabled View Portion action but no implemented preview screen.
-This reuses its top bar, image region, dish text and tokens. Final Figma/design acceptance
-is still required; no newly inspected Figma frame is claimed.
+View Portion switches the mounted dish-detail shell into the selected dish's preview.
+Back, Escape and browser Back restore the same detail DOM, scroll and CTA focus.
+Menu return retains category/search behavior. Dish facts remain on the restored
+detail screen; preview hides that card and keeps the dish-name header.
 
-## Asset handoff
+The supplied PeekaPlate Figma file `l7A9n8tACJic0FIhY49Zjw` was inspected in the browser:
 
-`PublicMenuCompleteDishSchema` accepts an optional `portion` described by
-`PublicPortionSchema` in `packages/contracts/src/portion.ts`. Existing photo-only bundles
-remain valid. A public portion contains schema version 1, exact dish/revision UUIDs,
-shared width/height, and two to six layer records with HTTPS URL, SHA-256, byte length
-and depth. Exactly one depth is zero, at least one is positive, all depths are 0–1.
-Texture dimensions are limited to 2048 on each axis, URLs to 2048 characters, serialized manifest bytes to 20 KB, and total
-layer bytes to 180 KB. All layers share the captured frame and must be reviewed together.
+| State | Frame | Behavior |
+| --- | --- | --- |
+| Loading | 846:7146 | Blurred, muted dish photo with exported 64px spinner and loading copy |
+| Ready | 258:6000 | Centered dish layers, exported 46px hand icon and drag hint |
+| Photo fallback | 221:260 | Original dish photo and the two-line fallback message |
+| Failed | 165:2413 | Exported 150px illustration, failure copy and Try again |
 
-The published-menu adapter copies this optional field through to the diner model. An
-identity mismatch is discarded rather than displaying another dish's assets. The renderer
-fetches only these URLs, without credentials or redirects, and checks exact byte length,
-SHA-256 and decoded dimensions before showing a canvas. Public asset hosting needs CORS.
-The eight-second attempt deadline includes dynamic import, fetch and decode. Missing assets,
-invalid identity, fetch/decode/hash/dimension failures and WebGL loss retain the dish photo;
-if the photo also fails, the dish text and back action remain usable.
+The shared Back artwork is an exact 42px SVG export. Assets and source node IDs are
+recorded in [preview-assets](../frontend/diner/src/menu/preview-assets/README.md).
+Exports are unmodified and used at their root dimensions. Inter is self-hosted under
+an alias scoped to preview, so other screens keep their existing typography.
+Web safe-area insets replace the design's native iOS status bar; fake device time and
+battery icons are not rendered. Food imagery remains selected-dish data.
 
-This is a public-delivery shape, **not** PR25's private processing manifest. Processing
-outputs remain `needs_review` and `publication.eligible=false`; no browser approval flag
-or guessed asset path converts them. The existing producer has no mapping from reviewed
-spatial layers into this optional field yet. Asset review, producer handoff, asset-manifest
-approval binding and an immutable approved publication must be completed before enabling
-real dish visuals. Do not hand-edit a live bundle or substitute generated edible surfaces.
+## PR25 logic integrated into the diner
 
-No actual-size, weight, portion-measurement or nutrition claim is added. The menu's existing
-approved description is retained; absent portion facts are not invented. No new observation
-events or changes to consent, publication refresh or other diner actions are introduced.
+[PR25](https://github.com/vivienk/peekaplate/pull/25) is merged as `95fbe1a` and already
+supplies the repository's offline processing modules. The relevant interaction logic
+from `processing/src/peekaplate_processing/harness.py` and `review_preview_html.py`
+is adapted into the diner renderer/controller, not embedded as a review-tool iframe:
 
-## Renderer and verification boundary
+- Depth-ordered layers, bounded pitch/yaw (at most ±3°), and depth-weighted 8px/4px parallax.
+- Combined pointer and keyboard contributions with immediate reversal at the clamp.
+- Mouse movement, horizontal touch drag, native vertical touch scrolling, Home reset,
+  smooth return to center and live reduced-motion changes.
+- One delayed retry for a failed layer fetch/decode before photo fallback; all work stays
+  inside the eight-second attempt deadline and is cancelled on Back/disposal.
+- Original photo retention for missing/invalid layers, failed WebGL and context loss.
+  Missing photos show the Failed screen. Try again repeats the selected dish's load,
+  including detail → card → missing-placeholder photo recovery, without pushing history.
 
-Three.js 0.183.2 is pinned and dynamically imported only after View Portion has a valid
-manifest. Its mount/update/dispose lifecycle owns one canvas, textures, materials, geometry,
-image bitmaps and observers. Drawing is event-driven, paused offscreen/in a hidden document,
-with bounded ±3° tilt, keyboard access and reduced-motion support. Photo fallback needs no
-WebGL. The initial graph budget remains 150 KB gzip; the T1 build check reserves 180 KB
-for layers and 20 KB for the manifest within the 400 KB total allowance.
+The Three.js renderer remains lazy, event-driven and bounded. It disposes its canvas,
+textures, geometry, bitmaps, observers and short animation frames. No idle animation loop.
+Photo fallback requires no WebGL. No actual-size, weight or nutrition claim is added.
 
-Run `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts`
-and `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`.
-The dedicated browser configuration runs the real diner with intercepted synthetic public
-bundles and simple geometric PNG layers, with distinct foregrounds for two dishes. These are test shapes, not restaurant captures.
-It also checks existing menu states, publication integrity and refresh behavior.
+## Asset handoff and publication boundary
 
-Physical-device performance, manual screen readers, captured-food fidelity, real approved
-asset hosting/publication and hosted end-to-end acceptance remain unverified. No deployment
-or production activation is part of this change.
+The optional public `portion` field is revision-bound and validated by
+`PublicPortionSchema`. It contains width/height, two to six HTTPS layers with exact
+byte lengths, SHA-256 and depths, and optional PR25-shaped motion limits. Existing
+photo-only menus and manifests without motion remain compatible (default ±3°).
+Exactly one layer has depth zero and at least one has positive depth. Dimensions
+are capped at 2048, combined layer bytes at 180 KB, and serialized manifest at 20 KB.
+The renderer verifies fetched lengths, hashes and decoded dimensions; it does not
+send credentials or follow redirects. Production asset hosting requires CORS.
 
+The public shape is distinct from PR25's private processing manifests. Those outputs
+remain `needs_review` and `publication.eligible=false`; they are not promoted by this
+viewer. Reviewed asset mapping, approval-bound manifests and immutable publication
+remain prerequisites for real restaurant visuals. No backend route, approval, cloud
+upload, deployment, tracking event or live-menu activation is added here.
+
+## Try all states locally
+
+Start `pnpm --filter @peekaplate/diner dev`, open one of these URLs, select the demo
+dish, then View Portion:
+
+- Ready: `http://127.0.0.1:5173/?scenario=portion-demo`
+- Loading then Ready: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=loading`
+- Photo fallback: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
+- Failed: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=failed`
+
+The loading scenario deliberately delays each local layer by three seconds; it then
+completes normally. Fallback/failed scenarios deliberately keep failing so their
+screens remain inspectable, including repeated Try again. The ready scenario is the
+working captured-photo tilt demo. These use actual state transitions, not static mockups.
+
+Demo imagery is the prior user-supplied capture/mask, not generated food. Demo menu
+facts are explicitly placeholders. Demo modules, query controls and URL substitution
+are DEV-only; production builds exclude the demo photo assets. Live-menu selection
+is unchanged. The reserved `.invalid` mapping is development-wide, not an approval gate.
 
 ## Changed files
 
-- UI and navigation: `frontend/diner/src/menu/dishDetail.ts`, `menuScreen.ts`,
-  `portionPreview.ts`, `portionRenderer.ts`, and `frontend/diner/src/style.css`.
-- Data handoff: `frontend/diner/src/menu/adapter.ts`, `published.ts`, `types.ts`, `wire.ts`,
-  `packages/contracts/src/index.ts`, and `packages/contracts/src/portion.ts`.
-- Dependencies and budget: `frontend/diner/package.json`, `pnpm-lock.yaml`,
-  `scripts/check-bundle.mjs`, and `scripts/check-bundle.test.mjs`.
-- Tests: `frontend/diner/src/menu/portion.test.ts`, `tests/e2e/portion.spec.ts`,
-  `playwright.portion.config.ts`, and the three geometric PNGs in `tests/fixtures/portion/`.
-- Handoff and verification: this document, `docs/CONTEXT.md`, and `errors.md`.
+- Flow/UI: `frontend/diner/src/menu/dishDetail.ts`, `menuScreen.ts`, `portionPreview.ts`,
+  `portionRenderer.ts`, `portionMotion.ts`, `portionDemo.ts`, `fixtures.ts`, `style.css`,
+  `preview-assets/*`, and local `fixture-assets/portion-demo/*`.
+- Data: `adapter.ts`, `published.ts`, `types.ts`, `wire.ts`,
+  `packages/contracts/src/index.ts` and `packages/contracts/src/portion.ts`.
+- Build: diner `package.json`, `pnpm-lock.yaml`, `scripts/check-bundle.mjs` and its tests.
+- Checks: `portion.test.ts`, `portionMotion.test.ts`, `tests/e2e/portion.spec.ts`,
+  `playwright.portion.config.ts`, and geometric texture fixtures.
+- Handoff: this document, `docs/CONTEXT.md`, and sanitized observations in `errors.md`.
 
-The implementation is isolated on `codex/diner-portion-integration`, based on develop
-`96b8de1d70ff599179f6eb5dbd7557a589c27a45`. Related PR25 (asset preparation), PR69
-(menu/detail), and PR136 (published-menu connection) are already merged into this base.
-Tracking PR77/80/84 were also confirmed merged; this change adds no tracking events.
+## Verification boundary
 
-Before claiming live T1 analytics, resolve the public response's existing T0 tier semantics
-and connect actual-tier exposure observations. This is separate from rendering and is not
-silently inferred from a View Portion click.
+Node 24.16.0 / pnpm 11.25.0, local isolated branch `codex/diner-portion-integration`.
+Based on develop `96b8de1`; PR25, PR69 and PR136 are already in that base.
 
+- PASS: `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts` — 213 tests.
+- PASS: `pnpm verify lint typecheck build` — all packages; Worker build is a dry-run.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` — 42 behavior/regression cases passed; three new icon assertions needed a test-only correction for Vite SVG data URLs.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts tests/e2e/portion.spec.ts --grep Figma --workers=2` — all four state checks passed after that correction. All 45 cases now have passing evidence.
+- PASS: `pnpm verify lint context:check docs:check` and `git diff --check`.
+- Inspected all four 390px screenshots: exact icon assets, geometry, copy, Back and retry placement. Dynamic captured imagery differs from the design sample by intent.
+- NOT RUN: physical phones, manual VoiceOver/TalkBack, genuine approved publication,
+  hosted asset loading, full default browser suite and database suite.
 
-## Verification record — November 10, 2026
-
-Commands used Node 24.16.0 and pnpm 11.25.0. PASS means local evidence only.
-
-| Command | Result |
-| --- | --- |
-| `pnpm exec vitest run frontend/diner/src/menu packages/contracts/src/index.test.ts` | PASS, 210 tests on final application sources |
-| `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` | PASS, 38 tests, 1.8 minutes; includes existing menu/publication regressions |
-| `pnpm exec playwright test --config playwright.portion.config.ts tests/e2e/portion.spec.ts --workers=2` | PASS, final 12 preview cases, 1.1 minutes after distinct-image/tilt assertions and manifest byte cap |
-| `pnpm check` | PASS, 1,210 unit tests plus 73 script tests, 4 optional skips on implementation commit 70913ed, before the final manifest-byte test/refinement |
-| `pnpm verify lint typecheck build context:check docs:check` | PASS on final application sources; both frontends and Worker dry-run |
-| `git diff --check` | PASS |
-| `pnpm verify test:db` | NOT RUN; no database/migration or backend behavior change |
-| Full default browser suite, physical phones and manual screen readers | NOT RUN; focused browser configuration covers the affected diner flow |
-
-The final build's budget check reports 51,945 gzip bytes for initial diner JavaScript
-(limit 150,000) and a 324,288-byte T1 delivery allowance (limit 400,000). The emitted
-renderer file is about 125 KB gzip. No renderer appears in the initial import graph.
-The 390px preview screenshot was inspected; it displays clearly synthetic geometry.
-
-Two independent automated read-only reviews of 70913ed found no supported blocking
-architecture/correctness defects. Final refinements tighten the serialized byte cap
-and add distinct-rendered-image/keyboard evidence; they do not change navigation.
-These reviews are not human approval or production acceptance. No branch push,
-PR creation, merge or deployment was performed.
-
-
-## Browser-observed Figma alignment — November 10, 2026
-
-The user requested browser inspection after the Figma connector quota was exhausted.
-Observed section 482:503 in the supplied PeekaPlate file: Ready 258:6000,
-Fallback 221:260, Failed 165:2413, Loading 846:7146.
-The preview now uses the dish-name header, 250px centered visual, hides detail cards,
-and uses the design's loading, drag, photo fallback and failed/retry copy.
-Native status-bar artwork is omitted; the web layout respects safe-area insets.
-Retry reloads the selected dish photo and attempts the renderer without pushing history.
-Keyboard controls and reduced-motion behavior remain available.
-
-Visual limitations: Figma SVG export/clipboard retrieval did not return usable files.
-The hand hint icon and failed-image illustration are therefore still absent; their space
-is retained. The loading ring uses CSS and the existing Back arrow is retained.
-This is a layout/state integration, not pixel-perfect design acceptance.
-No generated or Figma sample food replaces published dish-specific assets.
-
-Changed in this refinement: `frontend/diner/src/menu/portionPreview.ts`,
-`frontend/diner/src/style.css`, `tests/e2e/portion.spec.ts`, and this handoff/context/error ledger.
-
-Refinement checks: PASS 210 focused unit tests; PASS 38 browser tests including
-photo retry without extra history; PASS lint, typecheck and build (Worker dry-run).
-Initial JavaScript is 52,220 gzip bytes; T1 allowance remains 324,288 bytes.
-The browser screenshot was inspected at 390px. Exact exported icons and manual
-phone/screen-reader acceptance remain outstanding.
-
-Final narrow review identified a retry that skipped the smaller photo fallback.
-The correction preserves detail → card → missing-placeholder behavior, including
-late image failures after Back. PASS: targeted no-photo browser regression with
-only the card recovered; PASS final lint/typecheck/context/docs checks. The full
-12 preview cases passed immediately before this bounded retry correction.
-
-## Working local captured-dish demo
-
-Run the diner dev server and open `http://127.0.0.1:5173/?scenario=portion-demo`.
-Select **Captured dish · tilt demo**, then **View Portion**. Hold and drag on the
-photo, or focus it and use arrow keys. Reduced-motion preferences disable tilt.
-The photo and mask come from the prior user-supplied local review capture, with
-no generated food pixels. It is a shallow whole-card tilt, not reconstructed 3D.
-
-`portionDemo.ts` and its assets are imported only behind Vite DEV guards. Live
-menu selection remains unchanged. The public HTTPS contract, hash/size validation
-and asset budget remain enforced. A reserved `.invalid` fixture origin is mapped
-to local asset URLs only in development. Production builds omit the demo module
-and imagery; the demo scenario reports unavailable outside development.
-
-Demo verification: PASS 139 menu unit tests; PASS unmocked local captured-dish
-browser test (real texture loads, pointer drag changes canvas pixels, Back restores
-focus); PASS lint/typecheck/build/context/docs. Inspected the 390px screenshot.
-Production output inspection confirms no demo module, reserved URL mapping or
-photo assets. No deployment or publication performed.
+Local screenshots, synthetic bundle tests and a supplied-photo demo are not production
+acceptance. No push, PR creation, merge or deployment has been performed.

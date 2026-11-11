@@ -990,7 +990,6 @@ main:has(> .pp-detail) {
 }
 .pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
   height: 150px;
-  visibility: hidden;
   margin-top: max(48px, calc(50svh - 229px));
 }
 .pp-detail[data-portion-state="failed"] .pp-portion__status {
@@ -1027,4 +1026,59 @@ main:has(> .pp-detail) {
 }
 .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap {
   margin-top: max(48px, calc(50svh - 229px));
+}
+
+/* Exact exports from the four requested Figma frames; decorative UI artwork. */
+.pp-detail--preview .pp-detail__back {
+  font-size: 0;
+  background: url("./menu/preview-assets/back.svg") center / 42px 42px no-repeat;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status {
+  margin-top: 60px;
+}
+.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 8px;
+  background: url("./menu/preview-assets/hand-touch.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image {
+  display: none;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap::after {
+  content: "";
+  width: 150px;
+  height: 150px;
+  background: url("./menu/preview-assets/image-not-found.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image {
+  filter: grayscale(1) blur(10px);
+  opacity: 0.61;
+}
+.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
+  border: 0;
+  background: url("./menu/preview-assets/loading.svg") center no-repeat;
+}
+
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/inter/files/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/inter/files/inter-latin-600-normal.woff2") format("woff2");
+}
+.pp-detail--preview {
+  font-family: "PeekaPlate Preview Inter", system-ui, sans-serif;
+}
+.pp-detail--preview .pp-portion__retry {
+  font-family: inherit;
 }

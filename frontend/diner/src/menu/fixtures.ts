@@ -340,7 +340,10 @@ export function createFixtureMenuSource(
             height: 853,
             alt: 'User-supplied captured dish photograph, local demo only',
           };
-          dish.images = { card: image, detail: image };
+          dish.images =
+            new URLSearchParams(location.search).get('previewState') === 'failed'
+              ? null
+              : { card: image, detail: image };
           dish.portion = {
             schema_version: 1,
             dish_id: dish.dish_id,

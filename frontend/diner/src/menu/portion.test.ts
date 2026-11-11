@@ -86,3 +86,14 @@ it('bounds serialized manifest bytes as well as character counts', () => {
     }).success,
   ).toBe(false);
 });
+
+it('retains PR25 bounded motion limits and rejects unsafe rotations', () => {
+  const motion = { max_yaw_degrees: 2, max_pitch_degrees: 0 };
+  expect(adapt({ ...portion, motion }).portion?.motion).toEqual(motion);
+  expect(
+    adapt({ ...portion, motion: { ...motion, max_yaw_degrees: 3.1 } }).portion,
+  ).toBeUndefined();
+  expect(
+    adapt({ ...portion, motion: { ...motion, max_pitch_degrees: -1 } }).portion,
+  ).toBeUndefined();
+});

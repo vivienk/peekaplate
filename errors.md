@@ -2543,3 +2543,28 @@ not the failure. Rerun verifies actual local texture loading and pointer tilt.
 The menu boundary test also caught the new demo module importing the wire shape.
 Moved fixture construction into fixtures.ts; the demo module now exports only
 assets and local URL resolution, preserving the existing adapter boundary.
+
+### 2026-11-10 — preview artwork and font setup
+
+Figma connector quota remained exhausted. Browser exports succeeded as ZIPs because
+the layer hierarchy contains a slash; waiting for a single SVG download and searching
+only SVG filenames missed these artifacts. Exact SVGs were recovered from those ZIPs.
+A local data-URL transfer field was blocked by browser URL policy and was abandoned;
+normal Figma downloads supplied the assets instead. Temporary export settings were removed.
+The first offline font dependency command selected a different pnpm store; repeating
+with the already-used store succeeded without reinstalling dependencies.
+
+### 2026-11-10 — exported SVG browser assertion
+
+Three new artwork checks expected a .svg URL suffix, but Vite correctly inlined
+the small SVGs as data:image/svg+xml. Updated the assertion to accept both emitted
+asset forms while retaining root-dimension checks. Forty-two behavior/regression
+cases passed in that run; the three state checks are rerun after this test fix.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-11T03:39:14.355Z","exitCode":1}
+```
+
+Context refresh rejects directory paths; replaced the preview-assets directory
+entry with its four exact SVG filenames before refreshing fingerprints.
