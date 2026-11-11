@@ -226,8 +226,16 @@ test('a full outbox drops the oldest events with a developer warning, and the pa
   await startTracking(page, { live: true, consent: true });
   await page.context().setOffline(true);
   await trackMenuViewed(page, 505);
-  await expect.poll(() => storedEvents(page)).toBe(500);
-  expect(warnings.filter((text) => text.includes('outbox full'))).toHaveLength(5);
+  // Capacity is reached at event 500; wait for all five later writes and their warnings too.
+  await expect
+    .poll(
+      async () => ({
+        stored: await storedEvents(page),
+        dropped: warnings.filter((text) => text.includes('outbox full')).length,
+      }),
+      { timeout: 10_000 },
+    )
+    .toEqual({ stored: 500, dropped: 5 });
   await expect(page.locator('body')).toBeVisible();
 });
 
