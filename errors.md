@@ -2795,3 +2795,10 @@ all Monaco content. No provider credentials, accounts or mail links are recorded
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
 ```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
