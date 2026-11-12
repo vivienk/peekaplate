@@ -2636,3 +2636,12 @@ restored a visible Back control and cleared original-image detail sizing/shadow.
 Added stage/control spacing assertion. The original-photo failure test had registered
 its failure route after menu thumbnails loaded; inject that failure before initial
 navigation so cached card photos cannot satisfy the test.
+
+The touch regression dispatched gestures during loading in one full run. Await the
+visible cutout before interacting; actual controls intentionally ignore loading-state
+input. This removes the test race without changing viewer behavior.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T06:22:45.601Z","exitCode":1}
+```

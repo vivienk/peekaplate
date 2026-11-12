@@ -410,6 +410,7 @@ test('PR25 touch tracking uses linear motion, release resets and vertical gestur
   await openPortion(page);
   const stage = page.locator('.pp-detail__image-wrap');
   const card = page.locator('.pp-portion__css');
+  await expect(card).toBeVisible();
   const box = (await stage.boundingBox())!;
   await stage.dispatchEvent('pointerdown', {
     pointerType: 'touch',

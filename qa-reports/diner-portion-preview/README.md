@@ -1,63 +1,51 @@
-# Diner portion preview evidence
+# PR25 viewer inside View Portion — November 11, 2026
 
-Local development review on Node 24.16.0 / pnpm 11.25.0, Chromium at 390 × 844.
-Screenshots exercise the generated PR25 photo/mask fixture through the actual preview UI.
+Local development evidence on Node24.16.0 / pnpm11.25.0. The latest user direction
+selects PR25 review_preview_html.py appearance and behavior within the existing
+View Portion shell. Four state categories and Back/retry navigation are preserved.
 
-| Loading | Ready |
+| Ready | Loading |
 | --- | --- |
-| ![Loading](loading.png) | ![Ready](ready.png) |
-| Photo fallback | Failed |
+| ![Ready](ready.png) | ![Loading](loading.png) |
+| Original-photo fallback | Failed / retry |
 | ![Photo fallback](fallback.png) | ![Failed](failed.png) |
+
+## Implemented behavior
+
+- Warm full-width square stage, rounded corners, radial gradient and contained cutout
+  with PR25 drop shadow; controls sit directly above the stage.
+- CSS900px perspective, up to±3° rotation,5px/3px translation. Pointer replaces the
+  shared position; keys step1/6. Pointer tracking55ms linear, reset/keys300ms ease-out.
+- Show original photo / Show review candidate, aria-pressed, Reset view, Home,
+  horizontal touch tilt, vertical scrolling and live reduced-motion support.
+- No WebGL/Three.js dependency. The spatial backdrop is validated but visually replaced
+  by the review gradient; foreground cutout layers move together.
+- Original photo must decode before interaction. Missing/invalid cutouts retain the photo;
+  missing photo shows failed/retry. Back/Escape/browser history preserve detail state/focus.
+- PR25 processing output identity/provenance remains needs_review and publication-ineligible
+  in the DEV fixture. No production approval/hosting path was added.
 
 ## Verification
 
-- PASS: focused Python processing tests — 34 tests (actual T0, review, spatial and new diner export).
-- PASS: `pnpm verify lint typecheck context:check docs:check`.
-- PASS: `pnpm verify test build` — 1,214 Vitest tests passed, 4 skipped; all 74 script tests passed. All app builds passed; Worker build was dry-run only.
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` — all 45 browser tests passed on the processor-integrated code.
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts tests/e2e/portion.spec.ts --grep 'Figma|local captured' --workers=2` — all 5 passed again after the backdrop-color correction; screenshots above are from this final run.
-- PASS: `PYTHONPATH=processing/src:processing/tests python -m unittest processing/tests/test_diner_demo.py processing/tests/test_review_preview.py processing/tests/test_assets.py processing/tests/test_spatial.py` — 34 passed, rerun after the backdrop correction (existing focused Python environment with Pillow/Pydantic).
-- PASS: inspected production output: no demo host, review identity, demo module or photo assets.
-- PASS: `git diff --check`.
-- Initial JS: 52,657 gzip bytes / 150,000 limit. T1 budget: 372,771 / 400,000 bytes including 48,116 font bytes and the 200,000-byte layer/manifest allowance.
-- NOT RUN: full default browser suite, database suite (no database changes), physical phone performance, manual VoiceOver/TalkBack, hosted approved-asset publication.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —51/51 in one clean run. Includes compare/reset, exact motion/timing, original-photo failure, integrity, reduced motion, cancellation, navigation and four screenshots.
+- PASS: `pnpm verify lint typecheck test build` —1,214 Vitest tests passed,4 skipped;74 script tests passed; app builds and Worker dry-run passed.
+- PASS: final `pnpm verify lint typecheck build context:check docs:check` after layout corrections.
+- PASS: `git diff --check`; production JS excludes DEV fixture host and WebGL renderer.
+- Initial JS53,014 gzip bytes /150,000 limit. T1 delivery201,297 /400,000 bytes including200,000-byte asset/manifest allowance.
+- Inspected all four390×844 screenshots. Read-only architecture/correctness review found no blocking issues on implementation7909e9c.
+- NOT RUN: full default browser suite, database suite(no database changes), physical phones,
+  manual VoiceOver/TalkBack, hosted approved-asset publication. Python processing unchanged
+  in this correction; prior34-test processing evidence remains historical, not rerun here.
 
-The final suite supersedes earlier setup failures recorded in errors.md: restricted
-local listeners, a missing report link, widened JSON literal typing and a browser
-run disrupted while source files were changing. The stable browser run passed.
+Earlier setup/test observations and corrections are recorded in errors.md. The new
+appearance/control regression failed against the previous viewer before implementation.
 
-## Scope and remaining limits
+## Local viewing
 
-PR25's existing `prepare_review_preview` now actually generates the demo. Its T0
-photo validation, supplied mask, cutout and unchanged fallback feed the diner through
-`diner_demo.py`; generated `demo.json` retains processor identity and needs_review /
-publication-ineligible provenance. This is not optional generated-candidate support
-or an approved production publication pipeline. Demo menu facts are placeholders.
+Open `http://127.0.0.1:5173/?scenario=portion-demo`, select the dish, then View Portion.
+`previewState=loading` delays loading; `previewState=photo` forces original-photo fallback;
+`previewState=failed` forces failure/retry. Legacy `previewState=fallback` still opens the
+interactive cutout. The four categories originate from Figma846:7146,258:6000,221:260,
+165:2413; the latest requested PR25 presentation supersedes the prior dark ready layout.
 
-Automated architecture/correctness reviews of the processor integration found no
-blocking issues. The create-only CLI can leave a partial output directory on a disk
-write failure; rerun into a new destination after addressing the disk error.
-
-Figma frames: loading 846:7146, ready 258:6000, photo fallback 221:260, failed 165:2413
-in file l7A9n8tACJic0FIhY49Zjw. Exact exported artwork is included. The web preview uses
-safe-area insets instead of a simulated native status bar.
-
-No merge or deployment. Local evidence is not hosted publication acceptance.
-
-## Interactive cutout fallback correction — November 10
-
-`previewState=fallback` now selects the PR25 CSS interactive cutout, not a forced
-asset failure. `previewState=photo` exercises the original-photo state. The same
-CSS path is used when WebGL cannot initialize or its context is lost; it retains
-900px perspective, bounded rotation, depth-ranked parallax and the existing inputs.
-Both renderers share bounded fetch, SHA-256 verification and retry behavior. CSS
-images additionally validate decoded dimensions and release object URLs on Back.
-
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` — 49 tests; new interactive-fallback regression failed before the correction and passed afterward.
-- PASS: `pnpm verify lint typecheck test build` — 1,214 unit tests passed / 4 skipped; 74 script tests passed; app builds and Worker dry-run passed.
-- PASS: `pnpm verify context:check docs:check` and `git diff --check`.
-- PASS: inspected production JS excludes DEV fixture host/identity.
-- T1 delivery budget including fonts and asset allowance: 373,379 / 400,000 bytes.
-- NOT RUN: physical phones, manual screen readers or hosted publication acceptance.
-
-This correction is local only. No PR, workflow setting change or deployment.
+Local branch only. No PR, merge, workflow setting change or deployment.
