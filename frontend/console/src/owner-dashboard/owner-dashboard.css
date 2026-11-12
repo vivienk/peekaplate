@@ -1169,11 +1169,18 @@ article.insight {
   border-bottom: 1px solid var(--line);
 }
 
-/* menu */
-.mrow {
+/* menu: one column grid for the whole table. Every row (header included) is a subgrid, so the
+ * header labels start exactly where their column's content starts, whatever the buttons need. */
+.mtable {
   display: grid;
   grid-template-columns: 60px minmax(0, 1.5fr) 120px 100px 190px 140px auto;
-  gap: 14px;
+  column-gap: 14px;
+}
+.mrow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  row-gap: 14px;
   align-items: center;
   padding: 12px 8px;
   border-top: 1px solid var(--line);
@@ -1672,7 +1679,7 @@ article.insight {
   .g3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .mrow {
+  .mtable {
     grid-template-columns: 60px minmax(0, 1fr) auto;
   }
   .mrow > .hidem {
@@ -2257,15 +2264,15 @@ h3 {
   line-height: 1.35;
 }
 @media (min-width: 1400px) {
-  .mrow {
+  .mtable {
     grid-template-columns: 52px minmax(150px, 1.6fr) 90px 56px 90px 110px auto;
-    gap: 12px;
+    column-gap: 12px;
   }
 }
 @media (min-width: 901px) and (max-width: 1399px) {
-  .mrow {
+  .mtable {
     grid-template-columns: 52px minmax(0, 1fr) auto auto;
-    gap: 12px;
+    column-gap: 12px;
   }
   .mrow > .hidem {
     display: none;

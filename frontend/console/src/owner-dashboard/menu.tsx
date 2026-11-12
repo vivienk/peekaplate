@@ -48,7 +48,7 @@ export function MenuList({
           live.
         </p>
       </div>
-      <section className="card">
+      <section className="card mtable">
         <div className="mrow mhead" aria-hidden="true">
           <span />
           <span>Dish</span>
