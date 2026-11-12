@@ -181,7 +181,9 @@ p {
 }
 
 main:has(> .pp-menu),
-main:has(> .pp-detail) {
+main:has(> .pp-detail),
+main:has(> .pp-picker),
+main:has(> .pp-compare) {
   max-width: none;
   margin: 0;
   padding: 0;

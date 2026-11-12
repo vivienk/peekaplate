@@ -46,6 +46,12 @@ test('Compare on a dish detail opens the picker with that dish as Keeping', asyn
     'Garden Avocado Salad',
   ]);
   await expect(page.locator('.pp-picker__option .pp-picker__option-heart').first()).toBeDisabled();
+
+  // The picker starts at the top and fills the 390px frame, like the menu and detail: the app
+  // container's placeholder margin and padding must not apply (Adam, PR #127).
+  const box = await page.locator('.pp-picker').boundingBox();
+  expect(box?.y).toBe(0);
+  expect(box?.width).toBe(390);
   await expectNoAxeViolations(page);
 });
 
