@@ -150,7 +150,11 @@ export function bindPortionAR(
       dialog.close();
       dialog.remove();
       closeCurrent = undefined;
-      if (!disposed && open.isConnected) open.focus();
+      if (!disposed && open.isConnected) {
+        const collapsed = open.closest('details:not([open])');
+        const target = collapsed?.querySelector<HTMLElement>('summary') ?? open;
+        target.focus();
+      }
     };
     closeCurrent = close;
     const hidden = () => {

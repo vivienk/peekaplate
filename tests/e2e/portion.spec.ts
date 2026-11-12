@@ -590,6 +590,7 @@ test('local 3D ready switches, resets, survives reopen without duplicate create 
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.locator('model-viewer')).toHaveCount(0);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await page.getByRole('button', { name: 'Check 3D job', exact: true }).click();
   await expect(page.locator('model-viewer')).toBeVisible();
   expect(creates()).toBe(1);
@@ -938,12 +939,17 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page, true);
   await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Start camera preview', exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({ path: 'test-results/automatic-ar-portal.png' });
   expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
   await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
   await page.getByRole('button', { name: 'Place dish', exact: true }).click();
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Preview controls', { exact: true })).toBeFocused();
   await expect(page.locator('.pp-portion__css img')).toBeVisible();
   await page.getByText('Preview controls', { exact: true }).click();
   await page.getByLabel('Preview image (local review only)').selectOption('cutout');

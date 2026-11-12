@@ -2738,3 +2738,7 @@ Initial AR browser test was interrupted by Vite optimizing a newly introduced Th
 AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned decoded textures on normal close and late-load cancellation. Two textured-GLB regressions pass. Manual initial placement now centers the image within the camera area above the controls; existing source imagery remains unchanged.
 
 - Automatic AR entry verification: the restricted test run could not bind localhost (EPERM); rerun with local browser/network access. No application defect inferred from that environment error.
+
+- Automatic portal review found focus returned to a hidden button inside collapsed Preview controls. Dismissal now focuses the visible summary when collapsed, and the trigger when expanded; automatic-entry regression asserts focus restoration.
+
+- The existing 3D reopen test assumed View Portion returned directly to inline controls; automatic portal entry now intentionally covers them. Updated the reopen step to dismiss the portal before checking the saved job.
