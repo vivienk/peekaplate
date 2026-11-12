@@ -72,7 +72,7 @@ describe('S6-DATA-13 release hardening: Owner A/B isolation, revocation, 9/10/11
       dish_name: 'Eleven Sessions Valid Zero & Not Measurable Timing Dish',
       total_sessions: 11,
       exposed_open_sessions: 0,
-      open_eligible_sessions: 11,
+      open_eligible_sessions: 0,
       total_openings: 0,
       timed_openings: 0,
       engaged_sessions: 0,
@@ -143,7 +143,12 @@ describe('S6-DATA-13 release hardening: Owner A/B isolation, revocation, 9/10/11
     expect(dish11.metrics.open_rate.status).toBe('VALID_ZERO');
     expect(dish11.metrics.save_rate.value).toBe(0);
     expect(dish11.metrics.save_rate.status).toBe('VALID_ZERO');
+    expect(dish11.metrics.engagement_rate.value).toBeNull();
+    expect(dish11.metrics.engagement_rate.status).toBe('NOT_MEASURABLE');
+    expect(dish11.metrics.timing_coverage.value).toBeNull();
+    expect(dish11.metrics.timing_coverage.status).toBe('NOT_MEASURABLE');
     expect(dish11.metrics.avg_interaction_time_seconds.value).toBeNull();
+    expect(dish11.metrics.avg_interaction_time_seconds.status).toBe('NOT_MEASURABLE');
   });
 
   it('verifies missing/empty venue report returns EMPTY status with zero dishes and null freshness', async () => {
