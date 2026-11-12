@@ -35,7 +35,7 @@ function createClient(rows: ReturnType<typeof makeRow>[]) {
     if (sql.includes('FROM app_private.staff_membership')) {
       return { rows: [{ permission: 'viewer' }] };
     }
-    if (sql.includes('WITH current_period AS')) return { rows };
+    if (sql.includes('WITH scoped_facts AS MATERIALIZED')) return { rows };
     return { rows: [] };
   });
   return { client: { query } as unknown as Client, query };
@@ -63,7 +63,7 @@ describe('readComparisonReport', () => {
       eligible_sessions: 11,
     });
     const sql = query.mock.calls.find(([statement]) =>
-      statement.includes('WITH current_period AS'),
+      statement.includes('WITH scoped_facts AS MATERIALIZED'),
     )?.[0];
     expect(sql).toContain('baseline_period AS');
     expect(sql).toContain('FULL OUTER JOIN baseline_period USING (dish_id)');

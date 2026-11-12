@@ -6,7 +6,11 @@ import {
   UpsertExtractionReviewSessionRequestSchema,
 } from '@peekaplate/contracts';
 import { describe, expect, it } from 'vitest';
-import { type ReviewArtifactReader, verifyReviewArtifact } from './review-artifact';
+import {
+  type ReviewArtifactReader,
+  reviewInputFromReport,
+  verifyReviewArtifact,
+} from './review-artifact';
 import { ReviewCommandError } from './review-command';
 
 const fixture = (name: string) =>
@@ -27,6 +31,19 @@ const venueId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 const jobId = '0b9f2c8e-6f1d-4b7a-9c3e-2d5a7e1f4b60';
 const attemptId = '7c1e5d2a-3b4f-4e6a-8d9c-1a2b3c4d5e6f';
 const key = `menu-ingestion/review-artifacts/${venueId}/${jobId}/${attemptId}/bundle.json`;
+
+it('bootstraps the same candidate identity/evidence as the Python exporter without source snapshots', () => {
+  const source = structuredClone(report);
+  source.configuration.private_review_artifact = { schema_version: 1, key, sha256: 'a'.repeat(64) };
+  const input = reviewInputFromReport(source, jobId, crypto.randomUUID());
+  expect(input.extractionResult.extraction_id).toBe(candidates.extraction_id);
+  expect(input.extractionResult.source).toEqual(candidates.source);
+  expect(input.extractionResult.candidates.map((item) => item.evidence)).toEqual(
+    candidates.candidates.map((item: { evidence: unknown }) => item.evidence),
+  );
+  expect(JSON.stringify(input)).not.toContain('snapshot_base64');
+  expect(input.extractionResult.segments).toEqual(candidates.segments);
+});
 
 /** Mirrors the extraction host: the stored bytes are the bundle plus its server-derived scope. */
 function storedBundle(overrides: { report?: unknown; scope?: Record<string, unknown> } = {}) {
