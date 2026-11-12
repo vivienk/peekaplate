@@ -110,7 +110,15 @@ function reportMetric(values: MetricValues) {
 }
 
 const COMPARISON_SQL = `
-WITH current_period AS (
+WITH scoped_facts AS MATERIALIZED (
+  SELECT * FROM app_private.owner_observation_v1
+  WHERE tenant_id = $1
+    AND (
+      (occurred_at >= $2::timestamptz AND occurred_at < $3::timestamptz)
+      OR (occurred_at >= $4::timestamptz AND occurred_at < $5::timestamptz)
+    )
+),
+current_period AS (
   SELECT sessions.dish_id,
     count(*)::bigint AS eligible_sessions,
     count(*) FILTER (WHERE sessions.has_exposure)::bigint AS exposure_sessions,
@@ -135,7 +143,7 @@ WITH current_period AS (
         AND fact.active_ms >= 10000
         AND EXISTS (
           SELECT 1
-          FROM app_private.owner_observation_v1 linked_opening
+          FROM scoped_facts linked_opening
           WHERE linked_opening.tenant_id = fact.tenant_id
             AND linked_opening.session_id = obs.session_id
             AND linked_opening.event_type = 'dish_detail_opened'
@@ -150,7 +158,7 @@ WITH current_period AS (
         AND fact.comparison_id IS NOT NULL
         AND EXISTS (
           SELECT 1
-          FROM app_private.owner_observation_v1 prior_opening
+          FROM scoped_facts prior_opening
           JOIN app_private.observation_event prior_order USING (tenant_id, event_id)
           WHERE prior_opening.tenant_id = fact.tenant_id
             AND prior_opening.session_id = obs.session_id
@@ -170,7 +178,7 @@ WITH current_period AS (
       ) AS has_qualified_comparison,
       bool_or(fact.event_type = 'dish_saved' AND fact.save_origin = 'direct') AS has_save
     FROM app_private.observation_event obs
-    JOIN app_private.owner_observation_v1 fact USING (tenant_id, event_id)
+    JOIN scoped_facts fact USING (tenant_id, event_id)
     CROSS JOIN LATERAL (
       VALUES
         (fact.dish_id),
@@ -210,7 +218,7 @@ baseline_period AS (
         AND fact.active_ms >= 10000
         AND EXISTS (
           SELECT 1
-          FROM app_private.owner_observation_v1 linked_opening
+          FROM scoped_facts linked_opening
           WHERE linked_opening.tenant_id = fact.tenant_id
             AND linked_opening.session_id = obs.session_id
             AND linked_opening.event_type = 'dish_detail_opened'
@@ -225,7 +233,7 @@ baseline_period AS (
         AND fact.comparison_id IS NOT NULL
         AND EXISTS (
           SELECT 1
-          FROM app_private.owner_observation_v1 prior_opening
+          FROM scoped_facts prior_opening
           JOIN app_private.observation_event prior_order USING (tenant_id, event_id)
           WHERE prior_opening.tenant_id = fact.tenant_id
             AND prior_opening.session_id = obs.session_id
@@ -245,7 +253,7 @@ baseline_period AS (
       ) AS has_qualified_comparison,
       bool_or(fact.event_type = 'dish_saved' AND fact.save_origin = 'direct') AS has_save
     FROM app_private.observation_event obs
-    JOIN app_private.owner_observation_v1 fact USING (tenant_id, event_id)
+    JOIN scoped_facts fact USING (tenant_id, event_id)
     CROSS JOIN LATERAL (
       VALUES
         (fact.dish_id),
