@@ -110,7 +110,15 @@ export function bindPortionAR(
           material.dispose();
         }
       });
-      for (const item of textures) item.dispose();
+      const bitmaps = new Set<ImageBitmap>();
+      for (const item of textures) {
+        if (typeof ImageBitmap !== 'undefined' && item.image instanceof ImageBitmap)
+          bitmaps.add(item.image);
+        item.dispose();
+      }
+      // GLTFLoader owns decoded bitmaps; Three texture.dispose only releases GPU storage.
+      // The cutout uses the shared HTMLImageElement, which must stay available underneath.
+      for (const bitmap of bitmaps) bitmap.close();
     };
     const stopCamera = () => {
       for (const track of stream?.getTracks() ?? []) track.stop();
@@ -176,7 +184,20 @@ export function bindPortionAR(
     const placeDish = () => {
       if (!running || (tracked && !reticle.visible)) return;
       if (tracked) anchor.position.setFromMatrixPosition(reticle.matrix);
-      else anchor.position.set(0, -0.2, -0.85);
+      else {
+        const viewport = canvasHost.getBoundingClientRect();
+        const top =
+          dialog.querySelector('.pp-ar__header')!.getBoundingClientRect().bottom - viewport.top;
+        const bottom =
+          dialog.querySelector('.pp-ar__panel')!.getBoundingClientRect().top - viewport.top;
+        const pixelsPerUnit =
+          viewport.height / (2 * 0.85 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+        anchor.position.set(
+          0,
+          (viewport.height / 2 - (top + bottom) / 2) / pixelsPerUnit - height / 2,
+          -0.85,
+        );
+      }
       // Keep the cutout upright at its contact point; it remains a flat image, not inferred geometry.
       anchor.quaternion.identity();
       placed = true;

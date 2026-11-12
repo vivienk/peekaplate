@@ -680,6 +680,7 @@ async function openPortal(page: Page) {
 test('camera portal positions the exact cutout, rotates, resets and releases camera on Back', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await cameraFixture(page);
   await openPortal(page);
   expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
@@ -688,6 +689,7 @@ test('camera portal positions the exact cutout, rotates, resets and releases cam
   await page.getByRole('button', { name: 'Place dish', exact: true }).click();
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
+  await page.screenshot({ path: 'test-results/ar-camera-mobile.png' });
   await page.getByRole('slider', { name: 'Rotate dish', exact: true }).fill('45');
   await expect(page.getByRole('slider', { name: 'Rotate dish', exact: true })).toHaveValue('45');
   await page.getByRole('button', { name: 'Reposition', exact: true }).click();
@@ -727,15 +729,32 @@ test('closing portal during camera permission stops a late stream without revivi
   await expect(page.locator('.pp-portion__css')).toBeVisible();
 });
 
-function portalTestGLB() {
-  const binary = Buffer.alloc(36);
+function portalTestGLB(textured = false) {
+  const png = textured
+    ? readFileSync('frontend/diner/src/menu/fixture-assets/portion-demo/cutout.png')
+    : Buffer.alloc(0);
+  const geometryLength = textured ? 60 : 36;
+  const binary = Buffer.alloc(geometryLength + png.length + ((4 - (png.length % 4)) % 4));
+  if (textured) {
+    [0, 0, 1, 0, 0.5, 1].forEach((value, i) => binary.writeFloatLE(value, 36 + i * 4));
+    png.copy(binary, 60);
+  }
   [-0.5, 0, 0, 0.5, 0, 0, 0, 1, 0].forEach((value, i) => binary.writeFloatLE(value, i * 4));
   const doc = {
     asset: { version: '2.0' },
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0 }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0, ...(textured ? { TEXCOORD_0: 1 } : {}) },
+            ...(textured ? { material: 0 } : {}),
+          },
+        ],
+      },
+    ],
     accessors: [
       {
         bufferView: 0,
@@ -746,9 +765,39 @@ function portalTestGLB() {
         max: [0.5, 1, 0],
       },
     ],
-    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }],
-    buffers: [{ byteLength: 36 }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: 36 },
+      ...(textured
+        ? [
+            { buffer: 0, byteOffset: 36, byteLength: 24 },
+            { buffer: 0, byteOffset: 60, byteLength: png.length },
+          ]
+        : []),
+    ],
+    buffers: [{ byteLength: binary.length }],
+    ...(textured
+      ? {
+          images: [{ bufferView: 2, mimeType: 'image/png' }],
+          textures: [{ source: 0 }],
+          materials: [
+            {
+              pbrMetallicRoughness: { baseColorTexture: { index: 0 } },
+              alphaMode: 'BLEND',
+              doubleSided: true,
+            },
+          ],
+        }
+      : {}),
   };
+  if (textured)
+    doc.accessors.push({
+      bufferView: 1,
+      componentType: 5126,
+      count: 3,
+      type: 'VEC2',
+      min: [0, 0],
+      max: [1, 1],
+    });
   let json = JSON.stringify(doc);
   json += ' '.repeat((4 - (json.length % 4)) % 4);
   const result = Buffer.alloc(12 + 8 + json.length + 8 + binary.length);
@@ -831,3 +880,46 @@ test('unavailable table session falls back to manual camera and browser Back sto
   expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeVisible();
 });
+
+for (const late of [false, true]) {
+  test(`portal closes owned textured-model bitmaps on ${late ? 'late load' : 'dismissal'}`, async ({
+    page,
+  }) => {
+    await cameraFixture(page);
+    await page.addInitScript((late) => {
+      const original = window.createImageBitmap.bind(window);
+      const state = { created: 0, closed: 0, release: undefined as (() => void) | undefined };
+      Object.assign(window, { bitmapTest: state });
+      window.createImageBitmap = (async (...args: Parameters<typeof createImageBitmap>) => {
+        const bitmap = await original(...args);
+        const close = bitmap.close.bind(bitmap);
+        bitmap.close = () => {
+          state.closed++;
+          close();
+        };
+        state.created++;
+        if (late)
+          await new Promise<void>((resolve) => {
+            state.release = resolve;
+          });
+        return bitmap;
+      }) as typeof createImageBitmap;
+    }, late);
+    await local3d(page, 'ready');
+    await expect(page.locator('model-viewer')).toBeVisible();
+    await page.route('**/artifacts/model.glb', (route) =>
+      route.fulfill({ contentType: 'model/gltf-binary', body: portalTestGLB(true) }),
+    );
+    await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as any).bitmapTest.created)).toBe(1);
+    if (!late)
+      await expect(
+        page.getByRole('dialog').getByRole('button', { name: 'Show 3D', exact: true }),
+      ).toBeEnabled();
+    await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+    if (late) await page.evaluate(() => (window as any).bitmapTest.release());
+    await expect.poll(() => page.evaluate(() => (window as any).bitmapTest.closed)).toBe(1);
+    await page.getByRole('button', { name: 'Show 2.5D', exact: true }).click();
+    await expect(page.locator('.pp-portion__css')).toBeVisible();
+  });
+}
