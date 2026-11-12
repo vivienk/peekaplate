@@ -1,0 +1,117 @@
+/* FE-06.2 Screen 9 layout on the console tokens. Visual sign-off stays with Rania/Amr; this keeps the
+   structure readable until the owner shell (#125) and Jeffin's Screen 9 styling are merged. */
+.pp-dish-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-16, 16px);
+  max-width: 60rem;
+}
+
+.pp-dish-editor__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--pp-space-24, 24px);
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .pp-dish-editor__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pp-dish-editor__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-16, 16px);
+}
+
+.pp-dish-editor__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--pp-role-outline, #d4d4d8);
+  border-radius: 12px;
+}
+
+.pp-dish-editor__group legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.pp-dish-editor__status,
+.pp-dish-editor__checks,
+.pp-dish-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+
+.pp-dish-editor__status label,
+.pp-dish-editor__checks label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-dish-editor__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-dish-editor__tags li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--pp-role-outline, #d4d4d8);
+  border-radius: 999px;
+}
+
+.pp-dish-editor__tags button {
+  min-width: 28px;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pp-dish-editor__row .pp-input {
+  flex: 1 1 12rem;
+}
+
+.pp-dish-editor__summary,
+.pp-dish-editor__error {
+  padding: 12px 16px;
+  border: 1px solid var(--pp-color-red-700, #b91c1c);
+  border-radius: 12px;
+  color: var(--pp-color-red-700, #b91c1c);
+}
+
+.pp-dish-editor__summary a {
+  color: inherit;
+}
+
+.pp-dish-editor__evidence {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--pp-role-surface-variant, #f4f4f5);
+}
+
+.pp-dish-editor__evidence pre {
+  margin: 4px 0 12px;
+  white-space: pre-wrap;
+  font: inherit;
+}
+
+.pp-dish-editor__evidence figure {
+  margin: 0;
+}

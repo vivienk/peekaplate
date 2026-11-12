@@ -18,8 +18,17 @@ import {
   type SourceType,
   sha256Hex,
 } from './api';
-import { allergenOutcome, dishFromReviewItem, STAFF_ALLERGY_LINE } from './dishForm';
+import { DishEditor } from './DishEditor';
+import {
+  allergenOutcome,
+  approveCommand,
+  type DishForm,
+  dishFromReviewItem,
+  reviewCorrection,
+  STAFF_ALLERGY_LINE,
+} from './dishForm';
 import { evidenceExcerpts, pageProblems } from './evidence';
+import { reviewSession as syntheticSession } from './fixtures.test-helpers';
 import { errorMessage, menuProcessingState } from './jobs';
 
 const DEFAULT_API = 'https://peekaplate-api-staging.vxkong.workers.dev';
@@ -48,6 +57,7 @@ function Harness() {
     data: ExtractionReviewSessionResponse;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<{ candidateId: string; form: DishForm } | null>(null);
   const [log, setLog] = useState<LogEntry[]>([]);
   // Retrying a submission must reuse its idempotency keys, so they are kept per selection.
   const keys = useRef<{ group: string; files: string[] } | null>(null);
@@ -149,6 +159,60 @@ function Harness() {
     run(`Review session for ${jobId.slice(0, 8)}`, async () => {
       const data = await client.openReviewSession(venueId.trim(), jobId, newCommandId());
       setSession({ jobId, data });
+      setEditing(null);
+      // Approval needs each candidate's draft and its current draft_version.
+      const list = await client.listDrafts(venueId.trim(), { jobId });
+      setDrafts((current) => ({ ...current, [jobId]: list }));
+    });
+
+  // Screen 9 save for a scanned dish: only the changed fields, as a review correction.
+  const saveEdit = () =>
+    run('Save correction', async () => {
+      if (!session || !editing) return;
+      const item = session.data.items.find((i) => i.candidate.candidate_id === editing.candidateId);
+      if (!item) return;
+      const corrected = reviewCorrection(item, editing.form);
+      if (!corrected) {
+        note('Nothing changed, so nothing was sent');
+        return;
+      }
+      const saved = await client.reviewCandidate(
+        venueId.trim(),
+        session.data.extractionResult.extraction_id,
+        item.candidate.candidate_id,
+        {
+          commandId: newCommandId(),
+          expectedVersion: item.review.version,
+          action: 'correct',
+          corrected,
+        },
+      );
+      const items = session.data.items.map((i) =>
+        i.candidate.candidate_id === saved.candidate.candidate_id ? saved : i,
+      );
+      setSession({ ...session, data: { ...session.data, items } });
+      setEditing({
+        candidateId: saved.candidate.candidate_id,
+        form: dishFromReviewItem(session.data.extractionResult.extraction_id, saved),
+      });
+    });
+
+  // Owner verification of one scanned dish. Creates an approved revision; it never publishes.
+  const verifyEdit = () =>
+    run('Verify dish', async () => {
+      if (!session || !editing) return;
+      const draft = (drafts[session.jobId] ?? []).find(
+        (d) => d.candidate_id === editing.candidateId,
+      );
+      if (!draft) throw new Error('No draft found for this dish; reload the drafts first');
+      if (!window.confirm('Verify this dish on the staging restaurant? This does not publish.'))
+        return;
+      await client.approveDraft(
+        venueId.trim(),
+        draft.id,
+        approveCommand(editing.form, draft.draft_version ?? 1, newCommandId()),
+      );
+      note(`Dish ${editing.form.name} verified (approved revision, not published)`);
     });
 
   const newSelection = () => {
@@ -157,6 +221,7 @@ function Harness() {
     setJobs([]);
     setDrafts({});
     setSession(null);
+    setEditing(null);
   };
 
   return (
@@ -353,6 +418,21 @@ function Harness() {
 
       <section aria-labelledby="review">
         <h2 id="review">4. Extracted fields with evidence</h2>
+        <p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setEditing(null);
+              setSession({ jobId: 'synthetic-sample', data: syntheticSession() });
+              note(
+                'Loaded the synthetic sample (shared OCR fixture, no API call); Save/Verify will fail',
+              );
+            }}
+          >
+            Show synthetic sample (no API)
+          </button>
+        </p>
         {session ? (
           <>
             <p>
@@ -369,6 +449,23 @@ function Harness() {
             {session.data.extractionResult.warnings.map((warning) => (
               <p key={warning}>Warning: {warning}</p>
             ))}
+            {editing &&
+              (() => {
+                const item = session.data.items.find(
+                  (i) => i.candidate.candidate_id === editing.candidateId,
+                );
+                return (
+                  <DishEditor
+                    value={editing.form}
+                    evidence={item ? evidenceExcerpts(session.data, item) : []}
+                    onChange={(form) => setEditing({ ...editing, form })}
+                    onSave={saveEdit}
+                    onVerify={verifyEdit}
+                    onCancel={() => setEditing(null)}
+                    busy={busy}
+                  />
+                );
+              })()}
             {session.data.items.map((item) => {
               const form = dishFromReviewItem(session.data.extractionResult.extraction_id, item);
               const uncertain = new Set(form.source?.uncertainFields ?? []);
@@ -384,6 +481,13 @@ function Harness() {
                   style={{ border: '1px solid #ccc', padding: '0.75rem', margin: '0.75rem 0' }}
                 >
                   <h3>{form.name}</h3>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setEditing({ candidateId: item.candidate.candidate_id, form })}
+                  >
+                    Edit in Screen 9
+                  </button>
                   <dl>
                     <dt>Category</dt>
                     <dd>{value('category', form.category)}</dd>

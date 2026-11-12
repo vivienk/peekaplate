@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. FE-06.2 adds a framework-free owner menu workspace client and Screen 9 mapping (OCR ingredients proposed, allergens unknown) plus a local-only, never-built staging harness page; screens and sign-in wiring remain separate.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. FE-06.2 adds an owner menu workspace client, Screen 9 mapping and DishEditor (OCR ingredients proposed, allergens unknown) plus a local-only, never-built staging harness page; screens and sign-in wiring remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -241,7 +241,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/evidence.test.ts",
         "frontend/console/src/owner-menu/harness.tsx",
         "frontend/console/owner-menu-harness.html",
-        "scripts/console-preview-demos.test.mjs"
+        "scripts/console-preview-demos.test.mjs",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/DishEditor.test.tsx",
+        "frontend/console/src/owner-menu/dishEditor.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -251,7 +254,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6340f7e3227caed33d38a7c719741dabb402105bc9f05d9faec3bc7ce86a3ce3"
+      "sourceFingerprint": "2fd08a0550bb41ba02f01b98d08fc3dc593a23aaeaac9828f74348e01dea702e"
     },
     {
       "id": "backend",
@@ -725,7 +728,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-12",
-      "summary": "FE-06.2 owner menu client: frontend/console/src/owner-menu. createOwnerMenuClient(baseUrl, getToken, fetch) wraps docs/owner-menu-workspace.md with contract-validated requests, bearer token, no cookies and typed OwnerMenuApiError (isConflict/isRetryable). menuProcessingState(jobs) gives Screen 8 one phase (uploading/processing/ready/partial/empty/failed/cancelled) with counts only. dishForm maps review items and manual drafts to Screen 9 values: OCR ingredients stay proposed, allergens unknown; extracted saves send only changed fields as review corrections, manual saves replace the snapshot; approval binds the review version and never publishes. Requests time out (30 s, uploads 120 s). owner-menu-harness.html (pnpm dev at 127.0.0.1:5174 only, excluded from every build) runs upload, job status, drafts, fields with evidence/unknowns and retry/cancel against staging for FE-06.1.",
+      "summary": "FE-06.2 owner menu client: frontend/console/src/owner-menu. createOwnerMenuClient(baseUrl, getToken, fetch) wraps docs/owner-menu-workspace.md with contract-validated requests, bearer token, no cookies and typed OwnerMenuApiError (isConflict/isRetryable). menuProcessingState(jobs) gives Screen 8 one phase (uploading/processing/ready/partial/empty/failed/cancelled) with counts only. dishForm maps review items and manual drafts to Screen 9 values: OCR ingredients stay proposed, allergens unknown; extracted saves send only changed fields as review corrections, manual saves replace the snapshot; approval binds the review version and never publishes. DishEditor is Screen 9 on these values (adapted from #105 DishForm, no AI drafting): scanned dishes show menu evidence and cannot save allergens yet. Requests time out (30 s, uploads 120 s). owner-menu-harness.html (pnpm dev at 127.0.0.1:5174 only, excluded from every build) runs upload, job status, drafts, fields with evidence/unknowns and retry/cancel against staging for FE-06.1.",
       "modules": [
         "console"
       ],
