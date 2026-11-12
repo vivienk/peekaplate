@@ -193,6 +193,28 @@ describe('owner menu client', () => {
   });
 });
 
+describe('timeouts', () => {
+  it('fails a request with no answer as a retryable timeout instead of waiting forever', async () => {
+    // A fetch that never answers until it is aborted.
+    const hanging = ((_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () =>
+          reject(new DOMException('aborted', 'AbortError')),
+        );
+      })) as unknown as typeof fetch;
+    const api = createOwnerMenuClient({
+      baseUrl: 'https://api.example.test',
+      getToken: () => 'staff-token',
+      fetch: hanging,
+      timeoutMs: 20,
+    });
+    await expect(api.listJobs(VENUE, 'g1')).rejects.toMatchObject({
+      code: 'timeout',
+      isRetryable: true,
+    });
+  });
+});
+
 describe('sha256Hex', () => {
   it('hashes the exact bytes as lowercase hex', async () => {
     expect(await sha256Hex(new Blob(['abc']))).toBe(

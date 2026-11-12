@@ -88,6 +88,7 @@ const ERROR_COPY: Record<string, string> = {
   unauthorized: 'Your session has ended. Sign in again to continue.',
   version_conflict: 'This dish changed somewhere else. Reload it to see the latest version.',
   network: 'You appear to be offline. Check your connection and try again.',
+  timeout: 'The server did not answer in time. Check the job status, then try again.',
 };
 
 export function errorMessage(code: string): string {

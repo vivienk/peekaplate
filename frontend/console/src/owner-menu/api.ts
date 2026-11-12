@@ -81,7 +81,12 @@ export class OwnerMenuApiError extends Error {
 
   // Worth offering Retry: network failures, rate limits and server errors.
   get isRetryable(): boolean {
-    return this.code === 'network' || this.status === 429 || this.status >= 500;
+    return (
+      this.code === 'network' ||
+      this.code === 'timeout' ||
+      this.status === 429 ||
+      this.status >= 500
+    );
   }
 }
 
@@ -91,6 +96,10 @@ export type OwnerMenuClientOptions = {
   // The signed-in staff session's access token (S4-FE-04); called per request so a refresh applies.
   getToken: () => string | Promise<string>;
   fetch?: typeof fetch;
+  // A request with no answer by then fails as "timeout", so a screen never waits forever.
+  timeoutMs?: number;
+  // File and photo uploads carry up to 12 MB, so they get longer.
+  uploadTimeoutMs?: number;
 };
 
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
@@ -145,28 +154,43 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
 
   async function request<T>(
     url: string,
-    init: { method: string; body?: BodyInit; headers?: Record<string, string> },
+    init: { method: string; body?: BodyInit; headers?: Record<string, string>; upload?: boolean },
     parse: (body: unknown) => T,
   ): Promise<T> {
     const token = await options.getToken();
+    const limit = init.upload
+      ? (options.uploadTimeoutMs ?? 120_000)
+      : (options.timeoutMs ?? 30_000);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, limit);
     let response: Response;
-    try {
-      response = await send(url, {
-        method: init.method,
-        headers: { Authorization: `Bearer ${token}`, ...init.headers },
-        ...(init.body === undefined ? {} : { body: init.body }),
-        // The API never needs cookies; the bearer token is the only credential.
-        credentials: 'omit',
-        cache: 'no-store',
-      });
-    } catch {
-      throw new OwnerMenuApiError(0, 'network');
-    }
     let body: unknown = null;
     try {
-      body = await response.json();
-    } catch {
-      body = null;
+      try {
+        response = await send(url, {
+          method: init.method,
+          headers: { Authorization: `Bearer ${token}`, ...init.headers },
+          ...(init.body === undefined ? {} : { body: init.body }),
+          // The API never needs cookies; the bearer token is the only credential.
+          credentials: 'omit',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+      } catch {
+        throw new OwnerMenuApiError(0, timedOut ? 'timeout' : 'network');
+      }
+      try {
+        body = await response.json();
+      } catch {
+        if (timedOut) throw new OwnerMenuApiError(0, 'timeout');
+        body = null;
+      }
+    } finally {
+      clearTimeout(timer);
     }
     if (!response.ok) {
       const code =
@@ -215,6 +239,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
         venuePath(venueId, `/menus/upload-groups/${encodeURIComponent(groupId)}/files/${index}`),
         {
           method: 'PUT',
+          upload: true,
           body: file,
           headers: {
             'Content-Type': file.type || 'application/octet-stream',
@@ -342,6 +367,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/photos`),
         {
           method: 'POST',
+          upload: true,
           body: photo,
           headers: { 'Content-Type': photo.type, 'Idempotency-Key': idempotencyKey },
         },
