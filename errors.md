@@ -2736,3 +2736,5 @@ Live console reconciliation showed zero API balance, zero frozen credits and no 
 Initial AR browser test was interrupted by Vite optimizing a newly introduced Three.js import and reloading the preview. Added explicit dependency prebundling. A later synthetic-GLB switch test found two Show 2.5D controls (underlying preview and modal); scoped the assertion to the dialog. No live camera frames or Tripo calls were used in these tests. Camera-denial, pending-permission cleanup and manual placement regressions exercise the real renderer with synthetic streams. Physical WebXR hit testing remains NOT RUN without a supported device.
 
 AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned decoded textures on normal close and late-load cancellation. Two textured-GLB regressions pass. Manual initial placement now centers the image within the camera area above the controls; existing source imagery remains unchanged.
+
+- Automatic AR entry verification: the restricted test run could not bind localhost (EPERM); rerun with local browser/network access. No application defect inferred from that environment error.

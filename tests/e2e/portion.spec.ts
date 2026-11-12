@@ -98,9 +98,18 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
   return content;
 }
-async function openPortion(page: Page) {
+async function openPortion(page: Page, keepPortal = false) {
   await page.locator('.pp-card__open').first().click();
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  const url = new URL(page.url());
+  const state = url.searchParams.get('previewState');
+  if (
+    !keepPortal &&
+    url.searchParams.get('scenario') === 'portion-demo' &&
+    (!state || state === 'ready' || state === 'fallback')
+  ) {
+    await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+  }
 }
 
 test('menu → dish-specific 2.5D → detail → another dish, with focus and browser navigation', async ({
@@ -671,9 +680,7 @@ async function cameraFixture(page: Page, behavior: 'allow' | 'deny' | 'pending' 
 }
 async function openPortal(page: Page) {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
-  await openPortion(page);
-  await page.getByText('Preview controls', { exact: true }).click();
-  await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+  await openPortion(page, true);
   await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
 }
 
@@ -923,3 +930,23 @@ for (const late of [false, true]) {
     await expect(page.locator('.pp-portion__css')).toBeVisible();
   });
 }
+
+test('2.5D opens the camera portal automatically and Back keeps the preview usable', async ({
+  page,
+}) => {
+  await cameraFixture(page);
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await openPortion(page, true);
+  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
+  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+  await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
+  await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.pp-portion__css img')).toBeVisible();
+  await page.getByText('Preview controls', { exact: true }).click();
+  await page.getByLabel('Preview image (local review only)').selectOption('cutout');
+  await expect(page.locator('.pp-portion__css img')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});

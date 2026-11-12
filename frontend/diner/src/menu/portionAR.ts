@@ -425,6 +425,7 @@ export function bindPortionAR(
   };
   open.addEventListener('click', show);
   return {
+    show,
     dispose() {
       disposed = true;
       closeCurrent?.();

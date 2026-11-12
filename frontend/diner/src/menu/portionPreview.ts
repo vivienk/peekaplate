@@ -47,6 +47,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       ? 'cutout'
       : 'generated';
   let visualSelect: HTMLSelectElement | undefined;
+  let portalOffered = false;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let disposed = false;
@@ -214,6 +215,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           () => stage.querySelector<HTMLImageElement>('.pp-portion__css img'),
           () => local3d?.getModelUrl(),
         );
+        if (!portalOffered) {
+          portalOffered = true;
+          ar.show();
+        }
       }
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();
