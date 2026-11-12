@@ -258,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "def2746bb5a40b76f756a23c57fb7b4143c2a244fe366e813ba67f0b1af5149a"
+      "sourceFingerprint": "6a6ee81fb457e8dfbaf0174b3eb885d591032568fec89bc4eabd0b027df689bb"
     },
     {
       "id": "backend",
@@ -827,7 +827,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in. Cross-tab replacement and in-flight different-account switch regressions pass; successful reset-to-sign-in reaches the authenticated handoff.",
+      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in. Cross-tab replacement and in-flight different-account switch regressions pass; successful reset-to-sign-in reaches the authenticated handoff. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",

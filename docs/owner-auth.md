@@ -114,5 +114,34 @@ November 11 follow-up: the Site URL matches and all four exact local/staging
 redirect URLs above are now verified in Supabase. Public Auth settings return
 200 with email signup enabled and email confirmation required. The Developer
 role remains unable to edit those settings; Vivien configured the allowlist.
-Actual email delivery/confirmation/reset await the manual signup/password step.
+Recovery email delivery/link verification now pass as recorded below; password
+submission and fresh signup/confirmation remain manual acceptance steps.
 Hosted dashboard handoff remains unverified. Neither PR is merged or deployed.
+
+
+## Live email check — November 11, 2026
+
+The local console from PR146 at `d615a70` was tested against the existing staging
+Supabase Auth project and its configured Resend sender. This was not a hosted
+console release, a new signup, or a password change. The approved existing test
+account was reused; no restaurant membership was changed.
+
+- PASS: one deliberately invalid sign-in shows the generic wrong-details banner
+  and clears the password field without disclosing account existence.
+- PASS: the real recovery request shows the neutral check-email screen and resend
+  cooldown.
+- PASS: the recovery email arrived in the approved inbox from
+  `PeekaPlate <noreply@auth.peekaplate.app>`.
+- PASS: the email link uses the expected Supabase project, recovery purpose and
+  exact `http://127.0.0.1:5174/auth-reset.html` redirect.
+- PASS: the real PKCE exchange and user verification open the authorized reset
+  form. Callback credentials disappear from the address bar.
+- PASS: reopening the consumed email link is rejected; its URL is cleared and
+  the original authorized reset form remains open.
+- NOT RUN: submitting a new password, checking old/new password sign-in, fresh
+  signup/confirmation and the complete hosted owner/dashboard journey.
+
+The reset form is left for the account holder's password entry/submission under
+the browser credential-change rule. No password, token, private address or email
+link is stored in this evidence. Keep both auth PRs unmerged until the remaining
+email/owner-flow acceptance gates are satisfied.
