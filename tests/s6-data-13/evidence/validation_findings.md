@@ -2,13 +2,13 @@
 
 - **Ticket:** S6-DATA-13 (*Validate secure owner-report API, privacy and frontend reconciliation*)
 - **Date:** November 12, 2026
-- **Base `develop` Commit SHA:** `e9be312`
+- **PR branch merge base with `develop`:** `f470786c3b8b7337ed2fb2790988ab940a77f2db`
 - **Relevant PRs & Integration Suites:**
-  - [PR #107](https://github.com) & `backend/src/dish.integration.ts` — `owner_report.v1` synthetic API, SQL privacy floor baseline, and real Worker/DB report-access & revocation integration suites
-  - [PR #123](https://github.com) — Comparison report fixtures and privacy cases
-  - [PR #134](https://github.com) — Coupled suppression and ordered comparison evidence matching
-  - [PR #135](https://github.com) — Staging Worker deployment verification (`docs/owner-report-staging.md`)
-  - [PR #131](https://github.com) — Deterministic CSV export route (`S5-DATA-11`, approved)
+  - [PR #107](https://github.com/vivienk/peekaplate/pull/107) & [Worker/DB integration cases](../../../backend/src/dish.integration.ts) — `owner_report.v1` synthetic API, SQL privacy floor baseline, and real Worker/DB report-access & revocation integration suites
+  - [PR #123](https://github.com/vivienk/peekaplate/pull/123) — Comparison report fixtures and privacy cases
+  - [PR #134](https://github.com/vivienk/peekaplate/pull/134) — Coupled suppression and ordered comparison evidence matching
+  - [PR #135](https://github.com/vivienk/peekaplate/pull/135) — [Staging Worker deployment verification](../../../docs/owner-report-staging.md)
+  - [PR #131](https://github.com/vivienk/peekaplate/pull/131) — Deterministic CSV export route (`S5-DATA-11`, approved)
 - **Staging URLs & Allowlist Scope:**
   - Staging Console Origin: `https://peekaplate-console-staging.pages.dev` (plus local `http://127.0.0.1:5174`)
   - Approved Synthetic Fixture Venue: `00000000-0000-4000-8000-000000000123` (`source=synthetic`)
