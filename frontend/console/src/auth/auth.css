@@ -13,7 +13,9 @@
   --pp-auth-pending-card-shadow: 0 4px 16px rgba(28, 26, 23, 0.05);
   --pp-auth-text: var(--pp-color-gray-900);
   --pp-auth-text-secondary: var(--pp-color-gray-600);
-  --pp-auth-outline: var(--pp-color-neutral-500);
+  /* Figma color/outline-solid (Outlined button edge) and color/outline (#71737A at 80%, the divider). */
+  --pp-auth-outline-solid: var(--pp-color-neutral-500);
+  --pp-auth-outline: color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent);
   --pp-auth-focus: var(--pp-color-info-600);
   --pp-auth-error: var(--pp-color-error-700);
   box-sizing: border-box;
@@ -45,13 +47,13 @@
   }
 }
 
-/* Card: 600 wide, 24 radius, 1px white border, surface-container, 48 padding (E1: 64 top and
- * bottom, S01: 40). */
+/* Card: 600 wide, 24 radius, 1px card border (white at 80%), surface-container, 48 padding (E1: 64
+ * top and bottom, S01: 40). */
 .pp-auth__card {
   width: 100%;
   max-width: 37.5rem;
   padding: var(--pp-space-48);
-  border: 1px solid var(--pp-color-neutral-50);
+  border: 1px solid var(--pp-role-card-border);
   border-radius: var(--pp-radius-24);
   background: var(--pp-auth-pending-surface-container);
   box-shadow: var(--pp-auth-pending-card-shadow);
@@ -133,8 +135,10 @@
   margin-top: var(--pp-space-32);
 }
 
-/* Input / Text and Input / Password: label 14/24 semibold, 6 above a 44px box with a 1.5px edge,
- * 12 radius and 16 side padding; hint or error 12/16, 8 in, 6 below. */
+/* Input / Text and Input / Password: label 14/24 semibold, 6 above a 44px box with a 1.5px edge in
+ * the shared input-border roles (color/outline at 80%; hover, focus, error), 12 radius and 16 side
+ * padding; hint or error 12/16, 8 in, 6 below. One real 1.5px border, without the shared inset line
+ * (Rania, 12 Nov). */
 .pp-auth .pp-field {
   gap: var(--pp-space-6);
 }
@@ -163,7 +167,9 @@
 }
 
 .pp-auth .pp-input {
-  --pp-input-edge: var(--pp-auth-outline);
+  --pp-input-edge: var(--pp-role-input-border);
+  border-width: 1.5px;
+  box-shadow: none;
   height: 2.75rem;
   min-height: 2.75rem;
   padding-block: 0;
@@ -181,16 +187,21 @@
 }
 
 .pp-auth .pp-input:hover {
-  --pp-input-edge: var(--pp-auth-text-secondary);
+  --pp-input-edge: var(--pp-role-input-border-hover);
 }
 
 .pp-auth .pp-input:focus-visible {
-  --pp-input-edge: var(--pp-auth-focus);
+  --pp-input-edge: var(--pp-role-input-border-focus);
 }
 
 .pp-auth .pp-input[aria-invalid="true"] {
-  --pp-input-edge: var(--pp-auth-error);
+  --pp-input-edge: var(--pp-role-input-border-error);
   color: var(--pp-auth-text);
+}
+
+.pp-auth .pp-input[aria-invalid="true"]:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
 }
 
 /* Input with a control inside it (show/hide, Change). */
@@ -235,7 +246,7 @@
  * accent "Change" link inside. */
 .pp-auth .pp-auth-field__locked,
 .pp-auth .pp-auth-field__locked:hover {
-  --pp-input-edge: var(--pp-color-neutral-300);
+  --pp-input-edge: var(--pp-role-input-border-disabled);
   padding-inline-end: 6rem;
   background-color: var(--pp-color-gray-200);
   color: var(--pp-auth-text);
@@ -291,7 +302,9 @@
   justify-self: end;
 }
 
-/* Checkbox row: 24px box, 12 gap, 14/24 text/secondary. */
+/* Checkbox row: the Figma Checkbox component (24px, a rounded square outlined in text/secondary on
+ * surface-container, with a tick when checked), 12 gap, 14/24 text/secondary. A real checkbox
+ * input, drawn with the component's exported images, so keyboard and screen readers work as usual. */
 .pp-auth-terms__row {
   display: flex;
   align-items: flex-start;
@@ -303,8 +316,15 @@
   width: var(--pp-space-24);
   height: var(--pp-space-24);
   margin: 0;
-  accent-color: var(--pp-color-orange-800);
+  border-radius: var(--pp-radius-4);
+  background: url("./assets/checkbox-empty.svg") center / 19.58px 19.58px no-repeat;
+  appearance: none;
   cursor: pointer;
+}
+
+.pp-auth-terms__box:checked {
+  background-image: url("./assets/checkbox-checked.svg");
+  background-size: 19.28px 19.28px;
 }
 
 .pp-auth-terms__box[aria-invalid="true"] {
@@ -360,12 +380,12 @@
 .pp-auth .pp-auth-btn--outlined {
   background-color: var(--pp-auth-pending-surface-container);
   color: var(--pp-color-orange-950);
-  box-shadow: inset 0 0 0 1px var(--pp-auth-outline);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
   font-weight: var(--pp-font-weight-bold);
 }
 
 .pp-auth .pp-auth-btn--outlined:hover {
-  box-shadow: inset 0 0 0 3px var(--pp-auth-outline);
+  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
 }
 
 .pp-auth .pp-auth-btn--outlined:active {
@@ -383,7 +403,7 @@
 .pp-auth .pp-auth-btn--outlined[aria-busy="true"] {
   background-color: var(--pp-auth-pending-surface-container);
   color: var(--pp-color-orange-950);
-  box-shadow: inset 0 0 0 1px var(--pp-auth-outline);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
   cursor: progress;
 }
 
