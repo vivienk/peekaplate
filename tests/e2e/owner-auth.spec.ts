@@ -136,17 +136,48 @@ test('when confirmation is required, Create account shows Check your email', asy
   await fillCreate(page);
   const heading = page.getByRole('heading', { name: 'Check your email' });
   await expect(heading).toBeFocused();
+  // Rania's wording (12 Nov): short, no address, never says whether an account exists.
   await expect(
     page.getByText(
-      `If this address can be registered, a confirmation link will arrive at ${EMAIL}`,
+      'We’ve sent a confirmation link to your email address. Check your inbox and spam folder to complete your account setup.',
     ),
   ).toBeVisible();
+  await expect(page.getByText(EMAIL)).toHaveCount(0);
   // The result screen has no logo (Figma "Check your email").
   await expect(page.locator('.pp-auth__brand')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Edit email address' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeFocused();
   await expect(page.getByLabel('Email address')).toHaveValue(EMAIL);
+});
+
+test('Check your email: Resend waits, then sends another link', async ({ page }) => {
+  await page.clock.install();
+  await page.goto(demo);
+  await answer(page, 'Email check', 'new_account');
+  await page.getByLabel('Email address').fill(EMAIL);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.clock.runFor(1_000);
+  await page.getByLabel('Full name').fill('Sam Rivera');
+  await passwordField(page).fill('long-enough');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.clock.runFor(1_000);
+
+  const resend = page.getByRole('button', { name: 'Resend email' });
+  await expect(resend).toHaveAttribute('aria-disabled', 'true');
+  await expect(resend).toHaveAccessibleDescription(
+    'Resend is unavailable right now. Please wait before requesting another link.',
+  );
+  await expect(page.getByText('or', { exact: true })).toBeVisible();
+
+  // After the 60 s wait the button sends another link and waits again.
+  await page.clock.runFor(61_000);
+  await expect(resend).not.toHaveAttribute('aria-disabled');
+  await resend.click();
+  await page.clock.runFor(1_000);
+  await expect(page.getByText('We’ve sent another link.')).toBeVisible();
+  await expect(resend).toHaveAttribute('aria-disabled', 'true');
 });
 
 test('Check your email links back to Sign in', async ({ page }) => {
@@ -357,5 +388,21 @@ test('on a wide screen the card sits on the right, leaving the left side for the
   const card = await page.locator('.pp-auth__card').boundingBox();
   expect(card?.x).toBeGreaterThanOrEqual(720);
   expect(Math.round((card?.x ?? 0) + (card?.width ?? 0))).toBe(1440 - 96);
-  await expect(page.locator('.pp-auth__art')).toHaveAttribute('aria-hidden', 'true');
+  // The food photo is the page background (Figma), not content.
+  const background = await page
+    .locator('.pp-auth')
+    .evaluate((element) => getComputedStyle(element).backgroundImage);
+  expect(background).toContain('login-background');
+});
+
+test('the eye shows open while the password is visible and closed while hidden', async ({
+  page,
+}) => {
+  await openSignIn(page);
+  const eye = page.locator('.pp-auth-field__eye');
+  await expect(passwordField(page)).toHaveAttribute('type', 'password');
+  await expect(eye).toHaveAttribute('data-eye', 'closed');
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(passwordField(page)).toHaveAttribute('type', 'text');
+  await expect(eye).toHaveAttribute('data-eye', 'open');
 });

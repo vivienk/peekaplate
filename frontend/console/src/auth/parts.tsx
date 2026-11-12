@@ -1,7 +1,15 @@
-// S4-FE-04.1: the pieces the three sign-in screens share. Fields keep the TextField structure
-// (label above, one hint or error below, linked with aria-describedby) and the design-system Input.
+// S4-FE-04: the pieces the owner sign-in screens share, following the Figma components (Input /
+// Text, Input / Password, Owner dashboard_Button, Error Message, Text link). Fields keep the TextField
+// structure (label above, one hint or error below, linked with aria-describedby). Icons and the
+// envelope are the Figma exports in ./assets.
 import { type ReactNode, type Ref, useId, useState } from 'react';
 import { Button, Input } from '../ui';
+import arrowLeft from './assets/arrow-left.svg';
+import badge from './assets/badge.svg';
+import envelopeLineArt from './assets/envelope-line-art.svg';
+import errorIcon from './assets/error.svg';
+import eyeOpen from './assets/eye.svg';
+import eyeOff from './assets/eye-off.svg';
 import type { BannerCopy } from './copy';
 import '../foundations/field.css';
 
@@ -35,23 +43,19 @@ function FieldNote({
   ) : null;
 }
 
-const EYE = (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-    <path
-      fill="currentColor"
-      d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7Zm0 11.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9Zm0-7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"
-    />
-  </svg>
-);
-
-const EYE_OFF = (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
-    <path
-      fill="currentColor"
-      d="M3.3 2.3 2 3.6l3.1 3.1C3.3 8 1.9 9.9 1 12c1.73 3.89 6 7 11 7 1.9 0 3.6-.4 5.2-1.1l3.2 3.2 1.3-1.3L3.3 2.3ZM12 16.5A4.5 4.5 0 0 1 7.5 12c0-.7.2-1.4.5-2l1.5 1.5a2.5 2.5 0 0 0 3 3l1.5 1.5c-.6.3-1.3.5-2 .5Zm0-11.5c5 0 9.27 3.11 11 7-.7 1.6-1.8 3-3.1 4.1l-2.9-2.9c.3-.6.5-1.4.5-2.2A4.5 4.5 0 0 0 12 7.5c-.8 0-1.6.2-2.2.5L7.6 5.8C9 5.3 10.5 5 12 5Z"
-    />
-  </svg>
-);
+// Password-Eye Icon: open eye while the password is shown, crossed-out eye while it is hidden
+// (Rania, 12 Nov).
+function EyeIcon({ shown }: { shown: boolean }) {
+  return (
+    <span className="pp-auth-field__eye" data-eye={shown ? 'open' : 'closed'} aria-hidden="true">
+      {shown ? (
+        <img src={eyeOpen} alt="" width="20" height="15.5693" />
+      ) : (
+        <img src={eyeOff} alt="" width="20" height="20" />
+      )}
+    </span>
+  );
+}
 
 type PasswordFieldProps = {
   label: string;
@@ -110,7 +114,7 @@ export function PasswordField({
           aria-controls={id}
           onClick={() => setVisible((shown) => !shown)}
         >
-          {visible ? EYE_OFF : EYE}
+          <EyeIcon shown={visible} />
         </button>
       </div>
       <FieldNote id={errorId ?? hintId} hint={hint} error={error} />
@@ -205,18 +209,9 @@ export function LockedEmailField({
 export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: ReactNode }) {
   return (
     <div className="pp-auth-banner" role="alert">
-      <svg
-        className="pp-auth-banner__icon"
-        viewBox="0 0 20 20"
-        width="20"
-        height="20"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <circle cx="10" cy="10" r="8.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M10 5.5v5.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-        <circle cx="10" cy="14" r="1.1" fill="currentColor" />
-      </svg>
+      <span className="pp-auth-banner__icon" aria-hidden="true">
+        <img src={errorIcon} alt="" width="24" height="24" />
+      </span>
       <div className="pp-auth-banner__text">
         <p className="pp-auth-banner__title">{copy.title}</p>
         <p className="pp-auth-banner__body">{copy.body}</p>
@@ -226,9 +221,10 @@ export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: React
   );
 }
 
-// The full-width primary button. While a request runs it shows a spinner and a "…ing" label and
-// ignores presses; it is not disabled, so keyboard focus stays on it (S02 handoff, section 4). While
-// the service asks the owner to wait (rate limited) it is marked unavailable the same way.
+// Owner dashboard_Button, size Large, full width. While a request runs it shows a spinner and a
+// "…ing" label and ignores presses; it is not disabled, so keyboard focus stays on it (S02 handoff,
+// section 4). While the service asks the owner to wait (rate limited) it shows the Disabled look but
+// stays focusable.
 export function SubmitButton({
   busy,
   label,
@@ -243,7 +239,7 @@ export function SubmitButton({
   return (
     <Button
       type="submit"
-      className="pp-auth__submit"
+      className="pp-auth__submit pp-auth-btn pp-auth-btn--primary"
       aria-busy={busy ? true : undefined}
       aria-disabled={blocked && !busy ? true : undefined}
     >
@@ -253,7 +249,40 @@ export function SubmitButton({
   );
 }
 
-// "← Back to sign in" (Text link Tone=Neutral with back arrow, S03/S04 handoff).
+// Owner dashboard_Button, Large: Primary (filled) or Outlined, for actions that are not a form submit.
+export function ActionButton({
+  variant = 'primary',
+  busy = false,
+  blocked = false,
+  busyLabel,
+  onClick,
+  describedBy,
+  children,
+}: {
+  variant?: 'primary' | 'outlined';
+  busy?: boolean;
+  blocked?: boolean;
+  busyLabel?: string;
+  onClick: () => void;
+  describedBy?: string;
+  children: string;
+}) {
+  return (
+    <Button
+      variant={variant === 'primary' ? 'action' : 'outline'}
+      className={`pp-auth-btn pp-auth-btn--${variant}`}
+      aria-busy={busy ? true : undefined}
+      aria-disabled={blocked && !busy ? true : undefined}
+      aria-describedby={describedBy}
+      onClick={onClick}
+    >
+      {busy && <span className="pp-auth__spinner" aria-hidden="true" />}
+      {busy && busyLabel ? busyLabel : children}
+    </Button>
+  );
+}
+
+// "← Back to sign in" (Text link Tone=Neutral with the Arrow left icon).
 export function BackLink({
   onClick,
   disabled,
@@ -266,52 +295,36 @@ export function BackLink({
   return (
     <p className="pp-auth__back">
       <button type="button" className="pp-auth-link" disabled={disabled} onClick={onClick}>
-        <span aria-hidden="true">← </span>
+        <img src={arrowLeft} alt="" width="20" height="20" />
         {children}
       </button>
     </p>
   );
 }
 
-// The envelope from the S03 "Check your email" frame. Decorative.
-export const MAIL_ILLUSTRATION = (
-  <svg
-    className="pp-auth-status__art"
-    viewBox="0 0 240 112"
-    width="240"
-    height="112"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path
-      d="M10 112c0-16 14-26 30-24 4-14 20-20 32-12 8-14 32-14 40 2h40c8-16 32-16 40-2 12-8 28-2 32 12 16-2 30 8 30 24Z"
-      fill="var(--pp-color-orange-100)"
-    />
-    <g stroke="var(--pp-color-gray-900)" strokeWidth="3" strokeLinejoin="round" fill="none">
-      <rect x="78" y="38" width="84" height="66" rx="5" fill="var(--pp-color-gray-50)" />
-      <path d="M80 41 120 76 160 41" />
-      <path d="M80 102 108 70M160 102 132 70" />
-    </g>
-    <g stroke="var(--pp-color-orange-500)" strokeWidth="3" strokeLinecap="round">
-      <path d="M120 4v10M98 12l5 8M142 12l-5 8" />
-    </g>
-    <circle cx="162" cy="40" r="17" fill="var(--pp-color-orange-500)" />
-    <text
-      x="162"
-      y="47"
-      textAnchor="middle"
-      fontFamily="Inter, system-ui, sans-serif"
-      fontSize="20"
-      fontWeight="600"
-      fill="var(--pp-color-gray-50)"
-    >
-      1
-    </text>
-  </svg>
-);
+// "Divider or": two lines with "or" between them.
+export function OrDivider() {
+  return (
+    <p className="pp-auth-divider">
+      <span>or</span>
+    </p>
+  );
+}
 
-// A centred result screen without the form: "Check your email", "Password updated", "This reset
-// link can't be used". Focus moves to its heading when it opens (S03/S04 handoff, accessibility).
+// The Figma "Envelope illustration": Envelope line art with the orange "1" badge. Decorative.
+export function MailIllustration() {
+  return (
+    <span className="pp-auth-mail" aria-hidden="true">
+      <img className="pp-auth-mail__art" src={envelopeLineArt} alt="" width="320" height="150" />
+      <img className="pp-auth-mail__badge" src={badge} alt="" width="50" height="50" />
+      <span className="pp-auth-mail__count">1</span>
+    </span>
+  );
+}
+
+// A centred result screen without the form: illustration, then the heading and its text, then the
+// actions ("Check your email", and in recovery "Password updated" / "This reset link can't be used").
+// Focus moves to its heading when it opens (S03/S04 handoff, accessibility).
 export function StatusPanel({
   art,
   title,
@@ -327,12 +340,48 @@ export function StatusPanel({
 }) {
   return (
     <div className="pp-auth-status">
-      {art}
-      <h1 className="pp-auth__title pp-auth-status__title" ref={heading} tabIndex={-1}>
-        {title}
-      </h1>
-      <p className="pp-auth__lead pp-auth-status__body">{children}</p>
-      <div className="pp-auth-status__actions">{actions}</div>
+      <div className="pp-auth-status__top">
+        {art}
+        <div className="pp-auth-status__text">
+          <h1 className="pp-auth__title" ref={heading} tabIndex={-1}>
+            {title}
+          </h1>
+          <p className="pp-auth__lead">{children}</p>
+        </div>
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+// Resend email (Outlined) with its status line below (S03 handoff, section 6), as one group.
+export function ResendGroup({
+  busy,
+  blocked,
+  status,
+  onResend,
+}: {
+  busy: boolean;
+  blocked: boolean;
+  status: string;
+  onResend: () => void;
+}) {
+  const statusId = useId();
+  return (
+    <div className="pp-auth-resend">
+      <ActionButton
+        variant="outlined"
+        busy={busy}
+        blocked={blocked}
+        busyLabel="Sending…"
+        describedBy={statusId}
+        onClick={onResend}
+      >
+        Resend email
+      </ActionButton>
+      <p className="pp-auth-resend__status" id={statusId} aria-live="polite">
+        {status}
+      </p>
     </div>
   );
 }

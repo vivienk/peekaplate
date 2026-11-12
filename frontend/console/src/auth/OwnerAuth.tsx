@@ -20,8 +20,10 @@ import {
   EmailField,
   ErrorBanner,
   LockedEmailField,
-  MAIL_ILLUSTRATION,
+  MailIllustration,
+  OrDivider,
   PasswordField,
+  ResendGroup,
   StatusPanel,
   SubmitButton,
 } from './parts';
@@ -67,9 +69,7 @@ export function OwnerAuth({
 
   return (
     <div className="pp-auth">
-      {/* Left side of the Figma frames: the food photo goes here once it is exported (decorative). */}
-      <div className="pp-auth__art" aria-hidden="true" />
-      <div className="pp-auth__card">
+      <div className={`pp-auth__card pp-auth__card--${step}`}>
         {!WITHOUT_BRAND.includes(step) && (
           <p className="pp-auth__brand">
             <img src={logo} alt="" width="32" height="32" />
@@ -107,7 +107,13 @@ export function OwnerAuth({
           />
         )}
         {step === 'confirm-email' && (
-          <ConfirmEmailStep key="confirm-email" email={email} focusHeading={moved} onRoute={go} />
+          <ConfirmEmailStep
+            key="confirm-email"
+            email={email}
+            focusHeading={moved}
+            service={service}
+            onRoute={go}
+          />
         )}
       </div>
     </div>
@@ -415,7 +421,7 @@ function CreateStep({
         Already have an account?{' '}
         <button
           type="button"
-          className="pp-auth-link pp-auth-link--strong"
+          className="pp-auth-link"
           disabled={busy}
           onClick={() => onRoute('signin')}
         >
@@ -525,7 +531,7 @@ function SignInStep({
         New to PeekaPlate?{' '}
         <button
           type="button"
-          className="pp-auth-link pp-auth-link--accent pp-auth-link--strong"
+          className="pp-auth-link pp-auth-link--accent"
           disabled={busy}
           onClick={() => onRoute('create')}
         >
@@ -536,39 +542,85 @@ function SignInStep({
   );
 }
 
-// After Create account, when the provider sends a confirmation email (Sai, 11 Nov). Uses the S03
-// "Check your email" layout. The owner confirms from the email and returns to the app.
-function ConfirmEmailStep({
-  email,
-  focusHeading,
-  onRoute,
-}: {
-  email: string;
-  focusHeading: boolean;
-  onRoute: (step: AuthStep, email?: string) => void;
-}) {
+// How long "Resend email" stays unavailable when the service does not say (S03 handoff, section 6:
+// the wait is not decided yet).
+const DEFAULT_RESEND_WAIT_SECONDS = 60;
+
+// The line under Resend email: waiting, resent, or failed (S03 handoff, section 6).
+function resendStatus(state: 'sent' | 'resent' | 'failed' | BannerCopy, blocked: boolean): string {
+  if (typeof state === 'object') return `${state.title}. ${state.body}`;
+  if (state === 'resent') return 'We’ve sent another link.';
+  if (state === 'failed') return 'We couldn’t send another link. Please try again.';
+  return blocked
+    ? 'Resend is unavailable right now. Please wait before requesting another link.'
+    : '';
+}
+
+// After Create account, when the provider sends a confirmation email (Sai, 11 Nov). Figma "Check your
+// email" layout and Rania's wording (12 Nov): short, no address in the text, never says whether an
+// account exists. Resend email shows only when the service can resend the confirmation.
+function ConfirmEmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   const heading = useHeadingFocus(focusHeading);
+  const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
+  const [state, setState] = useState<'sent' | 'resent' | 'failed' | BannerCopy>('sent');
+  const resendConfirmation = service.resendConfirmation?.bind(service);
+
+  // The link was just sent, so Resend starts in its waiting state. Runs once, when the screen opens.
+  useEffect(() => {
+    cooldown.start({ kind: 'rate_limited', retryAfterSeconds: DEFAULT_RESEND_WAIT_SECONDS });
+  }, []);
+
+  async function resend() {
+    if (!resendConfirmation || running.current || cooldown.blocked) return;
+    const result = await run(() => resendConfirmation(email), { kind: 'failed' as const });
+    if (!result) return;
+    if (result.kind === 'sent') {
+      setState('resent');
+      cooldown.start({
+        kind: 'rate_limited',
+        retryAfterSeconds: result.resendAfterSeconds ?? DEFAULT_RESEND_WAIT_SECONDS,
+      });
+    } else if (result.kind === 'rate_limited') {
+      setState(rateLimitedBanner(result.retryAfterSeconds));
+      cooldown.start(result);
+    } else {
+      setState(result.kind === 'unavailable' ? BANNERS.unavailable : 'failed');
+    }
+  }
+
   return (
     <StatusPanel
-      art={MAIL_ILLUSTRATION}
+      art={<MailIllustration />}
       title="Check your email"
       heading={heading}
       actions={
         <>
-          <button
-            type="button"
-            className="pp-auth-link pp-auth-link--accent"
-            onClick={() => onRoute('email')}
-          >
-            Edit email address
-          </button>
-          <BackLink onClick={() => onRoute('signin')} />
+          {resendConfirmation && (
+            <ResendGroup
+              busy={busy}
+              blocked={cooldown.blocked}
+              status={resendStatus(state, cooldown.blocked)}
+              onResend={resend}
+            />
+          )}
+          <div className="pp-auth-status__links">
+            {resendConfirmation && <OrDivider />}
+            <button
+              type="button"
+              className="pp-auth-link pp-auth-link--accent"
+              disabled={busy}
+              onClick={() => onRoute('email')}
+            >
+              Edit email address
+            </button>
+            <BackLink disabled={busy} onClick={() => onRoute('signin')} />
+          </div>
         </>
       }
     >
-      If this address can be registered, a confirmation link will arrive at <strong>{email}</strong>
-      . Open it in this browser to finish creating your account. Already registered? Sign in
-      instead. Check your inbox and spam folder.
+      We’ve sent a confirmation link to your email address. Check your inbox and spam folder to
+      complete your account setup.
     </StatusPanel>
   );
 }

@@ -44,6 +44,14 @@ export type CreateAccountResult =
   | { kind: 'unavailable' }
   | RateLimited;
 
+// "Resend email" on Check your email after Create account (Figma S03 layout). resendAfterSeconds is
+// how long the button stays unavailable, if the service says.
+export type ResendConfirmationResult =
+  | { kind: 'sent'; resendAfterSeconds?: number }
+  | { kind: 'failed' }
+  | { kind: 'unavailable' }
+  | RateLimited;
+
 export type SignInRequest = { email: string; password: string };
 
 export type CreateAccountRequest = {
@@ -59,6 +67,8 @@ export interface OwnerAuthService {
   checkEmail(email: string): Promise<EmailCheckResult>;
   signIn(request: SignInRequest): Promise<SignInResult>;
   createAccount(request: CreateAccountRequest): Promise<CreateAccountResult>;
+  // Optional until the provider supports it; without it Check your email shows no Resend button.
+  resendConfirmation?(email: string): Promise<ResendConfirmationResult>;
 }
 
 // The service used until the provider is connected. It sends nothing anywhere.
