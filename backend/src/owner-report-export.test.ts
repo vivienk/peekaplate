@@ -86,9 +86,9 @@ describe('owner-report CSV export (S5-DATA-11)', () => {
     'save_rate',
   ] as const)('preserves a known zero for %s', (metric) => {
     const report = structuredClone(sampleReport);
-    report.dishes[1].name = 'Synthetic zero';
-    report.dishes[1].metrics[metric] = { value: 0, status: 'VALID_ZERO' };
-    const [header, row] = serializeOwnerReportCsv(report).trim().split('\n');
+    report.dishes[1]!.name = 'Synthetic zero';
+    report.dishes[1]!.metrics[metric] = { value: 0, status: 'VALID_ZERO' };
+    const [header = '', row = ''] = serializeOwnerReportCsv(report).trim().split('\n');
     const headers = header.split(',');
     const cells = row.split(',');
     expect(cells[headers.indexOf(metric)]).toBe('0');
@@ -99,9 +99,9 @@ describe('owner-report CSV export (S5-DATA-11)', () => {
     'keeps an unavailable %s value blank without converting it to zero',
     (status) => {
       const report = structuredClone(sampleReport);
-      report.dishes[1].name = 'Synthetic unavailable';
-      report.dishes[1].metrics.save_rate = { value: null, status };
-      const [header, row] = serializeOwnerReportCsv(report).trim().split('\n');
+      report.dishes[1]!.name = 'Synthetic unavailable';
+      report.dishes[1]!.metrics.save_rate = { value: null, status };
+      const [header = '', row = ''] = serializeOwnerReportCsv(report).trim().split('\n');
       const headers = header.split(',');
       const cells = row.split(',');
       expect(cells[headers.indexOf('save_rate')]).toBe('');

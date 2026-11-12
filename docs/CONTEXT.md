@@ -64,7 +64,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/comparison-report.test.ts",
         "packages/contracts/src/owner-actions.ts",
         "packages/contracts/src/owner-actions.test.ts",
-        "docs/owner-insight-actions.md"
+        "docs/owner-insight-actions.md",
+        "packages/contracts/src/owner-menu.ts",
+        "packages/contracts/src/owner-menu.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -72,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "54d6c4965afe366342c51401678d530e38b5a16b9816e5d8c483681c68a0f2e5"
+      "sourceFingerprint": "4ef95b7ebd0ab742a9a72c2e53164a1542f500249efca9fe7551128280ed4cc0"
     },
     {
       "id": "tokens",
@@ -211,7 +213,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c490fa8f10072b47814a00ac93adce4e94b665344350af58a06f09a43ed1b723"
+      "sourceFingerprint": "1e84fd03f0b773408b922971fa54eda243250938f8de0e5a6f771b413d55b4b6"
     },
     {
       "id": "console",
@@ -242,7 +244,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current venue authority, commands/publication, signed menu reads, canonical ingestion/Queue consumption, menu extraction and review persistence. Owner HTTP reports remain synthetic-source/environment gated. Internal period comparisons read live tenant-scoped facts with per-period session cohorts, ordered qualifying comparisons and complementary suppression of rates/deltas/counts that expose small opened cohorts. Restored DATA05 fixtures and real PostgreSQL cases cover privacy, traffic filtering, cross-publication deduplication and denied venue access. No comparison HTTP route, deployment or production report activation is added. Owner-only insight actions lock membership, validate menu revision and atomically store versioned writes with command receipts.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. Owner CSV exports retain NORMAL and VALID_ZERO values while blanking unavailable cells; JSON and CSV routes share exact-origin, source and current-owner guard tests.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -360,7 +362,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-insight-actions.test.ts",
         "migrations/20261109120000_owner_insight_actions.sql",
         "tests/db/owner_insight_actions.sql",
-        "docs/owner-insight-actions.md"
+        "docs/owner-insight-actions.md",
+        "backend/src/staff-venue.ts",
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu.integration.ts",
+        "backend/src/ingestion/intake.ts",
+        "backend/src/ingestion/intake.test.ts",
+        "backend/src/ingestion/pdf-fixture.ts",
+        "docs/owner-menu-workspace.md",
+        "backend/src/ingestion/intake.source.test.ts",
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/owner-report-export.ts",
+        "backend/src/owner-report-export.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -373,7 +388,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b26bec668884114a657e0eb43f9ea25249b90fed2748649a908470ab87faf565"
+      "sourceFingerprint": "36af0cfaebb5b3fad2a48aee1c69ae069292224e567f3da7411bb56156e508da"
     },
     {
       "id": "database",
@@ -406,7 +421,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261108120000_pos_mapping_reviewer_provenance.sql",
         "tests/db/order_outcomes.sql",
         "migrations/20261109120000_owner_insight_actions.sql",
-        "tests/db/owner_insight_actions.sql"
+        "tests/db/owner_insight_actions.sql",
+        "migrations/20261112010000_owner_menu_workspace.sql",
+        "tests/db/owner_menu_workspace.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -417,7 +434,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5fd8365667de544855c7f182fdb07f49c859235e18ac9e5457f0e9b0706b2883"
+      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
     },
     {
       "id": "measurement",
@@ -503,7 +520,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7f792284551e981bfe468028faaef7ed3aba19b1d8512c2786e39f07922d8171"
+      "sourceFingerprint": "aa08193f11cab070ac8a33a69cfec16323f3bd89694ddf5077ac3d74abee72df"
     },
     {
       "id": "agents",
@@ -700,24 +717,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-10",
       "modules": [
         "backend",
-        "processing",
-        "delivery"
-      ],
-      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
-      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
-        "backend",
         "delivery"
       ],
       "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
@@ -805,6 +804,38 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
+      "sources": [
+        "docs/owner-menu-workspace.md",
+        "backend/src/owner-menu.ts",
+        "backend/src/ingestion/intake.ts",
+        "migrations/20261112010000_owner_menu_workspace.sql",
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/evidence/owner-menu-staging-2026-11-12.json"
+      ],
+      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR131 CSV review reproduced dropped VALID_ZERO values. The serializer now preserves known zero values and retains blank unavailable cells. Regression coverage exercises visible zero metrics and unavailable states, and the existing signed-identity/source/venue/CORS report tests now also exercise the CSV route and its attachment headers. Current develop context and owner-menu changes are preserved. Local checks pass: 1425 unit tests (four optional skips), 74 script tests, 310 SQL assertions and 130 database/Worker cases; frontend builds and the Worker dry-run pass.",
+      "sources": [
+        "backend/src/owner-report-export.ts",
+        "backend/src/owner-report-export.test.ts",
+        "backend/src/index.test.ts",
+        "docs/owner-report-staging.md"
+      ],
+      "next": "Complete final-commit checks and review before approval. No merge, hosted CSV deployment, normal Queue activation or production acceptance is included. Empty exports contain only the fixed header; real spreadsheet execution remains separate."
     }
   ]
 }

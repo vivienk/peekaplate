@@ -2,8 +2,10 @@ import crypto from 'node:crypto';
 import {
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
+  ApprovedDishFactsSchema,
   ApproveMenuRevisionSchema,
   type BoundedRetrievalResult,
+  CandidateCorrectedFieldsSchema,
   CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
   type CreateOwnerInsightActionRequest,
@@ -21,6 +23,7 @@ import {
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
   type OrderOutcomeImportResponse,
+  OwnerDishFieldsSchema,
   OwnerInsightActionIdSchema,
   type OwnerInsightActionListQuery,
   OwnerInsightActionListQuerySchema,
@@ -51,6 +54,7 @@ import {
   type QueueHandlerServices,
 } from './consumer';
 import { CommandError, createDishRevision, type DishRevisionResult } from './dish-command';
+import { validateMenuPdf } from './ingestion/intake';
 import {
   type PythonExtractor,
   processIngestionQueueBatch,
@@ -88,6 +92,7 @@ import {
   OwnerInsightActionError,
   updateOwnerInsightAction,
 } from './owner-insight-actions';
+import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   buildOwnerReportExportFilename,
@@ -114,8 +119,11 @@ import {
   saveCandidateReviewCommand,
   upsertExtractionReviewSession,
 } from './review-command';
+import { authorizeStaffVenue } from './staff-venue';
 import { readTeamAnalytics } from './team-analytics';
 import { verifyTeamCollaborator } from './team-auth';
+
+export { authorizeStaffVenue } from './staff-venue';
 
 export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = [
   '00000000-0000-4000-8000-000000000123',
@@ -320,48 +328,6 @@ export async function submitAuthorizedMenuIngestion(
       queuedAt: new Date().toISOString(),
     });
   return job;
-}
-
-export async function authorizeStaffVenue(
-  client: Client,
-  actorId: string,
-  venueId: string,
-  inTransaction = false,
-): Promise<void> {
-  let started = false;
-  try {
-    if (!inTransaction) {
-      await client.query('BEGIN');
-      started = true;
-    }
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
-
-    if (!inTransaction) await client.query('COMMIT');
-    started = false;
-  } catch (error) {
-    if (started) {
-      try {
-        await client.query('ROLLBACK');
-      } catch {
-        // Rollback failure preserved
-      }
-    }
-    throw error;
-  }
 }
 
 let verifier: { issuer: string; local: boolean; verify: ReturnType<typeof createStaffVerifier> };
@@ -626,7 +592,14 @@ export async function approveDishDraftAtomic(
   actorId: string,
   venueId: string,
   draftId: string,
-  options: { commandId: string; expectedVersion?: number | undefined },
+  options: {
+    commandId: string;
+    expectedVersion?: number | undefined;
+    expectedDraftVersion?: number | undefined;
+    expectedReviewVersion?: number | undefined;
+    extractionId?: string | undefined;
+    confirmed?: true | undefined;
+  },
 ): Promise<{ draft: DishDraftRow; publishedRevision: DishRevisionResult }> {
   let started = false;
   try {
@@ -655,7 +628,27 @@ export async function approveDishDraftAtomic(
     const expectedVersion = options.expectedVersion ?? 0;
     const approvalHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify({ draftId, expectedVersion }))
+      .update(
+        JSON.stringify({
+          draftId,
+          expectedVersion,
+          ...(options.expectedDraftVersion === undefined &&
+          options.expectedReviewVersion === undefined &&
+          options.extractionId === undefined
+            ? {}
+            : {
+                approvalVersion: 2,
+                expectedDraftVersion: options.expectedDraftVersion,
+                ...(options.expectedReviewVersion === undefined
+                  ? {}
+                  : { expectedReviewVersion: options.expectedReviewVersion }),
+                ...(options.extractionId === undefined
+                  ? {}
+                  : { extractionId: options.extractionId }),
+                confirmed: options.confirmed ?? false,
+              }),
+        }),
+      )
       .digest('hex');
 
     const receipt = await client.query<{ request_hash: string; result: any }>(
@@ -674,6 +667,26 @@ export async function approveDishDraftAtomic(
       return existing.result;
     }
 
+    const discovered = await client.query<{ job_id: string | null }>(
+      'SELECT job_id FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+      [venueId, draftId],
+    );
+    let currentJob:
+      | {
+          status: string;
+          active_review_extraction_id: string | null;
+          result_storage_key: string | null;
+          review_result_storage_key: string | null;
+        }
+      | undefined;
+    if (discovered.rows[0]?.job_id) {
+      currentJob = (
+        await client.query(
+          'SELECT status,active_review_extraction_id,result_storage_key,review_result_storage_key FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND id=$2 FOR SHARE',
+          [venueId, discovered.rows[0].job_id],
+        )
+      ).rows[0];
+    }
     const draftRes = await client.query<DishDraftRow>(
       `SELECT * FROM app_private.dish_drafts
        WHERE tenant_id = $1 AND id = $2
@@ -685,8 +698,99 @@ export async function approveDishDraftAtomic(
       throw new IngestionError('draft_not_pending_or_not_found', 404);
     }
 
+    const manual =
+      draft.origin === 'manual' ? OwnerDishFieldsSchema.parse(draft.manual_fields) : null;
+    let reviewed = false;
+    let corrected: ReturnType<typeof CandidateCorrectedFieldsSchema.parse> = {};
+    if (!manual) {
+      const sessions = await client.query<{ extraction_id: string }>(
+        'SELECT extraction_id FROM app_private.extraction_review_session WHERE tenant_id=$1 AND job_id=$2',
+        [venueId, draft.job_id],
+      );
+      if (sessions.rows.length) {
+        if (
+          !options.extractionId ||
+          !currentJob ||
+          !['complete', 'incomplete'].includes(currentJob.status) ||
+          currentJob.active_review_extraction_id !== options.extractionId ||
+          !currentJob.result_storage_key ||
+          currentJob.result_storage_key !== currentJob.review_result_storage_key ||
+          !sessions.rows.some((session) => session.extraction_id === options.extractionId)
+        )
+          throw new IngestionError('draft_confirmation_required', 409);
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+          `candidate-review:${venueId}:${options.extractionId}:${draft.candidate_id ?? draft.draft_id}`,
+        ]);
+        const reviews = await client.query<{
+          version: number;
+          review_status: string;
+          corrected_fields: unknown;
+          incomplete_fields: string[];
+        }>(
+          'SELECT version,review_status,corrected_fields,incomplete_fields FROM app_private.candidate_review_current WHERE tenant_id=$1 AND extraction_id=$2 AND candidate_id=$3 FOR SHARE',
+          [venueId, options.extractionId, draft.candidate_id ?? draft.draft_id],
+        );
+        const review = reviews.rows[0];
+        if (
+          options.expectedReviewVersion !== (review?.version ?? 0) ||
+          options.expectedDraftVersion !== draft.draft_version ||
+          options.confirmed !== true
+        )
+          throw new IngestionError('draft_confirmation_required', 409);
+        if (
+          review &&
+          (['rejected', 'incomplete'].includes(review.review_status) ||
+            review.incomplete_fields.length > 0)
+        )
+          throw new IngestionError('draft_incomplete', 409);
+        if (review) corrected = CandidateCorrectedFieldsSchema.parse(review.corrected_fields);
+        reviewed = true;
+      }
+    }
+    const resolved = { ...draft, ...corrected };
+    if (
+      manual &&
+      (options.expectedDraftVersion !== draft.draft_version || options.confirmed !== true)
+    ) {
+      throw new IngestionError('draft_confirmation_required', 409);
+    }
+    if (
+      !draft.name ||
+      (manual && (!manual.category || manual.priceAmount === null || manual.priceCurrency === null))
+    ) {
+      throw new IngestionError('draft_incomplete', 409);
+    }
+    if (manual?.photoId) {
+      const photo = await client.query(
+        'SELECT id FROM app_private.dish_draft_photo WHERE tenant_id=$1 AND draft_id=$2 AND id=$3',
+        [venueId, draftId, manual.photoId],
+      );
+      if (photo.rowCount !== 1) throw new IngestionError('photo_not_found', 404);
+    }
+
     const newDishId = crypto.randomUUID();
     const revisionCommandId = crypto.randomUUID();
+    const facts = manual
+      ? {
+          category: manual.category,
+          priceAmount: manual.priceAmount,
+          priceCurrency: manual.priceCurrency,
+          ingredients: manual.ingredients.status === 'confirmed' ? manual.ingredients.items : null,
+          allergens: manual.allergens.status === 'confirmed' ? manual.allergens.items : null,
+          photoId: manual.photoId,
+        }
+      : reviewed
+        ? {
+            category: resolved.category,
+            priceAmount: resolved.price_amount,
+            priceCurrency: resolved.price_currency,
+            ingredients: resolved.ingredients,
+            allergens: null,
+            photoId: null,
+          }
+        : undefined;
+    const parsedFacts = facts === undefined ? undefined : ApprovedDishFactsSchema.safeParse(facts);
+    if (parsedFacts && !parsedFacts.success) throw new IngestionError('draft_incomplete', 409);
     const revision = await createDishRevision(
       client,
       actorId,
@@ -695,8 +799,9 @@ export async function approveDishDraftAtomic(
         commandId: revisionCommandId,
         dishId: newDishId,
         expectedVersion,
-        name: draft.name,
-        description: draft.description ?? draft.name,
+        name: corrected.name ?? draft.name,
+        description: resolved.description ?? (manual || reviewed ? '' : draft.name),
+        ...(parsedFacts?.success ? { facts: parsedFacts.data } : {}),
       },
       { inTransaction: true },
     );
@@ -714,7 +819,20 @@ export async function approveDishDraftAtomic(
 
     const result = { draft: updatedDraft, publishedRevision: revision };
 
-    const payload = JSON.stringify({ draftId, expectedVersion });
+    const payload = JSON.stringify({
+      draftId,
+      expectedVersion,
+      ...(options.expectedDraftVersion === undefined
+        ? {}
+        : { expectedDraftVersion: options.expectedDraftVersion }),
+      ...(options.extractionId === undefined
+        ? {}
+        : {
+            extractionId: options.extractionId,
+            expectedReviewVersion: options.expectedReviewVersion,
+          }),
+      ...(options.confirmed ? { confirmed: true } : {}),
+    });
     await client.query(
       `INSERT INTO app_private.es_command
         (id, tenant_id, actor_id, command_type, idempotency_key, payload, request_hash, result)
@@ -775,7 +893,15 @@ export function createApp(services: Dependencies = dependencies) {
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
   app.use('/venues/*', async (c, next) => {
-    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/menus\/uploads$/.test(c.req.path))
+    if (
+      c.req.method === 'PUT' &&
+      /^\/venues\/[^/]+\/menus\/upload-groups\/[^/]+\/files\/[0-4]$/.test(c.req.path)
+    )
+      return next();
+    if (
+      c.req.method === 'POST' &&
+      /^\/venues\/[^/]+\/(?:menus\/uploads|drafts\/[^/]+\/photos)$/.test(c.req.path)
+    )
       return next();
     if (c.req.method === 'POST' && /^\/venues\/[^/]+\/orders\/import$/.test(c.req.path)) {
       return orderImportLimit(c, next);
@@ -788,6 +914,25 @@ export function createApp(services: Dependencies = dependencies) {
       return reviewSessionLimit(c, next);
     }
     return defaultVenueLimit(c, next);
+  });
+  app.use('/venues/*', async (c, next) => {
+    if (
+      !/^\/venues\/[^/]+\/(?:menus\/(?:uploads|upload-groups|url|jobs)(?:\/|$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+        c.req.path,
+      )
+    )
+      return next();
+    return cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+      maxAge: 86400,
+    })(c, next);
+  });
+  registerOwnerMenuRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
   });
   app.use(
     '/public/venues/*',
@@ -1237,6 +1382,7 @@ export function createApp(services: Dependencies = dependencies) {
     const queue = c.env.INGESTION_QUEUE;
     if (!storage || !queue) throw new AuthUnavailableError();
     const upload = await readMenuUpload(c.req.raw);
+    await validateMenuPdf(upload);
     const createJob = async () => {
       const env = c.env;
       const connectionString =
