@@ -101,8 +101,9 @@ recovery delivery, expired/reused links, password update and old/new password
 checks. Keep addresses, passwords, email links, codes and tokens out of committed
 evidence. Record only sanitized check results and the tested source revision.
 
-November 11 inspection: the Site URL matches; no redirect URLs were configured,
-and the current Developer role cannot edit Auth settings. Vivien is configuring
-the four entries above. Actual email delivery and hosted dashboard handoff remain
-unverified until those steps are exercised. No merge or deployment is authorized
-by a passing local test.
+November 11 follow-up: the Site URL matches and all four exact local/staging
+redirect URLs above are now verified in Supabase. Public Auth settings return
+200 with email signup enabled and email confirmation required. The Developer
+role remains unable to edit those settings; Vivien configured the allowlist.
+Actual email delivery/confirmation/reset await the manual signup/password step.
+Hosted dashboard handoff remains unverified. Neither PR is merged or deployed.
