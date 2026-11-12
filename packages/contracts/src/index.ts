@@ -1,6 +1,8 @@
 export * from './owner-ai';
 
 import { z } from 'zod';
+import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
+export * from './owner-menu';
 
 export {
   type ReviewCandidate,
@@ -82,6 +84,7 @@ export const CreateDishRevisionSchema = z.strictObject({
   expectedVersion: z.number().int().nonnegative().max(2_147_483_646),
   name: postgresText.trim().min(1).max(160),
   description: postgresText.trim().max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export const DishRevisionSchema = z.strictObject({
@@ -90,6 +93,7 @@ export const DishRevisionSchema = z.strictObject({
   version: z.number().int().positive().max(2_147_483_647),
   name: postgresText.min(1).max(160),
   description: postgresText.max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
@@ -179,18 +183,6 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(false),
 });
-
-export const PublicMenuAllergenCodeSchema = z.enum([
-  'milk',
-  'egg',
-  'fish',
-  'crustacean shellfish',
-  'nuts',
-  'peanut',
-  'wheat',
-  'soy',
-  'sesame',
-]);
 
 export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
 
@@ -1417,6 +1409,8 @@ export type SubmitMenuIngestionRequest = z.infer<typeof SubmitMenuIngestionReque
 export const ApproveDishDraftRequestSchema = z.strictObject({
   commandId: uuid,
   expectedVersion: z.number().int().nonnegative().default(0),
+  expectedDraftVersion: z.number().int().positive().optional(),
+  confirmed: z.literal(true).optional(),
 });
 export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;
 

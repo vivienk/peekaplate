@@ -277,6 +277,7 @@ export async function executeIngestionWorkflow(
   if (!claim) {
     const existing = await getIngestionJob(client, params.tenantId, params.jobId);
     if (!existing) throw new IngestionError('job_not_found', 404);
+    if (existing.status === 'cancelled') throw new IngestionError('job_cancelled', 409);
     if (existing.status === 'running') {
       const leaseTimeoutMinutes = params.leaseTimeoutMinutes ?? DEFAULT_LEASE_TIMEOUT_MINUTES;
       throw new IngestionError(
@@ -570,6 +571,7 @@ export async function processIngestionQueueBatch(
           error: `Job requeued for retry: ${workflowOutcome.job.error_code ?? 'unknown_error'}`,
         });
       } else if (
+        workflowOutcome.job.status === 'cancelled' ||
         workflowOutcome.job.status === 'complete' ||
         workflowOutcome.job.status === 'incomplete' ||
         (workflowOutcome.job.status === 'failed' &&
@@ -613,7 +615,8 @@ export async function processIngestionQueueBatch(
             const existing = await getIngestionJob(client, tenantId, jobId);
             if (
               existing &&
-              (existing.status === 'complete' ||
+              (existing.status === 'cancelled' ||
+                existing.status === 'complete' ||
                 existing.status === 'incomplete' ||
                 (existing.status === 'failed' &&
                   (!options?.reportStorage || existing.result_storage_key !== null)))
@@ -646,7 +649,11 @@ export async function processIngestionQueueBatch(
           });
           continue;
         }
-        if (err.code === 'job_already_complete' || err.code === 'job_already_locked_or_complete') {
+        if (
+          err.code === 'job_cancelled' ||
+          err.code === 'job_already_complete' ||
+          err.code === 'job_already_locked_or_complete'
+        ) {
           if (options?.reportStorage) {
             try {
               const existing = await getIngestionJob(client, tenantId, jobId);
