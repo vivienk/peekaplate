@@ -2875,3 +2875,8 @@ Hosted migration and seven HTTP/CORS checks passed. Hosted staff checks did not 
 The earlier otp_expired verifier blocker was resolved by selecting the newest Gmail delivery explicitly. Gmail had cached/grouped repeated messages and hidden the fresh link under Show trimmed content; the refreshed newest message had zero visible sign-in links before expansion and one afterward. That complete link, verified once with its original type, returned a genuine session. No Auth settings, template, account or password change was needed.
 
 Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
+
+
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.

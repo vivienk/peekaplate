@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search, Save/Saved and Compare picker/result/Replace screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
+      "summary": "Diner fixture/live menu, detail, search, Save/Saved and Compare picker/result/Replace screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -219,7 +219,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "930547cd5c6b35055d9806148949de02aa71674752867778f4a0ae5461c6aa04"
+      "sourceFingerprint": "3c336e4b30d4d8c6aa5fb5caa8d48fc346cd239a38494ef2519ac95e26baaa39"
     },
     {
       "id": "console",
@@ -586,7 +586,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
+      "sourceFingerprint": "c20f2049bac24db021472a921cdc0883d902b36e6a5635ef0f476122fa236652"
     },
     {
       "id": "processing",
@@ -746,14 +746,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "backend",
         "delivery"
       ],
@@ -825,6 +817,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/comparison-reporting.md"
       ],
       "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "PR142 owner-only insight-action HTTP/persistence/contracts preserve develop PR134/123. Shared context/history conflicts and stale local port/evidence docs are reconciled. New real-Worker cases cover competing updates, old receipt replay, changed command reuse and dual-owner tenant isolation. A full DB run exposed six inherited comparison-reader statement timeouts; tenant/time-scoped materialization replaces repeated view expansion while preserving period/privacy/order semantics. The full runner passes 298 SQL assertions and 114 DB/Worker cases; 11 focused comparison cases include 1000 unrelated synthetic observations. pnpm check passes 1397 unit (4 optional skips), 74 script tests, types/lint/context/docs. Both builds/Worker dry-run, 137 Chromium and 9 SDK/privacy tests pass.",
+      "sources": [
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/dish.integration.ts",
+        "backend/src/comparison-report.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "docs/owner-insight-actions.md"
+      ],
+      "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
     }
   ]
 }
