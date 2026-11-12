@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
+      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -213,7 +213,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1e84fd03f0b773408b922971fa54eda243250938f8de0e5a6f771b413d55b4b6"
+      "sourceFingerprint": "91d0574ec00a8c3a0be4bd83d18ff767df79ac2655d7f7ebf57e757b2688829e"
     },
     {
       "id": "console",
@@ -580,7 +580,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
+      "sourceFingerprint": "c20f2049bac24db021472a921cdc0883d902b36e6a5635ef0f476122fa236652"
     },
     {
       "id": "processing",
@@ -714,14 +714,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "backend",
         "delivery"
       ],
@@ -828,6 +820,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/evidence/owner-menu-staging-2026-11-12.json"
       ],
       "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "summary": "Synchronizes the narrow first-consent release correction into develop without promoting other runtime work. The real-adapter regression reproduces a menu view lost only from PostHog when the screen listener runs first; current-gate synchronization before capture preserves matching IDs on initial and renewed consent. No new consent policy, provider configuration or Queue change.",
+      "paths": [
+        "frontend/diner/src/tracking/index.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "tests/e2e/posthog-adapter.spec.ts"
+      ],
+      "next": "Merge the reviewed correction and its exact-main staging release after final approval. Record corrected intercepted browser evidence separately from DATA-12 real destination persistence and metric reconciliation."
     }
   ]
 }
