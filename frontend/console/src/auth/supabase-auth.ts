@@ -130,6 +130,19 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
         return { kind: 'failed' };
       }
     },
+    async resendConfirmation(email) {
+      try {
+        const { error } = await client.auth.resend({
+          type: 'signup',
+          email,
+          options: { emailRedirectTo: config.confirmationUrl },
+        });
+        if (error) return providerFailure(error);
+        return { kind: 'sent' };
+      } catch {
+        return { kind: 'failed' };
+      }
+    },
   };
 
   async function confirmEmail(code: string): Promise<{ kind: 'confirmed' | 'invalid_link' }> {
