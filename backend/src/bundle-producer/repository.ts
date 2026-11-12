@@ -97,7 +97,11 @@ export async function loadApprovedDishSources(
       );
 
       const draftByDish = new Map<string, DraftRow>();
+      const enrichedIds = new Set(
+        current.rows.filter((row) => row.approved_facts != null).map((row) => row.dish_id),
+      );
       for (const row of drafts.rows) {
+        if (enrichedIds.has(row.published_dish_id)) continue;
         if (draftByDish.has(row.published_dish_id)) {
           throw new BundleProducerError(
             'ambiguous_dish_source',
@@ -108,6 +112,7 @@ export async function loadApprovedDishSources(
       }
       const reviewByDish = new Map<string, CandidateReviewRow>();
       for (const row of reviews.rows) {
+        if (enrichedIds.has(row.published_dish_id)) continue;
         if (reviewByDish.has(row.published_dish_id)) {
           throw new BundleProducerError(
             'ambiguous_candidate_review',
@@ -131,7 +136,7 @@ export async function loadApprovedDishSources(
             ingredients: facts.ingredients,
             approvedAllergens: facts.allergens,
             approvedCategory: facts.category,
-            reviewState: facts.allergens === null ? 'incomplete' : 'corrected',
+            reviewState: facts.category === null ? 'incomplete' : 'corrected',
           });
           continue;
         }

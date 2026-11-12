@@ -151,6 +151,15 @@ it('uses the reviewed allergen/category snapshot and refuses a different categor
   );
   const leek = dishes(result).find((dish) => dish.dish_id === LEEKS);
   expect(leek?.complete && leek.allergens).toEqual(['milk']);
+  const unknown = await produceMenuBundle(
+    parseRequest(requestInput()),
+    sources({ [LEEKS]: { approvedAllergens: null, approvedCategory: 'Starters' } }),
+    assets(),
+  );
+  expect(dishes(unknown).find((dish) => dish.dish_id === LEEKS)).toMatchObject({
+    complete: true,
+    allergens: null,
+  });
   await expect(
     produceMenuBundle(
       parseRequest(requestInput()),

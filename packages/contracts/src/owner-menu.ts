@@ -60,7 +60,7 @@ export const ApprovedDishFactsSchema = z.strictObject({
     .string()
     .regex(/^[A-Z]{3}$/)
     .nullable(),
-  ingredients: z.array(text.trim().min(1).max(160)).max(80).nullable(),
+  ingredients: z.array(text.trim().min(1).max(160)).max(100).nullable(),
   allergens: z.array(PublicMenuAllergenCodeSchema).max(9).nullable(),
   photoId: z.uuid().nullable(),
 });

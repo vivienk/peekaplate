@@ -2828,3 +2828,8 @@ Test setup corrections: use the installed PDF loading task cleanup API, a real l
 ```json
 {"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-12T08:00:17.419Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T08:24:41.362Z","exitCode":2}
+```

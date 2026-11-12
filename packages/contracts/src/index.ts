@@ -1418,6 +1418,8 @@ export const ApproveDishDraftRequestSchema = z.strictObject({
   commandId: uuid,
   expectedVersion: z.number().int().nonnegative().default(0),
   expectedDraftVersion: z.number().int().positive().optional(),
+  expectedReviewVersion: z.number().int().nonnegative().optional(),
+  extractionId: postgresText.trim().min(1).max(128).optional(),
   confirmed: z.literal(true).optional(),
 });
 export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;
