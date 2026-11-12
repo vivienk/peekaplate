@@ -74,7 +74,7 @@ function Demo() {
   return (
     <div className="owner-root">
       <div className="owner-demo-bar">
-        <span>Synthetic demo · fictional restaurant</span>
+        <span>Synthetic demo · Illustrative sample data · fictional restaurant</span>
         <label>
           Setup state{' '}
           <select
@@ -96,7 +96,6 @@ function Demo() {
         <span role="status">{note}</span>
       </div>
       <FirstDashboard
-        sample
         setup={setup}
         showPublishSuccess={showSuccess}
         onClosePublishSuccess={() => {

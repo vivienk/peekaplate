@@ -7,13 +7,14 @@ import type { OwnerPage } from './setup';
 
 export type { OwnerPage } from './setup';
 
+// Restaurant Setup sits last (design feedback, 10 Nov): the dashboard pages come first.
 const NAV: { id: OwnerPage; label: string; icon: IconName }[] = [
-  { id: 'setup', label: 'Restaurant Setup', icon: 'store' },
   { id: 'overview', label: 'Overview', icon: 'home' },
   { id: 'report', label: 'AI Insight Report', icon: 'report' },
   { id: 'performance', label: 'Dish performance', icon: 'chart' },
   { id: 'menu', label: 'Menu', icon: 'menu' },
   { id: 'actions', label: 'Actions', icon: 'action' },
+  { id: 'setup', label: 'Restaurant Setup', icon: 'store' },
 ];
 
 const LOCKED_HINT_ID = 'owner-nav-locked-hint';

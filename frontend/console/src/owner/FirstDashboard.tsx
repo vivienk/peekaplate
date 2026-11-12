@@ -32,13 +32,25 @@ function StatusLabel({
   );
 }
 
+const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** YYYY-MM-DD in the owner's local time zone (toISOString would give the UTC day). */
+const localDate = (date: Date) =>
+  [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join('-');
+
 export interface FirstDashboardProps {
   setup: OwnerSetup;
   /** Opens an onboarding step (S05 details, S06–S10 menu, review/publish). */
   onOpenStep: (step: StepId) => void;
   onNavigate: (page: OwnerPage) => void;
-  /** True only on labelled previews with fictional data. */
-  sample?: boolean;
+  /** Today's date for the top bar until a report period exists. Defaults to now. */
+  today?: Date;
   /** True right after the API confirmed publication: shows the success pop-up. */
   showPublishSuccess?: boolean;
   /** Closes the success pop-up and returns to the dashboard. */
@@ -49,7 +61,7 @@ export function FirstDashboard({
   setup,
   onOpenStep,
   onNavigate,
-  sample,
+  today = new Date(),
   showPublishSuccess,
   onClosePublishSuccess,
 }: FirstDashboardProps) {
@@ -61,8 +73,14 @@ export function FirstDashboard({
   const topbar = (
     <>
       <div className="owner-chips">
-        {sample && <span className="owner-chip">Illustrative sample data</span>}
-        {setup.reportPeriod && <span className="owner-chip">{setup.reportPeriod}</span>}
+        {/* The report week once there is one; until then, today's date (never an invented period). */}
+        {setup.reportPeriod ? (
+          <span className="owner-chip">{setup.reportPeriod}</span>
+        ) : (
+          <time className="owner-chip" dateTime={localDate(today)}>
+            {DATE_FORMAT.format(today)}
+          </time>
+        )}
       </div>
       {setup.published ? (
         <StatusLabel text="Published" tone="success" />

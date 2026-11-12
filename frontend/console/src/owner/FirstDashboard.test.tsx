@@ -4,13 +4,15 @@ import { FirstDashboard } from './FirstDashboard';
 import type { OwnerSetup } from './setup';
 
 const noop = () => {};
-const render = (setup: OwnerSetup, sample = false, showPublishSuccess = false) =>
+// 11 pm local: later than midnight UTC in Toronto, so a UTC date would wrongly say Nov 12.
+const today = new Date(2026, 10, 11, 23);
+const render = (setup: OwnerSetup, showPublishSuccess = false) =>
   renderToStaticMarkup(
     <FirstDashboard
       setup={setup}
       onOpenStep={noop}
       onNavigate={noop}
-      sample={sample}
+      today={today}
       showPublishSuccess={showPublishSuccess}
       onClosePublishSuccess={noop}
     />,
@@ -43,12 +45,29 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(words).not.toContain('Maple Street Kitchen');
   });
 
-  it('never shows invented numbers, a report period or a sample label unless given', () => {
-    const words = text(render(figmaState));
+  it('shows today in the top bar, never an invented report period or numbers', () => {
+    const html = render(figmaState);
+    const words = text(html);
     expect(words).toContain('We never show placeholder numbers.');
-    expect(words).not.toContain('Illustrative sample data');
+    expect(html).toContain('<time class="owner-chip" dateTime="2026-11-11">Nov 11, 2026</time>');
     expect(words).not.toMatch(/Oct|%|sessions/);
-    expect(text(render(figmaState, true))).toContain('Illustrative sample data');
+    const withPeriod = text(render({ ...published, reportPeriod: 'Nov 2–8, 2026' }));
+    expect(withPeriod).toContain('Nov 2–8, 2026');
+    expect(withPeriod).not.toContain('Nov 11, 2026');
+  });
+
+  it('lists Restaurant Setup last in the sidebar', () => {
+    const labels = [
+      ...render(figmaState).matchAll(/owner-nav__label">(?:<img[^>]*>)?([^<]+)</g),
+    ].map((m) => m[1]);
+    expect(labels).toEqual([
+      'Overview',
+      'AI Insight Report',
+      'Dish performance',
+      'Menu',
+      'Actions',
+      'Restaurant Setup',
+    ]);
   });
 
   it('labels only finished steps and shows no publish button while publishing is locked', () => {
@@ -102,9 +121,9 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
   });
 
   it('shows the success pop-up only after confirmed publication, about publishing only', () => {
-    expect(render(figmaState, false, true)).not.toContain('owner-dialog');
+    expect(render(figmaState, true)).not.toContain('owner-dialog');
     expect(render(published)).not.toContain('owner-dialog');
-    const html = render(published, false, true);
+    const html = render(published, true);
     const dialog = html.slice(html.indexOf('<dialog'));
     expect(dialog).toContain('aria-labelledby="owner-dialog-title"');
     expect(text(dialog)).toContain('Your menu is published');

@@ -438,7 +438,7 @@ body:has(.owner-root) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: var(--pp-space-24);
-  align-items: start;
+  align-items: stretch; /* design feedback, 10 Nov: both cards share one height */
 }
 .owner-verify,
 .owner-empty {
