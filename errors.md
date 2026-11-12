@@ -2670,3 +2670,9 @@ restore Figma composition, and place supplementary controls below it in a disclo
 Regression coverage checks dark surface, native asset dimensions, centered 250px stage
 and compare/reset behavior. Figma connector reached its plan limit after loading-frame
 context; remaining frame layouts were inspected in the browser.
+
+Figma-shell verification: 51/52 browser checks passed initially; the failed assertion
+queried a comparison button without includeHidden after controls became intentionally
+hidden in unavailable state. Assert both hidden container and disabled button.
+Review also found the delivery-budget font matcher excluded the new names and weight700;
+updated matcher and added a three-font budget regression.

@@ -465,8 +465,9 @@ test('PR25 original-photo failure blocks an otherwise valid cutout and compariso
   await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'failed');
   await expect(page.locator('.pp-portion__css')).toHaveCount(0);
   await expect(
-    page.getByRole('button', { name: 'Show original photo', exact: true }),
+    page.getByRole('button', { name: 'Show original photo', exact: true, includeHidden: true }),
   ).toBeDisabled();
+  await expect(page.locator('.pp-portion__controls')).toBeHidden();
 });
 
 test('local review renders the exact original PNGs and switches without adding history', async ({

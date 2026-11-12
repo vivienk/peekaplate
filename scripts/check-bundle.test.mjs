@@ -66,3 +66,17 @@ test('T1 includes both emitted preview font weights', () => {
   assert.equal(checkPortionBundle(bundle).total, baseline + 24_000);
   assert.throws(() => checkPortionBundle(bundle, baseline + 23_999), /exceeds/);
 });
+
+test('T1 counts all three preview-scoped font assets with current filenames', () => {
+  const renderer = chunk('portion.js');
+  renderer.modules['/src/menu/portionRenderer.ts'] = {};
+  const bundle = { 'portion.js': renderer };
+  const baseline = checkPortionBundle(bundle).total;
+  for (const weight of [400, 600, 700]) {
+    const name = `assets/inter-latin-${weight}-abc123.woff2`;
+    bundle[name] = { type: 'asset', fileName: name, source: new Uint8Array(24_000) };
+  }
+  assert.equal(checkPortionBundle(bundle).fontBytes, 72_000);
+  assert.equal(checkPortionBundle(bundle).total, baseline + 72_000);
+  assert.throws(() => checkPortionBundle(bundle, baseline + 71_999), /exceeds/);
+});

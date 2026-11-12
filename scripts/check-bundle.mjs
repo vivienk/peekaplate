@@ -54,7 +54,8 @@ export function checkPortionBundle(bundle, limit = 400_000) {
   const fontBytes = Object.values(bundle)
     .filter(
       (part) =>
-        part.type === 'asset' && /inter-latin-(400|600)-normal.*\.woff2$/.test(part.fileName),
+        part.type === 'asset' &&
+        /inter-latin-(400|600|700)(?:-normal)?(?:-[\w-]+)?\.woff2$/.test(part.fileName),
     )
     .reduce((sum, part) => sum + Buffer.byteLength(part.source), 0);
   const total = gzipBytes + fontBytes + 180_000 + 20_000;
