@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner auth uses a pinned Supabase SDK with PKCE, exact trusted origins and public config. Neutral email entry, confirmation, verified sign-in, session restoration and sign-out preserve synthetic provider-disabled demos. Callbacks scrub credentials and contain no analytics. Recovery requires a current token-bound recovery exchange; password updates use an isolated SDK session and abort on shared identity changes. Approved editable signup/reset email templates are saved in staging Auth; branded Gmail delivery, logo, real recovery callback and consumed-link rejection pass. No automatic venue grants or invented setup progress. Fresh signup/confirmation, actual password submission, old/new password checks and hosted dashboard acceptance remain pending; PR143/146 stay unmerged.",
+      "summary": "React/Vite owner auth uses pinned Supabase SDK PKCE, exact trusted callbacks and public config. Neutral email entry, confirmation, verified sign-in, restoration and sign-out preserve provider-disabled synthetic previews. Callbacks scrub credentials and have no analytics. Recovery requires a current token-bound exchange; isolated SDK password updates abort after shared identity changes. Approved email templates are applied in staging Auth. Fresh Gmail-alias signup, real branded confirmation/recovery, unconfirmed denial, sign-in, actual password update, old/new password checks, reload/sign-out and consumed-link rejection passed live. Signup has no tester-email allowlist or automatic venue grants. PR143/146 stay unmerged; hosted console and owner/dashboard integration remain pending.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -261,7 +261,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d148a37848519b84cdce2a234a70e56bc5ac4881c230aad50b02b984d23e1729"
+      "sourceFingerprint": "77ff44a3add9a72530fc55246f76a63a290f5a692b1089bb6cc1b152f6dd6725"
     },
     {
       "id": "backend",
@@ -817,27 +817,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained. Approved branded templates were saved after admin access; logo bytes, actual branded recovery delivery and verified/reused-link behavior pass. Fresh signup, password submission and owner/dashboard acceptance remain NOT RUN.",
+      "summary": "PR143 and stacked PR146 integrate real Supabase identity/email flows while previews remain synthetic. Both approved templates are applied with a verified public logo. Live local-console/staging-provider tests using a fresh Gmail alias passed signup delivery, unconfirmed denial, confirmation, password sign-in, restoration, sign-out, recovery delivery, actual password update, old/new password checks and consumed-link rejection. The account holder supplied credentials/terms; result states and messages were observed. Original linked account preserved, QA session signed out, no account/data deletion. Private recipient/credential details are excluded.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
         "docs/owner-auth.md",
         "frontend/console/email-templates/README.md"
       ],
-      "next": "Keep PR143 and stacked PR146 unmerged until dashboard/setup flow is connected; finish actual email confirmation/recovery tests and record final independent review. No deployment or tenant grant."
+      "next": "Keep both PRs unmerged until dashboard/setup acceptance. Teammates can repeat the verified identity/email journeys locally with their own inboxes. Hosted console release, production acceptance, Outlook/mobile-client rendering and actual time-expiry waiting remain separate."
     },
     {
       "date": "2026-11-11",
       "modules": [
         "console"
       ],
-      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in. Cross-tab replacement and in-flight different-account switch regressions pass; successful reset-to-sign-in reaches the authenticated handoff. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained.",
+      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in. Cross-tab replacement and in-flight different-account switch regressions pass; successful reset-to-sign-in reaches the authenticated handoff. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. A later fresh Gmail-alias run passed signup/confirmation, actual password update, old/new password sign-in, restoration, sign-out and consumed-link checks. Complete hosted owner/dashboard flow remains pending; no credentials or private recipient details are recorded.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
         "tests/e2e/owner-auth-provider.spec.ts"
       ],
-      "next": "Complete actual Resend delivery/confirmation/reset checks after Vivien saves exact redirects. Keep both auth PRs draft/unmerged until real owner setup/dashboard handoff is connected. No venue grants, hosted release or production activation."
+      "next": "Keep both PRs unmerged until dashboard/setup acceptance. Teammates can repeat the verified identity/email journeys locally with their own inboxes. Hosted console release, production acceptance, Outlook/mobile-client rendering and actual time-expiry waiting remain separate."
     }
   ]
 }

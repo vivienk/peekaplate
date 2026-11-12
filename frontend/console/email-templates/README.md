@@ -42,7 +42,10 @@ Real local-app recovery delivery in Gmail, sender/subject/body, loaded logo,
 matching button/fallback links, expected project/purpose/local callback, verified
 reset form and consumed-link rejection passed. No password was submitted.
 
-Fresh-signup confirmation delivery, unconfirmed denial, actual password update,
-old/new password sign-in, Outlook/mobile-client rendering and the complete hosted
-owner/dashboard journey remain NOT RUN. Browser/Supabase previews do not replace
-those checks. Keep PR143 and stacked PR146 unmerged until owner-flow acceptance.
+The subsequent fresh Gmail-alias run passed signup confirmation delivery,
+unconfirmed denial, confirmation, password sign-in, session restoration, sign-out,
+actual password update, old-password denial, new-password sign-in and consumed
+link rejection. The account holder entered credentials; the app/email results
+were independently observed. See [live acceptance](../../../docs/owner-auth.md).
+Outlook/mobile-client rendering and the complete hosted owner/dashboard journey
+remain NOT RUN. Keep PR143 and stacked PR146 unmerged until owner-flow acceptance.
