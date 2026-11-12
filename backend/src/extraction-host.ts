@@ -25,6 +25,12 @@ const pipelineVariables = [
   'MENU_AI_API_KEY',
   'MENU_AI_API_URL',
   'MENU_AI_MODEL',
+  'GEMINI_API_KEY',
+  'GOOGLE_AI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_URL',
+  'GEMINI_MODEL',
+  'OPENROUTER_API_KEY',
   'NARA_ROUTER_KEY',
   'NARA_ROUTER_URL',
   'NARA_ROUTER_MODEL',
@@ -110,6 +116,40 @@ const maxBundleBytes = 32_000_000;
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+async function safeErrorResponse(response: Response): Promise<Response> {
+  const status = response.status >= 400 && response.status < 600 ? response.status : 502;
+  const headers = new Headers();
+  headers.set('Content-Type', 'application/json');
+  headers.set('Cache-Control', 'no-store');
+  const retryAfter = response.headers.get('retry-after');
+  if (retryAfter) {
+    headers.set('Retry-After', retryAfter);
+  }
+
+  let error = status === 429 ? 'busy' : status === 504 ? 'extraction_timeout' : 'extraction_failed';
+
+  try {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.startsWith('application/json') && response.body) {
+      const text = await response.text();
+      const parsed = JSON.parse(text);
+      if (
+        record(parsed) &&
+        typeof parsed.error === 'string' &&
+        /^[a-z0-9_-]{1,64}$/.test(parsed.error)
+      ) {
+        error = parsed.error;
+      }
+    } else {
+      await response.body?.cancel();
+    }
+  } catch {
+    await response.body?.cancel();
+  }
+
+  return Response.json({ error }, { status, headers });
+}
+
 async function readBundle(response: Response): Promise<unknown> {
   if (
     response.headers.get('x-extraction-artifact-bundle') !== '1' ||
@@ -147,7 +187,9 @@ async function retainArtifacts(
   env: ExtractionHostEnv,
   scope: ExtractionSource,
 ): Promise<Response> {
-  if (response.status !== 200) return response;
+  if (response.status !== 200) {
+    return await safeErrorResponse(response);
+  }
   const bundle = await readBundle(response);
   if (!record(bundle) || bundle.schema_version !== 1 || Object.keys(bundle).length !== 4)
     throw new Error('Invalid artifact bundle');
@@ -174,7 +216,11 @@ async function retainArtifacts(
     privateResult.input_mode !== 'ocr_image' ||
     !['complete', 'incomplete', 'failed'].some((value) => value === privateResult.status) ||
     !Array.isArray(privateResult.suggestions) ||
-    privateResult.suggestions.some((value) => !record(value) || value.status !== 'unvalidated') ||
+    (report.configuration.extraction_mode === 'vision_v4'
+      ? privateResult.suggestions.length !== 0 || privateResult.status !== report.status
+      : privateResult.suggestions.some(
+          (value) => !record(value) || value.status !== 'unvalidated',
+        )) ||
     !record(timings) ||
     timings.schema_version !== 1 ||
     timings.input_mode !== 'ocr_image' ||
@@ -182,6 +228,12 @@ async function retainArtifacts(
     !record(timings.timings_seconds)
   )
     throw new Error('Artifact scope or version mismatch');
+  if (
+    Buffer.byteLength(JSON.stringify(report), 'utf8') > 24_000_000 ||
+    Buffer.byteLength(JSON.stringify(privateResult), 'utf8') > 8_000_000 ||
+    Buffer.byteLength(JSON.stringify(timings), 'utf8') > 1_000_000
+  )
+    throw new Error('Artifact too large');
   const attemptId = crypto.randomUUID();
   const key = `menu-ingestion/review-artifacts/${scope.tenantId}/${scope.jobId}/${attemptId}/bundle.json`;
   const stored = JSON.stringify({
@@ -255,7 +307,28 @@ export default {
           await object.body.cancel();
           return json('source_too_large', 413);
         }
-        return new Response(object.body, {
+        const bytes = new Uint8Array(object.size);
+        const hash = createHash('sha256');
+        const reader = object.body.getReader();
+        let size = 0;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > object.size) {
+              await reader.cancel();
+              throw new Error('Source size mismatch');
+            }
+            bytes.set(value, size - value.byteLength);
+            hash.update(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        if (size !== object.size || hash.digest('hex') !== scope.sourceHash)
+          throw new Error('Source integrity mismatch');
+        return new Response(bytes, {
           headers: {
             'Content-Type': 'application/octet-stream',
             'Content-Length': String(object.size),
@@ -278,6 +351,10 @@ export default {
             scope.jobId !== request.headers.get('x-job-id')
           )
             return json('forbidden', 403);
+          const requestedBundle = request.headers.get('x-extraction-artifact-bundle');
+          if (requestedBundle !== null && requestedBundle !== '1') {
+            return json('invalid_request', 400);
+          }
           const forwarded = new Request(request);
           forwarded.headers.set('X-Source-Hash', scope.sourceHash);
           forwarded.headers.set('X-Extraction-Artifact-Bundle', '1');

@@ -224,7 +224,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence, with per-metric/cohort and complementary suppression. Local/staging HTTP reports require exactly one source=synthetic and a configured server-allowlisted venue; production fails closed. S4-RES CLI builds canonical immutable bundles from approved tenant-scoped dish/review facts and verified T0 assets, with explicit privileged transactional admission; no approval/publication is implied. AI-01 drafts/abstention and frozen offline evaluation remain separate. Existing ingestion/review commands are preserved. Diner verification/hosting are described in the diner node; full pilot acceptance remains gated and queues stay paused.",
+      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence with privacy floors. S4-RES builds canonical immutable bundles from approved dish facts and T0 assets. Reconciled staging upload API (POST /venues/:id/menus/uploads) streams raw PDF/PNG/JPEG with binary signature checks, writes job-scoped R2 source, and enqueues to INGESTION_QUEUE. Menu consumer in staging wrangler.jsonc is bounded to single-message/concurrency with its own retry/DLQ policy. Review API (review-session, candidates, review) and extraction host error sanitization are preserved. Queues remain paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -266,6 +266,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/repository.test.ts",
         "backend/src/ingestion/repository.ts",
         "backend/src/ingestion/transport.ts",
+        "backend/src/ingestion/upload.test.ts",
+        "backend/src/ingestion/upload.ts",
         "backend/src/ingestion/workflow.integration.test.ts",
         "backend/src/menu-token.test.ts",
         "backend/src/menu-token.ts",
@@ -336,7 +338,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e62b4c11cf26fa02a79a7414a2d19f17e89d360a91ac458849d3784897d3c0d0"
+      "sourceFingerprint": "dd7d4aff1640ad7b42f27217436b0eb4fc414c666c13aba83099c243c60162d2"
     },
     {
       "id": "database",
@@ -454,7 +456,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b3d7142b6aa0452abd56d70a3e9ea1d762a7cd1f10a39fa3ec237bf80c3d0ea3"
+      "sourceFingerprint": "e56bf4c570d128f3b8a6adfa4a5b3f36a72382acf189307382a7a52d104b3662"
     },
     {
       "id": "agents",

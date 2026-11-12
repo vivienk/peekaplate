@@ -70,6 +70,15 @@
             "max_retries": 3,
             "dead_letter_queue": "peekaplate-staging-observations-dlq",
             "retry_delay": 10
+          },
+          {
+            "queue": "peekaplate-staging-menu-ingestion",
+            "max_batch_size": 1,
+            "max_batch_timeout": 1,
+            "max_concurrency": 1,
+            "max_retries": 3,
+            "dead_letter_queue": "peekaplate-staging-menu-ingestion-dlq",
+            "retry_delay": 60
           }
         ]
       }

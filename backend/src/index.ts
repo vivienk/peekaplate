@@ -58,6 +58,7 @@ import {
   type MenuIngestionJobRow,
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
+import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -237,15 +238,45 @@ type Dependencies = {
   ) => Promise<ReviewCandidateItemResponse>;
 };
 
+export async function submitAuthorizedMenuIngestion(
+  client: Client,
+  actorId: string,
+  venueId: string,
+  request: Parameters<typeof submitMenuIngestion>[1],
+  queue?: { send(message: unknown): Promise<void> },
+) {
+  await client.query('BEGIN');
+  let job: MenuIngestionJobRow;
+  try {
+    await authorizeStaffVenue(client, actorId, venueId, true);
+    job = await submitMenuIngestion(client, request, undefined, { inTransaction: true });
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  }
+  if (queue)
+    await queue.send({
+      version: 1,
+      tenantId: venueId,
+      jobId: job.id,
+      queuedAt: new Date().toISOString(),
+    });
+  return job;
+}
+
 export async function authorizeStaffVenue(
   client: Client,
   actorId: string,
   venueId: string,
+  inTransaction = false,
 ): Promise<void> {
   let started = false;
   try {
-    await client.query('BEGIN');
-    started = true;
+    if (!inTransaction) {
+      await client.query('BEGIN');
+      started = true;
+    }
     await client.query("SET LOCAL statement_timeout = '5s'");
     await client.query("SET LOCAL lock_timeout = '3s'");
     await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
@@ -262,7 +293,7 @@ export async function authorizeStaffVenue(
       throw new CommandError('forbidden', 403);
     }
 
-    await client.query('COMMIT');
+    if (!inTransaction) await client.query('COMMIT');
     started = false;
   } catch (error) {
     if (started) {
@@ -672,6 +703,9 @@ export function createApp(services: Dependencies = dependencies) {
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
   app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/menus\/uploads$/.test(c.req.path)) {
+      return next();
+    }
     if (
       c.req.method === 'PUT' &&
       /^\/venues\/[^/]+\/extractions\/[^/]+\/review-session$/.test(c.req.path)
@@ -951,6 +985,47 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result);
   });
 
+  app.post('/venues/:venueId/menus/uploads', async (c) => {
+    if (c.env?.APP_ENV !== 'staging' && c.env?.APP_ENV !== 'local')
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    await (services.authorizeVenue ?? dependencies.authorizeVenue!)(
+      actorId,
+      scope.data.venueId,
+      c.env,
+    );
+    const storage = c.env.INGESTION_REPORTS_BUCKET;
+    const queue = c.env.INGESTION_QUEUE;
+    if (!storage || !queue) throw new IngestionError('storage_unavailable', 503);
+    const upload = await readMenuUpload(c.req.raw);
+    const createJob = async () => {
+      const connectionString =
+        c.env?.APP_ENV === 'local'
+          ? c.env?.LOCAL_DATABASE_URL
+          : c.env?.HYPERDRIVE?.connectionString;
+      if (!connectionString) throw new AuthUnavailableError();
+      const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+      try {
+        await client.connect();
+        return await submitAuthorizedMenuIngestion(client, actorId, scope.data.venueId, {
+          venueId: scope.data.venueId,
+          sourceType: upload.sourceType,
+          sourceHash: upload.sourceHash,
+          idempotencyKey: upload.idempotencyKey,
+        });
+      } finally {
+        await client.end();
+      }
+    };
+    const job = await storeAndDispatchUpload(scope.data.venueId, upload, createJob, storage, queue);
+    return c.json({ job }, 202);
+  });
+
   app.post('/venues/:venueId/menus/jobs', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -981,11 +1056,16 @@ export function createApp(services: Dependencies = dependencies) {
         const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
         try {
           await client.connect();
-          await authorizeStaffVenue(client, actorId, venueId);
           const queueProducer = env.INGESTION_QUEUE
             ? { send: (msg: unknown) => env.INGESTION_QUEUE!.send(msg) }
             : undefined;
-          return await submitMenuIngestion(client, { venueId, ...req }, queueProducer);
+          return await submitAuthorizedMenuIngestion(
+            client,
+            actorId,
+            venueId,
+            { venueId, ...req },
+            queueProducer,
+          );
         } finally {
           await client.end();
         }

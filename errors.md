@@ -2494,3 +2494,11 @@ missing. The pinned helper was restored outside repository dependencies, and
 the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
+
+## November 12 staging ingestion reconciliation (FE-06.1)
+
+Reconciled the authenticated menu upload endpoint (`POST /venues/:venueId/menus/uploads`) and menu ingestion queue consumer configuration from `origin/codex/staging-pr58-release` (`fdbd6b0`) onto the latest `develop` baseline.
+Preserved all existing Review API routes, S4 bundle producer, owner-report endpoints, and Vision V4 contracts.
+Applied safe error handling, timeout mappings, and provider variable forwarding in `backend/src/extraction-host.ts`.
+Maintained menu queue consumer bounded settings (batch size 1, concurrency 1, retry delay 60s, DLQ) in `backend/wrangler.jsonc` and verified in `scripts/menu-ingestion-infra.test.mjs`.
+Refreshed context fingerprints and validated docs links.
