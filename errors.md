@@ -2719,3 +2719,13 @@ not a distributed queue or production owner endpoint.
 Initial lint rejected formatting in the new proxy test; formatted the file. Typecheck rejected an explicitly undefined fetch body under exactOptionalPropertyTypes; use null for bodyless requests. A pytest invocation could not run because this environment has unittest, not pytest; rerun the existing unittest suites with their intended runner. These were local verification errors, not provider failures. Regression coverage: scripts/local-model-proxy.test.mjs and tests/e2e/portion.spec.ts.
 
 Review recovery fix: stale scheduled/running attempts now expose explicit resume after the bounded polling deadline; regression `stale running attempt offers explicit resume after polling deadline` passes. Initial browser launch was blocked by loopback permissions; authorized local rerun passed 55 tests, followed by focused reset and stale-attempt checks.
+
+
+## ERR-20261112-TRIPO-CREDITS — rejected submission misreported as unknown
+
+Live console reconciliation showed zero API balance, zero frozen credits and no tasks this month. Original transport discarded all HTTP status/provider codes; the pipeline therefore labelled definite rejections ambiguous. Exact historical error response was not retained. Added zero-balance preflight plus allowlisted rejection reasons, while retaining unknown barriers for timeouts/server failures. Initial regressions failed for missing preflight and safe rejection code; both now pass. One intermediate test caught ExtractionError inheriting ValueError and being swallowed by the JSON parser catch; narrowed that catch. Regression coverage: test_generate_model.py credit/balance/ambiguous cases and portion.spec.ts credit fallback/resume. No new paid request during this fix.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T10:30:26.290Z","exitCode":1}
+```

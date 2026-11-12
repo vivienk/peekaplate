@@ -5,13 +5,13 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 
 from PIL import Image, ImageDraw
 
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.generate_model import OPTIONS, digest, prepare, run, validate_glb
-from peekaplate_processing.tripo import TripoClient
+from peekaplate_processing.tripo import TripoClient, TripoRejected
 
 
 def triangle_glb(external=False):
@@ -36,6 +36,9 @@ class FakeClient:
         self.states = list(states)
         self.model = triangle_glb() if model is None else model
         self.uploads = self.submissions = self.polls = 0
+
+    def balance(self):
+        return 100
 
     def upload(self, image):
         self.uploads += 1
@@ -111,6 +114,30 @@ class ModelPipelineTests(unittest.TestCase):
         client.states = ['success']
         self.assertEqual(run(self.jobdir, client)['status'], 'ready')
         self.assertEqual((client.uploads, client.submissions), (1, 1))
+
+    def test_zero_balance_blocks_upload_and_can_resume_same_job(self):
+        self.prepare()
+        client = FakeClient()
+        client.balance = lambda: 0
+        result = run(self.jobdir, client)
+        self.assertEqual(result['status'], 'prepared')
+        self.assertEqual(result['error_code'], 'insufficient_credits')
+        self.assertEqual((client.uploads, client.submissions), (0, 0))
+        client.balance = lambda: 100
+        self.assertEqual(run(self.jobdir, client)['status'], 'ready')
+        self.assertNotIn('error_code', self.saved())
+        self.assertEqual(client.submissions, 1)
+
+    def test_credit_rejection_at_submit_is_not_ambiguous(self):
+        self.prepare()
+        client = FakeClient()
+        def reject(*_):
+            raise TripoRejected(2010)
+        client.submit = reject
+        result = run(self.jobdir, client)
+        self.assertEqual(result['status'], 'prepared')
+        self.assertEqual(result['error_code'], 'insufficient_credits')
+        self.assertIsNone(result['task_id'])
 
     def test_ambiguous_submission_never_retries(self):
         self.prepare()
@@ -225,6 +252,34 @@ class TripoTransportTests(unittest.TestCase):
         self.assertEqual(json.loads(opener.requests[1].data), {'input': 'file_one', **OPTIONS})
         self.assertTrue(opener.requests[2].full_url.endswith('/tasks/task_one'))
         self.assertIsNone(opener.requests[3].get_header('Authorization'))
+
+    def test_credit_rejection_preserves_safe_code_without_provider_text(self):
+        error = HTTPError('https://openapi.tripo3d.ai/v3/generation/image-to-model', 403,
+                          'private-message', {}, io.BytesIO(b'{"code":2010,"message":"synthetic-secret"}'))
+        client = TripoClient('synthetic-secret', opener=FakeOpener([error]))
+        with self.assertRaises(ExtractionError) as caught:
+            client.submit('file_one', OPTIONS)
+        self.assertEqual(getattr(caught.exception, 'reason', None), 'insufficient_credits')
+        self.assertNotIn('synthetic-secret', str(caught.exception))
+        self.assertNotIn('private-message', str(caught.exception))
+
+    def test_ambiguous_server_error_stays_unknown_even_with_credit_code(self):
+        error = HTTPError('https://openapi.tripo3d.ai/v3/generation/image-to-model', 500,
+                          'private', {}, io.BytesIO(b'{"code":2010}'))
+        client = TripoClient('synthetic', opener=FakeOpener([error]))
+        with self.assertRaises(ExtractionError) as caught:
+            client.submit('file_one', OPTIONS)
+        self.assertNotIsInstance(caught.exception, TripoRejected)
+
+    def test_balance_wire_format_and_invalid_balances(self):
+        for value in [0, 30.5, -1, True, '100', None]:
+            client = TripoClient('synthetic', opener=FakeOpener([
+                json.dumps({'code': 0, 'data': {'balance': value}}).encode()]))
+            if type(value) in (int, float) and value >= 0:
+                self.assertEqual(client.balance(), value)
+            else:
+                with self.assertRaises(ExtractionError):
+                    client.balance()
 
     def test_rejects_arbitrary_download_hosts_before_io(self):
         opener = FakeOpener([])

@@ -14,7 +14,7 @@ from uuid import UUID
 from PIL import Image
 
 from peekaplate_processing.errors import ExtractionError
-from peekaplate_processing.tripo import MAX_GLB_BYTES, MODEL, TripoClient, identifier
+from peekaplate_processing.tripo import MAX_GLB_BYTES, MODEL, TripoClient, TripoRejected, identifier
 
 MAX_IMAGE_BYTES = 10_000_000
 MAX_JSON_BYTES = 1_000_000
@@ -213,14 +213,28 @@ def run(directory, client, *, timeout=600, interval=5, clock=time.monotonic, sle
         if not job.get('task_id'):
             if job['status'] not in ('prepared', 'uploading'):
                 raise ExtractionError('Job state lacks a task ID; manual reconciliation required.')
-            job['status'] = 'uploading'
-            save(directory, job)
-            token = client.upload(source)
+            job.pop('error_code', None)
+            try:
+                if client.balance() == 0:
+                    raise TripoRejected(2010)
+                job['status'] = 'uploading'
+                save(directory, job)
+                token = client.upload(source)
+            except TripoRejected as error:
+                job['status'] = 'prepared'
+                job['error_code'] = error.reason
+                save(directory, job)
+                return job
             job['status'] = 'submitting'
             save(directory, job)  # Persist BEFORE the potentially billable call.
             try:
                 task_id = client.submit(token, job['options'])
                 job['task_id'] = identifier(task_id)
+            except TripoRejected as error:
+                job['status'] = 'prepared'
+                job['error_code'] = error.reason
+                save(directory, job)
+                return job
             except Exception:
                 job['status'] = 'submission_unknown'
                 save(directory, job)

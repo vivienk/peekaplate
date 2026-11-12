@@ -52,6 +52,18 @@ class ModelServiceTests(unittest.TestCase):
         self.assertNotIn('task_id', result.json())
         self.assertNotIn(str(self.root), result.text)
 
+    def test_credit_rejection_is_safe_and_resume_reuses_job(self):
+        self.provider.balance = lambda: 0
+        self.post()
+        result = self.client.get(self.path, headers=self.headers).json()
+        self.assertEqual(result['status'], 'prepared')
+        self.assertEqual(result['error_code'], 'insufficient_credits')
+        self.assertEqual((self.provider.uploads, self.provider.submissions), (0, 0))
+        self.provider.balance = lambda: 100
+        self.assertEqual(self.client.post(self.path + '/resume', headers=self.headers).status_code, 202)
+        self.assertEqual(self.client.get(self.path, headers=self.headers).json()['status'], 'ready')
+        self.assertEqual(self.provider.submissions, 1)
+
     def test_idempotent_create_and_conflicting_input(self):
         self.post()
         self.assertEqual(self.post().status_code, 200)

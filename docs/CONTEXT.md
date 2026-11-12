@@ -213,7 +213,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "554d225517f9935a723be28bb8b0b07887ab373f92bd1313b24b94fe0f9cd3a0"
+      "sourceFingerprint": "aef95a6a9da4c2e07618d66708b6b55e11bd89729f7545fe85b5ce146a5dfee9"
     },
     {
       "id": "console",
@@ -541,7 +541,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible. A separate authenticated single-tenant FastAPI adapter provides idempotent create/status/resume and verified artifact downloads; live generation is not tested.",
+      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible. A separate authenticated single-tenant FastAPI adapter provides idempotent create/status/resume and verified artifact downloads; live generation is not tested. New tasks check balance before upload; documented request rejections preserve safe codes and keep explicit same-job resume, while uncertain outcomes remain blocked.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -632,7 +632,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "847e62f796b3e025e218d2c9d3e02e5dbb34657c198f36cbe537b9576002e128"
+      "sourceFingerprint": "9c4c67bf070c7661c18a7541b97b56fa9986825e7374bae87b75c8e7155cd51c"
     },
     {
       "id": "assets",

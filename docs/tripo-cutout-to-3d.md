@@ -206,3 +206,13 @@ The browser uses a same-origin, loopback-only development bridge with a fixed up
 The job ID survives closing/reopening in the same browser tab. Checking never starts a second job; interrupted jobs offer explicit resume. The 2.5D image remains visible while generation and the pinned model-viewer load. A successful 3D model supports camera controls, reset and a return to 2.5D; model errors return to 2.5D. Back disposes browser work but does not cancel an already submitted provider job. Jobs remain local review artifacts, never published menu assets. No live provider generation was performed for this integration.
 
 Local connection verification (2026-11-12): PASS lint, typecheck, production build, context/docs checks; 4 proxy tests, 13 API tests, 16 model pipeline tests, 55 browser regressions plus focused reset and stale-attempt recovery checks. New 3D browser success cases substitute the viewer element; they prove UI transitions, not a generated dish GLB. NOT RUN: live Tripo generation (no key).
+
+## Credit rejection and reconciliation
+
+Before uploading a source for a new task, the private pipeline checks available API credits. A zero balance keeps the job prepared with `insufficient_credits`, without uploading or submitting. Positive balance is not a price guarantee: Tripo can still reject a request for insufficient credits. Documented request rejection codes on HTTP 400/401/403/404/429 (or a successful HTTP envelope carrying a documented rejection) are retained as safe reason enums. Provider messages, headers and URLs are discarded. Network errors, server errors and contradictory responses remain `submission_unknown` and cannot be automatically retried.
+
+View Portion displays the credit problem, preserves 2.5D, and offers explicit resume of the same prepared job after the account is funded. Existing unknown jobs are not silently reclassified. Restart the local API through the private launcher to load Python changes; a frontend refresh alone does not update the API.
+
+On November 12, 2026, the signed-in Tripo console showed no tasks in the current month, zero credits spent, zero available credits and zero frozen credits. No new generation was submitted during this reconciliation. The previous failure's exact provider code was not retained, so insufficient credits is the supported diagnosis, not a recovered historical error response. Live successful generation remains blocked by the empty API balance.
+
+Credit-handling verification: 21 pipeline/transport tests, 14 private API tests and five focused browser regressions pass. Browser provider responses are mocked; no credits were spent for these checks.

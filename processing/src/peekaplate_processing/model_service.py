@@ -91,6 +91,7 @@ def create_app(settings=None, *, client_factory=None, runner=run):
             attempt = json.loads(read(path / 'attempt.json', 4096)).get('status')
         return {'job_id': path.name, 'status': job['status'], 'attempt_status': attempt,
                 'dish': job['dish'], 'source': job['source'],
+                'error_code': job.get('error_code') if job.get('error_code') in ('insufficient_credits', 'authentication_failed', 'invalid_parameters', 'rate_limited', 'content_rejected', 'unsupported_model', 'invalid_endpoint') else None,
                 'progress': job.get('progress'), 'review_status': 'needs_review',
                 'publication_eligible': False,
                 'artifacts': {'source': f'/v1/model-jobs/{path.name}/artifacts/source.png',

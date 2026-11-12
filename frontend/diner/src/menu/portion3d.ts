@@ -6,6 +6,7 @@ type Job = {
   status: string;
   attempt_status: string;
   progress?: number;
+  error_code?: string;
   dish: { dish_id: string; revision_id: string };
   source: { review_asset_id: string; sha256: string; variant: string };
 };
@@ -155,6 +156,16 @@ export function bindLocal3d(
   const handle = async (job: Job, deadline: number): Promise<void> => {
     if (disposed) return;
     validate(job);
+    if (job.status === 'prepared' && job.error_code) {
+      fallback(
+        job.error_code === 'insufficient_credits'
+          ? 'Tripo API credits are insufficient. Add credits in Tripo Billing, then resume this job. Your 2.5D preview still works.'
+          : 'Tripo rejected the request. Check the local job error before resuming. Your 2.5D preview still works.',
+      );
+      mode = 'resume';
+      action.textContent = 'Resume 3D job';
+      return;
+    }
     if (job.status === 'ready') {
       message.textContent = 'Loading 3D. Your 2.5D preview stays available.';
       await loadModel();

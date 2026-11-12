@@ -526,12 +526,14 @@ async function local3d(page: Page, state: string) {
       json: {
         job_id: saved,
         status:
-          ['resume', 'stale'].includes(state) && !req.url().endsWith('/resume')
+          ['resume', 'stale', 'credits'].includes(state) && !req.url().endsWith('/resume')
             ? state === 'stale'
               ? 'waiting'
               : 'prepared'
             : 'ready',
         attempt_status: state === 'stale' ? 'running' : null,
+        error_code:
+          state === 'credits' && !req.url().endsWith('/resume') ? 'insufficient_credits' : null,
         dish: metadata.dish,
         source: {
           review_asset_id: metadata.source_asset_id,
@@ -601,6 +603,24 @@ test('stale running attempt offers explicit resume after polling deadline', asyn
   const creates = await local3d(page, 'stale');
   await expect(page.locator('.pp-local3d')).toContainText('Generating 3D');
   await page.clock.fastForward(10 * 60_000 + 3000);
+  await page.getByRole('button', { name: 'Resume 3D job', exact: true }).click();
+  await expect(page.locator('model-viewer')).toBeVisible();
+  expect(creates()).toBe(1);
+});
+
+test('zero Tripo credits explain rejection while preserving tilt and explicit same-job resume', async ({
+  page,
+}) => {
+  const creates = await local3d(page, 'credits');
+  await expect(page.locator('.pp-local3d')).toContainText('Tripo API credits are insufficient');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  const stage = page.getByRole('group', {
+    name: 'Captured dish · tilt demo portion preview',
+    exact: true,
+  });
+  await stage.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.pp-portion__css')).not.toHaveCSS('transform', 'none');
   await page.getByRole('button', { name: 'Resume 3D job', exact: true }).click();
   await expect(page.locator('model-viewer')).toBeVisible();
   expect(creates()).toBe(1);

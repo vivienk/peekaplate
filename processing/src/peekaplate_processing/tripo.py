@@ -1,5 +1,6 @@
 """Bounded Tripo v3 transport. Credentials never enter artifacts or browser code."""
 import json
+import math
 import re
 import socket
 import uuid
@@ -12,6 +13,35 @@ from peekaplate_processing.errors import ExtractionError
 API = 'https://openapi.tripo3d.ai/v3'
 MODEL = 'v3.1-20260211'
 MAX_GLB_BYTES = 50_000_000
+
+
+# Only documented request rejections prove that no generation task was accepted.
+REJECTIONS = {2: 'authentication_failed', 1002: 'authentication_failed',
+              1003: 'invalid_parameters', 1004: 'invalid_parameters',
+              1007: 'rate_limited', 2000: 'rate_limited',
+              2002: 'invalid_parameters', 2003: 'invalid_parameters',
+              2004: 'invalid_parameters', 2008: 'content_rejected',
+              2010: 'insufficient_credits', 2015: 'unsupported_model',
+              2018: 'invalid_parameters', 4001: 'invalid_endpoint'}
+
+
+class TripoRejected(ExtractionError):
+    def __init__(self, code):
+        self.reason = REJECTIONS[code]
+        super().__init__('Tripo rejected the request: ' + self.reason)
+
+
+def rejection(raw):
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return
+    code = payload.get('code') if isinstance(payload, dict) else None
+    if type(code) is int and code in REJECTIONS:
+        # Contradictory responses with a task ID remain uncertain.
+        if payload.get('task_id') or (isinstance(payload.get('data'), dict) and payload['data'].get('task_id')):
+            return
+        raise TripoRejected(code) from None
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -39,7 +69,13 @@ class TripoClient:
                 if len(data) > limit:
                     raise ExtractionError('Tripo response exceeds the configured byte limit.')
                 return data
-        except (HTTPError, URLError, TimeoutError, socket.timeout, OSError):
+        except HTTPError as error:
+            if request.full_url.startswith(API + '/') and error.code in (400, 401, 403, 404, 429):
+                raw = error.read(limit + 1)
+                if len(raw) <= limit:
+                    rejection(raw)
+            raise ExtractionError('Tripo request failed; inspect the saved job state before retrying.') from None
+        except (URLError, TimeoutError, socket.timeout, OSError):
             # Never expose response bodies, signed URLs, request headers or provider messages.
             raise ExtractionError('Tripo request failed; inspect the saved job state before retrying.') from None
 
@@ -48,6 +84,7 @@ class TripoClient:
             'Authorization': 'Bearer ' + self._key, 'Content-Type': content_type,
             'Accept': 'application/json'}, method='POST' if data is not None else 'GET')
         raw = self._request(request, timeout=timeout)
+        rejection(raw)
         try:
             payload = json.loads(raw)
             if not isinstance(payload, dict) or payload.get('code') != 0 or not isinstance(payload.get('data'), dict):
@@ -55,6 +92,12 @@ class TripoClient:
             return payload['data']
         except (ValueError, TypeError):
             raise ExtractionError('Tripo returned an invalid or unsuccessful API response.') from None
+
+    def balance(self):
+        value = self._api('/account/balance').get('balance')
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            raise ExtractionError('Invalid Tripo balance response.')
+        return value
 
     def upload(self, png):
         boundary = 'peekaplate-' + uuid.uuid4().hex
