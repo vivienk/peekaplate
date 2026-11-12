@@ -67,6 +67,43 @@ describe('owner provider configuration', () => {
 });
 
 describe('Supabase owner adapter (real SDK, synthetic HTTP)', () => {
+  it('resends signup confirmation through PKCE at the exact callback and can confirm it', async () => {
+    const { runtime, calls } = fixture([
+      { body: {} },
+      { body: session },
+      { body: user },
+      { body: {} },
+    ]);
+    expect(await runtime.service.resendConfirmation?.('owner@example.test')).toEqual({
+      kind: 'sent',
+    });
+    expect(new URL(calls[0]!.url).pathname).toBe('/auth/v1/resend');
+    expect(new URL(calls[0]!.url).searchParams.get('redirect_to')).toBe(
+      `${origin}/auth-confirm.html`,
+    );
+    expect(calls[0]!.body).toMatchObject({
+      email: 'owner@example.test',
+      type: 'signup',
+      code_challenge_method: 's256',
+    });
+    expect(await runtime.confirmEmail('resent-signup-code')).toEqual({ kind: 'confirmed' });
+    expect(calls[1]!.body).toMatchObject({
+      auth_code: 'resent-signup-code',
+      code_verifier: expect.any(String),
+    });
+  });
+
+  it.each([
+    [429, 'rate_limited'],
+    [400, 'failed'],
+    [503, 'failed'],
+  ])('keeps resend errors sanitized (%s)', async (status, kind) => {
+    const { runtime } = fixture([
+      { status, body: { code: 'unexpected_failure', msg: 'private provider detail' } },
+    ]);
+    expect(await runtime.service.resendConfirmation?.('owner@example.test')).toEqual({ kind });
+  });
+
   it('continues neutrally without looking up whether an email exists', async () => {
     const { runtime, calls } = fixture([]);
     expect(await runtime.service.checkEmail('owner@example.test')).toEqual({

@@ -21,6 +21,16 @@ account existence. Wrong details and provider/network failures are different typ
 outcomes; raw provider messages never reach the screen. Supabase owns throttling;
 the UI respects supplied cooldowns and does not invent account lockouts.
 
+Signup's Check your email screen now exposes Resend through the optional
+`resendConfirmation(email)` service method. The live adapter uses
+`supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo } })`
+with the same exact confirmation callback and SDK-managed PKCE. It returns a
+neutral sent result, sanitized failure or rate-limited state; it never looks up
+account existence or grants a session/restaurant. The existing UI applies its
+60-second resend wait. Real-SDK synthetic HTTP tests verify the request, cooldown,
+throttling and confirmation using the resent link. Fresh real-email resend
+delivery has not been verified by those tests.
+
 Email confirmation is required. An unexpected signup session fails closed rather
 than bypassing confirmation. A confirmed sign-in identifies a person only: the
 Worker still checks restaurant membership on every private restaurant request.

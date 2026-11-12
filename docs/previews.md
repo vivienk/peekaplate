@@ -107,3 +107,10 @@ GitHub changed this event's source/reference to the default branch in December 2
 - Closing the test PR triggered [automatic cleanup](https://github.com/vivienk/peekaplate/actions/runs/40393553935). The cleanup job passed in 16 seconds; provider readback found no `pr-48` deployments in either project. The same bot comment changed to removed. Edge retirement briefly returned transient errors; by `2026-10-26T20:13:56Z`, both page and marker URLs returned 404.
 
 The test PR is reopened for the final reviewed documentation/merge step; its eventual merge repeats cleanup. No Worker, Supabase, Queue/R2, PostHog or production deployment was changed. Repeat lifecycle acceptance when changing the workflow or provider configuration.
+
+
+## Stacked owner-auth design review
+
+PR146 temporarily targets develop so the existing develop/main-only preview workflow can build its complete auth demo. It still depends on PR143 and stays draft/unmerged; its diff includes signup until143 is merged. Retargeting alone does not trigger this workflow: push the tested recovery head afterward, then verify the preview comment and peekaplate-preview.json match that exact SHA. The workflow_dispatch action is cleanup-only, not a rebuild button.
+
+Rania reviews S03/S04 through `/owner-sign-in.html` and the synthetic demo controls. Real `/owner-auth.html`, `/auth-confirm.html` and `/auth-reset.html` are intentionally excluded from previews. No wildcard Supabase callback, provider secret, staging deployment or auth merge is needed for design review. Merge143 first, then recheck146 against develop after the owner/dashboard flow is accepted.

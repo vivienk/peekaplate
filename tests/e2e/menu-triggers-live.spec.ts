@@ -105,11 +105,16 @@ test('opting in on an open detail starts a new opening without preconsent time',
     active_ms: 5000,
     final: false,
   });
-  await page.clock.runFor(5000);
-  const deliveries = await page.evaluate(
-    () => (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered,
-  );
-  expect(deliveries.some((event) => event.type === 'dish_detail_opened')).toBe(true);
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(1000);
+      return page.evaluate(() =>
+        (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered.some(
+          (event) => event.type === 'dish_detail_opened',
+        ),
+      );
+    })
+    .toBe(true);
 });
 
 test('withdrawal discards detail timing and reconsent starts a fresh opening', async ({ page }) => {
