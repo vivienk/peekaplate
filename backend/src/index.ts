@@ -89,7 +89,11 @@ import {
   updateOwnerInsightAction,
 } from './owner-insight-actions';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
-import { buildOwnerReportExportFilename, serializeOwnerReportCsv } from './owner-report-export';
+import {
+  buildOwnerReportExportFilename,
+  type ExportableOwnerReport,
+  serializeOwnerReportCsv,
+} from './owner-report-export';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -943,10 +947,11 @@ export function createApp(services: Dependencies = dependencies) {
       env,
       'synthetic',
     );
-    const csv = serializeOwnerReportCsv(report);
+    const typedReport = report as ExportableOwnerReport;
+    const csv = serializeOwnerReportCsv(typedReport);
     const filename = buildOwnerReportExportFilename(
-      report.venue_id,
-      report.report_metadata.generated_at,
+      typedReport.venue_id,
+      typedReport.report_metadata.generated_at,
     );
     return new Response(csv, {
       status: 200,
