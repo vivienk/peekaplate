@@ -40,6 +40,14 @@ from production dist. The broader unit/script results below predate this asset c
 
 ## Current Figma verification
 
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —52/52.
+- PASS: `pnpm verify lint typecheck build` and `pnpm verify context:check docs:check`.
+- PASS: `node --test scripts/check-bundle.test.mjs` —6/6, including all three font weights.
+- Initial JS53,046 gzip bytes; T1 delivery273,769/400,000 bytes including72,472 font bytes.
+- Architecture and correctness reviews resolved the font-budget finding at3db33af.
+- NOT RUN: physical phones, manual screen readers, hosted publication and full database suite.
+
+
 Figma loading frame was read through design context. The connector then reached its
 plan limit; ready and unavailable frames were inspected in the browser. Existing exact
 SVG exports are reused at native sizes. Ready/loading/unavailable renders were visually
