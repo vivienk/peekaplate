@@ -127,8 +127,9 @@
   gap: var(--pp-space-16);
 }
 
+/* 24 between the password helper text and the checkbox (Rania, 12 Nov). */
 .pp-auth__card--create .pp-auth-terms {
-  margin-top: var(--pp-space-24);
+  margin-top: var(--pp-space-8);
 }
 
 .pp-auth__card--create .pp-auth__form > .pp-auth__submit {
@@ -361,7 +362,8 @@
   box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
 }
 
-/* Type=Primary: Default Orange/500, Hover Orange/300, Pressed Orange/700, content Orange/950. */
+/* Type=Primary: Default Orange/500, Hover Orange/300, Pressed back to the brand Orange/500 (Rania,
+ * 12 Nov), content Orange/950. */
 .pp-auth .pp-auth-btn--primary {
   background-color: var(--pp-color-orange-500);
   color: var(--pp-color-orange-950);
@@ -372,7 +374,7 @@
 }
 
 .pp-auth .pp-auth-btn--primary:active {
-  background-color: var(--pp-color-orange-700);
+  background-color: var(--pp-color-orange-500);
 }
 
 /* Type=Outlined: surface-container with a 1px outline-solid edge (3px on hover), bold label;
