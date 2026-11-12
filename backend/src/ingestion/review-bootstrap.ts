@@ -59,5 +59,7 @@ export async function bootstrapMenuReview(
   if (sessions.rows[0])
     input.extractionResult = ReviewCandidateResultSchema.parse(sessions.rows[0].payload);
   await verifyReviewArtifact({ appEnv, venueId: venue, input, read });
-  return upsertExtractionReviewSession(client, actor, venue, input);
+  return upsertExtractionReviewSession(client, actor, venue, input, {
+    jobReportKey: job.result_storage_key,
+  });
 }
