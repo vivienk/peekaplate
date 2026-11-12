@@ -2676,3 +2676,12 @@ queried a comparison button without includeHidden after controls became intentio
 hidden in unavailable state. Assert both hidden container and disabled button.
 Review also found the delivery-budget font matcher excluded the new names and weight700;
 updated matcher and added a three-font budget regression.
+
+
+## Tripo private generation boundary
+
+The cutout-to-3D path is new. No Tripo key is used in verification, by request;
+mock provider/task responses and synthetic GLB geometry cannot establish live dish
+fidelity, billing or provider availability. Submission uncertainty is persisted before
+any retry and requires reconciliation, preventing automatic duplicate billable jobs.
+Current local source preparation verifies the original PR25 PNG bytes and identity.

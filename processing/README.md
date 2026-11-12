@@ -452,3 +452,10 @@ create-only review-page builder. It accepts a T0 detail-sized grayscale mask and
 an optional generated PNG with its actual prompt/model provenance. See
 [asset delivery](../docs/asset-delivery.md#offline-supplied-mask-and-png-review-preview)
 for commands, non-approval behavior, browser controls and test boundaries.
+# Tripo cutout-to-3D review
+
+The private `peekaplate_processing.generate_model` CLI verifies an existing PR25 cutout,
+submits a Tripo image-to-model job, resumes polling without resubmission, and saves a
+validated GLB for human review. The current 2.5D diner remains unchanged.
+See [setup, commands and verification limits](../docs/tripo-cutout-to-3d.md).
+
