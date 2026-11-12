@@ -94,8 +94,9 @@ describe('S6-DATA-13 release hardening: Owner A/B isolation, revocation, 9/10/11
     });
 
     // Owner A reads Venue A successfully
-    const reportA = await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic');
-    expect(OwnerDishReportSchema.safeParse(reportA).success).toBe(true);
+    const reportA = OwnerDishReportSchema.parse(
+      await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic'),
+    );
     expect(reportA.venue_id).toBe(VENUE_A);
     expect(reportA.dishes).toHaveLength(3);
 
@@ -114,8 +115,9 @@ describe('S6-DATA-13 release hardening: Owner A/B isolation, revocation, 9/10/11
     const memberships = { [OWNER_A]: { [VENUE_A]: 'owner' } };
     const { client } = createMultiTenantClient(memberships, { [VENUE_A]: boundaryRows });
 
-    const report = await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic');
-    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic'),
+    );
 
     // 1. 9 sessions -> SUPPRESSED with null (never coerced to 0)
     const dish9 = report.dishes.find((d) => d.dish_id === '00000000-0000-4000-8000-000000000009')!;
@@ -148,8 +150,9 @@ describe('S6-DATA-13 release hardening: Owner A/B isolation, revocation, 9/10/11
     const memberships = { [OWNER_A]: { [VENUE_A]: 'owner' } };
     const { client } = createMultiTenantClient(memberships, { [VENUE_A]: [] });
 
-    const report = await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic');
-    expect(OwnerDishReportSchema.safeParse(report).success).toBe(true);
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(client, OWNER_A, VENUE_A, NOW, 'synthetic'),
+    );
     expect(report.report_metadata.report_status).toBe('EMPTY');
     expect(report.report_metadata.coverage.total_dishes_monitored).toBe(0);
     expect(report.report_metadata.coverage.measurable_dishes_count).toBe(0);
