@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search, Save/Saved and Compare picker screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
+      "summary": "Diner fixture/live menu, detail, search, Save/Saved and Compare picker screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "981a0558450fc9c9b1258624034f5325218d4f6e74604d17666b78443a4ad1e6"
+      "sourceFingerprint": "46b94f95e6b40dbddb895cf99c7441925736c32c9f9929a719c404c46ace3db1"
     },
     {
       "id": "console",
@@ -583,7 +583,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
+      "sourceFingerprint": "c20f2049bac24db021472a921cdc0883d902b36e6a5635ef0f476122fa236652"
     },
     {
       "id": "processing",
@@ -730,14 +730,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "backend",
         "delivery"
       ],
@@ -826,6 +818,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
+      "sources": [
+        "docs/owner-menu-workspace.md",
+        "backend/src/owner-menu.ts",
+        "backend/src/ingestion/intake.ts",
+        "migrations/20261112010000_owner_menu_workspace.sql",
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/evidence/owner-menu-staging-2026-11-12.json"
+      ],
+      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
     }
   ]
 }
