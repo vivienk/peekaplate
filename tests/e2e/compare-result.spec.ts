@@ -59,6 +59,10 @@ test('confirming a pick shows both dishes side by side and fires dish_compared s
   await compare(page, 'Avocado Toast', 'Harvest Power Bowl');
 
   await expect(sideNames(page)).toHaveText(['Avocado Toast', 'Harvest Power Bowl']);
+  // Like the menu, the result starts at the top and fills the 390px frame (Adam, PR #127).
+  const box = await page.locator('.pp-compare').boundingBox();
+  expect(box?.y).toBe(0);
+  expect(box?.width).toBe(390);
   // Every header, section and action cell carries data-side, so a side is all of its cells.
   const first = page.locator('[data-side="first"]');
   const other = page.locator('[data-side="other"]');

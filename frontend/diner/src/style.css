@@ -181,7 +181,9 @@ p {
 }
 
 main:has(> .pp-menu),
-main:has(> .pp-detail) {
+main:has(> .pp-detail),
+main:has(> .pp-picker),
+main:has(> .pp-compare) {
   max-width: none;
   margin: 0;
   padding: 0;
@@ -1320,4 +1322,22 @@ main:has(> .pp-detail) {
 .pp-compare__cell .pp-chip-group {
   flex: none;
   align-items: flex-start;
+}
+
+/* The header shares its rows (photo, name, price) across both dishes, so a name that wraps on
+   one side keeps the two prices level. */
+.pp-compare__header {
+  grid-template-rows: repeat(3, auto);
+}
+
+.pp-compare__header > .pp-compare__cell {
+  display: grid;
+  grid-row: 1 / span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-content: start;
+}
+
+.pp-compare__header > .pp-compare__divider {
+  grid-row: 1 / span 3;
 }
