@@ -2772,3 +2772,10 @@ The comparison SQL scope change also required updating both test clients that de
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
 ```
+
+
+## Owner auth integration - November 11, 2026
+
+Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.

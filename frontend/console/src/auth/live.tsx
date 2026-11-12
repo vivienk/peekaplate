@@ -74,6 +74,7 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
       setMessage('Your session could not be verified. Please sign in again.');
     }
     setOwner(current);
+    setCallbackState('none');
   }
 
   if (isRecovery && (callbackState === 'recovery' || callbackState === 'invalid'))

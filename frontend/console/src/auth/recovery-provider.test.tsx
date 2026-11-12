@@ -13,7 +13,7 @@ const user = {
   created_at: '2026-11-11T00:00:00Z',
 };
 const session = {
-  access_token: 'synthetic-access-token',
+  access_token: `${Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.c3ludGhldGlj`,
   refresh_token: 'synthetic-refresh-token',
   token_type: 'bearer',
   expires_in: 3600,
@@ -56,6 +56,7 @@ describe('recovery session authority', () => {
       { body: user },
       { body: user },
       { body: { user } },
+      { body: {} },
       { body: {} },
     ]);
     expect(await runtime.service.requestPasswordReset(email)).toEqual({

@@ -13,7 +13,7 @@ const user = {
   created_at: '2026-11-11T00:00:00Z',
 };
 const session = {
-  access_token: 'synthetic-access-token',
+  access_token: `${Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.c3ludGhldGlj`,
   refresh_token: 'synthetic-refresh-token',
   token_type: 'bearer',
   expires_in: 3600,
@@ -173,8 +173,34 @@ test('recovery opens in a new tab, changes password once, then requires sign in'
   ).toHaveLength(1);
   await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(reset.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await reset.getByLabel('Password', { exact: true }).fill('new-synthetic-password');
+  await reset.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(reset.getByRole('heading', { name: 'You’re signed in' })).toBeVisible();
+  await reset.getByRole('button', { name: 'Sign out', exact: true }).click();
   await reset.goto(`${origin}/owner-auth.html`);
   await expect(reset.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+});
+
+test('another tab replacing the session cancels recovery permission', async ({ page, context }) => {
+  const calls = await provider(page);
+  await recoveryEmail(page);
+  await page.goto(`${origin}/auth-reset.html?code=recovery-code`);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
+  const other = await context.newPage();
+  await provider(other);
+  await other.goto(`${origin}/owner-auth.html`);
+  await expect(other.getByRole('heading', { name: 'You’re signed in' })).toBeVisible();
+  await other.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await other.getByLabel('Email address').fill(email);
+  await other.getByRole('button', { name: 'Continue', exact: true }).click();
+  await other.getByLabel('Password', { exact: true }).fill('synthetic-password');
+  await other.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(other.getByRole('heading', { name: 'You’re signed in' })).toBeVisible();
+  await page.getByLabel('New password', { exact: true }).fill('must-not-be-sent');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'This reset link can’t be used' })).toBeVisible();
+  expect(calls.some((call) => call.body?.password === 'must-not-be-sent')).toBe(false);
 });
 
 test('direct and signup-purpose reset links cannot authorize a password update', async ({
@@ -211,4 +237,54 @@ test('weak and unchanged passwords show actionable provider outcomes', async ({ 
   });
   await page.getByRole('button', { name: 'Reset password', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Choose a different password');
+});
+
+test('a concurrent account switch cannot redirect an in-flight reset to another owner', async ({
+  page,
+  context,
+}) => {
+  const calls = await provider(page);
+  await recoveryEmail(page);
+  await page.goto(`${origin}/auth-reset.html?code=recovery-code`);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
+  let entered!: () => void;
+  let release!: () => void;
+  const checking = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const resume = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('https://auth-fixture.supabase.co/auth/v1/user', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    entered();
+    await resume;
+    await route.fulfill({ json: user }).catch(() => {}); // The session guard can cancel this request first.
+  });
+  await page.getByLabel('New password', { exact: true }).fill('must-not-switch-owner');
+  await page.getByRole('button', { name: 'Reset password', exact: true }).click();
+  await checking;
+  const other = await context.newPage();
+  const ownerB = {
+    ...user,
+    id: '00000000-0000-4000-8000-000000000002',
+    email: 'other@example.test',
+  };
+  const otherCalls = await provider(other, {
+    token: { body: { ...session, user: ownerB, access_token: 'synthetic-owner-b' } },
+    user: { body: ownerB },
+  });
+  await other.goto(`${origin}/owner-auth.html`);
+  await other.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await other.getByLabel('Email address').fill(ownerB.email);
+  await other.getByRole('button', { name: 'Continue', exact: true }).click();
+  await other.getByLabel('Password', { exact: true }).fill('other-synthetic-password');
+  await other.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(other.getByRole('heading', { name: 'You’re signed in' })).toBeVisible();
+  release();
+  await expect(page.getByRole('heading', { name: 'This reset link can’t be used' })).toBeVisible();
+  expect(
+    [...calls, ...otherCalls].some((call) => call.body?.password === 'must-not-switch-owner'),
+  ).toBe(false);
 });

@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 extends the same adapter with neutral reset emails and password updates permitted only after a current PKCE recovery exchange. Direct/reset/confirmation-purpose links cannot authorize password changes; successful update ends the recovery session and returns to sign-in.",
+      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 extends the same adapter with neutral reset emails and password updates permitted only after a current PKCE recovery exchange. Direct/reset/confirmation-purpose links cannot authorize password changes; successful update ends the recovery session and returns to sign-in. Recovery purpose is token-bound; updates use an isolated in-memory SDK session and abort after cross-tab identity changes.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -258,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f0cdb9f428e376b596ff89164d6ef15e1a6fa02f1c443b431236f00c96a375e8"
+      "sourceFingerprint": "a532e40411194f655ebb955575cb43e4e89ea7484bc588517c82117dd220c570"
     },
     {
       "id": "backend",
@@ -827,7 +827,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in.",
+      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in. Cross-tab replacement and in-flight different-account switch regressions pass; successful reset-to-sign-in reaches the authenticated handoff.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",

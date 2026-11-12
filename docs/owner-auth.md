@@ -91,6 +91,10 @@ PR preview builds force the connection off even if ambient config is present.
   password update failed. The pinned SDK removes the local session before its
   local-scope revocation request. Failed callback exchanges preserve any unrelated
   existing owner session.
+  Recovery permission is bound to that exchange's token, and password updates use
+  an isolated in-memory SDK session. Another tab signing in/out or refreshing the
+  shared session cancels recovery; an in-flight account switch cannot change the
+  password request's actor. A cancelled attempt requires a fresh recovery email.
 
 ## Verification and remaining gates
 
