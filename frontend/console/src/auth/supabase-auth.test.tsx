@@ -174,4 +174,16 @@ describe('Supabase owner adapter (real SDK, synthetic HTTP)', () => {
     expect(await runtime.confirmEmail('expired-code')).toEqual({ kind: 'invalid_link' });
     expect(await runtime.confirmEmail('expired-code')).toEqual({ kind: 'invalid_link' });
   });
+
+  it('does not sign out an existing owner when a confirmation exchange fails', async () => {
+    const { runtime, calls } = fixture([
+      { body: session }, { body: user }, { body: { user, session: null } },
+      { status: 400, body: { code: 'flow_state_expired' } }, { body: user },
+    ]);
+    await runtime.service.signIn({ email: 'owner@example.test', password: 'fixture-password' });
+    await runtime.service.createAccount({ fullName: 'Synthetic Owner', email: 'owner@example.test', password: 'fixture-password', acceptedTerms: true });
+    expect(await runtime.confirmEmail('expired-code')).toEqual({ kind: 'invalid_link' });
+    expect(await runtime.signedInOwner()).toEqual({ id: user.id, email: user.email });
+    expect(calls.some((call) => new URL(call.url).pathname.endsWith('/logout'))).toBe(false);
+  });
 });

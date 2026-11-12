@@ -140,7 +140,8 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     });
     try {
       const { error } = await client.auth.exchangeCodeForSession(code);
-      const owner = !error && !recovery ? await signedInOwner() : null;
+      if (error) return { kind: 'invalid_link' };
+      const owner = !recovery ? await signedInOwner() : null;
       const signedOut = await signOut();
       return { kind: owner && signedOut ? 'confirmed' : 'invalid_link' };
     } catch {
