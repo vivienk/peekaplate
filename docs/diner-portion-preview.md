@@ -12,13 +12,13 @@ The four state categories come from the supplied PeekaPlate Figma file `l7A9n8tA
 | State | Frame | Behavior |
 | --- | --- | --- |
 | Loading | 846:7146 | Blurred, muted dish photo with exported 64px spinner and loading copy |
-| Ready | 258:6000 | PR25 warm cutout card, exact movement, compare/reset controls and instructions |
+| Ready | 258:6000 | Dark Figma stage, centered 250px interactive dish and 46px gesture hint |
 | Photo fallback | 221:260 | Original dish photo and the two-line fallback message |
 | Failed | 165:2413 | Exported 150px illustration, failure copy and Try again |
 
 The shared Back artwork is an exact 42px SVG export. Assets and source node IDs are
 recorded in [preview-assets](../frontend/diner/src/menu/preview-assets/README.md).
-Failure/loading artwork remains unchanged. The latest user direction selects the PR25 review viewer appearance for View Portion: system typography, warm square stage, gradient and cutout shadow. Other screens retain their typography.
+Failure/loading artwork remains unchanged. The latest user direction selects the Figma screen designs while retaining the accepted PR25 generated image and movement. The preview uses dark surface, Inter typography, centered imagery and original exported artwork. Compare/reset and local image selection remain in an expandable Preview controls area below the composition. Other screens retain their typography.
 Web safe-area insets replace the design's native iOS status bar; fake device time and
 battery icons are not rendered. Food imagery remains selected-dish data.
 
@@ -60,8 +60,7 @@ This override requires DEV, the explicit portion-demo scenario, matching dish/re
 and reserved fixture URLs. Its private images are capped at 10 MB each; it does not
 relax the 180 KB public contract. Production excludes both images and the selector.
 
-The viewer now follows `review_preview_html.py` (the supplied-mask review page),
-not the separate spatial feasibility harness:
+Movement and image handling follow `review_preview_html.py`; screen composition follows the three requested Figma frames:
 
 - CSS `perspective(900px)`, at most ±3° pitch/yaw, and foreground translation up to
   5px horizontally / 3px vertically. Manifest motion limits can restrict rotation.
@@ -69,10 +68,11 @@ not the separate spatial feasibility harness:
   it by 1/6. Pointer tracking uses 55ms linear transitions; keys/reset use 300ms ease-out.
 - Horizontal touch tilt, native vertical scrolling, Home/reset, pointer-leave/blur reset,
   touch-release reset and immediate live reduced-motion handling.
-- Full-width square stage within a 760px shell, 18px corners, warm radial gradient,
-  contained cutout with `drop-shadow(0 14px 9px #2223)`. The spatial backdrop layer is
-  verified but replaced visually by the review viewer's gradient; positive-depth cutout
-  layers move together. No WebGL or Three.js dependency remains.
+- Centered 250px stage within the existing 390px diner shell on #2a2d36, with
+  contained cutout and `drop-shadow(0 14px 9px #2223)`. The spatial backdrop layer is
+  verified but visually omitted; positive-depth layers move together. No WebGL or Three.js
+  dependency remains. The 42px Back, 64px loading, 46px hand and 150px unavailable
+  exports retain their native geometry. Loading uses 20.5px blur at 61% opacity.
 - Show original photo / Show review candidate switches the mounted original and card,
   resets motion and updates aria-pressed. Reset view centers the card. Compare is disabled
   until the original and cutout are ready. Original-photo failure blocks interactive view.

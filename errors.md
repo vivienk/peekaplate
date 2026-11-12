@@ -2660,3 +2660,13 @@ rerun with permission for the local test server. No application failure inferred
 Verification invocation correction: `context:refresh` is a standalone pnpm script,
 not a `pnpm verify` check. The invalid combined invocation stopped before running checks;
 reran lint/typecheck/build through verify and refresh separately.
+
+
+## Preview composition drift from requested Figma screens
+
+The prior correction copied PR25 review-page styling along with its motion, displacing
+the requested dark diner screen layout. Keep the approved PNG bytes and movement,
+restore Figma composition, and place supplementary controls below it in a disclosure.
+Regression coverage checks dark surface, native asset dimensions, centered 250px stage
+and compare/reset behavior. Figma connector reached its plan limit after loading-frame
+context; remaining frame layouts were inspected in the browser.

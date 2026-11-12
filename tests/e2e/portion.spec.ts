@@ -272,13 +272,19 @@ for (const state of ['loading', 'ready', 'fallback', 'failed'] as const) {
       state === 'ready'
         ? page.locator('.pp-portion__status')
         : page.locator('.pp-detail__image-wrap');
-    if (state !== 'fallback' && state !== 'ready') {
-      const style = await art.evaluate((el, pseudo) => {
-        const css = getComputedStyle(el, pseudo);
-        return { image: css.backgroundImage, width: css.width, height: css.height };
-      }, '::after');
+    await expect(page.locator('.pp-detail')).toHaveCSS('background-color', 'rgb(42, 45, 54)');
+    await expect(page.locator('.pp-detail__back')).toHaveCSS('width', '42px');
+    if (state !== 'ready') await expect(page.locator('.pp-portion__controls')).toBeHidden();
+    if (state !== 'fallback') {
+      const style = await art.evaluate(
+        (el, pseudo) => {
+          const css = getComputedStyle(el, pseudo);
+          return { image: css.backgroundImage, width: css.width, height: css.height };
+        },
+        state === 'ready' ? '::before' : '::after',
+      );
       expect(style.image).toMatch(/image\/svg\+xml|\.svg/);
-      expect(style.width).toBe(state === 'loading' ? '64px' : '150px');
+      expect(style.width).toBe(state === 'loading' ? '64px' : state === 'ready' ? '46px' : '150px');
       expect(style.height).toBe(style.width);
     }
     await page.screenshot({ path: `test-results/figma-portion-${state}.png` });
@@ -369,19 +375,23 @@ for (const mode of ['hash', 'dimensions', 'no-photo'] as const) {
   });
 }
 
-test('PR25 review appearance and compare/reset controls match the original viewer', async ({
+test('Figma shell retains PR25 movement and expandable compare/reset controls', async ({
   page,
 }) => {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page);
   const stage = page.getByRole('group', { name: 'Captured dish · tilt demo portion preview' });
   const compare = page.getByRole('button', { name: 'Show original photo', exact: true });
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  await page.getByText('Preview controls', { exact: true }).click();
   await expect(compare).toBeEnabled();
   const card = page.locator('.pp-portion__css');
-  await expect(card).toHaveCSS('background-image', /radial-gradient/);
+  await expect(card).toHaveCSS('background-image', 'none');
+  await expect(page.locator('.pp-detail')).toHaveCSS('background-color', 'rgb(42, 45, 54)');
   const stageBox = (await stage.boundingBox())!;
   const controlBox = (await page.locator('.pp-portion__controls').boundingBox())!;
-  expect(stageBox.y - (controlBox.y + controlBox.height)).toBeLessThanOrEqual(20);
+  expect(controlBox.y).toBeGreaterThan(stageBox.y + stageBox.height);
+  expect(stageBox.width).toBe(250);
   expect(stageBox.width).toBeCloseTo(stageBox.height, 0);
   await stage.press('ArrowRight');
   await expect(card).toHaveAttribute('style', /rotateY\(0.5deg\)/);
@@ -466,6 +476,8 @@ test('local review renders the exact original PNGs and switches without adding h
   const metadata = JSON.parse(readFileSync(`${root}review-images.json`, 'utf8'));
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  await page.getByText('Preview controls', { exact: true }).click();
   const selector = page.getByRole('combobox', { name: 'Preview image (local review only)' });
   const length = await page.evaluate(() => history.length);
   for (const variant of ['generated', 'cutout', 'generated']) {

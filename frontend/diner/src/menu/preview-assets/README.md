@@ -10,3 +10,10 @@ Figma browser exports on November 10, 2026. SVG bytes are unmodified.
 
 Used at those dimensions as decorative CSS backgrounds; labels and actions remain
 accessible native text/buttons. Dish photography remains dynamic menu content.
+
+Preview-scoped Inter Latin 400/600/700 WOFF2 files are copied without alteration
+from @fontsource/inter 5.3.0, under the accompanying Inter-LICENSE.txt (OFL).
+The family alias applies only inside View Portion, avoiding other-screen typography changes.
+
+November 11 recheck: loading846:7146 read through Figma design context; ready258:6000
+and failed165:2413 inspected in the browser after the connector plan limit.

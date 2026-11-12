@@ -18,9 +18,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   retry.textContent = 'Try again';
   retry.hidden = true;
   status.after(retry);
-  const controls = document.createElement('div');
+  const controls = document.createElement('details');
   controls.className = 'pp-portion__controls';
   controls.hidden = true;
+  const controlsSummary = document.createElement('summary');
+  controlsSummary.textContent = 'Preview controls';
+  controls.append(controlsSummary);
   const compare = document.createElement('button');
   compare.type = 'button';
   compare.textContent = 'Show original photo';
@@ -29,9 +32,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   resetButton.type = 'button';
   resetButton.textContent = 'Reset view';
   controls.append(compare, resetButton);
-  stage.before(controls);
+  status.after(controls);
   const instructions = document.createElement('p');
-  instructions.className = 'pp-portion__instructions';
+  instructions.className = 'pp-portion__instructions pp-sr-only';
   instructions.hidden = true;
   instructions.textContent =
     'Move the pointer, drag horizontally on touch, or use arrow keys. Home resets. Vertical touch scrolling stays available. Motion is disabled with Reduce Motion.';
@@ -73,6 +76,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   };
   const setState = (state: 'loading' | 'ready' | 'fallback' | 'failed') => {
     root.dataset.portionState = state;
+    controls.hidden = state !== 'ready';
     compare.disabled = state !== 'ready';
     resetButton.disabled = state !== 'ready';
     instructions.hidden = state !== 'ready';
@@ -163,7 +167,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
             }
             visualSelect.value = visual;
             visualSelect.addEventListener('change', changeVisual);
-            controls.prepend(visualSelect);
+            controlsSummary.after(visualSelect);
           }
         }
       }

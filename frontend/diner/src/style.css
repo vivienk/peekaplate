@@ -893,11 +893,36 @@ main:has(> .pp-detail) {
   }
 }
 
-/* Figma 482:503: preview states reuse the mounted dish and its history entry. */
+/* Figma preview shell. PR25 image bytes and movement remain independent of layout. */
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PeekaPlate Preview Inter";
+  src: url("./menu/preview-assets/inter-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 .pp-detail--preview {
   position: relative;
   min-height: 100svh;
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding: max(12px, env(safe-area-inset-top)) 16px 32px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: "PeekaPlate Preview Inter", "Inter", sans-serif;
 }
 .pp-detail--preview .pp-detail__save,
 .pp-detail--preview .pp-detail__section,
@@ -911,12 +936,16 @@ main:has(> .pp-detail) {
 }
 .pp-detail--preview .pp-detail__title {
   text-align: left;
+  line-height: 28px;
+  letter-spacing: 0;
   overflow-wrap: anywhere;
 }
 .pp-detail--preview .pp-detail__back {
   width: 42px;
   height: 42px;
   padding: 0;
+  font-size: 0;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
 }
 .pp-detail--preview .pp-detail__image-wrap {
   position: relative;
@@ -926,23 +955,38 @@ main:has(> .pp-detail) {
   padding: 0;
   margin: max(48px, calc(50svh - 233px)) auto 0;
   touch-action: pan-y;
+  isolation: isolate;
 }
 .pp-detail--preview .pp-detail__image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.pp-portion__canvas {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
-.pp-portion--ready > .pp-detail__image {
+.pp-portion__css {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pp-portion__css img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 9px #2223);
+}
+.pp-portion--ready > .pp-detail__image,
+.pp-portion--original .pp-portion__css {
   visibility: hidden;
 }
-.pp-detail--preview .pp-detail__image-wrap:focus-visible {
-  outline: 2px solid var(--pp-role-on-surface);
+.pp-portion--original > .pp-detail__image {
+  visibility: visible;
+}
+.pp-detail--preview .pp-detail__image-wrap:focus-visible,
+.pp-portion__controls :focus-visible {
+  outline: 2px solid #fff8ed;
   outline-offset: 4px;
 }
 .pp-detail--preview .pp-portion__status {
@@ -963,17 +1007,27 @@ main:has(> .pp-detail) {
   margin-bottom: 4px;
 }
 .pp-detail[data-portion-state="ready"] .pp-portion__status {
-  margin-top: 114px;
-  color: #fafafa;
-  font-weight: 600;
-}
-.pp-detail[data-portion-state="loading"] .pp-portion__status {
   margin-top: 60px;
   color: #fafafa;
   font-weight: 600;
 }
+.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
+  content: "";
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 8px;
+  background: url("./menu/preview-assets/hand-touch.svg") center no-repeat;
+}
+.pp-detail[data-portion-state="loading"] .pp-portion__status {
+  margin-top: 60px;
+  color: #fff8ed;
+  font-weight: 700;
+}
 .pp-detail[data-portion-state="loading"] .pp-detail__image {
-  filter: blur(8px);
+  filter: blur(20.5px);
+  opacity: 0.61;
+  mix-blend-mode: lighten;
 }
 .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
   content: "";
@@ -982,14 +1036,20 @@ main:has(> .pp-detail) {
   top: calc(50% - 32px);
   width: 64px;
   height: 64px;
-  box-sizing: border-box;
-  border: 3px solid #71737a;
-  border-top-color: #fafafa;
-  border-radius: 50%;
+  background: url("./menu/preview-assets/loading.svg") center no-repeat;
   animation: pp-portion-spin 1s linear infinite;
 }
 .pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
   height: 150px;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image {
+  display: none;
+}
+.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap::after {
+  content: "";
+  width: 150px;
+  height: 150px;
+  background: url("./menu/preview-assets/image-not-found.svg") center no-repeat;
 }
 .pp-detail[data-portion-state="failed"] .pp-portion__status {
   margin-top: 32px;
@@ -1003,10 +1063,39 @@ main:has(> .pp-detail) {
   border-radius: 999px;
   background: #f89537;
   color: #421708;
-  font-size: 14px;
+  font:
+    14px "PeekaPlate Preview Inter",
+    sans-serif;
   cursor: pointer;
 }
-.pp-portion__retry[hidden] {
+.pp-portion__controls {
+  margin-top: max(80px, calc(50svh - 190px));
+  font-size: 14px;
+  color: #fafafa;
+}
+.pp-portion__controls summary {
+  cursor: pointer;
+  text-align: center;
+  padding: 12px;
+}
+.pp-portion__controls button,
+.pp-portion__visual {
+  padding: 10px;
+  margin: 8px 4px;
+  font: inherit;
+  color: #fafafa;
+  background: #2a2d36;
+  border: 1px solid #b5b6ba;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.pp-portion__visual {
+  display: block;
+  width: calc(100% - 8px);
+}
+.pp-portion__retry[hidden],
+.pp-portion__controls[hidden],
+.pp-portion__instructions[hidden] {
   display: none;
 }
 @keyframes pp-portion-spin {
@@ -1018,166 +1107,9 @@ main:has(> .pp-detail) {
   .pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
     animation: none;
   }
-}
-
-/* Exact exports from the four requested Figma frames; decorative UI artwork. */
-.pp-detail--preview .pp-detail__back {
-  font-size: 0;
-  background: url("./menu/preview-assets/back.svg") center / 42px 42px no-repeat;
-}
-.pp-detail[data-portion-state="ready"] .pp-portion__status {
-  margin-top: 60px;
-}
-.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
-  content: "";
-  display: block;
-  width: 46px;
-  height: 46px;
-  margin: 0 auto 8px;
-  background: url("./menu/preview-assets/hand-touch.svg") center no-repeat;
-}
-.pp-detail[data-portion-state="failed"] .pp-detail__image {
-  display: none;
-}
-.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap::after {
-  content: "";
-  width: 150px;
-  height: 150px;
-  background: url("./menu/preview-assets/image-not-found.svg") center no-repeat;
-}
-.pp-detail[data-portion-state="loading"] .pp-detail__image {
-  filter: grayscale(1) blur(10px);
-  opacity: 0.61;
-}
-.pp-detail[data-portion-state="loading"] .pp-detail__image-wrap::after {
-  border: 0;
-  background: url("./menu/preview-assets/loading.svg") center no-repeat;
-}
-
-/* PR25 review viewer inside the existing detail/back-navigation shell. */
-.pp-detail--preview {
-  max-width: 760px;
-  padding: max(12px, env(safe-area-inset-top)) 24px 32px;
-  background: #f6f4ee;
-  color: #252822;
-  font: 16px system-ui;
-}
-.pp-detail--preview .pp-detail__image-wrap {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1;
-  margin: 0 auto;
-  overflow: hidden;
-  border-radius: 18px;
-  background: #ebe7db;
-  isolation: isolate;
-}
-.pp-detail--preview .pp-detail__image {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.pp-portion__css {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse, #fffef9, #eae5d9);
-  pointer-events: none;
-}
-.pp-portion__css img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 14px 9px #2223);
-}
-.pp-portion--original .pp-portion__css {
-  visibility: hidden;
-}
-.pp-portion--original > .pp-detail__image {
-  visibility: visible;
-}
-.pp-portion__controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 18px 0;
-}
-.pp-portion__controls[hidden],
-.pp-portion__instructions[hidden] {
-  display: none;
-}
-.pp-portion__controls button {
-  font: inherit;
-  padding: 10px;
-  border: 1px solid #75796e;
-  border-radius: 8px;
-  background: white;
-  color: inherit;
-  cursor: pointer;
-}
-.pp-portion__controls button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.pp-portion__controls button:focus-visible,
-.pp-detail--preview .pp-detail__image-wrap:focus-visible {
-  outline: 3px solid #416738;
-  outline-offset: 4px;
-}
-.pp-detail--preview .pp-portion__status,
-.pp-detail[data-portion-state="ready"] .pp-portion__status,
-.pp-detail[data-portion-state="loading"] .pp-portion__status {
-  margin: 16px 0;
-  min-height: 48px;
-  color: #252822;
-  font: 16px / 1.5 system-ui;
-  text-align: left;
-}
-.pp-detail--preview .pp-portion__status strong {
-  color: inherit;
-}
-.pp-detail[data-portion-state="ready"] .pp-portion__status::before {
-  display: none;
-}
-.pp-portion__instructions {
-  margin: 16px 0;
-  line-height: 1.5;
-}
-.pp-detail[data-portion-state="failed"] .pp-detail__image-wrap {
-  height: 150px;
-  aspect-ratio: auto;
-}
-@media (prefers-reduced-motion: reduce) {
   .pp-portion__css,
   .pp-portion__css img {
     transition: none !important;
     transform: none !important;
   }
-}
-
-.pp-detail--preview .pp-detail__back {
-  font-size: 24px;
-  background: white;
-  color: #252822;
-  border: 1px solid #75796e;
-  border-radius: 8px;
-}
-.pp-detail--preview .pp-detail__image {
-  max-width: none;
-  filter: none;
-}
-
-.pp-portion__visual {
-  flex-basis: 100%;
-  max-width: 100%;
-  padding: 10px;
-  font: inherit;
-  color: #252822;
-  background: white;
-  border: 1px solid #75796e;
-  border-radius: 8px;
 }
