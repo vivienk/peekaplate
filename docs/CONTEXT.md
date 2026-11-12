@@ -258,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "80b1461a0ff89d3a9fcfc809042baa64ea142b0bb2c833b767f018a55435ee2f"
+      "sourceFingerprint": "def2746bb5a40b76f756a23c57fb7b4143c2a244fe366e813ba67f0b1af5149a"
     },
     {
       "id": "backend",
@@ -814,7 +814,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. The current Supabase Developer role cannot edit the empty redirect allowlist; Vivien is configuring exact staging/local callbacks. Email recipient and credentials are excluded from shared evidence.",
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
