@@ -2772,3 +2772,14 @@ The comparison SQL scope change also required updating both test clients that de
 ## Owner auth integration - November 11, 2026
 
 Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+
+## Auth email editor - November 11, 2026
+
+An editor replacement retained part of the previous HTML. A complete-source
+comparison exposed the mismatch; the complete document was selected and pasted,
+then compared before the corrected save and on reopening. No email was sent
+from the intermediate source. Source equality, persisted preview and the actual
+branded Gmail recovery email now pass. Use whole-document selection/paste and
+verify copied source rather than assuming a generic editor set-value replaces
+all Monaco content. No provider credentials, accounts or mail links are recorded.

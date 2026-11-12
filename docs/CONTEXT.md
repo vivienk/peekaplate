@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 adds recovery separately.",
+      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 adds recovery separately. Approved editable signup/recovery email templates are saved in staging Auth; branded Gmail recovery/link checks pass, while fresh signup/password submission and complete owner acceptance remain pending.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -245,7 +245,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/live.tsx",
         "playwright.auth.config.ts",
         "tests/e2e/owner-auth-provider.spec.ts",
-        "docs/owner-auth.md"
+        "docs/owner-auth.md",
+        "frontend/console/email-templates/README.md",
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -255,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "41c88cac910007fbc299858e03f40049d2ac1c68972f2abd473a8581dbe97861"
+      "sourceFingerprint": "fac84fc22c3549490fe22ba5329f9e68f746f064105614279d72d64882751019"
     },
     {
       "id": "backend",
@@ -819,11 +822,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained.",
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained. Approved branded templates were saved after admin access; logo bytes, actual branded recovery delivery and verified/reused-link behavior pass. Fresh signup, password submission and owner/dashboard acceptance remain NOT RUN.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
-        "docs/owner-auth.md"
+        "docs/owner-auth.md",
+        "frontend/console/email-templates/README.md"
       ],
       "next": "Keep PR143 and stacked PR146 unmerged until dashboard/setup flow is connected; finish actual email confirmation/recovery tests and record final independent review. No deployment or tenant grant."
     }
