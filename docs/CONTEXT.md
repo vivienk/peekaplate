@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. Owner sign-in UI (src/auth: E1/S01/S02) calls only OwnerAuthService, unconnected (unavailable) until the provider is wired; preview-only synthetic owner-sign-in demo.",
+      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 adds recovery separately.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -235,7 +235,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/copy.ts",
         "frontend/console/src/auth/auth.css",
         "frontend/console/src/auth/demo.tsx",
-        "tests/e2e/owner-auth.spec.ts"
+        "tests/e2e/owner-auth.spec.ts",
+        "frontend/console/owner-auth.html",
+        "frontend/console/auth-confirm.html",
+        "frontend/console/src/auth/supabase-auth.ts",
+        "frontend/console/src/auth/supabase-auth.test.tsx",
+        "frontend/console/src/auth/callback.ts",
+        "frontend/console/src/auth/callback.test.tsx",
+        "frontend/console/src/auth/live.tsx",
+        "playwright.auth.config.ts",
+        "tests/e2e/owner-auth-provider.spec.ts",
+        "docs/owner-auth.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -245,7 +255,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c0b23b6d4b3a5898dff32d645c037350c216eb1f7b4eadbbab2f801e88918296"
+      "sourceFingerprint": "c574909e8d6d91d70099a9d68b7391dd5353632b3744068f9b6cdc7412e1a078"
     },
     {
       "id": "backend",
@@ -381,7 +391,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d7ed42cb624dd53cb596dffcadb567acc8cc08bd0557247de4ace4dcb94718bf"
+      "sourceFingerprint": "8bf07b95e2c3490495f25c6d93e87fd24a6d19cefabb2624bbcb5f68e1616684"
     },
     {
       "id": "database",
@@ -511,7 +521,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "009589de7b73f7a22ec0b93ffacbda2117143b02ba2bf974c784121d96e649e5"
+      "sourceFingerprint": "1b41ad3e4b3592831f8e6dcb1aba6539a2f9792fa9934aafb4f889522ecf5b14"
     },
     {
       "id": "agents",
@@ -707,16 +717,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
-      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "diner"
       ],
       "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
@@ -813,6 +813,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. The current Supabase Developer role cannot edit the empty redirect allowlist; Vivien is configuring exact staging/local callbacks. Email recipient and credentials are excluded from shared evidence.",
+      "sources": [
+        "frontend/console/src/auth/supabase-auth.ts",
+        "frontend/console/src/auth/live.tsx",
+        "docs/owner-auth.md"
+      ],
+      "next": "Keep PR143 and stacked PR146 unmerged until dashboard/setup flow is connected; finish actual email confirmation/recovery tests and record final independent review. No deployment or tenant grant."
     }
   ]
 }

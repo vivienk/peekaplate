@@ -1,7 +1,5 @@
-// S4-FE-04.1: the only place the owner sign-in screens reach the auth provider. The screens react
-// to these results and nothing else, so connecting a real provider (Sai, S4-FE-04 backend) changes
-// this file only. Until then every call answers "unavailable" and the screens say sign-in is not
-// available here; they never show a sign-in as successful without a real one.
+// Screens use typed outcomes; supabase-auth.ts owns provider calls. Synthetic demos keep their
+// fake service. Missing live configuration returns unavailable without sending credentials.
 
 // Too many attempts: the provider or server is throttling requests. retryAfterSeconds is the wait
 // the service supplied, if any; the screens keep the action blocked until it has passed. There is no
@@ -9,6 +7,8 @@
 export type RateLimited = { kind: 'rate_limited'; retryAfterSeconds?: number };
 
 export type EmailCheckResult =
+  // Live flow never discloses account existence. Sign in always offers Create account.
+  | { kind: 'continue_to_sign_in' }
   // An owner account exists for this email: go to Sign in (S02).
   | { kind: 'existing_account' }
   // No account yet: go to Create account (S01).
@@ -37,6 +37,7 @@ export type CreateAccountResult =
   // Created, and a confirmation email was sent: the screen shows "Check your email". Confirming
   // returns the owner to the app.
   | { kind: 'confirmation_required' }
+  | { kind: 'weak_password' }
   // An account already exists for this email: the screen offers Sign in instead.
   | { kind: 'account_exists' }
   | { kind: 'failed' }

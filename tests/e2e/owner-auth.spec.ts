@@ -136,7 +136,11 @@ test('when confirmation is required, Create account shows Check your email', asy
   await fillCreate(page);
   const heading = page.getByRole('heading', { name: 'Check your email' });
   await expect(heading).toBeFocused();
-  await expect(page.getByText(`We sent a confirmation link to ${EMAIL}.`)).toBeVisible();
+  await expect(
+    page.getByText(
+      `If this address can be registered, a confirmation link will arrive at ${EMAIL}`,
+    ),
+  ).toBeVisible();
   // The result screen has no logo (Figma "Check your email").
   await expect(page.locator('.pp-auth__brand')).toHaveCount(0);
 

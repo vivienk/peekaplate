@@ -57,6 +57,7 @@ jobs:
               - 'scripts/verify*'
               - 'playwright.config.ts'
               - 'playwright.posthog.config.ts'
+              - 'playwright.auth.config.ts'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'

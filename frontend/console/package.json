@@ -10,12 +10,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
     "@fontsource/inter": "5.3.0",
     "@peekaplate/analytics": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
-    "@peekaplate/ui": "workspace:*"
+    "@peekaplate/ui": "workspace:*",
+    "@supabase/supabase-js": "2.119.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

@@ -39,6 +39,10 @@ export type BannerCopy = { title: string; body: string };
 const TRY_AGAIN = 'Something went wrong on our side. Check your connection and try again.';
 
 export const BANNERS = {
+  weakPassword: {
+    title: 'Choose a stronger password',
+    body: 'Use a longer, unique password and try again.',
+  },
   // S02 handoff, section 2.
   invalidCredentials: {
     title: 'Email or password is incorrect',

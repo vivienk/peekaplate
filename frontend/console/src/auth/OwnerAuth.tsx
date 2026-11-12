@@ -211,7 +211,8 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
     setBanner(null);
     const result = await run(() => service.checkEmail(address), { kind: 'failed' as const });
     if (!result) return;
-    if (result.kind === 'existing_account') onRoute('signin', address);
+    if (result.kind === 'existing_account' || result.kind === 'continue_to_sign_in')
+      onRoute('signin', address);
     else if (result.kind === 'new_account') onRoute('create', address);
     else if (result.kind === 'rate_limited') {
       cooldown.start(result);
@@ -222,7 +223,7 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   return (
     <>
       <StepHeader heading={heading} title="Welcome to PeekaPlate">
-        Enter your work email to get started. We’ll take you to the right next step.
+        Enter your work email, then sign in or create an account.
       </StepHeader>
       {banner && <ErrorBanner copy={banner} />}
       <form className="pp-auth__form" noValidate onSubmit={submit}>
@@ -308,6 +309,7 @@ function CreateStep({
     if (!result) return;
     if (result.kind === 'created') onCreated();
     else if (result.kind === 'confirmation_required') onRoute('confirm-email');
+    else if (result.kind === 'weak_password') setBanner(BANNERS.weakPassword);
     else if (result.kind === 'account_exists') setBanner('exists');
     else if (result.kind === 'rate_limited') {
       cooldown.start(result);
@@ -564,8 +566,9 @@ function ConfirmEmailStep({
         </>
       }
     >
-      We sent a confirmation link to <strong>{email}</strong>. Open it to finish creating your
-      account. Check your inbox and spam folder.
+      If this address can be registered, a confirmation link will arrive at <strong>{email}</strong>
+      . Open it in this browser to finish creating your account. Already registered? Sign in
+      instead. Check your inbox and spam folder.
     </StatusPanel>
   );
 }
