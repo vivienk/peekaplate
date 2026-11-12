@@ -99,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Save, Unsave, Undo, badge and Saved routing are connected to real menu/detail screens. Saved refreshes current dish revisions without a new shortlist view, and keyboard removal retains focus. Verified publication loading, cancellation, expiry and withdrawal tracking suspension remain enforced. Compare and remaining real UI tracking acceptance are separate.",
+      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -189,7 +189,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/diner-connection.md",
         "frontend/diner/src/save/screens.ts",
         "frontend/diner/src/save/save.css",
-        "tests/e2e/save-screens.spec.ts"
+        "tests/e2e/save-screens.spec.ts",
+        "tests/e2e/menu-triggers.spec.ts",
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "docs/diner-tracking-staging.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -198,7 +201,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "eeaf24948b1da79d6308dde121b2064c9388f79bbea2af33968849a0102fcf56"
+      "sourceFingerprint": "727d774dcb38138455045c9c6d2d38deda37c2c4d1170255006cc31440f606d2"
     },
     {
       "id": "console",
@@ -476,7 +479,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "540bd41066a69a873b38ebcec2cc4c94950bede0728c14d3fbceb138678e3446"
+      "sourceFingerprint": "2943859e518870b721347ec55e6df7437543ec8424bbd6e89f96083552deb4b3"
     },
     {
       "id": "agents",
@@ -538,7 +541,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ea8d828a39fd80d003c97b6e306ee6072bba4bdeb240bcebe6e8ffdae51ee574"
+      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
     },
     {
       "id": "processing",
@@ -666,15 +669,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
-      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
-    },
-    {
-      "date": "2026-11-09",
       "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
       "modules": [
         "diner"
@@ -767,6 +761,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/evidence/owner-menu-staging-2026-11-12.json"
       ],
       "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "diner",
+        "analytics",
+        "delivery"
+      ],
+      "summary": "Narrow main release promotes the already reviewed PR78 diner triggers and compatible browser regressions from develop. Existing live-menu/PostHog configuration and staging Pages hosting are reused. API, extraction, database, console and Queue configuration are unchanged. The release PR records exact deployment identity and observed smoke checks.",
+      "sources": [
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/events.ts",
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "docs/diner-tracking-staging.md"
+      ],
+      "next": "Release the reviewed main commit to the existing diner staging Pages project, verify release metadata and bounded synthetic browser dispatch. Jeffin/Uneeza then coordinate approved real PostHog/canonical persistence and numeric report reconciliation; no normal collection activation is implied."
     }
   ]
 }
