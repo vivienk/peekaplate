@@ -2597,3 +2597,8 @@ Test setup corrections: use the installed PDF loading task cleanup API, a real l
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T08:37:09.613Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T08:40:31.440Z","exitCode":1}
+```
