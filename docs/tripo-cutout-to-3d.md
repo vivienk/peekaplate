@@ -177,3 +177,14 @@ provider billing, returned dish quality, phone performance and production public
 
 The prepared actual-input job is outside the repository in the local outputs directory;
 it is `prepared` with `task_id: null`, not a generated 3D result.
+
+### HTTP API verification
+
+PASS: `PYTHONPATH=processing/src:processing/tests python -m unittest
+test_model_service test_generate_model test_service test_service_artifacts -v` —61 tests.
+This includes13 HTTP API cases for authentication, tenant isolation, bounded requests,
+source identity/integrity, idempotent create, conflicting inputs, concurrent work,
+nonblocking health, resume, ambiguous submissions and protected artifact downloads.
+The transport is fake; the actual preparation/generation state machine is exercised.
+PASS: repository lint/typecheck and context/documentation checks.
+No live generation, deployment or public owner-API integration was performed.
