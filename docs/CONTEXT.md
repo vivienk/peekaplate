@@ -244,7 +244,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Hosted activation and real S06–S09 integration require separate acceptance evidence.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -372,7 +372,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/pdf-fixture.ts",
         "docs/owner-menu-workspace.md",
         "backend/src/ingestion/intake.source.test.ts",
-        "backend/src/ingestion/review-bootstrap.ts"
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/evidence/owner-menu-staging-2026-11-12.json"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -385,7 +386,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "9faa300dbff43b7eccd7bf971ddd7d61e3acb76b2e7cb8119cd6d4dbba4fcc35"
+      "sourceFingerprint": "32f01e3a1db7abfcb6f7f5bb3f8e8917a38630b9f6e8e84783327eb106c68011"
     },
     {
       "id": "database",
@@ -517,7 +518,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "0a351cbdc2cd95bc1f348da95a65a83cb02163e1b592aadfab10129b710d2662"
+      "sourceFingerprint": "aa08193f11cab070ac8a33a69cfec16323f3bd89694ddf5077ac3d74abee72df"
     },
     {
       "id": "agents",
@@ -817,15 +818,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Owner menu workspace adds versioned manual drafts/private photos, ordered verified uploads, PDF limits, private URL provenance, fenced cancel/retry and retained-report review bootstrap. Approval binds the current job/report/review and freezes corrected facts. Supabase forward migration20261112010000 applied; new metadata forces RLS and denies browser reads. Main release149 fad0eb0 deployed as staging API58034c48. Local develop1405 unit/74 script/310SQL/130integration and narrow main1220/74/225/104 passed. Seven hosted HTTP checks passed; private R2 and paused Queues preserved. Dedicated account restored viewer.",
+      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
       "sources": [
         "docs/owner-menu-workspace.md",
         "backend/src/owner-menu.ts",
         "backend/src/ingestion/intake.ts",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "backend/src/ingestion/review-bootstrap.ts"
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/evidence/owner-menu-staging-2026-11-12.json"
       ],
-      "next": "Ehab connects FE06 S06–S09 using owner-menu-workspace.md. Genuine hosted staff workspace checks remain NOT RUN: magic-link verification returned otp_expired; SQL role probe blocked by SET ROLE permission. No account/password changes or production deployment. Auth143/146 remains unmerged; do not claim full owner-screen acceptance."
+      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
     }
   ]
 }
