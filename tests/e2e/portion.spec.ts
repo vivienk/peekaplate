@@ -458,3 +458,39 @@ test('PR25 original-photo failure blocks an otherwise valid cutout and compariso
     page.getByRole('button', { name: 'Show original photo', exact: true }),
   ).toBeDisabled();
 });
+
+test('local review renders the exact original PNGs and switches without adding history', async ({
+  page,
+}) => {
+  const root = 'frontend/diner/src/menu/fixture-assets/portion-demo/';
+  const metadata = JSON.parse(readFileSync(`${root}review-images.json`, 'utf8'));
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await openPortion(page);
+  const selector = page.getByRole('combobox', { name: 'Preview image (local review only)' });
+  const length = await page.evaluate(() => history.length);
+  for (const variant of ['generated', 'cutout', 'generated']) {
+    await selector.selectOption(variant);
+    await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+    const asset = metadata.variants[variant];
+    const rendered = await page.locator('.pp-portion__css img').evaluate(async (element) => {
+      const image = element as HTMLImageElement;
+      const bytes = await (await fetch(image.src)).arrayBuffer();
+      return {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        sha256: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) =>
+          b.toString(16).padStart(2, '0'),
+        ).join(''),
+      };
+    });
+    expect(rendered).toEqual({ width: asset.width, height: asset.height, sha256: asset.sha256 });
+    expect(hash(readFileSync(`${root}${asset.filename}`))).toBe(asset.sha256);
+    expect(await page.evaluate(() => history.length)).toBe(length);
+    await page.screenshot({ path: `test-results/original-${variant}.png` });
+  }
+  await page.getByRole('button', { name: 'Show original photo', exact: true }).click();
+  await expect(page.locator('.pp-portion__css')).toBeHidden();
+  await expect(page.locator('img.pp-detail__image')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
+});

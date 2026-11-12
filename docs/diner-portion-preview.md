@@ -32,7 +32,7 @@ verifies the source, creates the cutout, retains the original fallback and recor
 provenance. The adapter converts that cutout to bounded WebP layers and exports
 `demo.json`; `portionDemo.ts` and `fixtures.ts` consume its actual dish/revision IDs,
 dimensions, hashes and motion limits. The review manifest remains attached with
-`needs_review` and `publication.eligible=false`. No generated candidate is accepted.
+`needs_review` and `publication.eligible=false`. The public delivery adapter accepts no generated candidate.
 
 To regenerate from a captured T0 bundle and matching grayscale mask, use the processing
 Python environment (Pillow and Pydantic required), from the repository root:
@@ -50,6 +50,15 @@ Output is create-only. Copy the generated `demo.json`, `photo.jpg`, `dish.webp` 
 Never relabel this output as approved public content. This integrates PR25's captured
 photo/supplied-mask path; it does not invoke optional generated presentation candidates
 or create a hosted approval/publication service.
+
+The local review demo additionally restores the exact earlier `cutout.png` and
+`presentation.png` from review asset `review_b2f135ce8784a517ca9cf1f3fbc8fcbf`.
+`review-images.json` preserves their original hashes, dimensions and needs-review,
+publication-ineligible provenance. The selector defaults to the generated presentation;
+choose Original cutout to inspect the supplied-mask result. Neither PNG is re-encoded.
+This override requires DEV, the explicit portion-demo scenario, matching dish/revision
+and reserved fixture URLs. Its private images are capped at 10 MB each; it does not
+relax the 180 KB public contract. Production excludes both images and the selector.
 
 The viewer now follows `review_preview_html.py` (the supplied-mask review page),
 not the separate spatial feasibility harness:
@@ -99,16 +108,16 @@ dish, then View Portion:
 
 - Ready: `http://127.0.0.1:5173/?scenario=portion-demo`
 - Loading then Ready: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=loading`
-- Interactive cutout (legacy fallback demo link): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
+- Interactive cutout (legacy fallback demo link): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback&demoVisual=cutout`
 - Photo fallback (missing cutout assets): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=photo`
 - Failed: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=failed`
 
 The loading scenario deliberately delays each local layer by three seconds; it then
 completes normally. Photo/failed scenarios deliberately keep failing so their
 screens remain inspectable, including repeated Try again. The ready scenario is the
-working captured-photo tilt demo. These use actual state transitions, not static mockups.
+working review-image tilt demo. These use actual state transitions, not static mockups.
 
-Demo imagery is the prior user-supplied capture/mask, not generated food. Demo menu
+Demo imagery includes the prior user-supplied capture/mask and the earlier generated presentation, explicitly labelled for local review only. Demo menu
 facts are explicitly placeholders. Demo modules, query controls and URL substitution
 are DEV-only; production builds exclude the demo photo assets. Live-menu selection
 is unchanged. The reserved `.invalid` mapping is development-wide, not an approval gate.

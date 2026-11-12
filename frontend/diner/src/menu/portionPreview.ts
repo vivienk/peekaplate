@@ -39,6 +39,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   const key = crypto.randomUUID();
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
+  let visual: 'cutout' | 'generated' =
+    new URLSearchParams(location.search).get('demoVisual') === 'cutout' ? 'cutout' : 'generated';
+  let visualSelect: HTMLSelectElement | undefined;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let disposed = false;
@@ -133,7 +136,36 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       if (!photo) throw new Error('Original photo unavailable');
       await photo.decode();
       if (controller.signal.aborted) return;
-      const mounted = await mount(stage, parsed.data, controller.signal);
+      let renderManifest = parsed.data;
+      if (
+        import.meta.env.DEV &&
+        new URLSearchParams(location.search).get('scenario') === 'portion-demo'
+      ) {
+        const { originalReviewPortion } = await import('./portionDemo');
+        const original = originalReviewPortion(parsed.data, visual);
+        if (controller.signal.aborted) return;
+        if (original) {
+          renderManifest = original;
+          if (!visualSelect) {
+            visualSelect = document.createElement('select');
+            visualSelect.className = 'pp-portion__visual';
+            visualSelect.setAttribute('aria-label', 'Preview image (local review only)');
+            for (const [value, label] of [
+              ['generated', 'Generated image — review only'],
+              ['cutout', 'Original cutout — review only'],
+            ]) {
+              const option = document.createElement('option');
+              option.value = value!;
+              option.textContent = label!;
+              visualSelect.append(option);
+            }
+            visualSelect.value = visual;
+            visualSelect.addEventListener('change', changeVisual);
+            controls.prepend(visualSelect);
+          }
+        }
+      }
+      const mounted = await mount(stage, renderManifest, controller.signal);
       if (controller.signal.aborted || disposed) {
         mounted.dispose();
         return;
@@ -267,6 +299,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   const pointerup = (event: PointerEvent) => {
     if (drag?.id === event.pointerId) reset();
   };
+  const changeVisual = async () => {
+    visual = visualSelect?.value === 'cutout' ? 'cutout' : 'generated';
+    await show(true);
+    if (active && !disposed) visualSelect?.focus();
+  };
   const retryPreview = () => {
     const photo = dish.images?.detail ?? dish.images?.card;
     if (photo && !stage.querySelector('img.pp-detail__image')) {
@@ -317,6 +354,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     retry.remove();
     compare.removeEventListener('click', comparePhoto);
     resetButton.removeEventListener('click', reset);
+    visualSelect?.removeEventListener('change', changeVisual);
     controls.remove();
     instructions.remove();
     open.removeEventListener('click', openPreview);

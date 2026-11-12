@@ -2645,3 +2645,14 @@ input. This removes the test race without changing viewer behavior.
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T06:22:45.601Z","exitCode":1}
 ```
+
+
+## Original PR25 review images omitted (local preview)
+
+The viewer correction reused a lossy cutout WebP and omitted the earlier generated
+presentation PNG, so matching motion did not restore the requested appearance.
+The DEV-only review demo now loads both original PNGs without re-encoding, with their
+recorded SHA-256 and dimensions. Regression: `local review renders the exact original
+PNGs and switches without adding history` in tests/e2e/portion.spec.ts.
+The first browser run could not bind localhost under restricted permissions (EPERM);
+rerun with permission for the local test server. No application failure inferred.

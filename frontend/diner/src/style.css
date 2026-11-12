@@ -1170,3 +1170,14 @@ main:has(> .pp-detail) {
   max-width: none;
   filter: none;
 }
+
+.pp-portion__visual {
+  flex-basis: 100%;
+  max-width: 100%;
+  padding: 10px;
+  font: inherit;
+  color: #252822;
+  background: white;
+  border: 1px solid #75796e;
+  border-radius: 8px;
+}
