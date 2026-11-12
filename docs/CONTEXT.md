@@ -353,12 +353,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d2ff011193f98360fd6ecb598e90eb475fcca72b0f62a686dbf7c8cf6fde5203"
+      "sourceFingerprint": "9930efdac5b3704dbcd974e1d9b12bd7bdd79ae69658b2c321e824de774b0944"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
+      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Workspace migration is applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -756,14 +756,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Owner menu workspace reuses ingestion, R2 and publication boundaries. Added explicit owner-entered working drafts, private photo ownership, approved revision facts, ordered source groups, source-ready claims, PDF page limits and fenced cancel/retry. Before PR, hosted metadata confirmed four existing ingestion/review tables with forced RLS and absent new metadata tables. Local PostgreSQL/Worker/Chromium tests exercise save/resume/private photos/denial; final checks and hosted activation remain pending.",
+      "summary": "Owner menu workspace adds versioned manual drafts/private photos, ordered verified uploads, PDF limits, private URL provenance, fenced cancel/retry and retained-report review bootstrap. Approval binds the current job/report/review and freezes corrected facts. Supabase forward migration20261112010000 applied; new metadata forces RLS and denies browser reads. Main release149 fad0eb0 deployed as staging API58034c48. Local develop1405 unit/74 script/310SQL/130integration and narrow main1220/74/225/104 passed. Seven hosted HTTP checks passed; private R2 and paused Queues preserved. Dedicated account restored viewer.",
       "sources": [
         "docs/owner-menu-workspace.md",
         "backend/src/owner-menu.ts",
         "backend/src/ingestion/intake.ts",
-        "migrations/20261112010000_owner_menu_workspace.sql"
+        "migrations/20261112010000_owner_menu_workspace.sql",
+        "backend/src/ingestion/review-bootstrap.ts"
       ],
-      "next": "Complete pinned reviews, CI, final human approval, guarded staging migration/release and synthetic cleanup. Ehab connects S06–S09; auth143/146 remains separate/unmerged. No claim of live UI completion or production acceptance."
+      "next": "Ehab connects FE06 S06–S09 using owner-menu-workspace.md. Genuine hosted staff workspace checks remain NOT RUN: magic-link verification returned otp_expired; SQL role probe blocked by SET ROLE permission. No account/password changes or production deployment. Auth143/146 remains unmerged; do not claim full owner-screen acceptance."
     }
   ]
 }

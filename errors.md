@@ -2602,3 +2602,9 @@ Test setup corrections: use the installed PDF loading task cleanup API, a real l
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T08:40:31.440Z","exitCode":1}
 ```
+
+## Owner menu staging acceptance — November 12, 2026
+
+Independent review found approval could use a historical extraction after a retry, and bootstrap could register against a changed job. A real database regression reproduced incorrect approval before the fix; current report/session pointers, job-first locks and registration-time revalidation now reject both cases. All 130 integration cases pass. A CI tracking test also armed delivery after its fixed fake-time advance; bounded clock polling preserves the assertion and passed five repeated browser runs.
+
+Hosted migration and seven HTTP/CORS checks passed. Hosted staff checks did not execute: the dedicated account's email magic-link verification returned otp_expired, including a fresh dashboard-generated link. The account/password were preserved and its temporary synthetic permission restored to viewer. A rollback-only SQL probe stopped before writes because the dashboard role cannot SET ROLE peekaplate_runtime; no privilege expansion was made. Do not report those attempts as authenticated API or runtime-role acceptance. Shell helpers use files to avoid nested PowerShell variable expansion, and merge gates use the exact SHA returned by GitHub.
