@@ -38,6 +38,72 @@ The default input is `cutout.png`, not a lossy WebP or a new generated picture. 
 instead. Both choices retain the dish/revision and original review-manifest hash. An output
 directory is create-only: preparation never overwrites another job.
 
+## Private HTTP API
+
+`peekaplate_processing.model_service:create_app` exposes the same pipeline over FastAPI.
+Use the existing processing `service` optional dependencies (FastAPI, HTTPX, Uvicorn).
+The API is separate from the extraction service and existing Cloudflare Worker routes.
+It is a trusted-backend interface, **not a browser-facing owner API**: the calling backend
+must authorize the user before calling it. No service token belongs in frontend code.
+
+Configure these process variables privately; dotenv files are not loaded automatically:
+
+- `TRIPO_SERVICE_TOKEN`: dedicated ASCII secret, at least 48 characters, no whitespace.
+- `TRIPO_TENANT_ID`: canonical UUID owned by this service instance. Requests cannot select a tenant.
+- `TRIPO_REVIEW_ROOT`: absolute private directory on persistent local storage.
+- `TRIPO_API_KEY`: server-only Tripo key. Missing key returns 503 before job creation.
+
+Register verified PR25 review bundles through the trusted server/operator filesystem at
+`$TRIPO_REVIEW_ROOT/$TRIPO_TENANT_ID/reviews/<review_asset_id>/`. The manifest's asset ID
+must match the folder name. The API accepts neither filesystem paths nor source URLs.
+Jobs persist below the same tenant's `jobs/<job_id>/` directory. Do not place this root
+inside a public static directory or let untrusted users write it.
+
+```sh
+PYTHONPATH=processing/src python -m uvicorn \
+  peekaplate_processing.model_service:create_app --factory --host 127.0.0.1 --port 5182
+```
+
+All job/artifact routes require `Authorization: Bearer <TRIPO_SERVICE_TOKEN>` and use
+`Cache-Control: no-store`. `/health` exposes only service/configuration readiness.
+
+| Method | Route | Result |
+| --- | --- | --- |
+| POST | `/v1/model-jobs` | Prepare and schedule generation; 202 |
+| GET | `/v1/model-jobs/{job_id}` | Read saved status, attempt status and artifact paths; no provider calls |
+| POST | `/v1/model-jobs/{job_id}/resume` | Explicitly resume polling/download; 202 |
+| GET | `/v1/model-jobs/{job_id}/artifacts/source.png` | Exact verified input PNG |
+| GET | `/v1/model-jobs/{job_id}/artifacts/fallback.jpg` | Verified original image |
+| GET | `/v1/model-jobs/{job_id}/artifacts/model.glb` | Hash-checked GLB, only when ready |
+
+Create body (8 KB maximum, unknown fields rejected):
+
+```json
+{
+  "job_id": "22222222-2222-4222-8222-222222222222",
+  "review_asset_id": "review_b2f135ce8784a517ca9cf1f3fbc8fcbf",
+  "source": "cutout"
+}
+```
+
+The caller chooses a stable UUID per deliberate generation request. Repeating the same
+job ID/input returns 200 with saved state and never schedules another charge. Reusing
+that ID with another review asset or variant returns 409. Terminal/ready jobs return their
+saved state on resume; ambiguous submissions return 409 and require reconciliation.
+Status responses omit provider task IDs, keys, signed URLs and local paths.
+
+Background work runs off the HTTP event loop, with two active attempts per process and
+per-job filesystem locks across processes. A full process returns 429; a prepared job may
+already exist, so inspect its status and explicitly resume it after capacity is available.
+Concurrent work on one job returns 409. This is a bounded local worker, not a distributed
+queue: persistent storage is required, and after a restart the caller must explicitly resume
+interrupted jobs. `attempt_status: incomplete` means the attempt encountered an error;
+inspect the pipeline `status` before resuming. No automatic retries of ambiguous submissions.
+
+Tenant isolation is enforced by server configuration and separate token/root namespaces,
+not by trusting tenant fields from clients. This implementation does not add public routing,
+owner-session authorization, fleet scheduling, automatic recovery after restart or deployment.
+
 ## Provider request and lifecycle
 
 Verified against Tripo documentation on November 12, 2026:

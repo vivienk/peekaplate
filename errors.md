@@ -2693,3 +2693,12 @@ Current local source preparation verifies the original PR25 PNG bytes and identi
 
 Context validation initially rejected an overlong processing summary; shortened the
 bounded summary while retaining the existing OCR/recovery and new private Tripo scope.
+
+
+## Private Tripo HTTP adapter verification
+
+The focused PR25 Python environment lacks FastAPI. HTTP tests use the existing processing
+service environment with FastAPI/HTTPX installed; no dependency installation or provider
+call is required. API authority is a dedicated server token bound to one tenant, never a
+request tenant field. Restart recovery is explicit resume on persistent local storage,
+not a distributed queue or production owner endpoint.

@@ -538,7 +538,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible; live generation is not tested.",
+      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible. A separate authenticated single-tenant FastAPI adapter provides idempotent create/status/resume and verified artifact downloads; live generation is not tested.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -547,6 +547,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/__init__.py",
         "processing/src/peekaplate_processing/generate_model.py",
         "processing/src/peekaplate_processing/tripo.py",
+        "processing/src/peekaplate_processing/model_service.py",
+        "processing/tests/test_model_service.py",
         "processing/tests/test_generate_model.py",
         "docs/tripo-cutout-to-3d.md",
         "processing/src/peekaplate_processing/check_llm.py",
@@ -626,7 +628,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "cae96bb7571778e5c4da1a122372a28e51a0801f536ba6038cf24d6e72e7a61a"
+      "sourceFingerprint": "f17debe0e840583f57fe2f8e56a8f201ff5bd6183d4c10637035e3be77663ba6"
     },
     {
       "id": "assets",
