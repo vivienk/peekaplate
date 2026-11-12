@@ -39,7 +39,7 @@ function createClient(current: PeriodCohort, baseline: PeriodCohort) {
     if (sql.includes('FROM app_private.staff_membership')) {
       return { rows: [{ permission: 'viewer' }] };
     }
-    if (sql.includes('WITH current_period AS')) {
+    if (sql.includes('WITH scoped_facts AS MATERIALIZED')) {
       return { rows: [row] };
     }
     return { rows: [] };

@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -61,7 +61,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/ingredient-review.json",
         "processing/tests/fixtures/ingredient-review-unicode.json",
         "packages/contracts/src/comparison-report.ts",
-        "packages/contracts/src/comparison-report.test.ts"
+        "packages/contracts/src/comparison-report.test.ts",
+        "packages/contracts/src/owner-actions.ts",
+        "packages/contracts/src/owner-actions.test.ts",
+        "docs/owner-insight-actions.md"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -69,7 +72,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1b54826c4b30f2e61033013c16c29a7a2b89df812e537e2cddb73391ab2ec1de"
+      "sourceFingerprint": "54d6c4965afe366342c51401678d530e38b5a16b9816e5d8c483681c68a0f2e5"
     },
     {
       "id": "tokens",
@@ -239,7 +242,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current venue authority, commands/publication, signed menu reads, canonical ingestion/Queue consumption, menu extraction and review persistence. Owner HTTP reports remain synthetic-source/environment gated. Internal period comparisons read live tenant-scoped facts with per-period session cohorts, ordered qualifying comparisons and complementary suppression of rates/deltas/counts that expose small opened cohorts. Restored DATA05 fixtures and real PostgreSQL cases cover privacy, traffic filtering, cross-publication deduplication and denied venue access. No comparison HTTP route, deployment or production report activation is added.",
+      "summary": "Worker enforces staff JWT/current venue authority, commands/publication, signed menu reads, canonical ingestion/Queue consumption, menu extraction and review persistence. Owner HTTP reports remain synthetic-source/environment gated. Internal period comparisons read live tenant-scoped facts with per-period session cohorts, ordered qualifying comparisons and complementary suppression of rates/deltas/counts that expose small opened cohorts. Restored DATA05 fixtures and real PostgreSQL cases cover privacy, traffic filtering, cross-publication deduplication and denied venue access. No comparison HTTP route, deployment or production report activation is added. Owner-only insight actions lock membership, validate menu revision and atomically store versioned writes with command receipts.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -352,7 +355,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/data05/comparison_revision_cases.json",
         "tests/data05/evidence/validation_findings.md",
         "tests/data05/evidence/validation_results.txt",
-        "docs/comparison-reporting.md"
+        "docs/comparison-reporting.md",
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/owner-insight-actions.test.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql",
+        "docs/owner-insight-actions.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -365,12 +373,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6fd6e788f052c56e1e135740ddcedb4a3bfccb9e8db9ac31dee8e0ecca1d8099"
+      "sourceFingerprint": "d7ed42cb624dd53cb596dffcadb567acc8cc08bd0557247de4ace4dcb94718bf"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Eight migration entries are applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted. Order imports remain gated by owner authority, reviewed mappings and explicit activation; hosted setup is separate.",
+      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -396,7 +404,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/review_persistence.sql",
         "migrations/20261107120000_order_outcomes.sql",
         "migrations/20261108120000_pos_mapping_reviewer_provenance.sql",
-        "tests/db/order_outcomes.sql"
+        "tests/db/order_outcomes.sql",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "tests/db/owner_insight_actions.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -407,7 +417,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "43c52dbacf8dd0e4d28cebdbe04a449faaa4af48b4fa217446af62c7a26e6fe3"
+      "sourceFingerprint": "5fd8365667de544855c7f182fdb07f49c859235e18ac9e5457f0e9b0706b2883"
     },
     {
       "id": "measurement",
@@ -493,7 +503,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "bd4e11033c49712e56b818f7fc0afd10c4798bb46987665716003364d869fec8"
+      "sourceFingerprint": "97c8e09ff60fa9b5dcfa6cd34349ccd76def7ac9c449f1f9778b326065a83e8e"
     },
     {
       "id": "agents",
@@ -693,8 +703,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing",
         "delivery"
       ],
-      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
-      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
+      "summary": "Reconciled current release foundations; regression and release verification are in progress. Draft PR129 preserves the DATA-01 12-case dual-destination runbook; all shared hosted cases remain planned.",
+      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate. Link Jeffin’s coordinated S6-REL-02 run when the Compare and release gates are ready. The draft is not permission to resume collection.",
+      "sources": [
+        "docs/observation-infrastructure.md"
+      ]
     },
     {
       "date": "2026-11-10",
@@ -782,14 +795,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-11",
       "modules": [
-        "delivery",
-        "measurement"
+        "backend",
+        "contracts",
+        "database"
       ],
-      "summary": "Draft PR129 syncs the DATA-01 acceptance preparation with develop after diner tracking and periodic comparison changes. The existing 12-case runbook and its browser, PostHog, Queue, and durable report reconciliation boundaries are preserved. All shared hosted cases remain planned.",
+      "summary": "PR142 owner-only insight-action HTTP/persistence/contracts preserve develop PR134/123. Shared context/history conflicts and stale local port/evidence docs are reconciled. New real-Worker cases cover competing updates, old receipt replay, changed command reuse and dual-owner tenant isolation. A full DB run exposed six inherited comparison-reader statement timeouts; tenant/time-scoped materialization replaces repeated view expansion while preserving period/privacy/order semantics. The full runner passes 298 SQL assertions and 114 DB/Worker cases; 11 focused comparison cases include 1000 unrelated synthetic observations. pnpm check passes 1397 unit (4 optional skips), 74 script tests, types/lint/context/docs. Both builds/Worker dry-run, 137 Chromium and 9 SDK/privacy tests pass.",
       "sources": [
-        "docs/observation-infrastructure.md"
+        "backend/src/owner-insight-actions.ts",
+        "backend/src/dish.integration.ts",
+        "backend/src/comparison-report.ts",
+        "migrations/20261109120000_owner_insight_actions.sql",
+        "docs/owner-insight-actions.md"
       ],
-      "next": "Link Jeffin’s coordinated S6-REL-02 staging run and reconcile its results when Compare and the remaining release gates are ready. Evidence preparation grants no approval to resume collection."
+      "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
     }
   ]
 }

@@ -6,6 +6,8 @@ import {
   type BoundedRetrievalResult,
   CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
+  type CreateOwnerInsightActionRequest,
+  CreateOwnerInsightActionRequestSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
@@ -19,6 +21,9 @@ import {
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
   type OrderOutcomeImportResponse,
+  OwnerInsightActionIdSchema,
+  type OwnerInsightActionListQuery,
+  OwnerInsightActionListQuerySchema,
   type PublicMenuResponse,
   PublishMenuSchema,
   type ReviewCandidateCommand,
@@ -28,6 +33,8 @@ import {
   SubmitMenuIngestionRequestSchema,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
+  type UpdateOwnerInsightActionRequest,
+  UpdateOwnerInsightActionRequestSchema,
   type UpsertExtractionReviewSessionRequest,
   UpsertExtractionReviewSessionRequestSchema,
   VenueScopeSchema,
@@ -75,6 +82,12 @@ import {
   OrderImportError,
   type OrderOutcomeStorage,
 } from './order-ingestion/service';
+import {
+  createOwnerInsightAction,
+  listOwnerInsightActions,
+  OwnerInsightActionError,
+  updateOwnerInsightAction,
+} from './owner-insight-actions';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
   createPublicMenuResponse,
@@ -256,6 +269,25 @@ type Dependencies = {
     input: ReviewCandidateCommand,
     env: Bindings,
   ) => Promise<ReviewCandidateItemResponse>;
+  createOwnerAction?: (
+    actorId: string,
+    venueId: string,
+    input: CreateOwnerInsightActionRequest,
+    env: Bindings,
+  ) => ReturnType<typeof createOwnerInsightAction>;
+  updateOwnerAction?: (
+    actorId: string,
+    venueId: string,
+    actionId: string,
+    input: UpdateOwnerInsightActionRequest,
+    env: Bindings,
+  ) => ReturnType<typeof updateOwnerInsightAction>;
+  listOwnerActions?: (
+    actorId: string,
+    venueId: string,
+    query: OwnerInsightActionListQuery,
+    env: Bindings,
+  ) => ReturnType<typeof listOwnerInsightActions>;
 };
 
 export async function submitAuthorizedMenuIngestion(
@@ -492,6 +524,17 @@ const dependencies: Dependencies = {
     } finally {
       await client.end();
     }
+  },
+  async createOwnerAction(actorId, venueId, input, env) {
+    return withDatabase(env, (client) => createOwnerInsightAction(client, actorId, venueId, input));
+  },
+  async updateOwnerAction(actorId, venueId, actionId, input, env) {
+    return withDatabase(env, (client) =>
+      updateOwnerInsightAction(client, actorId, venueId, actionId, input),
+    );
+  },
+  async listOwnerActions(actorId, venueId, query, env) {
+    return withDatabase(env, (client) => listOwnerInsightActions(client, actorId, venueId, query));
   },
   async retrieve(request) {
     return retrieveMenuEvidence(request);
@@ -975,6 +1018,101 @@ export function createApp(services: Dependencies = dependencies) {
     WithdrawMenuSchema,
     services.withdraw,
   );
+
+  app.get('/venues/:venueId/owner-insight-actions', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const url = new URL(c.req.url);
+    const params = url.searchParams;
+    const query = OwnerInsightActionListQuerySchema.safeParse(Object.fromEntries(params.entries()));
+    if (!query.success || [...params.keys()].length !== new Set(params.keys()).size) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+    if (!services.listOwnerActions) throw new AuthUnavailableError();
+
+    const result = await services.listOwnerActions(
+      actorId,
+      scope.data.venueId,
+      query.data,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
+
+  app.post('/venues/:venueId/owner-insight-actions', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = CreateOwnerInsightActionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.createOwnerAction) throw new AuthUnavailableError();
+
+    const result = await services.createOwnerAction(
+      actorId,
+      scope.data.venueId,
+      parsed.data,
+      c.env ?? {},
+    );
+    return c.json(result, 201);
+  });
+
+  app.patch('/venues/:venueId/owner-insight-actions/:actionId', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse({
+      venueId: c.req.param('venueId'),
+    });
+    const actionId = OwnerInsightActionIdSchema.safeParse(c.req.param('actionId'));
+    if (!scope.success || !actionId.success) {
+      return c.json({ error: 'invalid_request' }, 400);
+    }
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = UpdateOwnerInsightActionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.updateOwnerAction) throw new AuthUnavailableError();
+
+    const result = await services.updateOwnerAction(
+      actorId,
+      scope.data.venueId,
+      actionId.data,
+      parsed.data,
+      c.env ?? {},
+    );
+    return c.json(result);
+  });
+
   app.post('/venues/:venueId/menu-evidence', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1395,6 +1533,8 @@ export function createApp(services: Dependencies = dependencies) {
     if (error instanceof AuthUnavailableError) return c.json({ error: 'service_unavailable' }, 503);
     if (error instanceof CommandError) return c.json({ error: error.code }, error.status);
     if (error instanceof PublicationCommandError)
+      return c.json({ error: error.code }, error.status);
+    if (error instanceof OwnerInsightActionError)
       return c.json({ error: error.code }, error.status);
     if (error instanceof IngestionError) return c.json({ error: error.code }, error.status as any);
     if (error instanceof OrderImportError)
