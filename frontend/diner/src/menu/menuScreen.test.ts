@@ -4,13 +4,16 @@ import { mountMenuScreen } from './menuScreen';
 
 const mockObserve = vi.fn();
 const mockUnobserve = vi.fn();
-const mockDisconnect = vi.fn();
+// Every observer the screen creates, so a test can check each one individually.
+const observers: MockIntersectionObserver[] = [];
 
 class MockIntersectionObserver {
   observe = mockObserve;
   unobserve = mockUnobserve;
-  disconnect = mockDisconnect;
-  constructor() {}
+  disconnect = vi.fn();
+  constructor() {
+    observers.push(this);
+  }
 }
 
 // Minimal fake container that supports innerHTML and querySelectorAll
@@ -67,7 +70,7 @@ function extractCategoryTags(html: string): string[] {
 beforeEach(() => {
   mockObserve.mockClear();
   mockUnobserve.mockClear();
-  mockDisconnect.mockClear();
+  observers.length = 0;
   vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
   vi.stubGlobal('window', {
     location: { search: '?scenario=demo', hash: '' },
@@ -82,6 +85,9 @@ beforeEach(() => {
   vi.stubGlobal('document', {
     createElement: () => new FakeContainer(),
     body: { appendChild: vi.fn() },
+    hidden: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   } as any);
 });
 
@@ -138,16 +144,19 @@ describe('menu screen category visibility', () => {
 });
 
 describe('menu screen observer lifecycle', () => {
-  it('disconnects the previous IntersectionObserver before creating a new one on re-render', async () => {
+  it('disconnects every previous IntersectionObserver when the screen mounts again', async () => {
     const container = new FakeContainer();
 
-    // First mount
     await mountAndWait(container);
-    const disconnectsAfterFirst = mockDisconnect.mock.calls.length;
+    const firstMount = [...observers];
+    // The dimming observer and the exposure observer.
+    expect(firstMount.length).toBeGreaterThanOrEqual(2);
 
-    // Second mount: should disconnect the previous observer before creating a new one
     await mountAndWait(container);
-    expect(mockDisconnect).toHaveBeenCalledTimes(disconnectsAfterFirst + 1);
+
+    for (const observer of firstMount) {
+      expect(observer.disconnect).toHaveBeenCalled();
+    }
   });
 
   it('calls observe on the IntersectionObserver for cards', async () => {
