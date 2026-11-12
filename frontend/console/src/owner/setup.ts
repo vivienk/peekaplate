@@ -177,3 +177,11 @@ const ALL_PAGES: readonly OwnerPage[] = [
 export function availablePages(setup: OwnerSetup): ReadonlySet<OwnerPage> {
   return new Set(setup.published ? ALL_PAGES : (['setup'] as const));
 }
+
+/**
+ * Pages listed in the sidebar. Restaurant Setup is hidden once the menu is published (standup,
+ * 10 Nov), so a finished owner is not sent back into onboarding; the other pages are always listed.
+ */
+export function visiblePages(setup: OwnerSetup): ReadonlySet<OwnerPage> {
+  return new Set(setup.published ? ALL_PAGES.filter((page) => page !== 'setup') : ALL_PAGES);
+}

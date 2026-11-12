@@ -27,6 +27,8 @@ export interface OwnerShellProps {
   onNavigate: (page: OwnerPage) => void;
   /** Pages the owner may open; the rest are shown locked. Defaults to all pages. */
   available?: ReadonlySet<OwnerPage>;
+  /** Pages listed in the sidebar at all. Defaults to all pages. */
+  visible?: ReadonlySet<OwnerPage>;
   topbar: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
@@ -38,12 +40,14 @@ export function OwnerShell({
   current,
   onNavigate,
   available,
+  visible,
   topbar,
   aside,
   children,
 }: OwnerShellProps) {
   const isOpen = (page: OwnerPage) => !available || available.has(page);
-  const anyLocked = NAV.some((item) => !isOpen(item.id));
+  const items = NAV.filter((item) => !visible || visible.has(item.id));
+  const anyLocked = items.some((item) => !isOpen(item.id));
   return (
     <div className="owner-shell" data-venue-id={venueId}>
       <a className="owner-skip" href="#owner-content">
@@ -66,7 +70,7 @@ export function OwnerShell({
         </span>
         <nav className="owner-nav" aria-labelledby="owner-nav-label">
           <ul>
-            {NAV.map((item) => {
+            {items.map((item) => {
               const open = isOpen(item.id);
               return (
                 <li key={item.id}>

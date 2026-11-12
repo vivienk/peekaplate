@@ -13,6 +13,7 @@ import {
   setupProgress,
   setupSteps,
   type Tone,
+  visiblePages,
 } from './setup';
 
 function StatusLabel({
@@ -147,6 +148,7 @@ export function FirstDashboard({
       current="setup"
       onNavigate={onNavigate}
       available={availablePages(setup)}
+      visible={visiblePages(setup)}
       topbar={topbar}
       aside={aside}
     >

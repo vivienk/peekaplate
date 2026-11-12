@@ -85,6 +85,7 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(text(html)).toContain('These pages open after you publish your menu.');
     const after = render(published);
     expect(after).not.toContain('aria-disabled');
+    expect(text(after)).not.toContain('Restaurant Setup');
     expect(text(after)).not.toContain('These pages open after you publish your menu.');
   });
 

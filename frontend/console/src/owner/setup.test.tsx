@@ -6,6 +6,7 @@ import {
   type OwnerSetup,
   setupProgress,
   setupSteps,
+  visiblePages,
 } from './setup';
 
 const base: OwnerSetup = {
@@ -17,6 +18,15 @@ const base: OwnerSetup = {
 };
 
 describe('owner onboarding setup rules', () => {
+  it('lists Restaurant Setup only until the menu is published', () => {
+    const before: OwnerSetup = { ...base, detailsStatus: 'verified', menuAdded: true };
+    expect(visiblePages(before).has('setup')).toBe(true);
+    expect(visiblePages(before).size).toBe(6);
+    const after = visiblePages({ ...before, published: true });
+    expect(after.has('setup')).toBe(false);
+    expect([...after]).toEqual(['overview', 'report', 'performance', 'menu', 'actions']);
+  });
+
   it('nothing done: details and menu open, publish locked with no button', () => {
     const steps = setupSteps(base);
     expect(steps.map((s) => s.state)).toEqual(['current', 'current', 'locked']);
