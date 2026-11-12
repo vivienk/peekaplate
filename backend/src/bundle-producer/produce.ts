@@ -1,5 +1,6 @@
 import {
   canonicalJson,
+  type PublicMenuAllergenCode,
   type PublicMenuContentBundle,
   PublicMenuContentBundleSchema,
   type PublicMenuDish,
@@ -26,6 +27,8 @@ export type ApprovedDishSource = {
   priceCurrency: string | null;
   ingredients: unknown;
   reviewState: 'none' | 'corrected' | 'incomplete' | 'rejected';
+  approvedAllergens?: PublicMenuAllergenCode[] | null;
+  approvedCategory?: string | null;
 };
 
 /** A PR #25 T0 manifest whose webp variant files the caller has already hash-checked. */
@@ -120,6 +123,11 @@ export async function produceMenuBundle(
         diagnostics.push({ dishId: requested.dish_id, code: 'candidate_rejected' });
         continue;
       }
+      if (source.approvedCategory !== undefined && source.approvedCategory !== category.name)
+        throw new BundleProducerError(
+          'invalid_request',
+          `Dish ${source.dishId} category differs from its approved revision`,
+        );
       const built = await buildDish(input, requested, source, assets);
       diagnostics.push(...built.gaps.map((code) => ({ dishId: requested.dish_id, code })));
       categoryDishes.push(built.dish);
@@ -270,7 +278,7 @@ async function buildDish(
       description,
       price: { amount: price.amount, currency },
       ingredients,
-      allergens: requested.allergens,
+      allergens: source.approvedAllergens ?? requested.allergens,
       dietary: requested.dietary,
       images: {
         card: { url: assetUrl(card.path), width: card.width, height: card.height, alt },

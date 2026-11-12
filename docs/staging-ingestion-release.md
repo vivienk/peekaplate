@@ -1,5 +1,10 @@
 # Staging ingestion release candidate
 
+The follow-up [owner menu workspace](owner-menu-workspace.md) adds the S06–S09
+backend interfaces while reusing this ingestion service and private storage.
+Its new migration and hosted release need their own recorded acceptance; the
+historical PR118 results below do not certify those additions.
+
 This candidate promotes the merged extraction PR58, orchestration PR45 and
 architecture proposal PR44 onto the main release baseline. It adds the missing
 authenticated source-upload API and a main-SHA-guarded extraction deployment.

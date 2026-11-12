@@ -12,6 +12,11 @@ Staging links: [diner](https://peekaplate-diner-staging.pages.dev/) · [owner/st
 
 ## Implementation status
 
+The [owner menu workspace handoff](docs/owner-menu-workspace.md) defines grouped
+uploads, private dish photos, manual draft save/resume, cancel/retry and reviewed
+revision facts. Its acceptance record distinguishes merged/local capabilities,
+hosted activation and the remaining S06–S09 screen connection.
+
 Team analytics inspection is deployed in staging at release `afe45db`. Both read APIs returned 200 using an accepted repository collaborator's own GitHub token; missing/invalid tokens returned 401. On October 23, a valid non-collaborator received 403 from both endpoints in two reported checker runs. See [team data access](docs/team-data-access.md) for the URL, authentication, safe fields and dated evidence. All accepted repository collaborators are eligible; nobody receives a shared database or deployment credential. These delayed diagnostic counts are separate from owner business reports. The controlled collaborator-removal check remains pending; production is not configured.
 
 The repository includes diner menu/detail/search and Save/Compare foundations, staff review/publication commands, canonical observations and gated owner-report APIs. These pieces have separate integration and release boundaries. Genuine Supabase sessions have verified bounded synthetic staff/publication behavior and tenant denial; they do not certify the complete pilot. Owner-screen integration, remaining diner triggers, POS work and end-to-end evidence still require their ticket acceptance. See the [verification map](docs/verification.md) and dated deployment records rather than assuming every merged feature is deployed.
