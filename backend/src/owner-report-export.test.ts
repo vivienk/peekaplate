@@ -77,4 +77,35 @@ describe('owner-report CSV export (S5-DATA-11)', () => {
       ),
     ).toBe('owner-report-00000000-0000-4000-8000-000000000123-2026-11-08.csv');
   });
+
+  it.each([
+    'avg_interaction_time_seconds',
+    'timing_coverage',
+    'open_rate',
+    'engagement_rate',
+    'save_rate',
+  ] as const)('preserves a known zero for %s', (metric) => {
+    const report = structuredClone(sampleReport);
+    report.dishes[1].name = 'Synthetic zero';
+    report.dishes[1].metrics[metric] = { value: 0, status: 'VALID_ZERO' };
+    const [header, row] = serializeOwnerReportCsv(report).trim().split('\n');
+    const headers = header.split(',');
+    const cells = row.split(',');
+    expect(cells[headers.indexOf(metric)]).toBe('0');
+    expect(cells[headers.indexOf(`${metric}_status`)]).toBe('VALID_ZERO');
+  });
+
+  it.each(['SUPPRESSED', 'NOT_MEASURABLE', 'MISSING'])(
+    'keeps an unavailable %s value blank without converting it to zero',
+    (status) => {
+      const report = structuredClone(sampleReport);
+      report.dishes[1].name = 'Synthetic unavailable';
+      report.dishes[1].metrics.save_rate = { value: null, status };
+      const [header, row] = serializeOwnerReportCsv(report).trim().split('\n');
+      const headers = header.split(',');
+      const cells = row.split(',');
+      expect(cells[headers.indexOf('save_rate')]).toBe('');
+      expect(cells[headers.indexOf('save_rate_status')]).toBe(status);
+    },
+  );
 });

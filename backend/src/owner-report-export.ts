@@ -71,7 +71,7 @@ function escapeCsvCell(rawValue: string | number | null | undefined): string {
 }
 
 function formatMetricCells(metric: ExportMetricCell): [string, string] {
-  const isSuppressed = metric.status !== 'NORMAL' || metric.value === null;
+  const isSuppressed = !['NORMAL', 'VALID_ZERO'].includes(metric.status) || metric.value === null;
   return [isSuppressed ? '' : String(metric.value), metric.status];
 }
 
