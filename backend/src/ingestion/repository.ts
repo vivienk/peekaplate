@@ -366,6 +366,7 @@ export async function persistExtractedDrafts(
             image_id = EXCLUDED.image_id,
             evidence = EXCLUDED.evidence,
             review_warnings = EXCLUDED.review_warnings,
+            draft_version = app_private.dish_drafts.draft_version + 1,
             updated_at = now()
         WHERE app_private.dish_drafts.review_status = 'pending';`,
         [

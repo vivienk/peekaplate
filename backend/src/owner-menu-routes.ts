@@ -25,6 +25,7 @@ import {
   validateMenuPdf,
 } from './ingestion/intake';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
+import { bootstrapMenuReview } from './ingestion/review-bootstrap';
 import { readMenuUpload } from './ingestion/upload';
 import {
   type DraftPhoto,
@@ -49,7 +50,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     const scope = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
     if (!scope.success) throw new IngestionError('invalid_request', 400);
     await services.authorizeVenue(actor, scope.data.venueId, c.env);
-    return { actor, venue: scope.data.venueId };
+    return { actor, venue: scope.data.venueId.toLowerCase() };
   };
   const json = async (c: Context<{ Bindings: Bindings }>) => {
     if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? ''))
@@ -222,6 +223,27 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       cancelUploadGroup(client, actor, venue, scope.data.groupId, input.data.commandId),
     );
     return c.json({ group });
+  });
+  app.post('/venues/:venueId/menus/jobs/:jobId/review-session', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = JobScopeSchema.safeParse(c.req.param());
+    const input = MenuJobActionSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket?.get) throw new AuthUnavailableError();
+    const read = (key: string) => bucket.get!.call(bucket, key);
+    const session = await services.database(c.env, (client) =>
+      bootstrapMenuReview(
+        client,
+        actor,
+        venue,
+        scope.data.jobId.toLowerCase(),
+        input.data.commandId,
+        read,
+        c.env.APP_ENV,
+      ),
+    );
+    return c.json(session);
   });
   for (const action of ['cancel', 'retry'] as const) {
     app.post(`/venues/:venueId/menus/jobs/:jobId/${action}`, async (c) => {

@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import { OwnerDishFieldsSchema } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -14,6 +16,7 @@ import {
 import { processIngestionQueueBatch } from './ingestion/orchestrator';
 import { claimIngestionJob, getIngestionJob, persistExtractedDrafts } from './ingestion/repository';
 import { replayOwnerDraft, saveOwnerDishDraft, storeDraftPhoto } from './owner-menu';
+import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
@@ -172,7 +175,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
       (await loadApprovedDishSources(runtime, venue, [result.publishedRevision.dishId])).get(
         result.publishedRevision.dishId,
       )?.reviewState,
-    ).toBe('incomplete');
+    ).toBe('corrected');
     await expect(save(id, { name: 'Changed' }, 1)).rejects.toMatchObject({
       code: 'draft_not_editable',
     });
@@ -258,7 +261,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(next.facts?.ingredients).toBeNull();
     expect(next.facts?.allergens).toBeNull();
     const source = (await loadApprovedDishSources(runtime, venue, [next.dishId])).get(next.dishId);
-    expect(source?.reviewState).toBe('incomplete');
+    expect(source?.reviewState).toBe('corrected');
     expect(source?.ingredients).toBeNull();
   });
   it('keeps ordered group identity through retries and refuses a changed or truncated selection', async () => {
@@ -543,5 +546,163 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     );
     expect(forbidden.headers.get('access-control-allow-origin')).toBeNull();
     expect((await app.request(url, {}, env)).status).toBe(401);
+  });
+  it('bootstraps private extraction review, accepts the current owner correction and freezes its facts', async () => {
+    const bundle = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../processing/tests/fixtures/service-artifacts/representative-bundle.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    const report = structuredClone(bundle.report);
+    const sourceBytes = Uint8Array.from(Buffer.from(report.source.snapshot_base64, 'base64'));
+    const upload = {
+      bytes: sourceBytes,
+      sourceType: 'pdf' as const,
+      sourceHash: report.source.sha256,
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const group = await createUploadGroup(runtime, actor, venue, [upload]);
+    const job = group.jobs[0]!;
+    await acceptUploadGroupFile(runtime, actor, venue, group.id, 0, upload, async () => {});
+    const attempt = crypto.randomUUID();
+    const key = `menu-ingestion/review-artifacts/${venue}/${job.id}/${attempt}/bundle.json`;
+    const stored = JSON.stringify({
+      ...bundle,
+      scope: {
+        tenant_id: venue,
+        job_id: job.id,
+        source_hash: upload.sourceHash,
+        attempt_id: attempt,
+      },
+    });
+    report.configuration.private_review_artifact = {
+      schema_version: 1,
+      key,
+      sha256: createHash('sha256').update(stored).digest('hex'),
+    };
+    const objects = new Map<string, string>([[key, stored]]);
+    await processIngestionQueueBatch(
+      runtime,
+      {
+        messages: [
+          {
+            body: {
+              version: 1,
+              tenantId: venue,
+              jobId: job.id,
+              queuedAt: new Date().toISOString(),
+            },
+            ack: vi.fn(),
+            retry: vi.fn(),
+          },
+        ],
+      },
+      async () => report,
+      {
+        reportStorage: {
+          put: async (k, value) => {
+            objects.set(k, value);
+          },
+          get: async (k) => objects.get(k) ?? null,
+        },
+      },
+    );
+    const get = vi.fn(async (k: string) => {
+      const value = objects.get(k);
+      if (value === undefined) return null;
+      const bytes = new TextEncoder().encode(value);
+      return { size: bytes.length, arrayBuffer: async () => bytes.buffer };
+    });
+    const app = createApp({ verify: async () => actor, execute: vi.fn() });
+    const env = {
+      APP_ENV: 'local',
+      LOCAL_DATABASE_URL: runtimeUrl!,
+      INGESTION_REPORTS_BUCKET: { put: vi.fn(), get },
+    };
+    const commandId = crypto.randomUUID();
+    const request = () =>
+      app.request(
+        `https://test/venues/${venue}/menus/jobs/${job.id}/review-session`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandId }),
+        },
+        env,
+      );
+    const response = await request();
+    expect(response.status).toBe(200);
+    const session = (await response.json()) as {
+      extractionResult: { extraction_id: string };
+      items: { candidate: { candidate_id: string }; review: { version: number } }[];
+    };
+    expect(session.items).toHaveLength(report.drafts.length);
+    expect(JSON.stringify(session)).not.toContain('snapshot_base64');
+    expect(JSON.stringify(session)).not.toContain('review_suggestions');
+    expect((await request()).status).toBe(200);
+    const extractionId = session.extractionResult.extraction_id;
+    const candidateId = session.items[0]!.candidate.candidate_id;
+    const review = await saveCandidateReviewCommand(
+      runtime,
+      actor,
+      venue,
+      extractionId,
+      candidateId,
+      {
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        action: 'correct',
+        corrected: {
+          name: 'Owner verified fictional soup',
+          price_amount: '9.00',
+          category: 'Soups',
+          ingredients: ['Carrot'],
+        },
+      },
+    );
+    const row = (
+      await admin.query<{ id: string; draft_version: number }>(
+        'SELECT id,draft_version FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 AND candidate_id=$3',
+        [venue, job.id, candidateId],
+      )
+    ).rows[0]!;
+    await expect(
+      approveDishDraftAtomic(runtime, actor, venue, row.id, { commandId: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: 'draft_confirmation_required' });
+    await expect(
+      approveDishDraftAtomic(runtime, actor, venue, row.id, {
+        commandId: crypto.randomUUID(),
+        expectedDraftVersion: row.draft_version,
+        expectedReviewVersion: 0,
+        extractionId,
+        confirmed: true,
+      }),
+    ).rejects.toMatchObject({ code: 'draft_confirmation_required' });
+    const approved = await approveDishDraftAtomic(runtime, actor, venue, row.id, {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: row.draft_version,
+      expectedReviewVersion: review.review.version,
+      extractionId,
+      confirmed: true,
+    });
+    expect(approved.publishedRevision.name).toBe('Owner verified fictional soup');
+    expect(approved.publishedRevision.facts?.priceAmount).toBe('9.00');
+    await saveCandidateReviewCommand(runtime, actor, venue, extractionId, candidateId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: review.review.version,
+      action: 'correct',
+      corrected: { price_amount: '99.00' },
+    });
+    expect(
+      (await loadApprovedDishSources(runtime, venue, [approved.publishedRevision.dishId])).get(
+        approved.publishedRevision.dishId,
+      )?.priceAmount,
+    ).toBe('9.00');
+    objects.set(key, stored + ' ');
+    expect((await request()).status).toBe(409);
   });
 });

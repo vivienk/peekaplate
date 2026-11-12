@@ -123,7 +123,11 @@ export async function produceMenuBundle(
         diagnostics.push({ dishId: requested.dish_id, code: 'candidate_rejected' });
         continue;
       }
-      if (source.approvedCategory !== undefined && source.approvedCategory !== category.name)
+      if (
+        source.approvedCategory !== undefined &&
+        source.approvedCategory !== null &&
+        source.approvedCategory !== category.name
+      )
         throw new BundleProducerError(
           'invalid_request',
           `Dish ${source.dishId} category differs from its approved revision`,
@@ -278,7 +282,8 @@ async function buildDish(
       description,
       price: { amount: price.amount, currency },
       ingredients,
-      allergens: source.approvedAllergens ?? requested.allergens,
+      allergens:
+        source.approvedAllergens === undefined ? requested.allergens : source.approvedAllergens,
       dietary: requested.dietary,
       images: {
         card: { url: assetUrl(card.path), width: card.width, height: card.height, alt },

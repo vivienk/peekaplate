@@ -54,9 +54,14 @@ only. CORS does not grant membership or bypass authorization.
    `upload_index`, `source_uploaded`, stored status, warnings/error fields and
    draft count. The bounded list returns at most 100 jobs. Do not invent percentage
    progress or present a local timer as provider progress.
-5. Read extracted dishes through the existing
-   `GET /venues/:venueId/drafts?jobId=:jobId`. Use the artifact-verified
-   [review API](review-api.md) for extraction-backed corrections.
+5. Read extracted dishes through `GET /venues/:venueId/drafts?jobId=:jobId`.
+   For a complete or incomplete job, POST `{commandId}` to
+   `/venues/:venueId/menus/jobs/:jobId/review-session`. The server loads the retained
+   report and verifies its private artifact, source hash and original evidence;
+   the response is the existing extraction review session. No private R2 key,
+   embedded source snapshot or provider credentials are needed in the browser.
+   Use its extraction/candidate IDs with the [review API](review-api.md) for
+   corrections. A missing, oversized or tampered artifact blocks review.
 
 Existing single-file `POST /venues/:venueId/menus/uploads` remains compatible and
 now enforces the PDF page limit. `POST /venues/:venueId/menus/url` accepts
@@ -130,8 +135,16 @@ POST the existing `/venues/:venueId/drafts/:draftId/approve` with
 `{commandId,expectedVersion:0,expectedDraftVersion:<current>,confirmed:true}`
 for a manual draft. Name/category/price/currency must be present. Ingredients
 and allergens retain explicit unknown/proposed/confirmed states; only confirmed
-values enter approved facts. Unknown allergens keep diner output incomplete.
-An empty unknown list never becomes an allergen-free claim.
+values enter approved facts. Unknown allergens remain `null` in public content;
+an empty unknown list never becomes an allergen-free claim. Missing ingredients
+or other required public content still produce an incomplete dish placeholder.
+
+For an extraction-backed draft with a registered review session, approval also
+requires `extractionId`, `expectedReviewVersion` (zero before any correction),
+`expectedDraftVersion` and `confirmed:true`. The session must belong to that job.
+Rejected/incomplete candidates cannot be approved. Approval freezes the current
+corrected facts; later review edits do not change that approved revision. A job
+retry increments draft versions, so a stale screen must reload before approval.
 
 Approval creates an immutable dish revision snapshot through the existing
 command/event/outbox path; it does **not** publish a menu. Legacy text-only edits
