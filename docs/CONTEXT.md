@@ -814,7 +814,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence.",
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
