@@ -2587,9 +2587,10 @@ h1 {
    (12/20 padding, 18/28 label), pill, 8px icon gap.
    Primary: color/button/primary/background Orange/500, content Orange/950; hover Orange/300,
    pressed Orange/700. Outlined: color/surface-container with 1px color/outline-solid, content
-   Orange/950; hover Orange/500 fill; pressed Neutral/950 with light text. Focus: 2px
-   color/border/focus (Info/600). Disabled: Neutral/200 fill, Neutral/300 border, Neutral/400
-   text. */
+   Orange/950; hover: no fill and a 3px stroke (its Orange/500 fill is hidden in Figma, re-read
+   with Figwright on 11 Nov); pressed Neutral/950 fill and 2px stroke with light text. Focus: 2px
+   color/border/focus (Info/600) inside the button. Disabled: Neutral/200 fill, Neutral/300
+   border, Neutral/400 text. Thicker strokes are border + inset shadow, so sizes never change. */
 .ob.pp-button {
   --ob-pending-surface-container: #fffcfa; /* Figma Semantic Light color/surface-container;
      no Cream token in tokens.css yet (Harshita's lane), so it stays local and pending. */
@@ -2606,6 +2607,7 @@ h1 {
   transition:
     background-color 0.15s,
     border-color 0.15s,
+    box-shadow 0.15s,
     color 0.15s;
 }
 .ob--lg.pp-button {
@@ -2635,16 +2637,20 @@ h1 {
   color: var(--pp-color-orange-950);
 }
 .ob--outlined.pp-button:hover:not(:disabled) {
-  background-color: var(--pp-color-orange-500);
+  background-color: transparent;
+  box-shadow: inset 0 0 0 2px var(--pp-color-neutral-500); /* + 1px border = 3px */
 }
 .ob--outlined.pp-button:active:not(:disabled) {
   background-color: var(--pp-color-neutral-950);
   border-color: var(--pp-color-neutral-950);
+  box-shadow: inset 0 0 0 1px var(--pp-color-neutral-950); /* + 1px border = 2px */
   color: var(--ob-pending-surface-container);
 }
-.ob.pp-button:focus-visible {
-  outline: 2px solid var(--pp-color-info-600);
-  outline-offset: 2px;
+.ob--primary.pp-button:focus-visible,
+.ob--outlined.pp-button:focus-visible {
+  outline: none;
+  border-color: var(--pp-color-info-600);
+  box-shadow: inset 0 0 0 1px var(--pp-color-info-600); /* + 1px border = 2px inside */
 }
 .ob--primary.pp-button:disabled,
 .ob--outlined.pp-button:disabled {
