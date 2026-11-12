@@ -142,6 +142,7 @@ describe('DATA-12 isolated owner-report privacy thresholds', () => {
     const dish = await getDish(11, {
       exposed_open_sessions: 9,
       open_eligible_sessions: 9,
+      engaged_sessions: 9,
       timed_sessions: 9,
       timed_openings: 9,
     });

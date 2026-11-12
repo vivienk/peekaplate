@@ -38,7 +38,79 @@ Do not change TRK ownership or create a consent UI ticket.
 Never use production diner identities or real owner aggregates to
 manufacture acceptance evidence.
 
+
+### Validation lanes — keep separate
+
+#### Lane A: Canonical persistence testing
+
+Use approved test-classified traffic to verify:
+
+- PostHog and canonical delivery behavior, subject to consent.
+- Canonical receipts, durable archive, index and typed facts.
+- Replay, deduplication and recovery.
+
+Expected:
+- Test-classified events may persist successfully.
+- `owner_observation_v1` excludes traffic_class = 'test'.
+- These events must contribute zero rows to owner metrics.
+- Do not treat their exclusion as a pipeline failure.
+
+#### Lane B: Authorized numeric owner-report reconciliation
+
+Use only an explicitly authorized, isolated report fixture
+containing live-classified synthetic evidence.
+
+Requirements:
+- Record the server-derived traffic classification.
+- Use the configured fixture venue, not a real owner population.
+- Record the exact `source=synthetic` API route and returned
+  24-hour reporting window.
+- Reference `docs/owner-report-staging.md`.
+- Keep fixture data isolated from real owner metrics.
+- Do not enable collection without required approvals.
+
+The current report is venue/time scoped, not restricted to one
+publication revision. Account for other qualifying revisions
+within the returned reporting window.
+
+Test the 9/10/11-session privacy thresholds only in the
+authorized, isolated numeric validation lane.
+
+Neither lane establishes real staging acceptance by itself.
+
 ## 4. Capture deployment provenance
+
+### Existing staging report configuration
+
+Source: `docs/owner-report-staging.md`
+
+Approved report API route:
+
+`GET /api/v1/venues/00000000-0000-4000-8000-000000000123/analytics/dishes?source=synthetic`
+
+Configured synthetic fixture venue:
+
+`00000000-0000-4000-8000-000000000123`
+
+The server selects this venue through its allowlist and
+`SYNTHETIC_REPORT_VENUE_ID`.
+
+The report covers the previous 24 hours. During hosted
+validation, record the exact reporting window returned by
+the API rather than assuming local timestamps.
+
+The report is scoped by venue and time, not by a single
+publication revision. Identify and account for any other
+qualifying revisions within the returned window.
+
+Use an authorized Supabase staff session with current owner
+membership. Do not record or share access tokens.
+
+The `source=synthetic` parameter labels the report but does
+not anonymize real events.
+
+Production reports remain disabled. Do not activate Queue
+or provider traffic without the required approvals.
 
 Before testing, record:
 
@@ -176,7 +248,7 @@ Independently calculate:
 - Distinct exposed-and-opened sessions
 - Distinct open-eligible sessions
 - Distinct engaged sessions
-- Distinct direct-save sessions
+- Distinct exposed-and-direct-saved sessions
 - Distinct timed sessions
 - Total openings
 - Finalized openings
@@ -188,7 +260,8 @@ Current report formulas:
 
 - Open rate = exposed-and-opened / exposed sessions
 - Engagement rate = engaged / open-eligible sessions
-- Save rate = direct-save sessions / exposed sessions
+- Save rate = distinct sessions with BOTH qualifying dish exposure
+  and a direct save / distinct exposed sessions
 - Timing coverage = finalized openings / total openings
 - Average interaction time = average finalized opening duration
 
@@ -297,3 +370,14 @@ Independent reconciliation: PENDING
 Sai review: PENDING
 
 Overall acceptance: NOT YET ESTABLISHED
+
+### Save without exposure — negative reconciliation case
+
+Create an isolated fixture session containing a direct save but no
+qualifying dish_viewed exposure for that dish.
+
+Expected:
+- The session is excluded from the Save-rate numerator.
+- The session is excluded from the exposed-session denominator.
+- The save does not inflate the owner report's Save rate.
+- Record expected and actual counts in EVIDENCE_LEDGER.md.
