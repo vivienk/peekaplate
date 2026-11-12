@@ -2702,3 +2702,18 @@ service environment with FastAPI/HTTPX installed; no dependency installation or 
 call is required. API authority is a dedicated server token bound to one tenant, never a
 request tenant field. Restart recovery is explicit resume on persistent local storage,
 not a distributed queue or production owner endpoint.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T08:39:52.812Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T08:43:33.911Z","exitCode":2}
+```
+
+
+## Local 3D connection verification — 2026-11-12
+
+Initial lint rejected formatting in the new proxy test; formatted the file. Typecheck rejected an explicitly undefined fetch body under exactOptionalPropertyTypes; use null for bodyless requests. A pytest invocation could not run because this environment has unittest, not pytest; rerun the existing unittest suites with their intended runner. These were local verification errors, not provider failures. Regression coverage: scripts/local-model-proxy.test.mjs and tests/e2e/portion.spec.ts.

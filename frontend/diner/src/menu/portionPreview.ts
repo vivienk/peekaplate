@@ -54,10 +54,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let scroll = 0;
   let attempt: AbortController | undefined;
   let renderer: PortionRenderer | undefined;
+  let local3d: ReturnType<typeof import('./portion3d').bindLocal3d> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const motion = createPortionMotion();
   let drag: { id: number; x: number; y: number } | undefined;
   const stop = () => {
+    local3d?.dispose();
+    local3d = undefined;
     clearTimeout(timer);
     motion.key('Home');
     drag = undefined;
@@ -191,6 +194,17 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
         : 'Drag to tilt the plate';
+      if (import.meta.env.DEV && visualSelect) {
+        const module = await import('./portion3d').catch(() => null);
+        if (!module) return;
+        const { bindLocal3d } = module;
+        if (controller.signal.aborted || disposed) return;
+        local3d = bindLocal3d(stage, controls, status, () => {
+          showOriginal = false;
+          compare.textContent = 'Show original photo';
+          compare.setAttribute('aria-pressed', 'false');
+        });
+      }
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();
     }
@@ -241,19 +255,33 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       close();
       return;
     }
-    if (event.target !== stage || reduced.matches || showOriginal || !renderer) return;
+    if (
+      stage.dataset.model3d ||
+      event.target !== stage ||
+      reduced.matches ||
+      showOriginal ||
+      !renderer
+    )
+      return;
     const next = motion.key(event.key);
     if (!next) return;
     event.preventDefault();
     renderer.update(next.x, next.y, 300);
   };
   const pointerdown = (event: PointerEvent) => {
-    if (active && renderer && !showOriginal && !reduced.matches && event.pointerType !== 'mouse') {
+    if (
+      !stage.dataset.model3d &&
+      active &&
+      renderer &&
+      !showOriginal &&
+      !reduced.matches &&
+      event.pointerType !== 'mouse'
+    ) {
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
     }
   };
   const pointer = (event: PointerEvent) => {
-    if (!active || !renderer || showOriginal || reduced.matches) return;
+    if (stage.dataset.model3d || !active || !renderer || showOriginal || reduced.matches) return;
     const bounds = stage.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
     let x: number;
@@ -283,6 +311,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   };
   const comparePhoto = () => {
     if (!renderer || root.dataset.portionState !== 'ready') return;
+    local3d?.show2d();
     showOriginal = !showOriginal;
     stage.classList.toggle('pp-portion--original', showOriginal);
     compare.setAttribute('aria-pressed', String(showOriginal));
@@ -296,7 +325,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   };
   const motionChanged = () => {
     reset();
-    if (active && !showOriginal && root.dataset.portionState === 'ready') {
+    if (
+      active &&
+      !stage.dataset.model3d &&
+      !showOriginal &&
+      root.dataset.portionState === 'ready'
+    ) {
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
         : 'Drag to tilt the plate';
@@ -338,8 +372,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     }
     void show(true);
   };
+  const resetView = () => {
+    reset();
+    local3d?.reset();
+  };
   compare.addEventListener('click', comparePhoto);
-  resetButton.addEventListener('click', reset);
+  resetButton.addEventListener('click', resetView);
   retry.addEventListener('click', retryPreview);
   open.addEventListener('click', openPreview);
   back.addEventListener('click', backClick, true);
@@ -359,7 +397,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     retry.removeEventListener('click', retryPreview);
     retry.remove();
     compare.removeEventListener('click', comparePhoto);
-    resetButton.removeEventListener('click', reset);
+    resetButton.removeEventListener('click', resetView);
     visualSelect?.removeEventListener('change', changeVisual);
     controls.remove();
     instructions.remove();

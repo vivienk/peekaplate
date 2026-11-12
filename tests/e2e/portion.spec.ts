@@ -507,3 +507,86 @@ test('local review renders the exact original PNGs and switches without adding h
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
 });
+
+async function local3d(page: Page, state: string) {
+  const metadata = JSON.parse(
+    readFileSync('frontend/diner/src/menu/fixture-assets/portion-demo/review-images.json', 'utf8'),
+  );
+  let saved: string | undefined;
+  let creates = 0;
+  await page.route('**/__local3d/v1/model-jobs**', async (route) => {
+    const req = route.request();
+    if (state === 'missing') return route.fulfill({ status: 503, json: {} });
+    if (req.method() === 'POST' && !req.url().endsWith('/resume')) {
+      saved = req.postDataJSON().job_id;
+      creates++;
+    }
+    if (!saved) return route.fulfill({ status: 404, json: {} });
+    return route.fulfill({
+      json: {
+        job_id: saved,
+        status: state === 'resume' && !req.url().endsWith('/resume') ? 'prepared' : 'ready',
+        attempt_status: null,
+        dish: metadata.dish,
+        source: {
+          review_asset_id: metadata.source_asset_id,
+          variant: 'cutout',
+          sha256: metadata.variants.cutout.sha256,
+        },
+      },
+    });
+  });
+  await page.route('https://ajax.googleapis.com/**', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript',
+      body: `customElements.define('model-viewer', class extends HTMLElement { connectedCallback() { setTimeout(() => this.dispatchEvent(new Event('load')), 10); } });`,
+    }),
+  );
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await openPortion(page);
+  await page.getByText('Preview controls', { exact: true }).click();
+  await page.getByRole('button', { name: 'Generate 3D from cutout', exact: true }).click();
+  return () => creates;
+}
+
+test('local API unavailable keeps the original interactive 2.5D preview', async ({ page }) => {
+  await local3d(page, 'missing');
+  await expect(page.locator('.pp-local3d')).toContainText('local Tripo key');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+});
+
+test('local 3D ready switches, resets, survives reopen without duplicate create and falls back on viewer error', async ({
+  page,
+}) => {
+  const creates = await local3d(page, 'ready');
+  await expect(page.locator('model-viewer')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  expect(
+    await page
+      .locator('model-viewer')
+      .evaluate((el) => (el as HTMLElement & { cameraOrbit: string }).cameraOrbit),
+  ).toBe('0deg 75deg 105%');
+  await page.getByRole('button', { name: 'Show 2.5D', exact: true }).click();
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  await page.getByRole('button', { name: 'Show 3D', exact: true }).click();
+  await expect(page.locator('model-viewer')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(page.locator('model-viewer')).toHaveCount(0);
+  await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await page.getByRole('button', { name: 'Check 3D job', exact: true }).click();
+  await expect(page.locator('model-viewer')).toBeVisible();
+  expect(creates()).toBe(1);
+  await page.locator('model-viewer').dispatchEvent('error');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  await expect(page.locator('.pp-local3d')).toContainText('could not load');
+});
+
+test('prepared local job resumes explicitly without creating another generation', async ({
+  page,
+}) => {
+  const creates = await local3d(page, 'resume');
+  await page.getByRole('button', { name: 'Resume 3D job', exact: true }).click();
+  await expect(page.locator('model-viewer')).toBeVisible();
+  expect(creates()).toBe(1);
+});

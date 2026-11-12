@@ -188,3 +188,19 @@ nonblocking health, resume, ambiguous submissions and protected artifact downloa
 The transport is fake; the actual preparation/generation state machine is exercised.
 PASS: repository lint/typecheck and context/documentation checks.
 No live generation, deployment or public owner-API integration was performed.
+
+## View Portion local connection
+
+Run from the repository with Node 24.16 and a Python environment containing the processing dependencies:
+
+```sh
+PYTHONPATH=processing/src python -m peekaplate_processing.serve_model_demo \
+  --review-dir /absolute/path/to/review_b2f135ce8784a517ca9cf1f3fbc8fcbf \
+  --state-dir /absolute/path/to/local-model-state
+```
+
+Open `http://127.0.0.1:5173/?scenario=portion-demo`, open the dish, then **View Portion → Preview controls → Generate 3D from cutout**. The launcher registers the existing exact cutout, starts the private API on loopback port 5182 and the diner on 5173, and shares an ephemeral service token only between their server processes. Set `TRIPO_API_KEY` privately in the launcher environment for real generation; it is removed from the diner process environment. Without it, the API returns unavailable and the existing 2.5D preview remains interactive.
+
+The browser uses a same-origin, loopback-only development bridge with a fixed upstream and allowlisted routes. No token is embedded in browser code. Only the explicit DEV portion fixture loads generation controls; the production build excludes this module. The current original cutout is always the generation input, even when the generated presentation image is selected for 2.5D.
+
+The job ID survives closing/reopening in the same browser tab. Checking never starts a second job; interrupted jobs offer explicit resume. The 2.5D image remains visible while generation and the pinned model-viewer load. A successful 3D model supports camera controls, reset and a return to 2.5D; model errors return to 2.5D. Back disposes browser work but does not cancel an already submitted provider job. Jobs remain local review artifacts, never published menu assets. No live provider generation was performed for this integration.
