@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 extends the same adapter with neutral reset emails and password updates permitted only after a current PKCE recovery exchange. Direct/reset/confirmation-purpose links cannot authorize password changes; successful update ends the recovery session and returns to sign-in. Recovery purpose is token-bound; updates use an isolated in-memory SDK session and abort after cross-tab identity changes.",
+      "summary": "React/Vite owner auth uses a pinned Supabase SDK with PKCE, exact trusted origins and public config. Neutral email entry, confirmation, verified sign-in, session restoration and sign-out preserve synthetic provider-disabled demos. Callbacks scrub credentials and contain no analytics. Recovery requires a current token-bound recovery exchange; password updates use an isolated SDK session and abort on shared identity changes. Approved editable signup/reset email templates are saved in staging Auth; branded Gmail delivery, logo, real recovery callback and consumed-link rejection pass. No automatic venue grants or invented setup progress. Fresh signup/confirmation, actual password submission, old/new password checks and hosted dashboard acceptance remain pending; PR143/146 stay unmerged.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -248,7 +248,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-auth.md",
         "tests/e2e/owner-recovery.spec.ts",
         "frontend/console/auth-reset.html",
-        "frontend/console/src/auth/recovery-provider.test.tsx"
+        "frontend/console/src/auth/recovery-provider.test.tsx",
+        "frontend/console/email-templates/README.md",
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -258,7 +261,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "6a6ee81fb457e8dfbaf0174b3eb885d591032568fec89bc4eabd0b027df689bb"
+      "sourceFingerprint": "d148a37848519b84cdce2a234a70e56bc5ac4881c230aad50b02b984d23e1729"
     },
     {
       "id": "backend",
@@ -814,11 +817,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained.",
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. Vivien configured all four exact staging/local redirects; their saved values and enabled signup/required confirmation are verified. Actual email acceptance awaits the manual signup/password step. Email recipient and credentials are excluded from shared evidence. Live PR146/local-to-staging recovery request, actual inbox delivery, correct callback, verified reset form and consumed-link denial pass. Password submission, fresh signup and complete owner flow remain NOT RUN; no credentials or personal addresses are retained. Approved branded templates were saved after admin access; logo bytes, actual branded recovery delivery and verified/reused-link behavior pass. Fresh signup, password submission and owner/dashboard acceptance remain NOT RUN.",
       "sources": [
         "frontend/console/src/auth/supabase-auth.ts",
         "frontend/console/src/auth/live.tsx",
-        "docs/owner-auth.md"
+        "docs/owner-auth.md",
+        "frontend/console/email-templates/README.md"
       ],
       "next": "Keep PR143 and stacked PR146 unmerged until dashboard/setup flow is connected; finish actual email confirmation/recovery tests and record final independent review. No deployment or tenant grant."
     },

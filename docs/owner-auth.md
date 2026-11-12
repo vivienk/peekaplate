@@ -112,8 +112,9 @@ evidence. Record only sanitized check results and the tested source revision.
 
 November 11 follow-up: the Site URL matches and all four exact local/staging
 redirect URLs above are now verified in Supabase. Public Auth settings return
-200 with email signup enabled and email confirmation required. The Developer
-role remains unable to edit those settings; Vivien configured the allowlist.
+200 with email signup enabled and email confirmation required. Vivien configured
+the allowlist. The original Developer role was read-only;
+administrator access was subsequently granted for the template installation.
 Recovery email delivery/link verification now pass as recorded below; password
 submission and fresh signup/confirmation remain manual acceptance steps.
 Hosted dashboard handoff remains unverified. Neither PR is merged or deployed.
@@ -141,7 +142,27 @@ account was reused; no restaurant membership was changed.
 - NOT RUN: submitting a new password, checking old/new password sign-in, fresh
   signup/confirmation and the complete hosted owner/dashboard journey.
 
-The reset form is left for the account holder's password entry/submission under
-the browser credential-change rule. No password, token, private address or email
+Password entry/submission remains with the account holder under the browser
+credential-change rule. No password, token, private address or email
 link is stored in this evidence. Keep both auth PRs unmerged until the remaining
 email/owner-flow acceptance gates are satisfied.
+
+## Approved email templates applied - November 11, 2026
+
+Editable source, matching subjects and the installation checklist are in
+[console email templates](../frontend/console/email-templates/README.md). Both
+templates are now saved in the existing staging Auth project. The public logo's
+PNG bytes match the existing brand asset; no Pages application was redeployed.
+
+A fresh request through the local app delivered the branded reset email to the
+approved inbox. The loaded logo, sender, subject, body, matching button/fallback,
+exact recovery callback, verified reset form and rejected consumed link passed.
+Signup source was reopened and matched the approved HTML. This does not certify
+fresh signup/confirmation delivery or an actual password change. Those, old/new
+password sign-in and complete owner/dashboard acceptance remain NOT RUN.
+
+Use the same Brave profile for signup/reset and the newest email. Create a fresh
+account, verify unconfirmed sign-in is denied, confirm and sign in, then sign out
+and request a password reset. Submit passwords yourself; verify old-password
+denial, new-password success, restoration, sign-out and consumed-link denial.
+No restaurant permission is granted automatically. Both PRs remain unmerged.
