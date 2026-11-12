@@ -213,12 +213,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1e84fd03f0b773408b922971fa54eda243250938f8de0e5a6f771b413d55b4b6"
+      "sourceFingerprint": "485bda5c0ae106a0317b8a9ec422fe98f806552d4c78b9ecf1899da3c2bb917a"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. FE-06.2 adds a framework-free owner menu client (upload groups, URL intake, jobs, review sessions, corrections, manual drafts, photos, approval) and Screen 9 form mapping that keeps OCR ingredients proposed and allergens unknown; screens and sign-in wiring remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -229,7 +229,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/input.spec.ts",
         "frontend/console/vite.config.ts",
         "frontend/console/src/foundations/TextField.tsx",
-        "frontend/console/src/foundations/field.css"
+        "frontend/console/src/foundations/field.css",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/api.test.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/jobs.test.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/dishForm.test.ts",
+        "frontend/console/src/owner-menu/fixtures.test-helpers.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -239,7 +246,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c1af4f0e5ecec13375e3e01ebd7f7d7614fdaf64f0597cd841168a7754d6da36"
+      "sourceFingerprint": "abfeb3551797a9d97ad97f2cfdb32ee5cb7dda97877ad528b34fdd937a18d93c"
     },
     {
       "id": "backend",
@@ -386,7 +393,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "32f01e3a1db7abfcb6f7f5bb3f8e8917a38630b9f6e8e84783327eb106c68011"
+      "sourceFingerprint": "a8f9500e87c8e583b41481f0fb73b0f4e10b5bfc2193ec826fbaa2b4f9c07e3d"
     },
     {
       "id": "database",
@@ -518,7 +525,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "aa08193f11cab070ac8a33a69cfec16323f3bd89694ddf5077ac3d74abee72df"
+      "sourceFingerprint": "2e9bb7518466aff3e800363476c79802123707b8629ca0b71de1ab47645602eb"
     },
     {
       "id": "agents",
@@ -712,6 +719,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-12",
+      "summary": "FE-06.2 owner menu client: frontend/console/src/owner-menu. createOwnerMenuClient(baseUrl, getToken, fetch) wraps docs/owner-menu-workspace.md with contract-validated requests, bearer token, no cookies and typed OwnerMenuApiError (isConflict/isRetryable). menuProcessingState(jobs) gives Screen 8 one phase (uploading/processing/ready/partial/empty/failed/cancelled) with counts only. dishForm maps review items and manual drafts to Screen 9 values: OCR ingredients stay proposed, allergens unknown; extracted saves send only changed fields as review corrections, manual saves replace the snapshot; approval binds the review version and never publishes.",
+      "modules": [
+        "console"
+      ],
+      "paths": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/jobs.ts"
+      ],
+      "next": "Wire into Nifemi's Screens 6-8 and Jeffin's Screen 9 (#105) once they land, with the staff token from #143/#146. Hosted staging journey (FE-06.4) and error/resume regression (FE-06.5) follow."
+    },
+    {
       "date": "2026-11-10",
       "modules": [
         "diner"
@@ -810,24 +830,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
-    },
-    {
-      "date": "2026-11-12",
-      "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
-      "sources": [
-        "docs/owner-menu-workspace.md",
-        "backend/src/owner-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "migrations/20261112010000_owner_menu_workspace.sql",
-        "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
-      ],
-      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
     }
   ]
 }
