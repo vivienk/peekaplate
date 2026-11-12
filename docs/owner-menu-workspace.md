@@ -156,10 +156,40 @@ invokes a model or invents a suggestion.
 
 ## Acceptance record
 
-Before PR creation, hosted Supabase inspection confirmed the existing four
-ingestion/review tables with forced RLS and the absence of the two new metadata
-tables. This read-only check was not migration application or hosted acceptance.
-Record the reviewed commit, final local/hosted commands/results and cleanup in
-the PR before handoff. Synthetic transport fixtures prove APIs, not completion
-of the still-unconnected S06–S09 screens. Keep normal Queue delivery paused
-outside an explicitly approved test window.
+Rollback: once enriched revision events/receipts or manual drafts exist, prefer a
+forward correction. The preceding Worker cannot interpret every new event or
+enforce the new manual/current-review approval rules. Do not treat an old-Worker
+rollback as transparent; isolate workspace writes and review operations first.
+
+Verified on 2026-11-12:
+
+- Supabase staging migration `20261112010000` applied. Both new tables force
+  tenant RLS; runtime gets SELECT/INSERT only, and anon/authenticated roles cannot
+  read them. Existing ten migration entries were checked before the forward change.
+- [Main release #149](https://github.com/vivienk/peekaplate/pull/149) merged as
+  `fad0eb0870ade177a98ba035fac8cdb9e0964f40`. Exact-main staging API deployment
+  is Worker version `58034c48-e720-4d13-b5e4-28af5621b150`; existing remote vars
+  and secrets were preserved. No Pages, Python/container or production deployment.
+- Develop implementation: 1,405 unit tests (four optional skips), 74 script tests,
+  310 SQL assertions and 130 database/Worker cases. The narrow main release has
+  1,220 unit, 74 script, 225 SQL and 104 database/Worker cases. These include actual
+  local Chromium-to-Worker/private-database draft/photo/denial checks. The clock
+  regression passed five repeated browser runs in 9.4 seconds; both PR CI suites
+  passed. Two pinned Sol reviews cleared the implementation and release isolation.
+- Seven hosted HTTP checks passed: health, three anonymous workspace denials,
+  allowed local/staging preflight and blocked unapproved origin. R2 managed public
+  access remains disabled, with no custom domains or bucket CORS. Existing menu
+  and observation Queues and their DLQs remain paused.
+- Hosted staff-authenticated workspace acceptance is **NOT RUN**. Fresh test
+  magic-link verification returned `otp_expired`; no password or account was
+  changed. A separate SQL runtime-role probe was **BLOCKED** because the dashboard
+  operator cannot `SET ROLE peekaplate_runtime`. Do not grant broader operator
+  privileges to make a test pass. The temporary synthetic membership was restored
+  to viewer; no workspace test records or R2 objects were created on staging.
+
+Next acceptance: use a genuine staff session for synthetic draft save/reload,
+private photo upload/read, cross-venue/viewer denial, group resume/cancel and the
+retained-report review bootstrap. Then connect and test the real S06–S09 controls.
+The API is deployed; these remaining checks prevent calling the complete owner
+screen journey accepted. Keep normal Queue delivery paused outside a bounded
+synthetic test window. Auth #143/#146 remains separate and unmerged.
