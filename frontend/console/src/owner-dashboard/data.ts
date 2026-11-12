@@ -7,6 +7,7 @@ import frenchtoast from './assets/frenchtoast.webp';
 import greek from './assets/greek.webp';
 import harvest from './assets/harvest.webp';
 import poke from './assets/poke.webp';
+import type { DishFields, FactStatus } from './dish-fields';
 
 export const THUMBS: Record<string, string> = {
   avotoast,
@@ -689,6 +690,9 @@ export type MenuItem = {
   aiReviewed: boolean;
   has25: boolean;
   status: 'draft' | 'ready' | 'live';
+  /** Whether the ingredient list was checked by the owner (see dish-fields.ts). */
+  ingStatus: FactStatus;
+  allergens: DishFields['allergens'];
 };
 
 export const imgOf = (m: Pick<MenuItem, 'upload' | 'id'>) =>
@@ -707,6 +711,8 @@ export const newDraft = (): MenuItem => ({
   aiReviewed: false,
   has25: false,
   status: 'draft',
+  ingStatus: 'unknown',
+  allergens: { status: 'unknown', items: [] },
 });
 export const initialMenu = (): MenuItem[] =>
   DISH.map((d) => ({
@@ -723,6 +729,9 @@ export const initialMenu = (): MenuItem[] =>
     aiReviewed: false,
     has25: d.has25,
     status: 'live',
+    ingStatus: 'confirmed',
+    // The sample menu never recorded allergens, so they stay unknown (never "none").
+    allergens: { status: 'unknown', items: [] },
   }));
 
 export function suggestIng(name: string): string[] {

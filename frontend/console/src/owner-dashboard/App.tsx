@@ -15,7 +15,7 @@ import {
   type Scenario,
 } from './data';
 import { ModalDrawer } from './drawer';
-import { DishForm, type EditState, MenuList, Review, Saved } from './menu';
+import { type EditState, MenuDishForm, MenuList, Review, Saved } from './menu';
 import {
   Actions,
   type Acts,
@@ -260,7 +260,7 @@ export function App() {
       );
     else if (ed.step === 'form')
       body = (
-        <DishForm
+        <MenuDishForm
           ed={ed}
           setEd={setEd}
           orig={orig}

@@ -1,7 +1,9 @@
 // Menu management for the demo: list, edit/add form, review of what diners will see, saved.
 // Changes live only in this page's memory.
-import { type FormEvent, useRef, useState } from 'react';
+import { useState } from 'react';
 import { CATS, DISH, INSIGHTS, imgOf, type MenuItem, money, suggestIng } from './data';
+import { allergenSummary, type DishFields, type FieldError } from './dish-fields';
+import { DishForm } from './dish-form';
 import type { Acts } from './pages';
 import { Btn, Icon, Note } from './ui';
 
@@ -138,7 +140,37 @@ function toDataUrl(file: File, cb: (url: string | null) => void) {
   r.readAsDataURL(file);
 }
 
-export function DishForm({
+/** Demo dish -> the shared form's fields (dish-fields.ts). */
+export function toFields(m: MenuItem): DishFields {
+  return {
+    name: m.name || null,
+    category: m.cat || null,
+    description: m.desc || null,
+    priceAmount: m.price === '' ? null : String(m.price),
+    priceCurrency: 'USD',
+    ingredients: { status: m.ingStatus, items: m.ing },
+    allergens: m.allergens,
+    photoId: null,
+  };
+}
+
+/** The shared form's fields -> demo dish, keeping the demo-only parts (photo, AI, 2.5D). */
+export function fromFields(f: DishFields, m: MenuItem): MenuItem {
+  return {
+    ...m,
+    name: f.name ?? '',
+    cat: f.category ?? '',
+    desc: f.description ?? '',
+    price: f.priceAmount ?? '',
+    ing: f.ingredients.items,
+    aiIng: m.aiIng.filter((x) => f.ingredients.items.includes(x)),
+    ingStatus: f.ingredients.status,
+    allergens: f.allergens,
+  };
+}
+
+/** The demo's Add/Edit Dish: the shared DishForm with sample data and the demo-only AI and 2.5D parts. */
+export function MenuDishForm({
   ed,
   setEd,
   orig,
@@ -152,128 +184,41 @@ export function DishForm({
   toReview: () => void;
 }) {
   const dr = ed.draft;
-  const [errs, setErrs] = useState<[string, string][]>([]);
-  const [tag, setTag] = useState('');
   const [aiDraft, setAiDraft] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const set = (p: Partial<MenuItem>) => setEd({ ...ed, draft: { ...dr, ...p } });
-  const addTag = () => {
-    const t = tag.trim();
-    if (!t || dr.ing.includes(t)) return;
-    set({ ing: [...dr.ing, t] });
-    setTag('');
-  };
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const er: [string, string][] = [];
-    if (dr.name.trim().length < 2) er.push(['f-name', 'Enter a dish name.']);
-    if (!(Number(dr.price) > 0)) er.push(['f-price', 'Enter a price greater than 0.']);
-    if (dr.desc.trim().length < 20)
-      er.push(['f-desc', 'Write a description of at least 20 characters.']);
-    if (dr.ing.length < 1) er.push(['f-ing', 'Add at least one ingredient.']);
-    if (!imgOf(dr)) er.push(['f-photo', 'Add a photo of the dish.']);
-    if (dr.upload && !dr.rights)
-      er.push(['f-rights', 'Confirm you have the right to use this photo.']);
-    if (dr.aiUsed && !dr.aiReviewed)
-      er.push(['f-ai', 'Confirm you reviewed the AI-drafted text and ingredients.']);
-    setErrs(er);
-    if (er.length) {
-      setTimeout(() => document.getElementById('errsum')?.focus(), 0);
-      return;
-    }
-    toReview();
-  };
-  const err = (id: string) => errs.find((x) => x[0] === id);
   const fromInsight = ed.from ? INSIGHTS.find((i) => i.id === ed.from) : undefined;
   return (
-    <form className="stack" onSubmit={submit} noValidate>
-      <div>
-        <Btn kind="text" icon="back" type="button" onClick={cancel}>
-          Back to Menu
-        </Btn>
-      </div>
-      <div className="pagehead">
-        <span className="eyebrow">{orig ? 'Edit dish' : 'Add dish'} · Step 1 of 3</span>
-        <h1>{orig ? orig.name : 'New dish'}</h1>
-        {fromInsight && (
+    <DishForm
+      value={toFields(dr)}
+      onChange={(f) => setEd({ ...ed, draft: fromFields(f, dr) })}
+      onSave={toReview}
+      onCancel={cancel}
+      mode={orig ? 'edit' : 'add'}
+      title={orig ? orig.name : 'New dish'}
+      categories={CATS}
+      photoUrl={imgOf(dr) || null}
+      onPhotoSelect={(f) =>
+        toDataUrl(f, (u) => {
+          if (u) set({ upload: u, rights: false });
+        })
+      }
+      validate={() => [
+        ...(dr.upload && !dr.rights
+          ? ([['f-rights', 'Confirm you have the right to use this photo.']] as FieldError[])
+          : []),
+        ...(dr.aiUsed && !dr.aiReviewed
+          ? ([['f-ai', 'Confirm you reviewed the AI-drafted description.']] as FieldError[])
+          : []),
+      ]}
+      slots={{
+        notice: fromInsight && (
           <Note icon="info">
             Opened from a suggestion in your report: {fromInsight.action} Adding a 2.5D preview is
             not part of this form yet.
           </Note>
-        )}
-      </div>
-      {errs.length > 0 && (
-        <div id="errsum" tabIndex={-1} role="alert" className="note coral">
-          <Icon n="warn" s={18} />
-          <div>
-            <b>
-              Fix {errs.length} thing{errs.length > 1 ? 's' : ''} before reviewing
-            </b>
-            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-              {errs.map(([id, m]) => (
-                <li key={id}>
-                  <a
-                    href={`#${id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById(id)?.focus();
-                    }}
-                    style={{ color: 'inherit' }}
-                  >
-                    {m}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-      <div className="formgrid">
-        <section className="card stack">
-          <div className="field">
-            <label htmlFor="f-name">Dish name</label>
-            <input
-              id="f-name"
-              type="text"
-              value={dr.name}
-              aria-invalid={!!err('f-name')}
-              onChange={(e) => set({ name: e.target.value })}
-            />
-            {err('f-name') && <span className="err">{err('f-name')?.[1]}</span>}
-          </div>
-          <div className="grid g2">
-            <div className="field">
-              <label htmlFor="f-cat">Category</label>
-              <select id="f-cat" value={dr.cat} onChange={(e) => set({ cat: e.target.value })}>
-                {CATS.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="f-price">Price (USD)</label>
-              <input
-                id="f-price"
-                type="number"
-                min="0"
-                step="1"
-                value={dr.price}
-                aria-invalid={!!err('f-price')}
-                onChange={(e) => set({ price: e.target.value })}
-              />
-              {err('f-price') && <span className="err">{err('f-price')?.[1]}</span>}
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="f-desc">Description</label>
-            <textarea
-              id="f-desc"
-              rows={4}
-              value={dr.desc}
-              aria-invalid={!!err('f-desc')}
-              onChange={(e) => set({ desc: e.target.value })}
-            />
-            {err('f-desc') && <span className="err">{err('f-desc')?.[1]}</span>}
+        ),
+        descriptionTools: (
+          <>
             <div className="row">
               <Btn
                 kind="outlined"
@@ -291,181 +236,76 @@ export function DishForm({
               </Btn>
               <span className="hint">AI drafts need your approval.</span>
             </div>
-          </div>
-          {aiDraft && (
-            <div className="aibox">
-              <div className="row">
-                <span className="lab rsn">AI draft</span>
-              </div>
-              <p>{aiDraft}</p>
-              <div className="row">
-                <Btn
-                  kind="primary"
-                  size="md"
-                  type="button"
-                  onClick={() => {
-                    set({ desc: aiDraft, aiUsed: true, aiReviewed: false });
-                    setAiDraft(null);
-                  }}
-                >
-                  Use this draft
-                </Btn>
-                <Btn kind="outlined" size="md" type="button" onClick={() => setAiDraft(null)}>
-                  Discard
-                </Btn>
-              </div>
-            </div>
-          )}
-          <div className="field">
-            <span className="fl" id="f-ing-l">
-              Ingredients
-            </span>
-            <div className="tags" aria-labelledby="f-ing-l">
-              {dr.ing.map((t) => (
-                <span key={t} className={`tag${dr.aiIng.includes(t) ? ' ai' : ''}`}>
-                  {t}
-                  {dr.aiIng.includes(t) && (
-                    <span className="lab rsn" style={{ padding: '1px 6px' }}>
-                      AI
-                    </span>
-                  )}
-                  <button
+            {aiDraft && (
+              <div className="aibox">
+                <div className="row">
+                  <span className="lab rsn">AI draft</span>
+                </div>
+                <p>{aiDraft}</p>
+                <div className="row">
+                  <Btn
+                    kind="primary"
+                    size="md"
                     type="button"
-                    aria-label={`Remove ${t}`}
-                    onClick={() =>
-                      set({
-                        ing: dr.ing.filter((x) => x !== t),
-                        aiIng: dr.aiIng.filter((x) => x !== t),
-                      })
-                    }
+                    onClick={() => {
+                      set({ desc: aiDraft, aiUsed: true, aiReviewed: false });
+                      setAiDraft(null);
+                    }}
                   >
-                    <Icon n="x" s={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="row">
-              <input
-                id="f-ing"
-                type="text"
-                aria-label="Add an ingredient"
-                placeholder="Add an ingredient"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
-                style={{
-                  flex: '1 1 160px',
-                  border: '1.5px solid var(--line2)',
-                  borderRadius: 12,
-                  padding: '10px 12px',
-                  minHeight: 44,
-                  background: 'var(--surface)',
-                }}
-                aria-invalid={!!err('f-ing')}
-              />
-              <Btn kind="outlined" size="md" type="button" onClick={addTag}>
-                Add
-              </Btn>
-              <Btn
-                kind="outlined"
-                size="md"
-                icon="spark"
-                type="button"
-                onClick={() => {
-                  const s = suggestIng(dr.name).filter((x) => !dr.ing.includes(x));
-                  set({
-                    ing: [...dr.ing, ...s],
-                    aiIng: [...dr.aiIng, ...s],
-                    aiUsed: true,
-                    aiReviewed: false,
-                  });
-                }}
-              >
-                Suggest with AI
-              </Btn>
-            </div>
-            {err('f-ing') && <span className="err">{err('f-ing')?.[1]}</span>}
-            <span className="hint">Ingredients are hidden from diners until you approve them.</span>
-          </div>
-          {dr.aiUsed && (
-            <label className="check" htmlFor="f-ai">
-              <input
-                id="f-ai"
-                type="checkbox"
-                checked={dr.aiReviewed}
-                onChange={(e) => set({ aiReviewed: e.target.checked })}
-              />
-              <span>
-                I reviewed the AI-drafted text and ingredients. They are accurate.
-                {err('f-ai') && (
-                  <span className="err" style={{ display: 'block' }}>
-                    {err('f-ai')?.[1]}
-                  </span>
-                )}
-              </span>
-            </label>
-          )}
-        </section>
-        <div className="stack">
-          <section className="card stack">
-            <h3>Photo</h3>
-            <div className="dcard" style={{ background: 'var(--surface2)' }}>
-              {imgOf(dr) ? (
-                <img
-                  src={imgOf(dr)}
-                  alt={dr.name ? `${dr.name} photo` : 'Dish photo'}
-                  style={{ width: 140, height: 140, objectFit: 'contain' }}
-                />
-              ) : (
-                <span className="muted">No photo yet</span>
-              )}
-            </div>
+                    Use this draft
+                  </Btn>
+                  <Btn kind="outlined" size="md" type="button" onClick={() => setAiDraft(null)}>
+                    Discard
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </>
+        ),
+        ingredientTools: (
+          <Btn
+            kind="outlined"
+            size="md"
+            icon="spark"
+            type="button"
+            onClick={() => {
+              const s = suggestIng(dr.name).filter((x) => !dr.ing.includes(x));
+              // AI suggestions are only proposed: the owner must tick "I checked these ingredients".
+              set({ ing: [...dr.ing, ...s], aiIng: [...dr.aiIng, ...s], ingStatus: 'proposed' });
+            }}
+          >
+            Suggest with AI
+          </Btn>
+        ),
+        ingredientBadge: (t) =>
+          dr.aiIng.includes(t) && (
+            <span className="lab rsn" style={{ padding: '1px 6px' }}>
+              AI
+            </span>
+          ),
+        afterFields: dr.aiUsed && (
+          <label className="check" htmlFor="f-ai">
             <input
-              ref={fileRef}
-              id="f-photo"
-              type="file"
-              accept="image/*"
-              className="sr"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f)
-                  toDataUrl(f, (u) => {
-                    if (u) set({ upload: u, rights: false });
-                  });
-              }}
+              id="f-ai"
+              type="checkbox"
+              checked={dr.aiReviewed}
+              onChange={(e) => set({ aiReviewed: e.target.checked })}
             />
-            <Btn kind="outlined" size="lg" type="button" onClick={() => fileRef.current?.click()}>
-              {imgOf(dr) ? 'Replace photo' : 'Upload photo'}
-            </Btn>
-            {err('f-photo') && (
-              <span className="err" id="f-photo-e">
-                {err('f-photo')?.[1]}
-              </span>
-            )}
-            {dr.upload && (
-              <label className="check" htmlFor="f-rights">
-                <input
-                  id="f-rights"
-                  type="checkbox"
-                  checked={dr.rights}
-                  onChange={(e) => set({ rights: e.target.checked })}
-                />
-                <span>
-                  I have the right to use this photo.
-                  {err('f-rights') && (
-                    <span className="err" style={{ display: 'block' }}>
-                      {err('f-rights')?.[1]}
-                    </span>
-                  )}
-                </span>
-              </label>
-            )}
-          </section>
+            <span>I reviewed the AI-drafted description. It is accurate.</span>
+          </label>
+        ),
+        afterPhoto: dr.upload && (
+          <label className="check" htmlFor="f-rights">
+            <input
+              id="f-rights"
+              type="checkbox"
+              checked={dr.rights}
+              onChange={(e) => set({ rights: e.target.checked })}
+            />
+            <span>I have the right to use this photo.</span>
+          </label>
+        ),
+        side: (
           <section className="card stack">
             <h3>2.5D preview</h3>
             <div>
@@ -479,17 +319,9 @@ export function DishForm({
                 : 'Until a preview exists, diners who tap “View in 2.5D” see the photo.'}
             </p>
           </section>
-        </div>
-      </div>
-      <div className="row">
-        <Btn kind="primary" size="lg" type="submit">
-          Review changes
-        </Btn>
-        <Btn kind="outlined" size="lg" type="button" onClick={cancel}>
-          Cancel
-        </Btn>
-      </div>
-    </form>
+        ),
+      }}
+    />
   );
 }
 
@@ -511,6 +343,9 @@ function DinerCard({ d, showIng }: { d: MenuItem; showIng: boolean }) {
           Ingredients hidden until approved
         </p>
       )}
+      <p className="muted" style={{ fontSize: 13 }}>
+        {allergenSummary(d.allergens)}
+      </p>
     </div>
   );
 }
@@ -539,6 +374,7 @@ export function Review({
         ch('desc') && 'Description',
         orig.ing.join('|') !== dr.ing.join('|') && 'Ingredients',
         (orig.upload || '') !== (dr.upload || '') && 'Photo',
+        allergenSummary(orig.allergens) !== allergenSummary(dr.allergens) && 'Allergens',
       ].filter(Boolean)
     : ['New dish'];
   return (
