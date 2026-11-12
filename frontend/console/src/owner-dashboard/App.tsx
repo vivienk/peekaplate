@@ -88,14 +88,15 @@ function Controls({
   );
 }
 
+// Restaurant Setup sits last, as in the owner shell (#139; design feedback, 10 Nov).
 const NAV: [Page, string, IconName][] = [
-  ['welcome', 'Restaurant Setup', 'store'],
   ['overview', 'Overview', 'home'],
   ['report', 'AI Insight Report', 'report'],
   ['perf', 'Dish performance', 'chart'],
   ['data', 'Report data', 'report'],
   ['menu', 'Menu', 'menu'],
   ['actions', 'Actions', 'action'],
+  ['welcome', 'Restaurant Setup', 'store'],
 ];
 
 const wideNow = () => window.matchMedia('(min-width:901px)').matches;
