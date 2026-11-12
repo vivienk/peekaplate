@@ -2,10 +2,8 @@
 // every use sits next to visible text, so they carry empty alt text.
 import action from './assets/action.svg';
 import activity from './assets/activity.svg';
-import buttonIcon from './assets/button-icon.svg';
 import chart from './assets/chart.svg';
 import check from './assets/check.svg';
-import dot from './assets/dot.svg';
 import edit from './assets/edit.svg';
 import home from './assets/home.svg';
 import lock from './assets/lock.svg';
@@ -20,10 +18,8 @@ import store from './assets/store.svg';
 export const ICONS = {
   action,
   activity,
-  buttonIcon,
   chart,
   check,
-  dot,
   edit,
   home,
   lock,

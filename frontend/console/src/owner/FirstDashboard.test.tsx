@@ -87,6 +87,20 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(html).toMatch(/id="owner-ai-input"[^>]*disabled/);
   });
 
+  it('follows the Nov 11 design review: no idle spinner, no setup dot, shared badge column, AI variant', () => {
+    const html = render(figmaState);
+    // 02: the next-action buttons hold only their label while nothing is loading.
+    const actions = html.slice(html.indexOf('owner-progress__actions'), html.indexOf('</section>'));
+    expect(actions).not.toContain('<img');
+    // 05B: no orange dot (or its hidden text) on the active Restaurant Setup item.
+    expect(html).not.toContain('setup not finished');
+    // 03: both status rows sit in one grid, so the descriptions share a start position.
+    expect(html.match(/owner-verify__rows/g)).toHaveLength(1);
+    // 04: onboarding uses the AI panel's Disabled variant; publication switches to Default.
+    expect(html).toContain('data-variant="disabled"');
+    expect(render(published)).toContain('data-variant="default"');
+  });
+
   it('shows the success pop-up only after confirmed publication, about publishing only', () => {
     expect(render(figmaState, false, true)).not.toContain('owner-dialog');
     expect(render(published)).not.toContain('owner-dialog');

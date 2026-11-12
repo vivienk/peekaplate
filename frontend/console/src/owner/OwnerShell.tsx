@@ -26,8 +26,6 @@ export interface OwnerShellProps {
   onNavigate: (page: OwnerPage) => void;
   /** Pages the owner may open; the rest are shown locked. Defaults to all pages. */
   available?: ReadonlySet<OwnerPage>;
-  /** Shows the dot on Restaurant Setup while onboarding is unfinished. */
-  setupIncomplete: boolean;
   topbar: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
@@ -39,7 +37,6 @@ export function OwnerShell({
   current,
   onNavigate,
   available,
-  setupIncomplete,
   topbar,
   aside,
   children,
@@ -86,12 +83,6 @@ export function OwnerShell({
                       <Icon name={item.icon} size={19} />
                       {item.label}
                     </span>
-                    {item.id === 'setup' && setupIncomplete && (
-                      <>
-                        <Icon name="dot" size={6} />
-                        <span className="owner-visually-hidden">(setup not finished)</span>
-                      </>
-                    )}
                     {!open && <Icon name="lock" size={16} />}
                   </button>
                 </li>

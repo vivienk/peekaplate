@@ -73,7 +73,11 @@ export function FirstDashboard({
   );
 
   const aside = (
-    <aside className="owner-ai" aria-label="PeekaPlate AI">
+    <aside
+      className="owner-ai"
+      aria-label="PeekaPlate AI"
+      data-variant={onboarding ? 'disabled' : 'default'}
+    >
       <div className="owner-ai__head">
         <div className="owner-ai__title">
           <span className="owner-ai__icon">
@@ -125,7 +129,6 @@ export function FirstDashboard({
       current="setup"
       onNavigate={onNavigate}
       available={availablePages(setup)}
-      setupIncomplete={progress.next !== null}
       topbar={topbar}
       aside={aside}
     >
@@ -167,7 +170,6 @@ export function FirstDashboard({
                 className="owner-button"
                 onClick={() => progress.next && onOpenStep(progress.next.id)}
               >
-                <Icon name="buttonIcon" size={22} />
                 {progress.next.label}
               </Button>
             )}
@@ -177,7 +179,6 @@ export function FirstDashboard({
                 className="owner-button"
                 onClick={() => progress.review && onOpenStep(progress.review.id)}
               >
-                <Icon name="buttonIcon" size={22} />
                 {progress.review.label}
               </Button>
             )}
@@ -229,34 +230,36 @@ export function FirstDashboard({
       <div className="owner-row">
         <section className="owner-card owner-verify" aria-labelledby="owner-verify-title">
           <h2 id="owner-verify-title">Verified is not the same as published</h2>
-          <div className="owner-verify__row">
-            {setup.detailsStatus === 'verified' ? (
-              <StatusLabel text="Verified" tone="success" />
-            ) : (
-              <StatusLabel
-                text={setup.detailsStatus === 'submitted' ? 'Waiting' : 'Not verified'}
-                tone="warning"
-              />
-            )}
-            <p>
-              {setup.detailsStatus === 'verified'
-                ? "We've checked your restaurant details. This does not make anything visible to diners."
-                : setup.detailsStatus === 'submitted'
-                  ? "We've received your restaurant details and are checking them."
-                  : 'We check your restaurant details before anything is shown to diners.'}
-            </p>
-          </div>
-          <div className="owner-verify__row">
-            {setup.published ? (
-              <StatusLabel text="Published" tone="success" />
-            ) : (
-              <StatusLabel text="Not published" tone="warning" />
-            )}
-            <p>
-              {setup.published
-                ? 'Your menu is visible to diners.'
-                : 'Your menu is not visible to diners yet. You decide when to publish.'}
-            </p>
+          <div className="owner-verify__rows">
+            <div className="owner-verify__row">
+              {setup.detailsStatus === 'verified' ? (
+                <StatusLabel text="Verified" tone="success" />
+              ) : (
+                <StatusLabel
+                  text={setup.detailsStatus === 'submitted' ? 'Waiting' : 'Not verified'}
+                  tone="warning"
+                />
+              )}
+              <p>
+                {setup.detailsStatus === 'verified'
+                  ? "We've checked your restaurant details. This does not make anything visible to diners."
+                  : setup.detailsStatus === 'submitted'
+                    ? "We've received your restaurant details and are checking them."
+                    : 'We check your restaurant details before anything is shown to diners.'}
+              </p>
+            </div>
+            <div className="owner-verify__row">
+              {setup.published ? (
+                <StatusLabel text="Published" tone="success" />
+              ) : (
+                <StatusLabel text="Not published" tone="warning" />
+              )}
+              <p>
+                {setup.published
+                  ? 'Your menu is visible to diners.'
+                  : 'Your menu is not visible to diners yet. You decide when to publish.'}
+              </p>
+            </div>
           </div>
         </section>
         <section className="owner-card owner-empty" aria-labelledby="owner-empty-title">

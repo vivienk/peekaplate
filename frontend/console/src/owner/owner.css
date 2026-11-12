@@ -163,7 +163,12 @@ body:has(.owner-root) {
 }
 /* S6-FE-14: pages that open only after publication stay visible but locked. */
 .owner-nav__item[aria-disabled="true"] {
+  /* Design review 05: the disabled navigation role from the token set (Navigation component). */
+  color: var(--pp-role-nav-icon-disabled);
   cursor: not-allowed;
+}
+.owner-nav__item[aria-disabled="true"] .owner-nav__label img {
+  opacity: 0.6;
 }
 .owner-nav__item[aria-disabled="true"]:hover {
   background: transparent;
@@ -334,10 +339,11 @@ body:has(.owner-root) {
 
 /* Setup steps */
 .owner-steps {
+  /* Design review 01: three equal columns and equal-height cards on desktop. */
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--pp-space-24);
-  align-items: start;
+  align-items: stretch;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -349,10 +355,11 @@ body:has(.owner-root) {
 }
 .owner-step__top {
   display: flex;
+  flex-wrap: wrap; /* a long status ("Waiting for verification") moves under STEP n, never past the card */
   align-items: center;
   justify-content: space-between;
   gap: var(--pp-space-8);
-  min-height: var(--pp-space-24);
+  min-height: var(--pp-space-32); /* the status label's full height, so every title starts level */
 }
 .owner-step__number {
   white-space: nowrap;
@@ -368,16 +375,24 @@ body:has(.owner-root) {
 }
 .owner-step__action {
   display: flex;
-  justify-content: flex-end;
-}
-.owner-step__locked {
-  display: flex;
   align-items: center;
-  gap: var(--pp-space-8);
+  justify-content: flex-end;
   min-height: 48px; /* same height as the step buttons, so cards stay aligned */
-  color: var(--pp-role-on-surface-variant);
+  margin-top: auto; /* actions sit on the same line in every card */
+}
+/* Design review 06: secondary helper text, one step smaller than the body copy and dark orange
+ * (orange-800 on white is about 8:1). The extra class beats the generic `.owner-card p` rule. */
+.owner-step .owner-step__locked {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: var(--pp-space-8);
+  color: var(--pp-color-orange-800);
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
+}
+.owner-step__locked img {
+  flex: none;
 }
 
 /* S6-FE-14 success pop-up (replaces the old S11 confirmation screen) */
@@ -435,10 +450,18 @@ body:has(.owner-root) {
 .owner-empty {
   gap: var(--pp-space-12);
 }
+/* Design review 03: the badges share one column, so both descriptions start at the same x. */
+.owner-verify__rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--pp-space-16) var(--pp-space-12);
+  align-items: start;
+}
 .owner-verify__row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--pp-space-12);
+  display: contents;
+}
+.owner-verify__row .owner-status {
+  justify-self: start;
 }
 .owner-empty__tile {
   display: inline-flex;
@@ -479,7 +502,7 @@ body:has(.owner-root) {
   display: inline-flex;
   padding: var(--pp-space-8);
   border-radius: var(--pp-radius-full);
-  background: var(--pp-color-orange-500);
+  background: var(--pp-color-orange-100); /* Figma AI panel: light tile, dark-orange icon */
 }
 .owner-ai__body {
   flex: 1 1 auto;
@@ -527,8 +550,14 @@ body:has(.owner-root) {
   border-radius: var(--pp-radius-full);
   background: var(--pp-color-orange-500);
 }
-.owner-ai__input:disabled,
+/* Design review 04: the AI panel's Disabled variant (onboarding): grey composer, icon colours kept. */
+.owner-ai__input:disabled {
+  border-color: var(--pp-role-input-border-disabled);
+  background: var(--pp-role-input-bg-disabled);
+  cursor: not-allowed;
+}
 .owner-ai__send:disabled {
+  background: var(--pp-role-input-bg-disabled);
   cursor: not-allowed;
 }
 
@@ -546,6 +575,11 @@ body:has(.owner-root) {
     min-height: 0;
     border-left: 0;
     border-top: 1px solid var(--pp-role-outline-variant);
+  }
+}
+@media (max-width: 1023px) {
+  .owner-steps {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 899px) {
