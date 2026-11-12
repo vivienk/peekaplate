@@ -2753,3 +2753,10 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Follow-up: the saved-job reopen test retains its viewer instance and intentionally does not auto-open twice. Removed the unnecessary dismissal added during diagnosis; the earlier entry interruption occurred while Vite reloaded edited source. Final regressions run against stable files sequentially.
 
 - Automatic camera tests: GLB scenarios open the portal twice (initial 2.5D entry, then after preparing 3D). Updated cleanup assertions from one stopped camera stream to two; both streams must be released.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T18:28:27.908Z","exitCode":2}
+```
+
+- Auto-camera typecheck TS2774: DOM types declare getUserMedia as always defined. Use an explicit typeof function capability check so older browsers remain guarded without an always-truthy function condition.

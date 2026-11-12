@@ -426,7 +426,8 @@ export function bindPortionAR(
     // Camera preview needs no immersive-session gesture: show the dish immediately,
     // then let the browser handle permission. Surface tracking remains an optional upgrade.
     start.textContent = 'Try camera preview';
-    if (isSecureContext && navigator.mediaDevices?.getUserMedia) void startCamera();
+    if (isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function')
+      void startCamera();
     else
       message.textContent =
         'Camera access needs a secure connection and a supported browser. Back returns to the 2.5D preview.';
