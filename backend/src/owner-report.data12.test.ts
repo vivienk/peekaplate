@@ -1,4 +1,3 @@
-
 import { OwnerDishReportSchema } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
@@ -90,12 +89,7 @@ describe('DATA-12 isolated owner-report privacy thresholds', () => {
       status: 'NORMAL',
     });
 
-    for (const name of [
-      'open_rate',
-      'engagement_rate',
-      'save_rate',
-      'timing_coverage',
-    ]) {
+    for (const name of ['open_rate', 'engagement_rate', 'save_rate', 'timing_coverage']) {
       expect(dish.metrics[name]).toEqual({
         value: 1,
         status: 'NORMAL',
@@ -154,11 +148,7 @@ describe('DATA-12 isolated owner-report privacy thresholds', () => {
 
     expect(dish.evidence_state).toBe('NORMAL');
 
-    for (const name of [
-      'engagement_rate',
-      'timing_coverage',
-      'avg_interaction_time_seconds',
-    ]) {
+    for (const name of ['engagement_rate', 'timing_coverage', 'avg_interaction_time_seconds']) {
       expect(dish.metrics[name]?.value).toBeNull();
       expect(dish.metrics[name]?.status).toBe('SUPPRESSED');
     }
