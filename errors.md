@@ -2823,3 +2823,8 @@ The comparison SQL scope change also required updating both test clients that de
 Local validation exposed and corrected: UUID/text parameter inference in the manual-draft INSERT; a row-lock attempt on immutable metadata without UPDATE privilege (replaced with a scoped advisory lock); stale automatic incomplete-job retries (now explicit); and a legacy text edit that could discard approved facts (now preserved, with a manual-origin fallback denied). Regressions exercise real PostgreSQL state, ownership, receipts, cancellation fences and snapshot preservation.
 
 Test setup corrections: use the installed PDF loading task cleanup API, a real loopback document for Chromium network-origin checks, and pgTAP's schema-qualified overloads with its extension enabled in each transactional script. Browser JavaScript cannot read an unexposed CORS response header; the browser's successful cross-origin request and independent preflight/header assertions establish the boundary instead. An RTK shorthand routed a root script incorrectly; recorded checks use explicit proxy invocation and process exit status. No credentials, real menu data or hosted mutation were involved in these failures.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-12T08:00:17.419Z","exitCode":1}
+```

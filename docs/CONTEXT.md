@@ -370,7 +370,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/intake.ts",
         "backend/src/ingestion/intake.test.ts",
         "backend/src/ingestion/pdf-fixture.ts",
-        "docs/owner-menu-workspace.md"
+        "docs/owner-menu-workspace.md",
+        "backend/src/ingestion/intake.source.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -383,7 +384,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "369ab49b4104abe81a9d1ad957776d56aaddbc427f9027c41a5f14e5dfabdea8"
+      "sourceFingerprint": "63712fa6e623368b2ef8ff3b472d619038310ca15d0dfa6b7050cec335f6d0c7"
     },
     {
       "id": "database",
@@ -429,7 +430,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c06e2d291279fb09becc89627f8df91852bbd56cf15fe1c533fcbc70c7f80820"
+      "sourceFingerprint": "f1b94c97b1ef627d1ded88c695ee12dd1d09b884a2e815d13cbb68c1d38eb0ca"
     },
     {
       "id": "measurement",
@@ -515,7 +516,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6f4f619769769378bba45bd72ca1875df28891e01a307f651bc09f696cc6e587"
+      "sourceFingerprint": "0a351cbdc2cd95bc1f348da95a65a83cb02163e1b592aadfab10129b710d2662"
     },
     {
       "id": "agents",

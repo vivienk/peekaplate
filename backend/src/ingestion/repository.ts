@@ -44,6 +44,7 @@ export type MenuIngestionJobRow = {
   upload_group_id?: string | null;
   upload_index?: number | null;
   source_uploaded?: boolean;
+  source_provenance?: unknown;
 };
 
 export type DishDraftRow = {
