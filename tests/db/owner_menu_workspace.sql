@@ -1,0 +1,17 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap;
+SELECT plan(12);
+SELECT has_table('app_private','menu_upload_group','saved upload groups exist');
+SELECT has_table('app_private','dish_draft_photo','private photo metadata exists');
+SELECT has_column('app_private','dish_drafts','origin','manual origin exists');
+SELECT has_column('app_private','dish_drafts','draft_version','draft versions exist');
+SELECT has_column('app_private','dish_current','approved_facts','approved facts exist');
+SELECT has_column('app_private','menu_ingestion_jobs','source_uploaded','verified source state exists');
+SELECT ok((SELECT bool_and(c.relrowsecurity AND c.relforcerowsecurity) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app_private' AND c.relname IN('menu_upload_group','dish_draft_photo')),'metadata forces tenant RLS');
+SELECT ok(has_table_privilege('peekaplate_runtime','app_private.menu_upload_group','SELECT,INSERT'),'runtime can save/read groups');
+SELECT ok(NOT has_table_privilege('peekaplate_runtime','app_private.menu_upload_group','UPDATE'),'runtime cannot rewrite group manifests');
+SELECT ok(NOT has_table_privilege('peekaplate_runtime','app_private.dish_draft_photo','DELETE'),'runtime cannot delete photo history');
+SELECT ok(CASE WHEN EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN NOT has_table_privilege('anon','app_private.dish_draft_photo','SELECT') ELSE true END,'anonymous browser has no metadata access');
+SELECT ok(CASE WHEN EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN NOT has_table_privilege('authenticated','app_private.menu_upload_group','SELECT') ELSE true END,'browser identity alone has no metadata access');
+SELECT * FROM finish();
+ROLLBACK;

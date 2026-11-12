@@ -2768,6 +2768,94 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:18:39.671Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:20:13.453Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:21:52.245Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:22:37.515Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:29:39.568Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:33:09.330Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:36:07.834Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:37:27.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:38:29.044Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T07:43:38.201Z","exitCode":1}
+```
+
+## Owner menu workspace — November 12, 2026
+
+Local validation exposed and corrected: UUID/text parameter inference in the manual-draft INSERT; a row-lock attempt on immutable metadata without UPDATE privilege (replaced with a scoped advisory lock); stale automatic incomplete-job retries (now explicit); and a legacy text edit that could discard approved facts (now preserved, with a manual-origin fallback denied). Regressions exercise real PostgreSQL state, ownership, receipts, cancellation fences and snapshot preservation.
+
+Test setup corrections: use the installed PDF loading task cleanup API, a real loopback document for Chromium network-origin checks, and pgTAP's schema-qualified overloads with its extension enabled in each transactional script. Browser JavaScript cannot read an unexposed CORS response header; the browser's successful cross-origin request and independent preflight/header assertions establish the boundary instead. An RTK shorthand routed a root script incorrectly; recorded checks use explicit proxy invocation and process exit status. No credentials, real menu data or hosted mutation were involved in these failures.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-12T08:00:17.419Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T08:24:41.362Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T08:37:09.613Z","exitCode":1}
+```
+
+## Owner menu staging acceptance — November 12, 2026
+
+Independent review found approval could use a historical extraction after a retry, and bootstrap could register against a changed job. A real database regression reproduced incorrect approval before the fix; current report/session pointers, job-first locks and registration-time revalidation now reject both cases. All 130 integration cases pass. A CI tracking test also armed delivery after its fixed fake-time advance; bounded clock polling preserves the assertion and passed five repeated browser runs.
+
+Hosted migration and seven HTTP/CORS checks passed. Hosted staff checks did not execute: the dedicated account's email magic-link verification returned otp_expired, including a fresh dashboard-generated link. The account/password were preserved and its temporary synthetic permission restored to viewer. A rollback-only SQL probe stopped before writes because the dashboard role cannot SET ROLE peekaplate_runtime; no privilege expansion was made. Do not report those attempts as authenticated API or runtime-role acceptance. Shell helpers use files to avoid nested PowerShell variable expansion, and merge gates use the exact SHA returned by GitHub.
+
+## Owner menu authenticated acceptance resolved — November 12, 2026
+
+The earlier otp_expired verifier blocker was resolved by selecting the newest Gmail delivery explicitly. Gmail had cached/grouped repeated messages and hidden the fresh link under Show trimmed content; the refreshed newest message had zero visible sign-in links before expansion and one afterward. That complete link, verified once with its original type, returned a genuine session. No Auth settings, template, account or password change was needed.
+
+Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
+
+
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
+
 
 ## November 10 evening DATA-01 acceptance synchronization
 
