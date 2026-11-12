@@ -31,7 +31,8 @@ export interface OwnerSetup {
 }
 
 export type StepState = 'done' | 'waiting' | 'current' | 'locked';
-export type Tone = 'success' | 'warning';
+/** Tones of Rania's "Status Label" component (Figma 2721:12212) that onboarding uses. */
+export type Tone = 'success' | 'warning' | 'information' | 'neutral';
 
 export interface StepView {
   id: StepId;
@@ -93,7 +94,7 @@ function stateOf(id: StepId, setup: OwnerSetup): StepState {
 }
 
 function statusOf(id: StepId, state: StepState): StepView['status'] {
-  if (state === 'waiting') return { text: 'Waiting for verification', tone: 'warning' };
+  if (state === 'waiting') return { text: 'Waiting for verification', tone: 'information' };
   if (id === 'details' && state === 'done') return { text: 'Verified', tone: 'success' };
   if (id === 'menu' && state === 'done') return { text: 'Added', tone: 'success' };
   if (id === 'publish' && state === 'done') return { text: 'Published', tone: 'success' };

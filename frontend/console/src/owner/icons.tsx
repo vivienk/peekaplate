@@ -4,6 +4,8 @@ import action from './assets/action.svg';
 import activity from './assets/activity.svg';
 import chart from './assets/chart.svg';
 import check from './assets/check.svg';
+import circle from './assets/circle.svg';
+import clock from './assets/clock.svg';
 import edit from './assets/edit.svg';
 import home from './assets/home.svg';
 import lock from './assets/lock.svg';
@@ -12,7 +14,6 @@ import menu from './assets/menu.svg';
 import report from './assets/report.svg';
 import send from './assets/send.svg';
 import spark from './assets/spark.svg';
-import stepCheck from './assets/step-check.svg';
 import store from './assets/store.svg';
 
 export const ICONS = {
@@ -20,6 +21,8 @@ export const ICONS = {
   activity,
   chart,
   check,
+  circle,
+  clock,
   edit,
   home,
   lock,
@@ -28,7 +31,6 @@ export const ICONS = {
   report,
   send,
   spark,
-  stepCheck,
   store,
 } as const;
 

@@ -60,7 +60,7 @@ describe('owner onboarding setup rules', () => {
     const setup: OwnerSetup = { ...base, detailsStatus: 'submitted' };
     const [details] = setupSteps(setup);
     expect(details?.state).toBe('waiting');
-    expect(details?.status).toEqual({ text: 'Waiting for verification', tone: 'warning' });
+    expect(details?.status).toEqual({ text: 'Waiting for verification', tone: 'information' });
     expect(details?.action).toEqual({ label: 'Edit', disabled: false });
     expect(setupProgress(setup)).toMatchObject({ done: 0, next: { id: 'menu' } });
   });

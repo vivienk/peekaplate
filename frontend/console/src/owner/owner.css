@@ -222,8 +222,11 @@ body:has(.owner-root) {
   outline: none;
 }
 
-/* Status label (Figma "Status label": Success / Warning) */
+/* Rania's "Status Label" component (Figma 2721:12212, read with Figwright on 11 Nov), Icons=Leading:
+ * 24px tall in total (4/12/4/8 padding, 6px gap, 16px icon), 12/16 Semi Bold. Onboarding uses four of
+ * its seven tones; the icon and label share the tone's "on" colour. */
 .owner-status {
+  box-sizing: border-box;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -243,6 +246,15 @@ body:has(.owner-root) {
 .owner-status--warning {
   background: var(--pp-color-warning-50);
   color: var(--pp-color-warning-900);
+}
+.owner-status--information {
+  background: var(--pp-color-info-50);
+  color: var(--pp-color-info-900);
+}
+.owner-status--neutral {
+  border: 1px solid var(--pp-color-gray-200);
+  background: var(--owner-pending-surface-container);
+  color: var(--pp-color-gray-600);
 }
 
 /* Figma "Owner dashboard_Button" (component set 1563:8484), read with Figwright on 11 Nov: a pill

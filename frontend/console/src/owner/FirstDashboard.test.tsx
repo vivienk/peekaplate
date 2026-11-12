@@ -121,6 +121,26 @@ describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', ()
     expect(render(published)).toContain('data-variant="default"');
   });
 
+  it('uses the Figma Status Label tones: verified success, waiting information, not published warning', () => {
+    // A status pill with its tone, its leading icon and its text.
+    const label = (tone: string, icon: string, words: string) =>
+      new RegExp(`owner-status--${tone}" data-icon="${icon}"><img[^>]*>${words}<`);
+    const verified = render(figmaState);
+    expect(verified).toMatch(label('success', 'check', 'Verified'));
+    expect(verified).toMatch(label('warning', 'lock', 'Not published'));
+    const waiting = render({ ...figmaState, detailsStatus: 'submitted' });
+    expect(waiting).toMatch(label('information', 'clock', 'Waiting for verification'));
+    expect(waiting).toMatch(label('information', 'clock', 'Waiting'));
+  });
+
+  it('shows the same date chip in the AI panel as in the top bar (Figma AI context chips)', () => {
+    const html = render(figmaState);
+    const ai = html.slice(html.indexOf('owner-ai__head'));
+    expect(ai).toContain(
+      '<time class="owner-chip owner-chip--surface" dateTime="2026-11-11">Nov 11, 2026</time>',
+    );
+  });
+
   it('shows the success pop-up only after confirmed publication, about publishing only', () => {
     expect(render(figmaState, true)).not.toContain('owner-dialog');
     expect(render(published)).not.toContain('owner-dialog');

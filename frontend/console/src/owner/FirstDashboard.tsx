@@ -16,18 +16,19 @@ import {
   visiblePages,
 } from './setup';
 
-function StatusLabel({
-  text,
-  tone,
-  icon,
-}: {
-  text: string;
-  tone: Tone;
-  icon?: IconName | undefined;
-}) {
+/** Leading icon of each tone in the Figma "Status Label" component (2721:12212). */
+const TONE_ICON: Record<Tone, IconName> = {
+  success: 'check',
+  warning: 'lock',
+  information: 'clock',
+  neutral: 'circle',
+};
+
+/** Rania's "Status Label" (Figma 2721:12212), Icons=Leading. */
+function StatusLabel({ text, tone }: { text: string; tone: Tone }) {
   return (
-    <span className={`owner-status owner-status--${tone}`}>
-      <Icon name={icon ?? (tone === 'success' ? 'check' : 'lock')} size={16} />
+    <span className={`owner-status owner-status--${tone}`} data-icon={TONE_ICON[tone]}>
+      <Icon name={TONE_ICON[tone]} size={16} />
       {text}
     </span>
   );
@@ -106,8 +107,12 @@ export function FirstDashboard({
         </div>
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{setup.restaurantName}</span>
-          {setup.reportPeriod && (
+          {setup.reportPeriod ? (
             <span className="owner-chip owner-chip--surface">{setup.reportPeriod}</span>
+          ) : (
+            <time className="owner-chip owner-chip--surface" dateTime={localDate(today)}>
+              {DATE_FORMAT.format(today)}
+            </time>
           )}
         </div>
       </div>
@@ -211,13 +216,7 @@ export function FirstDashboard({
           <li key={step.id} className="owner-card owner-step">
             <div className="owner-step__top">
               <span className="owner-step__number">STEP {step.number}</span>
-              {step.status && (
-                <StatusLabel
-                  text={step.status.text}
-                  tone={step.status.tone}
-                  icon={step.status.tone === 'success' ? 'stepCheck' : undefined}
-                />
-              )}
+              {step.status && <StatusLabel text={step.status.text} tone={step.status.tone} />}
             </div>
             <div className="owner-step__text">
               <h3>{step.title}</h3>
@@ -257,7 +256,7 @@ export function FirstDashboard({
               ) : (
                 <StatusLabel
                   text={setup.detailsStatus === 'submitted' ? 'Waiting' : 'Not verified'}
-                  tone="warning"
+                  tone={setup.detailsStatus === 'submitted' ? 'information' : 'warning'}
                 />
               )}
               <p>
