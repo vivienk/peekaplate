@@ -1460,7 +1460,7 @@ describe('real PostgreSQL menu publication commands', () => {
     });
     expect(withdrawal.status).toBe(200);
     expect((await requestPublicMenu(menuId)).status).toBe(404);
-  },30000);
+  });
 
   it('publishes a producer-built bundle: admit, approve, publish, public read, withdraw', async () => {
     const menuId = crypto.randomUUID();
