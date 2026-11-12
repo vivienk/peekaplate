@@ -229,7 +229,7 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   return (
     <>
       <StepHeader heading={heading} title="Welcome to PeekaPlate">
-        Enter your work email, then sign in or create an account.
+        Enter your work email to get started. We’ll take you to the right next step.
       </StepHeader>
       {banner && <ErrorBanner copy={banner} />}
       <form className="pp-auth__form" noValidate onSubmit={submit}>

@@ -88,7 +88,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
+      "sourceFingerprint": "718ef1f80715da06acefcd2e2c14e99fb432e015b592a3882d9c4de9a47bb4ac"
     },
     {
       "id": "ui",
@@ -258,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "57c474988b703d4d550de8daf08bf5a30e5170dced8e4b20e81e1735e5844277"
+      "sourceFingerprint": "4e9092eedccfe2f31adf4226568646b6397a4ad711ccc5ae3ac6e816ab4634c7"
     },
     {
       "id": "backend",

@@ -329,6 +329,9 @@
   --pp-role-input-bg-disabled: var(--pp-color-neutral-200);
   --pp-role-input-border-disabled: var(--pp-color-neutral-300);
   --pp-role-input-text-disabled: var(--pp-color-neutral-400);
+
+  /* Card roles. Figma color/card/border-white: white at 80% (Rania, 12 Nov). */
+  --pp-role-card-border: color-mix(in srgb, var(--pp-color-white) 80%, transparent);
 }
 
 /* Reduced motion: transitions shrink to 1ms, delays and staggers are removed, and screens
