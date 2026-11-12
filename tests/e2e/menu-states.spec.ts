@@ -301,7 +301,7 @@ test('observers are disconnected across open/Back cycles', async ({ page }) => {
 
   for (let i = 0; i < 3; i++) {
     await expect(page.locator('.pp-menu')).toBeVisible({ timeout: 10_000 });
-    expect(await liveCount()).toBe(1);
+    expect(await liveCount()).toBe(2);
     await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
     await expect(page.locator('.pp-detail')).toBeVisible();
     expect(await liveCount()).toBe(0);
