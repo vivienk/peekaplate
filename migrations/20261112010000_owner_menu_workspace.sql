@@ -5,6 +5,7 @@ ALTER TABLE app_private.menu_ingestion_jobs ADD CONSTRAINT menu_ingestion_jobs_s
 ALTER TABLE app_private.menu_ingestion_jobs ADD COLUMN upload_group_id uuid;
 ALTER TABLE app_private.menu_ingestion_jobs ADD COLUMN upload_index integer CHECK (upload_index BETWEEN 0 AND 4);
 ALTER TABLE app_private.menu_ingestion_jobs ADD COLUMN source_uploaded boolean NOT NULL DEFAULT true;
+ALTER TABLE app_private.menu_ingestion_jobs ADD COLUMN source_provenance jsonb CHECK (source_provenance IS NULL OR jsonb_typeof(source_provenance)='object');
 ALTER TABLE app_private.menu_ingestion_jobs ADD CONSTRAINT upload_group_order
   CHECK ((upload_group_id IS NULL) = (upload_index IS NULL));
 CREATE UNIQUE INDEX menu_ingestion_group_order ON app_private.menu_ingestion_jobs(tenant_id, upload_group_id, upload_index);

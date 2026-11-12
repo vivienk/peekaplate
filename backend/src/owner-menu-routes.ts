@@ -16,10 +16,12 @@ import { AuthUnavailableError } from './auth';
 import type { Bindings } from './index';
 import {
   acceptUploadGroupFile,
+  cancelUploadGroup,
   changeMenuJob,
   createUploadGroup,
   dispatchReadyUploadGroup,
   materializeMenuUrl,
+  readUploadGroup,
   validateMenuPdf,
 } from './ingestion/intake';
 import { type DishDraftRow, IngestionError } from './ingestion/repository';
@@ -211,6 +213,16 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     );
     return c.json({ jobs });
   });
+  app.post('/venues/:venueId/menus/upload-groups/:groupId/cancel', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = MenuUploadGroupScopeSchema.safeParse(c.req.param());
+    const input = MenuJobActionSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    const group = await services.database(c.env, (client) =>
+      cancelUploadGroup(client, actor, venue, scope.data.groupId, input.data.commandId),
+    );
+    return c.json({ group });
+  });
   for (const action of ['cancel', 'retry'] as const) {
     app.post(`/venues/:venueId/menus/jobs/:jobId/${action}`, async (c) => {
       const { actor, venue } = await identity(c);
@@ -220,7 +232,18 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
       const job = await services.database(c.env, (client) =>
         changeMenuJob(client, actor, venue, scope.data.jobId, input.data.commandId, action),
       );
-      if (action === 'retry' && job.status === 'queued') {
+      if (job.upload_group_id) {
+        const group = await services.database(c.env, (client) =>
+          readUploadGroup(client, actor, venue, job.upload_group_id!),
+        );
+        if (
+          group.ready &&
+          group.jobs.some((member) => member.status === 'queued' && member.source_uploaded)
+        ) {
+          if (!c.env.INGESTION_QUEUE) throw new AuthUnavailableError();
+          await dispatchReadyUploadGroup(group, c.env.INGESTION_QUEUE);
+        }
+      } else if (action === 'retry' && job.status === 'queued') {
         if (!c.env.INGESTION_QUEUE) throw new AuthUnavailableError();
         await c.env.INGESTION_QUEUE.send({
           version: 1,

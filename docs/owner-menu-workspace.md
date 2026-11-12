@@ -61,7 +61,9 @@ only. CORS does not grant membership or bypass authorization.
 Existing single-file `POST /venues/:venueId/menus/uploads` remains compatible and
 now enforces the PDF page limit. `POST /venues/:venueId/menus/url` accepts
 `{url,idempotencyKey}` and materializes a public PDF/image through safe retrieval.
-An HTML page may resolve exactly one linked PDF/image. Ambiguous/text-only pages
+Original/resolved source URLs and the first verified retrieval time remain in
+private job provenance alongside the actual byte hash. An identical retry does
+not rewrite that evidence. An HTML page may resolve exactly one linked PDF/image. Ambiguous/text-only pages
 return `menu_file_link_required`; ask for the actual file instead of pretending an
 HTML page was processed. Redirects, DNS/private destinations, size and type rules
 remain enforced by the existing safe fetcher.
@@ -70,8 +72,12 @@ remain enforced by the existing safe fetcher.
 
 POST `/venues/:venueId/menus/jobs/:jobId/cancel` or `/retry` with a fresh
 `{commandId}`. Repeating the **same** command repairs delivery without repeatedly
-adding attempts. For a group Cancel control, cancel each unfinished job, then
-read their stored states before showing cancellation.
+adding attempts. The whole-menu Cancel control uses
+`POST /venues/:venueId/menus/upload-groups/:groupId/cancel` with `{commandId}`:
+unfinished members are cancelled together, preserving completed work and avoiding
+new sibling dispatch. Read the returned states before showing cancellation.
+Cancelling a missing member also dispatches any newly ready uploaded siblings;
+repeating that command repairs a failed Queue send.
 
 Cancellation invalidates the lease/token and fences later draft persistence.
 Already reviewed dishes are preserved. A remote OCR/model request already in

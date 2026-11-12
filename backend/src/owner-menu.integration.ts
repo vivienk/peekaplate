@@ -207,6 +207,33 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(await createDishRevision(runtime, actor, venue, input)).toEqual(first);
     expect(first.facts).toBeUndefined();
   });
+  it('replays an identical photo upload after approval without rewriting storage', async () => {
+    const id = crypto.randomUUID();
+    const fields = {
+      name: 'Fictional soup',
+      category: 'Soup',
+      priceAmount: '8',
+      priceCurrency: 'USD',
+    };
+    await save(id, fields);
+    const upload = image();
+    const put = vi.fn(async (_key: string, _bytes: ArrayBuffer) => {});
+    const photo = await storeDraftPhoto(runtime, actor, venue, id, upload, 'image/png', put);
+    await save(id, { ...fields, photoId: photo.id }, 1);
+    const approved = await approveDishDraftAtomic(runtime, actor, venue, id, {
+      commandId: crypto.randomUUID(),
+      expectedDraftVersion: 2,
+      confirmed: true,
+    });
+    expect(approved.publishedRevision.facts?.photoId).toBe(photo.id);
+    expect((await storeDraftPhoto(runtime, actor, venue, id, upload, 'image/png', put)).id).toBe(
+      photo.id,
+    );
+    expect(put).toHaveBeenCalledOnce();
+    await expect(
+      storeDraftPhoto(runtime, actor, venue, id, image(), 'image/png', put),
+    ).rejects.toMatchObject({ code: 'draft_not_editable' });
+  });
   it('retains reviewed facts through a legacy text-only edit instead of reopening draft fallback', async () => {
     const id = crypto.randomUUID();
     await save(id, {
@@ -412,6 +439,82 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
     expect(extractor).not.toHaveBeenCalled();
+  });
+  it('dispatches an uploaded sibling when a missing file is cancelled and repairs a failed dispatch', async () => {
+    const uploads = [image(), image()];
+    const group = await createUploadGroup(runtime, actor, venue, uploads);
+    await acceptUploadGroupFile(runtime, actor, venue, group.id, 0, uploads[0]!, async () => {});
+    const send = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('synthetic Queue unavailable'))
+      .mockResolvedValue(undefined);
+    const app = createApp({ verify: async () => actor, execute: vi.fn() });
+    const env = { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl!, INGESTION_QUEUE: { send } };
+    const commandId = crypto.randomUUID();
+    const request = () =>
+      app.request(
+        `https://test/venues/${venue}/menus/jobs/${group.jobs[1]!.id}/cancel`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandId }),
+        },
+        env,
+      );
+    expect((await request()).status).toBe(503);
+    expect((await request()).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map((call) => (call[0] as { jobId: string }).jobId)).toEqual([
+      group.jobs[0]!.id,
+      group.jobs[0]!.id,
+    ]);
+  });
+  it('persists URL provenance without changing first retrieval evidence on identical retries', async () => {
+    const upload = {
+      ...image(),
+      provenance: {
+        originalUrl: 'https://restaurant.example/menu',
+        finalUrl: 'https://cdn.example/menu.png',
+        retrievedAt: '2026-11-12T00:00:00.000Z',
+      },
+    };
+    const group = await createUploadGroup(runtime, actor, venue, [upload]);
+    expect(group.jobs[0]?.source_url).toBe(upload.provenance.finalUrl);
+    expect(group.jobs[0]?.source_provenance).toEqual(upload.provenance);
+    const again = await createUploadGroup(runtime, actor, venue, [
+      { ...upload, provenance: { ...upload.provenance, retrievedAt: '2026-11-12T00:01:00.000Z' } },
+    ]);
+    expect(again.jobs[0]?.id).toBe(group.jobs[0]?.id);
+    expect(again.jobs[0]?.source_provenance).toEqual(upload.provenance);
+  });
+  it('cancels the whole group atomically without dispatching uploaded siblings', async () => {
+    const uploads = [image(), image()];
+    const group = await createUploadGroup(runtime, actor, venue, uploads);
+    await acceptUploadGroupFile(runtime, actor, venue, group.id, 0, uploads[0]!, async () => {});
+    const send = vi.fn();
+    const app = createApp({ verify: async () => actor, execute: vi.fn() });
+    const commandId = crypto.randomUUID();
+    const request = () =>
+      app.request(
+        `https://test/venues/${venue}/menus/upload-groups/${group.id}/cancel`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandId }),
+        },
+        { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl!, INGESTION_QUEUE: { send } },
+      );
+    expect((await request()).status).toBe(200);
+    expect((await request()).status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+    const jobs = await admin.query(
+      'SELECT status,lease_generation::text FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND upload_group_id=$2',
+      [venue, group.id],
+    );
+    expect(jobs.rows).toEqual([
+      { status: 'cancelled', lease_generation: '1' },
+      { status: 'cancelled', lease_generation: '1' },
+    ]);
   });
   it('exposes console CORS without weakening anonymous/venue checks or permitting arbitrary origins', async () => {
     const app = createApp({ verify: async () => actor, execute: vi.fn() });

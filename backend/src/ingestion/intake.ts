@@ -13,7 +13,9 @@ import {
 } from './repository';
 import { readMenuUpload } from './upload';
 
-export type MenuUpload = Awaited<ReturnType<typeof readMenuUpload>>;
+export type MenuUpload = Awaited<ReturnType<typeof readMenuUpload>> & {
+  provenance?: { originalUrl: string; finalUrl: string; retrievedAt: string };
+};
 export function validateUploadSelection(
   files: readonly Pick<MenuUpload, 'sourceType' | 'sourceHash'>[],
 ) {
@@ -58,18 +60,28 @@ export async function materializeMenuUrl(url: string, key: string): Promise<Menu
     }),
   );
   await validateMenuPdf(upload);
-  return upload;
+  return {
+    ...upload,
+    provenance: { originalUrl: url, finalUrl: source.finalUrl, retrievedAt: source.retrievedAt },
+  };
 }
 
 export async function createUploadGroup(
   client: Client,
   actor: string,
   venue: string,
-  uploads: readonly Pick<MenuUpload, 'sourceType' | 'sourceHash' | 'idempotencyKey'>[],
+  uploads: readonly (Pick<MenuUpload, 'sourceType' | 'sourceHash' | 'idempotencyKey'> &
+    Pick<MenuUpload, 'provenance'>)[],
 ): Promise<{ id: string; jobs: MenuIngestionJobRow[] }> {
   validateUploadSelection(uploads);
   const key = uploads[0]!.idempotencyKey;
-  const manifest = uploads.map((upload) => ({ type: upload.sourceType, hash: upload.sourceHash }));
+  const manifest = uploads.map((upload) => ({
+    type: upload.sourceType,
+    hash: upload.sourceHash,
+    ...(upload.provenance
+      ? { originalUrl: upload.provenance.originalUrl, finalUrl: upload.provenance.finalUrl }
+      : {}),
+  }));
   return withOwnerMenuTransaction(client, actor, venue, async () => {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `upload-group:${venue}:${key}`,
@@ -97,14 +109,15 @@ export async function createUploadGroup(
           tenantId: venue,
           sourceType: upload.sourceType,
           sourceHash: upload.sourceHash,
+          sourceUrl: upload.provenance?.finalUrl ?? null,
           sourceStorageKey: `menu-ingestion/sources/${venue}/${jobId}/source`,
           idempotencyKey: `group:${id}:${index}`,
         },
         { inTransaction: true },
       );
       const updated = await client.query<MenuIngestionJobRow>(
-        'UPDATE app_private.menu_ingestion_jobs SET source_uploaded=CASE WHEN upload_group_id IS NULL THEN false ELSE source_uploaded END, upload_group_id=$3,upload_index=$4 WHERE tenant_id=$1 AND id=$2 RETURNING *',
-        [venue, job.id, id, index],
+        'UPDATE app_private.menu_ingestion_jobs SET source_uploaded=CASE WHEN upload_group_id IS NULL THEN false ELSE source_uploaded END, upload_group_id=$3,upload_index=$4,source_provenance=COALESCE(source_provenance,$5::jsonb) WHERE tenant_id=$1 AND id=$2 RETURNING *',
+        [venue, job.id, id, index, upload.provenance ? JSON.stringify(upload.provenance) : null],
       );
       jobs.push(updated.rows[0]!);
     }
@@ -173,6 +186,27 @@ export async function dispatchReadyUploadGroup(
       });
 }
 
+export async function readUploadGroup(
+  client: Client,
+  actor: string,
+  venue: string,
+  groupId: string,
+) {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const jobs = await client.query<MenuIngestionJobRow>(
+      'SELECT * FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND upload_group_id=$2 ORDER BY upload_index',
+      [venue, groupId],
+    );
+    return {
+      id: groupId,
+      jobs: jobs.rows,
+      ready:
+        jobs.rows.length > 0 &&
+        jobs.rows.every((job) => job.source_uploaded || job.status === 'cancelled'),
+    };
+  });
+}
+
 export async function changeMenuJob(
   client: Client,
   actor: string,
@@ -230,6 +264,58 @@ export async function changeMenuJob(
       ],
     );
     return changed.rows[0]!;
+  });
+}
+
+export async function cancelUploadGroup(
+  client: Client,
+  actor: string,
+  venue: string,
+  groupId: string,
+  commandId: string,
+) {
+  return withOwnerMenuTransaction(client, actor, venue, async () => {
+    const hash = createHash('sha256')
+      .update(JSON.stringify({ commandType: 'menu.group.cancel.v1', groupId }))
+      .digest('hex');
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `command:${venue}:${actor}:${commandId}`,
+    ]);
+    const receipt = await client.query<{ request_hash: string }>(
+      'SELECT request_hash FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, commandId],
+    );
+    if (receipt.rows[0] && receipt.rows[0].request_hash !== hash)
+      throw new IngestionError('command_conflict', 409);
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `upload-group-files:${venue}:${groupId}`,
+    ]);
+    const group = await client.query(
+      'SELECT id FROM app_private.menu_upload_group WHERE tenant_id=$1 AND id=$2',
+      [venue, groupId],
+    );
+    if (group.rowCount !== 1) throw new IngestionError('upload_group_not_found', 404);
+    await client.query(
+      'SELECT id FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND upload_group_id=$2 ORDER BY upload_index FOR UPDATE',
+      [venue, groupId],
+    );
+    if (!receipt.rows[0]) {
+      await client.query(
+        `UPDATE app_private.menu_ingestion_jobs SET status='cancelled',claim_token=NULL,locked_at=NULL,locked_by=NULL,lease_generation=lease_generation+1,finished_at=now()
+        WHERE tenant_id=$1 AND upload_group_id=$2 AND status IN('queued','running','incomplete')`,
+        [venue, groupId],
+      );
+      await client.query(
+        `INSERT INTO app_private.es_command(id,tenant_id,actor_id,command_type,idempotency_key,payload,request_hash,result)
+        VALUES($1,$2,$3,'menu.group.cancel.v1',$4,$5::jsonb,$6,$5::jsonb)`,
+        [randomUUID(), venue, actor, commandId, JSON.stringify({ groupId }), hash],
+      );
+    }
+    const jobs = await client.query<MenuIngestionJobRow>(
+      'SELECT * FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND upload_group_id=$2 ORDER BY upload_index',
+      [venue, groupId],
+    );
+    return { id: groupId, jobs: jobs.rows };
   });
 }
 
