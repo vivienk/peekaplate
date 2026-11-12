@@ -111,7 +111,7 @@ submission and fresh signup/confirmation remain manual acceptance steps.
 Hosted dashboard handoff remains unverified. Neither PR is merged or deployed.
 
 
-## Live email check — November 11, 2026
+## Earlier live recovery check — November 11, 2026
 
 The local console from PR146 at `d615a70` was tested against the existing staging
 Supabase Auth project and its configured Resend sender. This was not a hosted
@@ -157,3 +157,48 @@ account, verify unconfirmed sign-in is denied, confirm and sign in, then sign ou
 and request a password reset. Submit passwords yourself; verify old-password
 denial, new-password success, restoration, sign-out and consumed-link denial.
 No restaurant permission is granted automatically. Both PRs remain unmerged.
+
+## Current live signup and recovery acceptance - November 11, 2026
+
+The local console from stacked PR146 at `dd04c60` was tested with the real
+existing staging Supabase Auth service and Resend SMTP. A fresh Gmail alias
+outside the organization member list was used; the original linked staging
+account was preserved. This proves the tested identity/email journeys, not a
+hosted console release or dashboard/setup integration. The account holder
+entered/submitted passwords and accepted terms; the resulting application states
+and delivered emails were independently observed. Credentials and private
+recipient details are excluded from this record.
+
+| Live check | Result |
+| --- | --- |
+| Email provider enabled, public signup enabled, email confirmation required | PASS |
+| Fresh signup, without a tester-address allowlist | PASS |
+| Branded confirmation delivered in Gmail; logo loaded | PASS |
+| Correct password before confirmation is denied | PASS |
+| Confirmation link has the expected project, purpose and exact callback | PASS |
+| Confirmation completes; callback credentials removed | PASS |
+| Password sign-in succeeds after confirmation | PASS |
+| Ordinary entry reload restores the verified session | PASS |
+| Used confirmation link is denied without ending the existing sign-in | PASS |
+| Sign-out remains signed out after reload | PASS |
+| Branded recovery delivered to the fresh alias | PASS |
+| Recovery link opens the verified, purpose-bound reset form | PASS |
+| Password submission returns Password updated | PASS |
+| Old password is rejected; new password signs in | PASS |
+| Post-reset session restoration, used-reset-link denial and sign-out | PASS |
+
+Public signup settings and the adapter use the submitted email, with no
+restriction to the original tester's address. New teammates can use their own
+Gmail addresses in this local setup; each must confirm their address. Signup
+does not add them to the engineering organization or grant a restaurant role.
+
+Both template subjects/bodies were reopened and compared with the approved
+source. Gmail signup and recovery rendering passed. Desktop and 360 px browser
+previews have loaded logos and no horizontal overflow; they do not certify
+Outlook or a particular mobile email client. Actual time-expired-link waiting
+was not performed; consumed links were tested live.
+
+The QA session was signed out after verification. No accounts or linked records
+were deleted. Keep PR143 and stacked PR146 unmerged until dashboard/setup flow
+acceptance; a hosted console deployment, production acceptance and complete
+owner/dashboard navigation are not included in these PASS results.
