@@ -2751,3 +2751,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Automatic-entry camera test expected focus on the former manual trigger; updated to the visible summary. A concurrent Playwright run removed shared trace artifacts (ENOENT); rerun affected tests sequentially.
 
 - Follow-up: the saved-job reopen test retains its viewer instance and intentionally does not auto-open twice. Removed the unnecessary dismissal added during diagnosis; the earlier entry interruption occurred while Vite reloaded edited source. Final regressions run against stable files sequentially.
+
+- Automatic camera tests: GLB scenarios open the portal twice (initial 2.5D entry, then after preparing 3D). Updated cleanup assertions from one stopped camera stream to two; both streams must be released.

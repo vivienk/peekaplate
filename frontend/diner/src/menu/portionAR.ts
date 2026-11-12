@@ -56,6 +56,7 @@ export function bindPortionAR(
     let live = true;
     let busy = false;
     let tracked = false;
+    let xrSupported = false;
     let placed = false;
     let running = false;
     let session: XRSession | undefined;
@@ -224,6 +225,10 @@ export function bindPortionAR(
       rotation.value = '0';
       size.value = '100';
       changed();
+      if (!tracked) {
+        placeDish();
+        return;
+      }
       message.textContent = tracked
         ? 'Move your phone slowly over a table. Wait for the placement ring.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
@@ -244,7 +249,7 @@ export function bindPortionAR(
 
     const activate = () => {
       running = true;
-      start.hidden = true;
+      start.hidden = tracked || !xrSupported;
       place.hidden = false;
       place.disabled = tracked;
       resize();
@@ -256,16 +261,18 @@ export function bindPortionAR(
           reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
           if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
           place.disabled = !reticle.visible;
+          if (reticle.visible) placeDish();
         }
         renderer!.render(scene, camera);
       });
       message.textContent = tracked
-        ? 'Move your phone slowly over a table. Wait for the placement ring, then tap Place dish.'
+        ? 'Move your phone slowly over a table. The dish will appear when a table is detected.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     };
-    start.addEventListener('click', async () => {
+    const startCamera = async (useTracked = false) => {
       if (busy || !live) return;
       busy = true;
+      tracked = useTracked;
       start.disabled = true;
       try {
         if (!renderer) {
@@ -289,6 +296,9 @@ export function bindPortionAR(
             await next.end();
             return;
           }
+          stopCamera();
+          anchor.visible = false;
+          placed = false;
           session = next;
           session.addEventListener('end', close, { once: true });
           renderer.xr.enabled = true;
@@ -304,6 +314,8 @@ export function bindPortionAR(
           }
           session.addEventListener('select', placeDish);
         } else {
+          activate();
+          placeDish();
           const next = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: 'environment' } },
             audio: false,
@@ -319,7 +331,7 @@ export function bindPortionAR(
           for (const track of stream.getVideoTracks())
             track.addEventListener('ended', close, { once: true });
         }
-        activate();
+        if (tracked) activate();
       } catch {
         if (!live) return;
         stopCamera();
@@ -328,6 +340,8 @@ export function bindPortionAR(
           void session.end().catch(close);
         } else {
           tracked = false;
+          xrSupported = false;
+          start.hidden = false;
           start.textContent = 'Try camera preview';
           message.textContent =
             'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
@@ -336,7 +350,8 @@ export function bindPortionAR(
         busy = false;
         if (live) start.disabled = false;
       }
-    });
+    };
+    start.addEventListener('click', () => void startCamera(xrSupported && running));
 
     mode.addEventListener('click', () => {
       if (!model) return;
@@ -408,24 +423,21 @@ export function bindPortionAR(
         }
       })();
     }
+    // Camera preview needs no immersive-session gesture: show the dish immediately,
+    // then let the browser handle permission. Surface tracking remains an optional upgrade.
+    start.textContent = 'Try camera preview';
+    if (isSecureContext && navigator.mediaDevices?.getUserMedia) void startCamera();
+    else
+      message.textContent =
+        'Camera access needs a secure connection and a supported browser. Back returns to the 2.5D preview.';
     void (navigator.xr?.isSessionSupported('immersive-ar') ?? Promise.resolve(false))
       .then((supported) => {
-        if (!live) return;
-        tracked = supported;
-        start.textContent = supported ? 'Start table AR' : 'Start camera preview';
-        start.disabled = !isSecureContext || (!supported && !navigator.mediaDevices?.getUserMedia);
-        message.textContent = start.disabled
-          ? 'Camera access needs a secure connection and a supported browser. Back returns to the 2.5D preview.'
-          : supported
-            ? 'Use your camera to place the dish on a detected table.'
-            : 'Surface-tracking AR is unavailable here. Camera preview supports manual positioning only.';
+        if (!live || !supported) return;
+        xrSupported = true;
+        start.textContent = 'Start table AR';
+        start.hidden = false;
       })
-      .catch(() => {
-        if (!live) return;
-        tracked = false;
-        start.disabled = !navigator.mediaDevices?.getUserMedia;
-        message.textContent = 'Table AR is unavailable. Try a manual camera preview.';
-      });
+      .catch(() => {});
   };
   open.addEventListener('click', show);
   return {

@@ -690,10 +690,7 @@ test('camera portal positions the exact cutout, rotates, resets and releases cam
   await page.setViewportSize({ width: 390, height: 844 });
   await cameraFixture(page);
   await openPortal(page);
-  expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
-  await expect(page.locator('.pp-ar__message')).toContainText('manual positioning only');
-  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
-  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).cameraTest.calls)).toBe(1);
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
   await page.screenshot({ path: 'test-results/ar-camera-mobile.png' });
@@ -714,7 +711,6 @@ test('camera denial keeps the portal dismissible and preserves 2.5D and preview 
   await cameraFixture(page, 'deny');
   await openPortal(page);
   const length = await page.evaluate(() => history.length);
-  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
   await expect(page.locator('.pp-ar__message')).toContainText('could not start');
   await page.keyboard.press('Escape');
   await expect(page.locator('.pp-ar')).toHaveCount(0);
@@ -728,7 +724,8 @@ test('closing portal during camera permission stops a late stream without revivi
 }) => {
   await cameraFixture(page, 'pending');
   await openPortal(page);
-  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Reposition', exact: true })).toBeVisible();
+  await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
   await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await page.evaluate(() => (window as any).resolveCamera());
   await expect.poll(() => page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
@@ -836,8 +833,6 @@ for (const fail of [false, true]) {
       }),
     );
     await page.getByRole('button', { name: 'View on your table', exact: true }).click();
-    await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
-    await page.getByRole('button', { name: 'Place dish', exact: true }).click();
     if (fail) {
       await expect(
         page.getByRole('button', { name: '3D unavailable · showing 2.5D', exact: true }),
@@ -854,7 +849,7 @@ for (const fail of [false, true]) {
     await expect(page.locator('.pp-ar')).toHaveAttribute('data-visual', '2.5d');
     await page.screenshot({ path: `test-results/ar-camera-${fail ? 'fallback' : 'switch'}.png` });
     await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
-    expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+    expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(2);
   });
 }
 
@@ -881,10 +876,9 @@ test('unavailable table session falls back to manual camera and browser Back sto
     'dom-overlay',
   ]);
   await page.getByRole('button', { name: 'Try camera preview', exact: true }).click();
-  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
   await page.goBack();
   await expect(page.locator('.pp-ar')).toHaveCount(0);
-  expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+  expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(2);
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeVisible();
 });
 
@@ -938,13 +932,10 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page, true);
   await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Start camera preview', exact: true }),
-  ).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Reposition', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Place dish', exact: true })).toBeHidden();
   await page.screenshot({ path: 'test-results/automatic-ar-portal.png' });
-  expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
-  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
-  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).cameraTest.calls)).toBe(1);
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
