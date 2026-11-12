@@ -159,7 +159,7 @@ Each contributor installs and authenticates their own Claude or Codex client and
 
 ## Optional product analytics
 
-See [PostHog setup and evidence limits](docs/posthog.md) for consent, separate staging/production build variables, taxonomy mapping, validation and manual project setup. Tracking is disabled until configured; current shells do not publish menu or owner-report events.
+See [PostHog setup and evidence limits](docs/posthog.md) for consent, staging/production configuration, taxonomy and validation. Diner menu/detail and Save controls use the shared consent gate for independent PostHog and canonical dispatch. The [diner tracking staging release](docs/diner-tracking-staging.md) promotes the reviewed PR78 triggers; real destination readback and report reconciliation remain separate acceptance work. Owner-report events are not implied by this diner release.
 
 Python processing uses `uv sync --project processing --extra service --frozen` and
 `uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`.
