@@ -121,11 +121,33 @@ describe('fixture menu source', () => {
     expect(complete(menu, DISH.longName).name.length).toBeGreaterThan(80);
   });
 
-  it('labels every placeholder image as synthetic', async () => {
+  it('labels every image as synthetic: Figma sample photos or placeholders', async () => {
     for (const dish of completeDishes(await loadMenu('edge-cases'))) {
       if (!dish.images) continue;
       expect(dish.images.card.alt).toMatch(/synthetic fixture/);
-      expect(dish.images.card.url).toMatch(/^data:image\/svg\+xml,/);
+      expect(dish.images.card.url).toMatch(/^data:image\/svg\+xml,|\.webp($|\?)/);
+    }
+  });
+
+  it('uses the Figma sample photo for the six dishes drawn in the design', async () => {
+    const dishes = new Map(
+      [
+        ...completeDishes(await loadMenu('demo')),
+        ...completeDishes(await loadMenu('edge-cases')),
+      ].map((d) => [d.dishId, d]),
+    );
+    for (const id of [
+      DISH.avocadoToast,
+      DISH.harvestPowerBowl,
+      DISH.eggsBenedict,
+      DISH.gardenAvocadoSalad,
+      DISH.berryPancakeStack,
+      DISH.salmonPokeBowl,
+    ]) {
+      const images = dishes.get(id)?.images;
+      expect(images, id).toBeTruthy();
+      expect(images?.card.url).toMatch(/\.webp($|\?)/);
+      expect(images?.card.alt).toMatch(/sample photo/);
     }
   });
 

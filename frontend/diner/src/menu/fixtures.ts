@@ -1,10 +1,17 @@
 // Synthetic fixtures for S3-DIN-01.1. Dish names follow Rania's Figma frames; every value is
-// invented test data, not an approved restaurant menu, and images are labelled placeholders, not
-// food photos. Allergens use the approved P0 code values; the adapter turns them into labels.
+// invented test data, not an approved restaurant menu. Six dishes drawn in Rania's Figma menu frames
+// use her dish photos from that file (preview art, not a restaurant's photos); Brioche French Toast
+// stays the missing-image case and every other dish keeps a labelled placeholder. Allergens use the approved P0 code values; the adapter turns them into labels.
 // Ingredient names match the Figma icon set (./icons), except NO_ICON_INGREDIENT and dishes the
 // icon set does not cover, so screens can test both layouts.
 import { toMenu } from './adapter';
+import avocadoToastPhoto from './fixture-assets/avocado-toast.webp';
+import berryPancakeStackPhoto from './fixture-assets/berry-pancake-stack.webp';
+import classicEggsBenedictPhoto from './fixture-assets/classic-eggs-benedict.webp';
 import logo from './fixture-assets/ember-and-stone-logo.png';
+import gardenAvocadoSaladPhoto from './fixture-assets/garden-avocado-salad.webp';
+import harvestPowerBowlPhoto from './fixture-assets/harvest-power-bowl.webp';
+import salmonPokeBowlPhoto from './fixture-assets/salmon-poke-bowl.webp';
 import type { MenuLoadResult, MenuSource } from './types';
 import type { WireCompleteDish, WireDish, WireImage, WireMenuBundle } from './wire';
 
@@ -67,9 +74,15 @@ function dish(
   };
 }
 
-const images = (label: string) => ({
-  card: placeholderImage(label),
-  detail: placeholderImage(label),
+// Dish photos exported from Rania's Figma menu frames ("Image (<dish>)", e.g. node 20:1273),
+// resized to 640px WebP. They are design-file sample art, labelled as such in the alt text.
+function samplePhoto(url: string, label: string): WireImage {
+  return { url, width: 640, height: 640, alt: `${label} (sample photo, synthetic fixture)` };
+}
+
+const images = (label: string, photo?: string) => ({
+  card: photo ? samplePhoto(photo, label) : placeholderImage(label),
+  detail: photo ? samplePhoto(photo, label) : placeholderImage(label),
 });
 const usd = (amount: string) => ({ amount, currency: 'USD' });
 
@@ -89,7 +102,7 @@ const avocadoToast = dish(1, {
   ],
   allergens: ['wheat', 'egg'],
   dietary: ['Vegetarian'],
-  images: images('Avocado Toast'),
+  images: images('Avocado Toast', avocadoToastPhoto),
 });
 const harvestPowerBowl = dish(2, {
   name: 'Harvest Power Bowl',
@@ -98,7 +111,7 @@ const harvestPowerBowl = dish(2, {
   ingredients: ['Quinoa', 'Grilled chicken', 'Sweet potato', 'Avocado', 'Kale'],
   allergens: [],
   dietary: ['Gluten-free'],
-  images: images('Harvest Power Bowl'),
+  images: images('Harvest Power Bowl', harvestPowerBowlPhoto),
 });
 const eggsBenedict = dish(3, {
   name: 'Classic Eggs Benedict',
@@ -115,7 +128,7 @@ const eggsBenedict = dish(3, {
   ],
   allergens: ['milk', 'egg', 'wheat'],
   dietary: [],
-  images: images('Classic Eggs Benedict'),
+  images: images('Classic Eggs Benedict', classicEggsBenedictPhoto),
 });
 
 // Edge cases listed in the DIN-01 ticket.
@@ -126,7 +139,7 @@ const manyChips = dish(4, {
   ingredients: ['Mixed greens', 'Avocado', 'Walnuts', 'Peanut dressing', 'Tofu croutons'],
   allergens: ['nuts', 'peanut', 'soy', 'sesame', NO_ICON_ALLERGEN],
   dietary: ['Vegan', 'Vegetarian'],
-  images: images('Garden Avocado Salad'),
+  images: images('Garden Avocado Salad', gardenAvocadoSaladPhoto),
 });
 // The ticket's conflict case, reworded to Wheat with Gluten-free now the P0 list is approved.
 const glutenConflict = dish(5, {
@@ -136,7 +149,7 @@ const glutenConflict = dish(5, {
   ingredients: ['Buttermilk pancakes', 'Mixed berries', 'Maple syrup', 'Butter'],
   allergens: ['wheat', 'milk', 'egg'],
   dietary: ['Vegetarian', 'Gluten-free'],
-  images: images('Berry Pancake Stack'),
+  images: images('Berry Pancake Stack', berryPancakeStackPhoto),
 });
 const salmonPokeBowl = dish(6, {
   name: 'Salmon Poke Bowl',
@@ -145,7 +158,7 @@ const salmonPokeBowl = dish(6, {
   ingredients: ['Salmon', 'Sushi rice', 'Edamame', 'Cucumber', 'Pickled ginger'],
   allergens: ['fish', 'soy', 'sesame'],
   dietary: [],
-  images: images('Salmon Poke Bowl'),
+  images: images('Salmon Poke Bowl', salmonPokeBowlPhoto),
 });
 const missingImage = dish(7, {
   name: 'Brioche French Toast',
