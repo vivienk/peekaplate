@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+**Owner authentication (integration in progress, PR143 → PR146):** read the
+[owner auth guide](owner-auth.md) for Supabase/Resend email, exact confirmation
+and reset URLs, public-only browser config and the remaining dashboard handoff.
+The PR previews are synthetic; real credentials belong only on the configured
+owner auth entry. These PRs stay unmerged until the owner/dashboard flow is ready.
+
 Latest diner integration: [published-menu connection](diner-connection.md). It
 explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
 configuration and reused public hosting. Its release acceptance record identifies

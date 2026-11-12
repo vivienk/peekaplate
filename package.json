@@ -18,7 +18,7 @@
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "test": "vitest run && node --test scripts/*.test.mjs",
     "eval:owner-ai": "node scripts/evaluate-owner-ai.mjs",
-    "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts",
+    "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts && playwright test --config playwright.auth.config.ts",
     "test:db": "node scripts/test-db.mjs",
     "context:check": "node scripts/context.mjs check",
     "context:refresh": "node scripts/context.mjs refresh",

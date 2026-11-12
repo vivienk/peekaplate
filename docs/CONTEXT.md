@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations demo only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude it. Invalid fields preserve error styling and gain a distinct keyboard-focus outline. Owner sign-in and recovery UI (src/auth: E1/S01-S04) calls only OwnerAuthService, unconnected (unavailable) until the provider is wired; preview-only synthetic owner-sign-in demo.",
+      "summary": "React/Vite console foundations and owner auth screens. The separate owner-auth.html entry uses pinned Supabase SDK PKCE with explicit public config and exact trusted origins; neutral E1, signup confirmation, verified sign-in, restoration and local-device sign-out. Callback removes credentials, rejects malformed input and has no analytics. Preview demos stay synthetic and provider-disabled. Auth does not grant venue membership or invent setup progress; actual dashboard/setup API handoff and hosted email/release acceptance remain pending. PR146 extends the same adapter with neutral reset emails and password updates permitted only after a current PKCE recovery exchange. Direct/reset/confirmation-purpose links cannot authorize password changes; successful update ends the recovery session and returns to sign-in.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -236,7 +236,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/auth.css",
         "frontend/console/src/auth/demo.tsx",
         "tests/e2e/owner-auth.spec.ts",
-        "tests/e2e/owner-recovery.spec.ts"
+        "frontend/console/owner-auth.html",
+        "frontend/console/auth-confirm.html",
+        "frontend/console/src/auth/supabase-auth.ts",
+        "frontend/console/src/auth/supabase-auth.test.tsx",
+        "frontend/console/src/auth/callback.ts",
+        "frontend/console/src/auth/callback.test.tsx",
+        "frontend/console/src/auth/live.tsx",
+        "playwright.auth.config.ts",
+        "tests/e2e/owner-auth-provider.spec.ts",
+        "docs/owner-auth.md",
+        "tests/e2e/owner-recovery.spec.ts",
+        "frontend/console/auth-reset.html",
+        "frontend/console/src/auth/recovery-provider.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -246,7 +258,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "71fd69db5fa0991a5af0f1cc7b1131cccbe1742a4bf6997cbfa46bece0dea63f"
+      "sourceFingerprint": "f0cdb9f428e376b596ff89164d6ef15e1a6fa02f1c443b431236f00c96a375e8"
     },
     {
       "id": "backend",
@@ -382,7 +394,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d7ed42cb624dd53cb596dffcadb567acc8cc08bd0557247de4ace4dcb94718bf"
+      "sourceFingerprint": "8bf07b95e2c3490495f25c6d93e87fd24a6d19cefabb2624bbcb5f68e1616684"
     },
     {
       "id": "database",
@@ -512,7 +524,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "5cd946c2c800cf14dcdb539c522eacbeb2d451c2018ca4a0ea395c7e6f72285f"
+      "sourceFingerprint": "8a55a551dd6db908eea611dbed5168b9f645b57894669f47e5a4391cea5f9513"
     },
     {
       "id": "agents",
@@ -709,24 +721,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-10",
       "modules": [
         "backend",
-        "processing",
-        "delivery"
-      ],
-      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
-      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
-        "diner"
-      ],
-      "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
-      "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
-        "backend",
         "delivery"
       ],
       "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
@@ -814,6 +808,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR143 provider integration preserves synthetic demos. Real SDK unit/HTTP/browser checks cover neutral email entry, PKCE callbacks, user verification, restoration and sign-out. The current Supabase Developer role cannot edit the empty redirect allowlist; Vivien is configuring exact staging/local callbacks. Email recipient and credentials are excluded from shared evidence.",
+      "sources": [
+        "frontend/console/src/auth/supabase-auth.ts",
+        "frontend/console/src/auth/live.tsx",
+        "docs/owner-auth.md"
+      ],
+      "next": "Keep PR143 and stacked PR146 unmerged until dashboard/setup flow is connected; finish actual email confirmation/recovery tests and record final independent review. No deployment or tenant grant."
+    },
+    {
+      "date": "2026-11-11",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR146 preserves PR143 provider integration and adds neutral recovery email, current-PKCE recovery authorization, provider weak/same-password errors and an honest sign-out-pending result. Real SDK fixtures cover wrong purpose, missing/reused/expired codes and retaining an unrelated existing session. Chromium verifies same-browser second-tab recovery and one password update followed by sign-in.",
+      "sources": [
+        "frontend/console/src/auth/supabase-auth.ts",
+        "frontend/console/src/auth/live.tsx",
+        "tests/e2e/owner-auth-provider.spec.ts"
+      ],
+      "next": "Complete actual Resend delivery/confirmation/reset checks after Vivien saves exact redirects. Keep both auth PRs draft/unmerged until real owner setup/dashboard handoff is connected. No venue grants, hosted release or production activation."
     }
   ]
 }

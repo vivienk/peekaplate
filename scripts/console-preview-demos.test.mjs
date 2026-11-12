@@ -42,6 +42,9 @@ test('a normal console build contains no demo page', async (t) => {
   const dir = await build(t, false);
   const files = await readdir(dir);
   assert.ok(files.includes('index.html'));
+  assert.ok(files.includes('owner-auth.html'));
+  assert.ok(files.includes('auth-confirm.html'));
+  assert.ok(files.includes('auth-reset.html'));
   assert.ok(!files.includes('foundations.html'));
   assert.ok(!files.includes('owner-sign-in.html'));
   for (const asset of await readdir(join(dir, 'assets'))) {
@@ -52,6 +55,9 @@ test('a normal console build contains no demo page', async (t) => {
 test('a preview build adds the demo page, labelled synthetic, noindex and without analytics', async (t) => {
   const dir = await build(t, true);
   const files = await readdir(dir);
+  assert.ok(!files.includes('owner-auth.html'));
+  assert.ok(!files.includes('auth-confirm.html'));
+  assert.ok(!files.includes('auth-reset.html'));
   assert.ok(files.includes('index.html'));
   assert.ok(files.includes('foundations.html'));
   const html = await readFile(join(dir, 'foundations.html'), 'utf8');

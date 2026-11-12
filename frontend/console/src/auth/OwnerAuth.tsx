@@ -43,6 +43,7 @@ export type AuthStep =
   // S04, opened from the reset email: the form, Password updated, and This reset link can't be used.
   | 'reset'
   | 'reset-done'
+  | 'reset-signout-pending'
   | 'reset-invalid';
 
 // Result screens show no logo (Figma "Check your email", "Password updated", "link can't be used").
@@ -50,6 +51,7 @@ const WITHOUT_BRAND: readonly AuthStep[] = [
   'confirm-email',
   'forgot-sent',
   'reset-done',
+  'reset-signout-pending',
   'reset-invalid',
 ];
 
@@ -162,8 +164,14 @@ export function OwnerAuth({
             onRoute={go}
           />
         )}
-        {step === 'reset-done' && (
-          <ResetDoneStep key="reset-done" email={email} focusHeading={moved} onRoute={go} />
+        {(step === 'reset-done' || step === 'reset-signout-pending') && (
+          <ResetDoneStep
+            key="reset-done"
+            email={email}
+            focusHeading={moved}
+            onRoute={go}
+            signOutPending={step === 'reset-signout-pending'}
+          />
         )}
         {step === 'reset-invalid' && (
           <ResetInvalidStep key="reset-invalid" email={email} focusHeading={moved} onRoute={go} />
@@ -270,7 +278,8 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
     setBanner(null);
     const result = await run(() => service.checkEmail(address), { kind: 'failed' as const });
     if (!result) return;
-    if (result.kind === 'existing_account') onRoute('signin', address);
+    if (result.kind === 'existing_account' || result.kind === 'continue_to_sign_in')
+      onRoute('signin', address);
     else if (result.kind === 'new_account') onRoute('create', address);
     else if (result.kind === 'rate_limited') {
       cooldown.start(result);
@@ -281,7 +290,7 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   return (
     <>
       <StepHeader heading={heading} title="Welcome to PeekaPlate">
-        Enter your work email to get started. We’ll take you to the right next step.
+        Enter your work email, then sign in or create an account.
       </StepHeader>
       {banner && <ErrorBanner copy={banner} />}
       <form className="pp-auth__form" noValidate onSubmit={submit}>
@@ -367,6 +376,7 @@ function CreateStep({
     if (!result) return;
     if (result.kind === 'created') onCreated();
     else if (result.kind === 'confirmation_required') onRoute('confirm-email');
+    else if (result.kind === 'weak_password') setBanner(BANNERS.weakPassword);
     else if (result.kind === 'account_exists') setBanner('exists');
     else if (result.kind === 'rate_limited') {
       cooldown.start(result);
@@ -620,8 +630,9 @@ function ConfirmEmailStep({
         </>
       }
     >
-      We sent a confirmation link to <strong>{email}</strong>. Open it to finish creating your
-      account. Check your inbox and spam folder.
+      If this address can be registered, a confirmation link will arrive at <strong>{email}</strong>
+      . Open it in this browser to finish creating your account. Already registered? Sign in
+      instead. Check your inbox and spam folder.
     </StatusPanel>
   );
 }
@@ -829,8 +840,18 @@ function ResetStep({ email, focusHeading, service, onRoute }: StepProps) {
     setBanner(null);
     const result = await run(() => service.resetPassword(password), { kind: 'failed' as const });
     if (!result) return;
-    if (result.kind === 'updated') onRoute('reset-done', result.email ?? email);
+    if (result.kind === 'updated')
+      onRoute(
+        result.signOutPending ? 'reset-signout-pending' : 'reset-done',
+        result.email ?? email,
+      );
     else if (result.kind === 'invalid_link') onRoute('reset-invalid');
+    else if (result.kind === 'weak_password') setBanner(BANNERS.weakPassword);
+    else if (result.kind === 'same_password')
+      setBanner({
+        title: 'Choose a different password',
+        body: 'Your new password must differ from the current one.',
+      });
     else if (result.kind === 'rate_limited') {
       cooldown.start(result);
       setBanner(rateLimitedBanner(result.retryAfterSeconds));
@@ -881,7 +902,12 @@ type ResultStepProps = {
 };
 
 // S04 Password updated. The owner is not signed in automatically; Sign in opens S02.
-function ResetDoneStep({ email, focusHeading, onRoute }: ResultStepProps) {
+function ResetDoneStep({
+  email,
+  focusHeading,
+  onRoute,
+  signOutPending = false,
+}: ResultStepProps & { signOutPending?: boolean }) {
   const heading = useHeadingFocus(focusHeading);
   return (
     <StatusPanel
@@ -895,6 +921,12 @@ function ResetDoneStep({ email, focusHeading, onRoute }: ResultStepProps) {
       }
     >
       Your password has been changed. Sign in with your new password.
+      {signOutPending && (
+        <span role="alert">
+          {' '}
+          We could not confirm server sign-out. Close this page, then sign in again.
+        </span>
+      )}
     </StatusPanel>
   );
 }

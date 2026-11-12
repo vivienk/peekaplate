@@ -2767,3 +2767,8 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 ```
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
