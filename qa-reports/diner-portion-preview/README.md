@@ -10,6 +10,21 @@ View Portion shell. Four state categories and Back/retry navigation are preserve
 | Original-photo fallback | Failed / retry |
 | ![Photo fallback](fallback.png) | ![Failed](failed.png) |
 
+## Exact original image correction
+
+The earlier demo re-encoded the cutout and omitted the generated presentation.
+The local selector now uses the exact prior PNGs, with byte hashes checked in the browser.
+Generated presentation is the default; Original cutout is selectable above the stage.
+Both remain needs-review and publication-ineligible, excluded from production builds.
+
+| Generated presentation | Original cutout |
+| --- | --- |
+| ![Generated](generated.png) | ![Cutout](cutout.png) |
+
+Latest correction checks: PASS `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`
+(52/52); PASS `pnpm verify lint typecheck build`; PASS exact-asset and selector exclusion
+from production dist. The broader unit/script results below predate this asset correction.
+
 ## Implemented behavior
 
 - Warm full-width square stage, rounded corners, radial gradient and contained cutout
@@ -27,7 +42,7 @@ View Portion shell. Four state categories and Back/retry navigation are preserve
 
 ## Verification
 
-- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —51/51 in one clean run. Includes compare/reset, exact motion/timing, original-photo failure, integrity, reduced motion, cancellation, navigation and four screenshots.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2` —52/52 in the latest clean run. Includes compare/reset, exact motion/timing, original-photo failure, integrity, reduced motion, cancellation, navigation and four screenshots.
 - PASS: `pnpm verify lint typecheck test build` —1,214 Vitest tests passed,4 skipped;74 script tests passed; app builds and Worker dry-run passed.
 - PASS: final `pnpm verify lint typecheck build context:check docs:check` after layout corrections.
 - PASS: `git diff --check`; production JS excludes DEV fixture host and WebGL renderer.

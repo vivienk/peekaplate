@@ -2656,3 +2656,7 @@ recorded SHA-256 and dimensions. Regression: `local review renders the exact ori
 PNGs and switches without adding history` in tests/e2e/portion.spec.ts.
 The first browser run could not bind localhost under restricted permissions (EPERM);
 rerun with permission for the local test server. No application failure inferred.
+
+Verification invocation correction: `context:refresh` is a standalone pnpm script,
+not a `pnpm verify` check. The invalid combined invocation stopped before running checks;
+reran lint/typecheck/build through verify and refresh separately.

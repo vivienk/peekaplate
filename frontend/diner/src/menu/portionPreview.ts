@@ -40,7 +40,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
   let visual: 'cutout' | 'generated' =
-    new URLSearchParams(location.search).get('demoVisual') === 'cutout' ? 'cutout' : 'generated';
+    import.meta.env.DEV && new URLSearchParams(location.search).get('demoVisual') === 'cutout'
+      ? 'cutout'
+      : 'generated';
   let visualSelect: HTMLSelectElement | undefined;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
