@@ -2742,3 +2742,12 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Automatic portal review found focus returned to a hidden button inside collapsed Preview controls. Dismissal now focuses the visible summary when collapsed, and the trigger when expanded; automatic-entry regression asserts focus restoration.
 
 - The existing 3D reopen test assumed View Portion returned directly to inline controls; automatic portal entry now intentionally covers them. Updated the reopen step to dismiss the portal before checking the saved job.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T18:16:31.736Z","exitCode":1}
+```
+
+- Automatic-entry camera test expected focus on the former manual trigger; updated to the visible summary. A concurrent Playwright run removed shared trace artifacts (ENOENT); rerun affected tests sequentially.
+
+- Follow-up: the saved-job reopen test retains its viewer instance and intentionally does not auto-open twice. Removed the unnecessary dismissal added during diagnosis; the earlier entry interruption occurred while Vite reloaded edited source. Final regressions run against stable files sequentially.

@@ -590,7 +590,6 @@ test('local 3D ready switches, resets, survives reopen without duplicate create 
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.locator('model-viewer')).toHaveCount(0);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
-  await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await page.getByRole('button', { name: 'Check 3D job', exact: true }).click();
   await expect(page.locator('model-viewer')).toBeVisible();
   expect(creates()).toBe(1);
@@ -706,7 +705,7 @@ test('camera portal positions the exact cutout, rotates, resets and releases cam
   await expect(page.locator('.pp-ar')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
   await expect(page.locator('.pp-portion__css')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'View on your table', exact: true })).toBeFocused();
+  await expect(page.getByText('Preview controls', { exact: true })).toBeFocused();
 });
 
 test('camera denial keeps the portal dismissible and preserves 2.5D and preview history', async ({
