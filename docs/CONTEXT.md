@@ -538,7 +538,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo modes keep ocr, default ocr_image and ungrounded image-only; pipeline3/schema2 and legacy1/2 remain compatible. Bounded wrapped titles/columns and corroborated text/geometry sections permit only complete price groups; conflicts, crossing/unclaimed cells and unresolved repeats abstain. Whole-entry guards and narrow name/footer views never rewrite source. Atomic assembly preserves exact fractional page/index/literal joins in existing candidate-ID segment metadata; SourceSpan/TS schemas and legacy empty-field omission stay unchanged. Private PR25 cutout-to-Tripo CLI verifies exact source hashes, persists resumable task IDs, blocks ambiguous resubmission and retains fallback images. GLB outputs stay needs-review/ineligible; live generation is not tested. Originals stay unvalidated. Opt-in OCR recovery validates failed Engine3 pages and caps1–4 single attempts, stopping on failure. Selected-page model recovery preflights1–4 requests, retains history/incomplete coverage and never merges old candidates. Defaults/queues stay unchanged. Measured gains are modest; broad layout recall, fresh-provider, consumer and human acceptance remain unverified.",
+      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible; live generation is not tested.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -626,7 +626,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "afa65c7c4e5294a5ed18c6b93b782ae654cff17a5bdf1ccfd5cab2db55efc288"
+      "sourceFingerprint": "cae96bb7571778e5c4da1a122372a28e51a0801f536ba6038cf24d6e72e7a61a"
     },
     {
       "id": "assets",

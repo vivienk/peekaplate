@@ -98,3 +98,16 @@ and malformed/external-resource model rejection. A triangle fixture is not a gen
 The actual current cutout was prepared locally without network calls. Live Tripo generation,
 provider billing, returned dish quality, phone performance and production publication are
 **NOT RUN**, as requested (no live key). Local review is not production acceptance.
+
+### Local results — November 12, 2026
+
+- PASS: focused processing suite (`test_assets test_spatial test_presentation
+  test_generate_model test_review_preview test_diner_demo`) — 62 tests.
+- PASS: `pnpm verify lint typecheck` and `pnpm verify context:check docs:check`.
+- PASS: actual existing cutout preparation, preserving source hash and dish identity.
+- PASS: browser smoke test with a clearly labelled synthetic triangle GLB: model loaded,
+  source comparison and model return worked, reset remained available, no console errors.
+- NOT RUN: live Tripo submission and real generated dish review, per the no-live-key instruction.
+
+The prepared actual-input job is outside the repository in the local outputs directory;
+it is `prepared` with `task_id: null`, not a generated 3D result.

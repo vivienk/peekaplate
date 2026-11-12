@@ -2685,3 +2685,11 @@ mock provider/task responses and synthetic GLB geometry cannot establish live di
 fidelity, billing or provider availability. Submission uncertainty is persisted before
 any retry and requires reconciliation, preventing automatic duplicate billable jobs.
 Current local source preparation verifies the original PR25 PNG bytes and identity.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T08:22:00.870Z","exitCode":1}
+```
+
+Context validation initially rejected an overlong processing summary; shortened the
+bounded summary while retaining the existing OCR/recovery and new private Tripo scope.
