@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+**Owner menu backend:** [upload, processing and Add Dish handoff](owner-menu-workspace.md)
+lists the saved group/file APIs, draft/photo save-resume, cancel/retry and explicit
+owner confirmation. It reuses the ingestion/review pipeline and private R2; no
+new browser DB access is needed. Ehab's S06–S09 screen wiring remains his slice.
+The handoff separates local API/DB evidence from hosted activation and UI acceptance.
+
 Latest diner integration: [published-menu connection](diner-connection.md). It
 explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
 configuration and reused public hosting. Its release acceptance record identifies

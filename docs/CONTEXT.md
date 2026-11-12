@@ -51,7 +51,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.tampered-name.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
-        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json"
+        "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
+        "packages/contracts/src/owner-menu.ts",
+        "packages/contracts/src/owner-menu.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -59,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "9d8f423771bf2b136f52d89c08a034223a5bd3fe1a6a43aab2173f5602efcb88"
+      "sourceFingerprint": "636e7fd4f528ac0c641cd35791bcef114b102264207eacfb4a6d16bf62350d45"
     },
     {
       "id": "tokens",
@@ -227,7 +229,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staging/local authenticated PDF/PNG/JPEG upload verifies current membership before bytes and locks membership through idempotent job creation. Server derives source hash/key; private storage succeeds before dispatch. Existing review/publication/report APIs remain. Extraction V1 transport preserves vision metadata and bounded private review artifacts; hosted release acceptance is separate.",
+      "summary": "Staff JWT and current tenant membership protect commands, publication, extraction/review and synthetic-source owner reports. Owner workspace adds versioned manual drafts/private photos, ordered verified uploads, source-ready claims, URL provenance, fenced cancel/retry and retained-report review bootstrap. Corrected facts freeze at approval; public images/content still require independent approval. S06–S09 UI connection and auth143/146 remain separate. Hosted acceptance is recorded in the owner workspace guide.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -328,7 +330,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/s4-res-bundle-producer.md",
         "docs/owner-report-staging.md",
         "backend/src/ingestion/upload.ts",
-        "backend/src/ingestion/upload.test.ts"
+        "backend/src/ingestion/upload.test.ts",
+        "backend/src/staff-venue.ts",
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu.integration.ts",
+        "backend/src/ingestion/intake.ts",
+        "backend/src/ingestion/intake.test.ts",
+        "backend/src/ingestion/intake.source.test.ts",
+        "backend/src/ingestion/pdf-fixture.ts",
+        "backend/src/ingestion/review-bootstrap.ts",
+        "docs/owner-menu-workspace.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -341,7 +353,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c2c4a71024b7bfe705a7e4f570181470487fe7a7e21510c2d17af18fee264906"
+      "sourceFingerprint": "d2ff011193f98360fd6ecb598e90eb475fcca72b0f62a686dbf7c8cf6fde5203"
     },
     {
       "id": "database",
@@ -369,7 +381,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/staff.sql",
         "tests/db/team-analytics.sql",
         "migrations/20261030120000_review_candidate_persistence.sql",
-        "tests/db/review_persistence.sql"
+        "tests/db/review_persistence.sql",
+        "migrations/20261112010000_owner_menu_workspace.sql",
+        "tests/db/owner_menu_workspace.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -380,7 +394,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "76a55138ba95d21291f384366121fbf0b2c41794e96288b0c4268822a51c4188"
+      "sourceFingerprint": "0846016d62a8a9f14aa86ad2704e99ae603977098c2fad6b062cf25685e8ebc5"
     },
     {
       "id": "measurement",
@@ -461,7 +475,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "4c1a462327b649fa6cadf9044003985a87a217d5b08cc50dc6fc2c56ea8a1253"
+      "sourceFingerprint": "ed2b53df8a91f8a5f7c942e47dd5c78ba0f0342ea0b0acd2b86cbfa3152cf465"
     },
     {
       "id": "agents",
@@ -651,15 +665,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-09",
-      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
-    },
-    {
-      "date": "2026-11-09",
       "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
       "modules": [
         "backend",
@@ -743,6 +748,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
       "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "backend",
+        "contracts",
+        "database"
+      ],
+      "summary": "Owner menu workspace reuses ingestion, R2 and publication boundaries. Added explicit owner-entered working drafts, private photo ownership, approved revision facts, ordered source groups, source-ready claims, PDF page limits and fenced cancel/retry. Before PR, hosted metadata confirmed four existing ingestion/review tables with forced RLS and absent new metadata tables. Local PostgreSQL/Worker/Chromium tests exercise save/resume/private photos/denial; final checks and hosted activation remain pending.",
+      "sources": [
+        "docs/owner-menu-workspace.md",
+        "backend/src/owner-menu.ts",
+        "backend/src/ingestion/intake.ts",
+        "migrations/20261112010000_owner_menu_workspace.sql"
+      ],
+      "next": "Complete pinned reviews, CI, final human approval, guarded staging migration/release and synthetic cleanup. Ehab connects S06–S09; auth143/146 remains separate/unmerged. No claim of live UI completion or production acceptance."
     }
   ]
 }
