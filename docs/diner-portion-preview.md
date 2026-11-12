@@ -1,25 +1,24 @@
 # Diner portion preview
 
-## Flow and four Figma states
+## Flow and four preview states
 
 View Portion switches the mounted dish-detail shell into the selected dish's preview.
 Back, Escape and browser Back restore the same detail DOM, scroll and CTA focus.
 Menu return retains category/search behavior. Dish facts remain on the restored
 detail screen; preview hides that card and keeps the dish-name header.
 
-The supplied PeekaPlate Figma file `l7A9n8tACJic0FIhY49Zjw` was inspected in the browser:
+The four state categories come from the supplied PeekaPlate Figma file `l7A9n8tACJic0FIhY49Zjw` was inspected in the browser:
 
 | State | Frame | Behavior |
 | --- | --- | --- |
 | Loading | 846:7146 | Blurred, muted dish photo with exported 64px spinner and loading copy |
-| Ready | 258:6000 | Centered dish layers, exported 46px hand icon and drag hint |
+| Ready | 258:6000 | PR25 warm cutout card, exact movement, compare/reset controls and instructions |
 | Photo fallback | 221:260 | Original dish photo and the two-line fallback message |
 | Failed | 165:2413 | Exported 150px illustration, failure copy and Try again |
 
 The shared Back artwork is an exact 42px SVG export. Assets and source node IDs are
 recorded in [preview-assets](../frontend/diner/src/menu/preview-assets/README.md).
-Exports are unmodified and used at their root dimensions. Inter is self-hosted under
-an alias scoped to preview, so other screens keep their existing typography.
+Failure/loading artwork remains unchanged. The latest user direction selects the PR25 review viewer appearance for View Portion: system typography, warm square stage, gradient and cutout shadow. Other screens retain their typography.
 Web safe-area insets replace the design's native iOS status bar; fake device time and
 battery icons are not rendered. Food imagery remains selected-dish data.
 
@@ -52,23 +51,29 @@ Never relabel this output as approved public content. This integrates PR25's cap
 photo/supplied-mask path; it does not invoke optional generated presentation candidates
 or create a hosted approval/publication service.
 
-The relevant interaction logic
-from `processing/src/peekaplate_processing/harness.py` and `review_preview_html.py`
-is adapted into the diner renderer/controller, not embedded as a review-tool iframe:
+The viewer now follows `review_preview_html.py` (the supplied-mask review page),
+not the separate spatial feasibility harness:
 
-- Depth-ordered layers, bounded pitch/yaw (at most ±3°), and depth-weighted 8px/4px parallax.
-- Combined pointer and keyboard contributions with immediate reversal at the clamp.
-- Mouse movement, horizontal touch drag, native vertical touch scrolling, Home reset,
-  smooth return to center and live reduced-motion changes.
-- One delayed retry for a failed layer fetch/decode before photo fallback; all work stays
-  inside the eight-second attempt deadline and is cancelled on Back/disposal.
-- PR25 CSS interactive cutout on unavailable WebGL or context loss. Original photo retention for missing/invalid layers or unsupported CSS transforms.
-  Missing photos show the Failed screen. Try again repeats the selected dish's load,
-  including detail → card → missing-placeholder photo recovery, without pushing history.
+- CSS `perspective(900px)`, at most ±3° pitch/yaw, and foreground translation up to
+  5px horizontally / 3px vertically. Manifest motion limits can restrict rotation.
+- One shared clamped x/y position: pointer movement replaces it; arrow keys adjust
+  it by 1/6. Pointer tracking uses 55ms linear transitions; keys/reset use 300ms ease-out.
+- Horizontal touch tilt, native vertical scrolling, Home/reset, pointer-leave/blur reset,
+  touch-release reset and immediate live reduced-motion handling.
+- Full-width square stage within a 760px shell, 18px corners, warm radial gradient,
+  contained cutout with `drop-shadow(0 14px 9px #2223)`. The spatial backdrop layer is
+  verified but replaced visually by the review viewer's gradient; positive-depth cutout
+  layers move together. No WebGL or Three.js dependency remains.
+- Show original photo / Show review candidate switches the mounted original and card,
+  resets motion and updates aria-pressed. Reset view centers the card. Compare is disabled
+  until the original and cutout are ready. Original-photo failure blocks interactive view.
+- Loading, ready, photo fallback and failed/retry states remain in the same detail shell.
+  Missing or invalid cutouts retain the photo; missing photos show the failure illustration.
+  Retry preserves history; Back/Escape restores detail focus and scroll.
 
-The Three.js renderer remains lazy, event-driven and bounded. Its CSS fallback uses PR25 perspective(900px), bounded rotation and depth-ranked layers without WebGL. Both paths verify exact bytes, hashes and decoded dimensions. It disposes its canvas,
-textures, geometry, bitmaps, observers and short animation frames. No idle animation loop.
-Photo fallback requires no WebGL. No actual-size, weight or nutrition claim is added.
+Both images and delivered layers remain bounded and validated. One delayed layer retry
+stays within the eight-second attempt deadline; Back cancels loads and releases blob URLs.
+No reviewer downloads or publication actions are exposed in the diner UI.
 
 ## Asset handoff and publication boundary
 
@@ -94,7 +99,7 @@ dish, then View Portion:
 
 - Ready: `http://127.0.0.1:5173/?scenario=portion-demo`
 - Loading then Ready: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=loading`
-- Interactive cutout fallback (no WebGL): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
+- Interactive cutout (legacy fallback demo link): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=fallback`
 - Photo fallback (missing cutout assets): `http://127.0.0.1:5173/?scenario=portion-demo&previewState=photo`
 - Failed: `http://127.0.0.1:5173/?scenario=portion-demo&previewState=failed`
 
@@ -111,7 +116,7 @@ is unchanged. The reserved `.invalid` mapping is development-wide, not an approv
 ## Changed files
 
 - Flow/UI: `frontend/diner/src/menu/dishDetail.ts`, `menuScreen.ts`, `portionPreview.ts`,
-  `portionRenderer.ts`, `portionCssRenderer.ts`, `portionAssets.ts`, `portionMotion.ts`, `portionDemo.ts`, `fixtures.ts`, `style.css`,
+  `portionRenderer.ts`, `portionAssets.ts`, `portionMotion.ts`, `portionDemo.ts`, `fixtures.ts`, `style.css`,
   `preview-assets/*`, and local `fixture-assets/portion-demo/*`.
 - Data: `adapter.ts`, `published.ts`, `types.ts`, `wire.ts`,
   `packages/contracts/src/index.ts` and `packages/contracts/src/portion.ts`.

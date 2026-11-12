@@ -1,204 +1,114 @@
 import type { PublicPortion } from '@peekaplate/contracts';
-import {
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  OrthographicCamera,
-  PlaneGeometry,
-  Scene,
-  SRGBColorSpace,
-  Texture,
-  WebGLRenderer,
-} from 'three';
-
 import { readLayer, retryDelay } from './portionAssets';
-import { mountCss } from './portionCssRenderer';
-
 export type PortionRenderer = {
   update(x: number, y: number, durationMs?: number): void;
   dispose(): void;
 };
 
-// Imported only by View Portion. One canvas, no idle render loop, explicit resource ownership.
+// PR25 review_preview_html.py presentation: warm card, 900px perspective, 5px/3px cutout translation.
 export async function mount(
   element: HTMLElement,
   manifest: PublicPortion,
   signal: AbortSignal,
-  onFailure: () => void,
-  forceCss = false,
 ): Promise<PortionRenderer> {
   signal.throwIfAborted();
-  const demoCss =
-    import.meta.env.DEV &&
-    manifest.layers.every((layer) => layer.url.startsWith('https://portion-demo.invalid/')) &&
-    new URLSearchParams(location.search).get('previewState') === 'fallback';
-  if (forceCss || demoCss) return mountCss(element, manifest, signal);
-  let renderer: WebGLRenderer;
-  try {
-    renderer = new WebGLRenderer({ alpha: true, antialias: true });
-  } catch {
-    // PR25 shallow cards need CSS transforms, not a WebGL context.
-    return mountCss(element, manifest, signal);
-  }
-  const scene = new Scene();
-  const group = new Group();
-  scene.add(group);
-  const aspect = manifest.width / manifest.height;
-  const camera = new OrthographicCamera(-aspect * 0.55, aspect * 0.55, 0.55, -0.55, 0.1, 10);
-  camera.position.z = 2;
-  const geometry = new PlaneGeometry(aspect, 1);
-  const textures: Texture[] = [];
-  const planes: { mesh: Mesh; depth: number }[] = [];
-  let animation = 0;
-  let currentX = 0;
-  let currentY = 0;
-  const materials: MeshBasicMaterial[] = [];
-  const bitmaps: ImageBitmap[] = [];
+  if (!CSS.supports('transform', 'rotateY(1deg)')) throw new Error('CSS tilt unavailable');
+  const card = document.createElement('div');
+  card.className = 'pp-portion__css';
+  card.setAttribute('aria-hidden', 'true');
+  const images: { image: HTMLImageElement; depth: number }[] = [];
+  const urls = new Set<string>();
   let disposed = false;
-  let visible = true;
-  let resize: ResizeObserver | undefined;
-  let intersection: IntersectionObserver | undefined;
-  const canvas = renderer.domElement;
-  canvas.className = 'pp-portion__canvas';
-  canvas.setAttribute('aria-hidden', 'true');
   const dispose = () => {
     if (disposed) return;
     disposed = true;
-    cancelAnimationFrame(animation);
-    resize?.disconnect();
-    intersection?.disconnect();
     signal.removeEventListener('abort', dispose);
-    canvas.removeEventListener('webglcontextlost', lost);
-    document.removeEventListener('visibilitychange', draw);
-    geometry.dispose();
-    for (const material of materials) material.dispose();
-    for (const texture of textures) texture.dispose();
-    for (const bitmap of bitmaps) bitmap.close();
-    renderer.dispose();
-    renderer.forceContextLoss();
-    canvas.remove();
-  };
-  const lost = (event: Event) => {
-    event.preventDefault();
-    dispose();
-    onFailure();
-  };
-  const draw = () => {
-    if (disposed || !visible || document.hidden) return;
-    try {
-      renderer.render(scene, camera);
-    } catch {
-      dispose();
-      onFailure();
-    }
+    card.remove();
+    for (const { image } of images) image.removeAttribute('src');
+    for (const url of urls) URL.revokeObjectURL(url);
+    urls.clear();
   };
   signal.addEventListener('abort', dispose, { once: true });
-  canvas.addEventListener('webglcontextlost', lost);
   try {
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    for (const layer of [...manifest.layers].sort((a, b) => a.depth - b.depth)) {
-      let bitmap: ImageBitmap | undefined;
+    for (const [rank, layer] of [...manifest.layers].sort((a, b) => a.depth - b.depth).entries()) {
+      let image: HTMLImageElement | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         signal.throwIfAborted();
+        let url: string | undefined;
         try {
           const bytes = await readLayer(layer, signal);
-          bitmap = await createImageBitmap(new Blob([bytes]), { imageOrientation: 'flipY' });
-          if (bitmap.width !== manifest.width || bitmap.height !== manifest.height) {
-            bitmap.close();
-            bitmap = undefined;
+          signal.throwIfAborted();
+          url = URL.createObjectURL(new Blob([bytes]));
+          urls.add(url);
+          const candidate = new Image();
+          await new Promise<void>((resolve, reject) => {
+            const cleanup = () => {
+              signal.removeEventListener('abort', abort);
+              candidate.onload = null;
+              candidate.onerror = null;
+            };
+            const abort = () => {
+              cleanup();
+              candidate.removeAttribute('src');
+              reject(signal.reason);
+            };
+            candidate.onload = () => {
+              cleanup();
+              resolve();
+            };
+            candidate.onerror = () => {
+              cleanup();
+              reject(new Error('Cutout unavailable'));
+            };
+            signal.addEventListener('abort', abort, { once: true });
+            candidate.src = url!;
+          });
+          signal.throwIfAborted();
+          if (
+            candidate.naturalWidth !== manifest.width ||
+            candidate.naturalHeight !== manifest.height
+          ) {
             throw new Error('Layer dimensions mismatch');
           }
+          image = candidate;
           break;
         } catch (error) {
+          if (url) {
+            URL.revokeObjectURL(url);
+            urls.delete(url);
+          }
           signal.throwIfAborted();
           if (attempt === 1) throw error;
           await retryDelay(signal);
         }
       }
-      if (!bitmap) throw new Error('Layer unavailable');
-      if (disposed || signal.aborted) {
-        bitmap.close();
-        throw new Error('Preview closed');
-      }
-      bitmaps.push(bitmap);
-      const texture = new Texture(bitmap);
-      texture.colorSpace = SRGBColorSpace;
-      texture.needsUpdate = true;
-      textures.push(texture);
-      const material = new MeshBasicMaterial({ map: texture, transparent: layer.depth > 0 });
-      materials.push(material);
-      const mesh = new Mesh(geometry, material);
-      mesh.position.z = layer.depth * 0.04;
-      group.add(mesh);
-      planes.push({ mesh, depth: layer.depth });
+      if (!image) throw new Error('Cutout unavailable');
+      image.alt = '';
+      image.draggable = false;
+      image.style.zIndex = String(rank + 1);
+      // The review viewer supplies its own gradient instead of the spatial bundle backdrop.
+      // Validate every delivered layer, but display only the cutout foregrounds.
+      if (layer.depth > 0) card.append(image);
+      images.push({ image, depth: layer.depth });
     }
     signal.throwIfAborted();
-    const size = () => {
+    element.append(card);
+    const update: PortionRenderer['update'] = (x, y, durationMs = 0) => {
       if (disposed) return;
-      const width = Math.max(element.clientWidth, 1);
-      const height = Math.max(element.clientHeight, 1);
-      const viewport = width / height;
-      const frameHeight = Math.max(1, aspect / viewport) * 1.1;
-      camera.left = (-frameHeight * viewport) / 2;
-      camera.right = (frameHeight * viewport) / 2;
-      camera.top = frameHeight / 2;
-      camera.bottom = -frameHeight / 2;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height, false);
-      draw();
+      const nx = Math.max(-1, Math.min(1, x));
+      const ny = Math.max(-1, Math.min(1, y));
+      const yaw = manifest.motion?.max_yaw_degrees ?? 3;
+      const pitch = manifest.motion?.max_pitch_degrees ?? 3;
+      const easing = durationMs === 55 ? 'linear' : 'ease-out';
+      card.style.transition = `transform ${durationMs}ms ${easing}`;
+      card.style.transform = `perspective(900px) rotateX(${-ny * pitch}deg) rotateY(${nx * yaw}deg)`;
+      for (const { image } of images) {
+        image.style.transition = `transform ${durationMs}ms ${easing}`;
+        image.style.transform = `translate(${(yaw ? nx : 0) * 5}px, ${(pitch ? ny : 0) * 3}px)`;
+      }
     };
-    size();
-    if (disposed) throw new Error('Renderer unavailable');
-    element.append(canvas);
-    resize = new ResizeObserver(size);
-    resize.observe(element);
-    intersection = new IntersectionObserver(([entry]) => {
-      visible = !!entry?.isIntersecting;
-      draw();
-    });
-    intersection.observe(element);
-    document.addEventListener('visibilitychange', draw);
-    return {
-      update(x, y, durationMs = 0) {
-        if (disposed) return;
-        cancelAnimationFrame(animation);
-        const targetX = Math.max(-1, Math.min(1, x));
-        const targetY = Math.max(-1, Math.min(1, y));
-        const fromX = currentX;
-        const fromY = currentY;
-        const started = performance.now();
-        const frame = (now: number) => {
-          if (disposed) return;
-          const progress =
-            durationMs > 0 && visible && !document.hidden
-              ? Math.min(1, (now - started) / durationMs)
-              : 1;
-          const eased = 1 - (1 - progress) ** 3;
-          currentX = fromX + (targetX - fromX) * eased;
-          currentY = fromY + (targetY - fromY) * eased;
-          const maxYaw = manifest.motion?.max_yaw_degrees ?? 3;
-          const maxPitch = manifest.motion?.max_pitch_degrees ?? 3;
-          group.rotation.set(
-            (-currentY * maxPitch * Math.PI) / 180,
-            (currentX * maxYaw * Math.PI) / 180,
-            0,
-          );
-          // PR25 spatial harness: 8px horizontal / 4px vertical parallax, weighted by depth.
-          for (const { mesh, depth } of planes) {
-            mesh.position.x =
-              ((maxYaw ? currentX : 0) * depth * 8 * (camera.right - camera.left)) /
-              Math.max(element.clientWidth, 1);
-            mesh.position.y =
-              (-(maxPitch ? currentY : 0) * depth * 4 * (camera.top - camera.bottom)) /
-              Math.max(element.clientHeight, 1);
-          }
-          draw();
-          if (progress < 1 && !disposed) animation = requestAnimationFrame(frame);
-        };
-        frame(started);
-      },
-      dispose,
-    };
+    update(0, 0);
+    return { update, dispose };
   } catch (error) {
     dispose();
     throw error;

@@ -18,7 +18,27 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   retry.textContent = 'Try again';
   retry.hidden = true;
   status.after(retry);
+  const controls = document.createElement('div');
+  controls.className = 'pp-portion__controls';
+  controls.hidden = true;
+  const compare = document.createElement('button');
+  compare.type = 'button';
+  compare.textContent = 'Show original photo';
+  compare.setAttribute('aria-pressed', 'false');
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.textContent = 'Reset view';
+  controls.append(compare, resetButton);
+  stage.before(controls);
+  const instructions = document.createElement('p');
+  instructions.className = 'pp-portion__instructions';
+  instructions.hidden = true;
+  instructions.textContent =
+    'Move the pointer, drag horizontally on touch, or use arrow keys. Home resets. Vertical touch scrolling stays available. Motion is disabled with Reduce Motion.';
+  status.after(instructions);
   const key = crypto.randomUUID();
+  instructions.id = `portion-instructions-${key}`;
+  let showOriginal = false;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let disposed = false;
@@ -36,21 +56,28 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     attempt?.abort();
     renderer?.dispose();
     renderer = undefined;
-    stage.classList.remove('pp-portion--ready');
+    stage.classList.remove('pp-portion--ready', 'pp-portion--original');
+    showOriginal = false;
+    compare.textContent = 'Show original photo';
+    compare.setAttribute('aria-pressed', 'false');
     stage.removeAttribute('tabindex');
     stage.removeAttribute('role');
     stage.removeAttribute('aria-label');
     stage.removeAttribute('aria-description');
+    stage.removeAttribute('aria-describedby');
   };
   const setState = (state: 'loading' | 'ready' | 'fallback' | 'failed') => {
     root.dataset.portionState = state;
+    compare.disabled = state !== 'ready';
+    resetButton.disabled = state !== 'ready';
+    instructions.hidden = state !== 'ready';
     retry.hidden = state !== 'failed';
     stage.setAttribute('aria-busy', String(state === 'loading'));
   };
   const fallback = () => {
     stop();
     if (!active || disposed) return;
-    const hasPhoto = !!stage.querySelector('img');
+    const hasPhoto = !!stage.querySelector('img.pp-detail__image');
     setState(hasPhoto ? 'fallback' : 'failed');
     status.replaceChildren();
     if (hasPhoto) {
@@ -64,12 +91,16 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     }
   };
   const photoObserver = new MutationObserver(() => {
-    if (active && root.dataset.portionState === 'fallback' && !stage.querySelector('img')) {
+    if (
+      active &&
+      root.dataset.portionState !== 'failed' &&
+      !stage.querySelector('img.pp-detail__image')
+    ) {
       fallback();
     }
   });
   photoObserver.observe(stage, { childList: true });
-  const show = async (retrying = false, forceCss = false) => {
+  const show = async (retrying = false) => {
     if ((active && !retrying) || disposed) return;
     stop();
     active = true;
@@ -78,6 +109,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     title.textContent = dish.name;
     back.setAttribute('aria-label', 'Back to dish details');
     status.hidden = false;
+    controls.hidden = false;
     setState('loading');
     status.textContent = 'Loading Interactive preview...';
     back.focus({ preventScroll: true });
@@ -97,15 +129,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     try {
       const { mount } = await import('./portionRenderer');
       if (controller.signal.aborted) return;
-      const mounted = await mount(
-        stage,
-        parsed.data,
-        controller.signal,
-        () => {
-          if (attempt === controller && !controller.signal.aborted) void show(true, true);
-        },
-        forceCss,
-      );
+      const photo = stage.querySelector<HTMLImageElement>('img.pp-detail__image');
+      if (!photo) throw new Error('Original photo unavailable');
+      await photo.decode();
+      if (controller.signal.aborted) return;
+      const mounted = await mount(stage, parsed.data, controller.signal);
       if (controller.signal.aborted || disposed) {
         mounted.dispose();
         return;
@@ -120,6 +148,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         'aria-description',
         'Use arrow keys for a slight tilt. Escape returns to dish details.',
       );
+      stage.setAttribute('aria-describedby', instructions.id);
       setState('ready');
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
@@ -137,6 +166,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     delete root.dataset.portionState;
     stage.removeAttribute('aria-busy');
     retry.hidden = true;
+    controls.hidden = true;
+    instructions.hidden = true;
     title.textContent = 'Dish details';
     back.setAttribute('aria-label', 'Back to menu');
     status.hidden = true;
@@ -172,19 +203,19 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       close();
       return;
     }
-    if (event.target !== stage || reduced.matches || !renderer) return;
+    if (event.target !== stage || reduced.matches || showOriginal || !renderer) return;
     const next = motion.key(event.key);
     if (!next) return;
     event.preventDefault();
-    renderer.update(next.x, next.y, 150);
+    renderer.update(next.x, next.y, 300);
   };
   const pointerdown = (event: PointerEvent) => {
-    if (active && renderer && !reduced.matches && event.pointerType !== 'mouse') {
+    if (active && renderer && !showOriginal && !reduced.matches && event.pointerType !== 'mouse') {
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY };
     }
   };
   const pointer = (event: PointerEvent) => {
-    if (!active || !renderer || reduced.matches) return;
+    if (!active || !renderer || showOriginal || reduced.matches) return;
     const bounds = stage.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
     let x: number;
@@ -212,9 +243,22 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     drag = undefined;
     renderer?.update(0, 0, reduced.matches ? 0 : 300);
   };
+  const comparePhoto = () => {
+    if (!renderer || root.dataset.portionState !== 'ready') return;
+    showOriginal = !showOriginal;
+    stage.classList.toggle('pp-portion--original', showOriginal);
+    compare.setAttribute('aria-pressed', String(showOriginal));
+    compare.textContent = showOriginal ? 'Show review candidate' : 'Show original photo';
+    reset();
+    status.textContent = showOriginal
+      ? 'Original photo.'
+      : reduced.matches
+        ? '2.5D preview. Motion is reduced.'
+        : 'Drag to tilt the plate';
+  };
   const motionChanged = () => {
     reset();
-    if (active && root.dataset.portionState === 'ready') {
+    if (active && !showOriginal && root.dataset.portionState === 'ready') {
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
         : 'Drag to tilt the plate';
@@ -225,7 +269,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   };
   const retryPreview = () => {
     const photo = dish.images?.detail ?? dish.images?.card;
-    if (photo && !stage.querySelector('img')) {
+    if (photo && !stage.querySelector('img.pp-detail__image')) {
       const img = document.createElement('img');
       img.className = 'pp-detail__image';
       img.alt = photo.alt;
@@ -251,6 +295,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     }
     void show(true);
   };
+  compare.addEventListener('click', comparePhoto);
+  resetButton.addEventListener('click', reset);
   retry.addEventListener('click', retryPreview);
   open.addEventListener('click', openPreview);
   back.addEventListener('click', backClick, true);
@@ -269,6 +315,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     photoObserver.disconnect();
     retry.removeEventListener('click', retryPreview);
     retry.remove();
+    compare.removeEventListener('click', comparePhoto);
+    resetButton.removeEventListener('click', reset);
+    controls.remove();
+    instructions.remove();
     open.removeEventListener('click', openPreview);
     back.removeEventListener('click', backClick, true);
     window.removeEventListener('popstate', pop);

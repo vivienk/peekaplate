@@ -2614,3 +2614,25 @@ while the requested PR25 fallback is its CSS interactive cutout. A new browser
 regression failed before correction. Added the PR25 CSS card path for unavailable
 WebGL/context loss, retained byte/hash/dimension verification and retry/cancellation,
 and moved deliberate photo failure to previewState=photo. No publication changes.
+
+### 2026-11-11 — faithful PR25 review viewer
+
+The earlier implementation combined the spatial harness movement with a different
+presentation and omitted compare/reset. The new appearance/control browser regression
+failed before this correction. Port the supplied-mask review viewer instead: its
+warm square card/shadow, shared x/y input, 5px/3px translation and 55ms linear / 300ms
+ease-out transitions. Retain explicit image integrity checks and Back cleanup.
+The temporary Node runtime had expired; restored repository-required Node24.16.0
+before rerunning the regression (system24.14.0 cannot start this repo).
+
+The first faithful-viewer browser run passed47/49. The motion screenshot aimed
+outside the new rounded stage corner, triggering the intended pointer-leave reset;
+move inside the rounded edge. The numeric CSS assertion expected full JS float
+precision, but CSSOM serializes 5/6px as0.833333px; assert that browser value.
+
+Visual review caught higher-specificity legacy state margins pushing the new PR25
+stage down and a white Back icon on the light surface. Removed those legacy margins,
+restored a visible Back control and cleared original-image detail sizing/shadow.
+Added stage/control spacing assertion. The original-photo failure test had registered
+its failure route after menu thumbnails loaded; inject that failure before initial
+navigation so cached card photos cannot satisfy the test.

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 
-// Entirely synthetic HTTP fixtures. Real menu verifier, adapter, UI and WebGL renderer.
+// Entirely synthetic HTTP fixtures. Real menu verifier, adapter, UI and PR25 CSS viewer.
 const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const images = ['background', 'foreground'].map((name) =>
   readFileSync(`tests/fixtures/portion/${name}.png`),
@@ -18,7 +18,8 @@ type Mode =
   | 'hash'
   | 'dimensions'
   | 'slow'
-  | 'no-photo';
+  | 'no-photo'
+  | 'original-missing';
 async function openMenu(page: Page, mode: Mode = 'valid') {
   const content = JSON.parse(
     readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
@@ -78,7 +79,12 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
   await page.route('https://assets.example.test/**', async (route) => {
     const layer = /\/([01])\.png$/.exec(route.request().url());
     if (layer && mode === 'slow') await new Promise((resolve) => setTimeout(resolve, 9000));
-    if ((layer && mode === 'broken') || mode === 'no-photo') return route.fulfill({ status: 404 });
+    if (
+      (layer && mode === 'broken') ||
+      mode === 'no-photo' ||
+      (!layer && mode === 'original-missing')
+    )
+      return route.fulfill({ status: 404 });
     await route.fulfill({
       contentType: 'image/png',
       body:
@@ -110,26 +116,26 @@ test('menu → dish-specific 2.5D → detail → another dish, with focus and br
   expect(requested).toEqual([]);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   await expect(page.locator('.pp-portion__status')).toContainText('Drag to tilt the plate');
-  await expect(page.locator('canvas')).toHaveCount(1);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(1);
   expect(requested.filter((url) => /\/[01]\.png$/.test(url))).toHaveLength(2);
   expect(requested.some((url) => url.includes(content.categories[0].dishes[0].dish_id))).toBe(true);
   const stage = page.getByRole('group', { name: 'Charred Leeks portion preview' });
   await stage.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
-  const firstVisual = hash(await page.locator('canvas').screenshot());
+  const firstVisual = hash(await page.locator('.pp-portion__css').screenshot());
   await stage.focus();
   await page.keyboard.press('ArrowRight');
-  expect(hash(await page.locator('canvas').screenshot())).not.toBe(firstVisual);
+  expect(hash(await page.locator('.pp-portion__css').screenshot())).not.toBe(firstVisual);
   expect(
     (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations,
   ).toEqual([]);
   await page.screenshot({ path: 'test-results/portion-390.png', fullPage: true });
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
-  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(0);
   await page.goForward();
-  await expect(page.locator('canvas')).toHaveCount(1);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(1);
   await page.goBack();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
@@ -140,8 +146,8 @@ test('menu → dish-specific 2.5D → detail → another dish, with focus and br
   await page.locator('.pp-detail__image-wrap').evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
-  expect(hash(await page.locator('canvas').screenshot())).not.toBe(firstVisual);
-  await expect(page.locator('canvas')).toHaveCount(1);
+  expect(hash(await page.locator('.pp-portion__css').screenshot())).not.toBe(firstVisual);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(1);
   expect(requested.some((url) => url.includes(content.categories[1].dishes[0].dish_id))).toBe(true);
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.locator('.pp-detail__name')).toHaveText('Roast Chicken');
@@ -162,7 +168,7 @@ for (const mode of [
     await expect(page.locator('.pp-portion__status')).toContainText(
       mode === 'no-photo' ? 'Couldn’t load preview.' : 'Interactive preview unavailable',
     );
-    await expect(page.locator('canvas')).toHaveCount(0);
+    await expect(page.locator('.pp-portion__css')).toHaveCount(0);
     if (mode === 'no-photo') {
       const historyLength = await page.evaluate(() => history.length);
       await page.route('https://assets.example.test/**', (route) =>
@@ -181,7 +187,7 @@ for (const mode of [
   });
 }
 
-test('closing during loading disposes late work and repeated opens keep one canvas', async ({
+test('closing during loading disposes late work and repeated opens keep one cutout card', async ({
   page,
 }) => {
   await openMenu(page, 'slow');
@@ -190,7 +196,7 @@ test('closing during loading disposes late work and repeated opens keep one canv
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
   await page.waitForTimeout(9500);
-  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(0);
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   await expect(page.locator('.pp-portion__status')).toContainText(
     'Interactive preview unavailable',
@@ -198,23 +204,6 @@ test('closing during loading disposes late work and repeated opens keep one canv
       timeout: 10000,
     },
   );
-});
-
-test('WebGL context loss restores the interactive PR25 cutout', async ({ page }) => {
-  await openMenu(page);
-  await openPortion(page);
-  await expect(page.locator('canvas')).toHaveCount(1);
-  await page
-    .locator('canvas')
-    .evaluate((canvas) =>
-      (canvas as HTMLCanvasElement)
-        .getContext('webgl2')
-        ?.getExtension('WEBGL_lose_context')
-        ?.loseContext(),
-    );
-  await expect(page.locator('.pp-portion__status')).toContainText('Drag to tilt the plate');
-  await expect(page.locator('.pp-portion__css')).toBeVisible();
-  await expect(page.locator('canvas')).toHaveCount(0);
 });
 
 test('reduced motion renders without requiring motion or WebGL for navigation', async ({
@@ -244,7 +233,7 @@ test('unavailable WebGL keeps an interactive cutout and reload retires a stale p
   await expect(page.locator('.pp-portion__css')).toBeVisible();
   await page.reload();
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
-  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.locator('.pp-portion__css')).toHaveCount(0);
   await openPortion(page);
   await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
@@ -258,12 +247,12 @@ test('local captured-dish demo loads real textures and tilts without route mocks
   await expect(page.locator('.pp-logo__name')).toBeVisible();
   await openPortion(page);
   await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('.pp-portion__css');
   const before = hash(await canvas.screenshot());
   const bounds = (await canvas.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + bounds.width - 2, bounds.y + 2, { steps: 8 });
+  await page.mouse.move(bounds.x + bounds.width - 24, bounds.y + 24, { steps: 8 });
   expect(hash(await canvas.screenshot())).not.toBe(before);
   await page.screenshot({ path: 'test-results/captured-dish-demo.png' });
   await page.mouse.up();
@@ -283,16 +272,13 @@ for (const state of ['loading', 'ready', 'fallback', 'failed'] as const) {
       state === 'ready'
         ? page.locator('.pp-portion__status')
         : page.locator('.pp-detail__image-wrap');
-    if (state !== 'fallback') {
-      const style = await art.evaluate(
-        (el, pseudo) => {
-          const css = getComputedStyle(el, pseudo);
-          return { image: css.backgroundImage, width: css.width, height: css.height };
-        },
-        state === 'ready' ? '::before' : '::after',
-      );
+    if (state !== 'fallback' && state !== 'ready') {
+      const style = await art.evaluate((el, pseudo) => {
+        const css = getComputedStyle(el, pseudo);
+        return { image: css.backgroundImage, width: css.width, height: css.height };
+      }, '::after');
       expect(style.image).toMatch(/image\/svg\+xml|\.svg/);
-      expect(style.width).toBe(state === 'ready' ? '46px' : state === 'loading' ? '64px' : '150px');
+      expect(style.width).toBe(state === 'loading' ? '64px' : '150px');
       expect(style.height).toBe(style.width);
     }
     await page.screenshot({ path: `test-results/figma-portion-${state}.png` });
@@ -336,9 +322,9 @@ test('live reduced-motion preference immediately centers and updates instruction
   await stage.press('ArrowRight');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('.pp-portion__status')).toContainText('Motion is reduced');
-  const still = hash(await page.locator('canvas').screenshot());
+  const still = hash(await page.locator('.pp-portion__css').screenshot());
   await stage.press('ArrowRight');
-  expect(hash(await page.locator('canvas').screenshot())).toBe(still);
+  expect(hash(await page.locator('.pp-portion__css').screenshot())).toBe(still);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
 });
@@ -382,3 +368,92 @@ for (const mode of ['hash', 'dimensions', 'no-photo'] as const) {
     await expect(page.locator('.pp-portion__css')).toHaveCount(0);
   });
 }
+
+test('PR25 review appearance and compare/reset controls match the original viewer', async ({
+  page,
+}) => {
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await openPortion(page);
+  const stage = page.getByRole('group', { name: 'Captured dish · tilt demo portion preview' });
+  const compare = page.getByRole('button', { name: 'Show original photo', exact: true });
+  await expect(compare).toBeEnabled();
+  const card = page.locator('.pp-portion__css');
+  await expect(card).toHaveCSS('background-image', /radial-gradient/);
+  const stageBox = (await stage.boundingBox())!;
+  const controlBox = (await page.locator('.pp-portion__controls').boundingBox())!;
+  expect(stageBox.y - (controlBox.y + controlBox.height)).toBeLessThanOrEqual(20);
+  expect(stageBox.width).toBeCloseTo(stageBox.height, 0);
+  await stage.press('ArrowRight');
+  await expect(card).toHaveAttribute('style', /rotateY\(0.5deg\)/);
+  await expect(card.locator('img').last()).toHaveAttribute('style', /translate\(0.833333px, 0px\)/);
+  await expect(card).toHaveCSS('transition-duration', '0.3s');
+  await compare.click();
+  await expect(card).toBeHidden();
+  await expect(page.locator('img.pp-detail__image')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Show review candidate', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Show review candidate', exact: true }).click();
+  await expect(card).toBeVisible();
+  await stage.press('ArrowLeft');
+  await page.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await expect(compare).toBeHidden();
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeFocused();
+});
+
+test('PR25 touch tracking uses linear motion, release resets and vertical gestures scroll', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await openPortion(page);
+  const stage = page.locator('.pp-detail__image-wrap');
+  const card = page.locator('.pp-portion__css');
+  const box = (await stage.boundingBox())!;
+  await stage.dispatchEvent('pointerdown', {
+    pointerType: 'touch',
+    pointerId: 7,
+    clientX: box.x + 50,
+    clientY: box.y + 100,
+  });
+  await stage.dispatchEvent('pointermove', {
+    pointerType: 'touch',
+    pointerId: 7,
+    clientX: box.x + 50 + box.width * 0.35,
+    clientY: box.y + 100,
+  });
+  await expect(card).toHaveAttribute('style', /rotateY\(3deg\)/);
+  await expect(card.locator('img').last()).toHaveAttribute('style', /translate\(5px, 0px\)/);
+  await expect(card).toHaveCSS('transition-timing-function', 'linear');
+  await expect(card).toHaveCSS('transition-duration', '0.055s');
+  await stage.dispatchEvent('pointerup', { pointerType: 'touch', pointerId: 7 });
+  await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);
+  await expect(card).toHaveCSS('transition-duration', '0.3s');
+  await stage.dispatchEvent('pointerdown', {
+    pointerType: 'touch',
+    pointerId: 8,
+    clientX: 100,
+    clientY: 100,
+  });
+  await stage.dispatchEvent('pointermove', {
+    pointerType: 'touch',
+    pointerId: 8,
+    clientX: 102,
+    clientY: 160,
+  });
+  await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);
+  await expect(stage).toHaveCSS('touch-action', 'pan-y');
+});
+
+test('PR25 original-photo failure blocks an otherwise valid cutout and comparison', async ({
+  page,
+}) => {
+  await openMenu(page, 'original-missing');
+  await openPortion(page);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'failed');
+  await expect(page.locator('.pp-portion__css')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Show original photo', exact: true }),
+  ).toBeDisabled();
+});
