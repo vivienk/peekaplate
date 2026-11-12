@@ -662,6 +662,26 @@ export async function approveDishDraftAtomic(
       return existing.result;
     }
 
+    const discovered = await client.query<{ job_id: string | null }>(
+      'SELECT job_id FROM app_private.dish_drafts WHERE tenant_id=$1 AND id=$2',
+      [venueId, draftId],
+    );
+    let currentJob:
+      | {
+          status: string;
+          active_review_extraction_id: string | null;
+          result_storage_key: string | null;
+          review_result_storage_key: string | null;
+        }
+      | undefined;
+    if (discovered.rows[0]?.job_id) {
+      currentJob = (
+        await client.query(
+          'SELECT status,active_review_extraction_id,result_storage_key,review_result_storage_key FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND id=$2 FOR SHARE',
+          [venueId, discovered.rows[0].job_id],
+        )
+      ).rows[0];
+    }
     const draftRes = await client.query<DishDraftRow>(
       `SELECT * FROM app_private.dish_drafts
        WHERE tenant_id = $1 AND id = $2
@@ -685,6 +705,11 @@ export async function approveDishDraftAtomic(
       if (sessions.rows.length) {
         if (
           !options.extractionId ||
+          !currentJob ||
+          !['complete', 'incomplete'].includes(currentJob.status) ||
+          currentJob.active_review_extraction_id !== options.extractionId ||
+          !currentJob.result_storage_key ||
+          currentJob.result_storage_key !== currentJob.review_result_storage_key ||
           !sessions.rows.some((session) => session.extraction_id === options.extractionId)
         )
           throw new IngestionError('draft_confirmation_required', 409);

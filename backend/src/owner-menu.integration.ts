@@ -670,6 +670,29 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         [venue, job.id, candidateId],
       )
     ).rows[0]!;
+    const reportKey = (
+      await admin.query(
+        'SELECT result_storage_key FROM app_private.menu_ingestion_jobs WHERE id=$1',
+        [job.id],
+      )
+    ).rows[0].result_storage_key;
+    await admin.query(
+      'UPDATE app_private.menu_ingestion_jobs SET result_storage_key=$2 WHERE id=$1',
+      [job.id, `reports/${venue}/${job.id}/attempts/${crypto.randomUUID()}/extraction.json`],
+    );
+    await expect(
+      approveDishDraftAtomic(runtime, actor, venue, row.id, {
+        commandId: crypto.randomUUID(),
+        expectedDraftVersion: row.draft_version,
+        expectedReviewVersion: review.review.version,
+        extractionId,
+        confirmed: true,
+      }),
+    ).rejects.toMatchObject({ code: 'draft_confirmation_required' });
+    await admin.query(
+      'UPDATE app_private.menu_ingestion_jobs SET result_storage_key=$2 WHERE id=$1',
+      [job.id, reportKey],
+    );
     await expect(
       approveDishDraftAtomic(runtime, actor, venue, row.id, { commandId: crypto.randomUUID() }),
     ).rejects.toMatchObject({ code: 'draft_confirmation_required' });
@@ -702,6 +725,28 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
         approved.publishedRevision.dishId,
       )?.priceAmount,
     ).toBe('9.00');
+    const delayedGet = vi.fn(async (k: string) => {
+      const value = await get(k);
+      if (k === key)
+        await admin.query(
+          "UPDATE app_private.menu_ingestion_jobs SET status='queued' WHERE id=$1",
+          [job.id],
+        );
+      return value;
+    });
+    const raced = await app.request(
+      `https://test/venues/${venue}/menus/jobs/${job.id}/review-session`,
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer synthetic', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandId: crypto.randomUUID() }),
+      },
+      { ...env, INGESTION_REPORTS_BUCKET: { put: vi.fn(), get: delayedGet } },
+    );
+    expect(raced.status).toBe(409);
+    await admin.query("UPDATE app_private.menu_ingestion_jobs SET status='complete' WHERE id=$1", [
+      job.id,
+    ]);
     objects.set(key, stored + ' ');
     expect((await request()).status).toBe(409);
   });

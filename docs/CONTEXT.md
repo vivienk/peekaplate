@@ -385,7 +385,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "9ab74984326435ac839f0d60b85c67c4caaf967b01ba779e45abab236730f345"
+      "sourceFingerprint": "74b442300da23c6a5fe4afa001090fde09f232f05c02450e66208cf92824e67b"
     },
     {
       "id": "database",
@@ -431,7 +431,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f1b94c97b1ef627d1ded88c695ee12dd1d09b884a2e815d13cbb68c1d38eb0ca"
+      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
     },
     {
       "id": "measurement",
