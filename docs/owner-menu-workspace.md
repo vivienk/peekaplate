@@ -156,6 +156,11 @@ invokes a model or invents a suggestion.
 
 ## Acceptance record
 
+Rollback: once enriched revision events/receipts or manual drafts exist, prefer a
+forward correction. The preceding Worker cannot interpret every new event or
+enforce the new manual/current-review approval rules. Do not treat an old-Worker
+rollback as transparent; isolate workspace writes and review operations first.
+
 Before PR creation, hosted Supabase inspection confirmed the existing four
 ingestion/review tables with forced RLS and the absence of the two new metadata
 tables. This read-only check was not migration application or hosted acceptance.
