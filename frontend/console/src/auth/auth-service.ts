@@ -53,6 +53,10 @@ export type ResetLinkResult =
   | { kind: 'unavailable' }
   | RateLimited;
 
+// "Resend email" on Check your email after Create account (Figma S03 layout). resendAfterSeconds is
+// how long the button stays unavailable, if the service says.
+export type ResendConfirmationResult = ResetLinkResult;
+
 // S04: set a new password from the reset link. email, when known, lets "Sign in" open S02 directly.
 export type ResetPasswordResult =
   | { kind: 'updated'; email?: string; signOutPending?: true }
@@ -82,6 +86,8 @@ export interface OwnerAuthService {
   requestPasswordReset(email: string): Promise<ResetLinkResult>;
   // Uses the recovery session from the reset link; the link itself never reaches the screens.
   resetPassword(newPassword: string): Promise<ResetPasswordResult>;
+  // Optional until the provider supports it; without it Check your email shows no Resend button.
+  resendConfirmation?(email: string): Promise<ResendConfirmationResult>;
 }
 
 // The service used until the provider is connected. It sends nothing anywhere.

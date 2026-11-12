@@ -20,13 +20,15 @@ import {
 } from './copy';
 import {
   BackLink,
-  BROKEN_LINK_ILLUSTRATION,
-  DONE_ILLUSTRATION,
+  DoneMark,
   EmailField,
   ErrorBanner,
+  ErrorMark,
   LockedEmailField,
-  MAIL_ILLUSTRATION,
+  MailIllustration,
+  OrDivider,
   PasswordField,
+  ResendGroup,
   StatusPanel,
   SubmitButton,
 } from './parts';
@@ -91,9 +93,7 @@ export function OwnerAuth({
 
   return (
     <div className="pp-auth">
-      {/* Left side of the Figma frames: the food photo goes here once it is exported (decorative). */}
-      <div className="pp-auth__art" aria-hidden="true" />
-      <div className="pp-auth__card">
+      <div className={`pp-auth__card pp-auth__card--${step}`}>
         {!WITHOUT_BRAND.includes(step) && (
           <p className="pp-auth__brand">
             <img src={logo} alt="" width="32" height="32" />
@@ -130,7 +130,13 @@ export function OwnerAuth({
           />
         )}
         {step === 'confirm-email' && (
-          <ConfirmEmailStep key="confirm-email" email={email} focusHeading={moved} onRoute={go} />
+          <ConfirmEmailStep
+            key="confirm-email"
+            email={email}
+            focusHeading={moved}
+            service={service}
+            onRoute={go}
+          />
         )}
         {step === 'forgot' && (
           <ForgotStep
@@ -482,7 +488,7 @@ function CreateStep({
         Already have an account?{' '}
         <button
           type="button"
-          className="pp-auth-link pp-auth-link--strong"
+          className="pp-auth-link"
           disabled={busy}
           onClick={() => onRoute('signin')}
         >
@@ -589,7 +595,7 @@ function SignInStep({
         New to PeekaPlate?{' '}
         <button
           type="button"
-          className="pp-auth-link pp-auth-link--accent pp-auth-link--strong"
+          className="pp-auth-link pp-auth-link--accent"
           disabled={busy}
           onClick={() => onRoute('create')}
         >
@@ -600,39 +606,85 @@ function SignInStep({
   );
 }
 
-// After Create account, when the provider sends a confirmation email (Sai, 11 Nov). Uses the S03
-// "Check your email" layout. The owner confirms from the email and returns to the app.
-function ConfirmEmailStep({
-  email,
-  focusHeading,
-  onRoute,
-}: {
-  email: string;
-  focusHeading: boolean;
-  onRoute: (step: AuthStep, email?: string) => void;
-}) {
+// How long "Resend email" stays unavailable when the service does not say (S03 handoff, section 6:
+// the wait is not decided yet).
+const DEFAULT_RESEND_WAIT_SECONDS = 60;
+
+// The line under Resend email: waiting, resent, or failed (S03 handoff, section 6).
+function resendStatus(state: 'sent' | 'resent' | 'failed' | BannerCopy, blocked: boolean): string {
+  if (typeof state === 'object') return `${state.title}. ${state.body}`;
+  if (state === 'resent') return 'We’ve sent another link.';
+  if (state === 'failed') return 'We couldn’t send another link. Please try again.';
+  return blocked
+    ? 'Resend is unavailable right now. Please wait before requesting another link.'
+    : '';
+}
+
+// After Create account, when the provider sends a confirmation email (Sai, 11 Nov). Figma "Check your
+// email" layout and Rania's wording (12 Nov): short, no address in the text, never says whether an
+// account exists. Resend email shows only when the service can resend the confirmation.
+function ConfirmEmailStep({ email, focusHeading, service, onRoute }: StepProps) {
   const heading = useHeadingFocus(focusHeading);
+  const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
+  const [state, setState] = useState<'sent' | 'resent' | 'failed' | BannerCopy>('sent');
+  const resendConfirmation = service.resendConfirmation?.bind(service);
+
+  // The link was just sent, so Resend starts in its waiting state. Runs once, when the screen opens.
+  useEffect(() => {
+    cooldown.start({ kind: 'rate_limited', retryAfterSeconds: DEFAULT_RESEND_WAIT_SECONDS });
+  }, []);
+
+  async function resend() {
+    if (!resendConfirmation || running.current || cooldown.blocked) return;
+    const result = await run(() => resendConfirmation(email), { kind: 'failed' as const });
+    if (!result) return;
+    if (result.kind === 'sent') {
+      setState('resent');
+      cooldown.start({
+        kind: 'rate_limited',
+        retryAfterSeconds: result.resendAfterSeconds ?? DEFAULT_RESEND_WAIT_SECONDS,
+      });
+    } else if (result.kind === 'rate_limited') {
+      setState(rateLimitedBanner(result.retryAfterSeconds));
+      cooldown.start(result);
+    } else {
+      setState(result.kind === 'unavailable' ? BANNERS.unavailable : 'failed');
+    }
+  }
+
   return (
     <StatusPanel
-      art={MAIL_ILLUSTRATION}
+      art={<MailIllustration />}
       title="Check your email"
       heading={heading}
       actions={
         <>
-          <button
-            type="button"
-            className="pp-auth-link pp-auth-link--accent"
-            onClick={() => onRoute('email')}
-          >
-            Edit email address
-          </button>
-          <BackLink onClick={() => onRoute('signin')} />
+          {resendConfirmation && (
+            <ResendGroup
+              busy={busy}
+              blocked={cooldown.blocked}
+              status={resendStatus(state, cooldown.blocked)}
+              onResend={resend}
+            />
+          )}
+          <div className="pp-auth-status__links">
+            {resendConfirmation && <OrDivider />}
+            <button
+              type="button"
+              className="pp-auth-link pp-auth-link--accent"
+              disabled={busy}
+              onClick={() => onRoute('email')}
+            >
+              Edit email address
+            </button>
+            <BackLink disabled={busy} onClick={() => onRoute('signin')} />
+          </div>
         </>
       }
     >
-      If this address can be registered, a confirmation link will arrive at <strong>{email}</strong>
-      . Open it in this browser to finish creating your account. Already registered? Sign in
-      instead. Check your inbox and spam folder.
+      We’ve sent a confirmation link to your email address. Check your inbox and spam folder to
+      complete your account setup.
     </StatusPanel>
   );
 }
@@ -719,10 +771,6 @@ function ForgotStep({
   );
 }
 
-// How long "Resend email" stays unavailable when the service does not say (S03 handoff, section 6:
-// the wait is not decided yet).
-const DEFAULT_RESEND_WAIT_SECONDS = 60;
-
 // S03 Check email, with Resend email (available, waiting, resent), Edit email address and Back to
 // sign in. The text never confirms that an account exists (S03 handoff, section 4).
 function ForgotSentStep({
@@ -765,55 +813,36 @@ function ForgotSentStep({
     }
   }
 
-  const statusText =
-    typeof status === 'object'
-      ? `${status.title}. ${status.body}`
-      : status === 'resent'
-        ? 'We’ve sent another link.'
-        : status === 'failed'
-          ? 'We couldn’t send another link. Please try again.'
-          : cooldown.blocked
-            ? 'Resend is unavailable right now. Please wait before requesting another link.'
-            : '';
-
   return (
     <StatusPanel
-      art={MAIL_ILLUSTRATION}
+      art={<MailIllustration />}
       title="Check your email"
       heading={heading}
       actions={
         <>
-          <Button
-            variant="outline"
-            className="pp-auth__resend"
-            aria-busy={busy ? true : undefined}
-            aria-disabled={cooldown.blocked && !busy ? true : undefined}
-            aria-describedby="pp-auth-resend-status"
-            onClick={resend}
-          >
-            {busy && <span className="pp-auth__spinner" aria-hidden="true" />}
-            {busy ? 'Sending…' : 'Resend email'}
-          </Button>
-          <p className="pp-auth-status__note" id="pp-auth-resend-status" aria-live="polite">
-            {statusText}
-          </p>
-          <p className="pp-auth-divider">
-            <span>or</span>
-          </p>
-          <button
-            type="button"
-            className="pp-auth-link pp-auth-link--accent"
-            disabled={busy}
-            onClick={() => onRoute('forgot')}
-          >
-            Edit email address
-          </button>
-          <BackLink disabled={busy} onClick={() => onRoute(signInStep(email))} />
+          <ResendGroup
+            busy={busy}
+            blocked={cooldown.blocked}
+            status={resendStatus(status, cooldown.blocked)}
+            onResend={resend}
+          />
+          <div className="pp-auth-status__links">
+            <OrDivider />
+            <button
+              type="button"
+              className="pp-auth-link pp-auth-link--accent"
+              disabled={busy}
+              onClick={() => onRoute('forgot')}
+            >
+              Edit email address
+            </button>
+            <BackLink disabled={busy} onClick={() => onRoute(signInStep(email))} />
+          </div>
         </>
       }
     >
-      If an account exists for <strong>{email}</strong>, we’ll send a link to reset your password.
-      Check your inbox and spam folder.
+      If an account exists for this email address, we’ll send a link to reset your password. Check
+      your inbox and spam folder.
     </StatusPanel>
   );
 }
@@ -911,11 +940,14 @@ function ResetDoneStep({
   const heading = useHeadingFocus(focusHeading);
   return (
     <StatusPanel
-      art={DONE_ILLUSTRATION}
+      art={<DoneMark />}
       title="Password updated"
       heading={heading}
       actions={
-        <Button className="pp-auth__submit" onClick={() => onRoute(signInStep(email))}>
+        <Button
+          className="pp-auth-btn pp-auth-btn--primary"
+          onClick={() => onRoute(signInStep(email))}
+        >
           Sign in
         </Button>
       }
@@ -936,16 +968,16 @@ function ResetInvalidStep({ email, focusHeading, onRoute }: ResultStepProps) {
   const heading = useHeadingFocus(focusHeading);
   return (
     <StatusPanel
-      art={BROKEN_LINK_ILLUSTRATION}
+      art={<ErrorMark />}
       title="This reset link can’t be used"
       heading={heading}
       actions={
-        <>
-          <Button className="pp-auth__submit" onClick={() => onRoute('forgot')}>
+        <div className="pp-auth-status__actions">
+          <Button className="pp-auth-btn pp-auth-btn--primary" onClick={() => onRoute('forgot')}>
             Request a new link
           </Button>
           <BackLink onClick={() => onRoute(signInStep(email))} />
-        </>
+        </div>
       }
     >
       This link may have expired or be invalid. Request a new link to continue.

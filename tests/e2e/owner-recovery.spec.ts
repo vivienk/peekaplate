@@ -68,8 +68,10 @@ test('S03 Check email never confirms the account, and Resend waits before it can
   await sendLink(page).click();
   await expect(heading(page, 'Check your email')).toBeFocused();
   await expect(
-    page.getByText(`If an account exists for ${EMAIL}, we’ll send a link`),
+    page.getByText('If an account exists for this email address, we’ll send a link'),
   ).toBeVisible();
+  // Rania (12 Nov): the address is not repeated in the text.
+  await expect(page.getByText(EMAIL)).toHaveCount(0);
   await expect(page.locator('.pp-auth__brand')).toHaveCount(0);
 
   const resend = page.getByRole('button', { name: 'Resend email' });

@@ -137,6 +137,12 @@ function Demo() {
       await wait();
       return answer(answers.current.reset) as ResetPasswordResult;
     },
+    // Check your email: a resend always succeeds here and asks for the demo's short wait.
+    async resendConfirmation() {
+      setRequests((n) => n + 1);
+      await wait();
+      return { kind: 'sent', resendAfterSeconds: RETRY_AFTER_SECONDS };
+    },
   };
 
   return (
