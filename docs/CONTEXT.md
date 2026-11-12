@@ -99,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run.",
+      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -201,7 +201,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "727d774dcb38138455045c9c6d2d38deda37c2c4d1170255006cc31440f606d2"
+      "sourceFingerprint": "4a8479e9cea83db5a0ca8c5f78b703771bc8fd980fe517a5511740919860f4c1"
     },
     {
       "id": "console",
@@ -541,7 +541,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "69a2a2cbf53ba8bd4e3a0a42a2946fd926628089b643d34f001eea0cab44cfb4"
+      "sourceFingerprint": "a2f9e3ebca10ccb2df5e7c3449c6188e26eea30303d88b49031bcfc0d3e077e7"
     },
     {
       "id": "processing",
@@ -668,17 +668,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-09",
-      "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
-      "modules": [
-        "diner"
-      ],
-      "paths": [
-        "frontend/diner/src/tracking/delivery.ts"
-      ],
-      "next": "DIN-03 must connect the current in-memory publication token and approved endpoint. Verify real controls reach PostHog and canonical facts independently; collection stays gated pending release acceptance."
-    },
-    {
       "date": "2026-11-08",
       "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
       "modules": [
@@ -777,6 +766,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/diner-tracking-staging.md"
       ],
       "next": "Release the reviewed main commit to the existing diner staging Pages project, verify release metadata and bounded synthetic browser dispatch. Jeffin/Uneeza then coordinate approved real PostHog/canonical persistence and numeric report reconciliation; no normal collection activation is implied."
+    },
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "diner",
+        "analytics"
+      ],
+      "summary": "PR158 is merged on main8c83f53 and deployed to existing staging diner Pages24dcd65c. Intercepted hosted smoke found the first menu_viewed missing only from PostHog because the screen consent listener ran first. A real-adapter regression reproduced the loss; syncing adapter consent immediately before capture fixes initial and renewed consent. No policy, SDK configuration, API, provider or Queue changes.",
+      "paths": [
+        "frontend/diner/src/tracking/index.ts",
+        "frontend/diner/src/tracking/dispatch.test.ts",
+        "tests/e2e/posthog-adapter.spec.ts",
+        "docs/diner-tracking-staging.md"
+      ],
+      "next": "Obtain final-commit approval, deploy the corrected exact main diner and rerun the intercepted hosted smoke. Jeffin/Uneeza then coordinate genuine PostHog readback, canonical durability and report reconciliation in an explicitly approved window; normal collection stays gated."
     }
   ]
 }

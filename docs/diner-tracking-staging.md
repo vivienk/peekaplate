@@ -48,6 +48,15 @@ An intercepted request proves browser dispatch, not PostHog ingestion or durable
 canonical persistence. The dated release comment holds the observed results;
 this procedure alone is not an acceptance record.
 
+The first hosted check of PR158 found a consent-listener ordering defect: the
+screen emitted its initial menu view before the PostHog adapter received the new
+consent state. Canonical delivery accepted it, but PostHog dropped that first view.
+The shared dispatch now synchronizes the adapter from the current gate immediately
+before capture. Tests register the screen listener first and verify matching IDs
+at both destinations on initial consent and re-consent. Privacy signals, fixture
+mode and publication suspension retain their existing gates. The corrected hosted
+retest must be recorded separately before DATA-12 proceeds.
+
 ## DATA-12 handoff
 
 Jeffin coordinates the real joined run; Uneeza owns independent expected/actual

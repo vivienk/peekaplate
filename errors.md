@@ -2624,3 +2624,9 @@ Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, in
 ## Diner tracking release preparation — November 12, 2026
 
 The first preparation check passed code, types and unit/script suites but correctly rejected the stale diner context after promoting PR78 files. The diner summary and source paths now describe the promoted boundary; fingerprints are refreshed before the final check. No runtime workaround, provider request or hosted mutation was involved.
+
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 reproduced an initial menu view in the canonical sender with no matching PostHog capture. The menu's consent listener was registered before the adapter's listener, so it emitted while the adapter still held the previous consent state. Synchronizing the adapter from the current shared gate immediately before capture fixes the ordering dependency. The real-adapter unit regression failed before the correction and passes afterward, including re-consent; the SDK browser case now uses the same listener order. Corrected hosted verification remains pending release approval.
+
+The first external smoke harness used the default headless user agent and the SDK correctly filtered all its events as bot traffic. Reusing the repository's Desktop Chrome profile isolated the actual first-event defect. No raw payloads, credentials or private provider traffic are stored in this record.
