@@ -1,0 +1,289 @@
+/*
+ * Save on the menu, dish detail and Saved screen (S3-DIN-02.2, .5), following Rania's PR 122 design
+ * review (9 Nov) as agreed by Adam. Colours are Diner tokens (review #24).
+ */
+
+/* Saved: filled orange heart and the word "Saved" in Orange/500 (Heart with Text, 298:5568). */
+.pp-save-heart[aria-pressed="true"]:not(:disabled) {
+  color: var(--pp-color-orange-500);
+}
+
+/* Every heart reaches a 44px-high touch target without moving the layout (review #27). */
+.pp-save-heart {
+  position: relative;
+}
+
+.pp-save-heart::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
+/* The header heart is drawn 34 x 27; its touch target is 44 x 44 around that centre (review #27). */
+.pp-saved::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+/*
+ * The header heart and count follow Figma's Heart.svg frame (31 x 26): a 24px heart 2px down, and a
+ * 14px cream circle at its top-right edge (Adam, 9 Nov), not over its centre.
+ */
+.pp-saved .pp-saved__icon {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  display: block;
+}
+
+.pp-saved .pp-saved__badge {
+  top: 0;
+  left: 17px;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* The menu styles the badge as inline-flex, which would otherwise override [hidden] at zero. */
+.pp-saved__badge[hidden] {
+  display: none;
+}
+
+/*
+ * Toasts sit at the top, directly below the screen's header (review #2, DIN-02.2). The area takes no
+ * space, so a toast never pushes content down; it overlaps the content under the header, never the
+ * header itself. Once the header has scrolled away the toast stays at the top of the screen,
+ * below any notch or status bar (review #25).
+ */
+.pp-toast-area {
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 10;
+  height: 0;
+  overflow: visible;
+}
+
+.pp-toast {
+  --pp-toast-icon-mark: var(--pp-color-neutral-50);
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 358px;
+  min-height: 44px;
+  margin: 0 auto;
+  padding: 0 4px 0 12px;
+  border: 1px solid;
+  border-radius: var(--pp-radius-16);
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  box-shadow: var(--pp-shadow-elevation-2);
+}
+
+/* Removed: Orange/500 with an Orange/600 stroke (751:10189). Dark text keeps 4.5:1 contrast. */
+.pp-toast--removed {
+  border-color: var(--pp-color-orange-600);
+  background: var(--pp-color-orange-500);
+  color: var(--pp-color-orange-950);
+  --pp-toast-icon-mark: var(--pp-color-orange-500);
+}
+
+/* Restored: Success/900 with a Success/400 stroke (1091:2272). */
+.pp-toast--restored {
+  border-color: var(--pp-color-success-400);
+  background: var(--pp-color-success-900);
+  color: var(--pp-color-neutral-50);
+  --pp-toast-icon-mark: var(--pp-color-success-900);
+}
+
+.pp-toast--restored .pp-toast__icon {
+  color: var(--pp-color-success-400);
+}
+
+.pp-toast__icon {
+  flex: none;
+  display: flex;
+}
+
+.pp-toast__text {
+  flex: 1;
+  padding-block: 12px;
+}
+
+.pp-toast__undo {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* The Saved screen sits on the same surface as the menu, edge to edge like the menu and detail. */
+main:has(> .pp-saved-screen) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pp-saved-screen {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0 16px 20px;
+  background: var(--pp-color-neutral-800);
+  color: var(--pp-color-neutral-50);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.pp-saved-screen :where(button) {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pp-saved__topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.pp-saved__back {
+  font-size: 20px;
+}
+
+.pp-saved__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pp-saved__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-saved__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+/* Saved dish card (DishCard_Saved, 691:7715). */
+.pp-saved__item {
+  padding: 8px 4px 8px 8px;
+  border-radius: var(--pp-radius-16);
+  background: var(--pp-color-neutral-700);
+}
+
+.pp-saved__image {
+  flex: none;
+  display: block;
+  border-radius: var(--pp-radius-full);
+}
+
+.pp-saved__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pp-saved__category {
+  color: var(--pp-color-neutral-400);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pp-saved__name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.pp-saved__price {
+  color: var(--pp-color-orange-500);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pp-saved__save {
+  color: var(--pp-color-orange-500);
+  font-size: 20px;
+}
+
+/* Empty state (Saved_Empty, 722:8589): centred in the space below the header. */
+.pp-saved__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 48px;
+  text-align: center;
+}
+
+.pp-saved__empty-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pp-saved__empty-hint {
+  max-width: 220px;
+  margin: 0 0 8px;
+  color: var(--pp-color-neutral-400);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* The orange pill button from the Diner design system (review #11). */
+.pp-saved-screen .pp-saved__browse {
+  width: 100%;
+  max-width: 280px;
+  padding: 12px 20px;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+  color: var(--pp-color-orange-950);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pp-saved__notice {
+  margin: 0 0 12px;
+  color: var(--pp-color-neutral-400);
+  font-size: 14px;
+}

@@ -7,6 +7,13 @@ const config = JSON.parse(
 );
 const staging = config.env.staging;
 
+test('staging extraction requests can reach the same-account public Worker', () => {
+  assert.ok(staging.compatibility_flags.includes('global_fetch_strictly_public'));
+  assert.ok(staging.compatibility_flags.includes('nodejs_compat'));
+  assert.deepEqual(config.compatibility_flags, ['nodejs_compat']);
+  assert.equal(config.env.production?.compatibility_flags, undefined);
+});
+
 test('the extraction application uses the provider-required Durable Object scheduler', () => {
   const host = JSON.parse(
     readFileSync(new URL('../backend/wrangler.extraction.jsonc', import.meta.url), 'utf8'),
@@ -47,16 +54,26 @@ test('private ingestion reports reuse the staging bucket with an explicit bindin
   assert.equal(observations?.bucket_name, reports.bucket_name);
 });
 
-test('binding-only setup does not attach an unimplemented menu consumer or invent a service URL', () => {
-  // Replace this setup guard when the reviewed consumer and real service are released together.
-  assert.equal(
-    (staging.queues.consumers ?? []).some(
-      (item) => item.queue === 'peekaplate-staging-menu-ingestion',
-    ),
-    false,
+test('menu consumer is bounded separately from observations and has its own DLQ', () => {
+  const menu = staging.queues.consumers.find(
+    (item) => item.queue === 'peekaplate-staging-menu-ingestion',
   );
+  assert.deepEqual(menu, {
+    queue: 'peekaplate-staging-menu-ingestion',
+    max_batch_size: 1,
+    max_batch_timeout: 1,
+    max_concurrency: 1,
+    max_retries: 3,
+    dead_letter_queue: 'peekaplate-staging-menu-ingestion-dlq',
+    retry_delay: 60,
+  });
   assert.equal(staging.vars.EXTRACTION_SERVICE_URL, undefined);
   assert.equal(staging.vars.EXTRACTION_SERVICE_SECRET, undefined);
+  assert.equal(
+    staging.queues.consumers.find((item) => item.queue === 'peekaplate-staging-observations')
+      .max_batch_size,
+    10,
+  );
 });
 
 test('extraction host is staging-only, single-instance and contains no secret values', () => {
@@ -69,4 +86,14 @@ test('extraction host is staging-only, single-instance and contains no secret va
   assert.equal(host.r2_buckets[0].bucket_name, 'peekaplate-staging-assets');
   assert.deepEqual(Object.keys(host.vars).sort(), ['APP_ENV', 'EXTRACTION_SOURCE_ORIGIN']);
   assert.equal(host.vars.APP_ENV, 'staging');
+});
+
+test('extraction deployment resolves the locked backend CLI and guards main SHA', async () => {
+  const workflow = readFileSync(
+    new URL('../.github/workflows/deploy-extraction-staging.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(workflow, /working-directory: backend/);
+  assert.match(workflow, /pnpm exec wrangler deploy --config wrangler\.extraction\.jsonc/);
+  assert.match(workflow, /test "\$GITHUB_SHA" = "\$EXPECTED_SHA"/);
 });
