@@ -120,6 +120,11 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
     return () => data.subscription.unsubscribe();
   }
 
+  async function discardExchangedSession(accessToken: string) {
+    const { data } = await client.auth.getSession();
+    if (data.session?.access_token === accessToken) await signOut();
+  }
+
   const service: OwnerAuthService = {
     async checkEmail() {
       return { kind: 'continue_to_sign_in' };
@@ -252,6 +257,7 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
         recoveryToken !== data.session.access_token ||
         sessionVersion !== version
       ) {
+        if (data.session) await discardExchangedSession(data.session.access_token);
         return { kind: 'invalid_link' };
       }
       const abort = new AbortController();
@@ -262,6 +268,7 @@ export function connectOwnerAuth(config: OwnerAuthConfig, fetcher: typeof fetch 
       });
       if (verifyError || !confirmed(verified.user) || sessionVersion !== version) {
         abort.abort();
+        await discardExchangedSession(data.session.access_token);
         return { kind: 'invalid_link' };
       }
       recovery = {

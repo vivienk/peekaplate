@@ -218,6 +218,8 @@ test('direct and signup-purpose reset links cannot authorize a password update',
   expect(
     calls.filter((call) => new URL(call.url).pathname.endsWith('/user') && call.body?.password),
   ).toHaveLength(0);
+  await page.goto(`${origin}/owner-auth.html`);
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
 });
 
 test('weak and unchanged passwords show actionable provider outcomes', async ({ page }) => {

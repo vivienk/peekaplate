@@ -47,9 +47,9 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, []);
 
   useEffect(() => {
-    if (isCallback) return;
-    let active = true;
     const unsubscribe = auth.onSignedOut(() => setOwner(null));
+    if (isCallback) return unsubscribe;
+    let active = true;
     void auth
       .signedInOwner()
       .then((current) => {
