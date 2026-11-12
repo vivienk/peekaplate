@@ -290,3 +290,48 @@ test('a concurrent account switch cannot redirect an in-flight reset to another 
     [...calls, ...otherCalls].some((call) => call.body?.password === 'must-not-switch-owner'),
   ).toBe(false);
 });
+
+test('signup Resend uses the live SDK, respects the wait and confirms its new PKCE link', async ({
+  page,
+}) => {
+  await page.clock.install();
+  const calls = await provider(page);
+  await signup(page);
+  const resend = page.getByRole('button', { name: 'Resend email', exact: true });
+  await expect(resend).toBeVisible();
+  await expect(resend).toHaveAttribute('aria-disabled', 'true');
+  await resend.dispatchEvent('click');
+  expect(calls.filter((call) => new URL(call.url).pathname.endsWith('/resend'))).toHaveLength(0);
+  await page.clock.runFor(61_000);
+  await resend.click();
+  await expect(page.getByText('We’ve sent another link.', { exact: true })).toBeVisible();
+  await expect(resend).toHaveAttribute('aria-disabled', 'true');
+  const requests = calls.filter((call) => new URL(call.url).pathname.endsWith('/resend'));
+  expect(requests).toHaveLength(1);
+  expect(new URL(requests[0]!.url).searchParams.get('redirect_to')).toBe(
+    `${origin}/auth-confirm.html`,
+  );
+  expect(requests[0]!.body).toMatchObject({ email, type: 'signup', code_challenge_method: 's256' });
+  await page.goto(`${origin}/auth-confirm.html?code=resent-signup-code`);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Email confirmed', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(`${origin}/auth-confirm.html`);
+});
+
+test('signup Resend maps provider throttling without exposing provider details', async ({
+  page,
+}) => {
+  await page.clock.install();
+  const calls = await provider(page, {
+    resend: {
+      status: 429,
+      body: { code: 'over_email_send_rate_limit', msg: 'private fixture detail' },
+    },
+  });
+  await signup(page);
+  await page.clock.runFor(61_000);
+  await page.getByRole('button', { name: 'Resend email', exact: true }).click();
+  await expect(page.locator('.pp-auth-resend__status')).toContainText('Too many attempts');
+  await expect(page.getByText('private fixture detail')).toHaveCount(0);
+  expect(calls.filter((call) => new URL(call.url).pathname.endsWith('/resend'))).toHaveLength(1);
+});
