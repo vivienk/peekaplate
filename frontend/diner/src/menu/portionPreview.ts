@@ -55,10 +55,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let attempt: AbortController | undefined;
   let renderer: PortionRenderer | undefined;
   let local3d: ReturnType<typeof import('./portion3d').bindLocal3d> | undefined;
+  let ar: ReturnType<typeof import('./portionAR').bindPortionAR> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const motion = createPortionMotion();
   let drag: { id: number; x: number; y: number } | undefined;
   const stop = () => {
+    ar?.dispose();
+    ar = undefined;
     local3d?.dispose();
     local3d = undefined;
     clearTimeout(timer);
@@ -204,6 +207,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           compare.textContent = 'Show original photo';
           compare.setAttribute('aria-pressed', 'false');
         });
+        const arModule = await import('./portionAR').catch(() => null);
+        if (controller.signal.aborted || disposed || !arModule) return;
+        ar = arModule.bindPortionAR(
+          controls,
+          () => stage.querySelector<HTMLImageElement>('.pp-portion__css img'),
+          () => local3d?.getModelUrl(),
+        );
       }
     } catch {
       if (attempt === controller && !controller.signal.aborted) fallback();

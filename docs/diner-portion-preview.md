@@ -146,3 +146,16 @@ Final command results and all four screenshots are recorded in
 
 Local screenshots, synthetic bundle tests and a supplied-photo demo are not production
 acceptance. No merge or deployment is authorized by this change.
+
+## Local camera / AR portal
+
+The explicit DEV `?scenario=portion-demo` flow now offers **View Portion → Preview controls → View on your table**. This opens a modal portal shared by the current exact 2.5D cutout and the validated local 3D job, when available. Generation remains separate: opening the portal does not upload camera frames or submit a Tripo job.
+
+- Supported immersive-AR browsers request hit-test and DOM overlay from an explicit **Start table AR** tap. The placement ring appears only on an approximately horizontal, upward-facing detected surface. **Place dish** positions the cutout/model at that hit; **Reposition**, rotation and visual-size controls adjust the same scene.
+- Browsers without that support offer **Start camera preview**. This uses a local camera stream behind the same renderer and clearly labels placement as manual, without surface tracking. Tap to reposition after placing. It is not world-anchored AR.
+- **Show 3D / Show 2.5D** switches representations at the same position. A missing or broken GLB keeps 2.5D; both are explicitly visual scale, not calibrated portion measurement. Cutout geometry remains a flat image at the contact point, not reconstructed volume.
+- Camera permission is requested only after the start tap. Denial leaves Back usable. Closing, Escape, browser Back, page exit or a hidden manual-camera page stops camera tracks; a stream arriving after dismissal is stopped immediately. XR end closes the portal and returns to the established preview.
+
+This feature and its Three.js bundle are excluded from production builds. Localhost is secure for camera permissions on the computer running the server. Phone testing needs a secure reachable origin or localhost port forwarding; the current loopback setup does not automatically make the demo reachable from a phone. No deployment, public tunnel or new permissions were configured.
+
+Verification boundary: browser tests use a synthetic camera stream and a labelled synthetic triangle GLB with the real Three.js renderer. They cover placement controls, rotation input, 3D/2.5D switching, failed GLB, denied/pending permissions, XR-request fallback and stream cleanup. Real device surface detection, tracking stability, physical-scale quality and a real generated dish in AR require device testing; desktop checks are not that evidence.

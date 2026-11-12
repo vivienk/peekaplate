@@ -1138,3 +1138,109 @@ main:has(> .pp-detail) {
 .pp-detail__image-wrap[data-model3d="true"] .pp-portion__css {
   visibility: hidden;
 }
+
+/* Local AR portal: camera pixels remain on the device and never enter generation requests. */
+.pp-ar {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #171a21;
+  color: #fff;
+  overflow: hidden;
+  font-family: Inter, sans-serif;
+}
+.pp-ar:fullscreen,
+.pp-ar:xr-overlay {
+  background: transparent;
+}
+.pp-ar::backdrop {
+  background: #171a21;
+}
+.pp-ar__camera,
+.pp-ar__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pp-ar__camera {
+  object-fit: cover;
+}
+.pp-ar__canvas {
+  touch-action: none;
+}
+.pp-ar__canvas canvas {
+  display: block;
+}
+.pp-ar__header,
+.pp-ar__panel {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  padding: 16px max(16px, env(safe-area-inset-right));
+  background: rgb(23 26 33 / 88%);
+}
+.pp-ar__header {
+  top: 0;
+  padding-top: max(16px, env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pp-ar__header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.pp-ar__panel {
+  bottom: 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.pp-ar__panel p {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.pp-ar__message {
+  font-weight: 600;
+}
+.pp-ar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pp-ar button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: #fff;
+  background: #363b48;
+  border: 1px solid #9a9eaa;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.pp-ar button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.pp-ar button[hidden] {
+  display: none;
+}
+.pp-ar label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.pp-ar input {
+  flex: 1;
+  min-height: 32px;
+  min-width: 0;
+  accent-color: #fff;
+}

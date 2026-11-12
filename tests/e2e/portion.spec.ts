@@ -625,3 +625,209 @@ test('zero Tripo credits explain rejection while preserving tilt and explicit sa
   await expect(page.locator('model-viewer')).toBeVisible();
   expect(creates()).toBe(1);
 });
+
+async function cameraFixture(page: Page, behavior: 'allow' | 'deny' | 'pending' = 'allow') {
+  await page.addInitScript((behavior) => {
+    const state = {
+      calls: 0,
+      stopped: 0,
+      resolve: undefined as ((stream: MediaStream) => void) | undefined,
+    };
+    const fakeCamera = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#8b7766';
+      context.fillRect(0, 0, 640, 480);
+      const stream = canvas.captureStream(5);
+      for (const track of stream.getTracks()) {
+        const stop = track.stop.bind(track);
+        track.stop = () => {
+          state.stopped++;
+          stop();
+        };
+      }
+      return stream;
+    };
+    Object.assign(window, {
+      cameraTest: state,
+      resolveCamera: () => state.resolve?.(fakeCamera()),
+    });
+    Object.defineProperty(navigator, 'xr', { configurable: true, value: undefined });
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      configurable: true,
+      value: async () => {
+        state.calls++;
+        if (behavior === 'deny') throw new DOMException('Denied', 'NotAllowedError');
+        if (behavior === 'pending')
+          return new Promise<MediaStream>((resolve) => {
+            state.resolve = resolve;
+          });
+        return fakeCamera();
+      },
+    });
+  }, behavior);
+}
+async function openPortal(page: Page) {
+  await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
+  await openPortion(page);
+  await page.getByText('Preview controls', { exact: true }).click();
+  await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
+}
+
+test('camera portal positions the exact cutout, rotates, resets and releases camera on Back', async ({
+  page,
+}) => {
+  await cameraFixture(page);
+  await openPortal(page);
+  expect(await page.evaluate(() => (window as any).cameraTest.calls)).toBe(0);
+  await expect(page.locator('.pp-ar__message')).toContainText('manual positioning only');
+  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+  await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
+  await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
+  await page.getByRole('slider', { name: 'Rotate dish', exact: true }).fill('45');
+  await expect(page.getByRole('slider', { name: 'Rotate dish', exact: true })).toHaveValue('45');
+  await page.getByRole('button', { name: 'Reposition', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Rotate dish', exact: true })).toHaveValue('0');
+  await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+  await expect(page.locator('.pp-ar')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View on your table', exact: true })).toBeFocused();
+});
+
+test('camera denial keeps the portal dismissible and preserves 2.5D and preview history', async ({
+  page,
+}) => {
+  await cameraFixture(page, 'deny');
+  await openPortal(page);
+  const length = await page.evaluate(() => history.length);
+  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+  await expect(page.locator('.pp-ar__message')).toContainText('could not start');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pp-ar')).toHaveCount(0);
+  await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+  expect(await page.evaluate(() => history.length)).toBe(length);
+});
+
+test('closing portal during camera permission stops a late stream without reviving the portal', async ({
+  page,
+}) => {
+  await cameraFixture(page, 'pending');
+  await openPortal(page);
+  await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+  await page.evaluate(() => (window as any).resolveCamera());
+  await expect.poll(() => page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+  await expect(page.locator('.pp-ar')).toHaveCount(0);
+  await expect(page.locator('.pp-portion__css')).toBeVisible();
+});
+
+function portalTestGLB() {
+  const binary = Buffer.alloc(36);
+  [-0.5, 0, 0, 0.5, 0, 0, 0, 1, 0].forEach((value, i) => binary.writeFloatLE(value, i * 4));
+  const doc = {
+    asset: { version: '2.0' },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: 'VEC3',
+        min: [-0.5, 0, 0],
+        max: [0.5, 1, 0],
+      },
+    ],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }],
+    buffers: [{ byteLength: 36 }],
+  };
+  let json = JSON.stringify(doc);
+  json += ' '.repeat((4 - (json.length % 4)) % 4);
+  const result = Buffer.alloc(12 + 8 + json.length + 8 + binary.length);
+  result.write('glTF');
+  result.writeUInt32LE(2, 4);
+  result.writeUInt32LE(result.length, 8);
+  result.writeUInt32LE(json.length, 12);
+  result.writeUInt32LE(0x4e4f534a, 16);
+  result.write(json, 20);
+  const offset = 20 + json.length;
+  result.writeUInt32LE(binary.length, offset);
+  result.writeUInt32LE(0x004e4942, offset + 4);
+  binary.copy(result, offset + 8);
+  return result;
+}
+
+for (const fail of [false, true]) {
+  test(`camera portal loads a real GLB and retains 2.5D when model fails=${fail}`, async ({
+    page,
+  }) => {
+    await cameraFixture(page);
+    await local3d(page, 'ready');
+    await expect(page.locator('model-viewer')).toBeVisible();
+    await page.route('**/artifacts/model.glb', (route) =>
+      route.fulfill({
+        status: fail ? 404 : 200,
+        contentType: 'model/gltf-binary',
+        body: fail ? Buffer.from('missing') : portalTestGLB(),
+      }),
+    );
+    await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+    await page.getByRole('button', { name: 'Start camera preview', exact: true }).click();
+    await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+    if (fail) {
+      await expect(
+        page.getByRole('button', { name: '3D unavailable · showing 2.5D', exact: true }),
+      ).toBeDisabled();
+    } else {
+      await page.getByRole('button', { name: 'Show 3D', exact: true }).click();
+      await expect(page.locator('.pp-ar')).toHaveAttribute('data-visual', '3d');
+      await page.getByRole('slider', { name: 'Rotate dish', exact: true }).fill('60');
+      await page
+        .getByRole('dialog', { name: 'Dish on your table' })
+        .getByRole('button', { name: 'Show 2.5D', exact: true })
+        .click();
+    }
+    await expect(page.locator('.pp-ar')).toHaveAttribute('data-visual', '2.5d');
+    await page.screenshot({ path: `test-results/ar-camera-${fail ? 'fallback' : 'switch'}.png` });
+    await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
+    expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+  });
+}
+
+test('unavailable table session falls back to manual camera and browser Back stops the stream', async ({
+  page,
+}) => {
+  await cameraFixture(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      configurable: true,
+      value: {
+        isSessionSupported: async () => true,
+        requestSession: async (_mode: string, options: unknown) => {
+          Object.assign(window, { xrRequested: options });
+          throw new DOMException('Unsupported features', 'NotSupportedError');
+        },
+      },
+    });
+  });
+  await openPortal(page);
+  await page.getByRole('button', { name: 'Start table AR', exact: true }).click();
+  expect(await page.evaluate(() => (window as any).xrRequested.requiredFeatures)).toEqual([
+    'hit-test',
+    'dom-overlay',
+  ]);
+  await page.getByRole('button', { name: 'Try camera preview', exact: true }).click();
+  await page.getByRole('button', { name: 'Place dish', exact: true }).click();
+  await page.goBack();
+  await expect(page.locator('.pp-ar')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeVisible();
+});

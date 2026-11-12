@@ -4,5 +4,6 @@ import { localModelPlugin } from '../../scripts/local-model-proxy.mjs';
 
 export default defineConfig({
   plugins: [dinerBudget(), localModelPlugin()],
+  optimizeDeps: { include: ['three', 'three/addons/loaders/GLTFLoader.js'] },
   build: { manifest: true },
 });

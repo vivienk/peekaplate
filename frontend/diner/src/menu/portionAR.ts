@@ -1,0 +1,414 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// Local review only. The caller imports this module behind the explicit DEV fixture gate.
+export function bindPortionAR(
+  controls: HTMLElement,
+  source: () => HTMLImageElement | null,
+  modelUrl: () => string | undefined,
+) {
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.textContent = 'View on your table';
+  controls.append(open);
+  let closeCurrent: (() => void) | undefined;
+  let disposed = false;
+
+  const show = () => {
+    if (disposed || closeCurrent) return;
+    const image = source();
+    if (!image?.complete || !image.naturalWidth) return;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'pp-ar';
+    dialog.setAttribute('aria-label', 'Dish on your table');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.innerHTML = `<video class="pp-ar__camera" muted playsinline aria-hidden="true"></video>
+      <div class="pp-ar__canvas"></div>
+      <header class="pp-ar__header"><h2>Dish on your table</h2><button type="button" data-action="close">Back to preview</button></header>
+      <div class="pp-ar__panel">
+        <p class="pp-ar__message" role="status">Checking table AR support…</p>
+        <p>Visual scale only. This is not a serving-size measurement.</p>
+        <div class="pp-ar__actions">
+          <button type="button" data-action="start" disabled>Start camera preview</button>
+          <button type="button" data-action="place" hidden>Place dish</button>
+          <button type="button" data-action="reset" hidden>Reposition</button>
+          <button type="button" data-action="mode" hidden>Show 3D</button>
+        </div>
+        <label>Rotate dish <input aria-label="Rotate dish" type="range" min="-180" max="180" value="0" disabled></label>
+        <label>Visual size <input aria-label="Visual size" type="range" min="50" max="150" value="100" disabled></label>
+      </div>`;
+    const button = (name: string) =>
+      dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
+    const start = button('start');
+    const place = button('place');
+    const reset = button('reset');
+    const mode = button('mode');
+    const message = dialog.querySelector<HTMLElement>('.pp-ar__message')!;
+    const video = dialog.querySelector<HTMLVideoElement>('video')!;
+    const canvasHost = dialog.querySelector<HTMLElement>('.pp-ar__canvas')!;
+    const rotation = dialog.querySelector<HTMLInputElement>('[aria-label="Rotate dish"]')!;
+    const size = dialog.querySelector<HTMLInputElement>('[aria-label="Visual size"]')!;
+    video.muted = true;
+    document.body.append(dialog);
+    dialog.showModal();
+    button('close').focus();
+    const abort = new AbortController();
+    let live = true;
+    let busy = false;
+    let tracked = false;
+    let placed = false;
+    let running = false;
+    let session: XRSession | undefined;
+    let hits: XRHitTestSource | undefined;
+    let space: XRReferenceSpace | undefined;
+    let stream: MediaStream | undefined;
+    let renderer: THREE.WebGLRenderer | undefined;
+    let model: THREE.Object3D | undefined;
+    let use3d = false;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
+    const anchor = new THREE.Group();
+    const content = new THREE.Group();
+    anchor.add(content);
+    anchor.visible = false;
+    scene.add(anchor, new THREE.HemisphereLight(0xffffff, 0x666666, 3));
+    const light = new THREE.DirectionalLight(0xffffff, 3);
+    light.position.set(1, 3, 2);
+    scene.add(light);
+    const texture = new THREE.Texture(image);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    const width = 0.3;
+    const height = width * (image.naturalHeight / image.naturalWidth);
+    const cutout = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    cutout.position.y = height / 2;
+    content.add(cutout);
+    const reticle = new THREE.Mesh(
+      new THREE.RingGeometry(0.055, 0.07, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    );
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
+
+    const disposeObject = (object: THREE.Object3D) => {
+      const textures = new Set<THREE.Texture>();
+      object.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        node.geometry.dispose();
+        for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+          for (const value of Object.values(material))
+            if (value instanceof THREE.Texture) textures.add(value);
+          material.dispose();
+        }
+      });
+      for (const item of textures) item.dispose();
+    };
+    const stopCamera = () => {
+      for (const track of stream?.getTracks() ?? []) track.stop();
+      stream = undefined;
+      video.srcObject = null;
+    };
+    const resize = () => {
+      if (!renderer || session) return;
+      const bounds = canvasHost.getBoundingClientRect();
+      camera.aspect = bounds.width / Math.max(1, bounds.height);
+      camera.updateProjectionMatrix();
+      renderer.setSize(bounds.width, bounds.height);
+    };
+    const close = () => {
+      if (!live) return;
+      live = false;
+      abort.abort();
+      stopCamera();
+      hits?.cancel();
+      renderer?.setAnimationLoop(null);
+      const end = session?.end().catch(() => {});
+      void Promise.resolve(end).finally(() => {
+        disposeObject(scene);
+        renderer?.dispose();
+      });
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', hidden);
+      window.removeEventListener('pagehide', close);
+      dialog.close();
+      dialog.remove();
+      closeCurrent = undefined;
+      if (!disposed && open.isConnected) open.focus();
+    };
+    closeCurrent = close;
+    const hidden = () => {
+      if (document.hidden && !session) close();
+    };
+    const changed = () => {
+      content.rotation.y = THREE.MathUtils.degToRad(Number(rotation.value));
+      content.scale.setScalar(Number(size.value) / 100);
+    };
+    rotation.addEventListener('input', changed);
+    size.addEventListener('input', changed);
+    button('close').addEventListener('click', close);
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      close();
+    });
+    dialog.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+      }
+    });
+    for (const panel of dialog.querySelectorAll('.pp-ar__header, .pp-ar__panel')) {
+      panel.addEventListener('beforexrselect', (event) => event.preventDefault());
+    }
+    window.addEventListener('resize', resize);
+    window.addEventListener('pagehide', close);
+    document.addEventListener('visibilitychange', hidden);
+
+    const placeDish = () => {
+      if (!running || (tracked && !reticle.visible)) return;
+      if (tracked) anchor.position.setFromMatrixPosition(reticle.matrix);
+      else anchor.position.set(0, -0.2, -0.85);
+      // Keep the cutout upright at its contact point; it remains a flat image, not inferred geometry.
+      anchor.quaternion.identity();
+      placed = true;
+      anchor.visible = true;
+      reticle.visible = false;
+      place.hidden = true;
+      reset.hidden = false;
+      rotation.disabled = size.disabled = false;
+      message.textContent = tracked
+        ? 'Placed on the detected surface. Move around the dish; use Rotate to turn it.'
+        : 'Manual camera placement — no surface tracking. Tap the camera view to reposition.';
+    };
+    place.addEventListener('click', placeDish);
+    reset.addEventListener('click', () => {
+      placed = false;
+      anchor.visible = false;
+      reset.hidden = true;
+      place.hidden = false;
+      place.disabled = tracked;
+      rotation.value = '0';
+      size.value = '100';
+      changed();
+      message.textContent = tracked
+        ? 'Move your phone slowly over a table. Wait for the placement ring.'
+        : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
+    });
+    canvasHost.addEventListener('pointerup', (event) => {
+      if (!running || tracked || !placed) return;
+      const bounds = canvasHost.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+          (-(event.clientY - bounds.top) / bounds.height) * 2 + 1,
+        ),
+        camera,
+      );
+      ray.ray.at(0.85 / -ray.ray.direction.z, anchor.position);
+    });
+
+    const activate = () => {
+      running = true;
+      start.hidden = true;
+      place.hidden = false;
+      place.disabled = tracked;
+      resize();
+      renderer!.setAnimationLoop((_time, frame) => {
+        if (!live) return;
+        if (tracked && frame && hits && space && !placed) {
+          const pose = frame.getHitTestResults(hits)[0]?.getPose(space);
+          // Only approximately horizontal, upward-facing surfaces qualify as tables/floors.
+          reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
+          if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
+          place.disabled = !reticle.visible;
+        }
+        renderer!.render(scene, camera);
+      });
+      message.textContent = tracked
+        ? 'Move your phone slowly over a table. Wait for the placement ring, then tap Place dish.'
+        : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
+    };
+    start.addEventListener('click', async () => {
+      if (busy || !live) return;
+      busy = true;
+      start.disabled = true;
+      try {
+        if (!renderer) {
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+          renderer.setClearColor(0x000000, 0);
+          canvasHost.append(renderer.domElement);
+          renderer.domElement.addEventListener('webglcontextlost', (event) => {
+            event.preventDefault();
+            close();
+          });
+        }
+        if (tracked) {
+          // Called directly from this click, before any await, preserving user activation.
+          const next = await navigator.xr!.requestSession('immersive-ar', {
+            requiredFeatures: ['hit-test', 'dom-overlay'],
+            optionalFeatures: ['local-floor'],
+            domOverlay: { root: dialog },
+          });
+          if (!live) {
+            await next.end();
+            return;
+          }
+          session = next;
+          session.addEventListener('end', close, { once: true });
+          renderer.xr.enabled = true;
+          renderer.xr.setReferenceSpaceType('local');
+          await renderer.xr.setSession(session);
+          if (!live) return;
+          space = await session.requestReferenceSpace('local');
+          const viewer = await session.requestReferenceSpace('viewer');
+          hits = await session.requestHitTestSource!({ space: viewer });
+          if (!live) {
+            hits?.cancel();
+            return;
+          }
+          session.addEventListener('select', placeDish);
+        } else {
+          const next = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false,
+          });
+          if (!live) {
+            for (const track of next.getTracks()) track.stop();
+            return;
+          }
+          stream = next;
+          video.srcObject = stream;
+          await video.play();
+          if (!live) return;
+          for (const track of stream.getVideoTracks())
+            track.addEventListener('ended', close, { once: true });
+        }
+        activate();
+      } catch {
+        if (!live) return;
+        stopCamera();
+        if (session) {
+          // End listeners close the portal; the normal preview remains mounted underneath.
+          void session.end().catch(close);
+        } else {
+          tracked = false;
+          start.textContent = 'Try camera preview';
+          message.textContent =
+            'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
+        }
+      } finally {
+        busy = false;
+        if (live) start.disabled = false;
+      }
+    });
+
+    mode.addEventListener('click', () => {
+      if (!model) return;
+      use3d = !use3d;
+      model.visible = use3d;
+      cutout.visible = !use3d;
+      mode.textContent = use3d ? 'Show 2.5D' : 'Show 3D';
+      dialog.dataset.visual = use3d ? '3d' : '2.5d';
+    });
+    dialog.dataset.visual = '2.5d';
+    const url = modelUrl();
+    if (url) {
+      mode.hidden = false;
+      mode.disabled = true;
+      mode.textContent = 'Loading 3D…';
+      void (async () => {
+        try {
+          const response = await fetch(url, {
+            signal: AbortSignal.any([abort.signal, AbortSignal.timeout(30_000)]),
+            credentials: 'same-origin',
+          });
+          if (!response.ok || !response.body) throw new Error('Model unavailable');
+          const reader = response.body.getReader();
+          const chunks: Uint8Array[] = [];
+          let length = 0;
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              length += value.byteLength;
+              if (length > 50_000_000) throw new Error('Model exceeds budget');
+              chunks.push(value);
+            }
+          } finally {
+            await reader.cancel();
+          }
+          const bytes = new Uint8Array(length);
+          let offset = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.length;
+          }
+          const gltf = await new GLTFLoader().parseAsync(bytes.buffer, '');
+          if (!live) {
+            disposeObject(gltf.scene);
+            return;
+          }
+          const bounds = new THREE.Box3().setFromObject(gltf.scene);
+          const dimensions = bounds.getSize(new THREE.Vector3());
+          const extent = Math.max(dimensions.x, dimensions.y, dimensions.z);
+          if (!Number.isFinite(extent) || extent <= 0) {
+            disposeObject(gltf.scene);
+            throw new Error('Invalid model size');
+          }
+          gltf.scene.position.sub(bounds.getCenter(new THREE.Vector3()));
+          gltf.scene.position.y += dimensions.y / 2;
+          model = new THREE.Group();
+          model.add(gltf.scene);
+          model.scale.setScalar(0.3 / extent);
+          model.visible = false;
+          content.add(model);
+          mode.disabled = false;
+          mode.textContent = 'Show 3D';
+        } catch {
+          if (live) {
+            mode.textContent = '3D unavailable · showing 2.5D';
+            mode.disabled = true;
+          }
+        }
+      })();
+    }
+    void (navigator.xr?.isSessionSupported('immersive-ar') ?? Promise.resolve(false))
+      .then((supported) => {
+        if (!live) return;
+        tracked = supported;
+        start.textContent = supported ? 'Start table AR' : 'Start camera preview';
+        start.disabled = !isSecureContext || (!supported && !navigator.mediaDevices?.getUserMedia);
+        message.textContent = start.disabled
+          ? 'Camera access needs a secure connection and a supported browser. Back returns to the 2.5D preview.'
+          : supported
+            ? 'Use your camera to place the dish on a detected table.'
+            : 'Surface-tracking AR is unavailable here. Camera preview supports manual positioning only.';
+      })
+      .catch(() => {
+        if (!live) return;
+        tracked = false;
+        start.disabled = !navigator.mediaDevices?.getUserMedia;
+        message.textContent = 'Table AR is unavailable. Try a manual camera preview.';
+      });
+  };
+  open.addEventListener('click', show);
+  return {
+    dispose() {
+      disposed = true;
+      closeCurrent?.();
+      open.removeEventListener('click', show);
+      open.remove();
+    },
+  };
+}

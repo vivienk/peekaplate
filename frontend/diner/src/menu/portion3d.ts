@@ -253,6 +253,8 @@ export function bindLocal3d(
   action.addEventListener('click', generate);
   toggle.addEventListener('click', () => (stage.dataset.model3d ? show2d() : show3d()));
   return {
+    getModelUrl: () =>
+      modelReady && id ? `${prefix}/v1/model-jobs/${id}/artifacts/model.glb` : undefined,
     show2d,
     reset: () => {
       if (viewer) {

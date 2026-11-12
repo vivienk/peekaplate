@@ -2729,3 +2729,8 @@ Live console reconciliation showed zero API balance, zero frozen credits and no 
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T10:30:26.290Z","exitCode":1}
 ```
+
+
+## ERR-20261112-AR-PORTAL — local portal verification
+
+Initial AR browser test was interrupted by Vite optimizing a newly introduced Three.js import and reloading the preview. Added explicit dependency prebundling. A later synthetic-GLB switch test found two Show 2.5D controls (underlying preview and modal); scoped the assertion to the dialog. No live camera frames or Tripo calls were used in these tests. Camera-denial, pending-permission cleanup and manual placement regressions exercise the real renderer with synthetic streams. Physical WebXR hit testing remains NOT RUN without a supported device.
