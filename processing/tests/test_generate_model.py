@@ -4,13 +4,15 @@ import json
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
+from contextlib import redirect_stdout
 from pathlib import Path
 from urllib.error import URLError, HTTPError
 
 from PIL import Image, ImageDraw
 
 from peekaplate_processing.errors import ExtractionError
-from peekaplate_processing.generate_model import OPTIONS, digest, prepare, run, validate_glb
+from peekaplate_processing.generate_model import OPTIONS, digest, prepare, run, validate_glb, main
 from peekaplate_processing.tripo import TripoClient, TripoRejected
 
 
@@ -114,6 +116,17 @@ class ModelPipelineTests(unittest.TestCase):
         client.states = ['success']
         self.assertEqual(run(self.jobdir, client)['status'], 'ready')
         self.assertEqual((client.uploads, client.submissions), (1, 1))
+
+    def test_cli_reports_zero_credit_rejection_as_failure(self):
+        self.prepare()
+        client = FakeClient()
+        client.balance = lambda: 0
+        output = io.StringIO()
+        with patch('peekaplate_processing.generate_model.TripoClient', return_value=client), redirect_stdout(output):
+            result = main(['run', '--job-dir', str(self.jobdir)])
+        self.assertEqual(result, 2)
+        self.assertEqual(json.loads(output.getvalue())['error_code'], 'insufficient_credits')
+        self.assertEqual((client.uploads, client.submissions), (0, 0))
 
     def test_zero_balance_blocks_upload_and_can_resume_same_job(self):
         self.prepare()

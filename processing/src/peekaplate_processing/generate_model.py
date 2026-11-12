@@ -326,7 +326,10 @@ def main(argv=None):
             job = run(args.job_dir, TripoClient(os.getenv('TRIPO_API_KEY')),
                       timeout=args.wait_seconds)
         print(json.dumps({'status': job['status'], 'task_id': job['task_id'],
-                          'review_status': 'needs_review', 'publication_eligible': False}))
+                          'review_status': 'needs_review', 'publication_eligible': False,
+                          'error_code': job.get('error_code')}))
+        if args.command == 'run' and job.get('error_code'):
+            return 2
         return 0 if job['status'] in ('prepared', 'ready') else 3 if job['status'] not in TERMINAL else 2
     except (ExtractionError, OSError, ValueError, KeyError, TypeError):
         print(json.dumps({'status': 'error', 'message': 'Generation did not complete. Inspect local job state; never blindly resubmit.'}))
