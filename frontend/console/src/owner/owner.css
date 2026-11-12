@@ -245,21 +245,69 @@ body:has(.owner-root) {
   color: var(--pp-color-warning-900);
 }
 
-/* Shared button shape: Figma "Owner dashboard_Button" is a pill with a 16px label. */
+/* Figma "Owner dashboard_Button" (component set 1563:8484), read with Figwright on 11 Nov: a pill
+ * with a 16px Semi Bold label. Figma draws every stroke inside the button, so the thicker hover,
+ * pressed and focus strokes are a 1px border plus an inset shadow: the button never changes size.
+ *   Primary  default Orange/500, label Orange/950; hover Orange/300; pressed Orange/700.
+ *   Outlined default color/surface-container (#fffcfa) with 1px Neutral/500, label Orange/950;
+ *            hover: no fill and a 3px Neutral/500 stroke (the Orange/500 fill is hidden in Figma);
+ *            pressed: Neutral/950 fill and 2px stroke, label #fffcfa.
+ *   Focus    2px inside stroke color/border/focus (Info/600) on the default fill.
+ *   Disabled Neutral/200 fill, 1px Neutral/300, label Neutral/400. */
+.owner-root {
+  --owner-pending-surface-container: #fffcfa; /* Figma color/surface-container: no Cream token yet */
+}
 .owner-button.pp-button {
+  /* Medium size (the S12 frame uses Medium): 40px tall with the 1px stroke inside, 7 + 24 + 7 + 2. */
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 7px var(--pp-space-16);
   border-radius: var(--pp-radius-full);
   font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
   font-weight: var(--pp-font-weight-semibold);
+  transition:
+    background-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    box-shadow var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    transform var(--pp-motion-duration-press) var(--pp-motion-ease-out);
+}
+.owner-button.pp-button--action {
+  background-color: var(--pp-color-orange-500);
+  color: var(--pp-color-orange-950);
+}
+.owner-button.pp-button--action:hover:not(:disabled) {
+  background-color: var(--pp-color-orange-300);
+}
+.owner-button.pp-button--action:active:not(:disabled) {
+  background-color: var(--pp-color-orange-700);
 }
 .owner-button.pp-button--outline {
-  background: var(--pp-role-surface-container);
-  border-color: var(--pp-role-outline-solid);
-  color: var(--pp-role-button-action-text);
+  background-color: var(--owner-pending-surface-container);
+  border-color: var(--pp-color-neutral-500);
+  color: var(--pp-color-orange-950);
+}
+.owner-button.pp-button--outline:hover:not(:disabled) {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 2px var(--pp-color-neutral-500); /* + 1px border = 3px */
+}
+.owner-button.pp-button--outline:active:not(:disabled) {
+  background-color: var(--pp-color-neutral-950);
+  border-color: var(--pp-color-neutral-950);
+  box-shadow: inset 0 0 0 1px var(--pp-color-neutral-950); /* + 1px border = 2px */
+  color: var(--owner-pending-surface-container);
+}
+.owner-root .owner-button.pp-button:focus-visible {
+  outline: none;
+  border-color: var(--pp-color-info-600);
+  box-shadow: inset 0 0 0 1px var(--pp-color-info-600); /* + 1px border = 2px inside */
 }
 .owner-button.pp-button:disabled {
-  background: var(--pp-role-button-disabled-bg);
-  border-color: var(--pp-role-button-disabled-border);
-  color: var(--pp-role-button-disabled-text);
+  background-color: var(--pp-color-neutral-200);
+  border-color: var(--pp-color-neutral-300);
+  box-shadow: none;
+  color: var(--pp-color-neutral-400);
 }
 .owner-button.pp-button:disabled img {
   opacity: 0.5;
@@ -377,7 +425,7 @@ body:has(.owner-root) {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-height: 48px; /* same height as the step buttons, so cards stay aligned */
+  min-height: 40px; /* same height as the Medium step buttons, so cards stay aligned */
   margin-top: auto; /* actions sit on the same line in every card */
 }
 /* Design review 06: secondary helper text, one step smaller than the body copy and dark orange
