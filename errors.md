@@ -2717,3 +2717,5 @@ not a distributed queue or production owner endpoint.
 ## Local 3D connection verification — 2026-11-12
 
 Initial lint rejected formatting in the new proxy test; formatted the file. Typecheck rejected an explicitly undefined fetch body under exactOptionalPropertyTypes; use null for bodyless requests. A pytest invocation could not run because this environment has unittest, not pytest; rerun the existing unittest suites with their intended runner. These were local verification errors, not provider failures. Regression coverage: scripts/local-model-proxy.test.mjs and tests/e2e/portion.spec.ts.
+
+Review recovery fix: stale scheduled/running attempts now expose explicit resume after the bounded polling deadline; regression `stale running attempt offers explicit resume after polling deadline` passes. Initial browser launch was blocked by loopback permissions; authorized local rerun passed 55 tests, followed by focused reset and stale-attempt checks.

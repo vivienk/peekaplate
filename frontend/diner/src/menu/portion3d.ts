@@ -186,8 +186,11 @@ export function bindLocal3d(
     }
     message.textContent = `Generating 3D${typeof job.progress === 'number' ? ` · ${job.progress}%` : ''}. You can still tilt the 2.5D dish.`;
     if (Date.now() >= deadline) {
+      mode = 'resume';
       action.disabled = false;
-      action.textContent = 'Check 3D job';
+      action.textContent = 'Resume 3D job';
+      message.textContent =
+        'Automatic checking paused. Resume this same job to recover after a local server restart.';
       return;
     }
     timer = setTimeout(() => {

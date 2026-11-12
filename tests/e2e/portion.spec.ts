@@ -525,8 +525,13 @@ async function local3d(page: Page, state: string) {
     return route.fulfill({
       json: {
         job_id: saved,
-        status: state === 'resume' && !req.url().endsWith('/resume') ? 'prepared' : 'ready',
-        attempt_status: null,
+        status:
+          ['resume', 'stale'].includes(state) && !req.url().endsWith('/resume')
+            ? state === 'stale'
+              ? 'waiting'
+              : 'prepared'
+            : 'ready',
+        attempt_status: state === 'stale' ? 'running' : null,
         dish: metadata.dish,
         source: {
           review_asset_id: metadata.source_asset_id,
@@ -586,6 +591,16 @@ test('prepared local job resumes explicitly without creating another generation'
   page,
 }) => {
   const creates = await local3d(page, 'resume');
+  await page.getByRole('button', { name: 'Resume 3D job', exact: true }).click();
+  await expect(page.locator('model-viewer')).toBeVisible();
+  expect(creates()).toBe(1);
+});
+
+test('stale running attempt offers explicit resume after polling deadline', async ({ page }) => {
+  await page.clock.install();
+  const creates = await local3d(page, 'stale');
+  await expect(page.locator('.pp-local3d')).toContainText('Generating 3D');
+  await page.clock.fastForward(10 * 60_000 + 3000);
   await page.getByRole('button', { name: 'Resume 3D job', exact: true }).click();
   await expect(page.locator('model-viewer')).toBeVisible();
   expect(creates()).toBe(1);
