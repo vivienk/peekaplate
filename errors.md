@@ -2888,7 +2888,24 @@ The compiled staging check after PR158 found the first menu_viewed in the canoni
 
 ## Menu verification lifecycle and retention resolution — November 13, 2026
 
+Independent review reproduced three failures on disposable PostgreSQL using the
+restricted runtime role: retention without tenant context misclassified pending
+originals, stale draft versions were accepted for verification, and approval
+receipt replay returned a storage deletion action. Corrected with scoped locked
+retention, expected content versions and effect-free approval retries. Photo
+event sequencing and extracted-draft verification now use independent contiguous
+streams; content edits/retries invalidate verification without mutating published
+projections. Regression evidence: `backend/src/owner-menu.integration.ts` and
+`backend/src/owner-menu-retention.test.ts`. Earlier counts below are historical;
+current verification is recorded in PR #161. Hosted migration/deployment remains
+NOT RUN for this change.
+
 Transient observations during Phase 3 verification:
 - `lint` (exit 1): CommonJS require syntax in initial test file. Resolved by standardizing ESM imports and running `biome check --write .`.
 - `typecheck` (exit 2): R2 storage bucket type missing optional `delete` member in `backend/src/index.ts`, `verification_status` missing on `DishDraftRow`, and console package missing local contracts export references. Resolved with typed storage interface, updated `DishDraftRow` type in `backend/src/ingestion/repository.ts`, and local contract type mirroring in `frontend/console/src/owner-dashboard/menu-api.ts`.
 - `test` (exit 1): `cleanupStagedMenuPhotos` early-exit guard incorrectly treated `promotedRetentionDays: 0` as disabled. Resolved in `backend/src/owner-menu-retention.ts` by checking `promotedRetentionDays !== undefined`. Regression verified with `backend/src/owner-menu-retention.test.ts` and `backend/src/owner-menu.integration.ts`. Full test suite (86 test files, 1,417 tests) and all repository checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
+```

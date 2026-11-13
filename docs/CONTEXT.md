@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5ab2efcc9ea616ae097d767f12e500b9e1955a7af3104c1d7e802d3f6701b65a"
+      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
     },
     {
       "id": "tokens",
@@ -244,7 +244,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. PR161 adds revision-bound private draft verification and independent content-checked photo promotion; tenant-scoped retention remains disabled until configured. Synthetic demo labels are not live screen integration.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -373,7 +373,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-menu-workspace.md",
         "backend/src/ingestion/intake.source.test.ts",
         "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
+        "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu-retention.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -386,7 +388,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "05f78bd03817056d8b29e06a13812fca3da41c1469cc3fd11d16a84099c5db15"
+      "sourceFingerprint": "2876a6834b9501ac72c950d58f582c51b4d16102d9a56f29f146bd280f4c4537"
     },
     {
       "id": "database",
@@ -421,7 +423,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261109120000_owner_insight_actions.sql",
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "tests/db/owner_menu_workspace.sql"
+        "tests/db/owner_menu_workspace.sql",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -432,7 +435,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
+      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
     },
     {
       "id": "measurement",
@@ -518,7 +521,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "aa08193f11cab070ac8a33a69cfec16323f3bd89694ddf5077ac3d74abee72df"
+      "sourceFingerprint": "2855b77065bb1123132c64dc5112134ae33266541956e2e8677e1b220f841b98"
     },
     {
       "id": "agents",
@@ -833,7 +836,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "summary": "Menu verification lifecycle decouples dish verification from photo asset approval, staging unverified uploads in menu-staging/ and promoting approved assets to menu-assets/ via content-verified copy (SHA-256 byte digest and size check). PostgreSQL is source of truth for verification_status ('not_verified'/'verified' for dishes; 'not_verified'/'verified'/'rejected' for photos). Deletion of staging objects occurs strictly post-commit or via configurable scheduled retention, preserving active pending drafts. Publishing never requires verification. Jeffin's Screens 8 and 9 in console UI integrate verified/staging status badges and non-blocking publishing indicators.",
+      "summary": "PR161 verification correction: expected draft version required; separate verification event sequence supports manual and extracted drafts without changing content versions or published projections. Manual edits/extraction retries invalidate verification. Photo transitions serialize successive event versions; identical retries are storage-effect-free. Retention establishes tenant RLS scope and row locks, validates promoted bytes and exact keys, paginates R2 and retains on lookup failures. Review/Saved pages remain synthetic preview state, not connected persistence.",
       "sources": [
         "migrations/20261113010000_menu_verification_lifecycle.sql",
         "packages/contracts/src/owner-menu.ts",
@@ -843,7 +846,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-menu.integration.ts",
         "frontend/console/src/owner-dashboard/menu.tsx"
       ],
-      "next": "Review by human owner before merge into develop. No staging or production deployment without explicit authorization. Staging cleanup retention remains disabled by default until retention policy is formally activated by operators."
+      "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
     }
   ]
 }

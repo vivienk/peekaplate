@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { loadApprovedDishSources } from './bundle-producer/repository';
 import { createDishRevision, replayDish } from './dish-command';
 import { approveDishDraftAtomic, createApp } from './index';
+import { adaptPythonExtractionResult } from './ingestion/adapter';
 import {
   acceptUploadGroupFile,
   changeMenuJob,
@@ -19,11 +20,12 @@ import {
   promoteDraftPhoto,
   rejectDraftPhoto,
   replayOwnerDraft,
-  replayOwnerDraftProjection,
+  replayOwnerDraftVerification,
   saveOwnerDishDraft,
   storeDraftPhoto,
   verifyOwnerDish,
 } from './owner-menu';
+import { cleanupStagedMenuPhotos } from './owner-menu-retention';
 import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -760,6 +762,222 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     expect((await request()).status).toBe(409);
   });
 
+  it('verifies extracted revisions with replay and clears verification on extraction retry', async () => {
+    const report = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../processing/tests/fixtures/service-artifacts/representative-bundle.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ).report;
+    const adapted = adaptPythonExtractionResult(report);
+    if (!adapted.success || !adapted.drafts.length) throw new Error('invalid_review_fixture');
+    const upload = image();
+    const group = await createUploadGroup(runtime, actor, venue, [upload]);
+    await acceptUploadGroupFile(runtime, actor, venue, group.id, 0, upload, async () => {});
+    const job = group.jobs[0]!;
+    const persist = async () => {
+      const claim = await claimIngestionJob(runtime, {
+        tenantId: venue,
+        jobId: job.id,
+        workerId: 'verification-review',
+      });
+      await persistExtractedDrafts(runtime, {
+        tenantId: venue,
+        jobId: job.id,
+        claimToken: claim!.claimToken,
+        drafts: adapted.drafts,
+      });
+    };
+    await persist();
+    const row = (
+      await admin.query(
+        'SELECT id,draft_version FROM app_private.dish_drafts WHERE tenant_id=$1 AND job_id=$2 ORDER BY draft_index LIMIT 1',
+        [venue, job.id],
+      )
+    ).rows[0];
+    const command = crypto.randomUUID();
+    await verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1);
+    await expect(
+      verifyOwnerDish(runtime, actor, other, row.id, crypto.randomUUID(), true, 1),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(
+      verifyOwnerDish(runtime, viewer, venue, row.id, crypto.randomUUID(), true, 1),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    await admin.query(
+      "UPDATE app_private.menu_ingestion_jobs SET status='failed',finished_at=now() WHERE id=$1",
+      [job.id],
+    );
+    await changeMenuJob(runtime, actor, venue, job.id, crypto.randomUUID(), 'retry');
+    await persist();
+    const refreshed = (
+      await admin.query(
+        'SELECT draft_version,verification_status FROM app_private.dish_drafts WHERE id=$1',
+        [row.id],
+      )
+    ).rows[0];
+    expect(refreshed).toEqual({ draft_version: 2, verification_status: 'not_verified' });
+    const events = (
+      await admin.query(
+        "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='owner_draft_verification' AND stream_id=$2 ORDER BY version",
+        [venue, row.id],
+      )
+    ).rows;
+    expect(events).toHaveLength(1);
+    expect(replayOwnerDraftVerification(events, 1)).toBe('verified');
+    expect(replayOwnerDraftVerification(events, 2)).toBe('not_verified');
+    expect(
+      (await verifyOwnerDish(runtime, actor, venue, row.id, command, true, 1)).draft
+        .verification_status,
+    ).toBe('verified');
+    expect(
+      (
+        await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [
+          row.id,
+        ])
+      ).rows[0].verification_status,
+    ).toBe('not_verified');
+    await verifyOwnerDish(runtime, actor, venue, row.id, crypto.randomUUID(), true, 2);
+    const reverified = (
+      await admin.query(
+        "SELECT version,schema_version,event_type,payload FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='owner_draft_verification' AND stream_id=$2 ORDER BY version",
+        [venue, row.id],
+      )
+    ).rows;
+    expect(reverified.map((event) => event.version)).toEqual([1, 2]);
+    expect(replayOwnerDraftVerification(reverified, 2)).toBe('verified');
+    expect(
+      (
+        await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [
+          row.id,
+        ])
+      ).rows[0].verification_status,
+    ).toBe('verified');
+  });
+
+  it('retention scopes restricted reads before protecting pending originals', async () => {
+    const draftId = crypto.randomUUID();
+    await save(draftId);
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      image(),
+      'image/png',
+      async () => {},
+    );
+    const storage = {
+      list: async () => ({ objects: [{ key: photo.storage_key, uploaded: new Date(0) }] }),
+      get: async () => null,
+      put: async () => {},
+      delete: vi.fn(async () => {}),
+    };
+    const result = await cleanupStagedMenuPhotos({
+      storage,
+      client: runtime,
+      retentionConfig: { orphanGraceDays: 1 },
+    });
+    expect(result.protectedPending).toBe(1);
+    expect(storage.delete).not.toHaveBeenCalled();
+    expect(
+      (await runtime.query("SELECT current_setting('app.tenant_id',true) AS tenant")).rows[0]
+        .tenant,
+    ).toBe('');
+  });
+
+  it('HTTP verification requires authority and reviewed version before accepting the draft', async () => {
+    const id = crypto.randomUUID();
+    await save(id);
+    const app = createApp({ verify: async () => actor, execute: vi.fn() });
+    const env = { APP_ENV: 'local', LOCAL_DATABASE_URL: runtimeUrl! };
+    const request = (body: unknown, venueId = venue, authenticated = true) =>
+      app.request(
+        `https://test/venues/${venueId}/drafts/${id}/verify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authenticated ? { Authorization: 'Bearer synthetic' } : {}),
+          },
+          body: JSON.stringify(body),
+        },
+        env,
+      );
+    expect(
+      (await request({ commandId: crypto.randomUUID(), expectedVersion: 1 }, venue, false)).status,
+    ).toBe(401);
+    expect((await request({ commandId: crypto.randomUUID() })).status).toBe(400);
+    expect(
+      (await request({ commandId: crypto.randomUUID(), expectedVersion: 1 }, other)).status,
+    ).toBe(403);
+    expect((await request({ commandId: crypto.randomUUID(), expectedVersion: 2 })).status).toBe(
+      409,
+    );
+    const success = await request({ commandId: crypto.randomUUID(), expectedVersion: 1 });
+    expect(success.status).toBe(200);
+    expect(
+      ((await success.json()) as { draft: { verification_status: string } }).draft
+        .verification_status,
+    ).toBe('verified');
+  });
+
+  it('dish verification rejects stale content and is invalidated by a later edit', async () => {
+    const id = crypto.randomUUID();
+    await save(id);
+    await save(id, { name: 'Updated soup' }, 1);
+    await expect(
+      verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 1),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    const verified = await verifyOwnerDish(runtime, actor, venue, id, crypto.randomUUID(), true, 2);
+    expect(verified.draft.draft_version).toBe(2);
+    expect(verified.draft.verification_status).toBe('verified');
+    expect((await save(id, { name: 'Changed again' }, 2)).verification_status).toBe('not_verified');
+  });
+
+  it('photo approval and rejection serialize successive commands and replay without storage effects', async () => {
+    const draftId = crypto.randomUUID();
+    await save(draftId);
+    const bytes = image();
+    const storage = {
+      get: vi.fn(async () => ({ arrayBuffer: async () => bytes.bytes.buffer as ArrayBuffer })),
+      put: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+    };
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      bytes,
+      'image/png',
+      storage.put,
+    );
+    const commandId = crypto.randomUUID();
+    await promoteDraftPhoto(runtime, actor, venue, draftId, photo.id, commandId, storage);
+    const readCount = storage.get.mock.calls.length;
+    const replay = await promoteDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      photo.id,
+      commandId,
+      storage,
+    );
+    expect(replay.stagingKeyToDelete).toBeNull();
+    expect(storage.get).toHaveBeenCalledTimes(readCount);
+    await rejectDraftPhoto(runtime, actor, venue, draftId, photo.id, crypto.randomUUID());
+    await promoteDraftPhoto(runtime, actor, venue, draftId, photo.id, crypto.randomUUID(), storage);
+    const events = await admin.query(
+      "SELECT version FROM app_private.es_event WHERE tenant_id=$1 AND stream_type='owner_photo' AND stream_id=$2 ORDER BY version",
+      [venue, photo.id],
+    );
+    expect(events.rows.map((row) => row.version)).toEqual([1, 2, 3]);
+  });
+
   it('promotes staged photos to menu-assets safely and decouples from dish verification', async () => {
     const draftId = crypto.randomUUID();
     await save(draftId);
@@ -828,7 +1046,7 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
 
     // 2. Verify dish independently
     const verifyCmd = crypto.randomUUID();
-    const verifiedDish = await verifyOwnerDish(runtime, actor, venue, draftId, verifyCmd, true);
+    const verifiedDish = await verifyOwnerDish(runtime, actor, venue, draftId, verifyCmd, true, 1);
     expect(verifiedDish.draft.verification_status).toBe('verified');
 
     // Replay projection check
@@ -840,12 +1058,12 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     }>(
       `SELECT version, schema_version, event_type, payload
        FROM app_private.es_event
-       WHERE tenant_id=$1 AND stream_id=$2
+       WHERE tenant_id=$1 AND stream_type='owner_draft_verification' AND stream_id=$2
        ORDER BY version ASC`,
       [venue, draftId],
     );
-    const proj = replayOwnerDraftProjection(events.rows);
-    expect(proj?.verificationStatus).toBe('verified');
+    expect(replayOwnerDraftVerification(events.rows, 1)).toBe('verified');
+    expect(replayOwnerDraftVerification(events.rows, 2)).toBe('not_verified');
 
     // 3. Reject photo on a new draft
     const draft2Id = crypto.randomUUID();

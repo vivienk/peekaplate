@@ -102,6 +102,7 @@ export type PhotoVerificationStatus = z.infer<typeof PhotoVerificationStatusSche
 
 export const VerifyDishDraftSchema = z.strictObject({
   commandId: z.uuid(),
+  expectedVersion: z.number().int().min(1).max(2_147_483_646),
   verified: z.boolean().default(true),
 });
 export type VerifyDishDraft = z.infer<typeof VerifyDishDraftSchema>;

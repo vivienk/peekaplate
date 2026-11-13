@@ -92,6 +92,7 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
         scope.data.draftId,
         input.data.commandId,
         input.data.verified,
+        input.data.expectedVersion,
       ),
     );
     return c.json(result);

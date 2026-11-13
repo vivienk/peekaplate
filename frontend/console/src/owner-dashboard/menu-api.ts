@@ -4,8 +4,9 @@ export type PhotoVerificationStatus = 'not_verified' | 'verified' | 'rejected';
 export interface VerifyDishResponse {
   draft: {
     id: string;
-    verificationStatus: DishVerificationStatus;
-    updatedAt: string;
+    verification_status: DishVerificationStatus;
+    draft_version: number;
+    updated_at: string;
   };
 }
 
@@ -27,6 +28,7 @@ export async function verifyDishOnBackend(
   token: string,
   venueId: string,
   draftId: string,
+  expectedVersion: number,
   verified = true,
 ): Promise<VerifyDishResponse> {
   const commandId = crypto.randomUUID();
@@ -36,7 +38,7 @@ export async function verifyDishOnBackend(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ commandId, verified }),
+    body: JSON.stringify({ commandId, verified, expectedVersion }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'request_failed' }));
@@ -64,28 +66,6 @@ export async function approvePhotoOnBackend(
       body: JSON.stringify({ commandId }),
     },
   );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'request_failed' }));
-    throw new Error(err.error || `Failed with status ${res.status}`);
-  }
-  return res.json();
-}
-
-export async function publishMenuOnBackend(
-  apiOrigin: string,
-  token: string,
-  venueId: string,
-  menuId: string,
-): Promise<{ status: 'published'; publishedAt: string }> {
-  const commandId = crypto.randomUUID();
-  const res = await fetch(`${apiOrigin}/venues/${venueId}/menus/${menuId}/publish`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ commandId }),
-  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'request_failed' }));
     throw new Error(err.error || `Failed with status ${res.status}`);

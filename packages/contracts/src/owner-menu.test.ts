@@ -40,9 +40,11 @@ describe('owner working drafts', () => {
     expect(PhotoVerificationStatusSchema.safeParse('invalid').success).toBe(false);
 
     const commandId = crypto.randomUUID();
-    expect(VerifyDishDraftSchema.safeParse({ commandId }).success).toBe(true);
-    expect(VerifyDishDraftSchema.parse({ commandId }).verified).toBe(true);
-    expect(VerifyDishDraftSchema.safeParse({ commandId, verified: false }).success).toBe(true);
+    expect(VerifyDishDraftSchema.safeParse({ commandId }).success).toBe(false);
+    expect(VerifyDishDraftSchema.parse({ commandId, expectedVersion: 1 }).verified).toBe(true);
+    expect(
+      VerifyDishDraftSchema.safeParse({ commandId, expectedVersion: 1, verified: false }).success,
+    ).toBe(true);
     expect(VerifyDishDraftSchema.safeParse({ commandId: 'not-a-uuid' }).success).toBe(false);
 
     expect(ApproveDraftPhotoSchema.safeParse({ commandId }).success).toBe(true);

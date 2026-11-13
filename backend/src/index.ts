@@ -1861,18 +1861,22 @@ export const handleScheduled = async (event: any, env: any) => {
       : undefined;
     const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
 
+    const stagingStorage = env.INGESTION_REPORTS_BUCKET;
     if (
-      stagingRetentionDays !== undefined ||
-      stagingRejectedDays !== undefined ||
-      stagingOrphanDays !== undefined
+      stagingStorage &&
+      typeof stagingStorage.list === 'function' &&
+      typeof stagingStorage.delete === 'function' &&
+      (stagingRetentionDays !== undefined ||
+        stagingRejectedDays !== undefined ||
+        stagingOrphanDays !== undefined)
     ) {
       try {
         const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
         const stagingResult = await cleanupStagedMenuPhotos({
-          storage: storage as any,
+          storage: stagingStorage,
           client,
           retentionConfig: {
-            promotedRetentionDays: stagingRetentionDays ?? 0,
+            promotedRetentionDays: stagingRetentionDays,
             rejectedRetentionDays: stagingRejectedDays ?? 0,
             orphanGraceDays: stagingOrphanDays ?? 0,
           },
