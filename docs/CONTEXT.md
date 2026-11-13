@@ -681,7 +681,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "a02c217d1d90056d85662a5953cf3de21bd1a0b5f0f1b080d29bc9ae4a817f2e"
+      "sourceFingerprint": "ce99a1cde4a6c8f4b9843bf8d92eb01fcf7da0eaf27d57c8de7283c543a86b71"
     },
     {
       "id": "assets",
@@ -716,6 +716,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "processing"
+      ],
+      "summary": "Added PDF-to-illustration integration regression using actual extraction/orchestration and Gemini adapter, mocking only external model responses. Verifies original PDF bytes, extracted coconut, draft bindings, actual PNG/gallery files, unchanged needs_review/publication=false, and one image request across two runs. Focused ingredient suite passes 35 tests.",
+      "next": "Configure GEMINI_API_KEY and verify live provider output; local implementation is opt-in, not deployed hosted automation."
+    },
     {
       "date": "2026-11-12",
       "modules": [
@@ -806,23 +814,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/comparison-reporting.md"
       ],
       "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "PR142 owner-only insight-action HTTP/persistence/contracts preserve develop PR134/123. Shared context/history conflicts and stale local port/evidence docs are reconciled. New real-Worker cases cover competing updates, old receipt replay, changed command reuse and dual-owner tenant isolation. A full DB run exposed six inherited comparison-reader statement timeouts; tenant/time-scoped materialization replaces repeated view expansion while preserving period/privacy/order semantics. The full runner passes 298 SQL assertions and 114 DB/Worker cases; 11 focused comparison cases include 1000 unrelated synthetic observations. pnpm check passes 1397 unit (4 optional skips), 74 script tests, types/lint/context/docs. Both builds/Worker dry-run, 137 Chromium and 9 SDK/privacy tests pass.",
-      "sources": [
-        "backend/src/owner-insight-actions.ts",
-        "backend/src/dish.integration.ts",
-        "backend/src/comparison-report.ts",
-        "migrations/20261109120000_owner_insight_actions.sql",
-        "docs/owner-insight-actions.md"
-      ],
-      "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
     }
   ]
 }

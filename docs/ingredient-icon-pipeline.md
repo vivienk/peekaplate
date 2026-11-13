@@ -302,3 +302,9 @@ The generation follow-up adds focused tests for novel ingredient detection, dedu
 Generation verification: full Python suite PASS, 536 tests in 48.875 seconds; focused ingredient suite PASS, 33 tests after adding draft/index bindings. The Python environment is the same non-frozen environment recorded above.
 
 Final adapter hardening: 34 focused ingredient tests pass after adding malformed provider-container cases; those cases produce per-ingredient failures and continue the batch. The earlier 536-test full suite predates this narrow hardening.
+
+## PDF to illustration integration verification
+
+The added integration regression runs the actual pipeline CLI against a generated synthetic PDF containing coconut. Only the external text-model answer and image-provider HTTP response are mocked. Native PDF acquisition, extraction validation, ingredient detection, generation planning, Gemini response parsing, image validation/storage and review export all run normally. It asserts original PDF-byte preservation, draft-to-image bindings, PNG/gallery output, unchanged review/publication states, and exactly one image request across two extraction runs. The focused ingredient suite passes 35 tests. This proves local wiring; it is not a live Gemini or hosted deployment test.
+
+Final verification rerun: PASS — 538 Python tests in 51.950 seconds, including the PDF-to-illustration/cache integration regression. Context/documentation checks and diff whitespace check pass. Uses the existing local Python environment, not the frozen deployment runtime.

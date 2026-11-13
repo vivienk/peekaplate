@@ -5,6 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+from fixture_factory import make_pdf
+from test_workflow import FakeLLM
+
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.ingredient_icons import IconStore, build_icon_handoff, ingredient_identity
 from peekaplate_processing.ingredient_intelligence import build_review_handoff
@@ -165,6 +168,52 @@ class IngredientGenerationTests(unittest.TestCase):
                 self.assertEqual([j["state"] for j in result["jobs"]], ["failed", "failed"])
                 self.assertEqual(result["provider_requests"], 2)
                 self.assertNotIn("synthetic-key", json.dumps(result))
+
+    def test_pdf_to_illustration_runs_real_pipeline_and_adapter_then_reuses_cache(self):
+        """Only external model responses are mocked, not extraction/orchestration."""
+        class CoconutExtractor(FakeLLM):
+            def invoke(self, messages):
+                answer = super().invoke(messages)
+                answer["parsed"].dishes[0].ingredients = ["coconut"]
+                answer["raw"].content = answer["parsed"].model_dump_json()
+                return answer
+
+        source = self.root / "menu.pdf"
+        source.write_bytes(make_pdf([{"text": "Dish 1 8.50 CAD\nIngredients: coconut"}]))
+        extractor = CoconutExtractor()
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps({"candidates": [{
+            "finishReason": "STOP", "content": {"parts": [{"inlineData": {
+                "mimeType": "image/png", "data": base64.b64encode(png()).decode()}}]}}]}).encode()
+        opener = MagicMock()
+        opener.open.return_value = response
+        catalogue = self.root / "real-catalogue"
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "synthetic-key"}), patch(
+                "peekaplate_processing.run_pipeline.load_dotenv"), patch(
+                "peekaplate_processing.run_pipeline.configured_llm", return_value=extractor), patch(
+                "peekaplate_processing.ingredient_icon_generation.build_opener", return_value=opener), patch(
+                "peekaplate_processing.ocr_space.OCRSpaceClient.extract", side_effect=AssertionError("Native PDF needs no external OCR")):
+            for iteration, expected_state in [(1, "generated"), (2, "cached")]:
+                folder = self.root / f"actual-run-{iteration}"
+                code = pipeline_main(["--input", str(source), "--run-dir", str(folder), "--input-mode", "ocr",
+                                      "--no-llm-cache", "--no-ocr-cache", "--generate-ingredient-icons",
+                                      "--max-icon-requests", "1", "--icon-rights-confirmed",
+                                      "--icon-catalogue", str(catalogue)])
+                self.assertEqual(code, 0)
+                extraction = json.loads((folder / "extraction.json").read_text())
+                self.assertEqual(extraction["drafts"][0]["ingredients"], ["coconut"])
+                self.assertEqual(extraction["drafts"][0]["status"], "needs_review")
+                self.assertEqual(base64.b64decode(extraction["source"]["snapshot_base64"]), source.read_bytes())
+                generation = json.loads((folder / "ingredient-artwork/generation-results.json").read_text())
+                self.assertEqual(generation["jobs"][0]["state"], expected_state)
+                self.assertEqual(generation["plan"]["bindings"][0]["draft_id"], extraction["evidence"][0]["draft_id"])
+                self.assertFalse(generation["publishable"])
+                artwork = list((folder / "ingredient-artwork").glob("*.png"))
+                self.assertEqual(len(artwork), 1)
+                self.assertEqual(artwork[0].read_bytes(), png())
+                self.assertTrue((folder / "ingredient-artwork/index.html").is_file())
+        self.assertEqual(len(extractor.calls), 2)
+        self.assertEqual(opener.open.call_count, 1)
 
 
 if __name__ == "__main__":
