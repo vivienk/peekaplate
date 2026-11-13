@@ -20,6 +20,7 @@ export default defineConfig({
           foundations: page('foundations.html'),
           firstDashboard: page('first-dashboard.html'),
           ownerDashboard: page('owner-dashboard.html'),
+          reviewDishes: page('review-dishes.html'),
         },
       },
     },
