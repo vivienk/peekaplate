@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import {
+  AcceptPilotOrderAgreementRequestSchema,
+  type AcceptPilotOrderAgreementResponse,
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
   ApprovedDishFactsSchema,
@@ -10,6 +12,7 @@ import {
   CreateDishRevisionSchema,
   type CreateOwnerInsightActionRequest,
   CreateOwnerInsightActionRequestSchema,
+  DeleteOrderDataRequestSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
@@ -22,6 +25,7 @@ import {
   ObservationBatchV2Schema,
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
+  type OrderDataDeletionReason,
   type OrderOutcomeImportResponse,
   OwnerDishFieldsSchema,
   OwnerInsightActionIdSchema,
@@ -34,6 +38,7 @@ import {
   type ReviewCandidateItemResponse,
   type SubmitMenuIngestionRequest,
   SubmitMenuIngestionRequestSchema,
+  type SubmitOrderDeletionResponse,
   TeamAnalyticsQuerySchema,
   TeamAnalyticsResponseSchema,
   type UpdateOwnerInsightActionRequest,
@@ -81,10 +86,12 @@ import {
 } from './menu-token';
 import { ingestObservations } from './observation-ingest';
 import {
+  acceptPilotOrderAgreement as acceptPilotOrderAgreementService,
   cleanupOrphanedOrderImports,
   importOrderOutcomes as importOrderOutcomesService,
   OrderImportError,
   type OrderOutcomeStorage,
+  submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
 } from './order-ingestion/service';
 import {
   createOwnerInsightAction,
@@ -259,6 +266,19 @@ type Dependencies = {
     sourceFilename: string,
     env: Bindings,
   ) => Promise<OrderOutcomeImportResponse>;
+  acceptPilotOrderAgreement?: (
+    actorId: string,
+    venueId: string,
+    agreementVersion: string,
+    env: Bindings,
+  ) => Promise<AcceptPilotOrderAgreementResponse>;
+  submitOrderDataDeletionRequest?: (
+    actorId: string,
+    venueId: string,
+    requestId: string,
+    reason: OrderDataDeletionReason | undefined,
+    env: Bindings,
+  ) => Promise<SubmitOrderDeletionResponse>;
   upsertReviewSession?: (
     actorId: string,
     venueId: string,
@@ -1586,6 +1606,108 @@ export function createApp(services: Dependencies = dependencies) {
       c.env ?? {},
     );
     return c.json(result, 200);
+  });
+
+  app.post('/venues/:venueId/orders/agreement-acceptance', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = AcceptPilotOrderAgreementRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const acceptFn =
+      services.acceptPilotOrderAgreement ??
+      (async (actorId, venueId, agreementVersion, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await acceptPilotOrderAgreementService({
+            client,
+            actorId,
+            venueId,
+            agreementVersion,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await acceptFn(
+      actorId,
+      scope.data.venueId,
+      parsed.data.agreementVersion,
+      c.env ?? {},
+    );
+    return c.json(result, 200);
+  });
+
+  app.post('/venues/:venueId/orders/deletion-requests', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = DeleteOrderDataRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const submitDeletionFn =
+      services.submitOrderDataDeletionRequest ??
+      (async (actorId, venueId, requestId, reason, env) => {
+        const connectionString =
+          env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+        if (!connectionString) throw new AuthUnavailableError();
+        const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+        try {
+          await client.connect();
+          return await submitOrderDataDeletionRequestService({
+            client,
+            actorId,
+            venueId,
+            requestId,
+            reason,
+          });
+        } finally {
+          await client.end().catch(() => {});
+        }
+      });
+
+    const result = await submitDeletionFn(
+      actorId,
+      scope.data.venueId,
+      parsed.data.requestId,
+      parsed.data.reason,
+      c.env ?? {},
+    );
+    return c.json(result, 202);
   });
 
   app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {

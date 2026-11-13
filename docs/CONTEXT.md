@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
+      "sourceFingerprint": "e196a81d22cb55112cf3cea14d968692373228e058722e334ecda5960e8a6fbf"
     },
     {
       "id": "tokens",
@@ -390,7 +390,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2876a6834b9501ac72c950d58f582c51b4d16102d9a56f29f146bd280f4c4537"
+      "sourceFingerprint": "52bfdeba8d6fcf0cb55206b1e6446ef229f0acbed4c144a719a6aa8e003fad5d"
     },
     {
       "id": "database",
@@ -437,7 +437,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
+      "sourceFingerprint": "272a817229a8c27eb240f52f71cc51b987337f7fa598c8e2cb2df417a1567ef7"
     },
     {
       "id": "measurement",
@@ -447,10 +447,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/delivery.md",
         "docs/implementation_plan.md",
         "docs/pos-mapping-and-tracking-activation.md",
+        "docs/pilot-order-outcome-agreement.md",
         "packages/contracts/src/order-outcome.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/tracking-activation.ts",
-        "migrations/20261107120000_order_outcomes.sql"
+        "migrations/20261107120000_order_outcomes.sql",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
@@ -459,7 +461,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "61a94c827e8f542dd5f446af1da530956eb6add77d7acf3e6858d822cadf6ba1"
+      "sourceFingerprint": "3ca915fa802da20ce1068d2e1bc21160c5ceec240870ba9f6d5d191f0b40201a"
     },
     {
       "id": "delivery",
@@ -717,14 +719,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Initial PR51 head e67a574 passed full Linux CI40461046251, including frozen Python/package, browser and DB checks; Intel Mac native dependency limits are documented in errors.md. Independent automated review found no supported defect after disproving an assumed Zod Unicode mismatch; a boundary regression was added. See ingredient-intelligence.md for remaining authenticated RES-01 integration.",
-      "modules": [
-        "processing",
-        "contracts"
-      ],
-      "next": "Complete independent review and hosted pipeline checks, then integrate trusted imports, authenticated owner corrections/confirmation and publication enforcement through RES-01/RES-02."
-    },
-    {
       "date": "2026-11-11",
       "modules": [
         "contracts",
@@ -849,6 +843,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/menu.tsx"
       ],
       "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "measurement",
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "summary": "Implemented and hardened S6-DATA-14.1 agreement acceptance gate and S6-DATA-14.2 manual-operator order-data deletion: review-ready v0.1 agreement and runbook, atomic pilot_order_agreement_acceptances with fail-closed 403 on import, owner deletion-request intake blocking new imports (409 deletion_in_progress) with bounded reason enum, composite (tenant_id, id) PK, GUC-spoof-hardened SECURITY DEFINER delete_venue_order_data, and non-PII R2 deletion ledger receipt.",
+      "sources": [
+        "docs/pilot-order-outcome-agreement.md",
+        "packages/contracts/src/order-outcome.ts",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/index.ts"
+      ],
+      "next": "Run staging migration/R2 end-to-end verification, name the Manual deletion operator, complete post-restore backup reconciliation drill, and obtain Vivien (Product) and Sai (Security) approvals before enabling real pilot owner uploads."
     }
   ]
 }

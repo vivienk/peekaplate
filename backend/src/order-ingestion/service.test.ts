@@ -1,14 +1,18 @@
 import {
   MAX_ORDER_OUTCOME_ROWS,
+  PILOT_ORDER_AGREEMENT_VERSION,
   PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
   type PublicMenuContentBundle,
 } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  acceptPilotOrderAgreement,
   cleanupOrphanedOrderImports,
+  deleteVenueOrderData,
   type ImportOrderOutcomeOptions,
   importOrderOutcomes,
   OrderImportError,
+  submitOrderDataDeletionRequest,
 } from './service';
 import { getVenueTrackingActivation, recordVenueTrackingActivation } from './tracking-activation';
 
@@ -37,6 +41,18 @@ type MockDbState = {
   lines: Map<string, any>;
   quarantine: any[];
   conflicts: any[];
+  agreementAcceptances?: Map<
+    string,
+    {
+      id: string;
+      tenant_id: string;
+      agreement_version: string;
+      accepted_by: string;
+      accepted_at: Date;
+    }
+  >;
+  deletionRequests?: Map<string, any>;
+  simulateDbDeletionFailure?: boolean;
 };
 
 function createMockClient(state: MockDbState) {
@@ -76,6 +92,204 @@ function createMockClient(state: MockDbState) {
           return { rows: [{ permission: state.permission }], rowCount: 1 };
         }
         return { rows: [], rowCount: 0 };
+      }
+
+      // 1a. Pilot order agreement acceptance check & insert
+      if (normalizedSql.includes('FROM app_private.pilot_order_agreement_acceptances')) {
+        const [tenantId, version] = params!;
+        if (state.agreementAcceptances === undefined) {
+          if (tenantId === state.venueId && version === PILOT_ORDER_AGREEMENT_VERSION) {
+            return {
+              rows: [
+                {
+                  id: '00000000-0000-4000-8000-000000000099',
+                  agreement_version: version,
+                  accepted_by: state.actorId,
+                  accepted_at: new Date('2026-11-12T00:00:00Z'),
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          return { rows: [], rowCount: 0 };
+        }
+        const rec = state.agreementAcceptances.get(`${tenantId}:${version}`);
+        return { rows: rec ? [rec] : [], rowCount: rec ? 1 : 0 };
+      }
+
+      if (normalizedSql.includes('INSERT INTO app_private.pilot_order_agreement_acceptances')) {
+        const [id, tenantId, version, acceptedBy] = params!;
+        if (!state.agreementAcceptances) state.agreementAcceptances = new Map();
+        const key = `${tenantId}:${version}`;
+        if (state.agreementAcceptances.has(key)) {
+          return { rows: [], rowCount: 0 };
+        }
+        const rec = {
+          id,
+          tenant_id: tenantId,
+          agreement_version: version,
+          accepted_by: acceptedBy,
+          accepted_at: new Date('2026-11-13T00:00:00Z'),
+        };
+        state.agreementAcceptances.set(key, rec);
+        return { rows: [rec], rowCount: 1 };
+      }
+
+      // 1a-2. Deletion request audit ledger & privileged deletion function
+      if (normalizedSql.includes('FROM app_private.order_data_deletion_requests')) {
+        if (normalizedSql.includes("status IN ('requested',")) {
+          const [tenantId] = params!;
+          const active = [...(state.deletionRequests?.values() ?? [])].find(
+            (r) =>
+              r.tenant_id === tenantId &&
+              (r.status === 'requested' ||
+                r.status === 'executing' ||
+                r.status === 'r2_deleted' ||
+                r.status === 'failed'),
+          );
+          return { rows: active ? [active] : [], rowCount: active ? 1 : 0 };
+        }
+        const rec = normalizedSql.includes('WHERE tenant_id = $1 AND id = $2')
+          ? state.deletionRequests?.get(`${params![0]}:${params![1]}`)
+          : state.deletionRequests?.get(`${params![1]}:${params![0]}`);
+        return { rows: rec ? [rec] : [], rowCount: rec ? 1 : 0 };
+      }
+
+      if (normalizedSql.includes('INSERT INTO app_private.order_data_deletion_requests')) {
+        const [id, tenantId, requestedBy, reason] = params!;
+        if (!state.deletionRequests) state.deletionRequests = new Map();
+        const key = `${tenantId}:${id}`;
+        if (state.deletionRequests.has(key)) {
+          return { rows: [], rowCount: 0 };
+        }
+        const rec = {
+          id,
+          tenant_id: tenantId,
+          requested_by: requestedBy,
+          executed_by: null as string | null,
+          execution_token: null as string | null,
+          execution_started_at: null as Date | null,
+          execution_lease_expires_at: null as Date | null,
+          reason,
+          status: 'requested',
+          r2_objects_deleted: 0,
+          db_batches_deleted: 0,
+          db_lines_deleted: 0,
+          db_quarantine_deleted: 0,
+          db_conflicts_deleted: 0,
+          error_code: null,
+          requested_at: new Date('2026-11-13T00:00:00Z'),
+          completed_at: null,
+        };
+        state.deletionRequests.set(key, rec);
+        return {
+          rows: [{ id, status: rec.status, reason: rec.reason, requested_at: rec.requested_at }],
+          rowCount: 1,
+        };
+      }
+
+      if (normalizedSql.includes('UPDATE app_private.order_data_deletion_requests')) {
+        const [requestId, tenantId] = params!;
+        const rec = state.deletionRequests?.get(`${tenantId}:${requestId}`);
+        if (rec && rec.status !== 'completed') {
+          if (normalizedSql.includes('SET execution_lease_expires_at = $4')) {
+            if (rec.status === 'executing' && rec.execution_token === params![2]) {
+              rec.execution_lease_expires_at = params![3];
+              return { rows: [{ id: rec.id }], rowCount: 1 };
+            }
+            return { rows: [], rowCount: 0 };
+          }
+          if (normalizedSql.includes("SET status = 'failed'")) {
+            if (rec.execution_token === params![3]) {
+              rec.status = 'failed';
+              rec.error_code = params![2];
+              rec.execution_token = null;
+              rec.execution_lease_expires_at = null;
+            }
+          } else if (normalizedSql.includes("SET status = 'executing'")) {
+            rec.status = 'executing';
+            rec.executed_by = params![2];
+            rec.execution_token = params![3];
+            rec.execution_started_at = params![4];
+            rec.execution_lease_expires_at = params![5];
+            rec.error_code = null;
+          } else if (normalizedSql.includes("SET status = 'r2_deleted'")) {
+            rec.status = 'r2_deleted';
+            rec.r2_objects_deleted = params![2];
+            rec.error_code = null;
+          } else if (normalizedSql.includes("SET status = 'completed'")) {
+            rec.status = 'completed';
+            rec.r2_objects_deleted = params![2];
+            rec.db_batches_deleted = params![3];
+            rec.db_lines_deleted = params![4];
+            rec.db_quarantine_deleted = params![5];
+            rec.db_conflicts_deleted = params![6];
+            rec.executed_by = params![7] ?? rec.executed_by;
+            rec.execution_token = null;
+            rec.execution_lease_expires_at = null;
+            rec.error_code = null;
+            rec.completed_at = new Date('2026-11-13T00:01:00Z');
+            return { rows: [{ completed_at: rec.completed_at }], rowCount: 1 };
+          }
+        }
+        return { rows: [], rowCount: rec ? 1 : 0 };
+      }
+
+      if (
+        normalizedSql.includes('SELECT storage_key FROM app_private.order_outcome_import_batches')
+      ) {
+        const [tenantId] = params!;
+        const rows = [...state.batches.values()]
+          .filter((b) => b.tenant_id === tenantId && b.storage_key)
+          .map((b) => ({ storage_key: b.storage_key }));
+        return { rows, rowCount: rows.length };
+      }
+
+      if (normalizedSql.includes('FROM app_private.delete_venue_order_data')) {
+        if (state.simulateDbDeletionFailure) {
+          throw new Error('Simulated DB deletion failure');
+        }
+        const [tenantId] = params!;
+        let batchesDeleted = 0;
+        let linesDeleted = 0;
+        let quarantineDeleted = 0;
+        let conflictsDeleted = 0;
+
+        for (const [k, v] of state.lines.entries()) {
+          if (v.tenant_id === tenantId || k.startsWith(`${tenantId}:`)) {
+            state.lines.delete(k);
+            linesDeleted++;
+          }
+        }
+        for (let idx = state.quarantine.length - 1; idx >= 0; idx--) {
+          if (state.quarantine[idx].tenant_id === tenantId) {
+            state.quarantine.splice(idx, 1);
+            quarantineDeleted++;
+          }
+        }
+        for (let idx = state.conflicts.length - 1; idx >= 0; idx--) {
+          if (state.conflicts[idx].tenant_id === tenantId) {
+            state.conflicts.splice(idx, 1);
+            conflictsDeleted++;
+          }
+        }
+        for (const [k, v] of state.batches.entries()) {
+          if (v.tenant_id === tenantId) {
+            state.batches.delete(k);
+            batchesDeleted++;
+          }
+        }
+        return {
+          rows: [
+            {
+              batches_deleted: batchesDeleted,
+              lines_deleted: linesDeleted,
+              quarantine_deleted: quarantineDeleted,
+              conflicts_deleted: conflictsDeleted,
+            },
+          ],
+          rowCount: 1,
+        };
       }
 
       // 1b. POS dish mapping query
@@ -2213,6 +2427,9 @@ describe('importOrderOutcomes service', () => {
               // Second check inside processing transaction fails (e.g. membership revoked or downgraded)
               return { rows: [{ permission: 'editor' }], rowCount: 1 };
             }
+            if (normalizedSql.includes('FROM app_private.pilot_order_agreement_acceptances')) {
+              return { rows: [{ id: '00000000-0000-4000-8000-000000000099' }], rowCount: 1 };
+            }
             if (normalizedSql.includes('FROM app_private.order_outcome_import_batches')) {
               return { rows: [], rowCount: 0 };
             }
@@ -2278,6 +2495,9 @@ describe('importOrderOutcomes service', () => {
             }
             if (normalizedSql.includes('FROM app_private.staff_membership')) {
               return { rows: [{ permission: 'owner' }], rowCount: 1 };
+            }
+            if (normalizedSql.includes('FROM app_private.pilot_order_agreement_acceptances')) {
+              return { rows: [{ id: '00000000-0000-4000-8000-000000000099' }], rowCount: 1 };
             }
             if (
               normalizedSql.includes('FROM app_private.order_outcome_import_batches') &&
@@ -2557,6 +2777,670 @@ describe('importOrderOutcomes service', () => {
             expect(row.diagnostic_message).not.toContain(oversizedPosId);
           }
         });
+      });
+    });
+
+    describe('S6-DATA-14.1 Agreement Acceptance Enforcement', () => {
+      const venueId = '00000000-0000-4000-8000-000000000810';
+      const otherVenueId = '00000000-0000-4000-8000-000000000811';
+      const ownerId = '00000000-0000-4000-8000-000000000010';
+      const menuRevisionId = '00000000-0000-4000-8000-000000000910';
+      const dishId = '11111111-1111-4000-8000-000000000910';
+      const dishRevisionId = '22222222-2222-4000-8000-000000000910';
+
+      const validCsv = [
+        'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity',
+        `${PILOT_ORDER_OUTCOME_SCHEMA_VERSION},ORD-1,LINE-1,2026-11-10T12:00:00Z,${menuRevisionId},${dishId},${dishRevisionId},ordered,1`,
+      ].join('\n');
+
+      function makeState(overrides?: Partial<MockDbState>): MockDbState {
+        return {
+          venueId,
+          actorId: ownerId,
+          permission: 'owner',
+          menuApproval: {
+            menuRevisionId,
+            approvedAt: new Date('2026-11-01T00:00:00Z'),
+            bundleUrl: 'https://assets.peekaplate.example/menu.json',
+            contentHash: 'hash',
+          },
+          bundleContent: {
+            schema_version: 1,
+            venue_id: venueId,
+            menu_id: '00000000-0000-0000-0000-000000000001',
+            menu_revision_id: menuRevisionId,
+            restaurant: { name: 'Pilot Bistro', logo: null },
+            categories: [
+              {
+                category_id: '00000000-0000-4000-8000-000000000002',
+                name: 'Mains',
+                dishes: [
+                  {
+                    dish_id: dishId,
+                    dish_revision_id: dishRevisionId,
+                    complete: true,
+                    name: 'Dish',
+                    description: 'Desc',
+                    price: { amount: '12.00', currency: 'USD' },
+                    ingredients: [],
+                    allergens: null,
+                    dietary: [],
+                    images: {
+                      card: {
+                        url: 'https://cdn.example.com/c.jpg',
+                        width: 400,
+                        height: 300,
+                        alt: 'c',
+                      },
+                      detail: {
+                        url: 'https://cdn.example.com/d.jpg',
+                        width: 800,
+                        height: 600,
+                        alt: 'd',
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          posDishMappings: new Map(),
+          venueTrackingActivations: new Map([
+            [venueId, { tenant_id: venueId, activated_at: new Date('2026-11-01T00:00:00Z') }],
+          ]),
+          batches: new Map(),
+          lines: new Map(),
+          quarantine: [],
+          conflicts: [],
+          agreementAcceptances: new Map(),
+          ...overrides,
+        };
+      }
+
+      it('rejects import with 403 agreement_not_accepted when venue has no acceptance', async () => {
+        const state = makeState();
+        const client = createMockClient(state) as any;
+
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText: validCsv,
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'agreement_not_accepted', status: 403 });
+      });
+
+      it('rejects import when acceptance exists only for a different venue', async () => {
+        const state = makeState({
+          agreementAcceptances: new Map([
+            [
+              `${otherVenueId}:${PILOT_ORDER_AGREEMENT_VERSION}`,
+              {
+                id: '00000000-0000-4000-8000-000000000001',
+                tenant_id: otherVenueId,
+                agreement_version: PILOT_ORDER_AGREEMENT_VERSION,
+                accepted_by: ownerId,
+                accepted_at: new Date('2026-11-12T00:00:00Z'),
+              },
+            ],
+          ]),
+        });
+        const client = createMockClient(state) as any;
+
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText: validCsv,
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'agreement_not_accepted', status: 403 });
+      });
+
+      it('rejects non-owner trying to accept the agreement', async () => {
+        const state = makeState({ permission: 'editor' });
+        const client = createMockClient(state) as any;
+
+        await expect(
+          acceptPilotOrderAgreement({
+            client,
+            actorId: ownerId,
+            venueId,
+            agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+      });
+
+      it('rejects invalid/mismatched agreement version on acceptance', async () => {
+        const state = makeState();
+        const client = createMockClient(state) as any;
+
+        await expect(
+          acceptPilotOrderAgreement({
+            client,
+            actorId: ownerId,
+            venueId,
+            agreementVersion: 'v99.0',
+          }),
+        ).rejects.toMatchObject({ code: 'invalid_agreement_version', status: 400 });
+      });
+
+      it('allows import after owner accepts current version and rejects when required version changes', async () => {
+        const state = makeState();
+        const client = createMockClient(state) as any;
+
+        const first = await acceptPilotOrderAgreement({
+          client,
+          actorId: ownerId,
+          venueId,
+          agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+        });
+        expect(first.alreadyAccepted).toBe(false);
+        expect(first.agreementVersion).toBe(PILOT_ORDER_AGREEMENT_VERSION);
+
+        const second = await acceptPilotOrderAgreement({
+          client,
+          actorId: ownerId,
+          venueId,
+          agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+        });
+        expect(second.alreadyAccepted).toBe(true);
+
+        const imported = await importOrderOutcomes({
+          client,
+          actorId: ownerId,
+          venueId,
+          csvText: validCsv,
+          trackingStartedAt: new Date('2026-11-01T00:00:00Z'),
+          now: () => new Date('2026-11-12T12:00:00Z'),
+          bundleLoader: async () => state.bundleContent!,
+        });
+        expect(imported.status).toBe('completed');
+        expect(imported.totalRows).toBe(1);
+
+        // Changed agreement version requires fresh acceptance
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText: validCsv,
+            agreementVersion: 'v0.2',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'agreement_not_accepted', status: 403 });
+      });
+    });
+
+    describe('S6-DATA-14.2 Owner-Scoped Order-Data Deletion', () => {
+      const venueId = '00000000-0000-4000-8000-000000000820';
+      const otherVenueId = '00000000-0000-4000-8000-000000000821';
+      const ownerId = '00000000-0000-4000-8000-000000000020';
+      const requestId = '33333333-3333-4000-8000-000000000020';
+
+      function makeDeletionFixture(overrides?: Partial<MockDbState>) {
+        const r2Objects = new Map<string, string>([
+          [`order-imports/${venueId}/batch-1/source.csv`, 'secret-order-csv-content'],
+          [`order-imports/${otherVenueId}/batch-2/source.csv`, 'other-venue-csv'],
+        ]);
+
+        const state: MockDbState = {
+          venueId,
+          actorId: ownerId,
+          permission: 'owner',
+          posDishMappings: new Map([
+            [`${venueId}:POS-1`, { pos_item_code: 'POS-1', review_status: 'approved' }],
+          ]),
+          batches: new Map([
+            [
+              'batch-1',
+              {
+                id: 'batch-1',
+                tenant_id: venueId,
+                storage_key: `order-imports/${venueId}/batch-1/source.csv`,
+              },
+            ],
+            [
+              'batch-2',
+              {
+                id: 'batch-2',
+                tenant_id: otherVenueId,
+                storage_key: `order-imports/${otherVenueId}/batch-2/source.csv`,
+              },
+            ],
+          ]),
+          lines: new Map([
+            [`${venueId}:ORD-1:LINE-1:ordered`, { tenant_id: venueId, order_id: 'ORD-1' }],
+            [
+              `${otherVenueId}:ORD-2:LINE-1:ordered`,
+              { tenant_id: otherVenueId, order_id: 'ORD-2' },
+            ],
+          ]),
+          quarantine: [
+            { tenant_id: venueId, batch_id: 'batch-1', diagnostic_message: 'too_old' },
+            { tenant_id: otherVenueId, batch_id: 'batch-2', diagnostic_message: 'too_old' },
+          ],
+          conflicts: [
+            { tenant_id: venueId, batch_id: 'batch-1', order_id: 'ORD-1' },
+            { tenant_id: otherVenueId, batch_id: 'batch-2', order_id: 'ORD-2' },
+          ],
+          deletionRequests: new Map(),
+          ...overrides,
+        };
+
+        const operatorId = '00000000-0000-4000-8000-000000000099';
+        const authorizedOperatorIds = new Set([operatorId]);
+
+        const storage = {
+          put: vi.fn(
+            async (
+              key: string,
+              value: string,
+              opts?: { onlyIf?: { etagDoesNotMatch?: string } },
+            ) => {
+              if (opts?.onlyIf?.etagDoesNotMatch === '*' && r2Objects.has(key)) {
+                return null;
+              }
+              r2Objects.set(key, value);
+              return { key };
+            },
+          ),
+          list: vi.fn(async (opts?: { prefix?: string }) => ({
+            objects: [...r2Objects.keys()]
+              .filter((k) => !opts?.prefix || k.startsWith(opts.prefix))
+              .map((key) => ({ key, uploaded: new Date('2026-11-12T00:00:00Z') })),
+            truncated: false,
+          })),
+          delete: vi.fn(async (key: string) => {
+            r2Objects.delete(key);
+          }),
+        };
+
+        return { state, r2Objects, storage, operatorId, authorizedOperatorIds };
+      }
+
+      it('submits owner deletion request, blocks new imports while active, and executes operator deletion with R2 ledger', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        const client = createMockClient(state) as any;
+
+        const submitted = await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+          reason: 'pilot_withdrawal',
+        });
+        expect(submitted.status).toBe('requested');
+        expect(submitted.alreadyExists).toBe(false);
+
+        // Idempotent submission returns alreadyExists: true
+        const submittedAgain = await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+          reason: 'pilot_withdrawal',
+        });
+        expect(submittedAgain.alreadyExists).toBe(true);
+
+        // New imports are blocked while deletion request is active
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-NEW,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        const res = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+
+        expect(res.status).toBe('completed');
+        expect(res.operatorId).toBe(operatorId);
+        expect(res.alreadyCompleted).toBe(false);
+        expect(res.r2ObjectsDeleted).toBe(1);
+        expect(res.dbBatchesDeleted).toBe(1);
+        expect(res.dbLinesDeleted).toBe(1);
+        expect(res.dbQuarantineDeleted).toBe(1);
+        expect(res.dbConflictsDeleted).toBe(1);
+
+        // Target venue data removed
+        expect(r2Objects.has(`order-imports/${venueId}/batch-1/source.csv`)).toBe(false);
+        expect(state.batches.has('batch-1')).toBe(false);
+        expect(state.lines.has(`${venueId}:ORD-1:LINE-1:ordered`)).toBe(false);
+        expect(state.quarantine.filter((q) => q.tenant_id === venueId)).toHaveLength(0);
+        expect(state.conflicts.filter((c) => c.tenant_id === venueId)).toHaveLength(0);
+
+        // Other venue & POS mappings untouched
+        expect(r2Objects.has(`order-imports/${otherVenueId}/batch-2/source.csv`)).toBe(true);
+        expect(state.batches.has('batch-2')).toBe(true);
+        expect(state.lines.has(`${otherVenueId}:ORD-2:LINE-1:ordered`)).toBe(true);
+        expect(state.posDishMappings.has(`${venueId}:POS-1`)).toBe(true);
+
+        // Non-PII R2 deletion intent & completion ledger receipts written as separate immutable objects
+        const intentRaw = r2Objects.get(
+          `order-deletion-ledger/${venueId}/${requestId}/intent.json`,
+        );
+        const completedRaw = r2Objects.get(
+          `order-deletion-ledger/${venueId}/${requestId}/completed.json`,
+        );
+        expect(intentRaw).toBeDefined();
+        expect(completedRaw).toBeDefined();
+        expect(JSON.parse(intentRaw!).status).toBe('in_progress');
+        expect(JSON.parse(completedRaw!).status).toBe('completed');
+        expect(intentRaw).not.toContain('secret-order-csv-content');
+        expect(completedRaw).not.toContain('secret-order-csv-content');
+        expect(completedRaw).not.toContain('ORD-1');
+
+        // Audit record contains no order contents
+        const audit = state.deletionRequests!.get(`${venueId}:${requestId}`);
+        expect(audit.status).toBe('completed');
+        expect(audit.executed_by).toBe(operatorId);
+        expect(JSON.stringify(audit)).not.toContain('secret-order-csv-content');
+        expect(JSON.stringify(audit)).not.toContain('ORD-1');
+      });
+
+      it('denies unauthorized requester, cross-tenant submission, missing request, and unauthorized operator', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture({ permission: 'editor' });
+        const client = createMockClient(state) as any;
+
+        await expect(
+          submitOrderDataDeletionRequest({
+            client,
+            actorId: ownerId,
+            venueId,
+            requestId,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+        expect(r2Objects.has(`order-imports/${venueId}/batch-1/source.csv`)).toBe(true);
+
+        // Cross-tenant submission attempt (wrong venueId for actor)
+        state.permission = 'owner';
+        await expect(
+          submitOrderDataDeletionRequest({
+            client,
+            actorId: ownerId,
+            venueId: otherVenueId,
+            requestId,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+        expect(r2Objects.has(`order-imports/${otherVenueId}/batch-2/source.csv`)).toBe(true);
+
+        // Operator cannot execute without an existing owner-submitted request
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_request_not_found', status: 404 });
+
+        // Unauthorized operator cannot execute deletion
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId: ownerId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+        // Empty or missing authorizedOperatorIds fails closed
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds: new Set(),
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds: undefined as any,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+      });
+
+      it('records durable in_progress ledger intent before destructive operations and upgrades on retry after crash', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        const client = createMockClient(state) as any;
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+          reason: 'pilot_withdrawal',
+        });
+
+        // 1. If recording the pre-deletion intent fails, zero R2 or DB deletions occur
+        storage.put = vi.fn().mockRejectedValueOnce(new Error('R2 intent write failed'));
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_storage_failed', status: 502 });
+        expect(r2Objects.has(`order-imports/${venueId}/batch-1/source.csv`)).toBe(true);
+        expect(state.batches.has('batch-1')).toBe(true);
+
+        // 2. If process/R2 fails at Phase 4 after DB commit, in_progress intent remains in R2 and retry upgrades it to completed
+        let putCount = 0;
+        storage.put = vi.fn(async (key: string, value: string) => {
+          putCount++;
+          if (putCount === 2) {
+            throw new Error('Simulated crash before Phase 4 ledger finalization');
+          }
+          r2Objects.set(key, value);
+          return { key };
+        });
+
+        const res = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(res.status).toBe('completed');
+        const intentKey = `order-deletion-ledger/${venueId}/${requestId}/intent.json`;
+        const completedKey = `order-deletion-ledger/${venueId}/${requestId}/completed.json`;
+        const originalIntentRaw = r2Objects.get(intentKey)!;
+        expect(JSON.parse(originalIntentRaw).status).toBe('in_progress');
+        expect(r2Objects.get(completedKey)).toBeUndefined();
+
+        // Retrying writes missing completed.json without overwriting original intent.json
+        storage.put = vi.fn(async (key: string, value: string) => {
+          r2Objects.set(key, value);
+          return { key };
+        });
+        const retried = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(retried.alreadyCompleted).toBe(true);
+        expect(r2Objects.get(intentKey)).toBe(originalIntentRaw);
+        const completedAfterRetry = JSON.parse(r2Objects.get(completedKey)!);
+        expect(completedAfterRetry.status).toBe('completed');
+        expect(completedAfterRetry.operatorId).toBe(operatorId);
+      });
+
+      it('is idempotent on retry with the same requestId', async () => {
+        const { state, storage, operatorId, authorizedOperatorIds } = makeDeletionFixture();
+        const client = createMockClient(state) as any;
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+        });
+
+        const first = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(first.alreadyCompleted).toBe(false);
+
+        const retry = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(retry.alreadyCompleted).toBe(true);
+        expect(retry.operatorId).toBe(operatorId);
+        expect(retry.r2ObjectsDeleted).toBe(1);
+        expect(retry.dbBatchesDeleted).toBe(1);
+      });
+
+      it('preserves DB batch metadata on R2 failure and succeeds on retry', async () => {
+        const { state, storage, operatorId, authorizedOperatorIds } = makeDeletionFixture();
+        let failOnce = true;
+        storage.delete = vi.fn(async () => {
+          if (failOnce) {
+            failOnce = false;
+            throw new Error('R2 transient failure');
+          }
+        });
+        const client = createMockClient(state) as any;
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+        });
+
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_storage_failed', status: 502 });
+
+        // DB records preserved on R2 failure so retry can still find all storage keys
+        expect(state.batches.has('batch-1')).toBe(true);
+        expect(state.deletionRequests!.get(`${venueId}:${requestId}`).status).toBe('failed');
+
+        // Retry succeeds cleanly
+        const retried = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(retried.status).toBe('completed');
+        expect(state.batches.has('batch-1')).toBe(false);
+      });
+
+      it('records failure on DB deletion error and succeeds on retry', async () => {
+        const { state, storage, operatorId, authorizedOperatorIds } = makeDeletionFixture({
+          simulateDbDeletionFailure: true,
+        });
+        const client = createMockClient(state) as any;
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+        });
+
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_db_failed', status: 500 });
+
+        expect(state.deletionRequests!.get(`${venueId}:${requestId}`).status).toBe('failed');
+
+        state.simulateDbDeletionFailure = false;
+        const retried = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(retried.status).toBe('completed');
+        expect(retried.dbBatchesDeleted).toBe(1);
+      });
+
+      it('fails closed with 503 when archive storage is unavailable', async () => {
+        const { state, operatorId, authorizedOperatorIds } = makeDeletionFixture();
+        const client = createMockClient(state) as any;
+
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage: undefined,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'storage_unavailable', status: 503 });
       });
     });
   });

@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(68);
+SELECT plan(78);
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -442,6 +442,51 @@ SELECT is((SELECT count(*)::int FROM app_private.pos_dish_mappings), 0, 'Venue B
 
 -- 5. Reporting isolation check: owner_observation_v1 remains completely unaffected
 SELECT is((SELECT count(*)::int FROM app_private.owner_observation_v1 WHERE tenant_id = '00000000-0000-0000-0000-000000000801'), 0, 'owner_observation_v1 is unaffected by order outcomes');
+
+-- 6. S6-DATA-14.1 & 14.2: Agreement acceptance, deletion requests, and bypass protection
+RESET ROLE;
+SELECT has_table('app_private', 'pilot_order_agreement_acceptances', 'pilot_order_agreement_acceptances exists');
+SELECT has_table('app_private', 'order_data_deletion_requests', 'order_data_deletion_requests exists');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.pilot_order_agreement_acceptances'::regclass), true, 'agreement acceptances RLS is forced');
+SELECT is((SELECT relforcerowsecurity FROM pg_class WHERE oid = 'app_private.order_data_deletion_requests'::regclass), true, 'deletion requests RLS is forced');
+
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000003', true);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.pilot_order_agreement_acceptances (tenant_id, agreement_version, accepted_by)
+    VALUES ('00000000-0000-0000-0000-000000000801', 'v0.1', '00000000-0000-0000-0000-000000000003')$$,
+  '%owner%',
+  'editor cannot accept pilot order agreement'
+);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.order_data_deletion_requests (id, tenant_id, requested_by, reason, status)
+    VALUES ('00000000-0000-4000-8000-000000000999', '00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000003', 'pilot_withdrawal', 'requested')$$,
+  '%owner%',
+  'editor cannot submit order-data deletion request'
+);
+
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000001', true);
+SELECT lives_ok(
+  $$INSERT INTO app_private.order_data_deletion_requests (id, tenant_id, requested_by, reason, status)
+    VALUES ('00000000-0000-4000-8000-000000000998', '00000000-0000-0000-0000-000000000801', '00000000-0000-0000-0000-000000000001', 'pilot_withdrawal', 'requested')$$,
+  'owner can submit order-data deletion request'
+);
+
+SELECT set_config('app.order_data_deletion_active', 'on', true);
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_lines
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%append-only table order_outcome_lines rejects DELETE%',
+  'runtime cannot bypass append-only trigger by spoofing GUC'
+);
+SELECT set_config('app.order_data_deletion_active', 'off', true);
+
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000802', true);
+SELECT is((SELECT count(*)::int FROM app_private.pilot_order_agreement_acceptances), 0, 'Venue B sees 0 agreement acceptances from Venue A');
+SELECT is((SELECT count(*)::int FROM app_private.order_data_deletion_requests), 0, 'Venue B sees 0 deletion requests from Venue A');
 
 RESET ROLE;
 SELECT * FROM finish();
