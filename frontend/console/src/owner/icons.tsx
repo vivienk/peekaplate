@@ -7,8 +7,8 @@ import check from './assets/check.svg';
 import circle from './assets/circle.svg';
 import clock from './assets/clock.svg';
 import edit from './assets/edit.svg';
+import lock from './assets/fi-rr-lock.svg'; // Figma PeekaPlate Icons / Lock-dot, layer fi-rr-lock (2319:10949)
 import home from './assets/home.svg';
-import lock from './assets/lock.svg';
 import logo from './assets/logo.png';
 import menu from './assets/menu.svg';
 import report from './assets/report.svg';
