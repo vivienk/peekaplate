@@ -2862,3 +2862,12 @@ The compiled staging check after PR158 found the first menu_viewed in the canoni
 Initial environment discovery found no system Python pydantic; tests use the existing isolated Python 3.12 environment (pydantic 2.14.3, Pillow 13.0.0), not the frozen deployment environment. The first eight-case icon run exposed trailing whitespace in the new empty-ingredient synthetic fixture: DishDraft stripped it while source offsets retained it. The fixture now supplies explicit nonblank unknown-ingredient text; source validation remains strict. Ingredient tests (23), review-candidate tests (17) and full Python suite (526) pass. Initial branch setup could not fast-forward main to develop; a new clean task branch was based directly on the fetched develop SHA before edits. No existing work was discarded.
 
 Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise RecursionError rather than fall back to text. Catalogue reads now normalize this to ValueError; the new regression and all 24 ingredient tests pass. Initial pnpm checks were blocked by system Node 24.14 and automatic dependency installation without network access. Using installed Node 24.16 and disabling only automatic dependency installation allowed the dependency-free repository context/docs verification commands to pass; no check itself was disabled.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T07:35:35.800Z","exitCode":1}
+```
+
+## Ingredient illustration generation — November 12, 2026
+
+The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.

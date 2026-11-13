@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -20,7 +21,7 @@ from .schemas import MenuExtractionResult
 from .storage import save_json
 
 STYLE_VERSION = "figma-149-2169.v1"
-MAPPING_VERSION = "ingredient-icons.1"
+MAPPING_VERSION = "ingredient-icons.2"
 # Observed component variant names. These are artwork identities, not food rules.
 LABELS = ("Ham", "Poached egg", "Hollandaise", "Chives", "Avocado", "Cherry tomato",
           "Chili flakes", "Microgreens", "Mixed greens", "Wild rice", "Grilled chicken",
@@ -34,6 +35,18 @@ ALIASES = {"sesame seeds": "sesame", "carrots": "carrot", "avocados": "avocado",
            "cherry tomatoes": "cherry tomato"}
 
 
+def ingredient_identity(text):
+    """Artwork identity only: unknown explicit names need not be food-rule entries."""
+    term = ALIASES.get(normalize(text), normalize(text))
+    if not term or len(term) > 120 or any(not (c.isalpha() or c in " '-") for c in term):
+        return None
+    return VOCABULARY.get(term, "ingredient-" + hashlib.sha256(term.encode()).hexdigest()[:32])
+
+
+def valid_ingredient_id(value):
+    return value in VOCABULARY.values() or bool(re.fullmatch(r"ingredient-[0-9a-f]{32}", value))
+
+
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False,
                                      separators=(",", ":"), allow_nan=False).encode()).hexdigest()
@@ -45,8 +58,8 @@ class IconAsset(StrictModel):
     style_version: Literal["figma-149-2169.v1"] = STYLE_VERSION
     asset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     size_bytes: int = Field(gt=0, le=1_000_000)
-    width: int = Field(ge=16, le=1024)
-    height: int = Field(ge=16, le=1024)
+    width: int = Field(ge=16, le=2048)
+    height: int = Field(ge=16, le=2048)
     origin: Literal["curated", "generated"]
     provenance: str = Field(min_length=1, max_length=1000)
     rights_confirmed: Literal[True]
@@ -99,11 +112,11 @@ class IconStore:
                  provenance: str, recipe: str, rights_confirmed: bool) -> str:
         """Import curated exports or provider output; registration never approves."""
         import base64
-        if ingredient_id not in VOCABULARY.values() or not 0 < len(data) <= 1_000_000:
+        if not valid_ingredient_id(ingredient_id) or not 0 < len(data) <= 1_000_000:
             raise ValueError("Unsupported ingredient or asset size")
         with Image.open(io.BytesIO(data)) as picture:
             if (picture.format not in {"PNG", "WEBP"} or picture.width != picture.height
-                    or not 16 <= picture.width <= 1024 or getattr(picture, "n_frames", 1) != 1):
+                    or not 16 <= picture.width <= 2048 or getattr(picture, "n_frames", 1) != 1):
                 raise ValueError("Expected a bounded square PNG/WebP")
             picture.load()
             rgba = picture.convert("RGBA")
@@ -127,7 +140,7 @@ class IconStore:
         import base64
         raw = self._read("assets", key)
         asset = IconAsset.model_validate(raw)
-        if digest(raw) != key or asset.ingredient_id not in VOCABULARY.values():
+        if digest(raw) != key or not valid_ingredient_id(asset.ingredient_id):
             raise ValueError("Asset identity mismatch")
         blob = self._read("blobs", asset.asset_sha256)
         data = base64.b64decode(blob["base64"], validate=True)
@@ -167,16 +180,16 @@ def build_icon_handoff(report: MenuExtractionResult, *, store=None, selections=N
     prepare_review_candidates(report)
     review = build_review_handoff(report)
     selections = selections or {}
-    if not isinstance(selections, dict) or len(selections) > len(LABELS):
+    if not isinstance(selections, dict) or len(selections) > 1000:
         raise ValueError("Invalid icon selections")
-    if any(k not in VOCABULARY.values() or not isinstance(v, str) for k, v in selections.items()):
+    if any(not valid_ingredient_id(k) or not isinstance(v, str) for k, v in selections.items()):
         raise ValueError("Unknown selected ingredient")
     dishes = []
     for assessment in review.assessments:
         entries = []
         for ingredient in assessment.ingredients:
             term = ALIASES.get(ingredient.normalized, ingredient.normalized)
-            canonical = VOCABULARY.get(term)
+            canonical = ingredient_identity(term)
             eligible = bool(canonical and ingredient.evidence and
                             ingredient.reason not in {"missing_evidence", "qualified_context"})
             art = store.resolve(selections[canonical], canonical) if (

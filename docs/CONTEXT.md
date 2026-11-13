@@ -585,7 +585,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. Offline ingredient icon proposals reuse existing ingredient evidence without changing classifications; optional pipeline CLI export, immutable local curated/generated artwork imports and explicit artwork decisions retain text fallback and needs_review/publishable=false. Hosted routes, generation and public UI remain planned.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. Artwork reuses extraction and unchanged ingredient rules. Novel names receive stable artwork IDs; bounded local Gemini generation and tool plan/completion APIs produce review-only transparent assets, private gallery and draft/index bindings, with cache/claim protection. Vision artwork remains unverified and cannot become ingredient facts. Hosted authorization/publication integration remains planned.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -670,7 +670,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/ingredient-review-unicode.json",
         "processing/src/peekaplate_processing/ingredient_icons.py",
         "processing/tests/test_ingredient_icons.py",
-        "docs/ingredient-icon-pipeline.md"
+        "docs/ingredient-icon-pipeline.md",
+        "processing/src/peekaplate_processing/ingredient_icon_generation.py",
+        "processing/tests/test_ingredient_icon_generation.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -679,7 +681,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ce59acd3d2b99e5c8a8eb2cc1aafbd6c719945caf6d6a77838c12d23b6d5f123"
+      "sourceFingerprint": "7b8f9876c50a6534bdbeb9492e77b5386f5ea19b3ec5873ca9ed73c0313fa06c"
     },
     {
       "id": "assets",
@@ -714,6 +716,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-12",
+      "modules": [
+        "processing"
+      ],
+      "summary": "Extended ingredient artwork beyond the fixed Figma vocabulary: detect explicit new labels, generate bounded missing illustrations, cache results and produce private review gallery with draft bindings. Added Gemini adapter and run_pipeline opt-in. Live coconut illustration generated through built-in image tool, imported and reused with zero new calls; no unattended key configured. Existing food/allergen approval boundaries unchanged.",
+      "next": "Run authenticated Gemini acceptance with configured GEMINI_API_KEY and review exact design fidelity; then wire the versioned private bundle, owner API and existing publication gate."
+    },
     {
       "date": "2026-11-12",
       "modules": [
@@ -813,24 +823,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md"
       ],
       "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
-    },
-    {
-      "date": "2026-11-12",
-      "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
-      "sources": [
-        "docs/owner-menu-workspace.md",
-        "backend/src/owner-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "migrations/20261112010000_owner_menu_workspace.sql",
-        "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
-      ],
-      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
     }
   ]
 }

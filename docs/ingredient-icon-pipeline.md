@@ -32,8 +32,9 @@ Figma's connector returned a Starter-plan call limit, so exact asset exports,
 child styling tokens and high-fidelity design context are unavailable. No artwork
 or UI is claimed to match pixel-for-pixel, and no substitute art is shipped.
 
-The versioned vocabulary includes all 32 observed names. Only four explicit
-plural/seed aliases supplement them. Chicken is not mapped to grilled chicken,
+The curated vocabulary includes all 32 observed names and four explicit
+plural/seed aliases. Other explicit ingredient phrases now receive deterministic
+artwork identities without adding food-classification rules. Chicken is not mapped to grilled chicken,
 rice is not mapped to sushi rice, and egg is not mapped to poached egg.
 
 ## Implemented local slice
@@ -52,7 +53,7 @@ original extraction, allergen/dietary output and all existing review/publication
 commands are untouched. The sidecar is not added to the hosted V1 bundle.
 
 `IconStore` accepts curated exports or externally generated artwork. It checks
-PNG/WebP format, byte and dimension limits, square geometry, single frame,
+PNG/WebP format, byte and dimension limits, square geometry up to 2048 pixels per edge, single frame,
 transparent corners and visible content. It requires a rights assertion and
 provenance/recipe fields. Generated records must be supplied with model and prompt
 provenance by the operator; the current free-text recipe is not a verified provider
@@ -70,7 +71,8 @@ hosted revocation lifecycle must be implemented before this is a shared service.
 
 The deterministic output cache key covers source/draft evidence digests, mapping
 and style versions, and resolved artwork versions. Each build revalidates assets;
-a cached proposal never grants approval. No provider call occurs on an icon miss.
+a cached proposal never grants approval. The original proposal builder makes no provider calls; the opt-in generation stage
+now generates missing artwork within an explicit request budget.
 
 ### Local APIs and commands
 
@@ -122,7 +124,7 @@ exported approved reference pack only where permitted. Require a design review
 against the exact reference. Decorative icons must never be represented as a
 capture of the restaurant's dish or as evidence of ingredients/portion size.
 
-### 2 Add bounded asynchronous generation
+### 2 Generation implementation and hosted follow-up
 
 Define a typed generation recipe containing taxonomy ID, style/reference digest,
 prompt version, provider, model version, seed/settings and output format. Derive
@@ -133,9 +135,69 @@ an image provider in an HTTP request or database replay. Limit attempts, elapsed
 time, concurrency and per-venue spend; persist terminal errors and use a DLQ.
 Return text while a job is pending, rejected, unavailable or out of budget.
 
-Generation is not implemented or invoked in this change. No provider/model is
-chosen without capability, license and cost verification. The import API already
-accepts generated output after the same image validation and artwork review.
+Local generation is implemented in `ingredient_icon_generation.py`. It detects
+explicit ingredient fields from the existing extraction, preserves coconut versus
+coconut milk, and creates a request per unique label/style/prompt/provider/model.
+Each request has draft ID/index and ingredient-index bindings. The Gemini adapter
+uses a fixed Google endpoint, header authentication, disabled redirects, a socket
+timeout and bounded response reads; it makes no hidden retries. The model defaults
+to `gemini-3.1-flash-image`, following [Google's image-generation reference](https://github.com/google/skills/blob/main/skills/cloud/gemini-api/references/media_generation.md).
+A maximum of 20 new requests per invocation is allowed; cached images cost no new
+calls. A local exclusive claim prevents concurrent generation for the same key.
+A killed process leaves its claim for operator reconciliation before a retry.
+Provider failures, invalid/opaque artwork and exhausted budgets are explicit states.
+The provider may return an opaque image despite the prompt: this is rejected, never
+silently presented as transparent. Review output exits nonzero for partial failures.
+
+`plan_generation` and `complete_generation` also support tool-enabled orchestration:
+the agent reads the actual request prompt, calls its image tool, and imports the
+actual returned bytes under the same request. This is how the coconut example was
+executed here. It is not evidence that the unattended Gemini adapter ran live.
+No API key is present in this checkout. The built-in image tool does not expose its
+exact model version; provenance records `builtin-model-undisclosed` honestly.
+
+Vision-transcribed ingredient names can receive private candidate illustrations
+when they occur literally in the draft text and are not qualified. They remain
+`vision_unverified`; this does not change AI-02 abstention, source evidence, approved
+icon selection, allergen status or owner confirmation. OCR phrases with missing
+source evidence or qualified contexts do not trigger generation. Text normalization
+is not semantic ingredient recognition: malformed/unknown text needs owner review.
+
+To generate automatically after the existing extraction (configure `GEMINI_API_KEY`
+securely in the environment first):
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.run_pipeline \
+  --input menu.pdf --run-dir work/menu-run --generate-ingredient-icons \
+  --max-icon-requests 10 --icon-rights-confirmed
+```
+
+To generate from a saved extraction without another OCR/model extraction:
+
+```sh
+uv run --project processing --frozen python -m peekaplate_processing.ingredient_icon_generation \
+  --input work/menu-run/extraction.json --catalogue work/ingredient-icons \
+  --output work/menu-run/ingredient-artwork --max-requests 10 --rights-confirmed
+```
+
+The output directory contains `index.html`, actual PNG/WebP files and
+`generation-results.json`. The JSON maps each draft ingredient to its request and
+asset. All artwork remains unapproved. A rerun uses a new review output directory
+and the same catalogue to reuse cached images. The catalogue is private, trusted
+local state, not an HTTP authorization boundary. Rejected artwork is not used by
+the approved-selection resolver; cached candidates remain available for audit and
+must not be treated as approved because generation was cached.
+
+The generated coconut example is stored outside source code under
+`outputs/coconut-generation-live/` in the project workspace. Its input is synthetic
+saved extraction, not a fresh live OCR test. Actual image generation, import,
+transparent-image validation and zero-call cache reuse were exercised. Visual
+style is a candidate based on the inspected Figma geometry; exact exported Figma
+assets and final visual approval remain outstanding. The first concept is simpler;
+the request-generated candidate includes a whole coconut, half and pieces.
+
+Hosted durable queues, global spend limits, authenticated owner routes, asset
+revocation and publication integration remain the next implementation stages.
 
 ### 3 Add shared contracts and private hosted storage
 
@@ -228,9 +290,13 @@ does not authorize deployment or change any existing food-safety review policy.
 - PASS: `PYTHONPATH=processing/src ../noka-pr118-20261110/venv/bin/python -m unittest discover -s processing/tests -p test_review_candidates.py` — 17 tests.
 - PASS: `pnpm context:refresh` and `pnpm verify context:check docs:check`, with installed Node 24.16 on PATH and `pnpm_config_verify_deps_before_run=` to avoid unrelated automatic package installation.
 - PASS: `git diff --check`.
-- NOT RUN: frozen Linux dependency verification, full JavaScript check/build, hosted/API/database/browser acceptance and provider generation. No JavaScript, SQL or public UI behavior changed.
+- NOT RUN: frozen Linux dependency verification, full JavaScript check/build, hosted/API/database/browser acceptance and live unattended Gemini generation. No JavaScript, SQL or public UI behavior changed.
 
 Python checks use an existing isolated Python 3.12 environment with pydantic
 2.14.3 and Pillow 13.0.0; repository pins are different. Passing local checks do
 not establish frozen production compatibility. No remote push, PR or deployment
 was performed.
+
+The generation follow-up adds focused tests for novel ingredient detection, deduplication, request budgets, claims, cache corruption/model invalidation, provider parsing/authentication, vision-only candidate boundaries and pipeline CLI invocation. Mock images verify mechanics only; the separate coconut tool run verifies actual image output.
+
+Generation verification: full Python suite PASS, 536 tests in 48.875 seconds; focused ingredient suite PASS, 33 tests after adding draft/index bindings. The Python environment is the same non-frozen environment recorded above.
