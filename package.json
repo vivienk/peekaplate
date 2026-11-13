@@ -19,7 +19,7 @@
     "test": "vitest run && node --test scripts/*.test.mjs",
     "eval:owner-ai": "node scripts/evaluate-owner-ai.mjs",
     "probe:owner-ai:luna": "node scripts/probe-owner-ai-luna.mjs",
-    "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts",
+    "test:e2e": "playwright test && playwright test --config playwright.posthog.config.ts && playwright test --config playwright.owner-ai.config.ts",
     "test:db": "node scripts/test-db.mjs",
     "context:check": "node scripts/context.mjs check",
     "context:refresh": "node scripts/context.mjs refresh",

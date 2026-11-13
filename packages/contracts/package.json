@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./owner-ai": "./src/owner-ai.ts"
+    "./owner-ai": "./src/owner-ai.ts",
+    "./owner-analysis": "./src/owner-analysis.ts",
+    "./owner-report": "./src/owner-report.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

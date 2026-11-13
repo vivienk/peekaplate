@@ -86,6 +86,7 @@ import {
   OrderImportError,
   type OrderOutcomeStorage,
 } from './order-ingestion/service';
+import { registerOwnerAnalysisRoutes } from './owner-ai/routes';
 import {
   createOwnerInsightAction,
   listOwnerInsightActions,
@@ -125,6 +126,10 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
 ];
 
 export type Bindings = {
+  OWNER_AI_RESPONSES_ENABLED?: string;
+  OWNER_AI_OPENAI_API_KEY?: string;
+  OWNER_AI_OPENAI_PROJECT_ID?: string;
+  OWNER_AI_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
   APP_ENV?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
@@ -862,6 +867,13 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('Cache-Control', 'no-store');
     c.header('X-Request-ID', crypto.randomUUID());
     await next();
+  });
+  registerOwnerAnalysisRoutes(app, {
+    verify: services.verify,
+    ...(services.readOwnerReport ? { readReport: services.readOwnerReport } : {}),
+    allowedOrigins: CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
+    syntheticVenues: SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+    ...(services.now ? { now: services.now } : {}),
   });
   app.get('/health', (c) =>
     c.json({
