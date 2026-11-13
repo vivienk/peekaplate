@@ -206,7 +206,7 @@ describe('restaurants and reloads', () => {
 });
 
 describe('reload re-check', () => {
-  it('removes a withdrawn dish without reporting an unsave', async () => {
+  it('hides a withdrawn dish without deleting it or reporting an unsave', async () => {
     const [first, second] = await loadMenus('withdrawal', 2);
     if (!first || !second) throw new Error('missing menus');
     const storage = new FakeStorage();
@@ -219,8 +219,15 @@ describe('reload re-check', () => {
     state.subscribe(listener);
     expect(state.reconcile(second)).toEqual({ removed: [DISH.salmonPokeBowl] });
     expect(state.savedDishIds()).toEqual([DISH.harvestPowerBowl]);
-    expect(stored(storage, first.venueId).dishIds).toEqual([DISH.harvestPowerBowl]);
+    // S5-FE-10: the ID stays in storage; it is only hidden while the menu lacks the dish.
+    expect(stored(storage, first.venueId).dishIds).toEqual([
+      DISH.harvestPowerBowl,
+      DISH.salmonPokeBowl,
+    ]);
     expect(listener).toHaveBeenCalledOnce();
+    // Published again: the saved dish comes back.
+    state.reconcile(first);
+    expect(state.savedDishIds()).toEqual([DISH.harvestPowerBowl, DISH.salmonPokeBowl]);
   });
 
   it('keeps a dish that is still on the menu but now incomplete', async () => {
@@ -250,7 +257,7 @@ describe('reload re-check', () => {
     expect(storage.writes).toBe(writes);
   });
 
-  it('still removes withdrawn dishes in memory when the write fails', async () => {
+  it('hides withdrawn dishes in memory and writes nothing, even if storage would fail', async () => {
     const [first, second] = await loadMenus('withdrawal', 2);
     if (!first || !second) throw new Error('missing menus');
     const storage = new FakeStorage();
@@ -258,9 +265,11 @@ describe('reload re-check', () => {
     state.reconcile(first);
     state.save(DISH.salmonPokeBowl);
     storage.failWrites = true;
+    const writes = storage.writes;
     expect(state.reconcile(second)).toEqual({ removed: [DISH.salmonPokeBowl] });
     expect(state.isSaved(DISH.salmonPokeBowl)).toBe(false);
-    expect(state.mode()).toBe('session-only');
+    expect(storage.writes).toBe(writes);
+    expect(state.mode()).toBe('persistent');
   });
 });
 
@@ -394,7 +403,11 @@ describe('two tabs of the same restaurant', () => {
     tabB.save(DISH.salmonPokeBowl);
     tabB.save(DISH.harvestPowerBowl);
     expect(tabA.reconcile(second)).toEqual({ removed: [DISH.salmonPokeBowl] });
-    expect(stored(storage, first.venueId).dishIds).toEqual([DISH.harvestPowerBowl]);
+    expect(stored(storage, first.venueId).dishIds).toEqual([
+      DISH.harvestPowerBowl,
+      DISH.salmonPokeBowl,
+    ]);
+    expect(tabA.savedDishIds()).toEqual([DISH.harvestPowerBowl]);
   });
 
   it('keeps its own list when storage cannot be read for a moment', async () => {

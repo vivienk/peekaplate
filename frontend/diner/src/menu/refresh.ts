@@ -2,7 +2,8 @@
 // through schedule(); each successful re-read calls schedule() again, so there is no other polling.
 // A new publication replaces the menu in one step. A 404 stops event collection and tells the screen
 // the menu was withdrawn (onWithdrawn), so it can stop showing the old menu (S5-FE-10). Invalid data
-// or a failed read keeps the current menu; token expiry only stops collection.
+// or a failed read keeps the current menu and reports it through onTransientFailure so the screen
+// can offer a retry (S5-FE-10); token expiry only stops collection.
 import type { Menu, MenuLoadResult, MenuSource } from './types';
 
 // How long before the 30-minute token expires the re-read starts. Proposed, not yet agreed.
@@ -24,6 +25,12 @@ export type MenuRefresherOptions = {
   // Optional (S5-FE-10). Called once, only when the server itself answered 404: the screen then stops
   // showing the old menu. Never called for errors, offline reads, invalid data or token expiry.
   onWithdrawn?: () => void;
+  // Optional (S5-FE-10). Called when a re-read fails for a transient reason (error, offline or empty
+  // read). The menu stays; the screen can offer a retry that calls refresh() again.
+  onTransientFailure?: () => void;
+  // Optional (S5-FE-10). Called when a re-read succeeds and the publication is unchanged, so the
+  // screen can clear a "could not refresh" notice left by an earlier failure.
+  onRecovered?: () => void;
   now?: () => number;
 };
 
@@ -84,6 +91,7 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
         const current = options.getCurrent();
         // Same publication: the token was already updated by the source; the menu is unchanged.
         if (current && result.menu.publicationRevisionId === current.publicationRevisionId) {
+          options.onRecovered?.();
           return 'same';
         }
         options.onSwap(result.menu);
@@ -97,6 +105,7 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
       }
 
       // error, offline or empty: keep the current menu. Retry halfway to expiry while time remains.
+      options.onTransientFailure?.();
       const remaining = expiresAt - now();
       if (remaining > MIN_RETRY_REMAINING_MS) arm(remaining / 2);
       return 'kept';

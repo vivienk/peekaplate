@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. A confirmed 404 clears the menu on every screen with Check again; a replacement from detail or Saved returns to the new list. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -199,6 +199,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/tracking-delivery.spec.ts",
         "tests/e2e/published-refresh.spec.ts",
         "tests/e2e/published-integrity.spec.ts",
+        "tests/e2e/published-withdrawal.spec.ts",
         "docs/diner-connection.md",
         "frontend/diner/src/save/screens.ts",
         "frontend/diner/src/save/save.css",
@@ -213,7 +214,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "91d0574ec00a8c3a0be4bd83d18ff767df79ac2655d7f7ebf57e757b2688829e"
+      "sourceFingerprint": "88470473cf5cf3bcb5a6265f3cbd9bbc05c40702cdedc82fa6fd0941090792db"
     },
     {
       "id": "console",
@@ -386,7 +387,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "32f01e3a1db7abfcb6f7f5bb3f8e8917a38630b9f6e8e84783327eb106c68011"
+      "sourceFingerprint": "5d089106afd2509c62922df1717882638f0358916608beac1f23c90ad67de683"
     },
     {
       "id": "database",
@@ -738,17 +739,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Complete final review/CI and merge into develop. Ingredient-specific owner UI/import, recomputation from effective corrections, confirmation and representative food-domain acceptance remain separate; do not copy this sidecar into public food claims."
     },
     {
-      "date": "2026-11-08",
-      "summary": "November 8: S5-DATA-07 PR #120 review audit corrections: (A) runtime tracking activation lookup moved inside authorized tenant transaction with app.tenant_id established; (B) staff_membership FOR SHARE re-check acquired inside processing transaction before commit; (C) reviewer UUID provenance preserved via forward migration dropping restrictive FK to staff_membership; (D) canonical menu publication and withdrawal history resolved via app_private.es_event; (E) duplicate file SHA-256 re-checked under advisory lock; (F) order identity tuple formatted as JSON array [order_id, order_line_id, outcome_type]; (G) strict integer quantity validation (1-999); (H) downstream handoff fixture added with documentation; (I) raw CSV retention purge gated behind enableRawCsvPurge flag; (J) automatic tracking activation insert decoupled from publishMenu. 68/68 pgTAP assertions and 5/5 real PostgreSQL integration probes pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "measurement"
-      ],
-      "next": "Await explicit stakeholder sign-off on visit-matching and metric contracts before connecting outcomes to owner reports or causal attribution. No owner/editor mapping API or UI to be built for pilot."
-    },
-    {
       "date": "2026-11-11",
       "modules": [
         "contracts",
@@ -834,6 +824,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/posthog-adapter.spec.ts"
       ],
       "next": "Merge the reviewed correction and its exact-main staging release after final approval. Record corrected intercepted browser evidence separately from DATA-12 real destination persistence and metric reconciliation."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "diner"
+      ],
+      "summary": "S5-FE-10 deliberately reverses the earlier keep-the-menu-after-404 behavior. A confirmed 404 on the scheduled re-read stops collection, clears the menu on every diner surface and shows an unavailable state with Check again; network and 5xx errors keep the menu. A replacement while a dish detail or Saved is open returns to the new list with \"This menu was updated.\" The withdrawn and refresh-failed copy is interim. A failed re-read keeps the menu and shows a Retry notice that clears when a re-read succeeds. Saved IDs are kept in local storage and hidden, never deleted, while a published menu lacks the dish; they return if it is published again.",
+      "sources": [
+        "frontend/diner/src/menu/menuScreen.ts",
+        "frontend/diner/src/menu/refresh.ts",
+        "frontend/diner/src/save/save-state.ts",
+        "tests/e2e/published-withdrawal.spec.ts",
+        "docs/diner-connection.md"
+      ],
+      "next": "Final copy and return path, hosted check 6 and the token-expiry state need decisions. Confirm release scope. Run pnpm context:refresh."
     }
   ]
 }

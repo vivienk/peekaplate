@@ -166,6 +166,28 @@ describe('menu refresher', () => {
       await expect(refresher.refresh()).resolves.toBe('stopped');
       expect(onStop).toHaveBeenCalledOnce();
     });
+
+    it('calls onRecovered only when a re-read succeeds on the same publication', async () => {
+      const results: MenuLoadResult[] = [
+        { status: 'error' },
+        { status: 'ready', menu: menu('pub-1') },
+        { status: 'ready', menu: menu('pub-2') },
+      ];
+      const onRecovered = vi.fn();
+      const refresher = createMenuRefresher({
+        source: { load: async () => results.shift() ?? { status: 'error' } },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop: vi.fn(),
+        onRecovered,
+      });
+      await refresher.refresh();
+      expect(onRecovered).not.toHaveBeenCalled();
+      await expect(refresher.refresh()).resolves.toBe('same');
+      expect(onRecovered).toHaveBeenCalledOnce();
+      await expect(refresher.refresh()).resolves.toBe('swapped');
+      expect(onRecovered).toHaveBeenCalledOnce();
+    });
   });
 
   it('on an error keeps the menu and retries once halfway to expiry', async () => {

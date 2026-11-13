@@ -18,9 +18,18 @@ producer. It does not approve restaurant facts or complete pilot tracking.
    canonical sender. One consent choice still gates canonical and PostHog
    dispatch independently. GPC/DNT and fixture silence remain enforced.
 5. A refresh renews the token and atomically swaps a changed publication.
-   A detected 404 stops new collection and queued work at both destinations,
-   without changing the diner's consent choice. The already displayed menu stays
-   usable. Collection also stops at the current token's expiry if refresh hangs.
+   A confirmed 404 stops new collection and queued work at both destinations,
+   without changing the diner's consent choice, then clears the menu on every
+   diner surface (list, dish detail, Saved) and shows an unavailable/withdrawn
+   state with a "Check again" button. Only a real 404 does this; network failures
+   and 5xx errors keep the displayed menu. Saved dish IDs stay in local storage and
+   are shown again only after a valid published menu loads; dishes missing from it
+   stay hidden. A new publication that replaces the menu while a dish detail or
+   Saved is open returns the diner to the new list with "This menu was updated."
+   **Deliberate reversal (S5-FE-10):** earlier versions kept the displayed menu
+   usable after a 404; that behavior is removed because the diner must never
+   present a withdrawn or replaced menu as current. Collection also stops at the
+   current token's expiry if refresh hangs.
    Remounting aborts the old load so it cannot restore an obsolete token.
 
 Withdrawal detection follows the existing scheduled re-read: currently five
@@ -81,7 +90,8 @@ withdraw three labelled synthetic menus, then the actual deployed diner:
 - [ ] The tampered bundle is rejected without displaying its altered fields.
 - [ ] A fresh withdrawn menu is unavailable and does not fetch its bundle.
 - [ ] An active menu's scheduled refresh sees withdrawal, stops re-reading and
-      starts no new tracking requests; the existing screen remains usable.
+      starts no new tracking requests; the menu is cleared and the withdrawn
+      state with "Check again" is shown (reversed from "screen remains usable").
 - [ ] Pinned bundle/photo URLs and exact CORS still work after app deployment.
 - [ ] All synthetic menus are withdrawn; temporary owner membership returns to
       viewer; the genuine test session ends. API/console/Queues remain unchanged.

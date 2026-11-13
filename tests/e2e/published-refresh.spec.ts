@@ -61,7 +61,11 @@ test('publication refresh preserves focused Search and its query', async ({ page
   await expect(input).toBeFocused();
 });
 
-test('return from a removed dish focuses the new menu heading', async ({ page }) => {
+// S5-FE-10 (Option A, deliberate reversal of the earlier "detail stays open" behavior): a replaced
+// menu is never shown as current, so an open detail returns to the new list with a notice.
+test('replacement while a dish detail is open returns to the new list with a notice', async ({
+  page,
+}) => {
   await openRefreshMenu(page);
   const opener = page.locator('.pp-card__open').first();
   const dishId = await opener.getAttribute('data-open-dish-id');
@@ -70,9 +74,22 @@ test('return from a removed dish focuses the new menu heading', async ({ page })
     (window as unknown as { removeDish: string | null }).removeDish = id;
   }, dishId);
   await refresh(page);
-  await expect(page.locator('.pp-detail')).toBeVisible();
-  await page.locator('.pp-detail__back').click();
+  await expect(page.locator('.pp-detail')).toHaveCount(0);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await expect(page.getByText('This menu was updated.')).toBeVisible();
   await expect(page.locator('h1')).toBeFocused();
+});
+
+test('replacement while the Saved screen is open returns to the new list with a notice', async ({
+  page,
+}) => {
+  await openRefreshMenu(page);
+  await page.locator('.pp-saved').first().click();
+  await expect(page.locator('.pp-saved__title')).toBeVisible();
+  await refresh(page);
+  await expect(page.locator('.pp-saved__title')).toHaveCount(0);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await expect(page.getByText('This menu was updated.')).toBeVisible();
 });
 
 test('refresh retains the visible category opener rather than its hidden All copy', async ({
