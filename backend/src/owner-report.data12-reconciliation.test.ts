@@ -22,7 +22,7 @@ function createOwnerReportClient(rows: Record<string, unknown>[]) {
   return { query } as unknown as Client;
 }
 
-describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#134/#152 report outputs', () => {
+describe('DATA-12 aggregate-row serialization checks (SQL is not executed)', () => {
   it('reconciles D06-PRIVACY-09, D06-PRIVACY-10, D06-PRIVACY-11, and D06-PRIVACY-REPEAT session boundaries', async () => {
     const rows = [
       {
@@ -59,7 +59,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         total_sessions: 11,
         exposed_open_sessions: 10,
         open_eligible_sessions: 11,
-        total_openings: 10,
+        total_openings: 11,
         timed_openings: 10,
         engaged_sessions: 8,
         saved_sessions: 0,
@@ -104,7 +104,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
     const dish11 = report.dishes.find((d) => d.dish_id === '00000000-0000-4000-8000-000000000011')!;
     expect(dish11.evidence_state).toBe('NORMAL');
     expect(dish11.metrics.save_rate).toEqual({ value: 0, status: 'VALID_ZERO' });
-    expect(dish11.metrics.timing_coverage).toEqual({ value: 1, status: 'NORMAL' });
+    expect(dish11.metrics.timing_coverage).toEqual({ value: 0.909, status: 'NORMAL' });
 
     const dishRepeat = report.dishes.find(
       (d) => d.dish_id === '00000000-0000-4000-8000-000000000001',
@@ -134,7 +134,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         dish_name: 'Zero Openings Timing Dish',
         total_sessions: 11,
         exposed_open_sessions: 0,
-        open_eligible_sessions: 11,
+        open_eligible_sessions: 0,
         total_openings: 0,
         timed_openings: 0,
         engaged_sessions: 0,
@@ -162,13 +162,14 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
     )!;
     expect(zeroOpenings.metrics.open_rate).toEqual({ value: 0, status: 'VALID_ZERO' });
     expect(zeroOpenings.metrics.timing_coverage).toEqual({ value: null, status: 'NOT_MEASURABLE' });
+    expect(zeroOpenings.metrics.engagement_rate).toEqual({ value: null, status: 'NOT_MEASURABLE' });
     expect(zeroOpenings.metrics.avg_interaction_time_seconds).toEqual({
       value: null,
       status: 'NOT_MEASURABLE',
     });
   });
 
-  it('reconciles comparison attribution window suppression (INSUFFICIENT when below 10 sessions)', async () => {
+  it('suppresses pre-aggregated comparison metrics below the session floor', async () => {
     const query = vi.fn(async (text: string) => {
       const normalized = text.trim().replace(/\s+/g, ' ');
       if (normalized.includes('app_private.staff_membership')) {
@@ -213,8 +214,26 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
     );
 
     const dish = comparisonReport.dishes.at(0)!;
-    expect(dish.metrics.open_rate.status).toBe('INSUFFICIENT');
-    expect(dish.metrics.open_rate.current_value).toBeNull();
-    expect(dish.metrics.open_rate.delta).toBeNull();
+    for (const metric of Object.values(dish.metrics)) {
+      expect(metric).toMatchObject({
+        status: 'INSUFFICIENT',
+        current_value: null,
+        baseline_value: null,
+        delta: null,
+        eligible_sessions: null,
+      });
+    }
+  });
+
+  it('returns EMPTY with unknown freshness when the query has no rows', async () => {
+    const report = OwnerDishReportSchema.parse(
+      await readOwnerReport(createOwnerReportClient([]), ACTOR_ID, VENUE_ID, NOW, 'synthetic'),
+    );
+    expect(report.dishes).toEqual([]);
+    expect(report.report_metadata.report_status).toBe('EMPTY');
+    expect(report.report_metadata.freshness).toEqual({
+      is_stale: null,
+      last_event_ingested_at: null,
+    });
   });
 });

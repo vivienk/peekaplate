@@ -2909,3 +2909,14 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
+```
+
+## DATA-12 review corrections — November 13, 2026
+
+```json
+{"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+```
