@@ -1,0 +1,20 @@
+{
+  "schema_version": "qa02.manifest.v1",
+  "dataset_version": "qa02-development-example-v1",
+  "frozen_at": "2026-11-13T18:45:48.776Z",
+  "cases": [
+    {
+      "case_id": "DEV-SYNTHETIC-001",
+      "split": "development",
+      "source_path": "../../../tests/fixtures/menu-ingestion/synthetic-review-options.pdf",
+      "source_sha256": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+      "original_source_sha256": "0c2561a3aef8ce86a3a1e36355592dd6398cb12126529c1cc30d2d2ba1d9544c",
+      "page_count": 3,
+      "previously_inspected": true,
+      "source_permission": "Existing repository-generated fictional PDF; no restaurant/POS/customer data.",
+      "reference_path": "synthetic-menu.reference.json",
+      "reference_sha256": "8582a06d431eeb02e57683ee3521f6df811e3d012c1454d4128d768ac0ff25e8",
+      "reference_version": "synthetic-menu-v1"
+    }
+  ]
+}
