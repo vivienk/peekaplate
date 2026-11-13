@@ -151,7 +151,9 @@ export type Bindings = {
   INGESTION_REPORTS_BUCKET?: {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    delete?(key: string): Promise<unknown>;
   };
+
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
@@ -1845,6 +1847,52 @@ export const handleScheduled = async (event: any, env: any) => {
           retained: result.retained,
         }),
       );
+    }
+
+    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
+    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
+      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
+      : undefined;
+    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
+
+    if (
+      stagingRetentionDays !== undefined ||
+      stagingRejectedDays !== undefined ||
+      stagingOrphanDays !== undefined
+    ) {
+      try {
+        const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
+        const stagingResult = await cleanupStagedMenuPhotos({
+          storage: storage as any,
+          client,
+          retentionConfig: {
+            promotedRetentionDays: stagingRetentionDays ?? 0,
+            rejectedRetentionDays: stagingRejectedDays ?? 0,
+            orphanGraceDays: stagingOrphanDays ?? 0,
+          },
+          dryRun: stagingDryRun,
+        });
+        if (
+          stagingResult.promotedDeleted > 0 ||
+          stagingResult.rejectedDeleted > 0 ||
+          stagingResult.orphansDeleted > 0
+        ) {
+          console.log(
+            JSON.stringify({
+              event: 'menu_staging_cleanup',
+              ...stagingResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
+      }
     }
   } catch {
     console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));

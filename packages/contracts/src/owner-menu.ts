@@ -93,3 +93,25 @@ export const MenuUrlIntakeSchema = z.strictObject({
   url: z.url().max(2048),
   idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
 });
+
+export const DishVerificationStatusSchema = z.enum(['not_verified', 'verified']);
+export type DishVerificationStatus = z.infer<typeof DishVerificationStatusSchema>;
+
+export const PhotoVerificationStatusSchema = z.enum(['not_verified', 'verified', 'rejected']);
+export type PhotoVerificationStatus = z.infer<typeof PhotoVerificationStatusSchema>;
+
+export const VerifyDishDraftSchema = z.strictObject({
+  commandId: z.uuid(),
+  verified: z.boolean().default(true),
+});
+export type VerifyDishDraft = z.infer<typeof VerifyDishDraftSchema>;
+
+export const ApproveDraftPhotoSchema = z.strictObject({
+  commandId: z.uuid(),
+});
+export type ApproveDraftPhoto = z.infer<typeof ApproveDraftPhotoSchema>;
+
+export const RejectDraftPhotoSchema = z.strictObject({
+  commandId: z.uuid(),
+});
+export type RejectDraftPhoto = z.infer<typeof RejectDraftPhotoSchema>;

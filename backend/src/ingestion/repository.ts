@@ -78,6 +78,7 @@ export type DishDraftRow = {
   origin?: 'extracted' | 'manual';
   draft_version?: number;
   manual_fields?: unknown;
+  verification_status?: 'not_verified' | 'verified';
 };
 
 export const DEFAULT_LEASE_TIMEOUT_MINUTES = 15;

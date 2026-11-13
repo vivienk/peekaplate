@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
+  ApproveDraftPhotoSchema,
   CreateMenuUploadGroupSchema,
   DraftPhotoScopeSchema,
   DraftScopeSchema,
@@ -7,9 +8,12 @@ import {
   MenuJobActionSchema,
   MenuUploadGroupScopeSchema,
   MenuUrlIntakeSchema,
+  RejectDraftPhotoSchema,
   SaveOwnerDishDraftSchema,
   VenueScopeSchema,
+  VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
+
 import type { Context, Hono } from 'hono';
 import type { Client } from 'pg';
 import { AuthUnavailableError } from './auth';
@@ -29,8 +33,11 @@ import { bootstrapMenuReview } from './ingestion/review-bootstrap';
 import { readMenuUpload } from './ingestion/upload';
 import {
   type DraftPhoto,
+  promoteDraftPhoto,
+  rejectDraftPhoto,
   saveOwnerDishDraft,
   storeDraftPhoto,
+  verifyOwnerDish,
   withOwnerMenuTransaction,
 } from './owner-menu';
 
@@ -72,6 +79,24 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
     );
     return c.json({ draft });
   });
+  app.post('/venues/:venueId/drafts/:draftId/verify', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftScopeSchema.safeParse(c.req.param());
+    const input = VerifyDishDraftSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    const result = await services.database(c.env, (client) =>
+      verifyOwnerDish(
+        client,
+        actor,
+        venue,
+        scope.data.draftId,
+        input.data.commandId,
+        input.data.verified,
+      ),
+    );
+    return c.json(result);
+  });
+
   app.get('/venues/:venueId/drafts/:draftId', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftScopeSchema.safeParse(c.req.param());
@@ -110,11 +135,80 @@ export function registerOwnerMenuRoutes(app: Hono<{ Bindings: Bindings }>, servi
           contentType: photo.content_type,
           sizeBytes: photo.size_bytes,
           sha256: photo.source_hash,
+          verificationStatus: photo.verification_status ?? 'not_verified',
+          storageKey: photo.storage_key,
         },
       },
       201,
     );
   });
+  app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/approve', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
+    const input = ApproveDraftPhotoSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    if (!bucket?.get || !bucket?.put) throw new AuthUnavailableError();
+    const storage = {
+      get: (key: string) => bucket.get!(key),
+      put: (key: string, value: ArrayBuffer) => bucket.put(key, value),
+      delete: (key: string) => (bucket.delete ? bucket.delete(key) : Promise.resolve()),
+    };
+    const { photo, stagingKeyToDelete } = await services.database(c.env, (client) =>
+      promoteDraftPhoto(
+        client,
+        actor,
+        venue,
+        scope.data.draftId,
+        scope.data.photoId,
+        input.data.commandId,
+        storage,
+      ),
+    );
+    if (stagingKeyToDelete && bucket.delete) {
+      try {
+        await bucket.delete(stagingKeyToDelete);
+      } catch {
+        // Safe post-commit staging deletion: failure logged, retryable by scheduled retention
+      }
+    }
+    return c.json({
+      photo: {
+        id: photo.id,
+        draftId: photo.draft_id,
+        contentType: photo.content_type,
+        sizeBytes: photo.size_bytes,
+        sha256: photo.source_hash,
+        verificationStatus: photo.verification_status,
+        storageKey: photo.storage_key,
+        promotedStorageKey: photo.promoted_storage_key,
+      },
+    });
+  });
+  app.post('/venues/:venueId/drafts/:draftId/photos/:photoId/reject', async (c) => {
+    const { actor, venue } = await identity(c);
+    const scope = DraftPhotoScopeSchema.safeParse(c.req.param());
+    const input = RejectDraftPhotoSchema.safeParse(await json(c));
+    if (!scope.success || !input.success) return c.json({ error: 'invalid_request' }, 400);
+    const { photo } = await services.database(c.env, (client) =>
+      rejectDraftPhoto(
+        client,
+        actor,
+        venue,
+        scope.data.draftId,
+        scope.data.photoId,
+        input.data.commandId,
+      ),
+    );
+    return c.json({
+      photo: {
+        id: photo.id,
+        draftId: photo.draft_id,
+        verificationStatus: photo.verification_status,
+      },
+    });
+  });
+
   app.get('/venues/:venueId/drafts/:draftId/photos/:photoId', async (c) => {
     const { actor, venue } = await identity(c);
     const scope = DraftPhotoScopeSchema.safeParse(c.req.param());

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { OwnerDishFieldsSchema, SaveOwnerDishDraftSchema } from './owner-menu';
+import {
+  ApproveDraftPhotoSchema,
+  DishVerificationStatusSchema,
+  OwnerDishFieldsSchema,
+  PhotoVerificationStatusSchema,
+  SaveOwnerDishDraftSchema,
+  VerifyDishDraftSchema,
+} from './owner-menu';
 
 describe('owner working drafts', () => {
   it('permits incomplete saved work but never invents confirmed ingredients or allergens', () => {
@@ -20,5 +27,25 @@ describe('owner working drafts', () => {
     ).toBe(false);
     expect(OwnerDishFieldsSchema.safeParse({ priceAmount: '1.001' }).success).toBe(false);
     expect(OwnerDishFieldsSchema.safeParse({ name: '\u0000' }).success).toBe(false);
+  });
+
+  it('enforces strict verification status schemas', () => {
+    expect(DishVerificationStatusSchema.safeParse('not_verified').success).toBe(true);
+    expect(DishVerificationStatusSchema.safeParse('verified').success).toBe(true);
+    expect(DishVerificationStatusSchema.safeParse('rejected').success).toBe(false);
+
+    expect(PhotoVerificationStatusSchema.safeParse('not_verified').success).toBe(true);
+    expect(PhotoVerificationStatusSchema.safeParse('verified').success).toBe(true);
+    expect(PhotoVerificationStatusSchema.safeParse('rejected').success).toBe(true);
+    expect(PhotoVerificationStatusSchema.safeParse('invalid').success).toBe(false);
+
+    const commandId = crypto.randomUUID();
+    expect(VerifyDishDraftSchema.safeParse({ commandId }).success).toBe(true);
+    expect(VerifyDishDraftSchema.parse({ commandId }).verified).toBe(true);
+    expect(VerifyDishDraftSchema.safeParse({ commandId, verified: false }).success).toBe(true);
+    expect(VerifyDishDraftSchema.safeParse({ commandId: 'not-a-uuid' }).success).toBe(false);
+
+    expect(ApproveDraftPhotoSchema.safeParse({ commandId }).success).toBe(true);
+    expect(ApproveDraftPhotoSchema.safeParse({ commandId, extra: true }).success).toBe(false);
   });
 });

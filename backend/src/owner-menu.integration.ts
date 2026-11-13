@@ -15,7 +15,15 @@ import {
 } from './ingestion/intake';
 import { processIngestionQueueBatch } from './ingestion/orchestrator';
 import { claimIngestionJob, getIngestionJob, persistExtractedDrafts } from './ingestion/repository';
-import { replayOwnerDraft, saveOwnerDishDraft, storeDraftPhoto } from './owner-menu';
+import {
+  promoteDraftPhoto,
+  rejectDraftPhoto,
+  replayOwnerDraft,
+  replayOwnerDraftProjection,
+  saveOwnerDishDraft,
+  storeDraftPhoto,
+  verifyOwnerDish,
+} from './owner-menu';
 import { saveCandidateReviewCommand } from './review-command';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
@@ -129,10 +137,11 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     await expect(
       storeDraftPhoto(runtime, actor, venue, id, changed, 'image/png', put),
     ).rejects.toMatchObject({ code: 'command_conflict' });
-    expect(put.mock.calls[0]?.[0]).toBe(`owner-draft-photos/${venue}/${id}/${image().sourceHash}`);
+    expect(put.mock.calls[0]?.[0]).toBe(`menu-staging/${venue}/${id}/${image().sourceHash}`);
     expect((await storeDraftPhoto(runtime, actor, venue, id, image(), 'image/png', put)).id).toBe(
       photo.id,
     );
+
     await expect(save(otherId, { photoId: photo.id }, 1)).rejects.toMatchObject({
       code: 'photo_not_found',
     });
@@ -749,5 +758,112 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Owner menu workspace database', () =>
     ]);
     objects.set(key, stored + ' ');
     expect((await request()).status).toBe(409);
+  });
+
+  it('promotes staged photos to menu-assets safely and decouples from dish verification', async () => {
+    const draftId = crypto.randomUUID();
+    await save(draftId);
+
+    const storageObjects = new Map<string, ArrayBuffer>();
+    const storage = {
+      get: vi.fn(async (key: string) => {
+        const buf = storageObjects.get(key);
+        if (!buf) return null;
+        return {
+          arrayBuffer: async () => buf.slice(0),
+          size: buf.byteLength,
+        };
+      }),
+      put: vi.fn(async (key: string, bytes: ArrayBuffer) => {
+        storageObjects.set(key, bytes.slice(0));
+      }),
+      delete: vi.fn(async (key: string) => {
+        storageObjects.delete(key);
+      }),
+    };
+
+    const img = image();
+    const photo = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      img,
+      'image/png',
+      storage.put,
+    );
+    expect(photo.storage_key).toBe(`menu-staging/${venue}/${draftId}/${img.sourceHash}`);
+    expect(storageObjects.has(photo.storage_key)).toBe(true);
+
+    // 1. Promote photo
+    const commandId = crypto.randomUUID();
+    const promoted = await promoteDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draftId,
+      photo.id,
+      commandId,
+      storage,
+    );
+    expect(promoted.photo.verification_status).toBe('verified');
+    expect(promoted.photo.storage_key).toBe(`menu-assets/${venue}/${photo.id}/${img.sourceHash}`);
+    expect(promoted.stagingKeyToDelete).toBe(`menu-staging/${venue}/${draftId}/${img.sourceHash}`);
+
+    // Verify destination in storage
+    expect(storageObjects.has(promoted.photo.storage_key)).toBe(true);
+    // Delete staging after commit
+    if (promoted.stagingKeyToDelete) {
+      await storage.delete(promoted.stagingKeyToDelete);
+    }
+    expect(storageObjects.has(`menu-staging/${venue}/${draftId}/${img.sourceHash}`)).toBe(false);
+
+    // Verify draft verification_status is still not_verified (decoupled!)
+    const draftAfterPhoto = (
+      await admin.query('SELECT verification_status FROM app_private.dish_drafts WHERE id=$1', [
+        draftId,
+      ])
+    ).rows[0];
+    expect(draftAfterPhoto.verification_status).toBe('not_verified');
+
+    // 2. Verify dish independently
+    const verifyCmd = crypto.randomUUID();
+    const verifiedDish = await verifyOwnerDish(runtime, actor, venue, draftId, verifyCmd, true);
+    expect(verifiedDish.draft.verification_status).toBe('verified');
+
+    // Replay projection check
+    const events = await admin.query<{
+      version: number;
+      schema_version: number;
+      event_type: string;
+      payload: unknown;
+    }>(
+      `SELECT version, schema_version, event_type, payload
+       FROM app_private.es_event
+       WHERE tenant_id=$1 AND stream_id=$2
+       ORDER BY version ASC`,
+      [venue, draftId],
+    );
+    const proj = replayOwnerDraftProjection(events.rows);
+    expect(proj?.verificationStatus).toBe('verified');
+
+    // 3. Reject photo on a new draft
+    const draft2Id = crypto.randomUUID();
+    await save(draft2Id);
+    const img2 = image();
+    const photo2 = await storeDraftPhoto(
+      runtime,
+      actor,
+      venue,
+      draft2Id,
+      img2,
+      'image/png',
+      storage.put,
+    );
+    const rejectCmd = crypto.randomUUID();
+    const rejected = await rejectDraftPhoto(runtime, actor, venue, draft2Id, photo2.id, rejectCmd);
+    expect(rejected.photo.verification_status).toBe('rejected');
+    // Staging file preserved
+    expect(storageObjects.has(photo2.storage_key)).toBe(true);
   });
 });
