@@ -813,6 +813,11 @@ decisions remain PENDING.
 
 ## Owner-report staging API — November 10
 
+For the independent draft/photo verification APIs and retention controls, see
+[owner menu workspace](owner-menu-workspace.md#independent-draft-and-photo-verification-161).
+These additions need their own migration/release and hosted acceptance. The
+dashboard design previews still use synthetic state, with no live save/publish connection.
+
 The console may call the owner-report route from its exact staging origin or
 http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.
 GitHub collaborator tokens do not authorize restaurant reports. Staging reports
