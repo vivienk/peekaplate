@@ -222,6 +222,8 @@ does not authorize deployment or change any existing food-safety review policy.
 
 ## Recorded local verification
 
+- PASS: `PYTHONPATH=processing/src ../noka-pr118-20261110/venv/bin/python -m unittest discover -s processing/tests` — final full suite: 527 tests in 68.976 seconds.
+
 - PASS: `PYTHONPATH=processing/src ../noka-pr118-20261110/venv/bin/python -m unittest discover -s processing/tests -p 'test_ingredient*.py'` — 24 tests after the corrupt-record fix.
 - PASS: `PYTHONPATH=processing/src ../noka-pr118-20261110/venv/bin/python -m unittest discover -s processing/tests -p test_review_candidates.py` — 17 tests.
 - PASS: `pnpm context:refresh` and `pnpm verify context:check docs:check`, with installed Node 24.16 on PATH and `pnpm_config_verify_deps_before_run=` to avoid unrelated automatic package installation.

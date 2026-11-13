@@ -679,7 +679,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "48e4dff29428d6c94b8f2b64aedc617cc1ac50dfb2e56860fa85fea8098043ba"
+      "sourceFingerprint": "ce59acd3d2b99e5c8a8eb2cc1aafbd6c719945caf6d6a77838c12d23b6d5f123"
     },
     {
       "id": "assets",
@@ -719,7 +719,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "processing"
       ],
-      "summary": "Added opt-in private ingredient icon proposal CLI/API using unchanged ingredient intelligence and review evidence validation. Exact Figma component set inspected in browser; no art exports or UI shipped. Local store validates and hashes curated/generated imports and pins explicit artwork decisions. Full Python suite passes 526 tests in existing local environment.",
+      "summary": "Added opt-in private ingredient icon proposal CLI/API using unchanged ingredient intelligence and review evidence validation. Exact Figma component set inspected in browser; no art exports or UI shipped. Local store validates and hashes curated/generated imports and pins explicit artwork decisions. Final full Python suite passes 527 tests in existing local environment; both automated review passes clear the pinned implementation.",
       "next": "Export approved reference artwork; implement shared schemas, authenticated hosted lifecycle and owner/publication integration per ingredient-icon-pipeline.md. Frozen environment and hosted acceptance remain separate."
     },
     {
