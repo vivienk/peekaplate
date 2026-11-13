@@ -420,7 +420,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e739df37ae1682912cc70a191d41898c3b4c5ae83f13083cf1f563c23e774a4e"
+      "sourceFingerprint": "56beb4609af939ab09fa385355981a9d505346dbe79cf331318a083fbd3fffb7"
     },
     {
       "id": "database",
@@ -514,6 +514,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "scripts/verify.mjs",
         "scripts/verify.test.mjs",
+        "scripts/owner-ai-launcher.test.mjs",
         "docs/verification.md",
         "vitest.db.config.ts",
         ".github/main-ruleset.json",
@@ -552,7 +553,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "ff7a6c01a335e4fae033fb2fa32b3f322db3cf0de492ee71563701ff7ff1431e"
+      "sourceFingerprint": "88f3283e85eaeee986d5bf452e45ad01832aada007f24fb7644047340143ada0"
     },
     {
       "id": "agents",

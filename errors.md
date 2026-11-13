@@ -3304,3 +3304,10 @@ Initial checks identified exact-optional-property construction errors and Node v
 ```
 
 - Owner Responses integration verification: full test suite passed with local ports permitted (1515 tests, 4 skipped; 79 script checks). The context check detected the newly changed E2E script fingerprint; refreshed after reviewing the delivery summary. Build dry-run succeeded, but Wrangler could not write its default external log directory; retry uses a temporary log path. No deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-13T00:29:15.673Z","exitCode":1}
+```
+
+- Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.

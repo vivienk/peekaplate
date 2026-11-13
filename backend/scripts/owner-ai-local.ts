@@ -128,15 +128,19 @@ const frontend = spawn(
     },
   },
 );
-const stop = () => {
+const stop = (code = 0) => {
   frontend.kill('SIGTERM');
   server.close();
-  process.exit();
+  process.exit(code);
 };
-process.once('SIGINT', stop);
-process.once('SIGTERM', stop);
-frontend.once('exit', stop);
+process.once('SIGINT', () => stop(0));
+process.once('SIGTERM', () => stop(0));
+frontend.once('exit', (code, signal) => stop(code ?? (signal ? 1 : 0)));
+frontend.once('error', () => {
+  console.error('Dashboard could not start. Check the local dependencies.');
+  stop(1);
+});
 server.once('error', () => {
   console.error('Local server port unavailable.');
-  stop();
+  stop(1);
 });

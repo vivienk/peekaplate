@@ -20,11 +20,18 @@ env['OWNER_AI_OPENAI_API_KEY'] = key
 env['OWNER_AI_OPENAI_PROJECT_ID'] = project
 env.pop('OWNER_AI_LOCAL_MOCK', None)
 root = Path(__file__).resolve().parent.parent
+exit_code = 0
 try:
-    subprocess.run(['node', '--import', './scripts/node-ts-hooks.mjs',
+    result = subprocess.run(['node', '--import', './scripts/node-ts-hooks.mjs',
                     'backend/scripts/owner-ai-local.ts'], cwd=root, env=env, check=False)
+    exit_code = result.returncode if result.returncode >= 0 else 1
+except OSError:
+    print('Dashboard could not start. Check Node and local dependencies.', file=sys.stderr)
+    exit_code = 1
 except KeyboardInterrupt:
     pass
 finally:
     env.pop('OWNER_AI_OPENAI_API_KEY', None)
     key = ''
+
+sys.exit(exit_code)
