@@ -327,6 +327,31 @@ function fakeSdk() {
 }
 
 describe('PostHog adapter wiring', () => {
+  it('captures consent-triggered menu views when the screen subscribes before the adapter', async () => {
+    const tracking = await fresh();
+    const sdk = fakeSdk();
+    const canonical = recordingDeliver();
+    tracking.enableLiveTracking(canonical.deliver);
+    const stopScreen = tracking.onTrackingAllowedChange((allowed) => {
+      if (allowed) tracking.track('menu_viewed', menuViewed);
+    });
+    tracking.connectPostHogFromEnv(postHogEnv, { origin: ORIGIN, loadSdk: sdk.loadSdk });
+    try {
+      tracking.setTrackingAllowed(true);
+      await flush();
+      expect(canonical.sent()).toHaveLength(1);
+      expect(sdk.captures.map((event) => event.uuid)).toEqual(canonical.sent());
+      tracking.setTrackingAllowed(false);
+      tracking.setTrackingAllowed(true);
+      await flush();
+      expect(canonical.sent()).toHaveLength(2);
+      expect(sdk.captures.map((event) => event.uuid)).toEqual(canonical.sent());
+      expect(sdk.instances).toHaveLength(2);
+    } finally {
+      stopScreen();
+    }
+  });
+
   it('publication suspension discards a capture waiting for the SDK to load', async () => {
     const tracking = await fresh();
     const sdk = fakeSdk();

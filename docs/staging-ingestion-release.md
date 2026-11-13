@@ -1,5 +1,12 @@
 # Staging ingestion release candidate
 
+The follow-up [owner menu workspace](owner-menu-workspace.md) adds the S06–S09
+backend interfaces while reusing this ingestion service and private storage.
+Its migration and main release #149 are deployed. The November 12 authenticated
+workspace record passes 53 HTTP checks and 29 browser assertions, with independent
+Supabase/R2 verification. Use the workspace record for current deployment/test status; real S06–S09 screen
+acceptance remains separate. The candidate steps below are the historical setup order.
+
 This candidate promotes the merged extraction PR58, orchestration PR45 and
 architecture proposal PR44 onto the main release baseline. It adds the missing
 authenticated source-upload API and a main-SHA-guarded extraction deployment.
@@ -90,5 +97,7 @@ source was removed and read back as404. That test did not deploy this candidate,
 exercise its new upload API, or prove database persistence/queue acknowledgement.
 
 Local candidate checks cover types, unit tests, source hash/type/size checks,
-authorization boundaries and storage-before-dispatch ordering. Hosted owner
-acceptance remains NOT RUN until the release prerequisites above are satisfied.
+authorization boundaries and storage-before-dispatch ordering. At that candidate checkpoint, hosted owner
+acceptance was not run. The later [workspace record](owner-menu-workspace.md#acceptance-record)
+supersedes this upload/review gate with authenticated results; this retest did not
+repeat fresh provider processing or certify the unfinished owner screens.

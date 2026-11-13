@@ -28,7 +28,7 @@ export type MenuIngestionJobRow = {
   source_storage_key: string | null;
   result_storage_key: string | null;
   idempotency_key: string;
-  status: 'queued' | 'running' | 'complete' | 'incomplete' | 'failed';
+  status: 'queued' | 'running' | 'complete' | 'incomplete' | 'failed' | 'cancelled';
   attempt_count: number;
   max_attempts: number;
   claim_token: string | null;
@@ -41,16 +41,20 @@ export type MenuIngestionJobRow = {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  upload_group_id?: string | null;
+  upload_index?: number | null;
+  source_uploaded?: boolean;
+  source_provenance?: unknown;
 };
 
 export type DishDraftRow = {
   id: string;
   tenant_id: string;
-  job_id: string;
+  job_id: string | null;
   draft_id: string;
   candidate_id?: string | null;
   draft_index: number;
-  name: string;
+  name: string | null;
   description: string | null;
   category: string | null;
   subcategory?: string | null;
@@ -59,8 +63,8 @@ export type DishDraftRow = {
   price_amount: string | null;
   price_currency: string | null;
   ingredients: unknown[] | null;
-  source_id: string;
-  source_text: string;
+  source_id: string | null;
+  source_text: string | null;
   image_id: string | null;
   evidence: Record<string, unknown>;
   review_warnings: string[];
@@ -71,6 +75,10 @@ export type DishDraftRow = {
   published_dish_id: string | null;
   created_at: string;
   updated_at: string;
+  origin?: 'extracted' | 'manual';
+  draft_version?: number;
+  manual_fields?: unknown;
+  verification_status?: 'not_verified' | 'verified';
 };
 
 export const DEFAULT_LEASE_TIMEOUT_MINUTES = 15;
@@ -174,7 +182,7 @@ export async function createIngestionJob(
 }
 
 /**
- * Atomically claims a queued, timed-out running, or incomplete job.
+ * Atomically claims a queued or timed-out running job. Partial results require explicit retry.
  * Grants a new claim_token and increments lease_generation.
  */
 export async function claimIngestionJob(
@@ -208,10 +216,15 @@ export async function claimIngestionJob(
            started_at = COALESCE(started_at, now()),
            finished_at = NULL
        WHERE id = $2 AND tenant_id = $3
+         AND source_uploaded
+         AND (upload_group_id IS NULL OR NOT EXISTS (
+           SELECT 1 FROM app_private.menu_ingestion_jobs pending
+           WHERE pending.tenant_id=$3 AND pending.upload_group_id=menu_ingestion_jobs.upload_group_id
+             AND NOT pending.source_uploaded AND pending.status <> 'cancelled'
+         ))
          AND (
            status = 'queued'
            OR (status = 'running' AND locked_at < now() - ($4 || ' minutes')::interval)
-           OR (status = 'incomplete' AND attempt_count < max_attempts)
          )
        RETURNING claim_token, lease_generation;`,
       [params.workerId, params.jobId, params.tenantId, timeout.toString()],
@@ -354,6 +367,8 @@ export async function persistExtractedDrafts(
             image_id = EXCLUDED.image_id,
             evidence = EXCLUDED.evidence,
             review_warnings = EXCLUDED.review_warnings,
+            draft_version = app_private.dish_drafts.draft_version + 1,
+            verification_status = 'not_verified',
             updated_at = now()
         WHERE app_private.dish_drafts.review_status = 'pending';`,
         [
@@ -410,6 +425,8 @@ export async function persistExtractedDrafts(
        SET status = $1,
            draft_count = $2,
            result_storage_key = COALESCE($3, result_storage_key),
+           error_code = NULL,
+           error_details = NULL,
            finished_at = now(),
            locked_at = NULL,
            locked_by = NULL,

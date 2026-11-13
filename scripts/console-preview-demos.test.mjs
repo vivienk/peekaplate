@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
-  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Illustrative sample data/ },
+  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
 ];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
