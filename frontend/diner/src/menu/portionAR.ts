@@ -6,6 +6,7 @@ export function bindPortionAR(
   controls: HTMLElement,
   source: () => HTMLImageElement | null,
   modelUrl: () => string | undefined,
+  sampleNotice?: string,
 ) {
   const open = document.createElement('button');
   open.type = 'button';
@@ -37,6 +38,12 @@ export function bindPortionAR(
         <label>Rotate dish <input aria-label="Rotate dish" type="range" min="-180" max="180" value="0" disabled></label>
         <label>Visual size <input aria-label="Visual size" type="range" min="50" max="150" value="100" disabled></label>
       </div>`;
+    if (sampleNotice) {
+      const notice = document.createElement('p');
+      notice.className = 'pp-ar__sample-notice';
+      notice.textContent = sampleNotice;
+      dialog.querySelector('.pp-ar__panel')!.prepend(notice);
+    }
     const button = (name: string) =>
       dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
     const start = button('start');

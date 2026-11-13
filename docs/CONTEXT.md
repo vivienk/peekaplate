@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu/detail/search and Save/Saved use PR145 cfebee9 screen implementation and shared contracts/tokens. Live mode verifies bundle bytes and pointer identity before rendering/token use; refresh preserves focus and withdrawal/expiry suspends tracking. Consent gates independent PostHog and canonical outboxes; fixtures send neither destination. View Portion adds revision-bound layers, the PR25 viewer, photo fallback and camera cleanup on menu/detail/Saved transitions. The opt-in portion demo appends a labelled sample without replacing original menu dishes. Hosted spatial asset approval/publication, reconciliation and real-device acceptance remain separate gates.",
+      "summary": "Diner menu/detail/search and Save/Saved use PR145 cfebee9 screen implementation and shared contracts/tokens. Live mode verifies bundle bytes and pointer identity before rendering/token use; refresh preserves focus and withdrawal/expiry suspends tracking. Consent gates independent PostHog and canonical outboxes; fixtures send neither destination. View Portion adds revision-bound layers, the PR25 viewer, photo fallback and camera cleanup on menu/detail/Saved transitions. Opt-in preview builds mark the five original fixture dishes for camera testing from View Portion; an explicit shared-sample notice appears in the viewer and portal. No extra demo card or published-dish rebinding. Hosted spatial asset approval/publication, reconciliation and real-device acceptance remain separate gates.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -216,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "e85401a0088f83f7b14c9cc0f98d1f942d7430bd74610200ed0b7bbd1916e2f0"
+      "sourceFingerprint": "8b28e309386488a4f5c2d38f5ffb3b59c71635747e60c918ca653334cc1040b6"
     },
     {
       "id": "console",
@@ -674,6 +674,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-12",
+      "summary": "PR162 View Portion opens automatic mobile 2.5D camera fallback from each original PR145 menu dish, including the default preview URL. Fixture-only internal cameraSample marker selects a clearly labelled shared review image; production builds and published assets retain their normal validation/fallback. Removed the extra demo dish.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Verify on phone with camera permission. Dish-specific approved cutouts remain unavailable for PR145 placeholder fixtures."
+    },
+    {
+      "date": "2026-11-12",
       "summary": "PR162 uses PR145 current menu implementation cfebee9, including Save/Saved and search close icon. All original demo menu dishes remain; the captured camera sample is additional and explicitly labelled. View Portion retains cleanup on Saved/browser route changes.",
       "modules": [
         "diner"
@@ -759,15 +767,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/search.spec.ts"
       ],
       "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
-      "modules": [
-        "console",
-        "tokens"
-      ],
-      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
     }
   ]
 }

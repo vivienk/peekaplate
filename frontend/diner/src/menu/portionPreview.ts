@@ -39,6 +39,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   instructions.textContent =
     'Move the pointer, drag horizontally on touch, or use arrow keys. Home resets. Vertical touch scrolling stays available. Motion is disabled with Reduce Motion.';
   status.after(instructions);
+  const cameraSample =
+    (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && dish.cameraSample === true;
+  const sampleNotice = cameraSample
+    ? `Camera test for ${dish.name}: shared sample cutout, not this dish’s appearance or portion size.`
+    : undefined;
   const key = crypto.randomUUID();
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
@@ -131,18 +136,21 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     status.textContent = 'Loading Interactive preview...';
     back.focus({ preventScroll: true });
     window.scrollTo(0, 0);
-    const parsed = PublicPortionSchema.safeParse(dish.portion);
+    const controller = new AbortController();
+    attempt = controller;
+    timer = setTimeout(fallback, 8000);
+    const sample = cameraSample ? await import('./portionDemo').catch(() => null) : null;
+    if (controller.signal.aborted || disposed) return;
+    const parsed = PublicPortionSchema.safeParse(sample ? sample.portion : dish.portion);
     if (
       !parsed.success ||
-      parsed.data.dish_id !== dish.dishId ||
-      parsed.data.dish_revision_id !== dish.dishRevisionId
+      (!cameraSample &&
+        (parsed.data.dish_id !== dish.dishId ||
+          parsed.data.dish_revision_id !== dish.dishRevisionId))
     ) {
       fallback();
       return;
     }
-    const controller = new AbortController();
-    attempt = controller;
-    timer = setTimeout(fallback, 8000);
     try {
       const { mount } = await import('./portionRenderer');
       if (controller.signal.aborted) return;
@@ -153,7 +161,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       let renderManifest = parsed.data;
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        new URLSearchParams(location.search).get('scenario') === 'portion-demo'
+        (cameraSample || new URLSearchParams(location.search).get('scenario') === 'portion-demo')
       ) {
         const { originalReviewPortion } = await import('./portionDemo');
         const original = originalReviewPortion(parsed.data, visual);
@@ -196,9 +204,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       );
       stage.setAttribute('aria-describedby', instructions.id);
       setState('ready');
-      status.textContent = reduced.matches
-        ? '2.5D preview. Motion is reduced.'
-        : 'Drag to tilt the plate';
+      status.textContent =
+        sampleNotice ??
+        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
       if ((import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && visualSelect) {
         if (import.meta.env.DEV) {
           const module = await import('./portion3d').catch(() => null);
@@ -217,6 +225,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           controls,
           () => stage.querySelector<HTMLImageElement>('.pp-portion__css img'),
           () => local3d?.getModelUrl(),
+          sampleNotice,
         );
         if (!portalOffered) {
           portalOffered = true;
@@ -349,9 +358,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       !showOriginal &&
       root.dataset.portionState === 'ready'
     ) {
-      status.textContent = reduced.matches
-        ? '2.5D preview. Motion is reduced.'
-        : 'Drag to tilt the plate';
+      status.textContent =
+        sampleNotice ??
+        (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
     }
   };
   const pointerup = (event: PointerEvent) => {

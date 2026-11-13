@@ -2793,3 +2793,12 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - PR145 final checks: restricted backend build could not write Wrangler logs; authorized dry-run build passed. Context validation rejected an overlong diner summary; shortened it before refreshing.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T06:29:25.981Z","exitCode":2}
+```
+
+- Menu camera integration typecheck rejected boolean values for Vitest custom environment stubs. Use its supported string/undefined values; DEV retains its boolean stub. Regression checks fixture-only preview gating and unchanged dish content.
+
+- Direct-menu camera tests initially expected the old tilt-only status and lost the explicit failed-photo scenario during fixture replacement; updated the shared-sample notice assertion and restored the opt-in failed-photo setup. One local API test timed out waiting for the portal while source edits reloaded Vite; rerun with stable files.

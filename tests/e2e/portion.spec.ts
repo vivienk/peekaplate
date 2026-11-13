@@ -100,7 +100,7 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
 }
 async function openPortion(page: Page, keepPortal = false) {
   if (new URL(page.url()).searchParams.get('scenario') === 'portion-demo') {
-    await page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }).click();
+    await page.getByRole('button', { name: 'Open Avocado Toast', exact: true }).click();
   } else {
     await page.locator('.pp-card__open').first().click();
   }
@@ -259,7 +259,7 @@ test('local captured-dish demo loads real textures and tilts without route mocks
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await expect(page.locator('.pp-logo__name')).toBeVisible();
   await openPortion(page);
-  await expect(page.locator('.pp-portion__status')).toHaveText('Drag to tilt the plate');
+  await expect(page.locator('.pp-portion__status')).toContainText('shared sample cutout');
   const canvas = page.locator('.pp-portion__css');
   const before = hash(await canvas.screenshot());
   const bounds = (await canvas.boundingBox())!;
@@ -355,7 +355,7 @@ test('PR25 interactive cutout fallback stays tiltable without WebGL', async ({ p
   const card = page.locator('.pp-portion__css');
   await expect(card).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
-  const stage = page.getByRole('group', { name: 'Captured dish · tilt demo portion preview' });
+  const stage = page.getByRole('group', { name: 'Avocado Toast portion preview' });
   await stage.press('ArrowRight');
   await expect(card).toHaveCSS('transform', /matrix3d/);
   await expect(card).toHaveAttribute('style', /rotateY\(0.5deg\)/);
@@ -393,7 +393,7 @@ test('Figma shell retains PR25 movement and expandable compare/reset controls', 
 }) => {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page);
-  const stage = page.getByRole('group', { name: 'Captured dish · tilt demo portion preview' });
+  const stage = page.getByRole('group', { name: 'Avocado Toast portion preview' });
   const compare = page.getByRole('button', { name: 'Show original photo', exact: true });
   await expect(page.locator('.pp-detail')).toHaveAttribute('data-portion-state', 'ready');
   await page.getByText('Preview controls', { exact: true }).click();
@@ -628,7 +628,7 @@ test('zero Tripo credits explain rejection while preserving tilt and explicit sa
   await expect(page.locator('.pp-local3d')).toContainText('Tripo API credits are insufficient');
   await expect(page.locator('.pp-portion__css')).toBeVisible();
   const stage = page.getByRole('group', {
-    name: 'Captured dish · tilt demo portion preview',
+    name: 'Avocado Toast portion preview',
     exact: true,
   });
   await stage.focus();
@@ -968,7 +968,40 @@ test('camera demo retains the full diner menu and PR145 icons', async ({ page })
   await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
   await expect(page.locator('.pp-saved__item')).toContainText('Avocado Toast');
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Avocado Toast', exact: true }).click();
   await expect(page.locator('.pp-detail__back-icon')).toBeVisible();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeEnabled();
 });
+
+for (const name of [
+  'Avocado Toast',
+  'Classic Eggs Benedict',
+  'Harvest Power Bowl',
+  'Salmon Poke Bowl',
+  'Garden Avocado Salad',
+]) {
+  test(`actual PR145 menu opens automatic camera from ${name}`, async ({ page }) => {
+    await cameraFixture(page);
+    await page.goto('http://127.0.0.1:5173/');
+    await page.getByRole('button', { name: `Open ${name}`, exact: true }).click();
+    await expect(page.locator('.pp-detail__name')).toHaveText(name);
+    await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+    const portal = page.getByRole('dialog', { name: 'Dish on your table' });
+    await expect(portal).toBeVisible({ timeout: 20000 });
+    await expect(portal).toHaveAttribute('data-visual', '2.5d');
+    await expect(portal.locator('.pp-ar__sample-notice')).toContainText(`Camera test for ${name}`);
+    await expect(portal.getByRole('button', { name: 'Place dish', exact: true })).toBeHidden();
+    await expect.poll(() => page.evaluate(() => (window as any).cameraTest.calls)).toBe(1);
+    const size = await portal.boundingBox();
+    expect(size?.width).toBe(390);
+    expect(size?.height).toBe(844);
+    await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+    await expect(page.locator('.pp-detail__name')).toHaveText(name);
+    await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
+    await expect(page.getByRole('button', { name: `Open ${name}`, exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }),
+    ).toHaveCount(0);
+  });
+}

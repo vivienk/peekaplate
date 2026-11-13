@@ -38,6 +38,8 @@ export type IncompleteDish = {
 };
 
 export type CompleteDish = {
+  // Internal fixture-only flag; never read from a published menu bundle.
+  cameraSample?: true;
   portion?: PublicPortion;
   kind: 'complete';
   dishId: string;

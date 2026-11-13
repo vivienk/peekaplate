@@ -309,46 +309,37 @@ export function createFixtureMenuSource(
       loads++;
       const ready = (b: WireMenuBundle): MenuLoadResult =>
         toMenu(b, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
+      if (
+        scenario === 'portion-demo' &&
+        !(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO)
+      ) {
+        return { status: 'unavailable' };
+      }
       switch (scenario) {
-        case 'portion-demo': {
-          if (!(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO))
-            return { status: 'unavailable' };
-          const { portion, photo } = await import('./portionDemo');
-          const bundle = structuredClone(demoBundle);
-          const category = bundle.categories[0]!;
-          const dish = structuredClone(category.dishes[0]!);
-          category.dishes.push(dish);
-          if (!dish.complete) throw new Error('Demo requires a complete fixture');
-          dish.dish_id = portion.dish_id;
-          dish.dish_revision_id = portion.dish_revision_id;
-          dish.name = 'Captured dish · tilt demo';
-          dish.description =
-            'Local demonstration using a captured photo and supplied mask. Shallow tilt only, not reconstructed 3D or a portion measurement. Menu details and price are demo placeholders.';
-          dish.price = { amount: '0.00', currency: 'USD' };
-          dish.ingredients = [
-            {
-              ingredient_id: dish.ingredients[0]!.ingredient_id,
-              name: 'Ingredients not verified — demo only',
-              description: null,
-            },
-          ];
-          dish.allergens = [];
-          dish.dietary = [];
-          const image = {
-            url: photo,
-            width: portion.width,
-            height: portion.height,
-            alt: 'User-supplied captured dish photograph, local demo only',
-          };
-          dish.images =
-            new URLSearchParams(location.search).get('previewState') === 'failed'
-              ? null
-              : { card: image, detail: image };
-          dish.portion = portion;
-          return ready(bundle);
+        case 'portion-demo':
+        case 'demo': {
+          const result = ready(demoBundle);
+          if (
+            (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+            result.status === 'ready'
+          ) {
+            for (const category of result.menu.categories) {
+              for (const dish of category.dishes) {
+                if (dish.kind === 'complete') {
+                  dish.cameraSample = true;
+                  if (
+                    scenario === 'portion-demo' &&
+                    typeof location !== 'undefined' &&
+                    new URLSearchParams(location.search).get('previewState') === 'failed'
+                  ) {
+                    dish.images = null;
+                  }
+                }
+              }
+            }
+          }
+          return result;
         }
-        case 'demo':
-          return ready(demoBundle);
         case 'edge-cases':
           return ready(edgeCaseBundle);
         case 'withdrawal':

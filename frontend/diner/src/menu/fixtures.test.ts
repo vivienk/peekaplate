@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { chipKey, completeDishes, FIXTURE_NOTICE, toMenu } from './adapter';
 import {
   CATEGORY,
@@ -286,4 +286,21 @@ describe('menu adapter', () => {
     expect(complete(result.menu, DISH.gardenAvocadoSalad).dietary).toEqual(['Vegan']);
     expect(complete(result.menu, DISH.gardenAvocadoSalad).allergens).toEqual([]);
   });
+});
+
+it('camera preview preserves every PR145 dish and stays out of ordinary builds', async () => {
+  try {
+    vi.stubEnv('DEV', false);
+    vi.stubEnv('VITE_PORTION_DEMO', 'true');
+    const preview = completeDishes(await loadMenu('demo'));
+    expect(preview).toHaveLength(5);
+    expect(preview.every((dish) => dish.cameraSample === true)).toBe(true);
+    vi.stubEnv('VITE_PORTION_DEMO', undefined);
+    const ordinary = completeDishes(await loadMenu('demo'));
+    expect(ordinary.every((dish) => dish.cameraSample === undefined)).toBe(true);
+    expect(preview.map(({ cameraSample, ...dish }) => dish)).toEqual(ordinary);
+    expect(await createFixtureMenuSource('portion-demo').load()).toEqual({ status: 'unavailable' });
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

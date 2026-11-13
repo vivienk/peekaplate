@@ -53,7 +53,6 @@ export function originalReviewPortion(
 ): PublicPortion | null {
   if (
     !(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) ||
-    new URLSearchParams(location.search).get('scenario') !== 'portion-demo' ||
     base.dish_id !== reviewImages.dish.dish_id ||
     base.dish_revision_id !== reviewImages.dish.revision_id ||
     !base.layers.every((layer) => layer.url.startsWith('https://portion-demo.invalid/'))
