@@ -252,7 +252,7 @@ function EmailStep({ email, focusHeading, service, onRoute }: StepProps) {
         />
       </form>
       <p className="pp-auth__footer">
-        New to PeekaPlate? You’ll set up your account on the next step.
+        New to PeekaPlate? You’ll set up your account on the next step
       </p>
     </>
   );

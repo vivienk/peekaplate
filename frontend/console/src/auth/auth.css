@@ -362,8 +362,8 @@
   box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
 }
 
-/* Type=Primary: Default Orange/500, Hover Orange/300, Pressed back to the brand Orange/500 (Rania,
- * 12 Nov), content Orange/950. */
+/* Type=Primary: Default Orange/500, Hover Orange/300, Pressed slightly darker Orange/600 (Rania,
+ * 13 Nov), content Orange/950. */
 .pp-auth .pp-auth-btn--primary {
   background-color: var(--pp-color-orange-500);
   color: var(--pp-color-orange-950);
@@ -374,7 +374,7 @@
 }
 
 .pp-auth .pp-auth-btn--primary:active {
-  background-color: var(--pp-color-orange-500);
+  background-color: var(--pp-color-orange-600);
 }
 
 /* Type=Outlined: surface-container with a 1px outline-solid edge (3px on hover), bold label;
