@@ -647,7 +647,7 @@ SELECT throws_like(
       'PASS',
       'CU-166'
     )$$,
-  '%Separation of duties%',
+  '%Independent checker cannot be the requester or executing operator%',
   'checker cannot self-approve deletion executed by same actor'
 );
 
