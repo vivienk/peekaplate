@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Owner auth uses pinned Supabase SDK PKCE, public configuration and exact trusted callbacks; neutral email entry, confirmation (with resend), verified sign-in, restoration and sign-out keep provider-disabled synthetic previews. Screens follow Rania's Figma review (shared input/button roles, card-border token, Figma checkbox). Approved signup/reset email templates are saved in staging Auth; signup grants no restaurant access. An app-local accessible TextField foundation wraps the design-system ui/Input. Owner onboarding S05 (FE-05) is presentational (props in, callbacks out). PR previews include the labelled synthetic foundations, owner-sign-in, owner-onboarding and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude them and carry the live auth pages. Publication and restaurant-scoped live owner reports remain planned.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Owner auth uses pinned Supabase SDK PKCE, public configuration and exact trusted callbacks; neutral email entry, confirmation (with resend), verified sign-in, restoration and sign-out keep provider-disabled synthetic previews. Screens follow Rania's Figma review (shared input/button roles, card-border token, Figma checkbox). Approved signup/reset email templates are saved in staging Auth; signup grants no restaurant access. An app-local accessible TextField foundation wraps the design-system ui/Input. Owner onboarding S05 (FE-05) and S06 (FE-06) are presentational (props in, callbacks out). PR previews include the labelled synthetic foundations, owner-sign-in, owner-onboarding and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude them and carry the live auth pages. Publication and restaurant-scoped live owner reports remain planned.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -259,7 +259,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/onboarding/details.ts",
         "frontend/console/src/onboarding/onboarding.css",
         "frontend/console/src/onboarding/demo.tsx",
-        "tests/e2e/owner-onboarding.spec.ts"
+        "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -269,7 +270,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3435b960b1daf3173bc8b80e4f6c004a8e98c94e151cb8f71d5a65731cf02e59"
+      "sourceFingerprint": "35e70606ef88c094667123cd90e375e05418e5fdc9f9339e04b258faa2622f49"
     },
     {
       "id": "backend",
@@ -551,7 +552,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "cfa3a5b7c5b0c5efb4cd80517ea576130d7b5527dbb2118206f669ca351aa5ac"
+      "sourceFingerprint": "9bb967de273ecdb5748545fb1f7df309ff5567cc3f2fefe45f5688b6f8e19968"
     },
     {
       "id": "agents",

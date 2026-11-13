@@ -264,6 +264,93 @@
   padding: 0;
 }
 
+/* S06: the card is 80 all round, so the content is up to 1040 wide; title, 48, the three option
+ * cards 24 apart, then 64 to the buttons. */
+.pp-onboard__card > .pp-onboard-choose {
+  max-width: 65rem;
+}
+
+.pp-onboard-choose {
+  display: grid;
+  gap: 4rem;
+}
+
+.pp-onboard-choose__content {
+  display: grid;
+  gap: var(--pp-space-48);
+}
+
+.pp-onboard-choose__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16.5rem, 1fr));
+  gap: var(--pp-space-12) var(--pp-space-24);
+}
+
+/* Option card: surface, 24 radius, 1.5px outline-variant edge (color/primary when chosen), 24
+ * padding, at least 170 high; icon tile (48, Orange/100, 8 radius, soft shadow) and radio on top,
+ * the 18/28 semibold label 24 below. */
+.pp-onboard-option {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: var(--pp-space-24);
+  min-height: 10.625rem;
+  padding: var(--pp-space-24);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface);
+  box-shadow: inset 0 0 0 1.5px var(--pp-color-gray-200);
+  cursor: pointer;
+}
+
+.pp-onboard-option:hover {
+  box-shadow: inset 0 0 0 1.5px var(--pp-auth-outline-solid);
+}
+
+.pp-onboard-option--selected,
+.pp-onboard-option--selected:hover {
+  box-shadow: inset 0 0 0 1.5px var(--pp-color-orange-500);
+}
+
+.pp-onboard-option:has(.pp-onboard-option__input:focus-visible) {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
+/* The real radio input stays in the page for keyboard and screen readers; the Figma radio image
+ * shows its state. */
+.pp-onboard-option__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pp-onboard-option__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pp-onboard-option__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-48);
+  height: var(--pp-space-48);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-color-orange-100);
+  box-shadow: 0 8px 42px rgba(28, 26, 23, 0.06);
+}
+
+.pp-onboard-option__label {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
 @media (max-width: 40rem) {
   .pp-onboard__container {
     gap: var(--pp-space-32);

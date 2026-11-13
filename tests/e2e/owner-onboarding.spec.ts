@@ -61,7 +61,7 @@ test('a valid save shows Saving and then hands over to S06', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Saving…' })).toHaveAttribute('aria-busy', 'true');
   await expect(page.getByLabel('City')).toHaveAttribute('readonly', '');
   await expect(
-    page.getByText('In the product this opens S06 Choose how to add your menu'),
+    page.getByRole('heading', { name: 'Choose how to add your menu', level: 1 }),
   ).toBeVisible();
 });
 
@@ -121,4 +121,58 @@ test('on a phone the form fits without sideways scrolling', async ({ page }) => 
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto(demo);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+});
+
+// FE-06 S06 Choose how to add your menu.
+async function openS06(page: Page) {
+  await page.goto(demo);
+  await page.getByLabel('Screen', { exact: true }).selectOption('s06');
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', level: 1 }),
+  ).toBeVisible();
+}
+
+test('S06 starts with nothing chosen and Continue unavailable', async ({ page }) => {
+  await openS06(page);
+  const options = page.getByRole('radiogroup', { name: 'Choose how to add your menu' });
+  await expect(options.getByRole('radio')).toHaveCount(3);
+  for (const radio of await options.getByRole('radio').all()) await expect(radio).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Continue' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+});
+
+test('S06 allows one choice at a time and Continue opens the matching next screen', async ({
+  page,
+}) => {
+  await openS06(page);
+  await page.getByText('Paste URL').click();
+  await page.getByText('Upload photos/PDF').click();
+  await expect(page.getByRole('radio', { name: 'Upload photos/PDF' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Paste URL' })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText('In the product this opens S07 Upload your menu')).toBeVisible();
+});
+
+test('S06 works from the keyboard, and Add manually goes to S09', async ({ page }) => {
+  await openS06(page);
+  await page.getByRole('radio', { name: 'Paste URL' }).focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('radio', { name: 'Add manually' })).toBeChecked();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('In the product this opens S09 Add dish')).toBeVisible();
+});
+
+test('S06 Back returns to S05, and S06 passes the accessibility scan', async ({ page }) => {
+  await openS06(page);
+  const { violations } = await new AxeBuilder({ page })
+    .include('.pp-onboard')
+    .exclude('.pp-onboard__brand')
+    .analyze();
+  expect(violations).toEqual([]);
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByRole('heading', { name: 'Restaurant Details', level: 1 })).toBeVisible();
 });

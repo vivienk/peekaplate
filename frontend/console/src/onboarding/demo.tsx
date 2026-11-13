@@ -5,6 +5,7 @@ import { StrictMode, useId, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
 import '../auth/demo.css';
+import { ChooseMenuSource, type MenuSource } from './ChooseMenuSource';
 import type { RestaurantDetails as Details } from './details';
 import { OnboardingLayout } from './OnboardingLayout';
 import { RestaurantDetails } from './RestaurantDetails';
@@ -20,6 +21,17 @@ const SAMPLE: Details = {
   line2: '',
   phone: '(555) 234-5678',
   email: 'owner@emberandstone.com',
+};
+
+const SCREENS: Record<string, string> = {
+  s05: 'S05 Restaurant details',
+  s06: 'S06 Choose how to add your menu',
+};
+
+const SOURCE_NEXT: Record<MenuSource, string> = {
+  url: 'S07 Add your menu link',
+  upload: 'S07 Upload your menu',
+  manual: 'S09 Add dish',
 };
 
 // Long enough to see the saving state.
@@ -52,6 +64,7 @@ function Choice({
 }
 
 function Demo() {
+  const [screen, setScreen] = useState('s05');
   const [mode, setMode] = useState<'onboarding' | 'dashboard'>('onboarding');
   const [answer, setAnswer] = useState('saved');
   const [saving, setSaving] = useState(false);
@@ -74,7 +87,8 @@ function Demo() {
     setTimeout(() => {
       setSaving(false);
       if (answer === 'failed') setFailed(true);
-      else setDone(mode === 'onboarding' ? 'S06 Choose how to add your menu' : 'S12 Dashboard');
+      else if (mode === 'onboarding') setScreen('s06');
+      else setDone('S12 Dashboard');
     }, DELAY_MS);
   };
 
@@ -86,6 +100,15 @@ function Demo() {
           Pick the screen's state and what the save answers.
         </p>
         <div className="pp-auth-demo__choices">
+          <Choice
+            label="Screen"
+            options={SCREENS}
+            value={screen}
+            onChange={(value) => {
+              setScreen(value);
+              restart();
+            }}
+          />
           <Choice
             label="S05 opened from"
             options={{ onboarding: 'Onboarding (first time)', dashboard: 'Dashboard (edit saved)' }}
@@ -109,23 +132,37 @@ function Demo() {
       </aside>
       {done ? (
         <div className="pp-auth-demo__done">
-          <h1>Saved (demo)</h1>
-          <p>Demo only: nothing was saved. In the product this opens {done}.</p>
+          <h1>Next screen (demo)</h1>
+          <p>Demo only: nothing was sent or saved. In the product this opens {done}.</p>
           <button type="button" onClick={restart}>
             Start again
           </button>
         </div>
       ) : (
-        <OnboardingLayout restaurantName={mode === 'dashboard' ? SAMPLE.name : undefined}>
-          <RestaurantDetails
-            key={`${mode}-${run}`}
-            mode={mode}
-            saved={mode === 'dashboard' ? SAMPLE : undefined}
-            saving={saving}
-            saveFailed={failed}
-            onSave={save}
-            onLeave={() => setDone('S12 Dashboard')}
-          />
+        <OnboardingLayout
+          restaurantName={mode === 'dashboard' || screen !== 's05' ? SAMPLE.name : undefined}
+        >
+          {screen === 's05' && (
+            <RestaurantDetails
+              key={`${mode}-${run}`}
+              mode={mode}
+              saved={mode === 'dashboard' ? SAMPLE : undefined}
+              saving={saving}
+              saveFailed={failed}
+              onSave={save}
+              onLeave={() => setDone('S12 Dashboard')}
+            />
+          )}
+          {screen === 's06' && (
+            <ChooseMenuSource
+              key={run}
+              onContinue={(source) => setDone(SOURCE_NEXT[source])}
+              onBack={() => {
+                setScreen('s05');
+                restart();
+              }}
+            />
+          )}
         </OnboardingLayout>
       )}
     </>
