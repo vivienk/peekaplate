@@ -418,6 +418,7 @@ test('Figma shell retains PR25 movement and expandable compare/reset controls', 
   ).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Show review candidate', exact: true }).click();
   await expect(card).toBeVisible();
+  await expect(page.locator('.pp-portion__status')).toContainText('shared sample cutout');
   await stage.press('ArrowLeft');
   await page.getByRole('button', { name: 'Reset view', exact: true }).click();
   await expect(card).toHaveAttribute('style', /rotateY\(0deg\)/);

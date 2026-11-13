@@ -2802,3 +2802,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Menu camera integration typecheck rejected boolean values for Vitest custom environment stubs. Use its supported string/undefined values; DEV retains its boolean stub. Regression checks fixture-only preview gating and unchanged dish content.
 
 - Direct-menu camera tests initially expected the old tilt-only status and lost the explicit failed-photo scenario during fixture replacement; updated the shared-sample notice assertion and restored the opt-in failed-photo setup. One local API test timed out waiting for the portal while source edits reloaded Vite; rerun with stable files.
+
+- Review found that switching from original photo back to the shared review image replaced the sample disclosure with generic tilt copy. Preserve the disclosure in comparePhoto; browser regression asserts it after compare-back.
