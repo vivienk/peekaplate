@@ -1,5 +1,5 @@
 // Vite development middleware only. Never put these credentials in VITE_*.
-export function localModelProxy({ token, fetchImpl = fetch }) {
+export function localModelProxy({ token, fetchImpl = fetch, port = 5173, apiPort = 5182 }) {
   return async (req, res, next) => {
     if (!req.url?.startsWith('/__local3d/')) return next();
     const reply = (status, error) => {
@@ -7,7 +7,7 @@ export function localModelProxy({ token, fetchImpl = fetch }) {
       res.end(JSON.stringify({ error }));
     };
     const host = req.headers.host;
-    if (!['127.0.0.1:5173', 'localhost:5173'].includes(host)) return reply(403, 'local_only');
+    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(host)) return reply(403, 'local_only');
     const origin = req.headers.origin;
     if ((origin && origin !== `http://${host}`) || req.headers['sec-fetch-site'] === 'cross-site') {
       return reply(403, 'same_origin_required');
@@ -20,9 +20,13 @@ export function localModelProxy({ token, fetchImpl = fetch }) {
         new RegExp(
           `^/v1/model-jobs/${id}(/artifacts/(source\\.png|fallback\\.jpg|model\\.glb))?$`,
         ).test(path));
+    const upload =
+      req.method === 'POST' && new RegExp(`^/v1/portion-uploads/${id}/${id}$`).test(path);
     const post =
       req.method === 'POST' &&
-      (path === '/v1/model-jobs' || new RegExp(`^/v1/model-jobs/${id}/resume$`).test(path));
+      (upload ||
+        path === '/v1/model-jobs' ||
+        new RegExp(`^/v1/model-jobs/${id}/resume$`).test(path));
     if (!get && !post) return reply(404, 'route_unavailable');
     if (post && origin !== `http://${host}`) return reply(403, 'same_origin_required');
     if (!token) return reply(503, 'local_service_not_configured');
@@ -32,16 +36,19 @@ export function localModelProxy({ token, fetchImpl = fetch }) {
       if (post) {
         for await (const chunk of req) {
           length += chunk.length;
-          if (length > 8192) return reply(413, 'request_too_large');
+          if (length > (upload ? 12_000_000 : 8192)) return reply(413, 'request_too_large');
           chunks.push(chunk);
         }
       }
-      const upstream = await fetchImpl(`http://127.0.0.1:5182${path}`, {
+      const upstream = await fetchImpl(`http://127.0.0.1:${apiPort}${path}`, {
         method: req.method,
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': upload ? 'application/octet-stream' : 'application/json',
+        },
         body: post ? Buffer.concat(chunks) : undefined,
         redirect: 'error',
-        signal: AbortSignal.timeout(35_000),
+        signal: AbortSignal.timeout(upload ? 200_000 : 35_000),
       });
       const reader = upstream.body?.getReader();
       const parts = [];
@@ -78,7 +85,13 @@ export function localModelPlugin() {
     name: 'peekaplate-local-model-api',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use(localModelProxy({ token: process.env.TRIPO_SERVICE_TOKEN }));
+      server.middlewares.use(
+        localModelProxy({
+          token: process.env.TRIPO_SERVICE_TOKEN,
+          port: Number(process.env.PORTION_DEMO_PORT || 5173),
+          apiPort: Number(process.env.PORTION_API_PORT || 5182),
+        }),
+      );
     },
   };
 }

@@ -41,7 +41,11 @@ export async function mount(
           url = URL.createObjectURL(
             new Blob([bytes], {
               type:
-                layer.url === 'https://portion-fixtures.invalid/background.svg'
+                layer.url === 'https://portion-fixtures.invalid/background.svg' ||
+                (import.meta.env.DEV &&
+                  /^https:\/\/portion-ingestion\.invalid\/portion_[a-f0-9]{32}\/background\.svg$/.test(
+                    layer.url,
+                  ))
                   ? 'image/svg+xml'
                   : '',
             }),

@@ -1,4 +1,4 @@
-import { PublicPortionSchema } from '@peekaplate/contracts';
+import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
 import { createPortionMotion } from './portionMotion';
 import type { PortionRenderer } from './portionRenderer';
 import type { CompleteDish } from './types';
@@ -43,7 +43,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && dish.cameraSample === true;
   const fixtureCamera =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && !!dish.previewPortion;
-  const sampleNotice = cameraSample
+  let sampleNotice = cameraSample
     ? `Camera test for ${dish.name}: shared sample cutout, not this dish’s appearance or portion size.`
     : fixtureCamera
       ? `Design sample photo of ${dish.name}. Visual preview only, not a serving-size measurement.`
@@ -58,6 +58,25 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       : 'generated';
   let visualSelect: HTMLSelectElement | undefined;
   let portalOffered = false;
+  let uploadedPortion: PublicPortion | null | undefined;
+  let uploadAbort: AbortController | undefined;
+  let releaseUpload: (() => void) | undefined;
+  let uploadPhotoUrl: string | undefined;
+  let uploadInput: HTMLInputElement | undefined;
+  let uploadLabel: HTMLLabelElement | undefined;
+  let uploadStatus: HTMLParagraphElement | undefined;
+  if (import.meta.env.DEV) {
+    uploadLabel = document.createElement('label');
+    uploadLabel.textContent = 'Try your dish photo (local review)';
+    uploadInput = document.createElement('input');
+    uploadInput.type = 'file';
+    uploadInput.accept = 'image/jpeg,image/png,image/webp';
+    uploadInput.setAttribute('aria-label', 'Upload dish photo for 2.5D preview');
+    uploadLabel.append(uploadInput);
+    uploadStatus = document.createElement('p');
+    uploadStatus.setAttribute('role', 'status');
+    open.after(uploadLabel, uploadStatus);
+  }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
   let disposed = false;
@@ -146,7 +165,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     const sample = cameraSample ? await import('./portionDemo').catch(() => null) : null;
     if (controller.signal.aborted || disposed) return;
     const parsed = PublicPortionSchema.safeParse(
-      sample ? sample.portion : fixtureCamera ? dish.previewPortion : dish.portion,
+      uploadedPortion !== undefined
+        ? uploadedPortion
+        : sample
+          ? sample.portion
+          : fixtureCamera
+            ? dish.previewPortion
+            : dish.portion,
     );
     if (
       !parsed.success ||
@@ -167,6 +192,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       let renderManifest = parsed.data;
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+        uploadedPortion === undefined &&
         (cameraSample || new URLSearchParams(location.search).get('scenario') === 'portion-demo')
       ) {
         const { originalReviewPortion } = await import('./portionDemo');
@@ -215,7 +241,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        (visualSelect || fixtureCamera)
+        (visualSelect || fixtureCamera || uploadedPortion)
       ) {
         if (import.meta.env.DEV && visualSelect) {
           const module = await import('./portion3d').catch(() => null);
@@ -411,6 +437,51 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     reset();
     local3d?.reset();
   };
+  const uploadPhoto = async () => {
+    const file = uploadInput?.files?.[0];
+    if (!file || !uploadStatus) return;
+    uploadAbort?.abort();
+    const controller = new AbortController();
+    uploadAbort = controller;
+    uploadInput!.disabled = true;
+    uploadStatus.textContent = 'Removing background and preparing your dish…';
+    try {
+      const { uploadPortion } = await import('./portionUpload');
+      const result = await uploadPortion(file, dish.dishId, dish.dishRevisionId, controller.signal);
+      if (disposed || controller.signal.aborted) {
+        result.dispose();
+        return;
+      }
+      const photo = stage.querySelector<HTMLImageElement>('img.pp-detail__image');
+      if (!photo) {
+        result.dispose();
+        throw new Error('Dish photo unavailable');
+      }
+      stop();
+      releaseUpload?.();
+      releaseUpload = result.dispose;
+      uploadedPortion = result.portion;
+      if (uploadPhotoUrl) URL.revokeObjectURL(uploadPhotoUrl);
+      uploadPhotoUrl = URL.createObjectURL(file);
+      photo.src = uploadPhotoUrl;
+      photo.alt = `Uploaded photo of ${dish.name}; review only`;
+      sampleNotice =
+        'Your uploaded photo. Automatic cutout — review only; visual scale, not a serving-size measurement.';
+      portalOffered = false;
+      uploadStatus.textContent = result.portion
+        ? 'Cutout ready for review.'
+        : 'Cutout unavailable. Your original photo is retained.';
+      if (active) await show(true);
+      else openPreview();
+    } catch (error) {
+      if (!disposed && !controller.signal.aborted)
+        uploadStatus.textContent =
+          error instanceof Error ? error.message : 'Photo processing unavailable.';
+    } finally {
+      if (!disposed && uploadInput) uploadInput.disabled = false;
+    }
+  };
+  uploadInput?.addEventListener('change', uploadPhoto);
   compare.addEventListener('click', comparePhoto);
   resetButton.addEventListener('click', resetView);
   retry.addEventListener('click', retryPreview);
@@ -427,6 +498,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   reduced.addEventListener('change', motionChanged);
   return () => {
     disposed = true;
+    uploadAbort?.abort();
+    releaseUpload?.();
+    if (uploadPhotoUrl) URL.revokeObjectURL(uploadPhotoUrl);
+    uploadInput?.removeEventListener('change', uploadPhoto);
+    uploadLabel?.remove();
+    uploadStatus?.remove();
     stop();
     photoObserver.disconnect();
     retry.removeEventListener('click', retryPreview);

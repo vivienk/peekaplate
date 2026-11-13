@@ -86,3 +86,14 @@ test('only whitelisted artifact downloads are forwarded', async () => {
   assert.equal((await call({ url: base + 'model.glb', method: 'GET' })).calls.length, 1);
   assert.equal((await call({ url: base + 'job.json', method: 'GET' })).res.status, 404);
 });
+
+test('photo upload route is bounded, same-origin and preserves binary input', async () => {
+  const url =
+    '/__local3d/v1/portion-uploads/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222';
+  const { res, calls } = await call({ url, body: 'x'.repeat(9000) });
+  assert.equal(res.status, 202);
+  assert.equal(calls[0][1].body.length, 9000);
+  assert.equal(calls[0][1].headers['Content-Type'], 'application/octet-stream');
+  assert.equal((await call({ url, body: 'x'.repeat(12_000_001) })).res.status, 413);
+  assert.equal((await call({ url, headers: { origin: 'https://evil.test' } })).res.status, 403);
+});

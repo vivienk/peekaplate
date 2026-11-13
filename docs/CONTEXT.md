@@ -225,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4722194110065af18511839364985a5416f08d0723937f9a70a87fbbf2758836"
+      "sourceFingerprint": "9d4dee2fa45bca5a884c0f82440e3ada00f140bbe0726b40099362f988c4b3c4"
     },
     {
       "id": "console",
@@ -647,7 +647,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "f5a1d68cb8bddb1d4d92528dd6790385724a59b303ff0597f10fedfc3ddc3d3f"
+      "sourceFingerprint": "e6cdaa747bb3e7a632a40fe2df8bfb3b917404da46bfe74a972e183cc0684161"
     },
     {
       "id": "assets",
@@ -686,12 +686,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-12",
-      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha or supplied masks, bounded encoding, source/revision hashing, immutable verified retries and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. No public photo-upload endpoint or publication bypass added.",
+      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha, automatic local U2NetP segmentation or optional masks, bounded encoding, source/model/mask/revision hashing and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. Private authenticated upload route feeds DEV View Portion; no public upload endpoint or publication bypass.",
       "modules": [
         "diner",
         "processing"
       ],
-      "next": "Wire this processor from the authorized owner photo-upload job when that transport is implemented; approve artifacts before public publication."
+      "next": "Local upload works through the private service and Vite bridge. Hosting and owner authorization remain prerequisites for public uploads; approve artifacts before publication."
     },
     {
       "date": "2026-11-12",

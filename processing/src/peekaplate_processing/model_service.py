@@ -233,4 +233,6 @@ def create_app(settings=None, *, client_factory=None, runner=run):
         except Exception:
             return reply({'error': 'artifact_unavailable'}, 404)
 
+    from peekaplate_processing.portion_service import register_portion_routes
+    register_portion_routes(app, authorized=authorized, reply=reply, root=base)
     return app

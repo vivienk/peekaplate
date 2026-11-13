@@ -13,7 +13,12 @@ const target = new URL('portion-fixtures.json', root);
 const jobs = JSON.parse(readFileSync(input, 'utf8'));
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const pipeline = join(repo, 'processing/src/peekaplate_processing/portion_ingestion.py');
-const pipelineHash = hash(readFileSync(pipeline));
+const pipelineHash = hash(
+  Buffer.concat([
+    readFileSync(pipeline),
+    readFileSync(join(repo, 'processing/src/peekaplate_processing/cutout.py')),
+  ]),
+);
 const prefix = 'https://portion-fixtures.invalid/';
 
 function verify(record) {

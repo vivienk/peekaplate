@@ -466,8 +466,8 @@ See [setup, commands and verification limits](../docs/tripo-cutout-to-3d.md).
 The existing `python -m peekaplate_processing.prepare_assets` entry point now invokes
 `portion_ingestion.ingest_dish_photo` automatically after T0 photo preparation. Its JSON
 result includes `portion.status`, the ingestion manifest path and any fallback reason.
-Use `--mask <grayscale.png>` for opaque source photos; mask dimensions must match the
-EXIF-oriented original. Without a usable mask/alpha channel, the original photo remains
+Opaque photos run automatic local segmentation. Optional `--mask <grayscale.png>` overrides
+it; mask dimensions must match the EXIF-oriented original. On segmentation failure, the original photo remains
 the fallback. This does not run an external segmentation or generative model.
 
 The reusable processor also supports direct and batch jobs:
@@ -493,3 +493,35 @@ For PR147 preview assets, `pnpm ingest:portion-fixtures` invokes this same proce
 exports its output to the diner. Set `PEEKAPLATE_PROCESSING_PYTHON` to the Python executable
 with the processing dependencies installed. `pnpm --filter @peekaplate/diner build`
 checks source hashes, processor fingerprint and provenance before building.
+
+### Automatic photo cutout and local View Portion
+
+Install the pinned local CPU segmentation runtime with `uv sync --extra cutout --extra service`.
+Opaque photos now automatically run rembg U2NetP (no supplied mask or paid API key).
+The model changes alpha only; original food pixels and the source-photo fallback remain.
+Existing transparent PR147 photos bypass inference and retain their exact bytes.
+First use downloads public model weights; photos remain on the local machine. Use
+`U2NET_HOME` for a pre-provisioned cache. First inference may take up to three minutes;
+a timeout, invalid/empty mask or unavailable runtime retains the original photo.
+Model hash, generated mask hash and source/revision identity are recorded for review.
+The output remains `needs_review` and cannot auto-publish. Model segmentation can miss
+plate edges or include table objects; visual review is still required.
+
+Start the local upload flow (no Tripo key or review directory required):
+
+```sh
+PYTHONPATH=processing/src uv run --project processing --extra cutout --extra service python -m peekaplate_processing.serve_model_demo --state-dir /absolute/path/to/private-preview-state
+```
+
+Open `http://127.0.0.1:5173/`, select an actual menu dish, then choose a photo under
+**Try your dish photo (local review)**. Upload runs the same ingestion processor and
+opens View Portion with the returned dish/revision-bound layers. Compare uses the
+uploaded original; reset, back navigation and automatic camera entry are preserved.
+
+The authenticated private endpoint is `POST /v1/portion-uploads/{dish_id}/{revision_id}`
+with raw image bytes, capped at 12 MB / 24 MP. The loopback Vite bridge supplies the
+server token; it is never bundled into the browser. One upload runs at a time.
+The endpoint is single-tenant; callers must authorize dish ownership before exposing it
+outside this private local demo. No production upload route or publication approval is added.
+The static PR162 Pages preview continues to show generated fixture assets; it does not
+host this Python service, so fresh uploads are available locally only.

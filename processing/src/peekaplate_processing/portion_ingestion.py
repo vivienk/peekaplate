@@ -1,6 +1,6 @@
 """Photo ingestion -> bounded 2.5D layers -> review-only dish/revision binding.
 
-Transparent input is reused when possible; an opaque photo needs a supplied mask.
+Transparent input is reused; opaque photos are segmented locally without a supplied mask.
 This processor never invents food, approves assets, or replaces a published bundle.
 """
 import argparse
@@ -18,7 +18,7 @@ from peekaplate_processing.assets import read_source
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.spatial import open_layer_image
 
-RECIPE = 'photo-to-portion-v1'
+RECIPE = 'photo-to-portion-v2'
 MAX_BUDGET = 180_000
 
 
@@ -44,13 +44,26 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
         raise ExtractionError('Photo source hash conflict.')
     mask_bytes = read_source(Path(mask_path)) if mask_path else None
     image_format, has_alpha, image = open_layer_image(data)
+    automatic = None
+    segmentation_failed = False
+    if not mask_bytes:
+        with image.convert('RGBA') as probe:
+            with probe.getchannel('A') as alpha:
+                needs_cutout = alpha.getextrema()[0] == 255
+        if needs_cutout:
+            from peekaplate_processing.cutout import automatic_mask
+            try:
+                mask_bytes, automatic = automatic_mask(image)
+            except ExtractionError:
+                segmentation_failed = True
     identity = {'recipe': RECIPE, 'dish_id': dish_id, 'revision_id': revision_id,
                 'source_sha256': source_hash, 'mask_sha256': digest(mask_bytes) if mask_bytes else None,
-                'budget_bytes': budget_bytes, 'capture_evidence': capture_evidence}
+                'budget_bytes': budget_bytes, 'capture_evidence': capture_evidence,
+                'segmentation': automatic, 'segmentation_failed': segmentation_failed}
     asset_id = 'portion_' + digest(json.dumps(identity, sort_keys=True).encode())[:32]
     prefix = f'https://portion-ingestion.invalid/{asset_id}/'
     files = {'photo.' + {'PNG': 'png', 'WEBP': 'webp', 'JPEG': 'jpg'}[image_format]: data}
-    reason, portion = None, None
+    reason, portion = ('automatic_cutout_unavailable' if segmentation_failed else None), None
     try:
         rgba = image.convert('RGBA')
         try:
@@ -67,8 +80,7 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
                             rgba.putalpha(mask)
                     finally:
                         mask.close()
-            elif not has_alpha:
-                reason = 'mask_required'
+
             alpha = rgba.getchannel('A')
             low, high = alpha.getextrema()
             alpha.close()

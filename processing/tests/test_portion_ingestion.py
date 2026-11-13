@@ -2,6 +2,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stdout
 from pathlib import Path
 from uuid import UUID
@@ -71,12 +72,13 @@ class PortionIngestionTests(unittest.TestCase):
             self.ingest(expected_sha256='0' * 64)
         self.assertFalse((self.root / 'output').exists())
 
-    def test_opaque_photo_retains_fallback_until_mask_supplied(self):
+    @patch('peekaplate_processing.cutout.automatic_mask', side_effect=ExtractionError('Unavailable'))
+    def test_opaque_photo_retains_fallback_when_model_fails(self, _model):
         with Image.new('RGB', (80, 60), 'orange') as photo:
             photo.save(self.source, format='WEBP')
         directory, result = self.ingest()
         self.assertEqual(result['status'], 'fallback_retained')
-        self.assertEqual(result['reason'], 'mask_required')
+        self.assertEqual(result['reason'], 'automatic_cutout_unavailable')
         self.assertIsNone(result['portion'])
         self.assertEqual((directory / result['fallback']).read_bytes(), self.source.read_bytes())
         mask = self.root / 'mask.png'
@@ -87,6 +89,32 @@ class PortionIngestionTests(unittest.TestCase):
         self.assertEqual(masked['status'], 'ready')
         with Image.open(directory / 'dish.webp') as image:
             self.assertEqual(image.getchannel('A').getextrema(), (0, 255))
+
+    def test_opaque_photo_automatically_segments_and_records_model(self):
+        with Image.new('RGB', (80, 60), 'orange') as photo:
+            photo.save(self.source, format='WEBP', lossless=True)
+        mask_data = io.BytesIO()
+        with Image.new('L', (80, 60), 0) as mask:
+            mask.paste(255, (20, 15, 60, 45))
+            mask.save(mask_data, format='PNG')
+        metadata = {'engine': 'test', 'model_sha256': 'a' * 64}
+        with patch('peekaplate_processing.cutout.automatic_mask', return_value=(mask_data.getvalue(), metadata)) as model:
+            directory, result = self.ingest()
+        model.assert_called_once()
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(result['provenance']['segmentation'], metadata)
+        self.assertEqual(result['provenance']['mask_sha256'], digest(mask_data.getvalue()))
+        with Image.open(directory / 'dish.webp') as cutout:
+            self.assertEqual(cutout.getchannel('A').getextrema(), (0, 255))
+        self.assertEqual((directory / result['fallback']).read_bytes(), self.source.read_bytes())
+
+    def test_fully_opaque_alpha_channel_also_runs_segmentation(self):
+        with Image.new('RGBA', (80, 60), 'orange') as photo:
+            photo.save(self.source, format='PNG')
+        with patch('peekaplate_processing.cutout.automatic_mask', side_effect=ExtractionError('Unavailable')) as model:
+            _, result = self.ingest()
+        model.assert_called_once()
+        self.assertEqual(result['reason'], 'automatic_cutout_unavailable')
 
     def test_mask_size_mismatch_and_budget_keep_photo(self):
         mask = self.root / 'mask.png'

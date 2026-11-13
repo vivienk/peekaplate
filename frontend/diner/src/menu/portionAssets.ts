@@ -1,18 +1,22 @@
 import type { PublicPortion } from '@peekaplate/contracts';
 
 export async function readLayer(layer: PublicPortion['layers'][number], signal: AbortSignal) {
+  const uploaded =
+    import.meta.env.DEV && layer.url.startsWith('https://portion-ingestion.invalid/');
   const fixture =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
     layer.url.startsWith('https://portion-fixtures.invalid/');
-  const url = fixture
-    ? (await import('./fixturePortions')).fixtureLayerUrl(layer.url)
-    : (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        layer.url.startsWith('https://portion-demo.invalid/')
-      ? await (await import('./portionDemo')).demoLayerUrl(layer.url, signal)
-      : layer.url;
+  const url = uploaded
+    ? `data:image/webp;base64,${(await import('./portionUpload')).uploadedLayer(layer.url)}`
+    : fixture
+      ? (await import('./fixturePortions')).fixtureLayerUrl(layer.url)
+      : (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+          layer.url.startsWith('https://portion-demo.invalid/')
+        ? await (await import('./portionDemo')).demoLayerUrl(layer.url, signal)
+        : layer.url;
   const bundled =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-    (fixture || layer.url.startsWith('https://portion-demo.invalid/')) &&
+    (uploaded || fixture || layer.url.startsWith('https://portion-demo.invalid/')) &&
     /^data:image\/[^;]+;base64,/.test(url);
   const response = bundled
     ? new Response(Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0)))

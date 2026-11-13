@@ -2813,3 +2813,9 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - PR147 photo binding: initial browser checks found the empty SVG background could not decode from an untyped Blob. Supply image/svg+xml only for the fixed fixture background URL; photo bytes remain unchanged. An async fixture lookup delayed menu unit rendering; use synchronous manifest metadata lookup with lazy image loading. Preserved PR147 default five-dish order and its sixth photo in edge-cases; updated the placeholder-only image assertion.
 
 - Portion ingestion: the system Python lacked processing dependencies, so used the existing processing test environment. Initial batch recipe encoded every quality candidate even when the original transparent WebP fit; stopped superseded workers and changed candidates to lazy generation, preserving exact PR147 bytes and avoiding unnecessary encoding. Pipeline and photo-preparation integration regressions pass.
+
+- Automatic cutout setup: current transitive numba/llvmlite lacked Intel macOS wheels and attempted an unavailable compiler build. Pinned the optional CPU cutout extra to compatible numba 0.60, numpy 2.0.2, ONNX Runtime 1.19.2 and OpenCV 4.11 wheels. The repository uses Biome, not Prettier; formatting was rerun with Biome.
+
+- Live cutout browser check initially tried to read the HTTP body after the automatic preview transition; Chromium had evicted it from the inspector cache. The API tests assert the response contract, while the browser check now asserts the rendered cutout, comparison and navigation directly.
+
+- Live cutout test scoped its review notice to the AR dialog after finding the same deliberate disclosure in both underlying preview and dialog.
