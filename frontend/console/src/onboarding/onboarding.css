@@ -1,0 +1,284 @@
+/*
+ * Owner onboarding screens (FE-05 S05, FE-06 S06–S08): values from the Figma frames. Inputs,
+ * buttons, links and the error message share the sign-in screens' styles (auth.css, scoped to
+ * .pp-auth and .pp-onboard), including their --pp-auth-pending-* values.
+ */
+@import "../auth/auth.css";
+
+/* Page: surface, a 1200-wide column with 16 above the navbar, 96 between it and the card, 96
+ * below. */
+.pp-onboard {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0 var(--pp-space-16);
+  background: var(--pp-auth-pending-surface);
+}
+
+.pp-onboard__container {
+  display: grid;
+  gap: 6rem;
+  max-width: 75rem;
+  margin: 0 auto;
+  padding: var(--pp-space-16) 0 6rem;
+}
+
+/* Navbar: 80 high, logo + wordmark (H5/Bold, color/primary) left; Owner Portal (12/16
+ * on-surface-variant), the restaurant name (14/24 semibold text/secondary) and the 42px account
+ * tile right. */
+.pp-onboard__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-16);
+  min-height: var(--pp-space-80);
+}
+
+.pp-onboard__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+  margin: 0;
+  color: var(--pp-color-orange-500);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-bold);
+}
+
+.pp-onboard__account {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-16);
+}
+
+.pp-onboard__portal {
+  display: grid;
+  justify-items: end;
+  margin: 0;
+  text-align: end;
+}
+
+/* Figma uses on-surface-variant #A8A59E for this label, which is under 4.5:1 on the surface;
+ * text/secondary keeps it readable (flagged for design). */
+.pp-onboard__portal-label {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+.pp-onboard__venue {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-auth-pending-surface-container);
+}
+
+/* Card: surface-container, 24 radius, card border, menu-card shadow, 80 above and below; the
+ * content is at most 800 wide and centred. */
+/* The card is the page's main landmark; reset the console's default main width and margin. */
+.pp-onboard main.pp-onboard__card {
+  max-width: none;
+  margin: 0;
+}
+
+.pp-onboard__card {
+  display: block;
+  padding: var(--pp-space-80) var(--pp-space-24);
+  border: 1px solid var(--pp-role-card-border);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: var(--pp-auth-pending-card-shadow);
+}
+
+.pp-onboard__card > * {
+  max-width: 50rem;
+  margin-inline: auto;
+}
+
+/* H3/Bold, centred. */
+.pp-onboard__title {
+  margin: 0;
+  color: var(--pp-auth-text);
+  font-size: var(--pp-auth-pending-title-size);
+  line-height: var(--pp-auth-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+  text-align: center;
+}
+
+/* Two Large buttons, 24 apart, each 208–280 wide, centred; they wrap on narrow screens. */
+.pp-onboard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pp-space-24);
+}
+
+.pp-onboard .pp-onboard__actions > .pp-auth-btn {
+  flex: 1 1 13rem;
+  width: auto;
+  min-width: 13rem;
+  max-width: 17.5rem;
+  margin: 0;
+}
+
+/* S05: content, then 64 to the buttons; title, 48, photo, 48, sections 48 apart. */
+.pp-onboard-details {
+  display: grid;
+  gap: 4rem;
+}
+
+.pp-onboard-details__content,
+.pp-onboard-details__body,
+.pp-onboard-details__sections {
+  display: grid;
+  gap: var(--pp-space-48);
+}
+
+/* Section: header (48px Orange/500 tile, 8 radius, soft shadow, 24px icon; 12 gap; 18/28 semibold
+ * text/secondary), then fields 8 apart. */
+.pp-onboard-section {
+  display: grid;
+  gap: var(--pp-space-8);
+}
+
+.pp-onboard-section__head {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+}
+
+.pp-onboard-section__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-48);
+  height: var(--pp-space-48);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-color-orange-500);
+  box-shadow: 0 8px 42px rgba(28, 26, 23, 0.06);
+}
+
+.pp-onboard-section__title {
+  margin: 0;
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard-section__fields {
+  display: grid;
+  gap: var(--pp-space-8);
+}
+
+/* Phone and email side by side, 16 apart; stacked on phones. */
+.pp-onboard-details__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--pp-space-8) var(--pp-space-16);
+  align-items: start;
+}
+
+/* The red star after a required label, 2 from it. */
+.pp-onboard-required {
+  margin-inline-start: var(--pp-space-2);
+  color: var(--pp-auth-error);
+}
+
+/* Upload photo: a 250px photo with 24 radius; the Outlined Medium button sits 20 from its bottom. */
+.pp-onboard-photo {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-8);
+}
+
+.pp-onboard-photo__frame {
+  position: relative;
+  width: 15.625rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+}
+
+.pp-onboard-photo__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--pp-radius-24);
+  object-fit: cover;
+}
+
+/* The file input stays focusable but invisible; its label is the visible button. */
+.pp-onboard-photo__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pp-onboard-photo__button {
+  position: absolute;
+  bottom: var(--pp-space-20);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--pp-space-40);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
+  color: var(--pp-color-orange-950);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+.pp-onboard-photo__button:hover {
+  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
+}
+
+.pp-onboard-photo__input:focus-visible + .pp-onboard-photo__button {
+  box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
+}
+
+.pp-onboard-photo__input:disabled + .pp-onboard-photo__button {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pp-onboard-photo__problem {
+  padding: 0;
+}
+
+@media (max-width: 40rem) {
+  .pp-onboard__container {
+    gap: var(--pp-space-32);
+    padding-bottom: var(--pp-space-48);
+  }
+
+  .pp-onboard__card {
+    padding: var(--pp-space-40) var(--pp-space-16);
+  }
+
+  .pp-onboard__portal-label,
+  .pp-onboard__venue {
+    max-width: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

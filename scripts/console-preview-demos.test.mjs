@@ -13,6 +13,8 @@ const DEMOS = [
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
   // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
+  // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
+  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
 ];
 // Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
 const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html'];

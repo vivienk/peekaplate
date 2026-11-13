@@ -5,7 +5,9 @@
  * --pp-auth-pending-* until they land: the cream surfaces (color/surface, color/surface-container),
  * the 32/36 title (H3/Bold) and the card shadow (Owner/Shadow/Menu card).
  */
-.pp-auth {
+/* Shared by the sign-in screens and the owner onboarding screens (S05–S08), which use the same
+ * Figma inputs, buttons, links and error message. */
+:is(.pp-auth, .pp-onboard) {
   --pp-auth-pending-surface: #faf4ef;
   --pp-auth-pending-surface-container: #fffcfa;
   --pp-auth-pending-title-size: 2rem;
@@ -18,6 +20,17 @@
   --pp-auth-outline: color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent);
   --pp-auth-focus: var(--pp-color-info-600);
   --pp-auth-error: var(--pp-color-error-700);
+  color: var(--pp-auth-text);
+  font-family: var(--pp-font-family-base);
+}
+
+:is(.pp-auth, .pp-onboard) *,
+:is(.pp-auth, .pp-onboard) *::before,
+:is(.pp-auth, .pp-onboard) *::after {
+  box-sizing: border-box;
+}
+
+.pp-auth {
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -28,12 +41,6 @@
   background: var(--pp-auth-pending-surface);
   color: var(--pp-auth-text);
   font-family: var(--pp-font-family-base);
-}
-
-.pp-auth *,
-.pp-auth *::before,
-.pp-auth *::after {
-  box-sizing: border-box;
 }
 
 /* Wide screens follow the frames: the food photo fills the page and the card sits on the right,
@@ -140,34 +147,34 @@
  * the shared input-border roles (color/outline at 80%; hover, focus, error), 12 radius and 16 side
  * padding; hint or error 12/16, 8 in, 6 below. One real 1.5px border, without the shared inset line
  * (Rania, 12 Nov). */
-.pp-auth .pp-field {
+:is(.pp-auth, .pp-onboard) .pp-field {
   gap: var(--pp-space-6);
 }
 
-.pp-auth .pp-field__label {
+:is(.pp-auth, .pp-onboard) .pp-field__label {
   color: var(--pp-auth-text);
   font-size: var(--pp-font-size-paragraph-2);
   line-height: var(--pp-line-height-paragraph-1);
   font-weight: var(--pp-font-weight-semibold);
 }
 
-.pp-auth .pp-field__hint,
-.pp-auth .pp-field__error {
+:is(.pp-auth, .pp-onboard) .pp-field__hint,
+:is(.pp-auth, .pp-onboard) .pp-field__error {
   margin: 0;
   padding-inline-start: var(--pp-space-8);
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
 }
 
-.pp-auth .pp-field__hint {
+:is(.pp-auth, .pp-onboard) .pp-field__hint {
   color: var(--pp-auth-text-secondary);
 }
 
-.pp-auth .pp-field__error {
+:is(.pp-auth, .pp-onboard) .pp-field__error {
   color: var(--pp-auth-error);
 }
 
-.pp-auth .pp-input {
+:is(.pp-auth, .pp-onboard) .pp-input {
   --pp-input-edge: var(--pp-role-input-border);
   border-width: 1.5px;
   box-shadow: none;
@@ -182,25 +189,25 @@
   line-height: var(--pp-line-height-paragraph-1);
 }
 
-.pp-auth .pp-input::placeholder {
+:is(.pp-auth, .pp-onboard) .pp-input::placeholder {
   color: var(--pp-auth-text-secondary);
   opacity: 1;
 }
 
-.pp-auth .pp-input:hover {
+:is(.pp-auth, .pp-onboard) .pp-input:hover {
   --pp-input-edge: var(--pp-role-input-border-hover);
 }
 
-.pp-auth .pp-input:focus-visible {
+:is(.pp-auth, .pp-onboard) .pp-input:focus-visible {
   --pp-input-edge: var(--pp-role-input-border-focus);
 }
 
-.pp-auth .pp-input[aria-invalid="true"] {
+:is(.pp-auth, .pp-onboard) .pp-input[aria-invalid="true"] {
   --pp-input-edge: var(--pp-role-input-border-error);
   color: var(--pp-auth-text);
 }
 
-.pp-auth .pp-input[aria-invalid="true"]:focus-visible {
+:is(.pp-auth, .pp-onboard) .pp-input[aria-invalid="true"]:focus-visible {
   outline: 2px solid var(--pp-auth-focus);
   outline-offset: 2px;
 }
@@ -210,7 +217,7 @@
   position: relative;
 }
 
-.pp-auth .pp-auth-field__input {
+:is(.pp-auth, .pp-onboard) .pp-auth-field__input {
   padding-inline-end: var(--pp-space-48);
 }
 
@@ -245,8 +252,8 @@
 
 /* Input / Text, State=Read-only: outline-variant fill, disabled border, on-surface text, with the
  * accent "Change" link inside. */
-.pp-auth .pp-auth-field__locked,
-.pp-auth .pp-auth-field__locked:hover {
+:is(.pp-auth, .pp-onboard) .pp-auth-field__locked,
+:is(.pp-auth, .pp-onboard) .pp-auth-field__locked:hover {
   --pp-input-edge: var(--pp-role-input-border-disabled);
   padding-inline-end: 6rem;
   background-color: var(--pp-color-gray-200);
@@ -345,7 +352,7 @@
 }
 
 /* Owner dashboard_Button, size Large: 48 high, 20 side padding, pill, 18/28 label. */
-.pp-auth .pp-auth-btn {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn {
   width: 100%;
   min-height: var(--pp-space-48);
   padding: var(--pp-space-12) var(--pp-space-20);
@@ -357,52 +364,52 @@
   transform: none;
 }
 
-.pp-auth .pp-auth-btn:focus-visible {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
 }
 
 /* Type=Primary: Default Orange/500, Hover Orange/300, Pressed slightly darker Orange/600 (Rania,
  * 13 Nov), content Orange/950. */
-.pp-auth .pp-auth-btn--primary {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--primary {
   background-color: var(--pp-color-orange-500);
   color: var(--pp-color-orange-950);
 }
 
-.pp-auth .pp-auth-btn--primary:hover {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--primary:hover {
   background-color: var(--pp-color-orange-300);
 }
 
-.pp-auth .pp-auth-btn--primary:active {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--primary:active {
   background-color: var(--pp-color-orange-600);
 }
 
 /* Type=Outlined: surface-container with a 1px outline-solid edge (3px on hover), bold label;
  * Pressed is Neutral/950 with a light label. */
-.pp-auth .pp-auth-btn--outlined {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--outlined {
   background-color: var(--pp-auth-pending-surface-container);
   color: var(--pp-color-orange-950);
   box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
   font-weight: var(--pp-font-weight-bold);
 }
 
-.pp-auth .pp-auth-btn--outlined:hover {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--outlined:hover {
   box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
 }
 
-.pp-auth .pp-auth-btn--outlined:active {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--outlined:active {
   background-color: var(--pp-color-neutral-950);
   color: var(--pp-auth-pending-surface-container);
   box-shadow: none;
 }
 
 /* Loading keeps the Default look, with a spinner, even under the pointer. */
-.pp-auth .pp-auth-btn--primary[aria-busy="true"] {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--primary[aria-busy="true"] {
   background-color: var(--pp-color-orange-500);
   cursor: progress;
 }
 
-.pp-auth .pp-auth-btn--outlined[aria-busy="true"] {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn--outlined[aria-busy="true"] {
   background-color: var(--pp-auth-pending-surface-container);
   color: var(--pp-color-orange-950);
   box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
@@ -411,9 +418,9 @@
 
 /* State=Disabled (used while the service asks the owner to wait): Neutral/200 with a Neutral/300
  * edge and Neutral/400 label. aria-disabled, so it stays focusable. */
-.pp-auth .pp-auth-btn[aria-disabled="true"],
-.pp-auth .pp-auth-btn[aria-disabled="true"]:hover,
-.pp-auth .pp-auth-btn[aria-disabled="true"]:active {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn[aria-disabled="true"],
+:is(.pp-auth, .pp-onboard) .pp-auth-btn[aria-disabled="true"]:hover,
+:is(.pp-auth, .pp-onboard) .pp-auth-btn[aria-disabled="true"]:active {
   background-color: var(--pp-color-neutral-200);
   color: var(--pp-color-neutral-400);
   box-shadow: inset 0 0 0 1px var(--pp-color-neutral-300);
@@ -421,7 +428,7 @@
   cursor: not-allowed;
 }
 
-.pp-auth .pp-auth-btn[aria-disabled="true"]:focus-visible {
+:is(.pp-auth, .pp-onboard) .pp-auth-btn[aria-disabled="true"]:focus-visible {
   box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
 }
 

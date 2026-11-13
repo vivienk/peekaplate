@@ -214,7 +214,7 @@ export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: React
       </span>
       <div className="pp-auth-banner__text">
         <p className="pp-auth-banner__title">{copy.title}</p>
-        <p className="pp-auth-banner__body">{copy.body}</p>
+        {copy.body && <p className="pp-auth-banner__body">{copy.body}</p>}
         {action}
       </div>
     </div>
