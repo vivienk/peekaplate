@@ -437,7 +437,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "272a817229a8c27eb240f52f71cc51b987337f7fa598c8e2cb2df417a1567ef7"
+      "sourceFingerprint": "53ce86c0aacf98fe5785fbd974098198a5cb18707d2f26c0973fc7dfc8c18b58"
     },
     {
       "id": "measurement",
