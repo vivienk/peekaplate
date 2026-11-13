@@ -128,10 +128,8 @@ beforeEach(() => {
     get scrollY() {
       return 0;
     },
-    setTimeout: (...args: Parameters<typeof setTimeout>) =>
-      globalThis.setTimeout(...args),
-    clearTimeout: (timer: ReturnType<typeof setTimeout>) =>
-      globalThis.clearTimeout(timer),
+    setTimeout: (...args: Parameters<typeof setTimeout>) => globalThis.setTimeout(...args),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) => globalThis.clearTimeout(timer),
     IntersectionObserver: MockIntersectionObserver,
   } as any);
   vi.stubGlobal('document', {
@@ -232,15 +230,13 @@ describe('menu screen observer lifecycle', () => {
 
     const exposureObserver = observers.find(
       (observer) =>
-        Array.isArray(observer.options?.threshold) &&
-        observer.options.threshold.includes(0.5),
+        Array.isArray(observer.options?.threshold) && observer.options.threshold.includes(0.5),
     );
     expect(exposureObserver).toBeDefined();
 
     const card = exposureObserver?.observed.find(
       (element) =>
-        (element as HTMLElement).dataset.dishId ===
-        'a1000000-0000-4000-8000-000000000001',
+        (element as HTMLElement).dataset.dishId === 'a1000000-0000-4000-8000-000000000001',
     );
     expect(card).toBeDefined();
 
