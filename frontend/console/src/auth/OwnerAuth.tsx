@@ -744,7 +744,7 @@ function ForgotStep({
     <>
       <StepHeader heading={heading} title="Forgot password?">
         Enter the email address you use for PeekaPlate and we’ll send you a link to reset your
-        password.
+        password
       </StepHeader>
       {banner && <ErrorBanner copy={banner} />}
       <form className="pp-auth__form" noValidate onSubmit={submit}>
