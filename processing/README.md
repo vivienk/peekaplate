@@ -459,3 +459,37 @@ submits a Tripo image-to-model job, resumes polling without resubmission, and sa
 validated GLB for human review. The current 2.5D diner remains unchanged.
 See [setup, commands and verification limits](../docs/tripo-cutout-to-3d.md).
 
+
+
+## Dish-photo ingestion to 2.5D
+
+The existing `python -m peekaplate_processing.prepare_assets` entry point now invokes
+`portion_ingestion.ingest_dish_photo` automatically after T0 photo preparation. Its JSON
+result includes `portion.status`, the ingestion manifest path and any fallback reason.
+Use `--mask <grayscale.png>` for opaque source photos; mask dimensions must match the
+EXIF-oriented original. Without a usable mask/alpha channel, the original photo remains
+the fallback. This does not run an external segmentation or generative model.
+
+The reusable processor also supports direct and batch jobs:
+
+```sh
+PYTHONPATH=processing/src python -m peekaplate_processing.portion_ingestion \
+  --input dish.webp --dish-id <uuid> --revision-id <uuid> \
+  --capture-evidence "Source capture reference" --output-root work/portions
+
+PYTHONPATH=processing/src python -m peekaplate_processing.portion_ingestion \
+  --batch frontend/diner/src/menu/fixture-assets/portion-ingestion-input.json \
+  --source-root . --output-root work/portions
+```
+
+Each artifact records source/mask hashes, recipe, dish/revision IDs, fallback, bounded
+layers, review state and publication eligibility. Identical jobs reuse verified output;
+a changed source or revision produces a different artifact. Tampered cached output fails
+closed. Source-root traversal and mismatched source hashes are rejected. Local callers
+must enforce tenant authorization before invoking the processor; this is not a public
+upload endpoint. Restaurant approval and public publication remain separate operations.
+
+For PR147 preview assets, `pnpm ingest:portion-fixtures` invokes this same processor and
+exports its output to the diner. Set `PEEKAPLATE_PROCESSING_PYTHON` to the Python executable
+with the processing dependencies installed. `pnpm --filter @peekaplate/diner build`
+checks source hashes, processor fingerprint and provenance before building.

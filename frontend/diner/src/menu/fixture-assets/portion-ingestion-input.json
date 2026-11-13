@@ -1,0 +1,48 @@
+{
+  "source_pr": 147,
+  "source_commit": "d8e186b450845f5f6035eb32ab1858d9c7a7a3ce",
+  "jobs": [
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/avocado-toast.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000001",
+      "revision_id": "a2000000-0000-4000-8000-000000000001",
+      "sha256": "a8bd1c4efcbfc5a8a67e6a9fcf51ee8b2a79178a36fb5c8fca19fc974d598be0",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    },
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/harvest-power-bowl.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000002",
+      "revision_id": "a2000000-0000-4000-8000-000000000002",
+      "sha256": "4b4c7a19f71519f6f926962b12843c4c9c03c032673f341c264e69f07db9933c",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    },
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/classic-eggs-benedict.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000003",
+      "revision_id": "a2000000-0000-4000-8000-000000000003",
+      "sha256": "dce9b6acd8f5692528f2501117d922042a2df4a2e6443209d9a82811ba98f51f",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    },
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/garden-avocado-salad.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000004",
+      "revision_id": "a2000000-0000-4000-8000-000000000004",
+      "sha256": "91cdc1681dfe59e76576c8d5c83ff039ea3bba28449e7d4f51404d8f54b0f0dd",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    },
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/berry-pancake-stack.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000005",
+      "revision_id": "a2000000-0000-4000-8000-000000000005",
+      "sha256": "a4112fbb1c3df979472df424d34e9ac3f131c8754a123643ba109b46969d0c7e",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    },
+    {
+      "source": "frontend/diner/src/menu/fixture-assets/salmon-poke-bowl.webp",
+      "dish_id": "a1000000-0000-4000-8000-000000000006",
+      "revision_id": "a2000000-0000-4000-8000-000000000006",
+      "sha256": "3e83d63a4588793b9844b8de927da537db51387f1b2031379164997187b9770a",
+      "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+    }
+  ]
+}

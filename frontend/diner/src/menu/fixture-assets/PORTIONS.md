@@ -1,9 +1,11 @@
-# PR147 photo-derived 2.5D previews
+# Pipeline-generated PR147 2.5D previews
 
-The six WebP files are byte-for-byte copies from PR147 commit `d8e186b450845f5f6035eb32ab1858d9c7a7a3ce`. They are 640 × 640 Figma design sample photos with existing transparent dish-and-plate cutouts. No generated food surfaces, recoloring, segmentation, or paid model call is used.
+The six WebP sources are byte-for-byte copies from PR147 commit `d8e186b450845f5f6035eb32ab1858d9c7a7a3ce`. They are 640 × 640 Figma design sample photos with transparent dish-and-plate cutouts. No invented food surfaces or paid model call is used.
 
-Run `node scripts/generate-fixture-portions.mjs` to regenerate `portion-fixtures.json`; add `--check` to verify reproducibility. Each manifest binds one source photo to its fixture dish/revision IDs, with a transparent background, exact byte counts, SHA256 hashes and PR25's three-degree tilt limits. Combined assets stay within 180 KB per dish.
+`portion-ingestion-input.json` is the input job set: source photo, exact SHA256, dish/revision IDs and capture evidence. Run `pnpm ingest:portion-fixtures` with the processing Python environment (select its executable with `PEEKAPLATE_PROCESSING_PYTHON`). This invokes `peekaplate_processing.portion_ingestion`, then exports its actual output into `portion-fixtures.json`. The exporter does not implement a separate generation recipe. Diner builds run `--check` and reject stale source, processor or provenance bindings.
 
-These are preview-only design samples, not restaurant-approved publication assets. The internal previewPortion field is assigned only to fixture menus in development or explicitly enabled PR preview builds. Published bundle adaptation cannot supply it. The normal menu exposes five photos; Berry Pancake Stack remains in PR147's existing edge-cases menu. Missing photos retain the existing unavailable/photo fallback.
+The reusable processor also runs automatically from the existing `python -m peekaplate_processing.prepare_assets` photo-preparation command. Transparent photos are reused when within budget; otherwise they are resized/encoded into bounded WebP layers. Opaque photos accept a matching grayscale mask. Missing/invalid cutouts or delivery-budget failure retain the original photo. Outputs are immutable, content-addressed, hash-verified on retry, review-required and publication-ineligible.
 
-Only in local development, the dedicated `scenario=portion-demo` route retains the older single-image review and local 3D test harness. Hosted legacy links use the same dish-specific camera previews as the normal menu.
+The normal menu exposes five photos; Berry Pancake Stack remains in PR147's existing edge-cases menu. Internal previewPortion is assigned only to fixture menus in development or explicitly enabled PR builds. Published bundles cannot supply it. Backend approval/publication is a separate boundary; this PR does not add a public upload route or automatically publish generated assets.
+
+Only local development's explicit portion-demo route retains the older single-image/local-3D review harness. Hosted legacy links use the dish-specific photo previews.

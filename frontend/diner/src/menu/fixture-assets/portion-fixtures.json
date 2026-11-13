@@ -2,6 +2,7 @@
   "source_pr": 147,
   "source_commit": "d8e186b450845f5f6035eb32ab1858d9c7a7a3ce",
   "preview_only": true,
+  "pipeline_sha256": "335f8e9e96c4dd6facb46e6f4266a161e4937b2bea9fcc64d10b3a72cf69254a",
   "background": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"640\"></svg>",
   "entries": [
     {
@@ -153,6 +154,116 @@
           "depth": 1
         }
       ]
+    }
+  ],
+  "ingestions": [
+    {
+      "asset_id": "portion_7cffc5e7c70640d0554805ca9acfb0f5",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000001",
+        "revision_id": "a2000000-0000-4000-8000-000000000001",
+        "source_sha256": "a8bd1c4efcbfc5a8a67e6a9fcf51ee8b2a79178a36fb5c8fca19fc974d598be0",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_8c512864572bb7ef239268c479eabf37",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000002",
+        "revision_id": "a2000000-0000-4000-8000-000000000002",
+        "source_sha256": "4b4c7a19f71519f6f926962b12843c4c9c03c032673f341c264e69f07db9933c",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_706d6d047a1b3ddcc67290a8037889bb",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000003",
+        "revision_id": "a2000000-0000-4000-8000-000000000003",
+        "source_sha256": "dce9b6acd8f5692528f2501117d922042a2df4a2e6443209d9a82811ba98f51f",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_fefef90c88c9140c34cfe7069997313a",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000004",
+        "revision_id": "a2000000-0000-4000-8000-000000000004",
+        "source_sha256": "91cdc1681dfe59e76576c8d5c83ff039ea3bba28449e7d4f51404d8f54b0f0dd",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_4721e05dcdb4deaad9bc27825e4e9bf1",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000005",
+        "revision_id": "a2000000-0000-4000-8000-000000000005",
+        "source_sha256": "a4112fbb1c3df979472df424d34e9ac3f131c8754a123643ba109b46969d0c7e",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
+    },
+    {
+      "asset_id": "portion_040211d33275bc568e5718217d649384",
+      "provenance": {
+        "recipe": "photo-to-portion-v1",
+        "dish_id": "a1000000-0000-4000-8000-000000000006",
+        "revision_id": "a2000000-0000-4000-8000-000000000006",
+        "source_sha256": "3e83d63a4588793b9844b8de927da537db51387f1b2031379164997187b9770a",
+        "mask_sha256": null,
+        "budget_bytes": 180000,
+        "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval."
+      },
+      "review": {
+        "status": "needs_review"
+      },
+      "publication": {
+        "eligible": false
+      }
     }
   ]
 }

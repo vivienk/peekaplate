@@ -2811,3 +2811,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - PR147 photo binding: initial browser checks found the empty SVG background could not decode from an untyped Blob. Supply image/svg+xml only for the fixed fixture background URL; photo bytes remain unchanged. An async fixture lookup delayed menu unit rendering; use synchronous manifest metadata lookup with lazy image loading. Preserved PR147 default five-dish order and its sixth photo in edge-cases; updated the placeholder-only image assertion.
+
+- Portion ingestion: the system Python lacked processing dependencies, so used the existing processing test environment. Initial batch recipe encoded every quality candidate even when the original transparent WebP fit; stopped superseded workers and changed candidates to lazy generation, preserving exact PR147 bytes and avoiding unnecessary encoding. Pipeline and photo-preparation integration regressions pass.

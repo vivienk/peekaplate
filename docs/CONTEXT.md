@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate.",
+      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate. Photo preparation invokes reusable portion ingestion; PR147 fixtures are exports of this processor, with build-time freshness checks.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -212,7 +212,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/fixture-assets/portion-fixtures.json",
         "frontend/diner/src/menu/fixture-assets/PORTIONS.md",
         "scripts/generate-fixture-portions.mjs",
-        "scripts/generate-fixture-portions.test.mjs"
+        "scripts/generate-fixture-portions.test.mjs",
+        "frontend/diner/src/menu/fixture-assets/portion-ingestion-input.json",
+        "processing/src/peekaplate_processing/portion_ingestion.py",
+        "processing/src/peekaplate_processing/prepare_assets.py",
+        "processing/tests/test_portion_ingestion.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -221,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "558baf382b70c288843c53386d83468a27e88e20c7a6827876847eda084ca83b"
+      "sourceFingerprint": "4722194110065af18511839364985a5416f08d0723937f9a70a87fbbf2758836"
     },
     {
       "id": "console",
@@ -482,7 +486,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "e9a5920212ff74039eafb8bc1635b68a388757d6b436f8bcec655e705399140d"
+      "sourceFingerprint": "dfb624c6547fa1e28c6c8e0d3bd402987f59c16c9998e4fe4e20fb4f1ab8f9c6"
     },
     {
       "id": "agents",
@@ -549,7 +553,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible. A separate authenticated single-tenant FastAPI adapter provides idempotent create/status/resume and verified artifact downloads; live generation is not tested. New tasks check balance before upload; documented request rejections preserve safe codes and keep explicit same-job resume, while uncertain outcomes remain blocked.",
+      "summary": "PDF/photo modes preserve OCR defaults, pipeline/schema compatibility and exact source joins. Bounded title/column and text/geometry checks reject incomplete or conflicting price groups; originals remain unvalidated. Opt-in failed-page OCR and selected-page model recovery cap requests, retain history and never merge old candidates. Defaults and queues are unchanged; broad recall and human acceptance remain unverified. Private PR25 cutout-to-Tripo CLI verifies exact PNG hashes, persists resumable tasks, blocks ambiguous resubmission and retains fallback images. Structurally checked GLBs stay needs-review and publication-ineligible. A separate authenticated single-tenant FastAPI adapter provides idempotent create/status/resume and verified artifact downloads; live generation is not tested. New tasks check balance before upload; documented request rejections preserve safe codes and keep explicit same-job resume, uncertain outcomes stay blocked. 2.5D ingestion: see latest handoff.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -631,7 +635,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-candidates-v2.json",
         "processing/tests/fixtures/review-candidates/representative-extraction.json",
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
-        "processing/tests/fixtures/review-candidates/zero-price-candidate.json"
+        "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
+        "processing/src/peekaplate_processing/portion_ingestion.py",
+        "processing/tests/test_portion_ingestion.py",
+        "processing/src/peekaplate_processing/prepare_assets.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -640,7 +647,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ffa44331feeab6e9df7fc7659bd35348e796c9514bbebbf385b98ea506c32e35"
+      "sourceFingerprint": "f5a1d68cb8bddb1d4d92528dd6790385724a59b303ff0597f10fedfc3ddc3d3f"
     },
     {
       "id": "assets",
@@ -673,10 +680,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "e7a35400a71c5fba3092a3c127ca787af435e4ec031b09c724b1e572bab15701"
+      "sourceFingerprint": "97bd66cc3d428dfb7b22b83edd8d87c207836f482807b430e2f443c7cb441462"
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-12",
+      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha or supplied masks, bounded encoding, source/revision hashing, immutable verified retries and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. No public photo-upload endpoint or publication bypass added.",
+      "modules": [
+        "diner",
+        "processing"
+      ],
+      "next": "Wire this processor from the authorized owner photo-upload job when that transport is implemented; approve artifacts before public publication."
+    },
     {
       "date": "2026-11-12",
       "summary": "PR162 uses PR147 exact transparent photo bytes for six dish-specific 2.5D camera previews. Five are in the unchanged default menu; Berry Pancake Stack remains in edge-cases. Manifests are reproducible and hash/size/revision checked. Shared sample is confined to local development legacy review; hosted legacy links also use dish photos.",
@@ -756,17 +772,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts"
       ],
       "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
-    },
-    {
-      "date": "2026-11-09",
-      "summary": "PR84 reconciles delivery with current develop and retains atomic outbox/withdrawal behavior. Shared-schema receipt checks retain malformed responses; every split rechecks token and consent, including withdrawal/re-opt-in. Ten-second request/body abort permits same-ID retry. A transient result stops remaining splits and honors numeric/date Retry-After. Requests omit cookies/refuse redirects. Chromium uses intercepted synthetic receipts, not hosted ingestion.",
-      "modules": [
-        "diner"
-      ],
-      "paths": [
-        "frontend/diner/src/tracking/delivery.ts"
-      ],
-      "next": "DIN-03 must connect the current in-memory publication token and approved endpoint. Verify real controls reach PostHog and canonical facts independently; collection stays gated pending release acceptance."
     }
   ]
 }
