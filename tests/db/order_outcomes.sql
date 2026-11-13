@@ -622,6 +622,10 @@ SELECT is(
 SET ROLE peekaplate_deletion_operator;
 SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
 SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
+UPDATE app_private.order_data_deletion_requests
+SET status = 'db_deleted',
+    completed_at = now()
+WHERE id = '00000000-0000-4000-8000-000000000998';
 SELECT lives_ok(
   $$UPDATE app_private.order_data_deletion_requests
     SET status = 'awaiting_verification',
