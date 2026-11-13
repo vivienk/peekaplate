@@ -169,11 +169,21 @@ class GeminiImageProvider:
             if len(raw) > 8_000_000:
                 raise ValueError("Oversized provider response")
             payload = json.loads(raw)
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid provider envelope")
             candidates = payload.get("candidates", [])
-            if len(candidates) != 1 or candidates[0].get("finishReason") != "STOP":
+            if (not isinstance(candidates, list) or len(candidates) != 1
+                    or not isinstance(candidates[0], dict) or candidates[0].get("finishReason") != "STOP"):
                 raise ValueError("Provider returned no complete image")
-            images = [p["inlineData"] for p in candidates[0].get("content", {}).get("parts", []) if "inlineData" in p]
-            if len(images) != 1 or images[0].get("mimeType") not in {"image/png", "image/webp"}:
+            content = candidates[0].get("content")
+            if not isinstance(content, dict) or not isinstance(content.get("parts"), list):
+                raise ValueError("Invalid provider content")
+            parts = content["parts"]
+            if any(not isinstance(part, dict) for part in parts):
+                raise ValueError("Invalid provider parts")
+            images = [p["inlineData"] for p in parts if "inlineData" in p]
+            if (len(images) != 1 or not isinstance(images[0], dict)
+                    or images[0].get("mimeType") not in {"image/png", "image/webp"}):
                 raise ValueError("Provider returned no supported image")
             data = base64.b64decode(images[0]["data"], validate=True)
             if len(data) > 1_000_000:

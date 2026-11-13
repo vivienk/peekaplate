@@ -2871,3 +2871,5 @@ Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise
 ## Ingredient illustration generation — November 12, 2026
 
 The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.
+
+Generation review found valid JSON with non-object provider fields could raise AttributeError and stop the batch. Explicit envelope/candidate/content/part/image type validation now returns a sanitized failed job; malformed-shape regression verifies remaining ingredients still run. Focused ingredient suite passes 34 tests.

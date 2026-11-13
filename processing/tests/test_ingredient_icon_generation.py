@@ -147,6 +147,25 @@ class IngredientGenerationTests(unittest.TestCase):
         self.assertTrue((run / "ingredient-artwork/index.html").exists())
         self.assertEqual(len(self.provider.calls), 1)
 
+    def test_malformed_provider_shapes_become_failed_jobs_and_continue(self):
+        provider = GeminiImageProvider("synthetic-key")
+        malformed = [[], {"candidates": None}, {"candidates": [None]},
+                     {"candidates": [{"finishReason": "STOP", "content": []}]},
+                     {"candidates": [{"finishReason": "STOP", "content": {"parts": [None]}}]},
+                     {"candidates": [{"finishReason": "STOP", "content": {"parts": [{"inlineData": []}]}}]}]
+        for payload in malformed:
+            with self.subTest(payload=payload):
+                response = MagicMock()
+                response.__enter__.return_value.read.return_value = json.dumps(payload).encode()
+                opener = MagicMock()
+                opener.open.return_value = response
+                with patch("peekaplate_processing.ingredient_icon_generation.build_opener", return_value=opener):
+                    result = generate_missing(report(["coconut", "apple"]), store=self.store, provider=provider,
+                                              max_requests=2, rights_confirmed=True)
+                self.assertEqual([j["state"] for j in result["jobs"]], ["failed", "failed"])
+                self.assertEqual(result["provider_requests"], 2)
+                self.assertNotIn("synthetic-key", json.dumps(result))
+
 
 if __name__ == "__main__":
     unittest.main()

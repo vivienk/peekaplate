@@ -300,3 +300,5 @@ was performed.
 The generation follow-up adds focused tests for novel ingredient detection, deduplication, request budgets, claims, cache corruption/model invalidation, provider parsing/authentication, vision-only candidate boundaries and pipeline CLI invocation. Mock images verify mechanics only; the separate coconut tool run verifies actual image output.
 
 Generation verification: full Python suite PASS, 536 tests in 48.875 seconds; focused ingredient suite PASS, 33 tests after adding draft/index bindings. The Python environment is the same non-frozen environment recorded above.
+
+Final adapter hardening: 34 focused ingredient tests pass after adding malformed provider-container cases; those cases produce per-ingredient failures and continue the batch. The earlier 536-test full suite predates this narrow hardening.
