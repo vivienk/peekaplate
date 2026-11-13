@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(78);
+SELECT plan(79);
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -479,10 +479,19 @@ SELECT set_config('app.order_data_deletion_active', 'on', true);
 SELECT throws_like(
   $$DELETE FROM app_private.order_outcome_lines
     WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
-  '%append-only table order_outcome_lines rejects DELETE%',
-  'runtime cannot bypass append-only trigger by spoofing GUC'
+  '%permission denied for table order_outcome_lines%',
+  'runtime lacks DELETE privilege even when spoofing deletion GUC'
 );
 SELECT set_config('app.order_data_deletion_active', 'off', true);
+
+RESET ROLE;
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_lines
+    WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%append-only table order_outcome_lines rejects DELETE%',
+  'append-only trigger rejects DELETE for privileged role when deletion GUC is off'
+);
+SET ROLE peekaplate_runtime;
 
 SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000802', true);
 SELECT is((SELECT count(*)::int FROM app_private.pilot_order_agreement_acceptances), 0, 'Venue B sees 0 agreement acceptances from Venue A');
