@@ -173,8 +173,9 @@ body:has(.owner-root) {
 .owner-nav__item[aria-disabled="true"]:hover {
   background: transparent;
 }
-.owner-nav-hint {
-  margin: var(--pp-space-12) 0 0;
+/* .owner-root p resets margins, so this needs the same specificity to keep the gap (design review, 11 Nov). */
+.owner-root .owner-nav-hint {
+  margin: var(--pp-space-16) 0 0;
   padding: 0 14px;
   color: var(--pp-role-on-surface-variant);
   font-size: var(--pp-font-size-small);
@@ -610,15 +611,25 @@ body:has(.owner-root) {
   border-radius: var(--pp-radius-full);
   background: var(--pp-color-orange-500);
 }
-/* Design review 04: the AI panel's Disabled variant (onboarding): grey composer, icon colours kept. */
+/* Onboarding: the composer uses the Figma disabled state (same as the Button component's Disabled:
+ * background, border and content colours), so the field, placeholder and send icon all read as off. */
 .owner-ai__input:disabled {
   border-color: var(--pp-role-input-border-disabled);
   background: var(--pp-role-input-bg-disabled);
+  color: var(--pp-role-input-text-disabled);
   cursor: not-allowed;
 }
+.owner-ai__input:disabled::placeholder {
+  color: var(--pp-role-input-text-disabled);
+}
 .owner-ai__send:disabled {
+  border: 1px solid var(--pp-role-input-border-disabled);
   background: var(--pp-role-input-bg-disabled);
   cursor: not-allowed;
+}
+.owner-ai__send:disabled img {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 /* Responsive: the design is desktop-only (1440); Figma's responsive note is reference only.
