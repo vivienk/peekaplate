@@ -1,12 +1,12 @@
 // Icons and logo exported from Rania's Figma (Owner Dashboard, node 2346:6206). Decorative only:
 // every use sits next to visible text, so they carry empty alt text.
 import action from './assets/action.svg';
-import activity from './assets/activity.svg';
 import chart from './assets/chart.svg';
 import check from './assets/check.svg';
 import circle from './assets/circle.svg';
 import clock from './assets/clock.svg';
 import edit from './assets/edit.svg';
+import activity from './assets/fi-rr-chart-histogram.svg'; // Figma Screen 6 "No dish activity yet" icon tile, fi-rr-chart-histogram (I2346:6262;237:8097)
 import lock from './assets/fi-rr-lock.svg'; // Figma PeekaPlate Icons / Lock-dot, layer fi-rr-lock (2319:10949)
 import home from './assets/home.svg';
 import logo from './assets/logo.png';
