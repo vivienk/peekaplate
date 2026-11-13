@@ -41,9 +41,13 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   status.after(instructions);
   const cameraSample =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && dish.cameraSample === true;
+  const fixtureCamera =
+    (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && !!dish.previewPortion;
   const sampleNotice = cameraSample
     ? `Camera test for ${dish.name}: shared sample cutout, not this dish’s appearance or portion size.`
-    : undefined;
+    : fixtureCamera
+      ? `Design sample photo of ${dish.name}. Visual preview only, not a serving-size measurement.`
+      : undefined;
   const key = crypto.randomUUID();
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
@@ -141,7 +145,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     timer = setTimeout(fallback, 8000);
     const sample = cameraSample ? await import('./portionDemo').catch(() => null) : null;
     if (controller.signal.aborted || disposed) return;
-    const parsed = PublicPortionSchema.safeParse(sample ? sample.portion : dish.portion);
+    const parsed = PublicPortionSchema.safeParse(
+      sample ? sample.portion : fixtureCamera ? dish.previewPortion : dish.portion,
+    );
     if (
       !parsed.success ||
       (!cameraSample &&
@@ -207,8 +213,11 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       status.textContent =
         sampleNotice ??
         (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
-      if ((import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && visualSelect) {
-        if (import.meta.env.DEV) {
+      if (
+        (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+        (visualSelect || fixtureCamera)
+      ) {
+        if (import.meta.env.DEV && visualSelect) {
           const module = await import('./portion3d').catch(() => null);
           if (!module) return;
           const { bindLocal3d } = module;

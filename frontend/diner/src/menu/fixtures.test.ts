@@ -125,7 +125,7 @@ describe('fixture menu source', () => {
     for (const dish of completeDishes(await loadMenu('edge-cases'))) {
       if (!dish.images) continue;
       expect(dish.images.card.alt).toMatch(/synthetic fixture/);
-      expect(dish.images.card.url).toMatch(/^data:image\/svg\+xml,/);
+      expect(dish.images.card.url).toMatch(/^(data:image\/svg\+xml,|.*\.webp)/);
     }
   });
 
@@ -294,11 +294,23 @@ it('camera preview preserves every PR145 dish and stays out of ordinary builds',
     vi.stubEnv('VITE_PORTION_DEMO', 'true');
     const preview = completeDishes(await loadMenu('demo'));
     expect(preview).toHaveLength(5);
-    expect(preview.every((dish) => dish.cameraSample === true)).toBe(true);
+    const legacyLink = completeDishes(await loadMenu('portion-demo'));
+    expect(
+      legacyLink.every(
+        (dish) => dish.cameraSample === undefined && dish.previewPortion?.dish_id === dish.dishId,
+      ),
+    ).toBe(true);
+    expect(
+      preview.every(
+        (dish) =>
+          dish.previewPortion?.dish_id === dish.dishId &&
+          dish.previewPortion?.dish_revision_id === dish.dishRevisionId,
+      ),
+    ).toBe(true);
     vi.stubEnv('VITE_PORTION_DEMO', undefined);
     const ordinary = completeDishes(await loadMenu('demo'));
-    expect(ordinary.every((dish) => dish.cameraSample === undefined)).toBe(true);
-    expect(preview.map(({ cameraSample, ...dish }) => dish)).toEqual(ordinary);
+    expect(ordinary.every((dish) => dish.previewPortion === undefined)).toBe(true);
+    expect(preview.map(({ previewPortion, ...dish }) => dish)).toEqual(ordinary);
     expect(await createFixtureMenuSource('portion-demo').load()).toEqual({ status: 'unavailable' });
   } finally {
     vi.unstubAllEnvs();

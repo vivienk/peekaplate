@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu/detail/search and Save/Saved use PR145 cfebee9 screen implementation and shared contracts/tokens. Live mode verifies bundle bytes and pointer identity before rendering/token use; refresh preserves focus and withdrawal/expiry suspends tracking. Consent gates independent PostHog and canonical outboxes; fixtures send neither destination. View Portion adds revision-bound layers, the PR25 viewer, photo fallback and camera cleanup on menu/detail/Saved transitions. Opt-in preview builds mark the five original fixture dishes for camera testing from View Portion; an explicit shared-sample notice appears in the viewer and portal. No extra demo card or published-dish rebinding. Hosted spatial asset approval/publication, reconciliation and real-device acceptance remain separate gates.",
+      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -207,7 +207,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "playwright.portion.config.ts",
         "docs/diner-portion-preview.md",
         "frontend/diner/src/save/screens.ts",
-        "frontend/diner/src/save/save.css"
+        "frontend/diner/src/save/save.css",
+        "frontend/diner/src/menu/fixturePortions.ts",
+        "frontend/diner/src/menu/fixture-assets/portion-fixtures.json",
+        "frontend/diner/src/menu/fixture-assets/PORTIONS.md",
+        "scripts/generate-fixture-portions.mjs",
+        "scripts/generate-fixture-portions.test.mjs"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -216,7 +221,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "c8d4a2fec15a63064a5b6d0f24f1e229549d72505da3dff5e366e6e7b5761104"
+      "sourceFingerprint": "558baf382b70c288843c53386d83468a27e88e20c7a6827876847eda084ca83b"
     },
     {
       "id": "console",
@@ -674,6 +679,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-12",
+      "summary": "PR162 uses PR147 exact transparent photo bytes for six dish-specific 2.5D camera previews. Five are in the unchanged default menu; Berry Pancake Stack remains in edge-cases. Manifests are reproducible and hash/size/revision checked. Shared sample is confined to local development legacy review; hosted legacy links also use dish photos.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Verify matching photo cutouts on phone; these remain design fixtures, not approved restaurant publications."
+    },
+    {
+      "date": "2026-11-12",
       "summary": "PR162 View Portion opens automatic mobile 2.5D camera fallback from each original PR145 menu dish, including the default preview URL. Fixture-only internal cameraSample marker selects a clearly labelled shared review image; production builds and published assets retain their normal validation/fallback. Removed the extra demo dish.",
       "modules": [
         "diner"
@@ -754,19 +767,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/tracking/delivery.ts"
       ],
       "next": "DIN-03 must connect the current in-memory publication token and approved endpoint. Verify real controls reach PostHog and canonical facts independently; collection stays gated pending release acceptance."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
-      "modules": [
-        "diner"
-      ],
-      "paths": [
-        "frontend/diner/src/menu/searchView.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/search.spec.ts"
-      ],
-      "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
     }
   ]
 }

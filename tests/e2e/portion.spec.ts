@@ -977,20 +977,37 @@ test('camera demo retains the full diner menu and PR145 icons', async ({ page })
 for (const name of [
   'Avocado Toast',
   'Classic Eggs Benedict',
+  'Berry Pancake Stack',
   'Harvest Power Bowl',
   'Salmon Poke Bowl',
   'Garden Avocado Salad',
 ]) {
   test(`actual PR145 menu opens automatic camera from ${name}`, async ({ page }) => {
     await cameraFixture(page);
-    await page.goto('http://127.0.0.1:5173/');
+    await page.goto(
+      `http://127.0.0.1:5173/${name === 'Berry Pancake Stack' ? '?scenario=edge-cases' : ''}`,
+    );
     await page.getByRole('button', { name: `Open ${name}`, exact: true }).click();
     await expect(page.locator('.pp-detail__name')).toHaveText(name);
     await page.getByRole('button', { name: 'View Portion', exact: true }).click();
     const portal = page.getByRole('dialog', { name: 'Dish on your table' });
     await expect(portal).toBeVisible({ timeout: 20000 });
     await expect(portal).toHaveAttribute('data-visual', '2.5d');
-    await expect(portal.locator('.pp-ar__sample-notice')).toContainText(`Camera test for ${name}`);
+    const slug = name.toLowerCase().replaceAll(' ', '-');
+    const expected = hash(readFileSync(`frontend/diner/src/menu/fixture-assets/${slug}.webp`));
+    const actual = await page
+      .locator('.pp-portion__css img')
+      .evaluate(async (img: HTMLImageElement) => {
+        const bytes = await (await fetch(img.src)).arrayBuffer();
+        return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) =>
+          b.toString(16).padStart(2, '0'),
+        ).join('');
+      });
+    expect(actual).toBe(expected);
+
+    await expect(portal.locator('.pp-ar__sample-notice')).toContainText(
+      `Design sample photo of ${name}`,
+    );
     await expect(portal.getByRole('button', { name: 'Place dish', exact: true })).toBeHidden();
     await expect.poll(() => page.evaluate(() => (window as any).cameraTest.calls)).toBe(1);
     const size = await portal.boundingBox();

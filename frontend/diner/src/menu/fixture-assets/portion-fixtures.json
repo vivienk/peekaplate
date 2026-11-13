@@ -1,0 +1,158 @@
+{
+  "source_pr": 147,
+  "source_commit": "d8e186b450845f5f6035eb32ab1858d9c7a7a3ce",
+  "preview_only": true,
+  "background": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"640\"></svg>",
+  "entries": [
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000001",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000001",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/avocado-toast.webp",
+          "sha256": "a8bd1c4efcbfc5a8a67e6a9fcf51ee8b2a79178a36fb5c8fca19fc974d598be0",
+          "size_bytes": 72722,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000002",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000002",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/harvest-power-bowl.webp",
+          "sha256": "4b4c7a19f71519f6f926962b12843c4c9c03c032673f341c264e69f07db9933c",
+          "size_bytes": 95280,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000003",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000003",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/classic-eggs-benedict.webp",
+          "sha256": "dce9b6acd8f5692528f2501117d922042a2df4a2e6443209d9a82811ba98f51f",
+          "size_bytes": 68842,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000004",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000004",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/garden-avocado-salad.webp",
+          "sha256": "91cdc1681dfe59e76576c8d5c83ff039ea3bba28449e7d4f51404d8f54b0f0dd",
+          "size_bytes": 90842,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000005",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000005",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/berry-pancake-stack.webp",
+          "sha256": "a4112fbb1c3df979472df424d34e9ac3f131c8754a123643ba109b46969d0c7e",
+          "size_bytes": 82034,
+          "depth": 1
+        }
+      ]
+    },
+    {
+      "schema_version": 1,
+      "dish_id": "a1000000-0000-4000-8000-000000000006",
+      "dish_revision_id": "a2000000-0000-4000-8000-000000000006",
+      "width": 640,
+      "height": 640,
+      "motion": {
+        "max_yaw_degrees": 3,
+        "max_pitch_degrees": 3
+      },
+      "layers": [
+        {
+          "url": "https://portion-fixtures.invalid/background.svg",
+          "sha256": "4b9425dd14aa514507f94cc3eec93d69d5189473c45421b961f1a95acbc13795",
+          "size_bytes": 71,
+          "depth": 0
+        },
+        {
+          "url": "https://portion-fixtures.invalid/salmon-poke-bowl.webp",
+          "sha256": "3e83d63a4588793b9844b8de927da537db51387f1b2031379164997187b9770a",
+          "size_bytes": 83288,
+          "depth": 1
+        }
+      ]
+    }
+  ]
+}
