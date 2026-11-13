@@ -163,3 +163,6 @@ Verification boundary: browser tests use a synthetic camera stream and a labelle
 AR verification on November 12, 2026: full 63-test portion/menu browser suite passed; two additional textured-GLB cleanup regressions passed. Lint, typecheck, context/docs checks and build passed. Production JavaScript was checked to exclude portal controls and the GLTF loader. Camera feeds in automated tests are synthetic; physical table tracking is still NOT RUN.
 
 The local demo now opens the camera/table portal automatically on the first ready 2.5D screen. The camera and visible cutout start automatically; immersive AR remains an optional explicit upgrade. Back returns to the existing preview; changing the cutout does not reopen the portal. Preview controls retain a manual reopen button.
+
+## Hosted PR camera demo
+PR builds opt into the captured-dish camera demo through the existing PEEKAPLATE_PREVIEW_DEMOS build flag. Open `/?scenario=portion-demo`, select the dish and View Portion. HTTPS allows camera permission on phones; camera starts automatically and the 2.5D cutout is visible immediately. The dialog fits up to 390 × 844 CSS pixels, with full-viewport immersive AR if available. Tripo generation and the loopback bridge remain DEV-only; normal production builds exclude the demo.

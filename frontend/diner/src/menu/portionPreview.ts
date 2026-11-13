@@ -43,7 +43,8 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   instructions.id = `portion-instructions-${key}`;
   let showOriginal = false;
   let visual: 'cutout' | 'generated' =
-    import.meta.env.DEV && new URLSearchParams(location.search).get('demoVisual') === 'cutout'
+    (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+    new URLSearchParams(location.search).get('demoVisual') === 'cutout'
       ? 'cutout'
       : 'generated';
   let visualSelect: HTMLSelectElement | undefined;
@@ -151,7 +152,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       if (controller.signal.aborted) return;
       let renderManifest = parsed.data;
       if (
-        import.meta.env.DEV &&
+        (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
         new URLSearchParams(location.search).get('scenario') === 'portion-demo'
       ) {
         const { originalReviewPortion } = await import('./portionDemo');
@@ -198,16 +199,18 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
       status.textContent = reduced.matches
         ? '2.5D preview. Motion is reduced.'
         : 'Drag to tilt the plate';
-      if (import.meta.env.DEV && visualSelect) {
-        const module = await import('./portion3d').catch(() => null);
-        if (!module) return;
-        const { bindLocal3d } = module;
-        if (controller.signal.aborted || disposed) return;
-        local3d = bindLocal3d(stage, controls, status, () => {
-          showOriginal = false;
-          compare.textContent = 'Show original photo';
-          compare.setAttribute('aria-pressed', 'false');
-        });
+      if ((import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && visualSelect) {
+        if (import.meta.env.DEV) {
+          const module = await import('./portion3d').catch(() => null);
+          if (!module) return;
+          const { bindLocal3d } = module;
+          if (controller.signal.aborted || disposed) return;
+          local3d = bindLocal3d(stage, controls, status, () => {
+            showOriginal = false;
+            compare.textContent = 'Show original photo';
+            compare.setAttribute('aria-pressed', 'false');
+          });
+        }
         const arModule = await import('./portionAR').catch(() => null);
         if (controller.signal.aborted || disposed || !arModule) return;
         ar = arModule.bindPortionAR(

@@ -2,7 +2,8 @@ import type { PublicPortion } from '@peekaplate/contracts';
 
 export async function readLayer(layer: PublicPortion['layers'][number], signal: AbortSignal) {
   const url =
-    import.meta.env.DEV && layer.url.startsWith('https://portion-demo.invalid/')
+    (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+    layer.url.startsWith('https://portion-demo.invalid/')
       ? await (await import('./portionDemo')).demoLayerUrl(layer.url, signal)
       : layer.url;
   const response = await fetch(url, {

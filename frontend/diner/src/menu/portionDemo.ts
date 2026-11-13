@@ -52,7 +52,7 @@ export function originalReviewPortion(
   visual: 'cutout' | 'generated',
 ): PublicPortion | null {
   if (
-    !import.meta.env.DEV ||
+    !(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) ||
     new URLSearchParams(location.search).get('scenario') !== 'portion-demo' ||
     base.dish_id !== reviewImages.dish.dish_id ||
     base.dish_revision_id !== reviewImages.dish.revision_id ||

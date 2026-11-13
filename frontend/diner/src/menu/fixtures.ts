@@ -311,7 +311,8 @@ export function createFixtureMenuSource(
         toMenu(b, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
       switch (scenario) {
         case 'portion-demo': {
-          if (!import.meta.env.DEV) return { status: 'unavailable' };
+          if (!(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO))
+            return { status: 'unavailable' };
           const { portion, photo } = await import('./portionDemo');
           const bundle = structuredClone(demoBundle);
           const category = bundle.categories[0]!;
