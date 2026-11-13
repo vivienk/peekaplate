@@ -207,7 +207,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       '2026-11-07T00:00:00.000Z',
     );
 
-    const dish = comparisonReport.dishes!;
+    const dish = comparisonReport.dishes[0]!;
     expect(dish.metrics.open_rate.status).toBe('INSUFFICIENT');
     expect(dish.metrics.open_rate.current_value).toBeNull();
     expect(dish.metrics.open_rate.delta).toBeNull();
