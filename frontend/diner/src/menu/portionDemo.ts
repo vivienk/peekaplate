@@ -1,10 +1,10 @@
 import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
-import background from './fixture-assets/portion-demo/background.webp?url';
-import cutout from './fixture-assets/portion-demo/cutout.png?url';
+import background from './fixture-assets/portion-demo/background.webp?inline';
+import cutout from './fixture-assets/portion-demo/cutout.png?inline';
 import demo from './fixture-assets/portion-demo/demo.json';
-import foreground from './fixture-assets/portion-demo/dish.webp?url';
+import foreground from './fixture-assets/portion-demo/dish.webp?inline';
 import photo from './fixture-assets/portion-demo/photo.jpg?url';
-import generated from './fixture-assets/portion-demo/presentation.png?url';
+import generated from './fixture-assets/portion-demo/presentation.png?inline';
 import reviewImages from './fixture-assets/portion-demo/review-images.json';
 
 // This module is dynamically imported behind DEV guards. Never a publication source.

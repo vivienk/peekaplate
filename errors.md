@@ -2760,3 +2760,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - Auto-camera typecheck TS2774: DOM types declare getUserMedia as always defined. Use an explicit typeof function capability check so older browsers remain guarded without an always-truthy function condition.
+
+- Hosted camera preview initially fell back because trusted preview CSP blocks fetch (connect-src none). Fixed demo assets are now bundled data URLs decoded locally, then checked through the unchanged byte-size and SHA256 validation. Public asset fetch behavior and deployment CSP remain unchanged.
