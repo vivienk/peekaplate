@@ -133,6 +133,77 @@ describe('worker queue consumer wiring', () => {
       handleScheduled({}, { ORDER_OUTCOME_ARCHIVE_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
     ).resolves.toBeUndefined();
   });
+
+  it('invokes durable orphan cleanup retries during scheduled execution', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000801';
+    const batchId = '00000000-0000-4000-8000-000000000901';
+    const orphanKey = `order-imports/${venueId}/${batchId}/source.csv`;
+    let orphanStatus = 'pending';
+
+    const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+    const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined);
+    const querySpy = vi.spyOn(Client.prototype, 'query').mockImplementation((async (
+      sql: string,
+      params?: unknown[],
+    ) => {
+      const s = typeof sql === 'string' ? sql : '';
+      if (s.includes('list_pending_orphan_cleanup_tenants')) {
+        return { rows: [{ tenant_id: venueId }], rowCount: 1 };
+      }
+      if (s.includes('FROM app_private.order_import_orphan_cleanups')) {
+        return {
+          rows:
+            orphanStatus === 'pending'
+              ? [
+                  {
+                    id: '00000000-0000-4000-8000-000000000777',
+                    batch_id: batchId,
+                    storage_key: orphanKey,
+                    deletion_epoch: 0,
+                    retry_count: 1,
+                  },
+                ]
+              : [],
+          rowCount: orphanStatus === 'pending' ? 1 : 0,
+        };
+      }
+      if (s.includes('SELECT deletion_epoch')) {
+        return { rows: [{ deletion_epoch: 0 }], rowCount: 1 };
+      }
+      if (s.includes('UPDATE app_private.order_import_orphan_cleanups')) {
+        if (s.includes("SET status = 'cleaned'") && params?.[0] === venueId) {
+          orphanStatus = 'cleaned';
+        }
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }) as any);
+
+    const deleteMock = vi.fn().mockResolvedValue(undefined);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await handleScheduled(
+        {},
+        {
+          APP_ENV: 'local',
+          LOCAL_DATABASE_URL: 'postgres://localhost/test',
+          ORDER_OUTCOME_ARCHIVE_BUCKET: {
+            list: vi.fn().mockResolvedValue({ objects: [], truncated: false }),
+            delete: deleteMock,
+          },
+        },
+      );
+
+      expect(deleteMock).toHaveBeenCalledTimes(1);
+      expect(deleteMock).toHaveBeenCalledWith(orphanKey);
+      expect(orphanStatus).toBe('cleaned');
+    } finally {
+      connectSpy.mockRestore();
+      endSpy.mockRestore();
+      querySpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
 });
 
 describe('foundation API', () => {

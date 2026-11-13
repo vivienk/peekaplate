@@ -1464,6 +1464,8 @@ export {
   OPTIONAL_PRICING_HEADERS,
   type OrderDataDeletionReason,
   OrderDataDeletionReasonSchema,
+  type OrderDataDeletionStatus,
+  OrderDataDeletionStatusSchema,
   type OrderOutcomeImportResponse,
   OrderOutcomeImportResponseSchema,
   type OrderOutcomeLine,
@@ -1483,4 +1485,8 @@ export {
   SanitizedRowDiagnosticSchema,
   type SubmitOrderDeletionResponse,
   SubmitOrderDeletionResponseSchema,
+  type VerifyOrderDeletionRequest,
+  VerifyOrderDeletionRequestSchema,
+  type VerifyOrderDeletionResponse,
+  VerifyOrderDeletionResponseSchema,
 } from './order-outcome';

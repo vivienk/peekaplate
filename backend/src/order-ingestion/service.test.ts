@@ -5,14 +5,18 @@ import {
   type PublicMenuContentBundle,
 } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { reconcileOrderDeletionsAfterRestore } from './restore-reconciliation';
 import {
   acceptPilotOrderAgreement,
   cleanupOrphanedOrderImports,
   deleteVenueOrderData,
   type ImportOrderOutcomeOptions,
   importOrderOutcomes,
+  type OrderDeletionVerificationStorage,
   OrderImportError,
+  retryPendingOrphanCleanups,
   submitOrderDataDeletionRequest,
+  verifyVenueOrderDeletion,
 } from './service';
 import { getVenueTrackingActivation, recordVenueTrackingActivation } from './tracking-activation';
 
@@ -52,6 +56,9 @@ type MockDbState = {
     }
   >;
   deletionRequests?: Map<string, any>;
+  deletionGates?: Map<string, number>;
+  restoreFreezeActive?: boolean;
+  simulateSystemGatesUnreadable?: boolean;
   simulateDbDeletionFailure?: boolean;
 };
 
@@ -135,17 +142,28 @@ function createMockClient(state: MockDbState) {
         return { rows: [rec], rowCount: 1 };
       }
 
-      // 1a-2. Deletion request audit ledger & privileged deletion function
+      // 1a-2. System gates, deletion epoch gates, and deletion request audit ledger
+      if (normalizedSql.includes('FROM app_private.system_gates')) {
+        if (state.simulateSystemGatesUnreadable) {
+          return { rows: [], rowCount: 0 };
+        }
+        return {
+          rows: [{ is_active: state.restoreFreezeActive === true }],
+          rowCount: 1,
+        };
+      }
+
+      if (normalizedSql.includes('FROM app_private.order_data_deletion_gates')) {
+        const [tenantId] = params!;
+        const epoch = state.deletionGates?.get(tenantId) ?? 0;
+        return { rows: [{ deletion_epoch: epoch }], rowCount: 1 };
+      }
+
       if (normalizedSql.includes('FROM app_private.order_data_deletion_requests')) {
-        if (normalizedSql.includes("status IN ('requested',")) {
+        if (normalizedSql.includes("status <> 'verified'")) {
           const [tenantId] = params!;
           const active = [...(state.deletionRequests?.values() ?? [])].find(
-            (r) =>
-              r.tenant_id === tenantId &&
-              (r.status === 'requested' ||
-                r.status === 'executing' ||
-                r.status === 'r2_deleted' ||
-                r.status === 'failed'),
+            (r) => r.tenant_id === tenantId && r.status !== 'verified',
           );
           return { rows: active ? [active] : [], rowCount: active ? 1 : 0 };
         }
@@ -162,6 +180,8 @@ function createMockClient(state: MockDbState) {
         if (state.deletionRequests.has(key)) {
           return { rows: [], rowCount: 0 };
         }
+        if (!state.deletionGates) state.deletionGates = new Map();
+        state.deletionGates.set(tenantId, (state.deletionGates.get(tenantId) ?? 0) + 1);
         const rec = {
           id,
           tenant_id: tenantId,
@@ -177,9 +197,14 @@ function createMockClient(state: MockDbState) {
           db_lines_deleted: 0,
           db_quarantine_deleted: 0,
           db_conflicts_deleted: 0,
-          error_code: null,
+          error_code: null as string | null,
           requested_at: new Date('2026-11-13T00:00:00Z'),
-          completed_at: null,
+          completed_at: null as Date | null,
+          receipt_written_at: null as Date | null,
+          verified_by: null as string | null,
+          verified_at: null as Date | null,
+          verification_outcome: null as string | null,
+          verification_evidence_ref: null as string | null,
         };
         state.deletionRequests.set(key, rec);
         return {
@@ -191,7 +216,7 @@ function createMockClient(state: MockDbState) {
       if (normalizedSql.includes('UPDATE app_private.order_data_deletion_requests')) {
         const [requestId, tenantId] = params!;
         const rec = state.deletionRequests?.get(`${tenantId}:${requestId}`);
-        if (rec && rec.status !== 'completed') {
+        if (rec && rec.status !== 'verified') {
           if (normalizedSql.includes('SET execution_lease_expires_at = $4')) {
             if (rec.status === 'executing' && rec.execution_token === params![2]) {
               rec.execution_lease_expires_at = params![3];
@@ -199,9 +224,22 @@ function createMockClient(state: MockDbState) {
             }
             return { rows: [], rowCount: 0 };
           }
-          if (normalizedSql.includes("SET status = 'failed'")) {
-            if (rec.execution_token === params![3]) {
-              rec.status = 'failed';
+          if (normalizedSql.includes('SET execution_token = $3')) {
+            if (rec.status === 'db_deleted') {
+              rec.execution_token = params![2];
+              rec.execution_lease_expires_at = params![3];
+              rec.error_code = null;
+              return { rows: [], rowCount: 1 };
+            }
+            return { rows: [], rowCount: 0 };
+          }
+          if (normalizedSql.includes('SET status = CASE WHEN $5')) {
+            if (
+              rec.execution_token === params![3] &&
+              rec.status !== 'awaiting_verification' &&
+              rec.status !== 'verified'
+            ) {
+              rec.status = params![4] && rec.status === 'db_deleted' ? 'db_deleted' : 'failed';
               rec.error_code = params![2];
               rec.execution_token = null;
               rec.execution_lease_expires_at = null;
@@ -217,22 +255,85 @@ function createMockClient(state: MockDbState) {
             rec.status = 'r2_deleted';
             rec.r2_objects_deleted = params![2];
             rec.error_code = null;
-          } else if (normalizedSql.includes("SET status = 'completed'")) {
-            rec.status = 'completed';
+          } else if (normalizedSql.includes("SET status = 'db_deleted'")) {
+            if (rec.execution_token !== params![8]) {
+              return { rows: [], rowCount: 0 };
+            }
+            rec.status = 'db_deleted';
             rec.r2_objects_deleted = params![2];
             rec.db_batches_deleted = params![3];
             rec.db_lines_deleted = params![4];
             rec.db_quarantine_deleted = params![5];
             rec.db_conflicts_deleted = params![6];
             rec.executed_by = params![7] ?? rec.executed_by;
+            rec.error_code = null;
+            rec.completed_at = new Date();
+            return { rows: [{ completed_at: rec.completed_at }], rowCount: 1 };
+          } else if (normalizedSql.includes("SET status = 'awaiting_verification'")) {
+            if (rec.status !== 'db_deleted' || rec.execution_token !== params![2]) {
+              return { rows: [], rowCount: 0 };
+            }
+            rec.status = 'awaiting_verification';
+            rec.receipt_written_at = new Date('2026-11-13T00:01:05Z');
             rec.execution_token = null;
             rec.execution_lease_expires_at = null;
             rec.error_code = null;
-            rec.completed_at = new Date('2026-11-13T00:01:00Z');
-            return { rows: [{ completed_at: rec.completed_at }], rowCount: 1 };
+            return { rows: [{ receipt_written_at: rec.receipt_written_at }], rowCount: 1 };
           }
         }
         return { rows: [], rowCount: rec ? 1 : 0 };
+      }
+
+      if (normalizedSql.includes('FROM app_private.record_deletion_verification')) {
+        const [tenantId, requestId, checkerId, outcome, evidenceRef] = params!;
+        const rec = state.deletionRequests?.get(`${tenantId}:${requestId}`);
+        if (!rec) {
+          throw new Error(`Deletion request ${requestId} not found for tenant ${tenantId}`);
+        }
+        if (rec.status !== 'awaiting_verification') {
+          throw new Error(
+            `Deletion request ${requestId} is in status ${rec.status}, expected awaiting_verification`,
+          );
+        }
+        if (checkerId === rec.requested_by || checkerId === rec.executed_by) {
+          throw new Error('Independent checker cannot be the requester or executing operator');
+        }
+        rec.verified_by = checkerId;
+        rec.verified_at = new Date('2026-11-13T00:02:00Z');
+        rec.verification_outcome = outcome;
+        rec.verification_evidence_ref = evidenceRef;
+        if (outcome === 'PASS') {
+          rec.status = 'verified';
+          rec.execution_token = null;
+          rec.execution_lease_expires_at = null;
+        }
+        return {
+          rows: [
+            {
+              request_id: requestId,
+              venue_id: tenantId,
+              status: rec.status,
+              verified_by: rec.verified_by,
+              verified_at: rec.verified_at,
+              verification_outcome: rec.verification_outcome,
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+
+      if (normalizedSql.includes('AS total_remaining')) {
+        const [tenantId] = params!;
+        const batchCount = [...state.batches.values()].filter(
+          (b) => b.tenant_id === tenantId,
+        ).length;
+        const lineCount = [...state.lines.values()].filter((l) => l.tenant_id === tenantId).length;
+        const qCount = state.quarantine.filter((q) => q.tenant_id === tenantId).length;
+        const cCount = state.conflicts.filter((c) => c.tenant_id === tenantId).length;
+        return {
+          rows: [{ total_remaining: batchCount + lineCount + qCount + cCount }],
+          rowCount: 1,
+        };
       }
 
       if (
@@ -2418,6 +2519,12 @@ describe('importOrderOutcomes service', () => {
             ) {
               return { rows: [], rowCount: 0 };
             }
+            if (normalizedSql.includes('FROM app_private.system_gates')) {
+              return { rows: [{ is_active: false }], rowCount: 1 };
+            }
+            if (normalizedSql.includes('FROM app_private.order_data_deletion_gates')) {
+              return { rows: [{ deletion_epoch: 0 }], rowCount: 1 };
+            }
             if (normalizedSql.includes('FROM app_private.staff_membership')) {
               checkCount++;
               // First check during initial auth succeeds
@@ -2492,6 +2599,12 @@ describe('importOrderOutcomes service', () => {
               normalizedSql.includes('pg_advisory_xact_lock')
             ) {
               return { rows: [], rowCount: 0 };
+            }
+            if (normalizedSql.includes('FROM app_private.system_gates')) {
+              return { rows: [{ is_active: false }], rowCount: 1 };
+            }
+            if (normalizedSql.includes('FROM app_private.order_data_deletion_gates')) {
+              return { rows: [{ deletion_epoch: 0 }], rowCount: 1 };
             }
             if (normalizedSql.includes('FROM app_private.staff_membership')) {
               return { rows: [{ permission: 'owner' }], rowCount: 1 };
@@ -3112,7 +3225,7 @@ describe('importOrderOutcomes service', () => {
           authorizedOperatorIds,
         });
 
-        expect(res.status).toBe('completed');
+        expect(res.status).toBe('awaiting_verification');
         expect(res.operatorId).toBe(operatorId);
         expect(res.alreadyCompleted).toBe(false);
         expect(res.r2ObjectsDeleted).toBe(1);
@@ -3151,7 +3264,7 @@ describe('importOrderOutcomes service', () => {
 
         // Audit record contains no order contents
         const audit = state.deletionRequests!.get(`${venueId}:${requestId}`);
-        expect(audit.status).toBe('completed');
+        expect(audit.status).toBe('awaiting_verification');
         expect(audit.executed_by).toBe(operatorId);
         expect(JSON.stringify(audit)).not.toContain('secret-order-csv-content');
         expect(JSON.stringify(audit)).not.toContain('ORD-1');
@@ -3272,22 +3385,24 @@ describe('importOrderOutcomes service', () => {
           return { key };
         });
 
-        const res = await deleteVenueOrderData({
-          client,
-          operatorId,
-          venueId,
-          requestId,
-          storage,
-          authorizedOperatorIds,
-        });
-        expect(res.status).toBe('completed');
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_storage_failed', status: 502 });
+        expect(state.deletionRequests!.get(`${venueId}:${requestId}`).status).toBe('db_deleted');
         const intentKey = `order-deletion-ledger/${venueId}/${requestId}/intent.json`;
         const completedKey = `order-deletion-ledger/${venueId}/${requestId}/completed.json`;
         const originalIntentRaw = r2Objects.get(intentKey)!;
         expect(JSON.parse(originalIntentRaw).status).toBe('in_progress');
         expect(r2Objects.get(completedKey)).toBeUndefined();
 
-        // Retrying writes missing completed.json without overwriting original intent.json
+        // Retrying from db_deleted writes missing completed.json without re-running destructive work
         storage.put = vi.fn(async (key: string, value: string) => {
           r2Objects.set(key, value);
           return { key };
@@ -3300,7 +3415,8 @@ describe('importOrderOutcomes service', () => {
           storage,
           authorizedOperatorIds,
         });
-        expect(retried.alreadyCompleted).toBe(true);
+        expect(retried.status).toBe('awaiting_verification');
+        expect(retried.alreadyCompleted).toBe(false);
         expect(r2Objects.get(intentKey)).toBe(originalIntentRaw);
         const completedAfterRetry = JSON.parse(r2Objects.get(completedKey)!);
         expect(completedAfterRetry.status).toBe('completed');
@@ -3384,7 +3500,7 @@ describe('importOrderOutcomes service', () => {
           storage,
           authorizedOperatorIds,
         });
-        expect(retried.status).toBe('completed');
+        expect(retried.status).toBe('awaiting_verification');
         expect(state.batches.has('batch-1')).toBe(false);
       });
 
@@ -3423,7 +3539,7 @@ describe('importOrderOutcomes service', () => {
           storage,
           authorizedOperatorIds,
         });
-        expect(retried.status).toBe('completed');
+        expect(retried.status).toBe('awaiting_verification');
         expect(retried.dbBatchesDeleted).toBe(1);
       });
 
@@ -3441,6 +3557,967 @@ describe('importOrderOutcomes service', () => {
             authorizedOperatorIds,
           }),
         ).rejects.toMatchObject({ code: 'storage_unavailable', status: 503 });
+      });
+
+      it('fences in-flight import via deletion_epoch even if deletion reaches verified before Tx 2, and cleans up uploaded R2 CSV', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        const checkerId = '00000000-0000-4000-8000-000000000777';
+        const authorizedCheckerIds = new Set([checkerId]);
+        const client = createMockClient(state) as any;
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: storage.list!,
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        // Intercept storage.put during import so deletion submits, executes, and verifies while import is between Tx 1 and Tx 2
+        const origPut = storage.put;
+        let deletionTriggered = false;
+        storage.put = vi.fn(async (key: string, value: string, opts?: any) => {
+          const res = await origPut(key, value, opts);
+          if (!deletionTriggered && key.startsWith(`order-imports/${venueId}/`)) {
+            deletionTriggered = true;
+            await submitOrderDataDeletionRequest({
+              client,
+              actorId: ownerId,
+              venueId,
+              requestId,
+            });
+            await deleteVenueOrderData({
+              client,
+              operatorId,
+              venueId,
+              requestId,
+              storage: { ...storage, put: origPut },
+              authorizedOperatorIds,
+            });
+            await verifyVenueOrderDeletion({
+              client,
+              checkerId,
+              venueId,
+              requestId,
+              outcome: 'PASS',
+              evidenceRef: 'clickup:task-1',
+              verificationStorage,
+              authorizedCheckerIds,
+            });
+          }
+          return res;
+        });
+
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-RACE,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            storage,
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        // Uploaded CSV was cleaned up by compensating delete and no new batch was committed
+        const remainingVenueCsvs = [...r2Objects.keys()].filter((k) =>
+          k.startsWith(`order-imports/${venueId}/`),
+        );
+        expect(remainingVenueCsvs).toHaveLength(0);
+      });
+
+      it('blocks imports during global restore freeze and when system_gates is unreadable', async () => {
+        const { state } = makeDeletionFixture();
+        state.restoreFreezeActive = true;
+        const client = createMockClient(state) as any;
+
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-FREEZE,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'restore_reconciliation_pending', status: 503 });
+
+        state.restoreFreezeActive = false;
+        state.simulateSystemGatesUnreadable = true;
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-FREEZE2,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'restore_reconciliation_pending', status: 503 });
+      });
+
+      it('rejects self-approval and unblocks imports only after independent checker PASS verification', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        const checkerId = '00000000-0000-4000-8000-000000000777';
+        const authorizedCheckerIds = new Set([ownerId, operatorId, checkerId]);
+        const client = createMockClient(state) as any;
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: storage.list!,
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+        });
+        await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+
+        // Imports remain blocked in awaiting_verification
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-WAIT,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        // Self-approval by requester or operator is rejected
+        await expect(
+          verifyVenueOrderDeletion({
+            client,
+            checkerId: ownerId,
+            venueId,
+            requestId,
+            outcome: 'PASS',
+            evidenceRef: 'clickup:self-1',
+            verificationStorage,
+            authorizedCheckerIds,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+        await expect(
+          verifyVenueOrderDeletion({
+            client,
+            checkerId: operatorId,
+            venueId,
+            requestId,
+            outcome: 'PASS',
+            evidenceRef: 'clickup:self-2',
+            verificationStorage,
+            authorizedCheckerIds,
+          }),
+        ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+        // Independent checker FAIL keeps imports blocked
+        const failRes = await verifyVenueOrderDeletion({
+          client,
+          checkerId,
+          venueId,
+          requestId,
+          outcome: 'FAIL',
+          evidenceRef: 'clickup:fail-1',
+          verificationStorage,
+          authorizedCheckerIds,
+        });
+        expect(failRes.status).toBe('awaiting_verification');
+
+        // Independent checker PASS transitions to verified and unblocks imports
+        const passRes = await verifyVenueOrderDeletion({
+          client,
+          checkerId,
+          venueId,
+          requestId,
+          outcome: 'PASS',
+          evidenceRef: 'clickup:pass-1',
+          verificationStorage,
+          authorizedCheckerIds,
+        });
+        expect(passRes.status).toBe('verified');
+        expect(passRes.r2RemainingObjectCount).toBe(0);
+        expect(passRes.dbRemainingRowCount).toBe(0);
+
+        const importRes = await importOrderOutcomes({
+          client,
+          actorId: ownerId,
+          venueId,
+          csvText:
+            'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-AFTER,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+          now: () => new Date('2026-11-12T12:00:00Z'),
+          bundleLoader: async () => state.bundleContent!,
+        });
+        expect(importRes.status).toBe('completed');
+      });
+
+      it('reconciles completed and intent-only R2 ledger entries after restore, keeping freeze active on anomalies', async () => {
+        const operatorId = '00000000-0000-4000-8000-000000000888';
+        const authorizedOperatorIds = new Set([operatorId]);
+        const targetVenue = venueId;
+        const intentOnlyVenue = '00000000-0000-4000-8000-000000000333';
+        const controlVenue = otherVenueId;
+        const reqCompleted = '00000000-0000-4000-8000-000000000444';
+        const reqIntentOnly = '00000000-0000-4000-8000-000000000555';
+
+        const r2Objects = new Map<string, string>([
+          [`order-imports/${targetVenue}/b1/source.csv`, 'csv-resurrected'],
+          [`order-imports/${controlVenue}/b2/source.csv`, 'csv-control'],
+          [
+            `order-deletion-ledger/${targetVenue}/${reqCompleted}/intent.json`,
+            JSON.stringify({
+              requestId: reqCompleted,
+              venueId: targetVenue,
+              operatorId,
+              status: 'in_progress',
+              intentRecordedAt: '2026-11-12T00:00:00.000Z',
+            }),
+          ],
+          [
+            `order-deletion-ledger/${targetVenue}/${reqCompleted}/completed.json`,
+            JSON.stringify({
+              requestId: reqCompleted,
+              venueId: targetVenue,
+              operatorId,
+              status: 'completed',
+              r2ObjectsDeleted: 1,
+              dbBatchesDeleted: 1,
+              dbLinesDeleted: 1,
+              dbQuarantineDeleted: 0,
+              dbConflictsDeleted: 0,
+              completedAt: '2026-11-12T00:01:00.000Z',
+            }),
+          ],
+          [
+            `order-deletion-ledger/${intentOnlyVenue}/${reqIntentOnly}/intent.json`,
+            JSON.stringify({
+              requestId: reqIntentOnly,
+              venueId: intentOnlyVenue,
+              operatorId,
+              status: 'in_progress',
+              intentRecordedAt: '2026-11-12T00:02:00.000Z',
+            }),
+          ],
+        ]);
+
+        let freezeActive = false;
+        const reconciledCalls: string[] = [];
+        const mockClient = {
+          query: vi.fn(async (sql: string, params?: any[]) => {
+            const s = sql.replace(/\s+/g, ' ').trim();
+            if (s.includes('UPDATE app_private.system_gates') && s.includes('is_active = true')) {
+              freezeActive = true;
+              return { rows: [], rowCount: 1 };
+            }
+            if (s.includes('UPDATE app_private.system_gates') && s.includes('is_active = false')) {
+              freezeActive = false;
+              return { rows: [], rowCount: 1 };
+            }
+            if (s.includes('FROM app_private.reconcile_venue_order_deletion')) {
+              reconciledCalls.push(`${params![1]}:${params![2]}:${params![6]}`);
+              return {
+                rows: [
+                  {
+                    batches_deleted: params![6] === 'completed' ? 1 : 0,
+                    lines_deleted: params![6] === 'completed' ? 1 : 0,
+                    quarantine_deleted: 0,
+                    conflicts_deleted: 0,
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
+            return { rows: [], rowCount: 0 };
+          }),
+        } as any;
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: async (opts) => {
+            const prefix = opts?.prefix ?? '';
+            const objects = [...r2Objects.keys()]
+              .filter((k) => k.startsWith(prefix))
+              .map((key) => ({ key, uploaded: new Date('2026-11-12T00:00:00Z') }));
+            return { objects, truncated: false };
+          },
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        const storage = {
+          list: verificationStorage.list,
+          put: async (key: string, value: string) => {
+            r2Objects.set(key, value);
+            return { key };
+          },
+          delete: async (key: string) => {
+            r2Objects.delete(key);
+          },
+        };
+
+        const res = await reconcileOrderDeletionsAfterRestore({
+          client: mockClient,
+          operatorId,
+          authorizedOperatorIds,
+          verificationStorage,
+          storage,
+        });
+
+        expect(res.status).toBe('completed');
+        expect(res.freezeLifted).toBe(true);
+        expect(freezeActive).toBe(false);
+        expect(res.reconciledCount).toBe(1);
+        expect(res.blockedIntentOnlyCount).toBe(1);
+        expect(r2Objects.has(`order-imports/${targetVenue}/b1/source.csv`)).toBe(false);
+        expect(r2Objects.has(`order-imports/${controlVenue}/b2/source.csv`)).toBe(true);
+        expect(
+          r2Objects.has(`order-deletion-ledger/${targetVenue}/${reqCompleted}/reconciled.json`),
+        ).toBe(true);
+        expect(reconciledCalls).toEqual([
+          `${targetVenue}:${reqCompleted}:completed`,
+          `${intentOnlyVenue}:${reqIntentOnly}:intent_only`,
+        ]);
+
+        // Malformed ledger entry keeps global freeze active
+        r2Objects.set(
+          `order-deletion-ledger/${targetVenue}/00000000-0000-4000-8000-000000000666/intent.json`,
+          '{not-valid-json',
+        );
+        const failRes = await reconcileOrderDeletionsAfterRestore({
+          client: mockClient,
+          operatorId,
+          authorizedOperatorIds,
+          verificationStorage,
+          storage,
+        });
+        expect(failRes.status).toBe('failed');
+        expect(failRes.freezeLifted).toBe(false);
+        expect(freezeActive).toBe(true);
+        expect(failRes.anomalyCount).toBe(1);
+      });
+
+      it('detects missing_in_r2, operator/timestamp conflicts, fail-closed cursors, and missing gate row (H2/M1)', async () => {
+        const operatorId = '00000000-0000-4000-8000-000000000099';
+        const otherOperatorId = '00000000-0000-4000-8000-000000000088';
+        const authorizedOperatorIds = new Set([operatorId, otherOperatorId]);
+        const venueId = '00000000-0000-4000-8000-000000000801';
+        const reqMismatch = '00000000-0000-4000-8000-000000000301';
+        const reqMissingInR2 = '00000000-0000-4000-8000-000000000302';
+
+        const r2Objects = new Map<string, string>([
+          [
+            `order-deletion-ledger/${venueId}/${reqMismatch}/intent.json`,
+            JSON.stringify({
+              requestId: reqMismatch,
+              venueId,
+              operatorId,
+              status: 'in_progress',
+              intentRecordedAt: '2026-11-14T02:00:00.000Z',
+            }),
+          ],
+          [
+            `order-deletion-ledger/${venueId}/${reqMismatch}/completed.json`,
+            JSON.stringify({
+              requestId: reqMismatch,
+              venueId,
+              operatorId: otherOperatorId,
+              status: 'completed',
+              r2ObjectsDeleted: 0,
+              dbBatchesDeleted: 0,
+              dbLinesDeleted: 0,
+              dbQuarantineDeleted: 0,
+              dbConflictsDeleted: 0,
+              completedAt: '2026-11-14T01:00:00.000Z',
+            }),
+          ],
+        ]);
+
+        const reconciledCalls: string[] = [];
+        let gateRowCount = 1;
+        const mockClient = {
+          query: vi.fn(async (sql: string, params?: unknown[]) => {
+            const s = sql.trim();
+            if (s.includes('UPDATE app_private.system_gates')) {
+              return { rows: [], rowCount: gateRowCount };
+            }
+            if (s.includes('list_order_deletion_requests_for_reconcile')) {
+              return {
+                rows: [
+                  {
+                    tenant_id: venueId,
+                    id: reqMissingInR2,
+                    status: 'verified',
+                    executed_by: operatorId,
+                    completed_at: '2026-11-14T01:30:00.000Z',
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
+            if (s.includes('FROM app_private.reconcile_venue_order_deletion')) {
+              reconciledCalls.push(`${params![1]}:${params![2]}:${params![6]}`);
+              return {
+                rows: [
+                  {
+                    batches_deleted: 0,
+                    lines_deleted: 0,
+                    quarantine_deleted: 0,
+                    conflicts_deleted: 0,
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
+            return { rows: [], rowCount: 0 };
+          }),
+        } as any;
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: async (opts) => {
+            const prefix = opts?.prefix ?? '';
+            const objects = [...r2Objects.keys()]
+              .filter((k) => k.startsWith(prefix))
+              .map((key) => ({ key, uploaded: new Date('2026-11-14T00:00:00Z') }));
+            return { objects, truncated: false };
+          },
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        const storage = {
+          list: verificationStorage.list,
+          put: async (key: string, value: string) => {
+            r2Objects.set(key, value);
+            return { key };
+          },
+          delete: async (key: string) => {
+            r2Objects.delete(key);
+          },
+        };
+
+        const res = await reconcileOrderDeletionsAfterRestore({
+          client: mockClient,
+          operatorId,
+          authorizedOperatorIds,
+          verificationStorage,
+          storage,
+        });
+
+        expect(res.status).toBe('failed');
+        expect(res.freezeLifted).toBe(false);
+        expect(res.anomalyCount).toBe(2);
+        expect(
+          res.entries.some((e) => e.requestId === reqMismatch && e.ledgerStatus === 'malformed'),
+        ).toBe(true);
+        expect(
+          res.entries.some(
+            (e) => e.requestId === reqMissingInR2 && e.ledgerStatus === 'missing_in_r2',
+          ),
+        ).toBe(true);
+        expect(reconciledCalls).toContain(`${venueId}:${reqMissingInR2}:missing_in_r2`);
+
+        // Fail-closed when verificationStorage.list is truncated without cursor
+        await expect(
+          reconcileOrderDeletionsAfterRestore({
+            client: mockClient,
+            operatorId,
+            authorizedOperatorIds,
+            verificationStorage: {
+              list: async () => ({ objects: [], truncated: true }),
+              get: async () => null,
+            },
+            storage,
+          }),
+        ).rejects.toMatchObject({ code: 'verification_storage_incomplete', status: 502 });
+
+        // Fail-closed when verificationStorage.list repeats cursor
+        await expect(
+          reconcileOrderDeletionsAfterRestore({
+            client: mockClient,
+            operatorId,
+            authorizedOperatorIds,
+            verificationStorage: {
+              list: async () => ({ objects: [], truncated: true, cursor: 'same-cursor' }),
+              get: async () => null,
+            },
+            storage,
+          }),
+        ).rejects.toMatchObject({ code: 'verification_storage_incomplete', status: 502 });
+
+        // Fail-closed when system_gates row is missing
+        gateRowCount = 0;
+        await expect(
+          reconcileOrderDeletionsAfterRestore({
+            client: mockClient,
+            operatorId,
+            authorizedOperatorIds,
+            verificationStorage,
+            storage,
+          }),
+        ).rejects.toMatchObject({ code: 'restore_freeze_gate_missing', status: 500 });
+      });
+
+      it('verifyVenueOrderDeletion enforces fail-closed pagination and receipt/DB cross-check (L1)', async () => {
+        const venueId = '00000000-0000-4000-8000-000000000801';
+        const requestId = '00000000-0000-4000-8000-000000000401';
+        const operatorId = '00000000-0000-4000-8000-000000000099';
+        const checkerId = '00000000-0000-4000-8000-000000000088';
+
+        const mockClient = {
+          query: vi.fn(async (sql: string) => {
+            if (sql.includes('FROM app_private.order_data_deletion_requests')) {
+              return {
+                rows: [
+                  {
+                    executed_by: operatorId,
+                    r2_objects_deleted: 2,
+                    db_batches_deleted: 1,
+                    db_lines_deleted: 3,
+                    db_quarantine_deleted: 0,
+                    db_conflicts_deleted: 0,
+                  },
+                ],
+                rowCount: 1,
+              };
+            }
+            return { rows: [], rowCount: 0 };
+          }),
+        } as any;
+
+        // Truncated without cursor -> 502 verification_storage_incomplete
+        await expect(
+          verifyVenueOrderDeletion({
+            client: mockClient,
+            checkerId,
+            authorizedCheckerIds: new Set([checkerId]),
+            venueId,
+            requestId,
+            outcome: 'PASS',
+            evidenceRef: 'CU-166',
+            verificationStorage: {
+              list: async () => ({ objects: [], truncated: true }),
+              get: async () => null,
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'verification_storage_incomplete', status: 502 });
+
+        // Count mismatch between completed.json and DB -> 409 deletion_receipt_mismatch
+        const mismatchObjects = new Map<string, string>([
+          [
+            `order-deletion-ledger/${venueId}/${requestId}/intent.json`,
+            JSON.stringify({
+              requestId,
+              venueId,
+              operatorId,
+              status: 'in_progress',
+              intentRecordedAt: '2026-11-14T00:00:00.000Z',
+            }),
+          ],
+          [
+            `order-deletion-ledger/${venueId}/${requestId}/completed.json`,
+            JSON.stringify({
+              requestId,
+              venueId,
+              operatorId,
+              status: 'completed',
+              r2ObjectsDeleted: 99,
+              dbBatchesDeleted: 1,
+              dbLinesDeleted: 3,
+              dbQuarantineDeleted: 0,
+              dbConflictsDeleted: 0,
+              completedAt: '2026-11-14T00:01:00.000Z',
+            }),
+          ],
+        ]);
+        await expect(
+          verifyVenueOrderDeletion({
+            client: mockClient,
+            checkerId,
+            authorizedCheckerIds: new Set([checkerId]),
+            venueId,
+            requestId,
+            outcome: 'PASS',
+            evidenceRef: 'CU-166',
+            verificationStorage: {
+              list: async (opts) => {
+                const prefix = opts?.prefix ?? '';
+                return {
+                  objects: [...mismatchObjects.keys()]
+                    .filter((k) => k.startsWith(prefix))
+                    .map((key) => ({ key, uploaded: new Date('2026-11-14T00:00:00Z') })),
+                  truncated: false,
+                };
+              },
+              get: async (key: string) => {
+                const val = mismatchObjects.get(key);
+                if (!val) return null;
+                return { text: async () => val, json: async () => JSON.parse(val) };
+              },
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'verification_precondition_failed', status: 409 });
+      });
+
+      it('importOrderOutcomes logs structured error if compensating R2 delete fails after DB rollback (L2)', async () => {
+        const venueId = '00000000-0000-4000-8000-000000000801';
+        const actorId = '00000000-0000-4000-8000-000000000001';
+        const client = createMockClient({
+          venueId,
+          actorId,
+          permission: 'owner',
+          posDishMappings: new Map(),
+          batches: new Map(),
+          lines: new Map(),
+          quarantine: [],
+          conflicts: [],
+        });
+
+        const origQuery = client.query.bind(client);
+        client.query = (async (sql: string, params?: unknown[]) => {
+          if (
+            typeof sql === 'string' &&
+            sql.includes('INSERT INTO app_private.order_outcome_import_batches')
+          ) {
+            throw new Error('simulated db insert failure');
+          }
+          return origQuery(sql, params);
+        }) as typeof client.query;
+
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+          await expect(
+            importOrderOutcomes({
+              client: client as any,
+              venueId,
+              actorId,
+              sourceFilename: 'orders.csv',
+              csvText:
+                'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-COMP,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+              now: () => new Date('2026-11-12T12:00:00Z'),
+              storage: {
+                put: async (key) => ({ key }),
+                delete: async () => {
+                  throw new Error('r2 delete network timeout');
+                },
+              },
+            }),
+          ).rejects.toThrow('simulated db insert failure');
+
+          expect(errSpy).toHaveBeenCalledTimes(1);
+          const logged = JSON.parse(String(errSpy.mock.calls[0]?.[0]));
+          expect(logged.event).toBe('order_import_compensating_r2_delete_failed');
+          expect(logged.venueId).toBe(venueId);
+          expect(logged.error).toContain('r2 delete network timeout');
+        } finally {
+          errSpy.mockRestore();
+        }
+      });
+
+      it('records durable orphan state and supports idempotent retry, exhaustion, and deletion-race coordination (L2)', async () => {
+        const venueId = '00000000-0000-4000-8000-000000000801';
+        const otherVenueId = '00000000-0000-4000-8000-000000000802';
+        const actorId = '00000000-0000-4000-8000-000000000001';
+        const orphanRows = new Map<string, any>();
+        let currentEpoch = 2;
+        let activeDeletionCount = 0;
+
+        const baseClient = createMockClient({
+          venueId,
+          actorId,
+          permission: 'owner',
+          posDishMappings: new Map(),
+          batches: new Map(),
+          lines: new Map(),
+          quarantine: [],
+          conflicts: [],
+        });
+
+        const origQuery = baseClient.query.bind(baseClient);
+        const client = {
+          query: vi.fn(async (sql: string, params?: unknown[]) => {
+            const s = sql.trim();
+            if (s.includes('INSERT INTO app_private.order_outcome_import_batches')) {
+              throw new Error('simulated db insert failure');
+            }
+            if (s.includes('SELECT deletion_epoch') && s.includes('order_data_deletion_gates')) {
+              return { rows: [{ deletion_epoch: currentEpoch }], rowCount: 1 };
+            }
+            if (
+              s.includes('FROM app_private.order_data_deletion_requests') &&
+              s.includes("status <> 'verified'")
+            ) {
+              return {
+                rows: activeDeletionCount > 0 ? [{ id: 'del-1' }] : [],
+                rowCount: activeDeletionCount > 0 ? 1 : 0,
+              };
+            }
+            if (s.includes('INSERT INTO app_private.order_import_orphan_cleanups')) {
+              const [tId, bId, key, epoch, err, ts] = params!;
+              const mapKey = `${tId}:${bId}`;
+              const row = {
+                id: '00000000-0000-4000-8000-000000000901',
+                tenant_id: tId,
+                batch_id: bId,
+                storage_key: key,
+                deletion_epoch: epoch,
+                status: 'pending',
+                retry_count: 1,
+                last_error: err,
+                first_failed_at: ts,
+                last_attempt_at: ts,
+                cleaned_at: null,
+              };
+              orphanRows.set(mapKey, row);
+              return { rows: [], rowCount: 1 };
+            }
+            if (s.includes('FROM app_private.order_import_orphan_cleanups')) {
+              const [tId, maxRetries] = params!;
+              const rows = [...orphanRows.values()].filter(
+                (r) =>
+                  r.tenant_id === tId &&
+                  r.status === 'pending' &&
+                  r.retry_count < Number(maxRetries),
+              );
+              return { rows, rowCount: rows.length };
+            }
+            if (s.includes('UPDATE app_private.order_import_orphan_cleanups')) {
+              const [tId, id] = params!;
+              const row = [...orphanRows.values()].find((r) => r.tenant_id === tId && r.id === id);
+              if (row && row.status === 'pending') {
+                if (s.includes("SET status = 'cleaned'")) {
+                  row.status = 'cleaned';
+                  row.cleaned_at = params![2];
+                  row.last_error = null;
+                } else {
+                  row.retry_count += 1;
+                  row.status = row.retry_count >= Number(params![3]) ? 'failed' : 'pending';
+                  row.last_error = params![4];
+                  row.last_attempt_at = params![5];
+                }
+              }
+              return { rows: [], rowCount: row ? 1 : 0 };
+            }
+            return origQuery(sql, params);
+          }),
+        } as any;
+
+        const r2Objects = new Set<string>();
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+          // 1. Initial compensating delete fails -> durable pending orphan record created
+          await expect(
+            importOrderOutcomes({
+              client,
+              venueId,
+              actorId,
+              sourceFilename: 'orders.csv',
+              csvText:
+                'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-ORPH,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+              now: () => new Date('2026-11-12T12:00:00Z'),
+              storage: {
+                put: async (key) => {
+                  r2Objects.add(key);
+                  return { key };
+                },
+                delete: async () => {
+                  throw new Error('initial r2 timeout');
+                },
+              },
+            }),
+          ).rejects.toThrow('simulated db insert failure');
+
+          expect(orphanRows.size).toBe(1);
+          const recorded = [...orphanRows.values()][0]!;
+          expect(recorded.status).toBe('pending');
+          expect(recorded.deletion_epoch).toBe(2);
+          expect(recorded.retry_count).toBe(1);
+
+          // Cross-venue isolation: a foreign-venue orphan key is never deleted by retry
+          orphanRows.set(`${venueId}:foreign`, {
+            id: '00000000-0000-4000-8000-000000000902',
+            tenant_id: venueId,
+            batch_id: '00000000-0000-4000-8000-000000000999',
+            storage_key: `order-imports/${otherVenueId}/b-other/source.csv`,
+            deletion_epoch: 2,
+            status: 'pending',
+            retry_count: 1,
+          });
+          r2Objects.add(`order-imports/${otherVenueId}/b-other/source.csv`);
+
+          // 2. Active deletion race skips cleanup without deleting R2
+          activeDeletionCount = 1;
+          const raceRes = await retryPendingOrphanCleanups({
+            client,
+            venueId,
+            storage: {
+              delete: async (key) => {
+                r2Objects.delete(key);
+              },
+            },
+          });
+          expect(raceRes.skippedDeletionActive).toBe(true);
+          expect(raceRes.attempted).toBe(0);
+          expect(r2Objects.has(recorded.storage_key)).toBe(true);
+
+          // 3. Repeated failure increments retry_count and marks 'failed' at maxRetries=2
+          activeDeletionCount = 0;
+          const failRetry = await retryPendingOrphanCleanups({
+            client,
+            venueId,
+            maxRetries: 2,
+            storage: {
+              delete: async () => {
+                throw new Error('persistent r2 outage');
+              },
+            },
+          });
+          expect(failRetry.attempted).toBe(1);
+          expect(failRetry.failed).toBe(1);
+          expect(failRetry.exhausted).toBe(1);
+          expect(recorded.status).toBe('failed');
+          expect(recorded.retry_count).toBe(2);
+
+          // 4. Reset to pending and succeed -> cleans R2, marks 'cleaned', and is idempotent
+          recorded.status = 'pending';
+          recorded.retry_count = 1;
+          const okRetry = await retryPendingOrphanCleanups({
+            client,
+            venueId,
+            maxRetries: 5,
+            storage: {
+              delete: async (key) => {
+                r2Objects.delete(key);
+              },
+            },
+          });
+          expect(okRetry.attempted).toBe(1);
+          expect(okRetry.cleaned).toBe(1);
+          expect(recorded.status).toBe('cleaned');
+          expect(r2Objects.has(recorded.storage_key)).toBe(false);
+          expect(r2Objects.has(`order-imports/${otherVenueId}/b-other/source.csv`)).toBe(true);
+
+          // Idempotent re-run
+          const secondRetry = await retryPendingOrphanCleanups({
+            client,
+            venueId,
+            storage: {
+              delete: async () => {
+                throw new Error('should not be called');
+              },
+            },
+          });
+          expect(secondRetry.attempted).toBe(0);
+          expect(secondRetry.cleaned).toBe(0);
+        } finally {
+          errSpy.mockRestore();
+        }
+      });
+
+      it('fails closed in deleteVenueOrderData when R2 list returns truncated=true without a fresh cursor', async () => {
+        const localVenueId = '11111111-1111-4111-8111-111111111111';
+        const localOperatorId = '22222222-2222-4222-8222-222222222222';
+        const requestId = '77777777-7777-4777-8777-777777777771';
+        let currentStatus = 'requested';
+        const query = vi.fn(async (sql: string) => {
+          const normalized = sql.replace(/\s+/g, ' ').trim();
+          if (
+            normalized.startsWith('BEGIN') ||
+            normalized.startsWith('COMMIT') ||
+            normalized.startsWith('ROLLBACK') ||
+            normalized.startsWith('SET LOCAL') ||
+            normalized.startsWith('SELECT set_config') ||
+            normalized.startsWith('SELECT pg_advisory_xact_lock')
+          ) {
+            return { rows: [], rowCount: 0 };
+          }
+          if (
+            normalized.includes('FROM app_private.order_data_deletion_requests') &&
+            normalized.includes('FOR UPDATE')
+          ) {
+            return {
+              rows: [
+                {
+                  status: currentStatus,
+                  executed_by: null,
+                  execution_lease_expires_at: null,
+                  r2_objects_deleted: 0,
+                  db_batches_deleted: 0,
+                  db_lines_deleted: 0,
+                  db_quarantine_deleted: 0,
+                  db_conflicts_deleted: 0,
+                  completed_at: null,
+                  receipt_written_at: null,
+                },
+              ],
+              rowCount: 1,
+            };
+          }
+          if (normalized.startsWith('UPDATE app_private.order_data_deletion_requests')) {
+            if (normalized.includes("status = 'failed'")) currentStatus = 'failed';
+            else if (normalized.includes("status = 'executing'")) currentStatus = 'executing';
+            return { rows: [], rowCount: 1 };
+          }
+          if (normalized.includes('FROM app_private.order_outcome_import_batches')) {
+            return { rows: [], rowCount: 0 };
+          }
+          return { rows: [], rowCount: 0 };
+        });
+
+        const storageDelete = vi.fn(async () => {});
+        await expect(
+          deleteVenueOrderData({
+            client: { query } as unknown as Parameters<typeof deleteVenueOrderData>[0]['client'],
+            operatorId: localOperatorId,
+            venueId: localVenueId,
+            requestId,
+            authorizedOperatorIds: new Set([localOperatorId]),
+            storage: {
+              put: vi.fn(async () => {}),
+              delete: storageDelete,
+              list: vi.fn(async () => ({
+                objects: [
+                  {
+                    key: `order-imports/${localVenueId}/b1/source.csv`,
+                    uploaded: new Date('2026-11-13T00:00:00.000Z'),
+                  },
+                ],
+                truncated: true,
+                cursor: undefined,
+              })),
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_storage_failed', status: 502 });
+        expect(storageDelete).not.toHaveBeenCalled();
+        expect(
+          query.mock.calls.some(([sql]) => String(sql).includes('delete_venue_order_data')),
+        ).toBe(false);
       });
     });
   });

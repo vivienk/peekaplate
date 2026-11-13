@@ -10,6 +10,7 @@ import {
   MAX_ORDER_OUTCOME_FILE_BYTES,
   MAX_ORDER_OUTCOME_ROWS,
   type OrderDataDeletionReason,
+  type OrderDataDeletionStatus,
   type OrderOutcomeImportResponse,
   OrderOutcomeLineSchema,
   type OrderOutcomeQuarantineReason,
@@ -21,6 +22,7 @@ import {
   type SanitizedRowDiagnostic,
   type SubmitOrderDeletionResponse,
   sha256,
+  type VerifyOrderDeletionResponse,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 
@@ -66,6 +68,28 @@ export type OrderOutcomeStorage = {
     truncated: boolean;
     cursor?: string | undefined;
   }>;
+};
+
+/**
+ * Strictly read-only storage interface for independent deletion verification
+ * and post-restore ledger inspection (list + get only; no put or delete).
+ */
+export type OrderDeletionVerificationObject = {
+  text(): Promise<string>;
+  json<T = unknown>(): Promise<T>;
+};
+
+export type OrderDeletionVerificationStorage = {
+  list(options?: {
+    prefix?: string | undefined;
+    cursor?: string | undefined;
+    limit?: number | undefined;
+  }): Promise<{
+    objects: StoredObjectInfo[];
+    truncated: boolean;
+    cursor?: string | undefined;
+  }>;
+  get(key: string): Promise<OrderDeletionVerificationObject | null>;
 };
 
 export type OrderOutcomeRetentionConfig = {
@@ -140,6 +164,7 @@ export async function importOrderOutcomes(
   // Scoped within an explicit transaction so SET LOCAL and set_config(..., true) are active
   // and cleanly cleared on COMMIT/ROLLBACK, preventing session context leakage in connection pools
   let duplicateCompletedResponse: OrderOutcomeImportResponse | null = null;
+  let capturedDeletionEpoch = '0';
   await client.query('BEGIN');
   try {
     await client.query("SET LOCAL statement_timeout = '5s'");
@@ -167,10 +192,23 @@ export async function importOrderOutcomes(
       `order_lifecycle:${venueId}`,
     ]);
 
+    const freezeGate = await client.query<{ is_active: boolean }>(
+      `SELECT is_active
+       FROM app_private.system_gates
+       WHERE gate_name = 'order_imports_restore_freeze'`,
+    );
+    if (freezeGate.rows.length === 0 || freezeGate.rows[0]?.is_active !== false) {
+      throw new OrderImportError(
+        'restore_reconciliation_pending',
+        503,
+        'Order outcome imports are temporarily frozen pending post-restore deletion reconciliation',
+      );
+    }
+
     const activeDeletion = await client.query<{ id: string; status: string }>(
       `SELECT id, status
        FROM app_private.order_data_deletion_requests
-       WHERE tenant_id = $1 AND status IN ('requested', 'executing', 'r2_deleted', 'failed')
+       WHERE tenant_id = $1 AND status <> 'verified'
        LIMIT 1`,
       [venueId],
     );
@@ -179,9 +217,17 @@ export async function importOrderOutcomes(
       throw new OrderImportError(
         'deletion_in_progress',
         409,
-        'Order outcome import is blocked while an order-data deletion request is pending or in progress for this venue',
+        'Order outcome import is blocked while an order-data deletion request is pending, unverified, or failed for this venue',
       );
     }
+
+    const gateEpoch = await client.query<{ deletion_epoch: string | number }>(
+      `SELECT deletion_epoch
+       FROM app_private.order_data_deletion_gates
+       WHERE tenant_id = $1`,
+      [venueId],
+    );
+    capturedDeletionEpoch = String(gateEpoch.rows[0]?.deletion_epoch ?? '0');
 
     const requiredAgreementVersion = options.agreementVersion ?? PILOT_ORDER_AGREEMENT_VERSION;
     const acceptance = await client.query<{ id: string }>(
@@ -317,10 +363,23 @@ export async function importOrderOutcomes(
       `order_import:${venueId}`,
     ]);
 
+    const freezeGateRecheck = await client.query<{ is_active: boolean }>(
+      `SELECT is_active
+       FROM app_private.system_gates
+       WHERE gate_name = 'order_imports_restore_freeze'`,
+    );
+    if (freezeGateRecheck.rows.length === 0 || freezeGateRecheck.rows[0]?.is_active !== false) {
+      throw new OrderImportError(
+        'restore_reconciliation_pending',
+        503,
+        'Order outcome imports are temporarily frozen pending post-restore deletion reconciliation',
+      );
+    }
+
     const activeDeletionRecheck = await client.query<{ id: string; status: string }>(
       `SELECT id, status
        FROM app_private.order_data_deletion_requests
-       WHERE tenant_id = $1 AND status IN ('requested', 'executing', 'r2_deleted', 'failed')
+       WHERE tenant_id = $1 AND status <> 'verified'
        LIMIT 1`,
       [venueId],
     );
@@ -329,7 +388,22 @@ export async function importOrderOutcomes(
       throw new OrderImportError(
         'deletion_in_progress',
         409,
-        'Order outcome import is blocked while an order-data deletion request is pending or in progress for this venue',
+        'Order outcome import is blocked while an order-data deletion request is pending, unverified, or failed for this venue',
+      );
+    }
+
+    const gateEpochRecheck = await client.query<{ deletion_epoch: string | number }>(
+      `SELECT deletion_epoch
+       FROM app_private.order_data_deletion_gates
+       WHERE tenant_id = $1`,
+      [venueId],
+    );
+    const currentDeletionEpoch = String(gateEpochRecheck.rows[0]?.deletion_epoch ?? '0');
+    if (currentDeletionEpoch !== capturedDeletionEpoch) {
+      throw new OrderImportError(
+        'deletion_in_progress',
+        409,
+        'Order outcome import was fenced because a venue deletion request began while the import was in flight',
       );
     }
 
@@ -972,8 +1046,55 @@ export async function importOrderOutcomes(
     if (!commitAttempted && options.storage && typeof options.storage.delete === 'function') {
       try {
         await options.storage.delete(storageKey);
-      } catch {
-        // Compensating cleanup failure suppressed to bubble root cause
+      } catch (cleanupErr) {
+        const errMsg = cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr);
+        const failedAt = (options.now ? options.now() : new Date()).toISOString();
+        console.error(
+          JSON.stringify({
+            event: 'order_import_compensating_r2_delete_failed',
+            venueId,
+            batchId,
+            storageKey,
+            deletionEpoch: capturedDeletionEpoch,
+            failedAt,
+            error: errMsg,
+          }),
+        );
+        try {
+          await client.query('BEGIN');
+          await client.query("SET LOCAL statement_timeout = '3s'");
+          await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+          await client.query(
+            `INSERT INTO app_private.order_import_orphan_cleanups
+               (tenant_id, batch_id, storage_key, deletion_epoch, status, retry_count, last_error, first_failed_at, last_attempt_at)
+             VALUES ($1, $2, $3, $4, 'pending', 1, $5, $6, $6)
+             ON CONFLICT (tenant_id, batch_id) DO UPDATE
+             SET retry_count = order_import_orphan_cleanups.retry_count + 1,
+                 last_error = EXCLUDED.last_error,
+                 last_attempt_at = EXCLUDED.last_attempt_at,
+                 status = 'pending'`,
+            [
+              venueId,
+              batchId,
+              storageKey,
+              Number(capturedDeletionEpoch),
+              errMsg.slice(0, 500),
+              failedAt,
+            ],
+          );
+          await client.query('COMMIT');
+        } catch (recordErr) {
+          await client.query('ROLLBACK').catch(() => {});
+          console.error(
+            JSON.stringify({
+              event: 'order_import_orphan_record_failed',
+              venueId,
+              batchId,
+              storageKey,
+              error: recordErr instanceof Error ? recordErr.message : String(recordErr),
+            }),
+          );
+        }
       }
     }
     throw error;
@@ -1312,18 +1433,32 @@ export async function cleanupOrphanedOrderImports(
       // Check if batch exists in database within an explicit transaction to ensure
       // transaction-local `set_config(..., true)` is active for RLS and connection-leak-free
       let batchExists = false;
+      let deletionActive = false;
       let queryFailed = false;
 
       try {
         await options.client.query('BEGIN');
         await options.client.query("SET LOCAL statement_timeout = '5s'");
         await options.client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+        await options.client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+          `order_lifecycle:${tenantId}`,
+        ]);
 
-        const batchCheck = await options.client.query<{ id: string; status: string }>(
-          `SELECT id, status FROM app_private.order_outcome_import_batches WHERE tenant_id = $1 AND id = $2`,
-          [tenantId, batchId],
+        const activeDeletion = await options.client.query<{ id: string }>(
+          `SELECT id FROM app_private.order_data_deletion_requests
+           WHERE tenant_id = $1 AND status <> 'verified'
+           LIMIT 1`,
+          [tenantId],
         );
-        batchExists = batchCheck.rows.length > 0;
+        deletionActive = activeDeletion.rows.length > 0;
+
+        if (!deletionActive) {
+          const batchCheck = await options.client.query<{ id: string; status: string }>(
+            `SELECT id, status FROM app_private.order_outcome_import_batches WHERE tenant_id = $1 AND id = $2`,
+            [tenantId, batchId],
+          );
+          batchExists = batchCheck.rows.length > 0;
+        }
         await options.client.query('COMMIT');
       } catch {
         queryFailed = true;
@@ -1334,8 +1469,8 @@ export async function cleanupOrphanedOrderImports(
         }
       }
 
-      if (queryFailed) {
-        // Database query failed: fail closed and preserve object in R2
+      if (queryFailed || deletionActive) {
+        // Database query failed or deletion lifecycle owns this venue: fail closed and preserve object in R2
         result.retained++;
         continue;
       }
@@ -1373,6 +1508,203 @@ export type AcceptPilotOrderAgreementOptions = {
   venueId: string;
   agreementVersion: string;
 };
+
+export type RetryPendingOrphanCleanupsOptions = {
+  client: Client;
+  venueId: string;
+  storage: Pick<OrderOutcomeStorage, 'delete'>;
+  maxRetries?: number;
+  now?: () => Date;
+};
+
+export type RetryPendingOrphanCleanupsResult = {
+  attempted: number;
+  cleaned: number;
+  failed: number;
+  exhausted: number;
+  skippedDeletionActive: boolean;
+};
+
+/**
+ * Durably retries pending R2 orphan cleanups for a single venue.
+ * Coordinates with the deletion lifecycle (advisory lock, active deletion check, deletion_epoch check)
+ * and verifies no committed batch exists before deleting from R2. Idempotent across retries.
+ */
+export async function retryPendingOrphanCleanups(
+  options: RetryPendingOrphanCleanupsOptions,
+): Promise<RetryPendingOrphanCleanupsResult> {
+  const { client, venueId, storage, maxRetries = 5, now = () => new Date() } = options;
+  const result: RetryPendingOrphanCleanupsResult = {
+    attempted: 0,
+    cleaned: 0,
+    failed: 0,
+    exhausted: 0,
+    skippedDeletionActive: false,
+  };
+
+  if (typeof storage.delete !== 'function') {
+    return result;
+  }
+
+  let pendingRows: Array<{
+    id: string;
+    batch_id: string;
+    storage_key: string;
+    deletion_epoch: string | number;
+    retry_count: number;
+  }> = [];
+
+  await client.query('BEGIN');
+  try {
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `order_lifecycle:${venueId}`,
+    ]);
+
+    const activeDeletion = await client.query<{ id: string }>(
+      `SELECT id FROM app_private.order_data_deletion_requests
+       WHERE tenant_id = $1 AND status <> 'verified'
+       LIMIT 1`,
+      [venueId],
+    );
+    if (activeDeletion.rows.length > 0) {
+      await client.query('COMMIT');
+      result.skippedDeletionActive = true;
+      return result;
+    }
+
+    const res = await client.query<{
+      id: string;
+      batch_id: string;
+      storage_key: string;
+      deletion_epoch: string | number;
+      retry_count: number;
+    }>(
+      `SELECT c.id, c.batch_id, c.storage_key, c.deletion_epoch, c.retry_count
+       FROM app_private.order_import_orphan_cleanups c
+       WHERE c.tenant_id = $1
+         AND c.status = 'pending'
+         AND c.retry_count < $2
+         AND NOT EXISTS (
+           SELECT 1 FROM app_private.order_outcome_import_batches b
+           WHERE b.tenant_id = c.tenant_id AND b.id = c.batch_id
+         )
+       ORDER BY c.first_failed_at ASC
+       LIMIT 100`,
+      [venueId, maxRetries],
+    );
+    pendingRows = res.rows;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  }
+
+  const expectedPrefix = `order-imports/${venueId}/`;
+  for (const row of pendingRows) {
+    if (!row.storage_key.startsWith(expectedPrefix)) {
+      continue;
+    }
+
+    // Re-check deletion lifecycle & epoch immediately before R2 delete
+    let safeToDelete = false;
+    await client.query('BEGIN');
+    try {
+      await client.query("SET LOCAL statement_timeout = '5s'");
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `order_lifecycle:${venueId}`,
+      ]);
+      const activeDeletion = await client.query<{ id: string }>(
+        `SELECT id FROM app_private.order_data_deletion_requests
+         WHERE tenant_id = $1 AND status <> 'verified'
+         LIMIT 1`,
+        [venueId],
+      );
+      const gateEpochRes = await client.query<{ deletion_epoch: string | number }>(
+        `SELECT deletion_epoch FROM app_private.order_data_deletion_gates WHERE tenant_id = $1`,
+        [venueId],
+      );
+      const currentEpoch = String(gateEpochRes.rows[0]?.deletion_epoch ?? '0');
+      const batchRes = await client.query<{ id: string }>(
+        `SELECT id FROM app_private.order_outcome_import_batches WHERE tenant_id = $1 AND id = $2`,
+        [venueId, row.batch_id],
+      );
+      safeToDelete =
+        activeDeletion.rows.length === 0 &&
+        currentEpoch === String(row.deletion_epoch) &&
+        batchRes.rows.length === 0;
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    }
+
+    if (!safeToDelete) {
+      result.skippedDeletionActive = true;
+      continue;
+    }
+
+    result.attempted++;
+    const attemptAt = now().toISOString();
+    try {
+      await storage.delete(row.storage_key);
+      await client.query('BEGIN');
+      await client.query("SET LOCAL statement_timeout = '5s'");
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+      await client.query(
+        `UPDATE app_private.order_import_orphan_cleanups
+         SET status = 'cleaned', cleaned_at = $3, last_attempt_at = $3, last_error = NULL
+         WHERE tenant_id = $1 AND id = $2 AND status = 'pending'`,
+        [venueId, row.id, attemptAt],
+      );
+      await client.query('COMMIT');
+      result.cleaned++;
+    } catch (retryErr) {
+      await client.query('ROLLBACK').catch(() => {});
+      const errMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      const nextRetryCount = row.retry_count + 1;
+      const exhausted = nextRetryCount >= maxRetries;
+      console.error(
+        JSON.stringify({
+          event: 'order_import_orphan_cleanup_retry_failed',
+          venueId,
+          batchId: row.batch_id,
+          storageKey: row.storage_key,
+          deletionEpoch: row.deletion_epoch,
+          retryCount: nextRetryCount,
+          exhausted,
+          error: errMsg,
+        }),
+      );
+      await client.query('BEGIN');
+      try {
+        await client.query("SET LOCAL statement_timeout = '5s'");
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+        await client.query(
+          `UPDATE app_private.order_import_orphan_cleanups
+           SET retry_count = retry_count + 1,
+               status = CASE WHEN retry_count + 1 >= $4 THEN 'failed' ELSE 'pending' END,
+               last_error = $5,
+               last_attempt_at = $6
+           WHERE tenant_id = $1 AND id = $2 AND status = 'pending'`,
+          [venueId, row.id, attemptAt, maxRetries, errMsg.slice(0, 500), attemptAt],
+        );
+        await client.query('COMMIT');
+      } catch (dbUpdateErr) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw dbUpdateErr;
+      }
+      result.failed++;
+      if (exhausted) {
+        result.exhausted++;
+      }
+    }
+  }
+
+  return result;
+}
 
 /**
  * Records a venue owner's acceptance of the S6-DATA-14.1 pilot order-outcome agreement.
@@ -1546,7 +1878,7 @@ export async function submitOrderDataDeletionRequest(
 
     const existing = await client.query<{
       id: string;
-      status: 'requested' | 'executing' | 'r2_deleted' | 'completed' | 'failed';
+      status: OrderDataDeletionStatus;
       reason: OrderDataDeletionReason | null;
       requested_at: Date;
     }>(
@@ -1598,6 +1930,7 @@ async function recordDeletionFailureBestEffort(
   requestId: string,
   executionToken: string,
   errorCode: string,
+  preserveDbDeleted = false,
 ): Promise<void> {
   try {
     await client.query('BEGIN');
@@ -1606,12 +1939,13 @@ async function recordDeletionFailureBestEffort(
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
     await client.query(
       `UPDATE app_private.order_data_deletion_requests
-       SET status = 'failed',
+       SET status = CASE WHEN $5 AND status = 'db_deleted' THEN 'db_deleted' ELSE 'failed' END,
            error_code = $3,
            execution_token = NULL,
            execution_lease_expires_at = NULL
-       WHERE id = $1 AND tenant_id = $2 AND execution_token = $4 AND status <> 'completed'`,
-      [requestId, venueId, errorCode, executionToken],
+       WHERE id = $1 AND tenant_id = $2 AND execution_token = $4
+         AND status NOT IN ('awaiting_verification', 'verified')`,
+      [requestId, venueId, errorCode, executionToken, preserveDbDeleted],
     );
     await client.query('COMMIT');
   } catch {
@@ -1740,7 +2074,7 @@ export async function deleteVenueOrderData(
     ]);
 
     const existingRequest = await client.query<{
-      status: string;
+      status: OrderDataDeletionStatus;
       executed_by: string | null;
       execution_lease_expires_at: Date | null;
       r2_objects_deleted: number;
@@ -1749,9 +2083,10 @@ export async function deleteVenueOrderData(
       db_quarantine_deleted: number;
       db_conflicts_deleted: number;
       completed_at: Date | null;
+      receipt_written_at: Date | null;
     }>(
       `SELECT status, executed_by, execution_lease_expires_at, r2_objects_deleted, db_batches_deleted, db_lines_deleted,
-              db_quarantine_deleted, db_conflicts_deleted, completed_at
+              db_quarantine_deleted, db_conflicts_deleted, completed_at, receipt_written_at
        FROM app_private.order_data_deletion_requests
        WHERE id = $1 AND tenant_id = $2
        FOR UPDATE`,
@@ -1767,9 +2102,14 @@ export async function deleteVenueOrderData(
     }
 
     const row = existingRequest.rows[0]!;
-    if (row.status === 'completed') {
+    if (row.status === 'awaiting_verification' || row.status === 'verified') {
       await client.query('COMMIT');
       const completedAtIso = (row.completed_at ?? now()).toISOString();
+      const receiptWrittenAtIso = (
+        row.receipt_written_at ??
+        row.completed_at ??
+        now()
+      ).toISOString();
       const resolvedOperatorId = row.executed_by ?? operatorId;
       await putCreateOnly(completedKey, {
         requestId,
@@ -1782,11 +2122,11 @@ export async function deleteVenueOrderData(
         dbQuarantineDeleted: row.db_quarantine_deleted,
         dbConflictsDeleted: row.db_conflicts_deleted,
         completedAt: completedAtIso,
-      }).catch(() => {});
+      });
       return {
         requestId,
         venueId,
-        status: 'completed',
+        status: row.status,
         operatorId: resolvedOperatorId,
         r2ObjectsDeleted: row.r2_objects_deleted,
         dbBatchesDeleted: row.db_batches_deleted,
@@ -1794,13 +2134,14 @@ export async function deleteVenueOrderData(
         dbQuarantineDeleted: row.db_quarantine_deleted,
         dbConflictsDeleted: row.db_conflicts_deleted,
         completedAt: completedAtIso,
+        receiptWrittenAt: receiptWrittenAtIso,
         alreadyCompleted: true,
       };
     }
 
     const claimNow = now();
     if (
-      row.status === 'executing' &&
+      (row.status === 'executing' || row.status === 'db_deleted') &&
       row.execution_lease_expires_at &&
       row.execution_lease_expires_at.getTime() > claimNow.getTime()
     ) {
@@ -1812,234 +2153,570 @@ export async function deleteVenueOrderData(
     }
 
     const leaseExpiresAt = new Date(claimNow.getTime() + leaseMs);
-    await client.query(
-      `UPDATE app_private.order_data_deletion_requests
-       SET status = 'executing',
-           executed_by = $3,
-           execution_token = $4,
-           execution_started_at = $5,
-           execution_lease_expires_at = $6,
-           error_code = NULL
-       WHERE id = $1 AND tenant_id = $2 AND status <> 'completed'`,
-      [requestId, venueId, operatorId, executionToken, claimNow, leaseExpiresAt],
-    );
+    const resumeFromDbDeleted = row.status === 'db_deleted';
+
+    if (resumeFromDbDeleted) {
+      await client.query(
+        `UPDATE app_private.order_data_deletion_requests
+         SET execution_token = $3,
+             execution_lease_expires_at = $4,
+             error_code = NULL
+         WHERE id = $1 AND tenant_id = $2 AND status = 'db_deleted'`,
+        [requestId, venueId, executionToken, leaseExpiresAt],
+      );
+    } else {
+      await client.query(
+        `UPDATE app_private.order_data_deletion_requests
+         SET status = 'executing',
+             executed_by = $3,
+             execution_token = $4,
+             execution_started_at = $5,
+             execution_lease_expires_at = $6,
+             error_code = NULL
+         WHERE id = $1 AND tenant_id = $2 AND status NOT IN ('db_deleted', 'awaiting_verification', 'verified')`,
+        [requestId, venueId, operatorId, executionToken, claimNow, leaseExpiresAt],
+      );
+    }
     lastRenewedAtMs = claimNow.getTime();
 
-    const batchKeys = await client.query<{ storage_key: string }>(
-      `SELECT storage_key FROM app_private.order_outcome_import_batches WHERE tenant_id = $1`,
-      [venueId],
-    );
-    storageKeysFromDb = batchKeys.rows.map((r) => r.storage_key);
+    if (!resumeFromDbDeleted) {
+      const batchKeys = await client.query<{ storage_key: string }>(
+        `SELECT storage_key FROM app_private.order_outcome_import_batches WHERE tenant_id = $1`,
+        [venueId],
+      );
+      storageKeysFromDb = batchKeys.rows.map((r) => r.storage_key);
+    }
 
     await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  }
 
-  // Phase 1b: Establish immutable external deletion intent in R2 BEFORE any destructive operation
-  try {
-    await putCreateOnly(intentKey, {
-      requestId,
-      venueId,
-      operatorId,
-      status: 'in_progress',
-      intentRecordedAt: now().toISOString(),
-    });
-  } catch {
-    await recordDeletionFailureBestEffort(
-      client,
-      operatorId,
-      venueId,
-      requestId,
-      executionToken,
-      'ledger_intent_failed',
-    );
-    throw new OrderImportError(
-      'deletion_storage_failed',
-      502,
-      'Failed to record durable deletion intent in external ledger before destructive operations; retry with the same requestId',
-    );
-  }
+    let r2ObjectsDeleted = row.r2_objects_deleted;
+    let counts = {
+      batches_deleted: row.db_batches_deleted,
+      lines_deleted: row.db_lines_deleted,
+      quarantine_deleted: row.db_quarantine_deleted,
+      conflicts_deleted: row.db_conflicts_deleted,
+    };
+    let completedAtIso = (row.completed_at ?? claimNow).toISOString();
+    let resolvedOperatorId = row.executed_by ?? operatorId;
 
-  // Phase 2: Delete all venue CSV objects from private R2 storage with lease heartbeat & fencing
-  const venuePrefix = `order-imports/${venueId}/`;
-  const keysToDelete = new Set<string>(storageKeysFromDb.filter((k) => k.startsWith(venuePrefix)));
-  let r2ObjectsDeleted = 0;
-
-  try {
-    let cursor: string | undefined;
-    do {
-      if (now().getTime() - lastRenewedAtMs >= leaseMs / 3) {
-        await renewExecutionLeaseOrThrow();
+    if (!resumeFromDbDeleted) {
+      // Phase 1b: Establish immutable external deletion intent in R2 BEFORE any destructive operation
+      try {
+        await putCreateOnly(intentKey, {
+          requestId,
+          venueId,
+          operatorId,
+          status: 'in_progress',
+          intentRecordedAt: now().toISOString(),
+        });
+      } catch {
+        await recordDeletionFailureBestEffort(
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          executionToken,
+          'ledger_intent_failed',
+        );
+        throw new OrderImportError(
+          'deletion_storage_failed',
+          502,
+          'Failed to record durable deletion intent in external ledger before destructive operations; retry with the same requestId',
+        );
       }
-      const listResult = await storage.list({ prefix: venuePrefix, cursor, limit: 100 });
-      for (const obj of listResult.objects) {
-        if (obj.key.startsWith(venuePrefix)) {
-          keysToDelete.add(obj.key);
+
+      // Phase 2: Delete all venue CSV objects from private R2 storage with lease heartbeat & fencing
+      const venuePrefix = `order-imports/${venueId}/`;
+      const keysToDelete = new Set<string>(
+        storageKeysFromDb.filter((k) => k.startsWith(venuePrefix)),
+      );
+      r2ObjectsDeleted = 0;
+
+      try {
+        let cursor: string | undefined;
+        const seenCursors = new Set<string>();
+        do {
+          if (now().getTime() - lastRenewedAtMs >= leaseMs / 3) {
+            await renewExecutionLeaseOrThrow();
+          }
+          const listResult = await storage.list({ prefix: venuePrefix, cursor, limit: 100 });
+          for (const obj of listResult.objects) {
+            if (obj.key.startsWith(venuePrefix)) {
+              keysToDelete.add(obj.key);
+            }
+          }
+          if (listResult.truncated) {
+            if (!listResult.cursor || seenCursors.has(listResult.cursor)) {
+              throw new Error('R2 deletion listing truncated without a fresh continuation cursor');
+            }
+            seenCursors.add(listResult.cursor);
+            cursor = listResult.cursor;
+          } else {
+            cursor = undefined;
+          }
+        } while (cursor);
+
+        for (const key of keysToDelete) {
+          if (now().getTime() - lastRenewedAtMs >= leaseMs / 3) {
+            await renewExecutionLeaseOrThrow();
+          }
+          await storage.delete(key);
+          r2ObjectsDeleted++;
         }
+      } catch (err) {
+        if (err instanceof OrderImportError && err.code === 'deletion_lease_lost') {
+          throw err;
+        }
+        await recordDeletionFailureBestEffort(
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          executionToken,
+          'r2_delete_failed',
+        );
+        throw new OrderImportError(
+          'deletion_storage_failed',
+          502,
+          'Failed to delete one or more raw CSV objects from archive storage; retry with the same requestId',
+        );
       }
-      cursor = listResult.truncated ? listResult.cursor : undefined;
-    } while (cursor);
 
-    for (const key of keysToDelete) {
-      if (now().getTime() - lastRenewedAtMs >= leaseMs / 3) {
-        await renewExecutionLeaseOrThrow();
+      // Phase 3: Fenced DB deletion via reviewed SECURITY DEFINER function -> db_deleted (imports remain blocked)
+      await client.query('BEGIN');
+      try {
+        await client.query("SET LOCAL statement_timeout = '10s'");
+        await client.query("SET LOCAL lock_timeout = '5s'");
+        await client.query("SELECT set_config('app.actor_id', $1, true)", [operatorId]);
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+          `order_lifecycle:${venueId}`,
+        ]);
+
+        const fenceCheck = await client.query<{ status: string; execution_token: string | null }>(
+          `SELECT status, execution_token
+           FROM app_private.order_data_deletion_requests
+           WHERE id = $1 AND tenant_id = $2
+           FOR UPDATE`,
+          [requestId, venueId],
+        );
+
+        const fenced = fenceCheck.rows[0];
+        if (!fenced || fenced.status !== 'executing' || fenced.execution_token !== executionToken) {
+          throw new OrderImportError(
+            'deletion_lease_lost',
+            409,
+            'Order data deletion execution lease was lost before database deletion',
+          );
+        }
+
+        await client.query(
+          `UPDATE app_private.order_data_deletion_requests
+           SET status = 'r2_deleted', r2_objects_deleted = $3, error_code = NULL
+           WHERE id = $1 AND tenant_id = $2 AND execution_token = $4 AND status = 'executing'`,
+          [requestId, venueId, r2ObjectsDeleted, executionToken],
+        );
+
+        const dbCounts = await client.query<{
+          batches_deleted: number;
+          lines_deleted: number;
+          quarantine_deleted: number;
+          conflicts_deleted: number;
+        }>(
+          `SELECT batches_deleted, lines_deleted, quarantine_deleted, conflicts_deleted
+           FROM app_private.delete_venue_order_data($1, $2, $3, $4)`,
+          [venueId, requestId, operatorId, executionToken],
+        );
+
+        counts = dbCounts.rows[0] ?? {
+          batches_deleted: 0,
+          lines_deleted: 0,
+          quarantine_deleted: 0,
+          conflicts_deleted: 0,
+        };
+
+        const dbDeletedRes = await client.query<{ completed_at: Date }>(
+          `UPDATE app_private.order_data_deletion_requests
+           SET status = 'db_deleted',
+               executed_by = $8,
+               r2_objects_deleted = $3,
+               db_batches_deleted = $4,
+               db_lines_deleted = $5,
+               db_quarantine_deleted = $6,
+               db_conflicts_deleted = $7,
+               error_code = NULL,
+               completed_at = now()
+           WHERE id = $1 AND tenant_id = $2 AND execution_token = $9
+           RETURNING completed_at`,
+          [
+            requestId,
+            venueId,
+            r2ObjectsDeleted,
+            counts.batches_deleted,
+            counts.lines_deleted,
+            counts.quarantine_deleted,
+            counts.conflicts_deleted,
+            operatorId,
+            executionToken,
+          ],
+        );
+
+        await client.query('COMMIT');
+        completedAtIso = (dbDeletedRes.rows[0]?.completed_at ?? now()).toISOString();
+        resolvedOperatorId = operatorId;
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error instanceof OrderImportError && error.code === 'deletion_lease_lost') {
+          throw error;
+        }
+        await recordDeletionFailureBestEffort(
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          executionToken,
+          'db_delete_failed',
+        );
+        if (error instanceof OrderImportError) {
+          throw error;
+        }
+        throw new OrderImportError(
+          'deletion_db_failed',
+          500,
+          'Failed to delete database order-outcome records; retry with the same requestId',
+        );
       }
-      await storage.delete(key);
-      r2ObjectsDeleted++;
     }
-  } catch (err) {
-    if (err instanceof OrderImportError && err.code === 'deletion_lease_lost') {
-      throw err;
-    }
-    await recordDeletionFailureBestEffort(
-      client,
-      operatorId,
-      venueId,
-      requestId,
-      executionToken,
-      'r2_delete_failed',
-    );
-    throw new OrderImportError(
-      'deletion_storage_failed',
-      502,
-      'Failed to delete one or more raw CSV objects from archive storage; retry with the same requestId',
-    );
-  }
 
-  // Phase 3: Fenced DB deletion via reviewed SECURITY DEFINER function and finalize audit record
-  await client.query('BEGIN');
-  try {
-    await client.query("SET LOCAL statement_timeout = '10s'");
-    await client.query("SET LOCAL lock_timeout = '5s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [operatorId]);
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
-
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-      `order_lifecycle:${venueId}`,
-    ]);
-
-    const fenceCheck = await client.query<{ status: string; execution_token: string | null }>(
-      `SELECT status, execution_token
-       FROM app_private.order_data_deletion_requests
-       WHERE id = $1 AND tenant_id = $2
-       FOR UPDATE`,
-      [requestId, venueId],
-    );
-
-    const fenced = fenceCheck.rows[0];
-    if (!fenced || fenced.status !== 'executing' || fenced.execution_token !== executionToken) {
+    // Phase 4: Record durable non-PII completion receipt in R2 BEFORE awaiting_verification.
+    // Failure here leaves status in 'db_deleted' so imports stay blocked and retry resumes Phase 4.
+    try {
+      await putCreateOnly(completedKey, {
+        requestId,
+        venueId,
+        operatorId: resolvedOperatorId,
+        status: 'completed',
+        r2ObjectsDeleted,
+        dbBatchesDeleted: counts.batches_deleted,
+        dbLinesDeleted: counts.lines_deleted,
+        dbQuarantineDeleted: counts.quarantine_deleted,
+        dbConflictsDeleted: counts.conflicts_deleted,
+        completedAt: completedAtIso,
+      });
+    } catch {
+      await recordDeletionFailureBestEffort(
+        client,
+        resolvedOperatorId,
+        venueId,
+        requestId,
+        executionToken,
+        'ledger_receipt_failed',
+        true,
+      );
       throw new OrderImportError(
-        'deletion_lease_lost',
-        409,
-        'Order data deletion execution lease was lost before database deletion',
+        'deletion_storage_failed',
+        502,
+        'Failed to write durable deletion completion receipt in external ledger; imports remain blocked until retry succeeds',
       );
     }
 
-    await client.query(
-      `UPDATE app_private.order_data_deletion_requests
-       SET status = 'r2_deleted', r2_objects_deleted = $3, error_code = NULL
-       WHERE id = $1 AND tenant_id = $2 AND execution_token = $4 AND status = 'executing'`,
-      [requestId, venueId, r2ObjectsDeleted, executionToken],
-    );
+    // Phase 5: Transition db_deleted -> awaiting_verification (still blocked until independent checker sign-off)
+    let receiptWrittenAtIso = now().toISOString();
+    await client.query('BEGIN');
+    try {
+      await client.query("SET LOCAL statement_timeout = '5s'");
+      await client.query("SET LOCAL lock_timeout = '3s'");
+      await client.query("SELECT set_config('app.actor_id', $1, true)", [resolvedOperatorId]);
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `order_lifecycle:${venueId}`,
+      ]);
 
-    const dbCounts = await client.query<{
-      batches_deleted: number;
-      lines_deleted: number;
-      quarantine_deleted: number;
-      conflicts_deleted: number;
-    }>(
-      `SELECT batches_deleted, lines_deleted, quarantine_deleted, conflicts_deleted
-       FROM app_private.delete_venue_order_data($1, $2, $3, $4)`,
-      [venueId, requestId, operatorId, executionToken],
-    );
+      const verifiedReceiptRes = await client.query<{ receipt_written_at: Date }>(
+        `UPDATE app_private.order_data_deletion_requests
+         SET status = 'awaiting_verification',
+             receipt_written_at = now(),
+             execution_token = NULL,
+             execution_lease_expires_at = NULL,
+             error_code = NULL
+         WHERE id = $1 AND tenant_id = $2 AND execution_token = $3 AND status = 'db_deleted'
+         RETURNING receipt_written_at`,
+        [requestId, venueId, executionToken],
+      );
 
-    const counts = dbCounts.rows[0] ?? {
-      batches_deleted: 0,
-      lines_deleted: 0,
-      quarantine_deleted: 0,
-      conflicts_deleted: 0,
-    };
+      if (verifiedReceiptRes.rowCount === 0) {
+        throw new OrderImportError(
+          'deletion_lease_lost',
+          409,
+          'Order data deletion execution lease was lost before receipt finalization',
+        );
+      }
 
-    const completed = await client.query<{ completed_at: Date }>(
-      `UPDATE app_private.order_data_deletion_requests
-       SET status = 'completed',
-           executed_by = $8,
-           execution_token = NULL,
-           execution_lease_expires_at = NULL,
-           r2_objects_deleted = $3,
-           db_batches_deleted = $4,
-           db_lines_deleted = $5,
-           db_quarantine_deleted = $6,
-           db_conflicts_deleted = $7,
-           error_code = NULL,
-           completed_at = now()
-       WHERE id = $1 AND tenant_id = $2 AND execution_token = $9
-       RETURNING completed_at`,
-      [
-        requestId,
-        venueId,
-        r2ObjectsDeleted,
-        counts.batches_deleted,
-        counts.lines_deleted,
-        counts.quarantine_deleted,
-        counts.conflicts_deleted,
-        operatorId,
-        executionToken,
-      ],
-    );
-
-    await client.query('COMMIT');
-    const completedAtIso = (completed.rows[0]?.completed_at ?? now()).toISOString();
-
-    // Phase 4: Record immutable non-PII completion receipt in R2 (separate from intent.json)
-    await putCreateOnly(completedKey, {
-      requestId,
-      venueId,
-      operatorId,
-      status: 'completed',
-      r2ObjectsDeleted,
-      dbBatchesDeleted: counts.batches_deleted,
-      dbLinesDeleted: counts.lines_deleted,
-      dbQuarantineDeleted: counts.quarantine_deleted,
-      dbConflictsDeleted: counts.conflicts_deleted,
-      completedAt: completedAtIso,
-    }).catch(() => {});
+      receiptWrittenAtIso = (verifiedReceiptRes.rows[0]?.receipt_written_at ?? now()).toISOString();
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (error instanceof OrderImportError) {
+        throw error;
+      }
+      throw new OrderImportError(
+        'deletion_db_failed',
+        500,
+        'Failed to finalize deletion receipt state in database; retry with the same requestId',
+      );
+    }
 
     return {
       requestId,
       venueId,
-      status: 'completed',
-      operatorId,
+      status: 'awaiting_verification',
+      operatorId: resolvedOperatorId,
       r2ObjectsDeleted,
       dbBatchesDeleted: counts.batches_deleted,
       dbLinesDeleted: counts.lines_deleted,
       dbQuarantineDeleted: counts.quarantine_deleted,
       dbConflictsDeleted: counts.conflicts_deleted,
       completedAt: completedAtIso,
+      receiptWrittenAt: receiptWrittenAtIso,
       alreadyCompleted: false,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
-    if (error instanceof OrderImportError && error.code === 'deletion_lease_lost') {
-      throw error;
-    }
-    await recordDeletionFailureBestEffort(
-      client,
-      operatorId,
-      venueId,
-      requestId,
-      executionToken,
-      'db_delete_failed',
+    throw error;
+  }
+}
+
+export type VerifyVenueOrderDeletionOptions = {
+  client: Client;
+  checkerId: string;
+  venueId: string;
+  requestId: string;
+  outcome: 'PASS' | 'FAIL';
+  evidenceRef: string;
+  verificationStorage: OrderDeletionVerificationStorage;
+  authorizedCheckerIds: ReadonlySet<string>;
+};
+
+/**
+ * Independent deletion verification (checker <> requester and checker <> operator).
+ * Uses strictly read-only storage (list + get only) with full cursor pagination and zero CSV body reads.
+ */
+export async function verifyVenueOrderDeletion(
+  options: VerifyVenueOrderDeletionOptions,
+): Promise<VerifyOrderDeletionResponse> {
+  const {
+    client,
+    checkerId,
+    venueId,
+    requestId,
+    outcome,
+    evidenceRef,
+    verificationStorage,
+    authorizedCheckerIds,
+  } = options;
+
+  if (
+    !checkerId ||
+    !CANONICAL_UUID_PATTERN.test(checkerId) ||
+    !authorizedCheckerIds ||
+    authorizedCheckerIds.size === 0 ||
+    !authorizedCheckerIds.has(checkerId)
+  ) {
+    throw new OrderImportError(
+      'forbidden',
+      403,
+      'Order data deletion verification requires an authorized independent checker',
     );
+  }
+
+  if (
+    !verificationStorage ||
+    typeof verificationStorage.list !== 'function' ||
+    typeof verificationStorage.get !== 'function'
+  ) {
+    throw new OrderImportError(
+      'storage_unavailable',
+      503,
+      'Read-only verification storage is unavailable',
+    );
+  }
+
+  // 1. Full cursor pagination over order-imports/<venueId>/ (never read CSV bodies)
+  const venuePrefix = `order-imports/${venueId}/`;
+  let r2RemainingObjectCount = 0;
+  let cursor: string | undefined;
+  const seenCursors = new Set<string>();
+  do {
+    const page = await verificationStorage.list({ prefix: venuePrefix, cursor, limit: 100 });
+    for (const obj of page.objects) {
+      if (obj.key.startsWith(venuePrefix)) {
+        r2RemainingObjectCount++;
+      }
+    }
+    if (page.truncated) {
+      if (!page.cursor) {
+        throw new OrderImportError(
+          'verification_storage_incomplete',
+          502,
+          'R2 verification listing truncated without continuation cursor',
+        );
+      }
+      if (seenCursors.has(page.cursor)) {
+        throw new OrderImportError(
+          'verification_storage_incomplete',
+          502,
+          'R2 verification listing returned repeated continuation cursor',
+        );
+      }
+      seenCursors.add(page.cursor);
+      cursor = page.cursor;
+    } else {
+      cursor = undefined;
+    }
+  } while (cursor);
+
+  // 2. Validate R2 deletion ledger receipts exist and parse cleanly
+  const intentObj = await verificationStorage.get(
+    `order-deletion-ledger/${venueId}/${requestId}/intent.json`,
+  );
+  const completedObj = await verificationStorage.get(
+    `order-deletion-ledger/${venueId}/${requestId}/completed.json`,
+  );
+
+  let intentJson: Record<string, unknown> | null = null;
+  let completedJson: Record<string, unknown> | null = null;
+  let ledgerStructureValid = false;
+  if (intentObj && completedObj) {
+    try {
+      intentJson = (await intentObj.json()) as Record<string, unknown>;
+      completedJson = (await completedObj.json()) as Record<string, unknown>;
+      const intentTime =
+        typeof intentJson.intentRecordedAt === 'string'
+          ? Date.parse(intentJson.intentRecordedAt)
+          : Number.NaN;
+      const completedTime =
+        typeof completedJson.completedAt === 'string'
+          ? Date.parse(completedJson.completedAt)
+          : Number.NaN;
+      ledgerStructureValid =
+        intentJson.venueId === venueId &&
+        intentJson.requestId === requestId &&
+        intentJson.status === 'in_progress' &&
+        typeof intentJson.operatorId === 'string' &&
+        CANONICAL_UUID_PATTERN.test(intentJson.operatorId) &&
+        completedJson.venueId === venueId &&
+        completedJson.requestId === requestId &&
+        completedJson.status === 'completed' &&
+        typeof completedJson.operatorId === 'string' &&
+        completedJson.operatorId === intentJson.operatorId &&
+        Number.isFinite(intentTime) &&
+        Number.isFinite(completedTime) &&
+        completedTime >= intentTime;
+    } catch {
+      ledgerStructureValid = false;
+    }
+  }
+
+  // 3. Check PostgreSQL remaining row counts, cross-check audit provenance/counts (L1), and record verification
+  await client.query('BEGIN');
+  try {
+    await client.query("SET LOCAL statement_timeout = '10s'");
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SELECT set_config('app.actor_id', $1, true)", [checkerId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+
+    const auditRes = await client.query<{
+      executed_by: string | null;
+      r2_objects_deleted: number;
+      db_batches_deleted: number;
+      db_lines_deleted: number;
+      db_quarantine_deleted: number;
+      db_conflicts_deleted: number;
+    }>(
+      `SELECT executed_by, r2_objects_deleted, db_batches_deleted, db_lines_deleted,
+              db_quarantine_deleted, db_conflicts_deleted
+       FROM app_private.order_data_deletion_requests
+       WHERE tenant_id = $1 AND id = $2`,
+      [venueId, requestId],
+    );
+    const auditRow = auditRes.rows[0];
+    const ledgerValid =
+      ledgerStructureValid &&
+      Boolean(auditRow) &&
+      completedJson !== null &&
+      auditRow!.executed_by === completedJson.operatorId &&
+      auditRow!.r2_objects_deleted === completedJson.r2ObjectsDeleted &&
+      auditRow!.db_batches_deleted === completedJson.dbBatchesDeleted &&
+      auditRow!.db_lines_deleted === completedJson.dbLinesDeleted &&
+      auditRow!.db_quarantine_deleted === completedJson.dbQuarantineDeleted &&
+      auditRow!.db_conflicts_deleted === completedJson.dbConflictsDeleted;
+
+    const dbRemainingRes = await client.query<{ total_remaining: number }>(
+      `SELECT (
+         (SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id = $1) +
+         (SELECT count(*)::int FROM app_private.order_outcome_lines WHERE tenant_id = $1) +
+         (SELECT count(*)::int FROM app_private.order_outcome_quarantine WHERE tenant_id = $1) +
+         (SELECT count(*)::int FROM app_private.order_outcome_conflicts WHERE tenant_id = $1)
+       ) AS total_remaining`,
+      [venueId],
+    );
+    const dbRemainingRowCount = Number(dbRemainingRes.rows[0]?.total_remaining ?? 0);
+
+    const effectiveOutcome: 'PASS' | 'FAIL' =
+      outcome === 'PASS' && r2RemainingObjectCount === 0 && dbRemainingRowCount === 0 && ledgerValid
+        ? 'PASS'
+        : 'FAIL';
+
+    if (outcome === 'PASS' && effectiveOutcome === 'FAIL') {
+      throw new OrderImportError(
+        'verification_precondition_failed',
+        409,
+        `Cannot record PASS: r2Remaining=${r2RemainingObjectCount}, dbRemaining=${dbRemainingRowCount}, ledgerValid=${ledgerValid}`,
+      );
+    }
+
+    const verifiedRes = await client.query<{
+      request_id: string;
+      venue_id: string;
+      status: 'awaiting_verification' | 'verified';
+      verified_by: string;
+      verified_at: Date;
+      verification_outcome: 'PASS' | 'FAIL';
+    }>(
+      `SELECT request_id, venue_id, status, verified_by, verified_at, verification_outcome
+       FROM app_private.record_deletion_verification($1, $2, $3, $4, $5)`,
+      [venueId, requestId, checkerId, effectiveOutcome, evidenceRef],
+    );
+
+    const row = verifiedRes.rows[0]!;
+    await client.query('COMMIT');
+    return {
+      requestId: row.request_id,
+      venueId: row.venue_id,
+      status: row.status,
+      verifiedBy: row.verified_by,
+      verifiedAt: row.verified_at.toISOString(),
+      verificationOutcome: row.verification_outcome,
+      evidenceRef,
+      r2RemainingObjectCount,
+      dbRemainingRowCount,
+    };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     if (error instanceof OrderImportError) {
       throw error;
     }
-    throw new OrderImportError(
-      'deletion_db_failed',
-      500,
-      'Failed to delete database order-outcome records; retry with the same requestId',
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/requester or executing operator|checker/i.test(msg)) {
+      throw new OrderImportError('forbidden', 403, msg);
+    }
+    if (/not found/i.test(msg)) {
+      throw new OrderImportError('deletion_request_not_found', 404, msg);
+    }
+    if (/awaiting_verification/i.test(msg)) {
+      throw new OrderImportError('invalid_deletion_state', 409, msg);
+    }
+    throw error;
   }
 }

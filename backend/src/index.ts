@@ -46,6 +46,7 @@ import {
   type UpsertExtractionReviewSessionRequest,
   UpsertExtractionReviewSessionRequestSchema,
   VenueScopeSchema,
+  VerifyOrderDeletionRequestSchema,
   WithdrawMenuSchema,
 } from '@peekaplate/contracts';
 import { Hono } from 'hono';
@@ -89,9 +90,12 @@ import {
   acceptPilotOrderAgreement as acceptPilotOrderAgreementService,
   cleanupOrphanedOrderImports,
   importOrderOutcomes as importOrderOutcomesService,
+  type OrderDeletionVerificationStorage,
   OrderImportError,
   type OrderOutcomeStorage,
+  retryPendingOrphanCleanups,
   submitOrderDataDeletionRequest as submitOrderDataDeletionRequestService,
+  verifyVenueOrderDeletion as verifyVenueOrderDeletionService,
 } from './order-ingestion/service';
 import {
   createOwnerInsightAction,
@@ -163,6 +167,13 @@ export type Bindings = {
 
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
+  ORDER_DELETION_VERIFICATION_BUCKET?: OrderDeletionVerificationStorage;
+  OPERATOR_HYPERDRIVE?: { connectionString: string };
+  LOCAL_OPERATOR_DATABASE_URL?: string;
+  CHECKER_HYPERDRIVE?: { connectionString: string };
+  LOCAL_CHECKER_DATABASE_URL?: string;
+  AUTHORIZED_DELETION_OPERATOR_IDS?: string;
+  AUTHORIZED_DELETION_CHECKER_IDS?: string;
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
   ORDER_IMPORT_RETENTION_DAYS?: string;
   ORDER_IMPORT_GRACE_PERIOD_MS?: string;
@@ -1710,6 +1721,72 @@ export function createApp(services: Dependencies = dependencies) {
     return c.json(result, 202);
   });
 
+  app.post('/internal/venues/:venueId/orders/deletions/:requestId/verify', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const checkerId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+    const reqScope = DeleteOrderDataRequestSchema.safeParse({
+      requestId: c.req.param('requestId'),
+    });
+    if (!scope.success || !reqScope.success) return c.json({ error: 'invalid_request' }, 400);
+
+    if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('Content-Type') ?? '')) {
+      return c.json({ error: 'unsupported_media_type' }, 415);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = VerifyOrderDeletionRequestSchema.safeParse(body);
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const env = c.env ?? {};
+    const authorizedCheckerIds = new Set(
+      (env.AUTHORIZED_DELETION_CHECKER_IDS ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+    if (!authorizedCheckerIds.has(checkerId)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+
+    // Fail closed: never fall back to runtime HYPERDRIVE or LOCAL_DATABASE_URL
+    const checkerConnectionString =
+      env.APP_ENV === 'local'
+        ? env.LOCAL_CHECKER_DATABASE_URL
+        : env.CHECKER_HYPERDRIVE?.connectionString;
+    if (!checkerConnectionString || !env.ORDER_DELETION_VERIFICATION_BUCKET) {
+      return c.json({ error: 'verification_infrastructure_unavailable' }, 503);
+    }
+
+    const client = new Client({
+      connectionString: checkerConnectionString,
+      connectionTimeoutMillis: 5000,
+    });
+    try {
+      await client.connect();
+      const result = await verifyVenueOrderDeletionService({
+        client,
+        checkerId,
+        venueId: scope.data.venueId,
+        requestId: reqScope.data.requestId,
+        outcome: parsed.data.outcome,
+        evidenceRef: parsed.data.evidenceRef,
+        verificationStorage: env.ORDER_DELETION_VERIFICATION_BUCKET,
+        authorizedCheckerIds,
+      });
+      return c.json(result, 200);
+    } finally {
+      await client.end().catch(() => {});
+    }
+  });
+
   app.put('/venues/:venueId/extractions/:extractionId/review-session', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1969,6 +2046,49 @@ export const handleScheduled = async (event: any, env: any) => {
           retained: result.retained,
         }),
       );
+    }
+
+    // L2: Durable retry queue for failed compensating R2 deletions
+    if (typeof storage.delete === 'function') {
+      try {
+        const tenantRes = await client.query<{ tenant_id: string }>(
+          `SELECT tenant_id FROM app_private.list_pending_orphan_cleanup_tenants()`,
+        );
+        for (const row of tenantRes.rows) {
+          try {
+            const retryRes = await retryPendingOrphanCleanups({
+              client,
+              venueId: row.tenant_id,
+              storage,
+            });
+            if (retryRes.attempted > 0 || retryRes.skippedDeletionActive) {
+              console.log(
+                JSON.stringify({
+                  event: 'order_import_orphan_cleanup_retry',
+                  venueId: row.tenant_id,
+                  ...retryRes,
+                }),
+              );
+            }
+          } catch (retryVenueErr) {
+            console.error(
+              JSON.stringify({
+                event: 'order_import_orphan_cleanup_retry_error',
+                venueId: row.tenant_id,
+                error:
+                  retryVenueErr instanceof Error ? retryVenueErr.message : String(retryVenueErr),
+              }),
+            );
+          }
+        }
+      } catch (listErr) {
+        console.error(
+          JSON.stringify({
+            event: 'order_import_orphan_cleanup_tenant_list_error',
+            error: listErr instanceof Error ? listErr.message : String(listErr),
+          }),
+        );
+      }
     }
 
     // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)

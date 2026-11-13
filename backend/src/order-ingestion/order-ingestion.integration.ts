@@ -9,13 +9,16 @@ import {
   importOrderOutcomes,
   type OrderOutcomeStorage,
   submitOrderDataDeletionRequest,
+  verifyVenueOrderDeletion,
 } from './service';
 import { recordVenueTrackingActivation } from './tracking-activation';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
+const operatorUrl = process.env.PEEKAPLATE_DB_OPERATOR_URL;
+const checkerUrl = process.env.PEEKAPLATE_DB_CHECKER_URL;
 
-const hasDb = Boolean(runtimeUrl && adminUrl);
+const hasDb = Boolean(runtimeUrl && adminUrl && operatorUrl && checkerUrl);
 
 function sha256Hex(content: string): string {
   return createHash('sha256').update(content).digest('hex');
@@ -1429,12 +1432,24 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
       });
       expect(otherSubmitted.status).toBe('requested');
 
-      // Concurrent deletion test with two separate PostgreSQL connections:
-      // 1. Start deletion on Venue A with a slow storage.list so a second concurrent execution overlaps
-      // 2. Verify second concurrent execution for Venue A fails with 409 deletion_in_progress
-      // 3. Verify Venue B deletion runs independently without blocking
-      const concurrentClient = new Client({ connectionString: runtimeUrl });
+      // Runtime role CANNOT execute deleteVenueOrderData (permission denied on app_private.delete_venue_order_data)
+      await expect(
+        deleteVenueOrderData({
+          client: runtimeClient,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        }),
+      ).rejects.toThrow(/permission denied/i);
+
+      const operatorClient = new Client({ connectionString: operatorUrl });
+      const concurrentClient = new Client({ connectionString: operatorUrl });
+      const checkerClient = new Client({ connectionString: checkerUrl });
+      await operatorClient.connect();
       await concurrentClient.connect();
+      await checkerClient.connect();
       try {
         let releaseFirstList!: () => void;
         const firstListEntered = new Promise<void>((resolve) => {
@@ -1453,7 +1468,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
         });
 
         const firstDeletePromise = deleteVenueOrderData({
-          client: runtimeClient,
+          client: operatorClient,
           operatorId,
           venueId,
           requestId,
@@ -1484,20 +1499,89 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
           storage,
           authorizedOperatorIds,
         });
-        expect(otherDeleted.status).toBe('completed');
+        expect(otherDeleted.status).toBe('awaiting_verification');
         expect(otherDeleted.dbBatchesDeleted).toBe(1);
 
         releaseFirstList();
         const deleted = await firstDeletePromise;
-        expect(deleted.status).toBe('completed');
+        expect(deleted.status).toBe('awaiting_verification');
         expect(deleted.operatorId).toBe(operatorId);
         expect(deleted.r2ObjectsDeleted).toBe(1);
         expect(deleted.dbBatchesDeleted).toBe(1);
         expect(deleted.dbLinesDeleted).toBe(1);
         expect(deleted.dbQuarantineDeleted).toBe(1);
         expect(deleted.dbConflictsDeleted).toBe(1);
+
+        // Independent checker verifies Venue A deletion -> transitions to 'verified'
+        const checkerId = randomUUID();
+        const verified = await verifyVenueOrderDeletion({
+          client: checkerClient,
+          checkerId,
+          authorizedCheckerIds: new Set([checkerId]),
+          venueId,
+          requestId,
+          outcome: 'PASS',
+          evidenceRef: 'CU-166',
+          verificationStorage: {
+            list: storage.list!,
+            get: async (key: string) => {
+              const val = r2Objects.get(key);
+              if (!val) return null;
+              return { text: async () => val, json: async () => JSON.parse(val) };
+            },
+          },
+        });
+        expect(verified.status).toBe('verified');
+
+        // C1 Real-DB role-boundary assertions across runtime, operator, checker, and admin logins
+        const forgedReqId = randomUUID();
+        await expect(
+          runtimeClient
+            .query(
+              `SELECT set_config('app.tenant_id', $1, false),
+                    set_config('app.actor_id', $2, false),
+                    set_config('app.deletion_lifecycle_context', 'reconciliation', false)`,
+              [venueId, ownerId],
+            )
+            .then(() =>
+              runtimeClient.query(
+                `INSERT INTO app_private.order_data_deletion_requests
+                 (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_outcome)
+               VALUES ($1, $2, $3, 'pilot_withdrawal', 'verified', true, $4, 'PASS')`,
+                [forgedReqId, venueId, ownerId, checkerId],
+              ),
+            ),
+        ).rejects.toThrow(/cannot insert reconciliation/i);
+
+        await expect(
+          checkerClient.query(
+            `SELECT * FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, now(), now(), 'completed', 0, 'ev')`,
+            [randomUUID(), venueId, forgedReqId, checkerId],
+          ),
+        ).rejects.toThrow(/permission denied/i);
+
+        await expect(
+          adminClient.query(
+            `INSERT INTO app_private.order_data_deletion_requests
+               (id, tenant_id, requested_by, reason, status, reconciled_from_r2)
+             VALUES ($1, $2, $3, 'pilot_withdrawal', 'awaiting_verification', true)`,
+            [forgedReqId, venueId, ownerId],
+          ),
+        ).rejects.toThrow(/cannot insert reconciliation/i);
+
+        await operatorClient.query('BEGIN');
+        await operatorClient.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+        await operatorClient.query("SELECT set_config('app.actor_id', $1, true)", [operatorId]);
+        const opReconcile = await operatorClient.query<{ outcome: string }>(
+          `SELECT outcome FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, now(), now(), 'completed', 0, 'order-deletion-ledger/test/completed.json')`,
+          [randomUUID(), venueId, forgedReqId, operatorId],
+        );
+        await operatorClient.query('COMMIT');
+        expect(opReconcile.rows[0]?.outcome).toBe('reconciled');
       } finally {
         await concurrentClient.end().catch(() => {});
+        await operatorClient.end().catch(() => {});
+        await checkerClient.end().catch(() => {});
       }
       expect(r2Objects.has(`order-imports/${venueId}/b1/source.csv`)).toBe(false);
       expect(r2Objects.has(`order-deletion-ledger/${venueId}/${requestId}/intent.json`)).toBe(true);
@@ -1546,7 +1630,9 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
       // 1. Long-running deletion renews lease past initial lease duration so a second worker gets 409 deletion_in_progress
       // 2. Stale paused worker whose lease expired is fenced out (409 deletion_lease_lost) when replacement worker takes over
       const leaseRequestId = randomUUID();
-      const leaseClient2 = new Client({ connectionString: runtimeUrl });
+      const leaseClient1 = new Client({ connectionString: operatorUrl });
+      const leaseClient2 = new Client({ connectionString: operatorUrl });
+      await leaseClient1.connect();
       await leaseClient2.connect();
       try {
         await submitOrderDataDeletionRequest({
@@ -1583,7 +1669,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
         });
 
         const slowWorkerPromise = deleteVenueOrderData({
-          client: runtimeClient,
+          client: leaseClient1,
           operatorId,
           venueId,
           requestId: leaseRequestId,
@@ -1610,7 +1696,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
 
         releaseSlowDelete();
         const slowRes = await slowWorkerPromise;
-        expect(slowRes.status).toBe('completed');
+        expect(slowRes.status).toBe('awaiting_verification');
 
         // Scenario B: Stale worker pauses past lease expiry without renewing; replacement worker takes over and stale worker gets 409 deletion_lease_lost
         const staleReqId = randomUUID();
@@ -1651,7 +1737,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
         });
 
         const staleWorkerPromise = deleteVenueOrderData({
-          client: runtimeClient,
+          client: leaseClient1,
           operatorId,
           venueId,
           requestId: staleReqId,
@@ -1676,7 +1762,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
           executionLeaseMs: leaseMs,
           now: controlledNow,
         });
-        expect(replacementRes.status).toBe('completed');
+        expect(replacementRes.status).toBe('awaiting_verification');
         expect(replacementRes.dbBatchesDeleted).toBe(1);
 
         // Stale Worker 1 wakes up and tries to continue -> fenced out with 409 deletion_lease_lost
@@ -1686,14 +1772,15 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
           status: 409,
         });
 
-        // Audit record remains completed (never clobbered by stale Worker 1)
+        // Audit record remains awaiting_verification (never clobbered by stale Worker 1)
         const finalAudit = await adminClient.query<{ status: string; executed_by: string }>(
           `SELECT status, executed_by FROM app_private.order_data_deletion_requests WHERE tenant_id = $1 AND id = $2`,
           [venueId, staleReqId],
         );
-        expect(finalAudit.rows[0]?.status).toBe('completed');
+        expect(finalAudit.rows[0]?.status).toBe('awaiting_verification');
         expect(finalAudit.rows[0]?.executed_by).toBe(operatorId);
       } finally {
+        await leaseClient1.end().catch(() => {});
         await leaseClient2.end().catch(() => {});
       }
     } finally {

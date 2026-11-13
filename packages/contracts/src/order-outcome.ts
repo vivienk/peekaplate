@@ -564,10 +564,21 @@ export const DeleteOrderDataRequestSchema = z.strictObject({
 });
 export type DeleteOrderDataRequest = z.infer<typeof DeleteOrderDataRequestSchema>;
 
+export const OrderDataDeletionStatusSchema = z.enum([
+  'requested',
+  'executing',
+  'r2_deleted',
+  'db_deleted',
+  'awaiting_verification',
+  'verified',
+  'failed',
+]);
+export type OrderDataDeletionStatus = z.infer<typeof OrderDataDeletionStatusSchema>;
+
 export const SubmitOrderDeletionResponseSchema = z.strictObject({
   requestId: uuid,
   venueId: uuid,
-  status: z.enum(['requested', 'executing', 'r2_deleted', 'completed', 'failed']),
+  status: OrderDataDeletionStatusSchema,
   reason: OrderDataDeletionReasonSchema.nullable(),
   requestedAt: z.string(),
   alreadyExists: z.boolean(),
@@ -577,7 +588,7 @@ export type SubmitOrderDeletionResponse = z.infer<typeof SubmitOrderDeletionResp
 export const DeleteOrderDataResponseSchema = z.strictObject({
   requestId: uuid,
   venueId: uuid,
-  status: z.enum(['completed']),
+  status: z.enum(['awaiting_verification', 'verified']),
   operatorId: uuid,
   r2ObjectsDeleted: z.number().int().nonnegative(),
   dbBatchesDeleted: z.number().int().nonnegative(),
@@ -585,6 +596,26 @@ export const DeleteOrderDataResponseSchema = z.strictObject({
   dbQuarantineDeleted: z.number().int().nonnegative(),
   dbConflictsDeleted: z.number().int().nonnegative(),
   completedAt: z.string(),
+  receiptWrittenAt: z.string(),
   alreadyCompleted: z.boolean(),
 });
 export type DeleteOrderDataResponse = z.infer<typeof DeleteOrderDataResponseSchema>;
+
+export const VerifyOrderDeletionRequestSchema = z.strictObject({
+  outcome: z.enum(['PASS', 'FAIL']),
+  evidenceRef: z.string().trim().min(1).max(512),
+});
+export type VerifyOrderDeletionRequest = z.infer<typeof VerifyOrderDeletionRequestSchema>;
+
+export const VerifyOrderDeletionResponseSchema = z.strictObject({
+  requestId: uuid,
+  venueId: uuid,
+  status: z.enum(['awaiting_verification', 'verified']),
+  verifiedBy: uuid,
+  verifiedAt: z.string(),
+  verificationOutcome: z.enum(['PASS', 'FAIL']),
+  evidenceRef: z.string(),
+  r2RemainingObjectCount: z.number().int().nonnegative(),
+  dbRemainingRowCount: z.number().int().nonnegative(),
+});
+export type VerifyOrderDeletionResponse = z.infer<typeof VerifyOrderDeletionResponseSchema>;

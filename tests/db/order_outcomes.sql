@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(79);
+SELECT plan(111);
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -496,6 +496,332 @@ SET ROLE peekaplate_runtime;
 SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000802', true);
 SELECT is((SELECT count(*)::int FROM app_private.pilot_order_agreement_acceptances), 0, 'Venue B sees 0 agreement acceptances from Venue A');
 SELECT is((SELECT count(*)::int FROM app_private.order_data_deletion_requests), 0, 'Venue B sees 0 deletion requests from Venue A');
+
+-- 7. S6-DATA-14 Hardening: Role separation, lifecycle state machine, and verification constraints
+RESET ROLE;
+SELECT is((SELECT has_function_privilege('peekaplate_runtime', 'app_private.delete_venue_order_data(uuid,uuid,uuid,uuid)', 'execute')), false, 'runtime lacks EXECUTE on delete_venue_order_data');
+SELECT is((SELECT has_table_privilege('peekaplate_runtime', 'app_private.order_data_deletion_requests', 'update')), false, 'runtime lacks UPDATE on order_data_deletion_requests');
+SELECT is((SELECT has_function_privilege('peekaplate_deletion_operator', 'app_private.delete_venue_order_data(uuid,uuid,uuid,uuid)', 'execute')), true, 'operator has EXECUTE on delete_venue_order_data');
+SELECT is((SELECT has_function_privilege('peekaplate_deletion_checker', 'app_private.delete_venue_order_data(uuid,uuid,uuid,uuid)', 'execute')), false, 'checker lacks EXECUTE on delete_venue_order_data');
+SELECT is((SELECT has_function_privilege('peekaplate_deletion_checker', 'app_private.record_deletion_verification(uuid,uuid,uuid,text,text)', 'execute')), true, 'checker has EXECUTE on record_deletion_verification');
+SELECT is((SELECT has_table_privilege('peekaplate_deletion_checker', 'app_private.order_data_deletion_requests', 'update')), false, 'checker lacks direct UPDATE on order_data_deletion_requests');
+
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000001', true);
+SELECT throws_like(
+  $$UPDATE app_private.order_data_deletion_requests
+    SET status = 'executing'
+    WHERE id = '00000000-0000-4000-8000-000000000998'$$,
+  '%permission denied%',
+  'runtime cannot UPDATE order_data_deletion_requests'
+);
+SELECT throws_like(
+  $$SELECT * FROM app_private.delete_venue_order_data(
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000998',
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-4000-8000-000000000777'
+    )$$,
+  '%permission denied%',
+  'runtime cannot EXECUTE delete_venue_order_data'
+);
+
+SELECT set_config('app.deletion_lifecycle_context', 'reconciliation', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.order_data_deletion_requests
+      (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_result)
+    VALUES
+      ('00000000-0000-4000-8000-000000000997', '00000000-0000-0000-0000-000000000801',
+       '00000000-0000-0000-0000-000000000001', 'pilot_withdrawal', 'verified', true,
+       '00000000-0000-0000-0000-000000000001', 'PASS')$$,
+  '%cannot insert%',
+  'runtime cannot forge reconciled_from_r2 or verified status even when spoofing lifecycle GUC'
+);
+SELECT set_config('app.deletion_lifecycle_context', '', true);
+
+SELECT set_config('app.order_data_deletion_active', 'on', true);
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_quarantine WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%permission denied%',
+  'runtime lacks DELETE on order_outcome_quarantine even with deletion GUC'
+);
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_conflicts WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%permission denied%',
+  'runtime lacks DELETE on order_outcome_conflicts even with deletion GUC'
+);
+SELECT throws_like(
+  $$DELETE FROM app_private.order_outcome_import_batches WHERE tenant_id = '00000000-0000-0000-0000-000000000801'$$,
+  '%permission denied%',
+  'runtime lacks DELETE on order_outcome_import_batches even with deletion GUC'
+);
+SELECT set_config('app.order_data_deletion_active', 'off', true);
+
+-- Seed control batch in Venue B to verify purge isolation
+RESET ROLE;
+INSERT INTO app_private.order_outcome_import_batches
+  (id, tenant_id, schema_version, created_by, source_filename, file_sha256, storage_key, status, finished_at)
+VALUES
+  ('00000000-0000-0000-0000-000000000909', '00000000-0000-0000-0000-000000000802', 'pilot_order_outcome.v1',
+   '00000000-0000-0000-0000-000000000001', 'control.csv',
+   'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+   'order-imports/00000000-0000-0000-0000-000000000802/control/source.csv', 'completed', now());
+
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
+SELECT throws_like(
+  $$UPDATE app_private.order_data_deletion_requests
+    SET status = 'verified'
+    WHERE id = '00000000-0000-4000-8000-000000000998'$$,
+  '%Illegal deletion lifecycle transition%',
+  'operator cannot skip directly from requested to verified'
+);
+
+SELECT throws_like(
+  $$SELECT * FROM app_private.delete_venue_order_data(
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000998',
+      '00000000-0000-0000-0000-000000000099',
+      '00000000-0000-4000-8000-000000000777'
+    )$$,
+  '%executing or r2_deleted%',
+  'delete_venue_order_data rejects requests still in requested state'
+);
+
+UPDATE app_private.order_data_deletion_requests
+SET status = 'executing',
+    executed_by = '00000000-0000-0000-0000-000000000099',
+    execution_lease_token = '00000000-0000-4000-8000-000000000777',
+    execution_lease_expires_at = now() + interval '5 minutes'
+WHERE id = '00000000-0000-4000-8000-000000000998';
+
+UPDATE app_private.order_data_deletion_requests
+SET status = 'r2_deleted', r2_objects_deleted = 1
+WHERE id = '00000000-0000-4000-8000-000000000998';
+
+SELECT is(
+  (SELECT batches_deleted >= 1 FROM app_private.delete_venue_order_data(
+    '00000000-0000-0000-0000-000000000801',
+    '00000000-0000-4000-8000-000000000998',
+    '00000000-0000-0000-0000-000000000099',
+    '00000000-0000-4000-8000-000000000777'
+  )),
+  true,
+  'operator purges Venue A order data via delete_venue_order_data'
+);
+
+RESET ROLE;
+SELECT is(
+  (SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id = '00000000-0000-0000-0000-000000000802'),
+  1,
+  'Venue B control data is preserved after Venue A deletion'
+);
+
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
+SELECT lives_ok(
+  $$UPDATE app_private.order_data_deletion_requests
+    SET status = 'awaiting_verification',
+        completed_at = now(),
+        receipt_written_at = now(),
+        execution_lease_token = NULL,
+        execution_lease_expires_at = NULL
+    WHERE id = '00000000-0000-4000-8000-000000000998'$$,
+  'operator transitions db_deleted request to awaiting_verification'
+);
+
+SET ROLE peekaplate_deletion_checker;
+SELECT throws_like(
+  $$SELECT * FROM app_private.record_deletion_verification(
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000998',
+      '00000000-0000-0000-0000-000000000099',
+      'PASS',
+      'CU-166'
+    )$$,
+  '%Separation of duties%',
+  'checker cannot self-approve deletion executed by same actor'
+);
+
+SELECT is(
+  (SELECT status FROM app_private.record_deletion_verification(
+    '00000000-0000-0000-0000-000000000801',
+    '00000000-0000-4000-8000-000000000998',
+    '00000000-0000-0000-0000-000000000088',
+    'FAIL',
+    'CU-166'
+  )),
+  'awaiting_verification',
+  'checker FAIL keeps request in awaiting_verification'
+);
+
+SELECT is(
+  (SELECT status FROM app_private.record_deletion_verification(
+    '00000000-0000-0000-0000-000000000801',
+    '00000000-0000-4000-8000-000000000998',
+    '00000000-0000-0000-0000-000000000088',
+    'PASS',
+    'CU-166'
+  )),
+  'verified',
+  'checker PASS transitions request to verified'
+);
+
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT throws_like(
+  $$UPDATE app_private.order_data_deletion_requests
+    SET status = 'executing'
+    WHERE id = '00000000-0000-4000-8000-000000000998'$$,
+  '%Illegal deletion lifecycle transition%',
+  'verified deletion request is immutable against operator updates'
+);
+
+SELECT is(
+  (SELECT count(*) >= 1 FROM app_private.list_order_deletion_requests_for_reconcile()),
+  true,
+  'operator can list deletion requests for restore reconciliation'
+);
+
+SELECT lives_ok(
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion(
+      '00000000-0000-4000-8000-000000000701',
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000996',
+      '00000000-0000-0000-0000-000000000099',
+      now(),
+      now(),
+      'completed',
+      0,
+      'order-deletion-ledger/test/completed.json'
+    )$$,
+  'operator can reconcile venue order deletion from R2 ledger'
+);
+
+-- C1 & L2 deep security checks: arbitrary postgres-owned SECURITY DEFINER bypasses, direct SQL, and orphan key scope
+RESET ROLE;
+CREATE OR REPLACE FUNCTION app_private.test_arbitrary_postgres_definer_insert()
+RETURNS void
+SECURITY DEFINER
+SET search_path = pg_catalog, app_private
+AS $$
+BEGIN
+  INSERT INTO app_private.order_data_deletion_requests
+    (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_outcome)
+  VALUES
+    ('00000000-0000-4000-8000-000000000995', '00000000-0000-0000-0000-000000000801',
+     '00000000-0000-0000-0000-000000000001', 'pilot_withdrawal', 'verified', true,
+     '00000000-0000-0000-0000-000000000088', 'PASS');
+END;
+$$ LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION app_private.test_arbitrary_postgres_definer_insert() TO peekaplate_runtime;
+
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.deletion_lifecycle_context', 'reconciliation', true);
+SELECT throws_like(
+  $$SELECT app_private.test_arbitrary_postgres_definer_insert()$$,
+  '%cannot insert reconciliation or pre-completed deletion records%',
+  'arbitrary postgres-owned SECURITY DEFINER function cannot bypass C1 guard even with spoofed GUC'
+);
+
+SET ROLE peekaplate_runtime;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT throws_like(
+  $$SELECT app_private.test_arbitrary_postgres_definer_insert()$$,
+  '%cannot insert reconciliation or pre-completed deletion records%',
+  'runtime calling postgres-owned SECURITY DEFINER function cannot bypass C1 guard'
+);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.deletion_privileged_tx_grants (txid, pid, operation, session_role)
+    VALUES (pg_current_xact_id(), pg_backend_pid(), 'reconciliation', current_user)$$,
+  '%permission denied%',
+  'runtime cannot write to deletion_privileged_tx_grants'
+);
+
+SELECT throws_like(
+  $$INSERT INTO app_private.order_import_orphan_cleanups (tenant_id, batch_id, storage_key)
+    VALUES ('00000000-0000-0000-0000-000000000801', '00000000-0000-4000-8000-000000000123',
+            'order-imports/00000000-0000-0000-0000-000000000802/00000000-0000-4000-8000-000000000123/source.csv')$$,
+  '%order_import_orphan_cleanups_storage_key_check%',
+  'orphan cleanup rejects cross-venue storage_key'
+);
+
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.deletion_lifecycle_context', 'verification', true);
+SELECT throws_like(
+  $$INSERT INTO app_private.order_data_deletion_requests (id, tenant_id, requested_by, reason, status)
+    VALUES ('00000000-0000-4000-8000-000000000994', '00000000-0000-0000-0000-000000000801',
+            '00000000-0000-0000-0000-000000000001', 'pilot_withdrawal', 'requested')$$,
+  '%permission denied%',
+  'operator cannot directly insert deletion requests'
+);
+
+RESET ROLE;
+SELECT set_config('app.deletion_lifecycle_context', '', true);
+SELECT throws_like(
+  $$SELECT * FROM app_private.record_deletion_verification(
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000996',
+      '00000000-0000-0000-0000-000000000088',
+      'PASS',
+      'CU-166'
+    )$$,
+  '%Trusted actor context%',
+  'direct superuser call without actor context is still gated'
+);
+
+CREATE OR REPLACE FUNCTION app_private.test_arbitrary_postgres_definer_update()
+RETURNS void
+SECURITY DEFINER
+SET search_path = pg_catalog, app_private
+AS $$
+BEGIN
+  UPDATE app_private.order_data_deletion_requests
+  SET status = 'failed'
+  WHERE id = '00000000-0000-4000-8000-000000000996';
+END;
+$$ LANGUAGE plpgsql;
+GRANT EXECUTE ON FUNCTION app_private.test_arbitrary_postgres_definer_update() TO peekaplate_deletion_checker;
+
+SET ROLE peekaplate_deletion_checker;
+SELECT throws_like(
+  $$SELECT app_private.test_arbitrary_postgres_definer_update()$$,
+  '%not authorized to update deletion lifecycle records%',
+  'checker calling arbitrary postgres-owned SECURITY DEFINER update function cannot escalate to operator'
+);
+
+RESET ROLE;
+INSERT INTO app_private.order_import_orphan_cleanups (tenant_id, batch_id, storage_key, status)
+VALUES ('00000000-0000-0000-0000-000000000801', '00000000-0000-4000-8000-000000000555',
+        'order-imports/00000000-0000-0000-0000-000000000801/00000000-0000-4000-8000-000000000555/source.csv', 'pending');
+
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
+SELECT * FROM app_private.reconcile_venue_order_deletion(
+  '00000000-0000-4000-8000-000000000702',
+  '00000000-0000-0000-0000-000000000801',
+  '00000000-0000-4000-8000-000000000993',
+  '00000000-0000-0000-0000-000000000099',
+  NULL, NULL, 'intent_only', 0, 'intent.json'
+);
+RESET ROLE;
+SELECT is(
+  (SELECT status FROM app_private.order_import_orphan_cleanups WHERE batch_id = '00000000-0000-4000-8000-000000000555'),
+  'pending',
+  'intent_only reconciliation does not mark pending orphan cleanups as cleaned'
+);
+
+SELECT is(
+  (SELECT has_function_privilege('peekaplate_runtime', 'app_private.list_pending_orphan_cleanup_tenants()', 'execute')),
+  true,
+  'runtime has EXECUTE on list_pending_orphan_cleanup_tenants for scheduled cleanup'
+);
 
 RESET ROLE;
 SELECT * FROM finish();

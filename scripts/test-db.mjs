@@ -182,6 +182,12 @@ export async function startDatabase() {
     databaseSql(
       "CREATE ROLE peekaplate_local LOGIN PASSWORD 'peekaplate_local_test' IN ROLE peekaplate_runtime;",
     );
+    databaseSql(
+      "CREATE ROLE peekaplate_operator_local LOGIN PASSWORD 'peekaplate_operator_test' IN ROLE peekaplate_deletion_operator;",
+    );
+    databaseSql(
+      "CREATE ROLE peekaplate_checker_local LOGIN PASSWORD 'peekaplate_checker_test' IN ROLE peekaplate_deletion_checker;",
+    );
     const address = docker(
       ['port', container, '5432/tcp'],
       'locate disposable database',
@@ -191,6 +197,8 @@ export async function startDatabase() {
     return {
       adminUrl: `postgres://postgres:peekaplate_test@${address}/peekaplate?sslmode=disable`,
       runtimeUrl: `postgres://peekaplate_local:peekaplate_local_test@${address}/peekaplate?sslmode=disable`,
+      operatorUrl: `postgres://peekaplate_operator_local:peekaplate_operator_test@${address}/peekaplate?sslmode=disable`,
+      checkerUrl: `postgres://peekaplate_checker_local:peekaplate_checker_test@${address}/peekaplate?sslmode=disable`,
     };
   } catch (error) {
     stopDatabase();
@@ -210,6 +218,8 @@ export function runIntegrationTests(database, run = spawnSync) {
         ...process.env,
         PEEKAPLATE_DB_TEST_URL: database.runtimeUrl,
         PEEKAPLATE_DB_ADMIN_URL: database.adminUrl,
+        PEEKAPLATE_DB_OPERATOR_URL: database.operatorUrl,
+        PEEKAPLATE_DB_CHECKER_URL: database.checkerUrl,
       },
     }),
     'real database integration tests',
