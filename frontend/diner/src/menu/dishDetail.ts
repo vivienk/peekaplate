@@ -1,3 +1,4 @@
+import { saveHeartMarkup, toastAreaMarkup } from '../save/screens';
 import { allergenIcon, dietaryIcon, ingredientIcon, UI_ICONS } from './icons';
 import { bindPortionPreview } from './portionPreview';
 import { formatPrice } from './price';
@@ -74,11 +75,9 @@ export function renderDishDetail(
       <header class="pp-detail__topbar">
         <button class="pp-back pp-detail__back" type="button" aria-label="Back to menu"><img class="pp-detail__back-icon" src="${UI_ICONS.back}" alt="" aria-hidden="true" width="16" height="16" /></button>
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
-        <button class="pp-detail__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-          <img src="${UI_ICONS.unsaveHeart}" alt="" aria-hidden="true" width="20" height="20" />
-          <span>Save</span>
-        </button>
+        ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>
+      ${toastAreaMarkup()}
       ${notice ? `<p class="pp-notice">${escapeHtml(notice)}</p>` : ''}
 
       <div class="pp-detail__image-wrap">
@@ -135,7 +134,7 @@ export function renderDishDetail(
           <button class="pp-btn pp-btn--primary pp-detail__portion" type="button">View Portion</button>
           <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
         </div>
-        <p class="pp-notice">Save and Compare are not available yet.</p>
+        <p class="pp-notice">Compare is not available yet.</p>
       </section>
     </div>
   `;

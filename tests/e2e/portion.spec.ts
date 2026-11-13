@@ -99,7 +99,11 @@ async function openMenu(page: Page, mode: Mode = 'valid') {
   return content;
 }
 async function openPortion(page: Page, keepPortal = false) {
-  await page.locator('.pp-card__open').first().click();
+  if (new URL(page.url()).searchParams.get('scenario') === 'portion-demo') {
+    await page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }).click();
+  } else {
+    await page.locator('.pp-card__open').first().click();
+  }
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   const url = new URL(page.url());
   const state = url.searchParams.get('previewState');
@@ -956,6 +960,14 @@ test('camera demo retains the full diner menu and PR145 icons', async ({ page })
   await expect(page.getByRole('heading', { name: 'Ember & Stone', exact: true })).toBeVisible();
   await expect.poll(() => page.locator('.pp-card__open').count()).toBeGreaterThan(1);
   await expect(page.locator('.pp-search__icon')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Avocado Toast', exact: true })).toBeVisible();
+  const save = page.getByRole('button', { name: 'Save Avocado Toast', exact: true });
+  await save.click();
+  await expect(save).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.pp-saved').click();
+  await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
+  await expect(page.locator('.pp-saved__item')).toContainText('Avocado Toast');
+  await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
   await page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }).click();
   await expect(page.locator('.pp-detail__back-icon')).toBeVisible();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeEnabled();

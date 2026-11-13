@@ -7,10 +7,18 @@ import type { SaveSurface, SendEvent } from './events';
 import { createSaveFeedback, type SaveFeedback, type Toast } from './feedback';
 import type { SaveState } from './save-state';
 
-// Provisional copy until the Figma toast frames are applied.
-const REMOVED_TEXT = 'Removed from Saved';
+// Figma toast copy (frames 751:10189 and 1091:2272; Rania's PR 122 review #5, agreed by Adam).
+const REMOVED_TEXT = 'Removed from saved dishes';
 const RESTORED_TEXT = 'Added back to Saved';
 const UNDO_TEXT = 'Undo';
+
+// Each toast's status icon sits in a circle (review #3); the colours come from save.css.
+const STATUS_ICONS = {
+  removed:
+    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M6 10h8" stroke="var(--pp-toast-icon-mark)" stroke-width="2" stroke-linecap="round"/></svg>',
+  restored:
+    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="m6 10.2 2.6 2.6L14 7.4" fill="none" stroke="var(--pp-toast-icon-mark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+} as const;
 
 // Until S3-DIN-01.5's track() (#65) is on this branch, screens pass `send`; events are otherwise
 // not sent.
@@ -45,11 +53,14 @@ function draw(hub: Hub) {
   const area = [...hub.areas].reverse().find((candidate) => candidate.isConnected);
   if (!area || toast === null) return;
   const box = document.createElement('div');
-  box.className = 'pp-toast';
+  box.className = `pp-toast pp-toast--${toast.kind}`;
+  const icon = document.createElement('span');
+  icon.className = 'pp-toast__icon';
+  icon.innerHTML = STATUS_ICONS[toast.kind];
   const text = document.createElement('span');
   text.className = 'pp-toast__text';
   text.textContent = toast.kind === 'removed' ? REMOVED_TEXT : RESTORED_TEXT;
-  box.append(text);
+  box.append(icon, text);
   if (toast.kind === 'removed') {
     const undo = document.createElement('button');
     undo.type = 'button';

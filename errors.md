@@ -2769,3 +2769,27 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T05:11:34.462Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T06:13:48.741Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T06:14:30.176Z","exitCode":1}
+```
+
+- PR145 actual-menu integration: lint initially caught formatting in a temporary browser config; formatted then removed it after checks. PR145 Save test still expected View Portion to be disabled; updated that assertion to the intentionally enabled action. Restricted unit run could not bind loopback (EPERM); authorized rerun passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T06:16:06.292Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T06:16:28.085Z","exitCode":1}
+```
+
+- PR145 final checks: restricted backend build could not write Wrangler logs; authorized dry-run build passed. Context validation rejected an overlong diner summary; shortened it before refreshing.

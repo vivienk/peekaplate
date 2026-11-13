@@ -316,7 +316,8 @@ export function createFixtureMenuSource(
           const { portion, photo } = await import('./portionDemo');
           const bundle = structuredClone(demoBundle);
           const category = bundle.categories[0]!;
-          const dish = category.dishes[0]!;
+          const dish = structuredClone(category.dishes[0]!);
+          category.dishes.push(dish);
           if (!dish.complete) throw new Error('Demo requires a complete fixture');
           dish.dish_id = portion.dish_id;
           dish.dish_revision_id = portion.dish_revision_id;
