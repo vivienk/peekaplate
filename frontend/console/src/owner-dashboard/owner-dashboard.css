@@ -303,10 +303,6 @@ h3 {
   color: var(--muted);
   white-space: nowrap;
 }
-.chip.sample {
-  background: var(--panel);
-  color: var(--muted);
-}
 
 .card {
   background: var(--glass);

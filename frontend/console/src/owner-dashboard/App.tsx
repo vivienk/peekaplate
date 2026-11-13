@@ -353,7 +353,6 @@ export function App() {
       <div className="main">
         <div className="topbar">
           <div className="l">
-            <span className="chip sample">Illustrative sample data</span>
             <span className="chip">{REST.period}</span>
           </div>
           <Btn
