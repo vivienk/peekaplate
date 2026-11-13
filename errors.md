@@ -2762,3 +2762,10 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Auto-camera typecheck TS2774: DOM types declare getUserMedia as always defined. Use an explicit typeof function capability check so older browsers remain guarded without an always-truthy function condition.
 
 - Hosted camera preview initially fell back because trusted preview CSP blocks fetch (connect-src none). Fixed demo assets are now bundled data URLs decoded locally, then checked through the unchanged byte-size and SHA256 validation. Public asset fetch behavior and deployment CSP remain unchanged.
+
+- PR145 menu test read card count during the loading shell (same restaurant heading); changed to wait for the cards. Camera regression reached ready before the lazy portal was available on this slow host; wait for the portal up to 20 seconds without changing application timeouts.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T05:11:34.462Z","exitCode":1}
+```

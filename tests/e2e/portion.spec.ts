@@ -681,7 +681,9 @@ async function cameraFixture(page: Page, behavior: 'allow' | 'deny' | 'pending' 
 async function openPortal(page: Page) {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page, true);
-  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
+    timeout: 20000,
+  });
 }
 
 test('camera portal positions the exact cutout, rotates, resets and releases camera on Back', async ({
@@ -931,7 +933,9 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
   await cameraFixture(page);
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await openPortion(page, true);
-  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
+    timeout: 20000,
+  });
   await expect(page.getByRole('button', { name: 'Reposition', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Place dish', exact: true })).toBeHidden();
   await page.screenshot({ path: 'test-results/automatic-ar-portal.png' });
@@ -950,7 +954,7 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
 test('camera demo retains the full diner menu and PR145 icons', async ({ page }) => {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await expect(page.getByRole('heading', { name: 'Ember & Stone', exact: true })).toBeVisible();
-  expect(await page.locator('.pp-card__open').count()).toBeGreaterThan(1);
+  await expect.poll(() => page.locator('.pp-card__open').count()).toBeGreaterThan(1);
   await expect(page.locator('.pp-search__icon')).toBeVisible();
   await page.getByRole('button', { name: 'Open Captured dish · tilt demo', exact: true }).click();
   await expect(page.locator('.pp-detail__back-icon')).toBeVisible();
