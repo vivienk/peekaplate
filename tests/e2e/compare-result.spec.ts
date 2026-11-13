@@ -78,17 +78,21 @@ test('confirming a pick shows both dishes side by side and fires dish_compared s
   await expect(page.getByRole('button', { name: 'Replace Harvest Power Bowl' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to Menu' })).toBeVisible();
 
-  // Bordered sections with their headings; Harvest Power Bowl lists no allergens, so its side of
-  // Contains shows nothing.
-  for (const heading of ['Description', 'Key ingredients', 'Contains', 'Dietary info']) {
+  // Figma structure (Azoz review #11): Description, Key ingredients (with the buttons at its foot)
+  // and one Dietary & Allergen Info section drawn with the approved icons.
+  for (const heading of ['Description', 'Key ingredients', 'Dietary & Allergen Info']) {
     await expect(page.getByRole('heading', { level: 3, name: heading })).toBeVisible();
   }
-  await expect(first.locator('.pp-compare__contains .pp-chip')).toHaveCount(2);
-  await expect(other.locator('.pp-compare__contains .pp-chip')).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 3, name: 'Contains' })).toHaveCount(0);
+  await expect(page.locator('.pp-compare__section--ingredients .pp-compare__view')).toHaveCount(2);
+  await expect(first.getByRole('img', { name: 'Contains Wheat' })).toBeVisible();
+  await expect(first.getByRole('img', { name: 'Contains Eggs' })).toBeVisible();
+  await expect(first.getByRole('img', { name: 'Vegetarian' })).toBeVisible();
+  await expect(other.getByRole('img', { name: /^Contains/ })).toHaveCount(0);
   // Figma buttons: outlined "View details →" and a text-style Replace.
   await expect(first.locator('.pp-compare__view')).toHaveClass(/pp-btn--outlined/);
   await expect(first.locator('.pp-compare__replace')).not.toHaveClass(/pp-btn/);
-  await expect(other.getByText('Gluten-free')).toBeVisible();
+  await expect(other.getByRole('img', { name: 'Gluten-free' })).toBeVisible();
   await expect(
     page.getByText('For allergy questions, please ask the restaurant staff.'),
   ).toBeVisible();
@@ -240,13 +244,13 @@ test('allergen and dietary rows line up across the two dishes, with no horizonta
         `[data-side="${side}"].pp-compare__${part}, [data-side="${side}"] .pp-compare__${part}`,
       )
       .evaluate((el) => el.getBoundingClientRect().top);
-  for (const part of ['name', 'price', 'ingredient-names', 'contains', 'dietary', 'actions']) {
+  for (const part of ['name', 'price', 'ingredient-names', 'icons', 'actions']) {
     expect(await top('first', part)).toBeCloseTo(await top('other', part), 0);
   }
   const salad = page.locator('[data-side="other"]');
-  await expect(salad.getByText('Mustard')).toBeVisible();
+  await expect(salad.locator('.pp-chip__text', { hasText: 'Mustard' })).toBeVisible();
   const chipTops = await salad
-    .locator('.pp-compare__contains .pp-chip')
+    .locator('.pp-compare__icons > li')
     .evaluateAll(
       (chips) => new Set(chips.map((c) => Math.round(c.getBoundingClientRect().top))).size,
     );
@@ -258,10 +262,20 @@ test('allergen and dietary rows line up across the two dishes, with no horizonta
   });
 });
 
+// Azoz review #12: a dish with no dietary or allergen labels says so instead of a blank cell.
+test('a dish with nothing listed shows None listed, never allergen-free', async ({ page }) => {
+  await compare(page, 'Fresh Fruit Cup', 'Avocado Toast', 'edge-cases');
+  const section = page.locator('.pp-compare__section--dietary');
+  await expect(section.locator('[data-side="first"]')).toContainText('None listed');
+  await expect(section.locator('[data-side="other"]')).not.toContainText('None listed');
+  await expect(page.getByText(/allergen-free/i)).toHaveCount(0);
+});
+
 test('a Wheat dish never shows Gluten-free on the result', async ({ page }) => {
   await compare(page, 'Berry Pancake Stack', 'Avocado Toast', 'edge-cases');
   const pancakes = page.locator('[data-side="first"]');
-  await expect(pancakes.getByText('Wheat')).toBeVisible();
+  await expect(pancakes.getByRole('img', { name: 'Contains Wheat' })).toBeVisible();
+  await expect(pancakes.getByRole('img', { name: 'Gluten-free' })).toHaveCount(0);
   await expect(pancakes.getByText('Gluten-free')).toHaveCount(0);
 });
 
@@ -271,7 +285,11 @@ test('the compare flow makes no network request', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   const requests: string[] = [];
   page.on('request', (request) => {
-    if (!request.url().startsWith('data:')) requests.push(request.url());
+    // Bundled icon files are static assets of the page itself, not data leaving it.
+    const url = request.url();
+    if (!url.startsWith('data:') && !/\/assets\/icons\/.+\.svg(\?|$)/.test(url)) {
+      requests.push(url);
+    }
   });
   await page.getByRole('button', { name: 'Open Avocado Toast' }).first().click();
   await page.locator('.pp-detail__compare').click();

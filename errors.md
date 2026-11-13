@@ -2934,3 +2934,10 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
+
+## 2026-11-13 compare-result first cold run
+
+- Check: `pnpm exec playwright test tests/e2e/compare-result.spec.ts tests/e2e/compare-picker.spec.ts --project=chromium` on feat/s3-din-02-4-compare-result after adding Compare allergen icons.
+- Result: one `toEqual` deep-equality failure on the first run after the change; the next two full runs and a `--repeat-each 4` run (36/36) passed.
+- Cause: not confirmed. Most likely the first cold Vite dev-server load of the new icon modules.
+- Prevention: rerun once before treating a single cold-start failure as a regression; keep the network test's allowance limited to bundled `/assets/icons/*.svg`.

@@ -1,11 +1,10 @@
 // Compare result screen (S3-DIN-02.4, Figma "Compare result allergens"). A header with both
-// dishes (photo, name, price), then bordered sections (Description, Key ingredients, Contains,
-// Dietary info) that each show the two dishes side by side with a divider, so every row lines up.
-// Chips use the dish-detail rules. Each dish has "View details" and a text-style "Replace", and
-// "Back to Menu" leaves Compare. The screen itself sends nothing: the caller fires dish_compared
+// dishes (photo, name, price), then bordered sections (Description; Key ingredients with "View
+// details" and a text-style "Replace" at its foot; Dietary & Allergen Info) that each show the two
+// dishes side by side with a divider, so every row lines up. "Back to Menu" leaves Compare. The screen itself sends nothing: the caller fires dish_compared
 // when a valid comparison is displayed.
 import { completeDishes } from '../menu/adapter';
-import { allergenChips, dietaryChips } from '../menu/dishDetail';
+import { allergenIcon, dietaryIcon } from '../menu/icons';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
 import type { CompareSide, Comparison } from './comparison';
@@ -101,6 +100,29 @@ function sectionMarkup(
   `;
 }
 
+// Figma "Allergens-dietary-info-icons": allergens, then dietary labels, as icons. Each icon carries
+// its full meaning for screen readers and as a tooltip ("Contains Wheat", "Vegan"); a value with no
+// approved icon falls back to its text label, so nothing is ever dropped. A dish with nothing
+// listed says "None listed" (Azoz review #12): never "allergen-free", which the data cannot promise.
+function dietaryAllergenCell(dish: CompleteDish): string {
+  const items = [
+    ...dish.allergens.map((value) => ({
+      icon: allergenIcon(value),
+      label: `Contains ${value}`,
+      text: value,
+    })),
+    ...dish.dietary.map((value) => ({ icon: dietaryIcon(value), label: value, text: value })),
+  ];
+  if (items.length === 0) return '<p class="pp-compare__none">None listed</p>';
+  return `<ul class="pp-compare__icons">${items
+    .map(({ icon, label, text }) =>
+      icon
+        ? `<li class="pp-compare__icon" title="${escapeHtml(label)}"><img src="${escapeHtml(icon)}" alt="${escapeHtml(label)}" width="24" height="24" /></li>`
+        : `<li class="pp-chip pp-compare__icon-text"><span class="pp-sr-only">${escapeHtml(label)}</span><span class="pp-chip__text" aria-hidden="true">${escapeHtml(text)}</span></li>`,
+    )
+    .join('')}</ul>`;
+}
+
 function actionsCell(view: CompareSideView): string {
   const name = escapeHtml(view.dish.name);
   return `
@@ -150,24 +172,7 @@ export function renderCompareResult(
           ${actionsCell(view[1])}
         </div>`,
       )}
-      ${
-        view.some((v) => v.hasAllergens)
-          ? sectionMarkup('contains', 'Contains', view, (v) =>
-              v.hasAllergens
-                ? `<div class="pp-chip-group pp-compare__contains">${allergenChips(v.dish)}</div>`
-                : '<div class="pp-compare__contains"></div>',
-            )
-          : ''
-      }
-      ${
-        view.some((v) => v.hasDietary)
-          ? sectionMarkup('dietary', 'Dietary info', view, (v) =>
-              v.hasDietary
-                ? `<div class="pp-chip-group pp-compare__dietary">${dietaryChips(v.dish)}</div>`
-                : '<div class="pp-compare__dietary"></div>',
-            )
-          : ''
-      }
+      ${sectionMarkup('dietary', 'Dietary &amp; Allergen Info', view, (v) => dietaryAllergenCell(v.dish))}
 
       <p class="pp-allergy-note pp-compare__staff">${COMPARE_STAFF_LINE}</p>
 

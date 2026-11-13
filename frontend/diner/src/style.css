@@ -1315,8 +1315,10 @@ main:has(> .pp-compare) {
 
 /* Figma dish header: centered, Paragraph 1/Bold 16/24 name and Paragraph 1/Semi Bold 16/24
    price in color/primary, 24px above the first section. */
+/* Figma: 16px bottom padding in the header, then a 24px gap: 40px from the prices to the first
+   section (Azoz review #9). The column gap already gives 16px. */
 .pp-compare__header {
-  margin-bottom: 8px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
@@ -1373,6 +1375,59 @@ main:has(> .pp-compare) {
 .pp-compare__actions {
   align-items: center;
   gap: 8px;
+}
+
+/* Figma Dietary & Allergen Info: icons with room around them, wrapping inside each column; the
+   column divider spans the whole row. */
+.pp-compare__icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.pp-compare__icon {
+  display: flex;
+}
+
+.pp-compare__icon img {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.pp-compare__none {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.pp-compare__pair {
+  align-items: stretch;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button roles. */
+.pp-compare__view:hover {
+  border-color: var(--pp-role-outline-solid);
+}
+
+.pp-compare__view:active {
+  background: var(--pp-role-button-outline-pressed-bg);
+}
+
+.pp-compare__replace:hover {
+  background: var(--pp-role-button-text-hover-bg);
+  border-radius: 999px;
+}
+
+.pp-compare__replace:active {
+  background: var(--pp-role-button-text-pressed-bg);
+  border-radius: 999px;
 }
 
 /* Figma Buttons (Medium, Outlined, trailing icon): a 40px pill, 20px side padding, 4px gap; and

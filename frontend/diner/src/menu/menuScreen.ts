@@ -691,6 +691,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   // Shows a comparison (DIN-02.4). dish_compared fires only when a result is actually displayed
   // after a start or a replacement; coming back from a detail or a cancelled Replace shows it again
   // silently. The same comparison_id is kept across Replace (matrix v0.1h D7).
+  let compareScroll = 0;
   const showResult = (
     comparison: Comparison,
     action?: CompareAction,
@@ -705,17 +706,24 @@ export function mountMenuScreen(container: HTMLElement): void {
       comparison,
       focus,
       onBackToMenu: () => showMenu(),
-      onReplace: (side) => showReplacePicker(comparison, side),
-      onViewDetails: (dish, side) =>
+      onReplace: (side) => {
+        compareScroll = window.scrollY;
+        showReplacePicker(comparison, side);
+      },
+      onViewDetails: (dish, side) => {
+        compareScroll = window.scrollY;
         showDetail(dish, 'menu_card', false, () =>
           showResult(comparison, undefined, { side, control: 'view' }),
-        ),
+        );
+      },
     });
     if (!shown) {
       showMenu();
       return;
     }
-    window.scrollTo(0, 0);
+    // Coming back to the result (focus set) restores where the diner was, so the focused View
+    // details / Replace button is on screen (Azoz review #13); a new result starts at the top.
+    window.scrollTo(0, focus ? compareScroll : 0);
     if (!action || !canTrackUi()) return;
     try {
       const payload = dishComparedPayload(menu, comparison, action, state.isSaveAvailable());
