@@ -932,43 +932,52 @@ main:has(> .pp-compare) {
   outline-offset: 2px;
 }
 
+/* Values from the Figma "Compare_Picker" auto layout: Keeping has 20px above, 12px from its
+   label to the card and 32px below; Dishes has 20px above and 16px between the heading block,
+   the search field and the list. */
 .pp-picker__keeping {
-  margin-top: 24px;
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+.pp-picker__keeping .pp-picker__label {
+  margin-bottom: 12px;
 }
 
 .pp-picker__choose-section {
   display: flex;
   flex-direction: column;
-  margin-top: 24px;
-  padding-bottom: 24px;
+  padding-top: 20px;
+  padding-bottom: 32px;
 }
 
-/* Section headings: Figma 14/24, semibold, uppercase. */
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
 .pp-picker__label {
-  margin: 0 0 8px;
-  color: #a8a59e;
+  margin: 0 0 10px;
+  color: var(--pp-role-on-surface-variant);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 24px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
+/* Figma kept-dish card: 12px padding, 16px gap, 16px radius, surface-container with outline. */
 .pp-picker__kept {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: rgba(255, 248, 237, 0.05);
-  border: 1px solid rgba(255, 248, 237, 0.1);
+  gap: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+  border: 1px solid var(--pp-role-outline);
 }
 
 .pp-picker__kept-image {
   display: block;
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   object-fit: cover;
 }
@@ -976,55 +985,71 @@ main:has(> .pp-compare) {
 .pp-picker__kept-name {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 24px;
 }
 
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
 .pp-picker__hint,
 .pp-picker__none {
   margin: 0 0 16px;
-  color: #a8a59e;
+  color: var(--pp-role-text-secondary);
   font-size: 14px;
-  line-height: 20px;
+  line-height: 24px;
 }
 
-/* Figma "Search_ compare screen": a 44px pill with the icon inset 16px. */
+/* Figma "Search_ compare screen": a 42px pill, 12px padding, a 16px icon and a 6px gap,
+   surface-container with an outline, placeholder Small/Regular 12/16. Typed text stays 16px so
+   phones do not zoom the page when the field is focused. */
 .pp-picker__search {
-  margin: 0;
+  margin: 0 0 16px;
 }
 
 .pp-picker__search .pp-search-bar__icon {
-  left: 16px;
-  font-size: 18px;
+  left: 13px;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 16px;
 }
 
 .pp-picker__search .pp-search-input {
-  height: 44px;
-  padding: 10px 16px 10px 44px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--pp-role-outline);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
   font-size: 16px;
   line-height: 24px;
+}
+
+.pp-picker__search .pp-search-input::placeholder {
+  color: var(--pp-role-on-surface-variant);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .pp-picker__list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 16px;
 }
 
 .pp-picker__list[hidden] {
   display: none;
 }
 
-/* Selected-dish card (Figma): text on one side, a round photo on the other, alternating. */
+/* Figma component "Dishes Menu-Compare": no fill or border by default; Selected adds a 3px
+   color/primary outline with an 8px radius and a 50px check badge. The text column sits beside a
+   220px photo (Direction Right/Left alternates) and aligns toward the photo. */
 .pp-picker__option {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   box-sizing: border-box;
-  padding: 16px;
-  border: 2px solid rgba(113, 115, 122, 0.3);
-  border-radius: 16px;
-  background: #2d3038;
+  min-height: 220px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
@@ -1033,22 +1058,33 @@ main:has(> .pp-compare) {
 }
 
 .pp-picker__option--selected {
-  border-color: #f89537;
+  outline: 3px solid var(--pp-role-primary);
+  outline-offset: 0;
 }
 
 .pp-picker__option-body {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
   min-width: 0;
+  padding: 0 16px 0 8px;
+  text-align: right;
 }
 
+.pp-picker__option:nth-child(even) .pp-picker__option-body {
+  align-items: flex-start;
+  padding: 0 8px 0 16px;
+  text-align: left;
+}
+
+/* Figma H5/Bold 18/28. */
 .pp-picker__option-name {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 24px;
+  line-height: 28px;
 }
 
 .pp-picker__choose {
@@ -1057,24 +1093,28 @@ main:has(> .pp-compare) {
   padding: 0;
   border: 0;
   background: none;
-  color: #fafafa;
+  color: var(--pp-role-on-surface);
   font: inherit;
-  text-align: left;
+  text-align: inherit;
   cursor: pointer;
 }
 
 .pp-picker__option-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
+}
+
+.pp-picker__option:nth-child(even) .pp-picker__option-meta {
+  flex-direction: row-reverse;
 }
 
 .pp-picker__option-heart {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #fafafa;
-  font-size: 18px;
+  color: var(--pp-role-on-surface);
+  font-size: 22px;
   line-height: 24px;
 }
 
@@ -1084,58 +1124,54 @@ main:has(> .pp-compare) {
 
 .pp-picker__option-price {
   margin: 0;
-  color: #f89537;
-  font-size: 14px;
+  color: var(--pp-role-primary);
+  font-size: 16px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 24px;
 }
 
 .pp-picker__option-media {
-  position: relative;
-  flex: 0 0 140px;
+  position: static;
+  flex: 0 0 min(220px, 60%);
+  min-width: 0;
 }
 
 .pp-picker__option-image {
   display: block;
-  width: 140px;
-  height: 140px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
   border-radius: 999px;
   object-fit: cover;
 }
 
+/* Figma check badge: 50px, 8px padding, color/primary, drop shadow, 12px from the card's left
+   edge and 20px from its top. */
 .pp-picker__check {
   display: none;
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
+  top: 20px;
+  left: 12px;
+  box-sizing: border-box;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
-  background: #f89537;
-  color: #421708;
-  font-size: 15px;
+  background: var(--pp-role-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--pp-role-on-surface);
+  font-size: 28px;
   font-weight: 700;
-  line-height: 28px;
+  line-height: 50px;
   text-align: center;
 }
 
-.pp-picker__option:nth-child(even) .pp-picker__check {
-  right: auto;
-  left: 0;
+.pp-picker__option:nth-child(odd) .pp-picker__check {
+  left: auto;
+  right: calc(min(220px, 60%) - 62px);
 }
 
 .pp-picker__option--selected .pp-picker__check {
   display: block;
-}
-
-@media (max-width: 360px) {
-  .pp-picker__option-media {
-    flex-basis: 104px;
-  }
-  .pp-picker__option-image {
-    width: 104px;
-    height: 104px;
-  }
 }
 
 /* The Compare action stays in the picker's column, pinned to the bottom of the viewport while the
