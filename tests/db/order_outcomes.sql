@@ -530,7 +530,7 @@ SELECT throws_like(
 SELECT set_config('app.deletion_lifecycle_context', 'reconciliation', true);
 SELECT throws_like(
   $$INSERT INTO app_private.order_data_deletion_requests
-      (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_result)
+      (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_outcome)
     VALUES
       ('00000000-0000-4000-8000-000000000997', '00000000-0000-0000-0000-000000000801',
        '00000000-0000-0000-0000-000000000001', 'pilot_withdrawal', 'verified', true,
