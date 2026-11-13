@@ -156,6 +156,20 @@ class PortionIngestionTests(unittest.TestCase):
         self.assertEqual(record['portion']['dish_id'], str(DISH))
         self.assertFalse(record['publication']['eligible'])
 
+    def test_direct_cli_preserves_and_validates_owner_width(self):
+        arguments = ['--input', str(self.source), '--dish-id', str(DISH),
+            '--revision-id', str(REVISION), '--capture-evidence', 'Synthetic photo',
+            '--output-root', str(self.root / 'cli-width')]
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            code = main([*arguments, '--serving-width-mm', '280'])
+        self.assertEqual(code, 0)
+        record = json.loads(stdout.getvalue())
+        self.assertEqual(record['portion']['physical_size']['width_mm'], 280)
+        self.assertEqual(record['provenance']['serving_width_mm'], 280)
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(main([*arguments, '--serving-width-mm', '1001']), 2)
+
     def test_batch_rejects_path_outside_source_root(self):
         batch = self.root / 'batch.json'
         batch.write_text(json.dumps({'jobs': [{'source': '../escape.webp'}]}))

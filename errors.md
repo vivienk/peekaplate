@@ -2834,3 +2834,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Orientation browser checks could not resize a Chromium window after a fullscreen transition. Split portrait and landscape checks into fresh viewport contexts; orientation API request/cleanup remains asserted separately.
 
 - Fullscreen browser instrumentation initially accessed documentElement before page creation, preventing its orientation mock from installing. Moved the mock to Element.prototype; application lifecycle tests already passed.
+
+- Review found the direct single-photo CLI parsed the serving width but did not forward it. Added forwarding and CLI regressions for retained dimensions and invalid-width rejection; batch and HTTP paths were already connected.

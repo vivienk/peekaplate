@@ -203,7 +203,8 @@ def main(argv=None):
         directory, record = ingest_dish_photo(input_path=args.input, dish_id=args.dish_id,
             revision_id=args.revision_id, capture_evidence=args.capture_evidence,
             mask_path=args.mask, expected_sha256=args.expected_sha256,
-            budget_bytes=args.budget_bytes, output_root=args.output_root)
+            budget_bytes=args.budget_bytes, output_root=args.output_root,
+            serving_width_mm=args.serving_width_mm)
         print(json.dumps({'directory': str(directory), **record}))
         return 0
     except (ExtractionError, OSError, ValueError, KeyError, TypeError) as error:
