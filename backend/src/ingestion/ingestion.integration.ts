@@ -2,7 +2,9 @@ import type { StructuredDishDraft } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { approveDishDraftAtomic, createApp, submitAuthorizedMenuIngestion } from '../index';
+import { changeMenuJob } from './intake';
 import { processIngestionQueueBatch, type QueueMessage, submitMenuIngestion } from './orchestrator';
+import { menuPdfFixture } from './pdf-fixture';
 import {
   approveDishDraft,
   claimIngestionJob,
@@ -71,7 +73,7 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
           'Content-Type': 'application/pdf',
           'Idempotency-Key': crypto.randomUUID(),
         },
-        body: '%PDF-1.7 synthetic database test',
+        body: menuPdfFixture(1) as BodyInit,
       },
       {
         APP_ENV: 'local',
@@ -351,6 +353,10 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       [jobId],
     );
 
+    expect(
+      await claimIngestionJob(adminClient, { tenantId: venueId, jobId, workerId: 'duplicate' }),
+    ).toBeNull();
+    await changeMenuJob(runtimeClient, actorId, venueId, jobId, crypto.randomUUID(), 'retry');
     const claimRetry = (await claimIngestionJob(adminClient, {
       tenantId: venueId,
       jobId,

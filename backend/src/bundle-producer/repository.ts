@@ -1,12 +1,20 @@
+import { ApprovedDishFactsSchema } from '@peekaplate/contracts';
 import type { DatabaseClient } from '../ingestion/repository';
 import { type ApprovedDishSource, BundleProducerError } from './produce';
 
-type DishCurrentRow = { dish_id: string; revision_id: string; name: string; description: string };
+type DishCurrentRow = {
+  dish_id: string;
+  revision_id: string;
+  name: string;
+  description: string;
+  approved_facts?: unknown;
+};
 type DraftRow = {
   published_dish_id: string;
   price_amount: string | null;
   price_currency: string | null;
   ingredients: unknown;
+  origin?: string;
 };
 type CandidateReviewRow = {
   published_dish_id: string;
@@ -60,13 +68,13 @@ export async function loadApprovedDishSources(
     async () => {
       const ids = [...dishIds];
       const current = await client.query<DishCurrentRow>(
-        `SELECT dish_id, revision_id, name, description
+        `SELECT dish_id, revision_id, name, description, approved_facts
          FROM app_private.dish_current
         WHERE tenant_id = $1 AND dish_id = ANY($2::uuid[])`,
         [tenantId, ids],
       );
       const drafts = await client.query<DraftRow>(
-        `SELECT published_dish_id, price_amount::text AS price_amount, price_currency, ingredients
+        `SELECT published_dish_id, price_amount::text AS price_amount, price_currency, ingredients, origin
          FROM app_private.dish_drafts
         WHERE tenant_id = $1
           AND published_dish_id = ANY($2::uuid[])
@@ -89,7 +97,11 @@ export async function loadApprovedDishSources(
       );
 
       const draftByDish = new Map<string, DraftRow>();
+      const enrichedIds = new Set(
+        current.rows.filter((row) => row.approved_facts != null).map((row) => row.dish_id),
+      );
       for (const row of drafts.rows) {
+        if (enrichedIds.has(row.published_dish_id)) continue;
         if (draftByDish.has(row.published_dish_id)) {
           throw new BundleProducerError(
             'ambiguous_dish_source',
@@ -100,6 +112,7 @@ export async function loadApprovedDishSources(
       }
       const reviewByDish = new Map<string, CandidateReviewRow>();
       for (const row of reviews.rows) {
+        if (enrichedIds.has(row.published_dish_id)) continue;
         if (reviewByDish.has(row.published_dish_id)) {
           throw new BundleProducerError(
             'ambiguous_candidate_review',
@@ -111,6 +124,22 @@ export async function loadApprovedDishSources(
 
       const sources = new Map<string, ApprovedDishSource>();
       for (const row of current.rows) {
+        if (row.approved_facts !== null && row.approved_facts !== undefined) {
+          const facts = ApprovedDishFactsSchema.parse(row.approved_facts);
+          sources.set(row.dish_id, {
+            dishId: row.dish_id,
+            dishRevisionId: row.revision_id,
+            name: row.name,
+            description: row.description,
+            priceAmount: facts.priceAmount,
+            priceCurrency: facts.priceCurrency,
+            ingredients: facts.ingredients,
+            approvedAllergens: facts.allergens,
+            approvedCategory: facts.category,
+            reviewState: facts.category === null ? 'incomplete' : 'corrected',
+          });
+          continue;
+        }
         const draft = draftByDish.get(row.dish_id);
         const review = reviewByDish.get(row.dish_id);
         const corrected = review?.corrected_fields ?? {};
@@ -136,12 +165,14 @@ export async function loadApprovedDishSources(
           priceCurrency,
           ingredients,
           reviewState:
-            review?.review_status === 'rejected'
-              ? 'rejected'
-              : (review?.incomplete_fields?.length ?? 0) > 0 ||
-                  review?.review_status === 'incomplete'
-                ? 'incomplete'
-                : (review?.review_status ?? 'none'),
+            draft?.origin === 'manual'
+              ? 'incomplete'
+              : review?.review_status === 'rejected'
+                ? 'rejected'
+                : (review?.incomplete_fields?.length ?? 0) > 0 ||
+                    review?.review_status === 'incomplete'
+                  ? 'incomplete'
+                  : (review?.review_status ?? 'none'),
         });
       }
       return sources;

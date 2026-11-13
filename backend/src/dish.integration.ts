@@ -325,10 +325,14 @@ beforeAll(async () => {
   config.main = fileURLToPath(new URL('./index.ts', import.meta.url));
   config.r2_buckets = [
     { binding: 'OBSERVATION_ARCHIVE_BUCKET', bucket_name: 'local-observation-fixtures' },
+    { binding: 'INGESTION_REPORTS_BUCKET', bucket_name: 'local-menu-workspace' },
   ];
   config.ratelimits = config.env.staging.ratelimits;
   config.queues = {
-    producers: [{ binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' }],
+    producers: [
+      { binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' },
+      { binding: 'INGESTION_QUEUE', queue: 'local-menu-workspace' },
+    ],
     consumers: [
       {
         queue: 'local-observation-fixtures',
@@ -375,6 +379,108 @@ afterAll(async () => {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+});
+
+describe('owner menu browser transport', () => {
+  it('saves and resumes a private draft/photo through Chromium and the actual Worker/database', async () => {
+    const browser = await chromium.launch();
+    const consoleServer = createServer((_, res) =>
+      res
+        .writeHead(200, { 'Content-Type': 'text/html' })
+        .end('<!doctype html><title>Synthetic owner workspace transport</title>'),
+    );
+    let ownsServer = false;
+    await new Promise<void>((resolve, reject) => {
+      consoleServer.once('error', (error: NodeJS.ErrnoException) =>
+        error.code === 'EADDRINUSE' ? resolve() : reject(error),
+      );
+      consoleServer.listen(5174, '127.0.0.1', () => {
+        ownsServer = true;
+        resolve();
+      });
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto('http://127.0.0.1:5174/workspace-check.html');
+      const id = crypto.randomUUID();
+      const bearer = await token({ sub: actor });
+      const api = `http://127.0.0.1:${worker.port}`;
+      const first = await page.evaluate(
+        async ({ api, id, venue, bearer }) => {
+          const response = await fetch(`${api}/venues/${venue}/drafts/${id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              commandId: crypto.randomUUID(),
+              expectedVersion: 0,
+              fields: { name: 'Browser fictional soup' },
+            }),
+          });
+          return {
+            status: response.status,
+            body: await response.json(),
+          };
+        },
+        { api, id, venue, bearer },
+      );
+      expect(first.status).toBe(200);
+      await page.reload();
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=',
+        'base64',
+      );
+      const result = await page.evaluate(
+        async ({ api, id, venue, otherVenue, bearer, png }) => {
+          const headers = { Authorization: `Bearer ${bearer}` };
+          const resumed = await fetch(`${api}/venues/${venue}/drafts/${id}`, { headers });
+          const draft = (await resumed.json()) as {
+            draft: { name: string; draft_version: number };
+          };
+          const uploaded = await fetch(`${api}/venues/${venue}/drafts/${id}/photos`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'image/png',
+              'Idempotency-Key': crypto.randomUUID(),
+            },
+            body: new Uint8Array(png),
+          });
+          const photo = (await uploaded.json()) as { photo: { id: string } };
+          const read = await fetch(`${api}/venues/${venue}/drafts/${id}/photos/${photo.photo.id}`, {
+            headers,
+          });
+          const denied = await fetch(`${api}/venues/${otherVenue}/drafts/${id}`, { headers });
+          const anonymous = await fetch(`${api}/venues/${venue}/drafts/${id}`);
+          return {
+            resumed: resumed.status,
+            name: draft.draft.name,
+            version: draft.draft.draft_version,
+            upload: uploaded.status,
+            photo: read.status,
+            type: read.headers.get('content-type'),
+            size: (await read.arrayBuffer()).byteLength,
+            denied: denied.status,
+            anonymous: anonymous.status,
+          };
+        },
+        { api, id, venue, otherVenue, bearer, png: [...png] },
+      );
+      expect(result).toEqual({
+        resumed: 200,
+        name: 'Browser fictional soup',
+        version: 1,
+        upload: 201,
+        photo: 200,
+        type: 'image/png',
+        size: png.length,
+        denied: 403,
+        anonymous: 401,
+      });
+    } finally {
+      await browser.close();
+      if (ownsServer) await new Promise<void>((resolve) => consoleServer.close(() => resolve()));
+    }
+  });
 });
 
 describe('real team analytics API', () => {
