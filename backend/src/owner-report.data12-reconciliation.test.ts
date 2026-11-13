@@ -174,22 +174,27 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       if (normalized.includes('app_private.staff_membership')) {
         return { rows: [{ permission: 'owner' }] };
       }
-      if (normalized.includes('app_private.owner_comparison_v1')) {
+      if (normalized.includes('current_opening_sessions')) {
         return {
           rows: [
             {
               dish_id: '00000000-0000-4000-8000-000000000031',
               dish_name: 'Suppressed Comparison Dish',
-              baseline_total_sessions: 12,
-              baseline_exposed_open_sessions: 8,
-              baseline_open_eligible_sessions: 12,
-              baseline_engaged_sessions: 6,
-              baseline_saved_sessions: 3,
-              current_total_sessions: 8,
-              current_exposed_open_sessions: 4,
-              current_open_eligible_sessions: 8,
-              current_engaged_sessions: 2,
-              current_saved_sessions: 1,
+              baseline_sessions: 12,
+              baseline_exposure_sessions: 12,
+              baseline_opening_sessions: 10,
+              baseline_open_rate: 0.8333,
+              baseline_engagement_rate: 0.6,
+              baseline_save_rate: 0.25,
+              current_sessions: 8,
+              current_exposure_sessions: 8,
+              current_opening_sessions: 4,
+              current_open_rate: 0.5,
+              current_engagement_rate: 0.5,
+              current_save_rate: 0.125,
+              open_rate_delta: -0.3333,
+              engagement_rate_delta: -0.1,
+              save_rate_delta: -0.125,
             },
           ],
         };
@@ -207,7 +212,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       '2026-11-07T00:00:00.000Z',
     );
 
-    const dish = comparisonReport.dishes[0]!;
+    const dish = comparisonReport.dishes!;
     expect(dish.metrics.open_rate.status).toBe('INSUFFICIENT');
     expect(dish.metrics.open_rate.current_value).toBeNull();
     expect(dish.metrics.open_rate.delta).toBeNull();
