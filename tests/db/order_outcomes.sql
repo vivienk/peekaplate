@@ -683,7 +683,7 @@ SELECT throws_like(
   $$UPDATE app_private.order_data_deletion_requests
     SET status = 'executing'
     WHERE id = '00000000-0000-4000-8000-000000000998'$$,
-  '%Illegal deletion lifecycle transition%',
+  '%Verified deletion audit records are immutable%',
   'verified deletion request is immutable against operator updates'
 );
 
