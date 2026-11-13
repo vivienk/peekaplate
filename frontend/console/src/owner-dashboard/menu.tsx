@@ -521,12 +521,16 @@ export function Review({
   back,
   confirm,
   cancel,
+  onVerifyDish,
+  onApprovePhoto,
 }: {
   ed: Extract<EditState, { step: 'form' | 'review' }>;
   orig: MenuItem | null;
   back: () => void;
   confirm: (ingOk: boolean) => void;
   cancel: () => void;
+  onVerifyDish?: () => void;
+  onApprovePhoto?: () => void;
 }) {
   const dr = ed.draft;
   const [ingOk, setIngOk] = useState(false);
@@ -541,6 +545,10 @@ export function Review({
         (orig.upload || '') !== (dr.upload || '') && 'Photo',
       ].filter(Boolean)
     : ['New dish'];
+
+  const dishVerified = dr.dishVerificationStatus === 'verified';
+  const photoVerified = dr.photoVerificationStatus === 'verified';
+
   return (
     <div className="stack">
       <div className="pagehead">
@@ -551,6 +559,21 @@ export function Review({
           {changes.length ? `Changed: ${changes.join(', ')}.` : 'No fields changed.'}
         </p>
       </div>
+
+      <div className="row" style={{ gap: 12, marginBottom: 8 }}>
+        <span className={`lab ${dishVerified ? 'good' : 'warn'}`}>
+          Dish Verification: {dishVerified ? 'Verified' : 'Not verified'}
+        </span>
+        <span className={`lab ${photoVerified ? 'good' : 'st'}`}>
+          Photo Asset:{' '}
+          {photoVerified
+            ? 'Approved (menu-assets)'
+            : dr.upload
+              ? 'Staging (unverified)'
+              : 'No photo'}
+        </span>
+      </div>
+
       <div className="diff">
         <div className="col">
           <h3>{orig ? 'Live now' : 'Not on the menu yet'}</h3>
@@ -571,10 +594,24 @@ export function Review({
         </div>
       </div>
       {dr.aiUsed && <Note icon="info">Includes AI-drafted content that you reviewed.</Note>}
-      <div className="row">
+      <Note icon="info">
+        Verification must never block publishing: unverified dishes can be saved and published at
+        any time.
+      </Note>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
         <Btn kind="primary" size="lg" type="button" onClick={() => confirm(ingOk)}>
           Approve and save
         </Btn>
+        {onVerifyDish && !dishVerified && (
+          <Btn kind="outlined" size="lg" type="button" onClick={onVerifyDish}>
+            Verify dish
+          </Btn>
+        )}
+        {onApprovePhoto && dr.upload && !photoVerified && (
+          <Btn kind="outlined" size="lg" type="button" onClick={onApprovePhoto}>
+            Approve & promote photo
+          </Btn>
+        )}
         <Btn kind="outlined" size="lg" type="button" onClick={back}>
           Back to edit
         </Btn>
@@ -595,16 +632,25 @@ export function Saved({
   publish: (id: string) => void;
   backToMenu: () => void;
 }) {
+  const dishVerified = m.dishVerificationStatus === 'verified';
   return (
     <div className="stack">
       <div className="pagehead">
         <span className="eyebrow">Step 3 of 3</span>
         <h1>{m.name} is saved</h1>
       </div>
+      <div className="row" style={{ gap: 12, marginBottom: 8 }}>
+        <span className={`lab ${dishVerified ? 'good' : 'warn'}`}>
+          {dishVerified ? 'Dish verified' : 'Dish not verified'}
+        </span>
+        <span className={`lab ${m.photoVerificationStatus === 'verified' ? 'good' : 'st'}`}>
+          {m.photoVerificationStatus === 'verified' ? 'Photo in menu-assets' : 'Photo in staging'}
+        </span>
+      </div>
       <Note kind="good" icon="check">
         Approved by you. Status:{' '}
-        {m.status === 'live' ? 'Live on the diner menu.' : 'ready to publish.'} Human review before
-        going live is a proposed step.
+        {m.status === 'live' ? 'Live on the diner menu.' : 'ready to publish.'} Unverified dishes
+        can still be published without blocking.
       </Note>
       <div className="row">
         {m.status !== 'live' && (

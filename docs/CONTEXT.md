@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "4ef95b7ebd0ab742a9a72c2e53164a1542f500249efca9fe7551128280ed4cc0"
+      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
     },
     {
       "id": "tokens",
@@ -229,7 +229,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/input.spec.ts",
         "frontend/console/vite.config.ts",
         "frontend/console/src/foundations/TextField.tsx",
-        "frontend/console/src/foundations/field.css"
+        "frontend/console/src/foundations/field.css",
+        "frontend/console/src/owner-dashboard/menu-api.ts",
+        "frontend/console/src/owner-dashboard/menu.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -239,12 +241,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d78e4f61ade86a3cf4e781b880b5bc299f275dbdc030788b9dd585c0f78d9930"
+      "sourceFingerprint": "3fb5f68d3246099957a785b4daac8f70b227e28face91ed635656db55639c03f"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. PR161 adds revision-bound private draft verification and independent content-checked photo promotion; tenant-scoped retention remains disabled until configured. Synthetic demo labels are not live screen integration.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -373,7 +375,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-menu-workspace.md",
         "backend/src/ingestion/intake.source.test.ts",
         "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
+        "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu-retention.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -386,7 +390,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "32f01e3a1db7abfcb6f7f5bb3f8e8917a38630b9f6e8e84783327eb106c68011"
+      "sourceFingerprint": "2876a6834b9501ac72c950d58f582c51b4d16102d9a56f29f146bd280f4c4537"
     },
     {
       "id": "database",
@@ -421,7 +425,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261109120000_owner_insight_actions.sql",
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "tests/db/owner_menu_workspace.sql"
+        "tests/db/owner_menu_workspace.sql",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -432,7 +437,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
+      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
     },
     {
       "id": "measurement",
@@ -518,7 +523,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b163c8afab888b70948ed2edd2c274ec53fb4002223043f3c55d8d64b66339f1"
+      "sourceFingerprint": "099543eb11a0589da162bd56496130ba10e690ec39bd53430c5d092f9bea8c15"
     },
     {
       "id": "agents",
@@ -741,13 +746,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Export approved reference artwork; implement shared schemas, authenticated hosted lifecycle and owner/publication integration per ingredient-icon-pipeline.md. Frozen environment and hosted acceptance remain separate."
     },
     {
-      "date": "2026-11-10",
+      "date": "2026-11-13",
       "modules": [
         "backend",
-        "delivery"
+        "contracts",
+        "database"
       ],
-      "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
-      "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
+      "summary": "PR161 verification correction: expected draft version required; separate verification event sequence supports manual and extracted drafts without changing content versions or published projections. Manual edits/extraction retries invalidate verification. Photo transitions serialize successive event versions; identical retries are storage-effect-free. Retention establishes tenant RLS scope and row locks, validates promoted bytes and exact keys, paginates R2 and retains on lookup failures. Review/Saved pages remain synthetic preview state, not connected persistence.",
+      "sources": [
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "packages/contracts/src/owner-menu.ts",
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu.integration.ts",
+        "frontend/console/src/owner-dashboard/menu.tsx"
+      ],
+      "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
     },
     {
       "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Initial PR51 head e67a574 passed full Linux CI40461046251, including frozen Python/package, browser and DB checks; Intel Mac native dependency limits are documented in errors.md. Independent automated review found no supported defect after disproving an assumed Zod Unicode mismatch; a boundary regression was added. See ingredient-intelligence.md for remaining authenticated RES-01 integration.",
