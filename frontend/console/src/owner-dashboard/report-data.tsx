@@ -43,6 +43,12 @@ const COLUMNS: [keyof (typeof UNEEZA_REPORT.dishes)[number]['metrics'], string, 
   ['engagement_rate', 'Engagement', 'rate'],
 ];
 
+// null means the reader abstains on freshness, so it must not read as "up to date".
+function freshnessLabel(isStale: boolean | null) {
+  if (isStale === null) return 'freshness not known';
+  return isStale ? 'out of date' : 'up to date';
+}
+
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString('en-US', {
     month: 'short',
@@ -75,8 +81,7 @@ export function ReportData() {
             <span className="sub">
               {m.coverage.measurable_dishes_count} of {m.coverage.total_dishes_monitored} dishes
               measurable · report {m.report_status.toLowerCase()} ·{' '}
-              {m.freshness.is_stale ? 'out of date' : 'up to date'} · {r.schema_version} ·{' '}
-              {m.calculation_version}
+              {freshnessLabel(m.freshness.is_stale)} · {r.schema_version} · {m.calculation_version}
             </span>
           </div>
         </div>
