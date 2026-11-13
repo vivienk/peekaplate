@@ -1145,11 +1145,14 @@ main:has(> .pp-compare) {
   object-fit: cover;
 }
 
-/* Figma check badge: 50px, 8px padding, color/primary, drop shadow, 12px from the card's left
-   edge and 20px from its top. */
+/* Figma check badge: 50px, color/primary, drop shadow, 20px from the top and 12px in from the
+   card's outer edge on the photo side, so it always sits on the photo's outer corner (never over
+   the middle of the card). The tick is centered in the circle. */
 .pp-picker__check {
   display: none;
   position: absolute;
+  align-items: center;
+  justify-content: center;
   top: 20px;
   left: 12px;
   box-sizing: border-box;
@@ -1161,17 +1164,16 @@ main:has(> .pp-compare) {
   color: var(--pp-role-on-surface);
   font-size: 28px;
   font-weight: 700;
-  line-height: 50px;
-  text-align: center;
+  line-height: 1;
 }
 
 .pp-picker__option:nth-child(odd) .pp-picker__check {
   left: auto;
-  right: calc(min(220px, 60%) - 62px);
+  right: 12px;
 }
 
 .pp-picker__option--selected .pp-picker__check {
-  display: block;
+  display: flex;
 }
 
 /* The Compare action stays in the picker's column, pinned to the bottom of the viewport while the

@@ -55,6 +55,28 @@ test('Compare on a dish detail opens the picker with that dish as Keeping', asyn
   await expectNoAxeViolations(page);
 });
 
+// Rania (Nov 13): the check must sit on the selected photo's outer top corner, never over the
+// middle of the card, whichever side the photo is on.
+async function expectCheckOnPhotoCorner(page: Page) {
+  const card = page.locator('.pp-picker__option--selected');
+  const [check, photo] = await Promise.all([
+    card.locator('.pp-picker__check').boundingBox(),
+    card.locator('.pp-picker__option-media').boundingBox(),
+  ]);
+  if (!check || !photo) throw new Error('selected card is not rendered');
+  // Fully inside the photo's top area…
+  expect(check.x).toBeGreaterThanOrEqual(photo.x);
+  expect(check.x + check.width).toBeLessThanOrEqual(photo.x + photo.width);
+  expect(check.y).toBeLessThan(photo.y + photo.height / 2);
+  // …and on its outer half, away from the card's middle.
+  const photoCenter = photo.x + photo.width / 2;
+  const cardBox = await card.boundingBox();
+  if (!cardBox) throw new Error('selected card is not rendered');
+  const cardCenter = cardBox.x + cardBox.width / 2;
+  const checkCenter = check.x + check.width / 2;
+  expect(Math.abs(checkCenter - cardCenter)).toBeGreaterThan(Math.abs(photoCenter - cardCenter));
+}
+
 test('one dish is selected at a time, with the orange border and check', async ({ page }) => {
   await openPicker(page);
   const bowl = page.getByRole('button', { name: 'Compare with Harvest Power Bowl' });
@@ -66,6 +88,7 @@ test('one dish is selected at a time, with the orange border and check', async (
     'Harvest Power Bowl',
   );
   await expect(page.locator('.pp-picker__option--selected .pp-picker__check')).toBeVisible();
+  await expectCheckOnPhotoCorner(page);
 
   // Tapping the card body selects too, and replaces the previous choice.
   await page.locator('.pp-picker__option', { hasText: 'Garden Avocado Salad' }).click({
@@ -74,6 +97,12 @@ test('one dish is selected at a time, with the orange border and check', async (
   await expect(salad).toHaveAttribute('aria-pressed', 'true');
   await expect(bowl).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.pp-picker__option--selected')).toHaveCount(1);
+  await expectCheckOnPhotoCorner(page);
+  // Cards alternate the photo side: Salmon Poke Bowl has its photo on the right, and its check
+  // must sit on that photo's outer corner as well, not over the middle of the card.
+  await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
+  await expectCheckOnPhotoCorner(page);
+  await salad.click();
 
   // The result screen is DIN-02.4, so Compare stays disabled and says so.
   await expect(page.locator('.pp-picker__confirm')).toBeDisabled();
