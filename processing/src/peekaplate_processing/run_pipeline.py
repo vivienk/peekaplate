@@ -390,6 +390,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
+    parser.add_argument("--ingredient-icons", action="store_true", help="Write private text-fallback icon proposals after extraction; no generation or approval.")
     parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), image (no OCR; private suggestions only), or vision_v4 (vision-model transcription with approximate boxes; falls back to ocr_image).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--target-pages",type=int,nargs="+",help="Explicitly recover only 1 to 4 saved ready pages; no merging with old drafts or automatic retry.")
@@ -410,6 +411,12 @@ def main(argv=None):
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")
+    if args.ingredient_icons:
+        from .ingredient_icons import export_icons
+        try:
+            export_icons(args.run_dir / "extraction.json", args.run_dir / "ingredient-icons.json")
+        except (ValueError, OSError, ExtractionError):
+            parser.exit(1, "Ingredient icons unavailable; original extraction retained.\n")
     if args.input_mode=="image":
         print("Image-only results are private unvalidated suggestions in review-suggestions.json; no OCR-grounded candidates were created.")
     for error in report.errors: print(error)
