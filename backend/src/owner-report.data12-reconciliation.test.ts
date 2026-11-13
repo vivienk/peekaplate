@@ -179,7 +179,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
           rows: [
             {
               dish_id: '00000000-0000-4000-8000-000000000031',
-              dish_name: 'Suppressed Comparison Dish',
+              name: 'Suppressed Comparison Dish',
               baseline_sessions: 12,
               baseline_exposure_sessions: 12,
               baseline_opening_sessions: 10,
