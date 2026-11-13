@@ -197,7 +197,11 @@ test('View details opens the dish detail from compare_view and Back returns to t
   await compare(page, 'Avocado Toast', 'Harvest Power Bowl');
   await expect.poll(() => compared(events).length).toBe(1);
 
-  await page.getByRole('button', { name: 'View details of Harvest Power Bowl' }).click();
+  const view = page.getByRole('button', { name: 'View details of Harvest Power Bowl' });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  expect(scrolled).toBeGreaterThan(0);
+  await view.click();
   await expect(page.getByRole('heading', { level: 2, name: 'Harvest Power Bowl' })).toBeVisible();
   // There is no Compare or Replace on a detail opened from a comparison.
   await expect(page.locator('.pp-detail__compare')).toHaveCount(0);
@@ -216,9 +220,10 @@ test('View details opens the dish detail from compare_view and Back returns to t
 
   await page.getByRole('button', { name: 'Back to compare' }).click();
   await expect(sideNames(page)).toHaveText(['Avocado Toast', 'Harvest Power Bowl']);
-  await expect(
-    page.getByRole('button', { name: 'View details of Harvest Power Bowl' }),
-  ).toBeFocused();
+  await expect(view).toBeFocused();
+  // Azoz review #13: the result comes back where the diner left it, with the button on screen.
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  await expect(view).toBeInViewport();
   await page.waitForTimeout(200);
   // Coming back shows the same comparison again; it is not a new start.
   expect(compared(events)).toHaveLength(1);
