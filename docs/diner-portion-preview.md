@@ -166,3 +166,5 @@ The local demo now opens the camera/table portal automatically on the first read
 
 ## Hosted PR camera demo
 PR builds opt into the captured-dish camera demo through the existing PEEKAPLATE_PREVIEW_DEMOS build flag. Open `/?scenario=portion-demo`, select the dish and View Portion. HTTPS allows camera permission on phones; camera starts automatically and the 2.5D cutout is visible immediately. The dialog fits up to 390 × 844 CSS pixels, with full-viewport immersive AR if available. Tripo generation and the loopback bridge remain DEV-only; normal production builds exclude the demo.
+
+PR #145 menu integration: the hosted demo retains the full Ember & Stone fixture menu and categories, with the captured-dish demo in its first slot. Header/logo/search, outline hearts, Back, and dish-information icons follow #145. Existing Save/Compare behavior is unchanged; this is a visual integration, not the dependent Saved-route implementation. Other dishes retain their own assets or the unavailable preview.

@@ -318,10 +318,6 @@ export function createFixtureMenuSource(
           const category = bundle.categories[0]!;
           const dish = category.dishes[0]!;
           if (!dish.complete) throw new Error('Demo requires a complete fixture');
-          bundle.restaurant = { name: 'Local tilt demo', logo: null };
-          category.name = 'Captured photo demo';
-          category.dishes = [dish];
-          bundle.categories = [category];
           dish.dish_id = portion.dish_id;
           dish.dish_revision_id = portion.dish_revision_id;
           dish.name = 'Captured dish · tilt demo';

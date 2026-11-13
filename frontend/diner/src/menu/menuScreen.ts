@@ -4,6 +4,7 @@ import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { UI_ICONS } from './icons';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
 import { menuRouteFromPath } from './route';
@@ -135,7 +136,7 @@ function renderCard(dish: CompleteDish): string {
         <h2 class="pp-card__name"><button type="button" class="pp-card__open" data-open-dish-id="${escapeHtml(dish.dishId)}" aria-label="Open ${escapeHtml(dish.name)}"><span class="pp-card__name-text">${escapeHtml(dish.name)}</span></button></h2>
         <p class="pp-card__price">${escapeHtml(formatPrice(dish.price))}</p>
         <button class="pp-card__save" type="button" aria-label="Save ${escapeHtml(dish.name)} (not available yet)" disabled>
-        <span aria-hidden="true">♡</span><span aria-hidden="true">Save</span>
+        <img src="${UI_ICONS.unsaveHeart}" alt="" aria-hidden="true" width="20" height="20" /><span aria-hidden="true">Save</span>
         </button>
         <p class="pp-card__description">${escapeHtml(dish.description)}</p>
       </div>
@@ -183,14 +184,14 @@ function renderMenu(
       <h1 class="pp-sr-only">${escapeHtml(menu.restaurant.name)}</h1>
       <header class="pp-header">
         <button class="pp-saved" type="button" aria-label="Saved dishes (not available yet)" disabled>
-          <span class="pp-saved__icon" aria-hidden="true">♥</span>
+          <img class="pp-saved__icon" src="${UI_ICONS.unsaveHeart}" alt="" aria-hidden="true" width="24" height="24" />
         </button>
         <div class="pp-logo">
-          <span class="pp-logo__emblem" aria-hidden="true"></span>
+          ${menu.restaurant.logo ? `<img class="pp-logo__image" src="${escapeHtml(menu.restaurant.logo.url)}" alt="" width="${menu.restaurant.logo.width}" height="${menu.restaurant.logo.height}" />` : '<span class="pp-logo__emblem" aria-hidden="true"></span>'}
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
-          <span aria-hidden="true">⌕</span>
+          <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="24" height="24" />
         </button>
       </header>
       ${
