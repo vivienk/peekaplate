@@ -428,7 +428,7 @@ DECLARE
   req_row record;
   v_now timestamptz := now();
 BEGIN
-  IF pg_has_role(session_user, 'peekaplate_runtime', 'member') THEN
+  IF app_private.is_runtime_role(session_user) THEN
     RAISE EXCEPTION 'Runtime role % cannot execute record_deletion_verification', session_user;
   END IF;
 
@@ -550,7 +550,7 @@ DECLARE
   v_conflicts integer := 0;
   v_outcome text;
 BEGIN
-  IF pg_has_role(session_user, 'peekaplate_runtime', 'member') THEN
+  IF app_private.is_runtime_role(session_user) THEN
     RAISE EXCEPTION 'Runtime role % cannot execute reconcile_venue_order_deletion', session_user;
   END IF;
 
@@ -712,7 +712,7 @@ DECLARE
   v_conflicts integer := 0;
   v_batches integer := 0;
 BEGIN
-  IF pg_has_role(session_user, 'peekaplate_runtime', 'member') THEN
+  IF app_private.is_runtime_role(session_user) THEN
     RAISE EXCEPTION 'Runtime role % cannot execute delete_venue_order_data', session_user;
   END IF;
 
