@@ -3078,6 +3078,24 @@ The comparison SQL scope change also required updating both test clients that de
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:37:27.047Z","exitCode":1}
+
+```
+
+## November 9 AI preview dependency setup boundary
+
+The new synthetic preview worktree's normal frozen install stopped at pnpm's
+project-registration symlink with Windows EPERM before workspace dependencies
+could be linked. The one added contracts dependency is a local workspace link;
+no external package, engine, lock version or installation policy is changed.
+Formatting and lint can use the already installed toolchain; direct context
+refresh/check and documentation-link checks also run without installation.
+Typechecking, unit/browser tests and builds are NOT RUN for this candidate until
+normal installation is available. No test is removed, skipped or weakened to
+bypass the sandbox limitation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:41:35.066Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -3127,3 +3145,136 @@ Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, in
 ## Diner first-consent dispatch — November 12, 2026
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
+
+```
+
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:42:35.891Z","exitCode":1}
+```
+
+## November 9 AI preview review corrections
+
+Normal dependency installation was completed in the contributor terminal. The
+first child full check passed lint/typechecks but localhost JWKS reads failed
+with EACCES; the root's permitted recheck passed all 998 application tests
+(four skipped). Root script verification then exposed a genuine new regression:
+the broad contracts barrel brought unrelated PostHog schema strings into the
+standalone demo bundle. The existing no-analytics artifact regression is kept.
+A public owner-ai export now exposes only the existing AI schemas; the console
+uses that subpath without changing any wire contract or external version.
+
+Independent correctness review also found that slicing offset-bearing report
+bounds to a date under a UTC label displayed the wrong day and discarded
+intraday times. Three regressions fail against the old date-only display and
+pass after UTC normalization: both offset directions crossing midnight and a
+same-day intraday window. All 16 focused preview unit cases now pass. Original
+dateTime values remain intact; there are no new result statuses or effects.
+
+The context update guard rejected an overlong contracts summary before writing;
+the same narrow export handoff is now recorded within the existing cap. Final
+aggregate/script, actual browser and build results still need the root recheck.
+The sandbox junction regression remains unchanged and is not bypassed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:48:45.851Z","exitCode":1}
+```
+
+## November 9 preview final local verification boundary
+
+At implementation 69e2060, the 16 focused component cases pass, including three
+UTC offset/intraday regressions. Normal lint and seven package typechecks pass.
+The full application suite passes 1001 tests (four optional skips); 66 of 67
+script tests pass, including the unchanged no-analytics preview-build check.
+Only the existing artifact-symlink regression cannot create its junction in the
+agent sandbox. No test, engine or lockfile security policy is weakened.
+
+Browser setup initially lacked the pinned Chromium runtime and attempted to
+write Wrangler logs/registry outside the workspace. Installing the official
+Playwright Chromium runtime to ignored outputs and using Wrangler's supported
+local log/registry paths resolved startup. All three unchanged preview cases
+then report passing assertions (desktop six states/no API requests, narrow
+mobile drawer and keyboard/scoped axe). The Windows process teardown did not
+return, even in a console-only local harness; it was interrupted after the
+assertions and local servers stopped. This is not a normal browser-command
+completion. The first ignored focused config was inside the runner-cleaned
+output directory; moving it outside that directory resolved its launch cwd
+failure. Temporary harness files are not part of this change or CI.
+
+The final frontend/Worker dry-run build passes. A normal-terminal full check
+and standard three-server browser command are still required before pushing
+this candidate. Final visual inspection confirmed the component mounted in
+the existing desktop panel with its synthetic label and UTC time window;
+manual device/screen-reader and full shell design acceptance remain separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T03:25:04.862Z","exitCode":1}
+```
+
+## November 9 late parent-drawer integration
+
+The preview branch now includes parent #105 dcb6fd4. Its sole App.tsx conflict
+keeps the parent ModalDrawer wrapper and the existing synthetic aiPreview in
+both ChatBox ctxBar slots. The parent drawer implementation, CSS and two
+keyboard browser regressions are inherited unchanged; shared result schemas,
+fixtures, formatting and application behavior outside this mount are unchanged.
+
+The initial inline context helper stopped before writing because a shell quote
+split its source. Running the same guarded update from a standalone helper
+preserved the bounded context graph and refreshed its fingerprints.
+
+On the synchronized candidate, the 16 component cases, lint, seven package
+typechecks, context freshness, documentation links and frontend/Worker dry-run
+build pass. The full application suite passes; only the unchanged artifact
+junction security regression remains unable to create its test link in this
+agent sandbox. Its automatic observation is retained and the test is unchanged.
+A complete Linux CI or normal-terminal full check plus the three preview and
+two modal-drawer browser cases are required before requesting re-review.
+Earlier passing checks at ba0a19d do not verify this integration. Both PRs #112
+and #124 remain Draft; AI-01 remains In Progress with existing integration and
+visual-review ownership. No extra scope or delivery date is assigned.
+
+## November 10 AI preview screen-context handoff
+
+The reusable component formerly rendered every schema-valid result without
+checking the report selected on screen and always included fictional-demo copy.
+The expanded component suite reproduces these gaps before the implementation:
+20 cases fail and eight pass. The component now requires the expected venue and
+exact window before showing either wire status, with optional comparison of a
+report ID already known to the caller. Missing or malformed runtime context
+fails closed. The synthetic wrapper retains all fictional notices and passes
+its fixed context; no public report ID is invented or live source connected.
+
+All 28 component cases pass after the correction. The first strict typecheck
+also caught test-helper inference, an invalid never-spread test cast and an
+exact-optional-property mismatch in the private render props. Explicit context
+typing, a checked expected-error runtime regression and an undefined-aware
+private prop resolve those without weakening result-call requirements. Console
+strict TypeScript now passes. App.tsx, ModalDrawer, public result contracts,
+deterministic validation and both existing mounts are unchanged. Full browser,
+build and final-head evidence are recorded separately, not implied by unit tests.
+
+Lint, seven workspace typechecks, context/documentation checks and the normal
+frontend/Worker dry-run build pass on this correction. The standard five-case
+browser command did not reach test execution: local web-server startup stopped
+reporting progress before readiness, and the bounded attempt was interrupted.
+It is NOT RUN evidence for those cases, not a passing run or an established
+component defect. A task-local console-only harness may verify the unchanged
+preview/drawer assertions separately; the repository's three-server CI config
+and all test assertions remain intact. Final results belong to the exact-head
+handoff and do not establish live report, authorization or design acceptance.
+
+## November 11 AI preview synchronization with the compact owner panel
+
+The focused Playwright command waited for console-server readiness and was
+stopped before the five preview/drawer cases started. A separate Chromium
+smoke loaded the built preview assets through browser request interception.
+At 1440px it confirmed the 360px panel, the keyboard selector and all six
+synthetic states. At 390px it confirmed the preview in ModalDrawer, focus
+containment, Escape and opener restoration, and a result without horizontal
+overflow. The smoke observed zero fetch or XHR requests. The repository's
+Playwright cases, including the scoped axe check, await CI on the merge revision.
+
+Direct context/docs checks, Biome, console TypeScript, 33 component/contract
+tests, and both normal and preview console builds pass. The preview build
+contains the dashboard demo, and the normal build excludes it.

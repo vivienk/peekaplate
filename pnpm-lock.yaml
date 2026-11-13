@@ -69,6 +69,9 @@ importers:
       '@peekaplate/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
+      '@peekaplate/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@peekaplate/tokens':
         specifier: workspace:*
         version: link:../../packages/tokens
