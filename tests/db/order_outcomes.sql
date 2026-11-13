@@ -593,7 +593,7 @@ SELECT throws_like(
 UPDATE app_private.order_data_deletion_requests
 SET status = 'executing',
     executed_by = '00000000-0000-0000-0000-000000000099',
-    execution_lease_token = '00000000-0000-4000-8000-000000000777',
+    execution_token = '00000000-0000-4000-8000-000000000777',
     execution_lease_expires_at = now() + interval '5 minutes'
 WHERE id = '00000000-0000-4000-8000-000000000998';
 
@@ -627,7 +627,7 @@ SELECT lives_ok(
     SET status = 'awaiting_verification',
         completed_at = now(),
         receipt_written_at = now(),
-        execution_lease_token = NULL,
+        execution_token = NULL,
         execution_lease_expires_at = NULL
     WHERE id = '00000000-0000-4000-8000-000000000998'$$,
   'operator transitions db_deleted request to awaiting_verification'
