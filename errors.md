@@ -2819,3 +2819,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Live cutout browser check initially tried to read the HTTP body after the automatic preview transition; Chromium had evicted it from the inspector cache. The API tests assert the response contract, while the browser check now asserts the rendered cutout, comparison and navigation directly.
 
 - Live cutout test scoped its review notice to the AR dialog after finding the same deliberate disclosure in both underlying preview and dialog.
+
+- Automatic-upload review found two missing cases: a successful upload required an existing dish image, and the legacy fixture selector could rebind its fixed-source Tripo controls after an upload. The upload now creates the original-photo element when needed, removes fixture controls, and forbids fixture 3D binding for uploaded sources. Live browser regressions cover both paths.

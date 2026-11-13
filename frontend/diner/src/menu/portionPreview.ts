@@ -243,7 +243,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
         (visualSelect || fixtureCamera || uploadedPortion)
       ) {
-        if (import.meta.env.DEV && visualSelect) {
+        if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
           if (!module) return;
           const { bindLocal3d } = module;
@@ -452,12 +452,17 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         result.dispose();
         return;
       }
-      const photo = stage.querySelector<HTMLImageElement>('img.pp-detail__image');
-      if (!photo) {
-        result.dispose();
-        throw new Error('Dish photo unavailable');
-      }
       stop();
+      let photo = stage.querySelector<HTMLImageElement>('img.pp-detail__image');
+      if (!photo) {
+        photo = document.createElement('img');
+        photo.className = 'pp-detail__image';
+        stage.querySelector('.pp-detail__image--missing')?.remove();
+        stage.append(photo);
+      }
+      visualSelect?.removeEventListener('change', changeVisual);
+      visualSelect?.remove();
+      visualSelect = undefined;
       releaseUpload?.();
       releaseUpload = result.dispose;
       uploadedPortion = result.portion;
