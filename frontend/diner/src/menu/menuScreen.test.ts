@@ -2,17 +2,50 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFixtureMenuSource } from './fixtures';
 import { mountMenuScreen } from './menuScreen';
 
+const { mockTrack } = vi.hoisted(() => ({
+  mockTrack: vi.fn(),
+}));
+
+vi.mock('../tracking', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tracking')>();
+  return {
+    ...actual,
+    track: mockTrack,
+  };
+});
+
 const mockObserve = vi.fn();
 const mockUnobserve = vi.fn();
 // Every observer the screen creates, so a test can check each one individually.
 const observers: MockIntersectionObserver[] = [];
 
 class MockIntersectionObserver {
-  observe = mockObserve;
+  observed: Element[] = [];
+  observe = vi.fn((target: Element) => {
+    mockObserve(target);
+    this.observed.push(target);
+  });
   unobserve = mockUnobserve;
   disconnect = vi.fn();
-  constructor() {
+
+  constructor(
+    private readonly callback: IntersectionObserverCallback,
+    readonly options?: IntersectionObserverInit,
+  ) {
     observers.push(this);
+  }
+
+  trigger(target: Element): void {
+    this.callback(
+      [
+        {
+          target,
+          isIntersecting: true,
+          intersectionRatio: 0.75,
+        } as IntersectionObserverEntry,
+      ],
+      this as unknown as IntersectionObserver,
+    );
   }
 }
 
@@ -31,19 +64,34 @@ class FakeContainer {
     const className = classMatch[1];
     if (!className) return [];
     const elements: HTMLElement[] = [];
-    // Extract all class attribute values from the HTML
-    const classAttrRegex = /class="([^"]*)"/g;
+    // Extract matching opening tags so each fake card retains its real dish ID.
+    const tagRegex = /<[a-z][^>]*>/gi;
     let attrMatch;
-    while ((attrMatch = classAttrRegex.exec(this._html)) !== null) {
-      const classes = (attrMatch[1] ?? '').split(/\s+/);
+    while ((attrMatch = tagRegex.exec(this._html)) !== null) {
+      const tag = attrMatch[0];
+      const classes = tag.match(/\bclass="([^"]*)"/)?.[1]?.split(/\s+/) ?? [];
       if (classes.includes(className)) {
+        const dishId = tag.match(/\bdata-dish-id="([^"]*)"/)?.[1];
+        const openDishId = tag.match(/\bdata-open-dish-id="([^"]*)"/)?.[1];
         elements.push({
           className,
-          getAttribute: () => null,
+          getAttribute: (name: string) =>
+            tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? null,
           hasAttribute: () => false,
           addEventListener: vi.fn(),
           removeEventListener: vi.fn(),
-          dataset: { dishId: 'test-dish-id' },
+          querySelector: vi.fn(() => null),
+          dataset: { dishId, openDishId },
+          isConnected: true,
+          closest: () => null,
+          classList: {
+            add: vi.fn(),
+            remove: vi.fn(),
+            toggle: vi.fn(),
+            contains: vi.fn(() => false),
+          },
+          style: {},
+          focus: vi.fn(),
         } as unknown as HTMLElement);
       }
     }
@@ -80,6 +128,10 @@ beforeEach(() => {
     get scrollY() {
       return 0;
     },
+    setTimeout: (...args: Parameters<typeof setTimeout>) =>
+      globalThis.setTimeout(...args),
+    clearTimeout: (timer: ReturnType<typeof setTimeout>) =>
+      globalThis.clearTimeout(timer),
     IntersectionObserver: MockIntersectionObserver,
   } as any);
   vi.stubGlobal('document', {
@@ -92,6 +144,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -157,6 +210,55 @@ describe('menu screen observer lifecycle', () => {
     for (const observer of firstMount) {
       expect(observer.disconnect).toHaveBeenCalled();
     }
+  });
+
+  it('tracks menu_viewed when the fixture menu becomes readable', async () => {
+    mockTrack.mockClear();
+    const container = new FakeContainer();
+
+    await mountAndWait(container);
+
+    expect(mockTrack).toHaveBeenCalledWith('menu_viewed', {
+      publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+      entry_source: 'direct_link',
+    });
+  });
+
+  it('tracks dish_viewed after a complete dish is at least 50% visible for one second', async () => {
+    mockTrack.mockClear();
+    const container = new FakeContainer();
+
+    await mountAndWait(container);
+
+    const exposureObserver = observers.find(
+      (observer) =>
+        Array.isArray(observer.options?.threshold) &&
+        observer.options.threshold.includes(0.5),
+    );
+    expect(exposureObserver).toBeDefined();
+
+    const card = exposureObserver?.observed.find(
+      (element) =>
+        (element as HTMLElement).dataset.dishId ===
+        'a1000000-0000-4000-8000-000000000001',
+    );
+    expect(card).toBeDefined();
+
+    vi.useFakeTimers();
+    exposureObserver!.trigger(card!);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(mockTrack).toHaveBeenCalledWith(
+      'dish_viewed',
+      expect.objectContaining({
+        publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+        dish_id: 'a1000000-0000-4000-8000-000000000001',
+        surface: 'menu_list',
+        position: 1,
+        exposure_basis: 'viewport_50pct_1s',
+        exposure_id: expect.any(String),
+      }),
+    );
   });
 
   it('calls observe on the IntersectionObserver for cards', async () => {
