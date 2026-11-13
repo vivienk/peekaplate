@@ -634,6 +634,7 @@ SELECT lives_ok(
 );
 
 SET ROLE peekaplate_deletion_checker;
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
 SELECT throws_like(
   $$SELECT * FROM app_private.record_deletion_verification(
       '00000000-0000-0000-0000-000000000801',
@@ -646,6 +647,7 @@ SELECT throws_like(
   'checker cannot self-approve deletion executed by same actor'
 );
 
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000088', true);
 SELECT is(
   (SELECT status FROM app_private.record_deletion_verification(
     '00000000-0000-0000-0000-000000000801',
@@ -672,6 +674,7 @@ SELECT is(
 
 SET ROLE peekaplate_deletion_operator;
 SELECT set_config('app.tenant_id', '00000000-0000-0000-0000-000000000801', true);
+SELECT set_config('app.actor_id', '00000000-0000-0000-0000-000000000099', true);
 SELECT throws_like(
   $$UPDATE app_private.order_data_deletion_requests
     SET status = 'executing'
