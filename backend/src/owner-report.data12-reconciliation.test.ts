@@ -26,7 +26,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
   it('reconciles D06-PRIVACY-09, D06-PRIVACY-10, D06-PRIVACY-11, and D06-PRIVACY-REPEAT session boundaries', async () => {
     const rows = [
       {
-        // D06-PRIVACY-09: 9 distinct eligible sessions -> SUPPRESSED
         dish_id: '00000000-0000-4000-8000-000000000009',
         dish_name: 'D06-PRIVACY-09 Dish',
         total_sessions: 9,
@@ -41,7 +40,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         last_event_ingested_at: NOW,
       },
       {
-        // D06-PRIVACY-10: 10 distinct eligible sessions -> NORMAL
         dish_id: '00000000-0000-4000-8000-000000000010',
         dish_name: 'D06-PRIVACY-10 Dish',
         total_sessions: 10,
@@ -56,7 +54,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         last_event_ingested_at: NOW,
       },
       {
-        // D06-PRIVACY-11: 11 distinct eligible sessions -> NORMAL
         dish_id: '00000000-0000-4000-8000-000000000011',
         dish_name: 'D06-PRIVACY-11 Dish',
         total_sessions: 11,
@@ -71,7 +68,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         last_event_ingested_at: NOW,
       },
       {
-        // D06-PRIVACY-REPEAT: 10 events from 1 distinct session -> distinct_eligible_sessions = 1 -> SUPPRESSED
         dish_id: '00000000-0000-4000-8000-000000000001',
         dish_name: 'D06-PRIVACY-REPEAT Dish',
         total_sessions: 1,
@@ -91,7 +87,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       await readOwnerReport(createOwnerReportClient(rows), ACTOR_ID, VENUE_ID, NOW, 'synthetic'),
     );
 
-    // Null-freshness abstention on current develop (#107/#152)
     expect(report.report_metadata.freshness.is_stale).toBeNull();
     expect(report.report_metadata.coverage.total_dishes_monitored).toBe(4);
     expect(report.report_metadata.coverage.measurable_dishes_count).toBe(2);
@@ -121,7 +116,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
   it('reconciles timing coverage coupled suppression and NOT_MEASURABLE states', async () => {
     const rows = [
       {
-        // 11 total sessions, but only 9 open_eligible_sessions -> timing_coverage & engagement_rate SUPPRESSED
         dish_id: '00000000-0000-4000-8000-000000000021',
         dish_name: 'Sub-floor Open Cohort Dish',
         total_sessions: 11,
@@ -136,7 +130,6 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
         last_event_ingested_at: NOW,
       },
       {
-        // 11 total sessions, 11 open_eligible_sessions, but 0 openings -> timing_coverage NOT_MEASURABLE
         dish_id: '00000000-0000-4000-8000-000000000022',
         dish_name: 'Zero Openings Timing Dish',
         total_sessions: 11,
@@ -160,7 +153,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       (d) => d.dish_id === '00000000-0000-4000-8000-000000000021',
     )!;
     expect(subFloorOpen.evidence_state).toBe('NORMAL');
-    expect(subFloorOpen.metrics.open_rate.status).toBe('NORMAL');
+    expect(subFloorOpen.metrics.open_rate).toEqual({ value: null, status: 'SUPPRESSED' });
     expect(subFloorOpen.metrics.timing_coverage).toEqual({ value: null, status: 'SUPPRESSED' });
     expect(subFloorOpen.metrics.engagement_rate).toEqual({ value: null, status: 'SUPPRESSED' });
 
@@ -175,7 +168,7 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
     });
   });
 
-  it('reconciles comparison attribution and PR #134 coupled open_rate suppression', async () => {
+  it('reconciles comparison attribution window suppression (INSUFFICIENT when below 10 sessions)', async () => {
     const query = vi.fn(async (text: string) => {
       const normalized = text.trim().replace(/\s+/g, ' ');
       if (normalized.includes('app_private.staff_membership')) {
@@ -187,11 +180,16 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
             {
               dish_id: '00000000-0000-4000-8000-000000000031',
               dish_name: 'Suppressed Comparison Dish',
-              total_sessions: 12,
-              exposed_open_sessions: 8,
-              comparison_eligible_sessions: 8,
-              compared_sessions: 4,
-              last_event_ingested_at: NOW,
+              baseline_total_sessions: 12,
+              baseline_exposed_open_sessions: 8,
+              baseline_open_eligible_sessions: 12,
+              baseline_engaged_sessions: 6,
+              baseline_saved_sessions: 3,
+              current_total_sessions: 8,
+              current_exposed_open_sessions: 4,
+              current_open_eligible_sessions: 8,
+              current_engaged_sessions: 2,
+              current_saved_sessions: 1,
             },
           ],
         };
@@ -203,13 +201,15 @@ describe('DATA-12 reconciliation: Uneeza approved synthetic fixtures vs #107/#13
       { query } as unknown as Client,
       ACTOR_ID,
       VENUE_ID,
-      NOW,
-      'synthetic',
+      '2026-11-07T00:00:00.000Z',
+      '2026-11-13T00:00:00.000Z',
+      '2026-11-01T00:00:00.000Z',
+      '2026-11-07T00:00:00.000Z',
     );
 
-    const dish = comparisonReport.dishes[0]!;
-    // PR #134 coupled suppression: comparison_eligible_sessions < 10 suppresses both comparison_rate and open_rate
-    expect(dish.metrics.comparison_rate).toEqual({ value: null, status: 'SUPPRESSED' });
-    expect(dish.metrics.open_rate).toEqual({ value: null, status: 'SUPPRESSED' });
+    const dish = comparisonReport.dishes!;
+    expect(dish.metrics.open_rate.status).toBe('INSUFFICIENT');
+    expect(dish.metrics.open_rate.current_value).toBeNull();
+    expect(dish.metrics.open_rate.delta).toBeNull();
   });
 });
