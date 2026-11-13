@@ -18,6 +18,10 @@ def register_portion_routes(app, *, authorized, reply, root, processor=ingest_di
     async def upload(dish_id: UUID, revision_id: UUID, request: Request):
         if not authorized(request):
             return reply({'error': 'unauthorized'}, 401)
+        raw_width = request.headers.get('x-serving-width-mm')
+        if raw_width is not None and (not raw_width.isascii() or not raw_width.isdigit() or len(raw_width) > 4 or not 30 <= int(raw_width) <= 1000):
+            return reply({'error': 'invalid_serving_width'}, 422)
+        serving_width = int(raw_width) if raw_width is not None else None
         if not slots.acquire(blocking=False):
             return reply({'error': 'busy'}, 429)
         try:
@@ -34,7 +38,7 @@ def register_portion_routes(app, *, authorized, reply, root, processor=ingest_di
                     source.write_bytes(body)
                     directory, record = processor(input_path=source, dish_id=dish_id,
                         revision_id=revision_id, output_root=root / 'portions',
-                        capture_evidence='Private local photo upload; review required')
+                        capture_evidence='Private local photo upload; review required', serving_width_mm=serving_width)
                     # Delivery is bounded by the 180KB portion contract. Never expose disk paths.
                     layers = {}
                     if record['portion']:

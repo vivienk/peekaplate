@@ -2821,3 +2821,16 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Live cutout test scoped its review notice to the AR dialog after finding the same deliberate disclosure in both underlying preview and dialog.
 
 - Automatic-upload review found two missing cases: a successful upload required an existing dish image, and the legacy fixture selector could rebind its fixed-source Tripo controls after an upload. The upload now creates the original-photo element when needed, removes fixture controls, and forbids fixture 3D binding for uploaded sources. Live browser regressions cover both paths.
+
+- Landscape action regression initially required identical button border-box widths; the original Compare outline adds 2px. Preserved the existing design and adjusted the assertion to allow that border while still requiring the same row and only the original two actions.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:09:03.145Z","exitCode":2}
+```
+
+- Serving-size test typecheck rejected indexing a zero-argument mock tuple; use a call assertion against expected headers. Local demo restart briefly raced socket teardown; verified both owned ports had no listeners before restarting.
+
+- Orientation browser checks could not resize a Chromium window after a fullscreen transition. Split portrait and landscape checks into fresh viewport contexts; orientation API request/cleanup remains asserted separately.
+
+- Fullscreen browser instrumentation initially accessed documentElement before page creation, preventing its orientation mock from installing. Moved the mock to Element.prototype; application lifecycle tests already passed.

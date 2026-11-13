@@ -1,5 +1,10 @@
+import type { PublicPortion } from '@peekaplate/contracts';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+export function portionWorldWidth(size?: PublicPortion['physical_size']) {
+  return size ? size.width_mm / 1000 / size.foreground_width_fraction : 0.3;
+}
 
 // Local review only. The caller imports this module behind the explicit DEV fixture gate.
 export function bindPortionAR(
@@ -7,6 +12,8 @@ export function bindPortionAR(
   source: () => HTMLImageElement | null,
   modelUrl: () => string | undefined,
   sampleNotice?: string,
+  orientation?: { request: () => void; release: () => void },
+  physicalSize?: PublicPortion['physical_size'],
 ) {
   const open = document.createElement('button');
   open.type = 'button';
@@ -25,8 +32,10 @@ export function bindPortionAR(
     dialog.setAttribute('aria-modal', 'true');
     dialog.innerHTML = `<video class="pp-ar__camera" muted playsinline aria-hidden="true"></video>
       <div class="pp-ar__canvas"></div>
-      <header class="pp-ar__header"><h2>Dish on your table</h2><button type="button" data-action="close">Back to preview</button></header>
-      <div class="pp-ar__panel">
+      <header class="pp-ar__header"><button class="pp-back pp-ar__back" type="button" data-action="close" aria-label="Back to preview"></button><h2 class="pp-sr-only">Dish on your table</h2></header>
+      <p class="pp-ar__rotate-hint" role="status">Rotate your phone sideways to view the dish.</p>
+      <p class="pp-ar__scale-status" role="status"></p>
+      <details class="pp-ar__settings"><summary>Adjust view</summary><div class="pp-ar__panel">
         <p class="pp-ar__message" role="status">Checking table AR support…</p>
         <p>Visual scale only. This is not a serving-size measurement.</p>
         <div class="pp-ar__actions">
@@ -37,7 +46,7 @@ export function bindPortionAR(
         </div>
         <label>Rotate dish <input aria-label="Rotate dish" type="range" min="-180" max="180" value="0" disabled></label>
         <label>Visual size <input aria-label="Visual size" type="range" min="50" max="150" value="100" disabled></label>
-      </div>`;
+      </div></details>`;
     if (sampleNotice) {
       const notice = document.createElement('p');
       notice.className = 'pp-ar__sample-notice';
@@ -51,6 +60,7 @@ export function bindPortionAR(
     const reset = button('reset');
     const mode = button('mode');
     const message = dialog.querySelector<HTMLElement>('.pp-ar__message')!;
+    const scaleStatus = dialog.querySelector<HTMLElement>('.pp-ar__scale-status')!;
     const video = dialog.querySelector<HTMLVideoElement>('video')!;
     const canvasHost = dialog.querySelector<HTMLElement>('.pp-ar__canvas')!;
     const rotation = dialog.querySelector<HTMLInputElement>('[aria-label="Rotate dish"]')!;
@@ -58,6 +68,7 @@ export function bindPortionAR(
     video.muted = true;
     document.body.append(dialog);
     dialog.showModal();
+    orientation?.request();
     button('close').focus();
     const abort = new AbortController();
     let live = true;
@@ -86,8 +97,10 @@ export function bindPortionAR(
     const texture = new THREE.Texture(image);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    const width = 0.3;
+    const physicalWidth = physicalSize ? physicalSize.width_mm / 1000 : undefined;
+    const width = portionWorldWidth(physicalSize);
     const height = width * (image.naturalHeight / image.naturalWidth);
+    let cameraScale = 0.3 / width;
     const cutout = new THREE.Mesh(
       new THREE.PlaneGeometry(width, height),
       new THREE.MeshBasicMaterial({
@@ -139,11 +152,13 @@ export function bindPortionAR(
       camera.aspect = bounds.width / Math.max(1, bounds.height);
       camera.updateProjectionMatrix();
       renderer.setSize(bounds.width, bounds.height);
+      if (placed && !tracked) placeDish();
     };
     const close = () => {
       if (!live) return;
       live = false;
       abort.abort();
+      orientation?.release();
       stopCamera();
       hits?.cancel();
       renderer?.setAnimationLoop(null);
@@ -168,9 +183,21 @@ export function bindPortionAR(
     const hidden = () => {
       if (document.hidden && !session) close();
     };
+    const updateScaleStatus = () => {
+      const prefix = sampleNotice?.includes('shared sample cutout')
+        ? 'Shared sample, not this dish · '
+        : 'Review preview · ';
+      scaleStatus.textContent =
+        prefix +
+        (physicalSize
+          ? `Owner serving width: ${physicalSize.width_mm / 10} cm · ${tracked ? 'tracked scale' : 'camera scale is approximate'}`
+          : 'owner dimensions not supplied');
+    };
     const changed = () => {
       content.rotation.y = THREE.MathUtils.degToRad(Number(rotation.value));
-      content.scale.setScalar(Number(size.value) / 100);
+      content.scale.setScalar(
+        tracked && physicalSize ? 1 : (cameraScale * Number(size.value)) / 100,
+      );
     };
     rotation.addEventListener('input', changed);
     size.addEventListener('input', changed);
@@ -186,7 +213,7 @@ export function bindPortionAR(
         close();
       }
     });
-    for (const panel of dialog.querySelectorAll('.pp-ar__header, .pp-ar__panel')) {
+    for (const panel of dialog.querySelectorAll('.pp-ar__header, .pp-ar__settings')) {
       panel.addEventListener('beforexrselect', (event) => event.preventDefault());
     }
     window.addEventListener('resize', resize);
@@ -200,13 +227,15 @@ export function bindPortionAR(
         const viewport = canvasHost.getBoundingClientRect();
         const top =
           dialog.querySelector('.pp-ar__header')!.getBoundingClientRect().bottom - viewport.top;
-        const bottom =
-          dialog.querySelector('.pp-ar__panel')!.getBoundingClientRect().top - viewport.top;
+        const bottom = viewport.height - 48;
+        const right = viewport.width;
         const pixelsPerUnit =
           viewport.height / (2 * 0.85 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+        cameraScale =
+          Math.min((right * 0.85) / width, ((bottom - top) * 0.9) / height) / pixelsPerUnit;
         anchor.position.set(
-          0,
-          (viewport.height / 2 - (top + bottom) / 2) / pixelsPerUnit - height / 2,
+          (right / 2 - viewport.width / 2) / pixelsPerUnit,
+          (viewport.height / 2 - (top + bottom) / 2) / pixelsPerUnit - (height * cameraScale) / 2,
           -0.85,
         );
       }
@@ -217,7 +246,10 @@ export function bindPortionAR(
       reticle.visible = false;
       place.hidden = true;
       reset.hidden = false;
-      rotation.disabled = size.disabled = false;
+      rotation.disabled = false;
+      size.disabled = tracked && !!physicalSize;
+      changed();
+      updateScaleStatus();
       message.textContent = tracked
         ? 'Placed on the detected surface. Move around the dish; use Rotate to turn it.'
         : 'Manual camera placement — no surface tracking. Tap the camera view to reposition.';
@@ -350,6 +382,7 @@ export function bindPortionAR(
           xrSupported = false;
           start.hidden = false;
           start.textContent = 'Try camera preview';
+          scaleStatus.textContent = 'Camera unavailable · open Adjust view to retry';
           message.textContent =
             'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
         }
@@ -369,6 +402,7 @@ export function bindPortionAR(
       dialog.dataset.visual = use3d ? '3d' : '2.5d';
     });
     dialog.dataset.visual = '2.5d';
+    updateScaleStatus();
     const url = modelUrl();
     if (url) {
       mode.hidden = false;
@@ -417,7 +451,8 @@ export function bindPortionAR(
           gltf.scene.position.y += dimensions.y / 2;
           model = new THREE.Group();
           model.add(gltf.scene);
-          model.scale.setScalar(0.3 / extent);
+          if (physicalWidth && dimensions.x <= 0) throw new Error('Invalid model width');
+          model.scale.setScalar(physicalWidth ? physicalWidth / dimensions.x : 0.3 / extent);
           model.visible = false;
           content.add(model);
           mode.disabled = false;

@@ -38,6 +38,7 @@ def main(argv:Sequence[str]|None=None)->int:
     parser.add_argument("--budget-bytes", type=positive_int, default=None, help="Optional total variant byte ceiling.")
     parser.add_argument("--mask", type=Path, help="Optional grayscale dish mask for opaque input photos.")
     parser.add_argument("--portion-budget-bytes", type=positive_int, default=180_000)
+    parser.add_argument("--serving-width-mm", type=int)
     args=parser.parse_args(argv)
     try:
         prepared=prepare_t0_bundle(
@@ -54,7 +55,7 @@ def main(argv:Sequence[str]|None=None)->int:
             dish_id=args.dish_id, revision_id=args.revision_id,
             output_root=prepared.directory/"portion", capture_evidence=args.capture_evidence,
             expected_sha256=prepared.manifest.source.sha256, mask_path=args.mask,
-            budget_bytes=args.portion_budget_bytes,
+            budget_bytes=args.portion_budget_bytes, serving_width_mm=args.serving_width_mm,
         )
         portion_result = {"status": portion["status"], "manifest": str(portion_dir/"portion-ingestion.json"),
                           "reason": portion["reason"], "publication_eligible": False}

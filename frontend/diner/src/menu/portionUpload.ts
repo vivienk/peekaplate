@@ -13,15 +13,24 @@ export async function uploadPortion(
   dishId: string,
   revisionId: string,
   signal: AbortSignal,
+  servingWidthMm?: number,
 ): Promise<{ portion: PublicPortion | null; dispose: () => void }> {
   if (!file.size || file.size > 12_000_000) throw new Error('Choose a photo under 12 MB.');
+  if (
+    servingWidthMm !== undefined &&
+    (!Number.isInteger(servingWidthMm) || servingWidthMm < 30 || servingWidthMm > 1000)
+  )
+    throw new Error('Serving width must be between 3 and 100 cm.');
   const response = await fetch(`/__local3d/v1/portion-uploads/${dishId}/${revisionId}`, {
     method: 'POST',
     body: file,
     signal,
     credentials: 'omit',
     redirect: 'error',
-    headers: { 'Content-Type': 'application/octet-stream' },
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...(servingWidthMm === undefined ? {} : { 'X-Serving-Width-Mm': String(servingWidthMm) }),
+    },
   });
   if (!response.ok)
     throw new Error('Photo processing unavailable. Check the local preview service.');

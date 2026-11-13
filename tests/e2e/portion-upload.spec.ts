@@ -40,6 +40,7 @@ for (const variant of [
         .click({ timeout: 20000 });
       await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
     }
+    await page.getByLabel('Owner serving width in centimetres').fill('28');
     const reply = page.waitForResponse(
       (response) =>
         response.url().includes('/v1/portion-uploads/') && response.request().method() === 'POST',
@@ -53,11 +54,17 @@ for (const variant of [
     await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
       timeout: 20_000,
     });
+    await page
+      .getByRole('dialog', { name: 'Dish on your table' })
+      .getByText('Adjust view', { exact: true })
+      .click();
     await expect(
       page
         .getByRole('dialog', { name: 'Dish on your table' })
         .getByText(/Your uploaded photo. Automatic cutout/),
     ).toBeVisible();
+    await expect(page.locator('.pp-ar__scale-status')).toContainText('28 cm');
+    await expect(page.locator('.pp-ar__scale-status')).toContainText('approximate');
     const rotation = page.getByRole('slider', { name: 'Rotate dish' });
     await rotation.fill('30');
     await expect(rotation).toHaveValue('30');

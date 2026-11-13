@@ -1345,3 +1345,104 @@ main:has(> .pp-detail) {
   min-width: 0;
   accent-color: #fff;
 }
+
+/* Keep the original detail action pair together; local upload is outside the row. */
+.pp-detail__actions + label {
+  display: block;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.pp-detail__actions + label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 8px;
+}
+.pp-ar__rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__rotate-hint {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: calc(76px + env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #fff;
+    background: rgb(23 26 33 / 88%);
+    text-align: center;
+    pointer-events: none;
+    font-size: 14px;
+  }
+}
+/* The dish uses the whole camera viewport; adjustments are collapsed by default. */
+.pp-ar {
+  width: 100vw;
+  height: 100dvh;
+}
+.pp-ar__header {
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+  background: transparent;
+  pointer-events: none;
+}
+.pp-ar .pp-ar__back {
+  pointer-events: auto;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 999px;
+  background: url("./menu/preview-assets/back.svg") center no-repeat;
+  border: 1px solid rgba(255, 248, 237, 0.1);
+}
+.pp-ar__scale-status {
+  position: absolute;
+  z-index: 2;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: max(16px, env(safe-area-inset-left));
+  right: 130px;
+  margin: 0;
+  font-size: 12px;
+  text-shadow: 0 1px 4px #000;
+  pointer-events: none;
+}
+.pp-ar__settings {
+  position: absolute;
+  z-index: 3;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
+  max-width: calc(100vw - 32px);
+}
+.pp-ar__settings > summary {
+  margin-left: auto;
+  width: fit-content;
+  padding: 12px;
+  border-radius: 999px;
+  background: rgb(23 26 33 / 78%);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pp-ar__settings .pp-ar__panel {
+  position: static;
+  width: 320px;
+  max-width: 100%;
+  max-height: calc(100dvh - 140px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 12px;
+}
+.pp-detail__actions ~ label {
+  display: block;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.pp-detail__actions ~ label input {
+  display: block;
+  max-width: 100%;
+  margin-top: 6px;
+}

@@ -525,3 +525,11 @@ The endpoint is single-tenant; callers must authorize dish ownership before expo
 outside this private local demo. No production upload route or publication approval is added.
 The static PR162 Pages preview continues to show generated fixture assets; it does not
 host this Python service, so fresh uploads are available locally only.
+
+### Owner serving dimensions and fullscreen AR
+
+Pass `--serving-width-mm` to photo ingestion or preparation, or `serving_width_mm` per batch job. The private upload endpoint accepts `X-Serving-Width-Mm`; the local review form accepts centimetres. This is the owner-measured physical width of the visible dish including its plate, from 30 to 1000 mm, not a weight or servings label. Missing measurements remain unknown. The processor records the width and visible-alpha width fraction so transparent image margins do not shrink the displayed serving. Measurement changes create distinct artifacts. Publication still requires review.
+
+The approved portion contract can carry optional `physical_size` with owner width and foreground fraction. Tracked table AR uses metres and fixes the measured scale; the plain camera overlay cannot establish table distance and explicitly remains approximate. Dimensions and segmentation must be checked against the real dish; physical-phone accuracy has not been accepted. The future owner menu-upload UI must provide these dimensions through its authorized backend; this PR only adds the ingestion/service/preview contract.
+
+View Portion and Compare retain their original detail row. The camera portal uses the full viewport, the existing preview back arrow, and collapsed adjustment controls. A mobile View Portion tap requests landscape/fullscreen where supported; unsupported browsers show a rotate-phone hint. Closing releases only this viewer's orientation/fullscreen request.

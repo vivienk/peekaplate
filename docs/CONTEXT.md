@@ -60,7 +60,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c596f230dfb82225605d149350fc15c2b504d2d1735027fd10cc1657d146b7b1"
+      "sourceFingerprint": "fa54092261206ba84a8b76fd29a370b886cf79a6832bd20ba0b32da463015ae6"
     },
     {
       "id": "tokens",
@@ -225,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "fbd16cbc01ad5e0d1ac8b25f7e4a0d82405a7c4e0d7fb3443d09da0018222cb9"
+      "sourceFingerprint": "aba0efe69cf9e4119f854a7de73c5e71b4929ff9922fa7610cadd3915030933d"
     },
     {
       "id": "console",
@@ -647,7 +647,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "e6cdaa747bb3e7a632a40fe2df8bfb3b917404da46bfe74a972e183cc0684161"
+      "sourceFingerprint": "b0e2d87dd009e2c31ae305c9c0cf58687171727c6fa5e336fac63bd378ff3888"
     },
     {
       "id": "assets",
@@ -680,13 +680,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "97bd66cc3d428dfb7b22b83edd8d87c207836f482807b430e2f443c7cb441462"
+      "sourceFingerprint": "579848ba03985e69d91446fb235c91b4d1ba33eed5a1d40b03a8d88bb4be7ac6"
     }
   ],
   "handoffs": [
     {
       "date": "2026-11-12",
-      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha, automatic local U2NetP segmentation or optional masks, bounded encoding, source/model/mask/revision hashing and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. Private authenticated upload route feeds DEV View Portion; no public upload endpoint or publication bypass.",
+      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha, automatic local U2NetP segmentation or optional masks, bounded encoding, source/model/mask/revision hashing and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. Owner serving width flows through ingestion into measured tracked-AR scale; camera scale stays approximate. Fullscreen landscape portal keeps original back/action controls. Private authenticated upload route feeds DEV View Portion; no public upload endpoint or publication bypass.",
       "modules": [
         "diner",
         "processing"

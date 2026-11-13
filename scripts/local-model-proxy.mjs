@@ -44,6 +44,9 @@ export function localModelProxy({ token, fetchImpl = fetch, port = 5173, apiPort
         method: req.method,
         headers: {
           Authorization: `Bearer ${token}`,
+          ...(upload && req.headers['x-serving-width-mm']
+            ? { 'X-Serving-Width-Mm': req.headers['x-serving-width-mm'] }
+            : {}),
           'Content-Type': upload ? 'application/octet-stream' : 'application/json',
         },
         body: post ? Buffer.concat(chunks) : undefined,

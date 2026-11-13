@@ -15,6 +15,13 @@ export const PublicPortionSchema = z
         max_pitch_degrees: z.number().min(0).max(3),
       })
       .optional(),
+    physical_size: z
+      .strictObject({
+        width_mm: z.number().int().min(30).max(1000),
+        foreground_width_fraction: z.number().min(0.01).max(1),
+        source: z.literal('owner'),
+      })
+      .optional(),
     layers: z
       .array(
         z.strictObject({

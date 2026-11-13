@@ -689,6 +689,10 @@ async function openPortal(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
     timeout: 20000,
   });
+  await page
+    .getByRole('dialog', { name: 'Dish on your table' })
+    .getByText('Adjust view', { exact: true })
+    .click();
 }
 
 test('camera portal positions the exact cutout, rotates, resets and releases camera on Back', async ({
@@ -840,6 +844,7 @@ for (const fail of [false, true]) {
       }),
     );
     await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+    await page.getByRole('dialog').getByText('Adjust view', { exact: true }).click();
     if (fail) {
       await expect(
         page.getByRole('button', { name: '3D unavailable · showing 2.5D', exact: true }),
@@ -919,6 +924,7 @@ for (const late of [false, true]) {
       route.fulfill({ contentType: 'model/gltf-binary', body: portalTestGLB(true) }),
     );
     await page.getByRole('button', { name: 'View on your table', exact: true }).click();
+    await page.getByRole('dialog').getByText('Adjust view', { exact: true }).click();
     await expect.poll(() => page.evaluate(() => (window as any).bitmapTest.created)).toBe(1);
     if (!late)
       await expect(
@@ -941,6 +947,7 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
   await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
     timeout: 20000,
   });
+  await page.getByRole('dialog').getByText('Adjust view', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reposition', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Place dish', exact: true })).toBeHidden();
   await page.screenshot({ path: 'test-results/automatic-ar-portal.png' });

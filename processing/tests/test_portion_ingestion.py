@@ -67,6 +67,16 @@ class PortionIngestionTests(unittest.TestCase):
         _, third = self.ingest()
         self.assertNotEqual(first['asset_id'], third['asset_id'])
 
+    def test_owner_serving_width_tracks_visible_foreground_and_changes_identity(self):
+        _, baseline = self.ingest()
+        _, measured = self.ingest(serving_width_mm=280)
+        self.assertNotEqual(baseline['asset_id'], measured['asset_id'])
+        self.assertEqual(measured['portion']['physical_size'], {
+            'width_mm': 280, 'foreground_width_fraction': 0.5, 'source': 'owner'})
+        for invalid in (0, 1001, True, 28.5):
+            with self.assertRaises(ExtractionError):
+                self.ingest(serving_width_mm=invalid)
+
     def test_hash_conflict_writes_nothing(self):
         with self.assertRaises(ExtractionError):
             self.ingest(expected_sha256='0' * 64)

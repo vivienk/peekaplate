@@ -2,7 +2,7 @@
   "source_pr": 147,
   "source_commit": "d8e186b450845f5f6035eb32ab1858d9c7a7a3ce",
   "preview_only": true,
-  "pipeline_sha256": "dd041adbfcfc6365c740f62f0a8bddc0a23bd791e401257df8d15ea93e39c790",
+  "pipeline_sha256": "b368f632f3a4dbf5b7df7469fa22d30b90d060b0783ce58b930757b95f8de440",
   "background": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"640\"></svg>",
   "entries": [
     {
@@ -158,7 +158,7 @@
   ],
   "ingestions": [
     {
-      "asset_id": "portion_02b5c01c334bc417f7217f2652c3cdf0",
+      "asset_id": "portion_04a9a7a046d4c4ab159805f75c24ca0e",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000001",
@@ -167,6 +167,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },
@@ -178,7 +179,7 @@
       }
     },
     {
-      "asset_id": "portion_a5f8217257f2d977a9f99cbcba6893a7",
+      "asset_id": "portion_697d8918122b1a79d13ddca12a12d674",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000002",
@@ -187,6 +188,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },
@@ -198,7 +200,7 @@
       }
     },
     {
-      "asset_id": "portion_12c7084447c78cbee79e49b8cd2f3d8c",
+      "asset_id": "portion_550cca4e9d78959bde0494f720a5600f",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000003",
@@ -207,6 +209,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },
@@ -218,7 +221,7 @@
       }
     },
     {
-      "asset_id": "portion_0e9c6ca74ec03325ad19255c494d3929",
+      "asset_id": "portion_c10e73c2b3ca1e64770db2c7faa853f5",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000004",
@@ -227,6 +230,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },
@@ -238,7 +242,7 @@
       }
     },
     {
-      "asset_id": "portion_bc01a1d30ed0239f8fb691fa9dd8b32b",
+      "asset_id": "portion_79bbff4621ec8506e68ec31df4a7f592",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000005",
@@ -247,6 +251,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },
@@ -258,7 +263,7 @@
       }
     },
     {
-      "asset_id": "portion_8efda86943ba95ed7c1e337e7768df17",
+      "asset_id": "portion_3f4ca31910fa2c5b14368f5c0a088abd",
       "provenance": {
         "recipe": "photo-to-portion-v2",
         "dish_id": "a1000000-0000-4000-8000-000000000006",
@@ -267,6 +272,7 @@
         "mask_sha256": null,
         "budget_bytes": 180000,
         "capture_evidence": "PR147 Figma design sample; source commit d8e186b450845f5f6035eb32ab1858d9c7a7a3ce; preview only, not restaurant approval.",
+        "serving_width_mm": null,
         "segmentation": null,
         "segmentation_failed": false
       },

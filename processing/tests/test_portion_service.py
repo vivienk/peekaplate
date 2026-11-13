@@ -33,13 +33,14 @@ class PortionServiceTests(unittest.TestCase):
             image.paste(255, (20, 15, 60, 45))
             image.save(mask, format='PNG')
         with patch('peekaplate_processing.cutout.automatic_mask', return_value=(mask.getvalue(), {'model': 'test'})):
-            response = self.client.post(self.path, content=photo.getvalue(), headers=self.headers)
+            response = self.client.post(self.path, content=photo.getvalue(), headers={**self.headers, 'X-Serving-Width-Mm': '280'})
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(result['status'], 'ready')
         self.assertEqual(result['portion']['dish_id'], DISH)
         self.assertEqual(result['portion']['dish_revision_id'], REV)
         self.assertEqual(len(result['layers']), 2)
+        self.assertEqual(result['portion']['physical_size']['width_mm'], 280)
         self.assertFalse(result['publication_eligible'])
         self.assertNotIn(str(self.temp.name), response.text)
 
