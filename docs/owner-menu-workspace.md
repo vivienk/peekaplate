@@ -154,6 +154,41 @@ and still requires independently approved images and menu publication. AI Draft/
 Suggest UI controls need their own reviewed integration; saving this work never
 invokes a model or invents a suggestion.
 
+## Independent draft and photo verification (#161)
+
+Migration `20261113010000` adds private draft/photo verification metadata. It is
+not part of the earlier hosted acceptance below and requires a separate staging
+migration/release. There is no new `dish_current` flag or publication bypass.
+
+POST `/venues/:venueId/drafts/:draftId/verify` accepts
+`{commandId,expectedVersion:<current draft_version>,verified:true}`. Only current
+owner/editor staff can verify a pending draft. A stale version returns 409.
+Verification records its own contiguous `owner_draft_verification` event stream,
+bound to the reviewed content version; it does not advance the content version.
+Manual edits and extraction retries clear verification. Replaying a command is
+effect-free and returns its historical receipt, not a fresh draft read.
+
+POST `/venues/:venueId/drafts/:draftId/photos/:photoId/approve` or `/reject` with
+`{commandId}` independently changes the photo status. Approval validates the
+source and copied destination SHA-256/size before committing the private
+`menu-assets/` reference. Only after commit may the original staging object be
+deleted. Replaying approval does not repeat that storage effect. Verification is
+separate from the existing approval/publication commands above; it never certifies
+food facts or makes an unapproved dish publicly eligible.
+
+Scheduled retention remains off until configured. `MENU_STAGING_RETENTION_DAYS`
+controls promoted originals (explicit zero permits immediate cleanup),
+`MENU_STAGING_REJECTED_RETENTION_DAYS` controls rejected originals, and
+`MENU_STAGING_ORPHAN_GRACE_DAYS` controls orphan uploads. Omitted rules stay off;
+use `MENU_STAGING_CLEANUP_DRY_RUN=true` before enabling deletion. The cleanup uses
+the ingestion bucket, exact tenant/draft/hash keys, tenant-scoped transactions,
+draft/photo locks and paginated R2 listings. Pending/unverified work, corrupt or
+missing promoted copies, malformed keys and failed lookups are retained.
+
+The #105/#161 dashboard pages are **synthetic preview screens**. Their labels
+and local state transitions do not establish connected API persistence; Ehab's
+screen integration and authenticated hosted acceptance remain separate work.
+
 ## Acceptance record
 
 Rollback: once enriched revision events/receipts or manual drafts exist, prefer a
