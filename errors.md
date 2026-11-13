@@ -2926,3 +2926,19 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:18:46.464Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T08:20:15.323Z","exitCode":1}
+```
+
+## Diner ingredient integration verification — November 13, 2026
+
+The first typecheck caught unchecked indexed access in the generated catalogue resolver and an optional test error handler. Both now have explicit guards. Focused menu tests exercise missing mappings and failed-image handling. The first local browser run could not bind port 5173 under restricted execution (EPERM); rerun with local server permission. No food-review command was changed.
+
+Follow-up: full JavaScript tests initially failed when authentication fixtures could not bind local ports; the permitted rerun passes all 1,423 unit and 74 script tests. The normal browser runner found port 5173 occupied. A temporary copy of the two targeted browser cases used only port 5283 and the diner server; both pass. The first temporary config was mistakenly placed under Playwright's cleaned output directory and found no tests; moving it outside that directory fixed the runner setup. Temporary runner files were removed.

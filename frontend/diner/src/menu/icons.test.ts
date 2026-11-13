@@ -1,12 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { createFixtureMenuSource, NO_ICON_ALLERGEN, NO_ICON_INGREDIENT } from './fixtures';
-import { allergenIcon, dietaryIcon, iconKey, ingredientIcon, UI_ICONS } from './icons';
+import {
+  allergenIcon,
+  dietaryIcon,
+  generatedIngredientIcon,
+  iconKey,
+  ingredientIcon,
+  UI_ICONS,
+} from './icons';
 import { ALLERGENS, DIETARY_VALUES } from './types';
 
 // Vite inlines small SVGs as data: URLs and emits larger ones as .svg files.
 const svgUrl = /^data:image\/svg\+xml|\.svg($|\?)/;
 
 describe('menu icons', () => {
+  it('resolves exported coconut art only by exact label and bundled content file', () => {
+    const file = `${'a'.repeat(64)}.png`;
+    const catalogue = { coconut: file };
+    const modules = { [`../assets/icons/generated-ingredients/${file}`]: '/assets/coconut.png' };
+    expect(generatedIngredientIcon('  COCONUT  ', catalogue, modules)).toBe('/assets/coconut.png');
+    expect(generatedIngredientIcon('Coconut milk', catalogue, modules)).toBeNull();
+    expect(generatedIngredientIcon('Coconut', catalogue, {})).toBeNull();
+    expect(
+      generatedIngredientIcon('Coconut', { coconut: 'https://example.com/icon.png' }, modules),
+    ).toBeNull();
+    expect(generatedIngredientIcon('toString', {}, modules)).toBeNull();
+  });
   it('has an icon for every approved P0 allergen, by code and by label', () => {
     for (const { code, label } of ALLERGENS) {
       expect(allergenIcon(code), code).toMatch(svgUrl);

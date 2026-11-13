@@ -1,7 +1,9 @@
 # Ingredient icon pipeline implementation plan
 
-This pipeline reuses saved menu extraction and ingredient evidence to propose
-ingredient artwork for owner review. Artwork approval never confirms a recipe,
+This pipeline reuses saved menu extraction and ingredient evidence to generate
+ingredient artwork for review and supply the diner ingredient tiles used by the
+screen in PR #147. PR #165 owns this logic; PR #147's dish-photo changes are separate.
+Artwork approval never confirms a recipe,
 changes an allergen classification, or authorizes publication.
 
 ## Inspected baseline and design
@@ -30,7 +32,49 @@ simple faceted geometry. Ham is a coral faceted cube; its component measures
 shown in the inspector. These set-level values are not a responsive screen spec.
 Figma's connector returned a Starter-plan call limit, so exact asset exports,
 child styling tokens and high-fidelity design context are unavailable. No artwork
-or UI is claimed to match pixel-for-pixel, and no substitute art is shipped.
+or UI is claimed to match pixel-for-pixel. The diner integration reuses the
+repository's existing Figma SVG exports; no generated substitute is approved or
+shipped by default.
+
+## Diner ingredient component integration
+
+`frontend/diner/src/menu/dishDetail.ts` now renders decorative ingredient artwork
+above the existing visible label. `icons.ts` looks up an existing Figma SVG first,
+then an exact normalized label in a reviewed, build-time generated catalogue.
+An absent mapping, missing bundled file or image-load error leaves the label
+visible. Images have empty alternative text and are hidden from assistive
+technology because the adjacent label already names the ingredient. Existing
+allergen notes, food contracts and approval/publication commands are unchanged.
+
+The generation stage remains an ingestion/operator action, never a diner-browser
+request. The browser receives no provider credentials, extraction drafts, review
+records or arbitrary remote artwork URLs. It decorates only ingredient names
+already supplied by the existing fixture or verified published menu path.
+
+After a human reviews a generated illustration, record its exact asset decision
+using `IconStore.review`. Supply a separate export selection file mapping exact
+display names to approved asset IDs, for example `{"Coconut":"<asset ID>"}`.
+Export to a **new** directory:
+
+```sh
+PYTHONPATH=processing/src python -m peekaplate_processing.ingredient_icon_export \
+  --catalogue work/ingredient-icons \
+  --selections work/diner-icon-selections.json \
+  --output work/diner-icon-export
+```
+
+The command validates artwork identity, approval and content hashes before
+writing `catalogue.json` and content-addressed PNG/WebP files. Any invalid
+selection rejects the whole export. Review the output and replace the complete
+contents of `frontend/diner/src/assets/icons/generated-ingredients/` with that
+export, then commit and rebuild the diner. Replace the whole directory on removal
+or withdrawal so obsolete artwork is not retained. Revocation of deployed static
+art requires a new build; this is not a live catalogue service.
+
+The committed generated catalogue starts empty: the actual coconut candidate is
+still pending visual approval, so Coconut displays as text in the diner until its
+reviewed export is added. Tests exercise synthetic approved coconut bytes through
+the exporter and the frontend resolver. They do not approve the real candidate.
 
 The curated vocabulary includes all 32 observed names and four explicit
 plural/seed aliases. Other explicit ingredient phrases now receive deterministic
@@ -308,3 +352,13 @@ Final adapter hardening: 34 focused ingredient tests pass after adding malformed
 The added integration regression runs the actual pipeline CLI against a generated synthetic PDF containing coconut. Only the external text-model answer and image-provider HTTP response are mocked. Native PDF acquisition, extraction validation, ingredient detection, generation planning, Gemini response parsing, image validation/storage and review export all run normally. It asserts original PDF-byte preservation, draft-to-image bindings, PNG/gallery output, unchanged review/publication states, and exactly one image request across two extraction runs. The focused ingredient suite passes 35 tests. This proves local wiring; it is not a live Gemini or hosted deployment test.
 
 Final verification rerun: PASS — 538 Python tests in 51.950 seconds, including the PDF-to-illustration/cache integration regression. Context/documentation checks and diff whitespace check pass. Uses the existing local Python environment, not the frozen deployment runtime.
+
+## Diner integration verification (PR #165)
+
+- PASS: focused Python ingredient tests — 38, including reviewed coconut export and rejection/corruption boundaries.
+- PASS: `pnpm verify typecheck`; all workspace packages.
+- PASS: `pnpm verify test` with local networking permitted — 1,423 unit tests (4 skipped) and 74 script tests.
+- PASS: `pnpm --filter @peekaplate/diner build` — initial JavaScript stays below the existing budget.
+- PASS: `pnpm verify lint context:check docs:check`.
+- PASS: the ingredient rendering/error-fallback test and existing allergen accessibility test in `tests/e2e/menu-states.spec.ts`; screenshot inspected at 390px. A temporary configuration changed only the local port to 5283 and started only the diner server because port 5173 was occupied.
+- NOT RUN: hosted publication-to-diner acceptance, live Gemini API generation, or visual approval of the real coconut candidate. PR #147's fixture photos are separate and were not copied into this branch.

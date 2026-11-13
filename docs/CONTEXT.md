@@ -112,7 +112,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. Consent, exposure and publication-swap behavior is unchanged. Ingredient tiles render existing Figma SVGs, then exact-name artwork from an operator-reviewed build catalogue; missing art or load errors retain labels. Generated art is never requested during browsing and cannot authorize food facts. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -204,7 +204,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save.css",
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -213,7 +214,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "91d0574ec00a8c3a0be4bd83d18ff767df79ac2655d7f7ebf57e757b2688829e"
+      "sourceFingerprint": "514c4bfd1dad19e2c97d2fd74729209c7267b849595d46b709399df2999bf3f8"
     },
     {
       "id": "console",
@@ -590,7 +591,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. Artwork reuses extraction and unchanged ingredient rules. Novel names receive stable artwork IDs; bounded local Gemini generation and tool plan/completion APIs produce review-only transparent assets, private gallery and draft/index bindings, with cache/claim protection. Vision artwork remains unverified and cannot become ingredient facts. Hosted authorization/publication integration remains planned.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. Artwork reuses extraction and unchanged ingredient rules. Novel names receive stable artwork IDs; bounded local Gemini generation and tool plan/completion APIs produce review-only transparent assets, Reviewed decorative artwork can be exported to a diner build catalogue; this does not publish ingredients or alter food review gates.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -677,7 +678,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_ingredient_icons.py",
         "docs/ingredient-icon-pipeline.md",
         "processing/src/peekaplate_processing/ingredient_icon_generation.py",
-        "processing/tests/test_ingredient_icon_generation.py"
+        "processing/tests/test_ingredient_icon_generation.py",
+        "processing/src/peekaplate_processing/ingredient_icon_export.py",
+        "processing/tests/test_ingredient_icon_export.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -686,7 +689,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ce99a1cde4a6c8f4b9843bf8d92eb01fcf7da0eaf27d57c8de7283c543a86b71"
+      "sourceFingerprint": "ebc33aad592331610a6cd897946cf425249165a14ba939bda1c7de096ccce134"
     },
     {
       "id": "assets",
@@ -721,6 +724,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "diner",
+        "processing"
+      ],
+      "summary": "PR165 connects ingredient generation to the diner ingredient tiles used by the screen in PR147. Existing Figma SVGs take precedence; a reviewed static export supplies additional PNG/WebP art by exact display name. Labels survive missing/loading failures. Empty generated catalogue leaves the real coconut candidate pending review. No food or allergen approval/publication change.",
+      "sources": [
+        "frontend/diner/src/menu/dishDetail.ts",
+        "frontend/diner/src/menu/icons.ts",
+        "processing/src/peekaplate_processing/ingredient_icon_export.py",
+        "docs/ingredient-icon-pipeline.md"
+      ],
+      "next": "Review and export candidate artwork, commit the complete catalogue and rebuild. Hosted generation/catalogue lifecycle and live Gemini acceptance remain separate."
+    },
     {
       "date": "2026-11-12",
       "modules": [
@@ -814,21 +832,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/posthog.md"
       ],
       "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "summary": "PR134 restores PR123 validation files lost from its later branch revision while preserving current develop. Two real PostgreSQL regressions failed before fixes: a one-session opened cohort reconstructed via open_rate/count, and valid menu-card comparison engagement reported zero. Both now pass. Nine restored mocked-row cases retain independent denominator checks with complementary suppression. The cross-publication JSON fixture now executes against SQL and yields seventeen distinct sessions. Full local DB runner passes 281 pgTAP assertions and 107 integration cases; focused reader suite passes eleven cases. Repository checks pass: 1374 unit, 74 script tests, types/lint/context/docs and both builds/Worker dry-run. No UI runtime changed.",
-      "sources": [
-        "backend/src/comparison-report.ts",
-        "backend/src/comparison-report.integration.ts",
-        "backend/src/comparison-report.data05.test.ts",
-        "docs/comparison-reporting.md"
-      ],
-      "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
     }
   ]
 }
