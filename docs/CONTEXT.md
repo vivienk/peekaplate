@@ -74,7 +74,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "4ef95b7ebd0ab742a9a72c2e53164a1542f500249efca9fe7551128280ed4cc0"
+      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
     },
     {
       "id": "tokens",
@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner auth uses pinned Supabase SDK PKCE, public configuration and exact trusted callbacks. Neutral email entry, confirmation, verified sign-in, restoration and sign-out preserve provider-disabled synthetic previews. Approved editable signup/reset email templates are saved in staging Auth. Fresh Gmail-alias signup, real branded mail delivery, unconfirmed denial, confirmation and session checks passed from stacked PR146, which adds recovery separately. That run also passed password update, old/new password checks and consumed-link rejection. Signup has no tester-email allowlist and grants no restaurant access. PR143/146 remain unmerged; hosted console release and dashboard/setup handoff remain pending. Signup confirmation Resend now uses the same Supabase SDK/PKCE callback via the optional auth-service method; typed throttling/errors and the existing UI cooldown preserve the neutral flow.",
+      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Owner auth uses pinned Supabase SDK PKCE, public configuration and exact trusted callbacks; neutral email entry, confirmation (with resend), verified sign-in, restoration and sign-out keep provider-disabled synthetic previews. Screens follow Rania's Figma review (shared input/button roles, card-border token, Figma checkbox). Approved signup/reset email templates are saved in staging Auth; signup grants no restaurant access. An app-local accessible TextField foundation wraps the design-system ui/Input. PR previews include the labelled synthetic foundations, owner-sign-in and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude them and carry the live auth pages. Publication and restaurant-scoped live owner reports remain planned.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -250,7 +250,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-auth.md",
         "frontend/console/email-templates/README.md",
         "frontend/console/email-templates/confirm-signup.html",
-        "frontend/console/email-templates/reset-password.html"
+        "frontend/console/email-templates/reset-password.html",
+        "frontend/console/src/owner-dashboard/menu-api.ts",
+        "frontend/console/src/owner-dashboard/menu.test.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -260,12 +262,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "65b79dfd3060696587e67210b42ae30dcc6ec683cbff828638eb7b8858b1dd9c"
+      "sourceFingerprint": "3ad5695fba076d53fe08ccce8319e6770e82d52e98f8c3c7a46a068c79261139"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. PR161 adds revision-bound private draft verification and independent content-checked photo promotion; tenant-scoped retention remains disabled until configured. Synthetic demo labels are not live screen integration.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -394,7 +396,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-menu-workspace.md",
         "backend/src/ingestion/intake.source.test.ts",
         "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
+        "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu-retention.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -407,7 +411,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "e94cbbee57e8ba4f8a35f341d0cf499902fd4b392a2f27a6f083dac0b4d6bf9a"
+      "sourceFingerprint": "5f38525fee7eee20f1b01636fd84a778b20dc5fec39aeed4eea288d557c82621"
     },
     {
       "id": "database",
@@ -442,7 +446,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261109120000_owner_insight_actions.sql",
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "tests/db/owner_menu_workspace.sql"
+        "tests/db/owner_menu_workspace.sql",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -453,7 +458,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
+      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
     },
     {
       "id": "measurement",
@@ -539,7 +544,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "6015e67d8393d83ec5c8bc11c45b92bd30a7d4cc34d4e15125d40cfbc48a86be"
+      "sourceFingerprint": "0fd123e8e44f73e28b47587b8231298119805365d902825798f9791a5937a36a"
     },
     {
       "id": "agents",
@@ -733,11 +738,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-10",
-      "modules": [
-        "diner"
-      ],
       "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
+      "modules": [
+        "processing",
+        "contracts"
+      ],
       "next": "Review final commit and merge to develop, then include it in the reviewed staging release. Complete picker/Compare and remaining UI triggers separately; real dual-destination acceptance and normal collection stay gated."
     },
     {
@@ -851,19 +856,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Merge the reviewed correction and its exact-main staging release after final approval. Record corrected intercepted browser evidence separately from DATA-12 real destination persistence and metric reconciliation."
     },
     {
-      "date": "2026-11-12",
+      "date": "2026-11-13",
       "modules": [
-        "console",
-        "delivery"
+        "backend",
+        "contracts",
+        "database"
       ],
-      "summary": "PR143 reconciles current develop while preserving Rania/Nifemi auth design, both team-guide sections and append-only errors. Signup resend is now connected to the existing Supabase adapter. A real-SDK regression failed while the optional method was absent, then passed with exact callback/PKCE and sanitized error cases. Five SDK/browser cases verify resend cooldown, successful confirmation and throttling using synthetic provider responses. No live resend delivery, auth setting or account change is implied.",
-      "paths": [
-        "frontend/console/src/auth/supabase-auth.ts",
-        "frontend/console/src/auth/supabase-auth.test.tsx",
-        "tests/e2e/owner-auth-provider.spec.ts",
-        "docs/owner-auth.md"
+      "summary": "PR161 verification correction: expected draft version required; separate verification event sequence supports manual and extracted drafts without changing content versions or published projections. Manual edits/extraction retries invalidate verification. Photo transitions serialize successive event versions; identical retries are storage-effect-free. Retention establishes tenant RLS scope and row locks, validates promoted bytes and exact keys, paginates R2 and retains on lookup failures. Review/Saved pages remain synthetic preview state, not connected persistence.",
+      "sources": [
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "packages/contracts/src/owner-menu.ts",
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu.integration.ts",
+        "frontend/console/src/owner-dashboard/menu.tsx"
       ],
-      "next": "Update PR146 from PR143 and temporarily target develop for its synthetic preview; preserve explicit PR143-first dependency and keep both auth PRs draft/unmerged until owner setup/dashboard acceptance. Record current preview SHA and actual remaining live-email boundaries."
+      "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
     }
   ]
 }
