@@ -1,0 +1,62 @@
+{
+  "schema_version": "qa02.reference.v1",
+  "reference_version": "synthetic-menu-v1",
+  "authored_by": "Sai",
+  "annotation_method": "source_only",
+  "review": {
+    "status": "pending",
+    "reviewer": null,
+    "decision_reference": null
+  },
+  "entries": [
+    {
+      "entry_id": "p1-soups-1",
+      "page": 1,
+      "section": "SOUPS",
+      "location": "Page 1, beneath FOOD / SOUPS; line beginning Garden Soup",
+      "role": "dish",
+      "name": "Garden Soup",
+      "description": "vegetables",
+      "price_text": "8.50 / 12.50 CAD",
+      "price_amount": null,
+      "scalar_null_reason": "Multiple printed amounts; no single unambiguous dish price.",
+      "ordered_price_options": [
+        { "label": null, "amount": "8.50" },
+        { "label": null, "amount": "12.50" }
+      ],
+      "currency": "CAD"
+    },
+    {
+      "entry_id": "p1-hot-drinks-1",
+      "page": 1,
+      "section": "HOT DRINKS",
+      "location": "Page 1, beneath HOT DRINKS; Coffee line",
+      "role": "dish",
+      "name": "Coffee",
+      "description": null,
+      "price_text": null,
+      "price_amount": null,
+      "scalar_null_reason": "No price is printed for Coffee.",
+      "ordered_price_options": [],
+      "currency": null
+    },
+    {
+      "entry_id": "p1-bakery-1",
+      "page": 1,
+      "section": "BAKERY",
+      "location": "Page 1, beneath BAKERY; Bread line",
+      "role": "dish",
+      "name": "Bread",
+      "description": null,
+      "price_text": "0.00 CAD",
+      "price_amount": "0.00",
+      "scalar_null_reason": null,
+      "ordered_price_options": [{ "label": null, "amount": "0.00" }],
+      "currency": "CAD"
+    }
+  ],
+  "excluded_pages": [
+    { "page": 2, "reason": "Rendered source page is blank; no printed dish entries." },
+    { "page": 3, "reason": "Rendered source page is blank; no printed dish entries." }
+  ]
+}

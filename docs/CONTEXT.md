@@ -590,7 +590,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. QA-02 adds offline source/reference freeze and integrity checks, development-only inventory and pending-review fictional source annotations; no strict quality scorer, provider run or reference-truth approval.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -672,7 +672,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_ingredient_intelligence.py",
         "processing/tests/fixtures/ingredient-review.json",
         "docs/ingredient-intelligence.md",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "processing/src/peekaplate_processing/qa02_reference.py",
+        "processing/tests/test_qa02_reference.py",
+        "processing/eval/qa02/README.md",
+        "processing/eval/qa02/EVIDENCE.md",
+        "processing/eval/qa02/development.manifest.json",
+        "processing/eval/qa02/development-inventory.json",
+        "processing/eval/qa02/synthetic-menu.reference.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -681,7 +688,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "60216b87932a13fdf733bb4982bceac50ac1e4b689034bcb0f6ec5adaf92d160"
+      "sourceFingerprint": "06950812ad90066ad4ef3da3ca1d112dd6aa097f35db39c02fab46e84ad75990"
     },
     {
       "id": "assets",
@@ -716,14 +723,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Initial PR51 head e67a574 passed full Linux CI40461046251, including frozen Python/package, browser and DB checks; Intel Mac native dependency limits are documented in errors.md. Independent automated review found no supported defect after disproving an assumed Zod Unicode mismatch; a boundary regression was added. See ingredient-intelligence.md for remaining authenticated RES-01 integration.",
-      "modules": [
-        "processing",
-        "contracts"
-      ],
-      "next": "Complete independent review and hosted pipeline checks, then integrate trusted imports, authenticated owner corrections/confirmation and publication enforcement through RES-01/RES-02."
-    },
     {
       "date": "2026-11-11",
       "modules": [
@@ -849,6 +848,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/menu.tsx"
       ],
       "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "processing"
+      ],
+      "summary": "QA-02 reference preparation reuses existing event fixtures and preserves historical fuzzy scoring/unreviewed menu keys. New offline CLI hashes actual source/reference bytes, checks actual page counts, occurrence identities, scalar/option/null/zero representation, split/source-family leakage and review-record prerequisites. Public example contains only an existing fictional three-page menu with three source-read entries; independent second reading remains pending. Patis/Virginia originals are absent and untouched holdouts are not registered.",
+      "sources": [
+        "processing/src/peekaplate_processing/qa02_reference.py",
+        "processing/tests/test_qa02_reference.py",
+        "processing/eval/qa02/README.md",
+        "processing/eval/qa02/EVIDENCE.md",
+        "processing/eval/qa02/development.manifest.json",
+        "processing/eval/qa02/development-inventory.json",
+        "processing/eval/qa02/synthetic-menu.reference.json"
+      ],
+      "next": "Uneeza independently checks source readings; Mohammad supplies permitted original images and pinned prediction/scorer artifacts and confirms rubric mapping. Record independent review before new evaluation; strict menu/model quality and hosted acceptance remain NOT RUN. Submit this focused PR for both contributors to review; no merge or cloud activation."
     }
   ]
 }

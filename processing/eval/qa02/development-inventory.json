@@ -1,0 +1,31 @@
+{
+  "schema_version": "qa02.inventory.v1",
+  "notice": "Inventory only; not a frozen reference manifest or an accepted benchmark. Keep the historical keys unchanged.",
+  "untouched_holdouts": [],
+  "legacy_development_cases": [
+    {
+      "case_id": "DEV-LEGACY-patis",
+      "split": "development",
+      "previously_inspected": true,
+      "reference_path": "../keys/patis.json",
+      "reference_sha256": "cd9d413daa3ba98d2cc455f41cdc450e1836b0c2b07b8acb291711f34f51f8a4",
+      "source_filename": "patis.webp",
+      "entry_count": 83,
+      "reference_status": "AGENT-DRAFTED / UNREVIEWED",
+      "source_bytes_status": "NOT PRESENT IN THIS CHECKOUT",
+      "freeze_status": "BLOCKED until source bytes/page identities and independent source review are supplied"
+    },
+    {
+      "case_id": "DEV-LEGACY-virginia-menu",
+      "split": "development",
+      "previously_inspected": true,
+      "reference_path": "../keys/virginia-menu.json",
+      "reference_sha256": "fd4e03aa4d7142e683bd14617f7ed0cd8dea98ec6462c67b7a4e60374072f15a",
+      "source_filename": "virginia-menu.jpg",
+      "entry_count": 23,
+      "reference_status": "AGENT-DRAFTED / UNREVIEWED",
+      "source_bytes_status": "NOT PRESENT IN THIS CHECKOUT",
+      "freeze_status": "BLOCKED until source bytes/page identities and independent source review are supplied"
+    }
+  ]
+}

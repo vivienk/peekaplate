@@ -2909,3 +2909,25 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T18:43:51.688Z","exitCode":1}
+```
+
+
+## QA-02 reference integrity preparation - November 13, 2026
+
+The initial lint observation was JSON formatting in the new draft synthetic
+reference. Formatting was applied and the manifest hash refreshed before any
+prediction run; pnpm check subsequently passed. Historical menu keys were unchanged.
+
+Independent review reproduced source/reference check-then-read replacement and
+rejection of an explicitly qualified single-price null. The validator now hashes
+and parses the same bounded byte snapshots, and supports qualified null scalars
+with an explicit reason. A CLI regression also replaced an unhelpful generic
+pending-review failure with a controlled reason, without exposing private input.
+The 18 focused tests and 536-test offline Python suite pass. See
+processing/tests/test_qa02_reference.py and processing/eval/qa02/EVIDENCE.md.
+Integrity checks do not certify source truth, reviewer identity, model quality
+or hosted acceptance; the example's independent review remains pending.
