@@ -753,7 +753,7 @@ SELECT throws_like(
   $$INSERT INTO app_private.order_import_orphan_cleanups (tenant_id, batch_id, storage_key)
     VALUES ('00000000-0000-0000-0000-000000000801', '00000000-0000-4000-8000-000000000123',
             'order-imports/00000000-0000-0000-0000-000000000802/00000000-0000-4000-8000-000000000123/source.csv')$$,
-  '%order_import_orphan_cleanups_storage_key_check%',
+  '%order_import_orphan_cleanups_check%',
   'orphan cleanup rejects cross-venue storage_key'
 );
 
@@ -795,14 +795,14 @@ END;
 $$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION app_private.test_arbitrary_postgres_definer_update() TO peekaplate_deletion_checker;
 
-SET ROLE peekaplate_deletion_checker;
+SET SESSION AUTHORIZATION peekaplate_deletion_checker;
 SELECT throws_like(
   $$SELECT app_private.test_arbitrary_postgres_definer_update()$$,
   '%not authorized to update deletion lifecycle records%',
   'checker calling arbitrary postgres-owned SECURITY DEFINER update function cannot escalate to operator'
 );
 
-RESET ROLE;
+RESET SESSION AUTHORIZATION;
 INSERT INTO app_private.order_import_orphan_cleanups (tenant_id, batch_id, storage_key, status)
 VALUES ('00000000-0000-0000-0000-000000000801', '00000000-0000-4000-8000-000000000555',
         'order-imports/00000000-0000-0000-0000-000000000801/00000000-0000-4000-8000-000000000555/source.csv', 'pending');

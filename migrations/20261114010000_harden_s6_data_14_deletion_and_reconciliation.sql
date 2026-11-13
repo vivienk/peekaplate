@@ -354,7 +354,10 @@ BEGIN
     is_reconciliation := app_private.has_privileged_deletion_tx_grant('reconciliation');
     is_verification := app_private.has_privileged_deletion_tx_grant('verification');
     is_operator := (
-      pg_has_role(current_user, 'peekaplate_deletion_operator', 'usage')
+      (
+        pg_has_role(current_user, 'peekaplate_deletion_operator', 'usage')
+        AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND rolsuper)
+      )
       OR pg_has_role(session_user, 'peekaplate_deletion_operator', 'member')
       OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname = session_user AND rolsuper)
     )
