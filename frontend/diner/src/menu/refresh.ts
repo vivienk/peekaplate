@@ -1,7 +1,8 @@
 // Re-reads the published menu before its token expires (DIN-03). The first load arms the timer
 // through schedule(); each successful re-read calls schedule() again, so there is no other polling.
-// A new publication replaces the menu in one step. A 404, invalid data or a failed read keeps the
-// current menu.
+// A new publication replaces the menu in one step. A 404 stops event collection and tells the screen
+// the menu was withdrawn (onWithdrawn), so it can stop showing the old menu (S5-FE-10). Invalid data
+// or a failed read keeps the current menu; token expiry only stops collection.
 import type { Menu, MenuLoadResult, MenuSource } from './types';
 
 // How long before the 30-minute token expires the re-read starts. Proposed, not yet agreed.
@@ -18,8 +19,11 @@ export type MenuRefresherOptions = {
   getCurrent: () => Menu | null;
   // Replaces the displayed menu with the new one. Called only with a fully validated menu.
   onSwap: (menu: Menu) => void;
-  // The publication is gone (404): the current menu stays and event collection must stop.
+  // The publication is gone (404): event collection must stop. Called before onWithdrawn.
   onStop: () => void;
+  // Optional (S5-FE-10). Called once, only when the server itself answered 404: the screen then stops
+  // showing the old menu. Never called for errors, offline reads, invalid data or token expiry.
+  onWithdrawn?: () => void;
   now?: () => number;
 };
 
@@ -88,6 +92,7 @@ export function createMenuRefresher(options: MenuRefresherOptions): MenuRefreshe
 
       if (result.status === 'unavailable') {
         stopCollection();
+        options.onWithdrawn?.();
         return 'stopped';
       }
 

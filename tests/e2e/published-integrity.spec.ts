@@ -75,7 +75,8 @@ test('a fresh withdrawn menu is unavailable', async ({ page }) => {
   await expect(page.getByText('This menu is unavailable right now.')).toBeVisible();
 });
 
-test('active withdrawal preserves browsing but stops both destinations', async ({ page }) => {
+// S5-FE-10: a real 404 on the re-read now removes the menu (this used to keep browsing).
+test('active withdrawal stops both destinations and removes the old menu', async ({ page }) => {
   const state = { kind: 'valid' as 'valid' | 'tampered' | 'withdrawn' };
   await open(page, state);
   await expect(page.locator('.pp-card__open').first()).toBeVisible();
@@ -139,5 +140,6 @@ test('active withdrawal preserves browsing but stops both destinations', async (
   expect(recorded.captured.filter((type) => type === 'menu_viewed')).toHaveLength(1);
   expect(recorded.sent).toHaveLength(sentAtWithdrawal);
   expect(recorded.captured).toHaveLength(capturedAtWithdrawal);
-  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await expect(page.locator('.pp-card__open')).toHaveCount(0);
+  await expect(page.getByText('This menu is no longer available.', { exact: false })).toBeVisible();
 });

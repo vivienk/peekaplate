@@ -118,21 +118,26 @@ function renderLoading(container: HTMLElement): void {
 
 function renderFailure(
   container: HTMLElement,
-  status: MenuLoadResult['status'],
+  status: MenuLoadResult['status'] | 'withdrawn',
   onRetry?: () => void,
 ): void {
   const messages: Record<string, string> = {
     empty: 'No dishes are available right now.',
     unavailable: 'This menu is unavailable right now.',
+    // INTERIM copy for S5-FE-10 (the server reported the menu gone); design confirmation pending.
+    withdrawn:
+      'This menu is no longer available. The restaurant may have updated or withdrawn it. Please check again.',
     error: 'We could not load the menu. Please try again.',
     offline: 'You appear to be offline. Please check your connection.',
   };
-  const showRetry = (status === 'error' || status === 'offline') && Boolean(onRetry);
+  const showRetry =
+    (status === 'error' || status === 'offline' || status === 'withdrawn') && Boolean(onRetry);
+  const retryLabel = status === 'withdrawn' ? 'Check again' : 'Try again';
   container.innerHTML = `
     <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
-      ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
+      ${showRetry ? `<button class="pp-button" type="button" data-retry>${retryLabel}</button>` : ''}
       ${fixtureNotice()}
     </div>
   `;
@@ -681,6 +686,25 @@ export function mountMenuScreen(container: HTMLElement): void {
   window.addEventListener('hashchange', onRouteChange);
   stopRouting = () => window.removeEventListener('hashchange', onRouteChange);
 
+  // S5-FE-10: the server reported the menu gone (404 on a re-read). Stop showing it at once, on
+  // whatever screen is open (list, dish detail or Saved), explain, and offer "Check again".
+  // Saved dishes stay stored; they are shown again only after a fresh load succeeds.
+  const showWithdrawn = (onRetry: () => void) => {
+    switchScreen('menu');
+    currentMenu = null;
+    exposureIds.clear();
+    activeCategoryId = null;
+    searchQuery = null;
+    openerDishId = null;
+    savedScroll = 0;
+    renderFailure(container, 'withdrawn', onRetry);
+    window.scrollTo(0, 0);
+    // The focused control was just removed; move focus to the explanation so it is announced.
+    const text = container.querySelector<HTMLElement>('.pp-state-text');
+    text?.setAttribute('tabindex', '-1');
+    text?.focus({ preventScroll: true });
+  };
+
   // Called by the re-read timer when a new publication replaced the old one. The swap is a single
   // assignment. The list is redrawn only if it is on screen; an open dish detail stays as it is
   // and going back shows the new menu.
@@ -829,13 +853,14 @@ export function mountMenuScreen(container: HTMLElement): void {
               source: { load: () => source.load(controller.signal) },
               getCurrent: () => currentMenu,
               onSwap: swapMenu,
-              // The publication is gone. The menu on screen stays, but nothing more is delivered.
+              // The publication is gone. Nothing more is delivered, and onWithdrawn removes the menu.
               onStop: () => {
                 menuToken = null;
                 controller.abort();
                 liveTrackingOn = false;
                 void tracking.suspendLiveTracking();
               },
+              onWithdrawn: () => showWithdrawn(handleRetry),
             });
             return source.load(controller.signal);
           })
@@ -852,7 +877,10 @@ export function mountMenuScreen(container: HTMLElement): void {
         if (controller.signal.aborted) return;
         isLoading = false;
         if (result.status !== 'ready') {
-          renderFailure(container, result.status, handleRetry);
+          // After "Check again" a 404 must keep offering it, or the visitor is stuck (S5-FE-10).
+          const failure =
+            result.status === 'unavailable' && retryCount > 0 ? 'withdrawn' : result.status;
+          renderFailure(container, failure, handleRetry);
           if (retryCount > 0) {
             focusAfterRetry(container, false);
           }
