@@ -81,7 +81,10 @@ class IconStore:
             raw = handle.read(1_500_001)
         if len(raw) > 1_500_000:
             raise ValueError("Oversized catalogue record")
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except RecursionError:
+            raise ValueError("Catalogue record is too deeply nested") from None
 
     def _put(self, kind, key, value):
         path = self._path(kind, key)
@@ -228,7 +231,7 @@ def main(argv=None):
         export_icons(args.input, args.output,
                      store=IconStore(args.catalogue) if args.catalogue else None,
                      selections=selections)
-    except (ValueError, OSError, ExtractionError, TypeError):
+    except (ValueError, OSError, ExtractionError, TypeError, RecursionError):
         parser.exit(1, "Icon preparation failed; check input, catalogue and a new output path.\n")
     print("Saved private ingredient icon proposals; owner review is still required.")
     return 0

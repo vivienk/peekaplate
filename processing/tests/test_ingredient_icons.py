@@ -103,6 +103,12 @@ class IngredientIconTests(unittest.TestCase):
         for missing in [None, []]:
             self.assertEqual(build_icon_handoff(report(missing))["dishes"][0]["ingredients_state"], "unknown")
 
+    def test_deeply_nested_corrupt_catalogue_falls_back_to_text(self):
+        key = self.register()
+        self.store._path("assets", key).write_text("[" * 2000 + "0" + "]" * 2000)
+        result = build_icon_handoff(report(["salmon"]), store=self.store, selections={"salmon": key})
+        self.assertEqual(result["dishes"][0]["ingredients"][0]["fallback"], "text")
+
     def test_cache_identity_is_stable_and_changes_with_evidence_and_review(self):
         source = report(["salmon"])
         first = build_icon_handoff(source)
