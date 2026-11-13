@@ -1244,14 +1244,25 @@ main:has(> .pp-compare) {
 .pp-compare__image {
   display: block;
   width: 100%;
+  max-width: 128px;
   height: auto;
   aspect-ratio: 1;
+  margin: 0 auto;
   border-radius: 999px;
   object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Figma dish header: centered, Paragraph 1/Bold 16/24 name and Paragraph 1/Semi Bold 16/24
+   price in color/primary, 24px above the first section. */
+.pp-compare__header {
+  margin-bottom: 8px;
+  text-align: center;
 }
 
 .pp-compare__name {
   margin: 4px 0 0;
+  color: var(--pp-role-on-surface);
   font-size: 16px;
   font-weight: 700;
   line-height: 24px;
@@ -1260,66 +1271,70 @@ main:has(> .pp-compare) {
 
 .pp-compare__price {
   margin: 0;
-  color: #f89537;
-  font-size: 14px;
+  color: var(--pp-role-primary);
+  font-size: 16px;
   font-weight: 600;
-  line-height: 20px;
+  line-height: 24px;
 }
 
-/* Figma comparison grouping: a bordered section with its own padding. */
+/* Figma comparison section: 16px padding and gap, 16px radius, surface-container with an
+   outline. */
 .pp-compare__section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding: 16px;
-  border: 1px solid rgba(113, 115, 122, 0.3);
+  border: 1px solid var(--pp-role-outline);
   border-radius: 16px;
+  background: var(--pp-role-surface-container);
 }
 
-/* Section headings: Figma 14/24, Inter semibold, uppercase. */
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
 .pp-compare__label {
   margin: 0;
-  color: #a8a59e;
+  color: var(--pp-role-on-surface-variant);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 24px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
 .pp-compare__description,
 .pp-compare__ingredient-names {
   margin: 0;
-  color: #d4d1ca;
+  color: var(--pp-role-text-secondary);
   font-size: 14px;
-  line-height: 22px;
+  line-height: 24px;
   overflow-wrap: anywhere;
-}
-
-.pp-compare__action-row {
-  margin-top: 4px;
 }
 
 .pp-compare__actions {
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-/* Figma: an outlined pill "View details →" and a text-style orange "Replace". */
+/* Figma Buttons (Medium, Outlined, trailing icon): a 40px pill, 20px side padding, 4px gap; and
+   a text-style color/primary "Replace" under it. */
 .pp-compare__view {
+  display: inline-flex;
   flex: none;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
   font-size: 14px;
 }
 
 .pp-compare__replace {
-  min-height: 44px;
-  padding: 10px 12px;
+  min-height: 40px;
+  padding: 0 12px;
   border: 0;
   background: transparent;
-  color: #f89537;
+  color: var(--pp-role-primary);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1330,15 +1345,10 @@ main:has(> .pp-compare) {
   padding: 0;
 }
 
-/* Back to Menu stays in the column, pinned to the bottom while the result scrolls. */
+/* Figma: Back to Menu follows the sections (24px after them) and the frame ends with 32px. */
 .pp-compare__footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  margin: auto -16px 0;
-  padding: 12px 16px 16px;
-  background: #2a2d36;
-  border-top: 1px solid rgba(113, 115, 122, 0.3);
+  margin-top: 8px;
+  padding-bottom: 32px;
 }
 
 .pp-compare__back {

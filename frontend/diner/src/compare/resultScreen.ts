@@ -82,6 +82,7 @@ function sectionMarkup(
   title: string,
   views: readonly CompareSideView[],
   cell: (view: CompareSideView) => string,
+  extra = '',
 ): string {
   const cells = views
     .map(
@@ -95,7 +96,7 @@ function sectionMarkup(
   return `
     <section class="pp-compare__section pp-compare__section--${key}" aria-labelledby="pp-compare-${key}">
       <h3 class="pp-compare__label" id="pp-compare-${key}">${title}</h3>
-      <div class="pp-compare__pair">${cells}</div>
+      <div class="pp-compare__pair">${cells}</div>${extra}
     </section>
   `;
 }
@@ -136,7 +137,19 @@ export function renderCompareResult(
       </div>
 
       ${sectionMarkup('description', 'Description', view, (v) => `<p class="pp-compare__description">${escapeHtml(v.dish.description)}</p>`)}
-      ${sectionMarkup('ingredients', 'Key ingredients', view, (v) => `<p class="pp-compare__ingredient-names">${v.ingredientNames.map(escapeHtml).join(', ')}</p>`)}
+      ${sectionMarkup(
+        'ingredients',
+        'Key ingredients',
+        view,
+        (v) =>
+          `<p class="pp-compare__ingredient-names">${v.ingredientNames.map(escapeHtml).join(', ')}</p>`,
+        // Figma places View details / Replace at the foot of the Key ingredients section.
+        `<div class="pp-compare__pair pp-compare__action-row">
+          ${actionsCell(view[0])}
+          <div class="pp-compare__divider" aria-hidden="true"></div>
+          ${actionsCell(view[1])}
+        </div>`,
+      )}
       ${
         view.some((v) => v.hasAllergens)
           ? sectionMarkup('contains', 'Contains', view, (v) =>
@@ -156,11 +169,6 @@ export function renderCompareResult(
           : ''
       }
 
-      <div class="pp-compare__pair pp-compare__action-row">
-        ${actionsCell(view[0])}
-        <div class="pp-compare__divider" aria-hidden="true"></div>
-        ${actionsCell(view[1])}
-      </div>
       <p class="pp-allergy-note pp-compare__staff">${COMPARE_STAFF_LINE}</p>
 
       <div class="pp-compare__footer">
