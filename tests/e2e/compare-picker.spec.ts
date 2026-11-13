@@ -77,6 +77,24 @@ async function expectCheckOnPhotoCorner(page: Page) {
   expect(Math.abs(checkCenter - cardCenter)).toBeGreaterThan(Math.abs(photoCenter - cardCenter));
 }
 
+// Azoz review #7: a selection that search hides must not stay confirmable.
+test('searching away the selected dish clears the selection', async ({ page }) => {
+  await openPicker(page);
+  const salmon = page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' });
+  await salmon.click();
+  await expect(salmon).toHaveAttribute('aria-pressed', 'true');
+
+  const search = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
+  await search.fill('avocado');
+  await expect(salmon).toHaveCount(0);
+  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(0);
+  await expect(page.locator('.pp-picker__confirm')).toBeDisabled();
+
+  await search.fill('');
+  await expect(salmon).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.pp-picker__option--selected')).toHaveCount(0);
+});
+
 test('one dish is selected at a time, with the orange border and check', async ({ page }) => {
   await openPicker(page);
   const bowl = page.getByRole('button', { name: 'Compare with Harvest Power Bowl' });
@@ -152,18 +170,6 @@ test('picker search uses the menu rules, with no results, Clear and the staff li
   await expect(input).toHaveValue('');
   await expect(input).toBeFocused();
   await expect(optionNames(page)).toHaveCount(4);
-});
-
-test('a selection survives a search that hides it', async ({ page }) => {
-  await openPicker(page);
-  await page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' }).click();
-  const input = page.getByRole('searchbox', { name: 'Search dishes or ingredients' });
-  await input.fill('benedict');
-  await input.fill('');
-  await expect(page.getByRole('button', { name: 'Compare with Salmon Poke Bowl' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
 });
 
 test('close and Escape return to the dish detail on its Compare button', async ({ page }) => {

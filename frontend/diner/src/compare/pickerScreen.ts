@@ -80,6 +80,15 @@ function thumbMarkup(dish: CompleteDish, className: string): string {
 // alternate sides like the menu list; the selected card gets the orange border and the check on
 // the photo. Save is not offered from the picker (no Save surface exists for it), so the heart is
 // shown disabled, as on the menu before Save.
+// Figma Heart icon (Design/Heart-search-icons), drawn as an outline in the button's colour at
+// 16px; the button around it keeps a 44px tap area.
+const HEART_OUTLINE_SVG =
+  '<svg class="pp-picker__heart-icon" viewBox="-1 1 26 26" width="16" height="16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2" d="M17.5009 3.91699C16.3749 3.93451 15.2734 4.24885 14.3077 4.82826C13.342 5.40768 12.5463 6.23166 12.0009 7.21699C11.4556 6.23166 10.6599 5.40768 9.69417 4.82826C8.72848 4.24885 7.62698 3.93451 6.50094 3.91699C4.70588 3.99498 3.01464 4.78025 1.79672 6.10122C0.578794 7.4222 -0.0668157 9.17152 0.000934853 10.967C0.000934853 15.514 4.78693 20.48 8.80093 23.847C9.69715 24.6001 10.8303 25.013 12.0009 25.013C13.1716 25.013 14.3047 24.6001 15.2009 23.847C19.2149 20.48 24.0009 15.514 24.0009 10.967C24.0687 9.17152 23.4231 7.4222 22.2052 6.10122C20.9872 4.78025 19.296 3.99498 17.5009 3.91699Z"/></svg>';
+
+// Figma check icon inside the 50px badge.
+const CHECK_SVG =
+  '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
 function optionMarkup(dish: CompleteDish, selected: boolean): string {
   const name = escapeHtml(dish.name);
   return `
@@ -87,13 +96,13 @@ function optionMarkup(dish: CompleteDish, selected: boolean): string {
       <div class="pp-picker__option-body">
         <h2 class="pp-picker__option-name"><button type="button" class="pp-picker__choose" data-pick-dish-id="${escapeHtml(dish.dishId)}" aria-pressed="${selected}" aria-label="Compare with ${name}"><span class="pp-card__name-text">${name}</span></button></h2>
         <div class="pp-picker__option-meta">
-          <button class="pp-picker__option-heart" type="button" aria-label="Save ${name} (not available here)" disabled><span aria-hidden="true">♡</span></button>
+          <button class="pp-picker__option-heart" type="button" aria-label="Save ${name} (not available here)" disabled>${HEART_OUTLINE_SVG}</button>
           <p class="pp-picker__option-price">${escapeHtml(formatPrice(dish.price))}</p>
         </div>
       </div>
       <div class="pp-picker__option-media">
         ${thumbMarkup(dish, 'pp-picker__option-image')}
-        <span class="pp-picker__check" aria-hidden="true">✓</span>
+        <span class="pp-picker__check" aria-hidden="true">${CHECK_SVG}</span>
       </div>
     </article>
   `;
@@ -130,9 +139,9 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
             : `
               <p class="pp-picker__hint">Select another dish from the menu to compare side by side.</p>
               <form class="pp-search-bar pp-picker__search" role="search" aria-label="Search dishes to compare">
-                <span class="pp-search-bar__icon" aria-hidden="true">⌕</span>
+                <span class="pp-picker__search-icon" aria-hidden="true"></span>
                 <label class="pp-sr-only" for="pp-picker-search-input">Search dishes or ingredients</label>
-                <input class="pp-search-input" id="pp-picker-search-input" type="search" placeholder="Search dishes" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+                <input class="pp-search-input" id="pp-picker-search-input" type="search" placeholder="Search here" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" />
               </form>
               <p class="pp-search-staff" hidden>${SEARCH_STAFF_LINE}</p>
               <p class="pp-sr-only" id="pp-picker-status" role="status" aria-live="polite"></p>
@@ -180,6 +189,12 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
 
   const renderOptions = () => {
     const state = pickerViewState(menu, exclude, query);
+    // A selected dish that the search hides is unselected, so Compare never confirms a dish the
+    // diner can no longer see (Azoz review #7).
+    if (selectedId && !state.options.some((dish) => dish.dishId === selectedId)) {
+      selectedId = null;
+      updateConfirm();
+    }
     list.innerHTML = state.options
       .map((dish) => optionMarkup(dish, dish.dishId === selectedId))
       .join('');
