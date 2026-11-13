@@ -187,7 +187,12 @@ export function App() {
   const editDish = (id: string, from?: string) => {
     const m = menu.find((x) => x.id === id);
     if (!m) return;
-    setEd({ step: 'form', draft: { ...m, ing: [...m.ing] }, origId: id, from: from || null });
+    setEd({
+      step: 'form',
+      draft: { ...m, ing: [...m.ing], alg: [...m.alg] },
+      origId: id,
+      from: from || null,
+    });
     setPage('menu');
     setChatOpen(false);
     window.scrollTo(0, 0);

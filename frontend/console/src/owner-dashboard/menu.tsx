@@ -1,7 +1,7 @@
 // Menu management for the demo: list, edit/add form, review of what diners will see, saved.
 // Changes live only in this page's memory.
 import { type FormEvent, useRef, useState } from 'react';
-import { CATS, DISH, INSIGHTS, imgOf, type MenuItem, money, suggestIng } from './data';
+import { CATS, DISH, INSIGHTS, imgOf, type MenuItem, money, suggestAlg, suggestIng } from './data';
 import type { Acts } from './pages';
 import { Btn, Icon, Note } from './ui';
 
@@ -138,6 +138,119 @@ function toDataUrl(file: File, cb: (url: string | null) => void) {
   r.readAsDataURL(file);
 }
 
+// One list of items (ingredients or allergens) with its input, Add, Suggest with AI, hint and
+// chips, as in Figma S09 "Ingredients-allergens" (2470:19062). AI suggestions get the dashed "AI"
+// tag until the owner reviews them.
+function TagField({
+  id,
+  label,
+  required,
+  placeholder,
+  hint,
+  items,
+  aiItems,
+  error,
+  onAdd,
+  onRemove,
+  onSuggest,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  hint: string;
+  items: string[];
+  aiItems: string[];
+  error?: string | undefined;
+  onAdd: (item: string) => void;
+  onRemove: (item: string) => void;
+  onSuggest: () => void;
+}) {
+  const [text, setText] = useState('');
+  const add = () => {
+    const t = text.trim();
+    if (!t || items.some((x) => x.toLowerCase() === t.toLowerCase())) return;
+    onAdd(t);
+    setText('');
+  };
+  return (
+    <div className="field s09-list">
+      <div className="s09-inrow">
+        <div className="field">
+          <label htmlFor={id}>
+            {label}
+            {required && <Req />}
+          </label>
+          <input
+            id={id}
+            type="text"
+            placeholder={placeholder}
+            value={text}
+            aria-invalid={!!error}
+            aria-describedby={`${id}-hint${error ? ` ${id}-err` : ''}`}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+        </div>
+        <Btn
+          kind="outlined"
+          size="md"
+          type="button"
+          onClick={add}
+          aria-label={`Add ${label.toLowerCase()}`}
+        >
+          Add
+        </Btn>
+        <Btn kind="outlined" size="md" type="button" onClick={onSuggest}>
+          Suggest with AI
+        </Btn>
+      </div>
+      {error && (
+        <span className="err" id={`${id}-err`}>
+          {error}
+        </span>
+      )}
+      <span className="s09-hint" id={`${id}-hint`}>
+        {hint}
+      </span>
+      {items.length > 0 && (
+        <ul className="tags" aria-label={label}>
+          {items.map((t) => {
+            const ai = aiItems.includes(t);
+            return (
+              <li key={t} className={`tag${ai ? ' ai' : ''}`}>
+                {t}
+                {ai && (
+                  <span className="ai-mark" title="Suggested by AI">
+                    AI
+                  </span>
+                )}
+                <button type="button" aria-label={`Remove ${t}`} onClick={() => onRemove(t)}>
+                  <Icon n="x" s={12} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const Req = () => (
+  <span className="req" aria-hidden="true">
+    *
+  </span>
+);
+
+// Screen 9, Add dish (Figma 1496:8021: Empty, Partially completed, Validation error, Draft with
+// AI, Photo uploaded, Ready to review). "Continue to review" looks disabled until the required
+// fields are filled, but stays focusable and clickable so it can explain what is missing.
 export function DishForm({
   ed,
   setEd,
@@ -152,134 +265,139 @@ export function DishForm({
   toReview: () => void;
 }) {
   const dr = ed.draft;
-  const [errs, setErrs] = useState<[string, string][]>([]);
-  const [tag, setTag] = useState('');
+  const [errs, setErrs] = useState<Record<string, string>>({});
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (p: Partial<MenuItem>) => setEd({ ...ed, draft: { ...dr, ...p } });
-  const addTag = () => {
-    const t = tag.trim();
-    if (!t || dr.ing.includes(t)) return;
-    set({ ing: [...dr.ing, t] });
-    setTag('');
+  // Any AI suggestion needs a fresh review.
+  const setAi = (p: Partial<MenuItem>) => set({ ...p, aiUsed: true, aiReviewed: false });
+  const check = (d: MenuItem) => {
+    const er: Record<string, string> = {};
+    if (d.name.trim().length < 2) er['f-name'] = 'Enter a dish name';
+    if (!d.cat) er['f-cat'] = 'Select a category';
+    if (!/^\d+(\.\d{1,2})?$/.test(String(d.price).trim()) || !(Number(d.price) > 0))
+      er['f-price'] = 'Enter a valid price';
+    if (d.ing.length < 1) er['f-ing'] = 'Add at least one ingredient';
+    if (d.upload && !d.rights) er['f-rights'] = 'Confirm you have the right to use this photo';
+    if (d.aiUsed && !d.aiReviewed)
+      er['f-ai'] = 'Confirm you reviewed the AI-drafted text and ingredients';
+    return er;
   };
+  const ready = Object.keys(check(dr)).length === 0;
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const er: [string, string][] = [];
-    if (dr.name.trim().length < 2) er.push(['f-name', 'Enter a dish name.']);
-    if (!(Number(dr.price) > 0)) er.push(['f-price', 'Enter a price greater than 0.']);
-    if (dr.desc.trim().length < 20)
-      er.push(['f-desc', 'Write a description of at least 20 characters.']);
-    if (dr.ing.length < 1) er.push(['f-ing', 'Add at least one ingredient.']);
-    if (!imgOf(dr)) er.push(['f-photo', 'Add a photo of the dish.']);
-    if (dr.upload && !dr.rights)
-      er.push(['f-rights', 'Confirm you have the right to use this photo.']);
-    if (dr.aiUsed && !dr.aiReviewed)
-      er.push(['f-ai', 'Confirm you reviewed the AI-drafted text and ingredients.']);
+    const er = check(dr);
     setErrs(er);
-    if (er.length) {
-      setTimeout(() => document.getElementById('errsum')?.focus(), 0);
+    const first = Object.keys(er)[0];
+    if (first) {
+      setTimeout(() => {
+        document.getElementById('errsum')?.scrollIntoView({ block: 'center' });
+        document.getElementById(first)?.focus();
+      }, 0);
       return;
     }
     toReview();
   };
-  const err = (id: string) => errs.find((x) => x[0] === id);
+  // Errors clear as the owner fixes each field.
+  const err = (id: string) => (errs[id] && check(dr)[id] ? errs[id] : undefined);
+  const showErrs = Object.keys(errs).some((id) => err(id));
   const fromInsight = ed.from ? INSIGHTS.find((i) => i.id === ed.from) : undefined;
+  const fieldErr = (id: string) =>
+    err(id) && (
+      <span className="err" id={`${id}-err`}>
+        {err(id)}
+      </span>
+    );
   return (
-    <form className="stack" onSubmit={submit} noValidate>
-      <div>
-        <Btn kind="text" icon="back" type="button" onClick={cancel}>
-          Back to Menu
-        </Btn>
-      </div>
-      <div className="pagehead">
-        <span className="eyebrow">{orig ? 'Edit dish' : 'Add dish'} · Step 1 of 3</span>
-        <h1>{orig ? orig.name : 'New dish'}</h1>
-        {fromInsight && (
-          <Note icon="info">
-            Opened from a suggestion in your report: {fromInsight.action} Adding a 2.5D preview is
-            not part of this form yet.
-          </Note>
-        )}
-      </div>
-      {errs.length > 0 && (
-        <div id="errsum" tabIndex={-1} role="alert" className="note coral">
-          <Icon n="warn" s={18} />
-          <div>
-            <b>
-              Fix {errs.length} thing{errs.length > 1 ? 's' : ''} before reviewing
-            </b>
-            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
-              {errs.map(([id, m]) => (
-                <li key={id}>
-                  <a
-                    href={`#${id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document.getElementById(id)?.focus();
-                    }}
-                    style={{ color: 'inherit' }}
-                  >
-                    {m}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-      <div className="formgrid">
-        <section className="card stack">
+    <form className="s09" onSubmit={submit} noValidate>
+      <div className="s09-grid">
+        <section className="card s09-card" aria-labelledby="s09-title">
+          <h1 id="s09-title">{orig ? 'Edit dish' : 'Add dish'}</h1>
+          {fromInsight && (
+            <Note icon="info">
+              Opened from a suggestion in your report: {fromInsight.action} Adding a 2.5D preview is
+              not part of this form yet.
+            </Note>
+          )}
+          {showErrs && (
+            <div id="errsum" role="alert" className="s09-errmsg">
+              <Icon n="warn" s={20} />
+              <b>Please correct the highlighted errors</b>
+            </div>
+          )}
           <div className="field">
-            <label htmlFor="f-name">Dish name</label>
+            <label htmlFor="f-name">
+              Dish name
+              <Req />
+            </label>
             <input
               id="f-name"
               type="text"
               value={dr.name}
               aria-invalid={!!err('f-name')}
+              aria-describedby={err('f-name') ? 'f-name-err' : undefined}
               onChange={(e) => set({ name: e.target.value })}
             />
-            {err('f-name') && <span className="err">{err('f-name')?.[1]}</span>}
+            {fieldErr('f-name')}
           </div>
-          <div className="grid g2">
+          <div className="s09-two">
             <div className="field">
-              <label htmlFor="f-cat">Category</label>
-              <select id="f-cat" value={dr.cat} onChange={(e) => set({ cat: e.target.value })}>
+              <label htmlFor="f-cat">
+                Category
+                <Req />
+              </label>
+              <select
+                id="f-cat"
+                value={dr.cat}
+                aria-invalid={!!err('f-cat')}
+                aria-describedby={err('f-cat') ? 'f-cat-err' : undefined}
+                className={dr.cat ? undefined : 'ph'}
+                onChange={(e) => set({ cat: e.target.value })}
+              >
+                <option value="" disabled>
+                  Select category
+                </option>
                 {CATS.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </select>
+              {fieldErr('f-cat')}
             </div>
             <div className="field">
-              <label htmlFor="f-price">Price (USD)</label>
+              <label htmlFor="f-price">
+                Price (USD)
+                <Req />
+              </label>
               <input
                 id="f-price"
-                type="number"
-                min="0"
-                step="1"
+                type="text"
+                inputMode="decimal"
                 value={dr.price}
                 aria-invalid={!!err('f-price')}
+                aria-describedby={err('f-price') ? 'f-price-err' : undefined}
                 onChange={(e) => set({ price: e.target.value })}
               />
-              {err('f-price') && <span className="err">{err('f-price')?.[1]}</span>}
+              {fieldErr('f-price')}
             </div>
           </div>
-          <div className="field">
-            <label htmlFor="f-desc">Description</label>
-            <textarea
-              id="f-desc"
-              rows={4}
-              value={dr.desc}
-              aria-invalid={!!err('f-desc')}
-              onChange={(e) => set({ desc: e.target.value })}
-            />
-            {err('f-desc') && <span className="err">{err('f-desc')?.[1]}</span>}
-            <div className="row">
+          <div className="s09-desc">
+            <div className="field">
+              <label htmlFor="f-desc">Description</label>
+              <textarea
+                id="f-desc"
+                rows={4}
+                placeholder="Add description if available..."
+                value={dr.desc}
+                onChange={(e) => set({ desc: e.target.value })}
+              />
+            </div>
+            <div className="s09-airow">
               <Btn
-                kind="outlined"
+                kind={aiDraft ? 'primary' : 'outlined'}
                 size="md"
-                icon="spark"
                 type="button"
+                className={aiDraft ? 's09-on' : undefined}
+                aria-pressed={!!aiDraft}
                 onClick={() => {
                   const ing = dr.ing.length ? dr.ing : suggestIng(dr.name);
                   setAiDraft(
@@ -289,140 +407,102 @@ export function DishForm({
               >
                 Draft with AI
               </Btn>
-              <span className="hint">AI drafts need your approval.</span>
+              <span className="s09-hint">AI drafts need your approval</span>
             </div>
-          </div>
-          {aiDraft && (
-            <div className="aibox">
-              <div className="row">
-                <span className="lab rsn">AI draft</span>
-              </div>
-              <p>{aiDraft}</p>
-              <div className="row">
-                <Btn
-                  kind="primary"
-                  size="md"
-                  type="button"
-                  onClick={() => {
-                    set({ desc: aiDraft, aiUsed: true, aiReviewed: false });
-                    setAiDraft(null);
-                  }}
-                >
-                  Use this draft
-                </Btn>
-                <Btn kind="outlined" size="md" type="button" onClick={() => setAiDraft(null)}>
-                  Discard
-                </Btn>
-              </div>
-            </div>
-          )}
-          <div className="field">
-            <span className="fl" id="f-ing-l">
-              Ingredients
-            </span>
-            <div className="tags" aria-labelledby="f-ing-l">
-              {dr.ing.map((t) => (
-                <span key={t} className={`tag${dr.aiIng.includes(t) ? ' ai' : ''}`}>
-                  {t}
-                  {dr.aiIng.includes(t) && (
-                    <span className="lab rsn" style={{ padding: '1px 6px' }}>
-                      AI
-                    </span>
-                  )}
-                  <button
+            {aiDraft && (
+              <div className="s09-aibox">
+                <span className="s09-chip">AI draft</span>
+                <p>{aiDraft}</p>
+                <div className="row">
+                  <Btn
+                    kind="primary"
+                    size="md"
                     type="button"
-                    aria-label={`Remove ${t}`}
-                    onClick={() =>
-                      set({
-                        ing: dr.ing.filter((x) => x !== t),
-                        aiIng: dr.aiIng.filter((x) => x !== t),
-                      })
-                    }
+                    onClick={() => {
+                      setAi({ desc: aiDraft });
+                      setAiDraft(null);
+                    }}
                   >
-                    <Icon n="x" s={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="row">
-              <input
-                id="f-ing"
-                type="text"
-                aria-label="Add an ingredient"
-                placeholder="Add an ingredient"
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
-                style={{
-                  flex: '1 1 160px',
-                  border: '1.5px solid var(--line2)',
-                  borderRadius: 12,
-                  padding: '10px 12px',
-                  minHeight: 44,
-                  background: 'var(--surface)',
-                }}
-                aria-invalid={!!err('f-ing')}
-              />
-              <Btn kind="outlined" size="md" type="button" onClick={addTag}>
-                Add
-              </Btn>
-              <Btn
-                kind="outlined"
-                size="md"
-                icon="spark"
-                type="button"
-                onClick={() => {
-                  const s = suggestIng(dr.name).filter((x) => !dr.ing.includes(x));
-                  set({
-                    ing: [...dr.ing, ...s],
-                    aiIng: [...dr.aiIng, ...s],
-                    aiUsed: true,
-                    aiReviewed: false,
-                  });
-                }}
-              >
-                Suggest with AI
-              </Btn>
-            </div>
-            {err('f-ing') && <span className="err">{err('f-ing')?.[1]}</span>}
-            <span className="hint">Ingredients are hidden from diners until you approve them.</span>
+                    Use this draft
+                  </Btn>
+                  <Btn kind="outlined" size="md" type="button" onClick={() => setAiDraft(null)}>
+                    Discard
+                  </Btn>
+                </div>
+              </div>
+            )}
           </div>
-          {dr.aiUsed && (
+          <TagField
+            id="f-ing"
+            label="Ingredients"
+            required
+            placeholder="Add an ingredient"
+            hint="Ingredients are hidden from diners until you approve them"
+            items={dr.ing}
+            aiItems={dr.aiIng}
+            error={err('f-ing')}
+            onAdd={(t) => set({ ing: [...dr.ing, t] })}
+            onRemove={(t) =>
+              set({ ing: dr.ing.filter((x) => x !== t), aiIng: dr.aiIng.filter((x) => x !== t) })
+            }
+            onSuggest={() => {
+              const s = suggestIng(dr.name).filter((x) => !dr.ing.includes(x));
+              setAi({ ing: [...dr.ing, ...s], aiIng: [...dr.aiIng, ...s] });
+            }}
+          />
+          <TagField
+            id="f-alg"
+            label="Allergens"
+            placeholder="Add an allergen"
+            hint="Allergens are hidden from diners until you approve them"
+            items={dr.alg}
+            aiItems={dr.aiAlg}
+            onAdd={(t) => set({ alg: [...dr.alg, t] })}
+            onRemove={(t) =>
+              set({ alg: dr.alg.filter((x) => x !== t), aiAlg: dr.aiAlg.filter((x) => x !== t) })
+            }
+            onSuggest={() => {
+              const s = suggestAlg(dr.name, dr.ing).filter((x) => !dr.alg.includes(x));
+              setAi({ alg: [...dr.alg, ...s], aiAlg: [...dr.aiAlg, ...s] });
+            }}
+          />
+          <div className="field">
             <label className="check" htmlFor="f-ai">
               <input
                 id="f-ai"
                 type="checkbox"
                 checked={dr.aiReviewed}
+                aria-invalid={!!err('f-ai')}
+                aria-describedby={err('f-ai') ? 'f-ai-err' : undefined}
                 onChange={(e) => set({ aiReviewed: e.target.checked })}
               />
-              <span>
-                I reviewed the AI-drafted text and ingredients. They are accurate.
-                {err('f-ai') && (
-                  <span className="err" style={{ display: 'block' }}>
-                    {err('f-ai')?.[1]}
-                  </span>
-                )}
-              </span>
+              <span>I reviewed the AI-drafted text and ingredients. They are accurate.</span>
             </label>
-          )}
+            {fieldErr('f-ai')}
+          </div>
+          <div className="s09-btns">
+            <Btn kind="outlined" size="lg" type="button" onClick={cancel}>
+              Back
+            </Btn>
+            <Btn
+              kind="primary"
+              size="lg"
+              type="submit"
+              aria-disabled={!ready}
+              className={ready ? undefined : 's09-off'}
+            >
+              Continue to review
+            </Btn>
+          </div>
         </section>
-        <div className="stack">
-          <section className="card stack">
-            <h3>Photo</h3>
-            <div className="dcard" style={{ background: 'var(--surface2)' }}>
+        <div className="s09-side">
+          <section className="card s09-sidecard" aria-labelledby="s09-photo">
+            <h2 id="s09-photo">Photo</h2>
+            <div className={`s09-photo${imgOf(dr) ? ' has' : ''}`}>
               {imgOf(dr) ? (
-                <img
-                  src={imgOf(dr)}
-                  alt={dr.name ? `${dr.name} photo` : 'Dish photo'}
-                  style={{ width: 140, height: 140, objectFit: 'contain' }}
-                />
+                <img src={imgOf(dr)} alt={dr.name ? `${dr.name} photo` : 'Dish photo'} />
               ) : (
-                <span className="muted">No photo yet</span>
+                <span>No photo yet</span>
               )}
             </div>
             <input
@@ -439,55 +519,38 @@ export function DishForm({
                   });
               }}
             />
-            <Btn kind="outlined" size="lg" type="button" onClick={() => fileRef.current?.click()}>
+            <Btn kind="outlined" size="md" type="button" onClick={() => fileRef.current?.click()}>
               {imgOf(dr) ? 'Replace photo' : 'Upload photo'}
             </Btn>
-            {err('f-photo') && (
-              <span className="err" id="f-photo-e">
-                {err('f-photo')?.[1]}
-              </span>
-            )}
             {dr.upload && (
-              <label className="check" htmlFor="f-rights">
-                <input
-                  id="f-rights"
-                  type="checkbox"
-                  checked={dr.rights}
-                  onChange={(e) => set({ rights: e.target.checked })}
-                />
-                <span>
-                  I have the right to use this photo.
-                  {err('f-rights') && (
-                    <span className="err" style={{ display: 'block' }}>
-                      {err('f-rights')?.[1]}
-                    </span>
-                  )}
-                </span>
-              </label>
+              <div className="field">
+                <label className="check" htmlFor="f-rights">
+                  <input
+                    id="f-rights"
+                    type="checkbox"
+                    checked={dr.rights}
+                    aria-invalid={!!err('f-rights')}
+                    aria-describedby={err('f-rights') ? 'f-rights-err' : undefined}
+                    onChange={(e) => set({ rights: e.target.checked })}
+                  />
+                  <span>I have the right to use this photo.</span>
+                </label>
+                {fieldErr('f-rights')}
+              </div>
             )}
           </section>
-          <section className="card stack">
-            <h3>2.5D preview</h3>
-            <div>
-              <span className={`lab ${dr.has25 ? 'good' : 'st'}`}>
-                {dr.has25 ? 'Available' : 'Not available'}
-              </span>
-            </div>
-            <p className="muted" style={{ fontSize: 13.5 }}>
+          <section className="card s09-sidecard" aria-labelledby="s09-25d">
+            <h2 id="s09-25d">2.5D preview</h2>
+            <span className={`s09-chip${dr.has25 ? ' good' : ''}`}>
+              {dr.has25 ? 'Available' : 'Not available'}
+            </span>
+            <p>
               {dr.has25
                 ? 'Diners can tap “View in 2.5D” to see the ingredients floating apart.'
                 : 'Until a preview exists, diners who tap “View in 2.5D” see the photo.'}
             </p>
           </section>
         </div>
-      </div>
-      <div className="row">
-        <Btn kind="primary" size="lg" type="submit">
-          Review changes
-        </Btn>
-        <Btn kind="outlined" size="lg" type="button" onClick={cancel}>
-          Cancel
-        </Btn>
       </div>
     </form>
   );
@@ -505,10 +568,16 @@ function DinerCard({ d, showIng }: { d: MenuItem; showIng: boolean }) {
       {showIng ? (
         <p style={{ fontSize: 13 }}>
           <b>Ingredients:</b> {d.ing.join(', ')}
+          {d.alg.length > 0 && (
+            <>
+              <br />
+              <b>Allergens:</b> {d.alg.join(', ')}
+            </>
+          )}
         </p>
       ) : (
         <p className="muted" style={{ fontSize: 13 }}>
-          Ingredients hidden until approved
+          Ingredients and allergens hidden until approved
         </p>
       )}
     </div>
@@ -542,6 +611,7 @@ export function Review({
         ch('price') && 'Price',
         ch('desc') && 'Description',
         orig.ing.join('|') !== dr.ing.join('|') && 'Ingredients',
+        orig.alg.join('|') !== dr.alg.join('|') && 'Allergens',
         (orig.upload || '') !== (dr.upload || '') && 'Photo',
       ].filter(Boolean)
     : ['New dish'];
@@ -589,7 +659,7 @@ export function Review({
               checked={ingOk}
               onChange={(e) => setIngOk(e.target.checked)}
             />
-            <span>Approve the ingredient list so diners can see it.</span>
+            <span>Approve the ingredient and allergen lists so diners can see them.</span>
           </label>
         </div>
       </div>

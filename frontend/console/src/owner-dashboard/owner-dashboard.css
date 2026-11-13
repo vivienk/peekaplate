@@ -2854,3 +2854,256 @@ h1 {
   width: 15px;
   height: 15px;
 }
+
+/* Screen 9, Add dish (Figma 1496:8021). Values from the "Ready to review" frame 2470:19031:
+   form card 80 padding, 24 between fields, 40 above the buttons; side cards 282 wide, 24 gap.
+   Figma is drawn without the AI panel, so the layout follows the space the form actually gets. */
+.s09 {
+  container-type: inline-size;
+}
+.s09-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 282px;
+  gap: 24px;
+  align-items: start;
+}
+.s09-card {
+  padding: 80px;
+  display: grid;
+  gap: 24px;
+}
+.s09-card h1 {
+  text-align: center;
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 700;
+  color: var(--pp-color-gray-900);
+  margin: 0;
+}
+.s09 .req {
+  color: var(--pp-color-error-500);
+  margin-left: 2px;
+}
+.s09 .field label {
+  font-weight: 600;
+}
+.s09 .field .err {
+  color: var(--pp-color-error-700);
+  font-weight: 400;
+  padding-left: 8px;
+}
+.s09 .field [aria-invalid="true"] {
+  border-color: var(--pp-color-error-700);
+}
+.s09 .field input[type="text"],
+.s09 .field select {
+  min-height: 44px;
+  padding: 0 16px;
+}
+.s09 .field select.ph {
+  color: var(--muted);
+}
+.s09 .field textarea {
+  min-height: 138px;
+  padding: 16px;
+}
+.s09-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.s09-desc {
+  display: grid;
+  gap: 16px;
+}
+.s09-airow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* "Draft with AI" pressed (frame 2470:19261): solid dark button. */
+.s09-airow .ob.s09-on.pp-button {
+  background-color: var(--pp-color-gray-900);
+  border-color: var(--pp-color-gray-900);
+  color: var(--pp-color-white);
+}
+.s09-hint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--pp-color-info-900);
+}
+.s09-aibox {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface2);
+}
+.s09-aibox p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+.s09-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--pp-color-gray-200);
+  border-radius: 999px;
+  background: var(--pp-color-white);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.s09-chip.good {
+  border-color: var(--pp-color-success-500);
+}
+.s09-list {
+  gap: 8px;
+}
+.s09-inrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+.s09-inrow > .field {
+  flex: 1 1 240px;
+}
+/* Tag 2324:15403: 24 tall, full radius, 4/12/4/8 padding, 12/16 SemiBold secondary text. */
+.s09 .tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+}
+.s09 .tag {
+  height: 24px;
+  padding: 4px 4px 4px 8px;
+  gap: 6px;
+  border: 1px solid var(--pp-color-gray-200);
+  background: var(--pp-color-white);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--pp-color-gray-600);
+}
+.s09 .tag.ai {
+  border: 1px dashed var(--pp-color-error-500);
+}
+.s09 .tag button {
+  width: 16px;
+  height: 16px;
+}
+.s09 .ai-mark {
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--pp-color-error-50);
+  color: var(--pp-color-error-700);
+  font-weight: 500;
+}
+/* error msg 2224:4337: error-100 fill, 16 padding, radius 12, 18/28 SemiBold error-700. */
+.s09-errmsg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--pp-color-error-100);
+  color: var(--pp-color-error-700);
+  font-size: 18px;
+  line-height: 28px;
+}
+.s09-errmsg b {
+  font-weight: 600;
+}
+.s09-btns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+.s09-btns > .ob {
+  flex: 1 1 208px;
+  max-width: 280px;
+}
+/* Looks like the disabled button, but stays clickable so it can list what is missing. */
+.s09-btns > .ob--primary.pp-button.s09-off {
+  background-color: var(--pp-color-neutral-200);
+  border-color: var(--pp-color-neutral-300);
+  color: var(--pp-color-neutral-400);
+  cursor: pointer;
+}
+.s09-side {
+  display: grid;
+  gap: 24px;
+}
+/* "Add photos" 2796:15391: 24 padding, 8 gap, 12/16 SemiBold title. */
+.s09-sidecard {
+  padding: 24px;
+  display: grid;
+  gap: 8px;
+}
+.s09-sidecard h2 {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.s09-sidecard p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.s09-sidecard > .ob {
+  width: 100%;
+  margin-top: 8px;
+}
+.s09-photo {
+  height: 120px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--pp-color-gray-400);
+  color: var(--pp-color-gray-800);
+  font-size: 12px;
+}
+.s09-photo.has {
+  background: var(--pp-color-neutral-50);
+}
+.s09-photo img {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+/* Figma medium buttons: 40 tall, 14/24 SemiBold, one line. */
+.s09 .ob.pp-button:not(.ob--lg) {
+  font-size: 14px;
+  white-space: nowrap;
+}
+@container (max-width: 1000px) {
+  .s09-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .s09-side {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: start;
+  }
+  .s09-card {
+    padding: 40px;
+  }
+}
+@container (max-width: 560px) {
+  .s09-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .s09-card {
+    padding: 24px 16px;
+  }
+  .s09-card h1 {
+    font-size: 24px;
+    line-height: 32px;
+  }
+}

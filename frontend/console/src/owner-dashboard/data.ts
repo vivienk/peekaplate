@@ -683,6 +683,9 @@ export type MenuItem = {
   desc: string;
   ing: string[];
   aiIng: string[];
+  /** Allergens the owner listed on Screen 9; hidden from diners until approved. */
+  alg: string[];
+  aiAlg: string[];
   upload: string | null;
   rights: boolean;
   aiUsed: boolean;
@@ -699,11 +702,13 @@ export const imgOf = (m: Pick<MenuItem, 'upload' | 'id'>) =>
 export const newDraft = (): MenuItem => ({
   id: null,
   name: '',
-  cat: 'Breakfast',
+  cat: '',
   price: '',
   desc: '',
   ing: [],
   aiIng: [],
+  alg: [],
+  aiAlg: [],
   upload: null,
   rights: false,
   aiUsed: false,
@@ -720,6 +725,8 @@ export const initialMenu = (): MenuItem[] =>
     desc: d.desc,
     ing: [...d.ing],
     aiIng: [],
+    alg: [],
+    aiAlg: [],
     upload: null,
     rights: false,
     aiUsed: false,
@@ -738,6 +745,23 @@ export function suggestIng(name: string): string[] {
   if (/salad/.test(s)) out.push('Mixed greens', 'Cherry tomato');
   if (/pancake|toast|waffle/.test(s)) out.push('Maple syrup', 'Seasonal berries');
   return out.length ? [...new Set(out)] : ['Seasonal vegetables', 'Fresh herbs'];
+}
+
+// Demo stand-in for "Suggest with AI" on allergens: keyword rules over the name and ingredients.
+// Suggestions are proposals only; the owner must review them before diners can see anything.
+export function suggestAlg(name: string, ing: string[]): string[] {
+  const s = [name, ...ing].join(' ').toLowerCase();
+  const out: string[] = [];
+  if (/bread|toast|pancake|waffle|wheat|flour|pasta/.test(s)) out.push('Gluten');
+  if (/egg/.test(s)) out.push('Eggs');
+  if (/milk|cheese|butter|cream|yogurt|feta/.test(s)) out.push('Milk');
+  if (/salmon|tuna|fish/.test(s)) out.push('Fish');
+  if (/shrimp|prawn|crab/.test(s)) out.push('Shellfish');
+  if (/peanut/.test(s)) out.push('Peanuts');
+  if (/almond|walnut|pecan|cashew|hazelnut/.test(s)) out.push('Tree nuts');
+  if (/sesame|tahini/.test(s)) out.push('Sesame');
+  if (/soy|tofu/.test(s)) out.push('Soy');
+  return out;
 }
 
 export type ActionStatus = 'suggested' | 'planned' | 'done' | 'dismissed' | 'approved';
