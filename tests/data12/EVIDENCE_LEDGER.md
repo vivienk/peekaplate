@@ -197,6 +197,18 @@ bucket or database was used, and no event left the test machine.
 
 Tools: Vitest 4.1.11, Playwright 1.64.0, macOS. Date: 2026-11-14.
 
+Log excerpt (fixture, terminal output on 2026-11-14 local time):
+
+```text
+# Vitest
+ Test Files  17 passed (17)
+      Tests  352 passed (352)
+   Start at  18:08:38
+# Playwright
+Running 37 tests using 4 workers
+  37 passed (15.8s)
+```
+
 ### 10.4 Live checks still needed (S6-TRK-03 acceptance)
 
 | Check | Status |
