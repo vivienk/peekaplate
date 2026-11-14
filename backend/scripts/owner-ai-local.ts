@@ -119,7 +119,7 @@ const consoleDirectory = new URL('../../frontend/console/', import.meta.url);
 const frontend = spawn(
   process.execPath,
   [
-    fileURLToPath(new URL('node_modules/vite/bin/vite.js', consoleDirectory)),
+    fileURLToPath(new URL('node_modules/vite/bin/vite.js', consoleDirectory).href),
     '--host',
     '127.0.0.1',
     '--port',
@@ -127,7 +127,7 @@ const frontend = spawn(
     '--strictPort',
   ],
   {
-    cwd: fileURLToPath(consoleDirectory),
+    cwd: fileURLToPath(consoleDirectory.href),
     stdio: 'inherit',
     env: {
       PATH: process.env.PATH ?? '',
