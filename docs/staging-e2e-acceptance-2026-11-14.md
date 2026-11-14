@@ -107,5 +107,3 @@ existing staging resources after accepting it. No new extraction deployment is r
 merely because GitHub Actions has no extraction runs; the existing operator deployment
 is pinned above. Actual provider accounting/enforcement remains a separate gate before
 paid execution; no large new budget subsystem is implemented by this read-only PR.
-
-

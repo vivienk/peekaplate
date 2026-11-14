@@ -178,6 +178,8 @@ export async function verifyIngestionE2E({
   )
     throw new Error('Invalid expected source ID');
   const base = new URL(apiUrl);
+  if (expectedSourceId !== undefined && !reportJson)
+    throw new Error('Expected source ID requires a report');
   if (
     ![API_ORIGIN, 'http://127.0.0.1:8787'].includes(base.origin) ||
     base.username ||

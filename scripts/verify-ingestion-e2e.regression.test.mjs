@@ -42,7 +42,7 @@ function fixture() {
       schema_version: 2,
       pipeline_version: '3',
       status: 'complete',
-      source: { sha256: sourceHash },
+      source: { sha256: sourceHash, source_id: 'synthetic-source' },
       segments: [],
       drafts: [{ draft_id: 'dish-0', draft_index: 0 }],
       evidence: [{ draft_id: 'dish-0', draft_index: 0 }],
@@ -203,6 +203,30 @@ test('same-count report from another source, status or producer draft fails', as
       false,
     );
   }
+});
+test('explicit expected source pins apply to the job and report', async () => {
+  const f = fixture();
+  const options = {
+    reportJson: 'report.json',
+    readFileFn: async () => JSON.stringify(f.report),
+    expectedSourceId: 'synthetic-source',
+    expectedSourceHash: sourceHash,
+  };
+  assert.equal((await verify(f, options)).outcome.passed, true);
+  assert.equal(
+    (await verify(f, { ...options, expectedSourceHash: 'b'.repeat(64) })).outcome.passed,
+    false,
+  );
+  assert.equal(
+    (await verify(f, { ...options, expectedSourceId: 'unrelated' })).outcome.passed,
+    false,
+  );
+});
+test('an explicit source-ID pin cannot be silently skipped without its report', async () => {
+  await assert.rejects(
+    () => verify(fixture(), { expectedSourceId: 'wrong-source' }),
+    /source ID.*report/i,
+  );
 });
 test('report-only and requested report without a reader do not claim API acceptance', async () => {
   const f = fixture();
