@@ -232,3 +232,18 @@ Rania’s editable signup/reset email downloads are applied as source-only chang
 ## November 13 email refinement and reconciliation (146)
 
 Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.
+
+## Cloudflare Pages callback paths
+
+Pages redirects the configured `.html` callbacks to `/auth-confirm` and
+`/auth-reset`, preserving their query. The auth entry and parser recognise both
+the existing exact `.html` path and its exact clean alias for the same purpose.
+They still reject other paths, wrong-purpose callbacks, duplicate codes, extra
+parameters and fragments; credentials are removed before rendering or provider
+calls. Supabase keeps the existing exact `.html` redirect allowlist. No wildcard
+redirect, new destination, account, grant or authentication policy is introduced.
+
+The hosted 308 responses reproduced this gap after the first workspace release.
+The clean-path unit case and both SDK/browser flows fail before the correction
+and pass afterward. SDK browser responses are synthetic HTTP; this evidence
+does not establish fresh email delivery or a genuine hosted staff session.

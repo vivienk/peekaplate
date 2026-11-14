@@ -2668,3 +2668,12 @@ merged half-open query passed both actual PostgreSQL cases.
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T20:35:08.044Z","exitCode":1}
 ```
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.

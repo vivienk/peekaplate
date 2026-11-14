@@ -80,6 +80,33 @@ async function signup(page: Page) {
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 }
 
+test('Pages clean confirmation callback keeps PKCE and strips the code', async ({ page }) => {
+  const calls = await provider(page);
+  await signup(page);
+  await page.goto(`${origin}/auth-confirm?code=synthetic-clean-code`);
+  await expect(page).toHaveURL(`${origin}/auth-confirm`);
+  await expect(page.getByRole('heading', { name: 'Confirm your email' })).toBeVisible();
+  expect(calls.filter((call) => call.body?.auth_code)).toHaveLength(0);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Email confirmed', exact: true })).toBeVisible();
+  expect(calls.filter((call) => call.body?.auth_code === 'synthetic-clean-code')).toHaveLength(1);
+});
+
+test('Pages clean recovery callback opens only the recovery form', async ({ page }) => {
+  const calls = await provider(page);
+  await recoveryEmail(page);
+  await page.goto(`${origin}/auth-reset?code=synthetic-clean-recovery`);
+  await expect(page).toHaveURL(`${origin}/auth-reset`);
+  await expect(page.getByRole('heading', { name: 'Open password reset' })).toBeVisible();
+  expect(calls.filter((call) => call.body?.auth_code)).toHaveLength(0);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
+  expect(calls.filter((call) => call.body?.auth_code === 'synthetic-clean-recovery')).toHaveLength(
+    1,
+  );
+  expect(calls.some((call) => call.url.endsWith('/user') && call.body?.password)).toBe(false);
+});
+
 test('neutral entry makes no lookup, confirmed sign-in restores and signs out', async ({
   page,
 }) => {
