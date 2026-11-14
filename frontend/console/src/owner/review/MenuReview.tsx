@@ -24,8 +24,8 @@ export interface ReviewDishesProps {
   onEditDish: (id: string) => void;
   onRemoveDish: (id: string) => void;
   onUndoRemove: () => void;
-  /** Destination and save behavior are still to be confirmed with design. */
-  onBack: () => void;
+  /** Left footer button. Figma frame S10_Review — Default labels it Cancel; its behavior is not specified. */
+  onCancel: () => void;
   /** Saves progress and returns to S12. */
   onSaveAndExit: () => void;
   /** Starts publication. The parent confirms success with the API before showing the pop-up. */
@@ -66,7 +66,7 @@ export function ReviewDishes({
   onEditDish,
   onRemoveDish,
   onUndoRemove,
-  onBack,
+  onCancel,
   onSaveAndExit,
   onPublish,
   publishing = false,
@@ -116,7 +116,7 @@ export function ReviewDishes({
               {count} dish{count === 1 ? '' : 'es'}
             </p>
           </div>
-          <Button variant="text" className="owner-button" onClick={onAddDish}>
+          <Button variant="text" className="owner-button review-add" onClick={onAddDish}>
             + Add dish
           </Button>
         </div>
@@ -207,25 +207,25 @@ export function ReviewDishes({
         )}
 
         <div className="review-footer">
-          <Button variant="text" className="owner-button" onClick={onBack}>
-            Back
+          <Button variant="outline" className="owner-button" onClick={onCancel}>
+            Cancel
           </Button>
-          <Button variant="outline" className="owner-button" onClick={onSaveAndExit}>
-            Save and Exit
-          </Button>
-          <Button
-            variant="action"
-            className="owner-button"
-            disabled={!ready || publishing}
-            aria-busy={publishing}
-            onClick={onPublish}
-          >
-            Publish Menu
-          </Button>
+          {ready ? (
+            <Button
+              variant="action"
+              className="owner-button"
+              disabled={publishing}
+              aria-busy={publishing}
+              onClick={onPublish}
+            >
+              Publish Menu
+            </Button>
+          ) : (
+            <Button variant="action" className="owner-button" onClick={onSaveAndExit}>
+              Save and Exit
+            </Button>
+          )}
         </div>
-        {!ready && count > 0 && (
-          <p className="review-hint">Publish Menu opens when every dish is Ready.</p>
-        )}
       </main>
     </div>
   );

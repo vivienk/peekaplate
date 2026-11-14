@@ -56,7 +56,7 @@
   padding: var(--pp-space-40);
   border-radius: var(--pp-radius-24);
   background: var(--pp-color-white);
-  box-shadow: var(--owner-pending-shadow-card);
+  box-shadow: var(--owner-pending-shadow-menu);
 }
 
 .review-head {
@@ -134,7 +134,7 @@
   font-weight: var(--pp-font-weight-semibold);
 }
 .review-table tbody tr {
-  border-bottom: 1px solid var(--pp-role-outline-variant);
+  border-bottom: 1px solid color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent);
 }
 .review-table td,
 .review-table tbody th {
@@ -203,7 +203,7 @@
   border: 0;
   border-radius: var(--pp-radius-full);
   background: transparent;
-  color: var(--pp-color-orange-800);
+  color: var(--pp-color-gray-600);
   cursor: pointer;
 }
 .review-trash:hover {
@@ -230,6 +230,26 @@
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
   text-align: center;
+}
+
+/* Figma "+ Add dish" text link: orange-800 (#983A14). */
+.review-add.pp-button {
+  color: var(--pp-color-orange-800);
+}
+
+/* Figma footer buttons: 48px high pills, 18px label, 208 to 280px wide. Cancel is Bold, the
+ * orange button is Semi Bold. */
+.review-footer .owner-button.pp-button {
+  flex: 1 1 var(--pp-space-80);
+  min-width: 208px; /* Figma button min width: no size token */
+  max-width: 280px; /* Figma button max width: no size token */
+  min-height: var(--pp-space-48);
+  padding: var(--pp-space-12) var(--pp-space-20);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+}
+.review-footer .owner-button.pp-button--outline {
+  font-weight: var(--pp-font-weight-bold);
 }
 
 .review-footer {

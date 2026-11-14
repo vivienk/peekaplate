@@ -1,6 +1,8 @@
 // Preview-only demo of S10 "Menu Review and Publish" (S5-FE-10) with fictional dishes (PR previews
-// only). The owner draft API and the S09 form replace these stand-ins; nothing here is real
-// restaurant data. "Publishing" only waits briefly and flips a local flag to show the success pop-up.
+// only). The dishes come from the owner dashboard's menu data (the data behind its Menu screen), so
+// S10 and that screen show the same menu. The owner draft API and the S09 form replace these
+// stand-ins; nothing here is real restaurant data. "Publishing" only waits briefly and flips a
+// local flag to show the success pop-up.
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@peekaplate/tokens/tokens.css';
@@ -10,7 +12,9 @@ import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';
 import '../owner.css';
 import './review.css';
+import { initialMenu, newDraft } from '../../owner-dashboard/data';
 import { PublishSuccessDialog } from '../PublishSuccessDialog';
+import { type DashboardMenuItem, menuItemToReviewDish } from './fromMenuItem';
 import { ReviewDishes } from './MenuReview';
 import {
   addDish,
@@ -23,36 +27,26 @@ import {
 } from './reviewDishes';
 
 const RESTAURANT = 'Ember & Stone';
-const items = (count: number) => Array.from({ length: count }, (_, index) => `item ${index + 1}`);
-const confirmed = { status: 'confirmed', items: ['egg'] } as const;
-const unknown = { status: 'unknown', items: [] } as const;
 
-const make = (
-  id: string,
-  name: string,
-  category: string | null,
-  priceAmount: string | null,
-  ingredientCount: number,
-  allergens: ReviewDish['allergens'],
-): ReviewDish => ({
-  id,
-  name,
-  category,
-  priceAmount,
-  ingredients: { status: 'confirmed', items: items(ingredientCount) },
-  allergens,
+// Illustrative allergens for the sample dishes, so most rows show them as recorded (as in Figma).
+// Berry Pancake Stack and Brioche French Toast have none recorded.
+const ALLERGENS: Record<string, string[]> = {
+  avotoast: ['egg', 'wheat'],
+  benedict: ['egg', 'milk', 'wheat'],
+  harvest: ['milk'],
+  poke: ['fish', 'soy', 'sesame'],
+  greek: ['milk'],
+};
+
+const dashboardDishes = (): DashboardMenuItem[] =>
+  initialMenu().map((item) => ({ ...item, alg: ALLERGENS[item.id ?? ''] ?? [] }));
+
+// The Figma example: the dashboard's seven dishes, one without a price and one without a category.
+const NEEDS_FIXES: ReviewDish[] = dashboardDishes().map((item) => {
+  if (item.id === 'berrypancakes') return menuItemToReviewDish({ ...item, price: '' });
+  if (item.id === 'frenchtoast') return menuItemToReviewDish({ ...item, cat: '' });
+  return menuItemToReviewDish(item);
 });
-
-// The Figma example: 7 dishes, one without a price and one without a category.
-const NEEDS_FIXES: ReviewDish[] = [
-  make('d1', 'Avocado Toast', 'Breakfast', '14', 6, confirmed),
-  make('d2', 'Classic Eggs Benedict', 'Breakfast', '16', 5, unknown),
-  make('d3', 'Berry Pancake Stack', 'Breakfast', null, 5, unknown),
-  make('d4', 'Brioche French Toast', null, '16', 5, unknown),
-  make('d5', 'Harvest Power Bowl', 'Breakfast', '18', 7, confirmed),
-  make('d6', 'Salmon Poke Bowl', 'Breakfast', '19', 6, unknown),
-  make('d7', 'Garden Avocado Salad', 'Breakfast', '15', 5, confirmed),
-];
 
 // The same menu after the missing price and category are filled in (Figma "Ready to publish").
 const ALL_READY: ReviewDish[] = NEEDS_FIXES.map((dish) => ({
@@ -105,6 +99,19 @@ function Demo() {
     setNote(`Demo: S09 would open for ${dish.name ?? 'this dish'}; saving returns here.`);
   };
 
+  const onAddDish = () => {
+    added.current += 1;
+    const dish = menuItemToReviewDish({
+      ...newDraft(),
+      id: `new-${added.current}`,
+      name: `New dish ${added.current}`,
+      price: '12',
+      ing: ['Rice', 'Mixed greens', 'Avocado', 'Sesame'],
+    });
+    setState(addDish(state, dish));
+    setNote('Demo: the empty S09 form would open; saving adds the dish here.');
+  };
+
   const onPublish = () => {
     setPublishError(null);
     setPublishing(true);
@@ -139,27 +146,11 @@ function Demo() {
         state={state}
         publishing={publishing}
         publishError={publishError}
-        onAddDish={() => {
-          added.current += 1;
-          setState(
-            addDish(
-              state,
-              make(
-                `new-${added.current}`,
-                `New dish ${added.current}`,
-                'Breakfast',
-                '12',
-                4,
-                unknown,
-              ),
-            ),
-          );
-          setNote('Demo: the empty S09 form would open; saving adds the dish here.');
-        }}
+        onAddDish={onAddDish}
         onEditDish={onEditDish}
         onRemoveDish={(id) => setState(removeDish(state, id))}
         onUndoRemove={() => setState(undoRemove(state))}
-        onBack={() => setNote('Back: destination still to be confirmed with design.')}
+        onCancel={() => setNote('Cancel: behavior not specified in Figma yet (to confirm).')}
         onSaveAndExit={() => setNote('Demo: progress saved; would return to S12.')}
         onPublish={onPublish}
       />

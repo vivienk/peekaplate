@@ -38,7 +38,7 @@ const render = (state: ReviewState, props: Partial<ReviewDishesProps> = {}) =>
       onEditDish={noop}
       onRemoveDish={noop}
       onUndoRemove={noop}
-      onBack={noop}
+      onCancel={noop}
       onSaveAndExit={noop}
       onPublish={noop}
       {...props}
@@ -69,21 +69,28 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(words).toContain('Ready');
   });
 
-  it('keeps Publish Menu off until every dish is Ready, and explains why', () => {
+  it('while any dish is not Ready, the footer is Cancel and Save and Exit (no Publish Menu)', () => {
     const html = render(initialReview([dish(), noPrice]));
-    expect(publishButton(html)).toContain('disabled=""');
-    expect(text(html)).toContain('Publish Menu opens when every dish is Ready.');
+    const words = text(html);
+    expect(words).toContain('Cancel');
+    expect(words).toContain('Save and Exit');
+    expect(publishButton(html)).toBe('');
+    expect(words).not.toContain('Back');
   });
 
-  it('turns Publish Menu on when all dishes are Ready', () => {
+  it('when every dish is Ready, Publish Menu replaces Save and Exit', () => {
     const html = render(initialReview([dish(), dish({ id: 'd9', name: 'Eggs' })]));
+    const words = text(html);
+    expect(words).toContain('Cancel');
+    expect(publishButton(html)).not.toBe('');
     expect(publishButton(html)).not.toContain('disabled');
-    expect(text(html)).not.toContain('opens when every dish is Ready');
+    expect(words).not.toContain('Save and Exit');
   });
 
   it('cannot publish an empty menu and says so', () => {
     const html = render(initialReview([]));
-    expect(publishButton(html)).toContain('disabled=""');
+    expect(publishButton(html)).toBe('');
+    expect(text(html)).toContain('Save and Exit');
     expect(text(html)).toContain('No dishes yet.');
   });
 
@@ -106,8 +113,8 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(text(html)).toContain('Dish removed.');
     expect(html).toContain('>Undo</button>');
     expect(text(html)).not.toContain('Berry Pancake Stack');
-    // The only bad dish is gone, so Publish Menu is on.
-    expect(publishButton(html)).not.toContain('disabled');
+    // The only bad dish is gone, so Publish Menu takes the place of Save and Exit.
+    expect(publishButton(html)).not.toBe('');
   });
 
   it('shows Dish restored with no further Undo', () => {
@@ -116,7 +123,8 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(text(html)).toContain('Dish restored.');
     expect(html).not.toContain('>Undo</button>');
     expect(text(html)).toContain('Berry Pancake Stack');
-    expect(publishButton(html)).toContain('disabled=""');
+    expect(publishButton(html)).toBe('');
+    expect(text(html)).toContain('Save and Exit');
   });
 
   it('gives every row Edit and Remove buttons a name that includes the dish', () => {
@@ -134,10 +142,7 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(html).toContain('<caption');
   });
 
-  it('shows Back and Save and Exit', () => {
-    const words = text(render(initialReview([dish()])));
-    expect(words).toContain('Back');
-    expect(words).toContain('Save and Exit');
-    expect(words).toContain('+ Add dish');
+  it('shows + Add dish', () => {
+    expect(text(render(initialReview([dish()])))).toContain('+ Add dish');
   });
 });
