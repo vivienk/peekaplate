@@ -6,7 +6,7 @@ import check from './assets/check.svg';
 import circle from './assets/circle.svg';
 import clock from './assets/clock.svg';
 import edit from './assets/edit.svg';
-import activity from './assets/fi-rr-chart-histogram.svg'; // Figma Screen 6 "No dish activity yet" icon tile, fi-rr-chart-histogram (I2346:6262;237:8097)
+import activity from './assets/fi-rr-chart-histogram.svg'; // Figma "Icon Dashboard" (2319:11366) in No dish activity yet: chart-histogram in icon/accent (I3038:13161;2319:11354)
 import lock from './assets/fi-rr-lock.svg'; // Figma PeekaPlate Icons / Lock-dot, layer fi-rr-lock (2319:10949)
 import home from './assets/home.svg';
 import logo from './assets/logo.png';

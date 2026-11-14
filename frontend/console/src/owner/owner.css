@@ -531,6 +531,8 @@ body:has(.owner-root) {
 .owner-verify__row .owner-status {
   justify-self: start;
 }
+/* Figma "Icon Dashboard" (2319:11366): 48 square, radius sm (8), color/icon/accent-container
+ * (Orange/100) with the Card small shadow; the 24px icon is color/icon/accent (Orange/700). */
 .owner-empty__tile {
   display: inline-flex;
   align-items: center;
@@ -538,7 +540,8 @@ body:has(.owner-root) {
   width: var(--pp-space-48);
   height: var(--pp-space-48);
   border-radius: var(--pp-radius-8);
-  background: var(--pp-color-orange-500);
+  background: var(--pp-color-orange-100);
+  box-shadow: var(--owner-pending-shadow-card);
 }
 
 /* AI panel (empty state) */
