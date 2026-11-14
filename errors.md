@@ -2875,3 +2875,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - 2026-11-14 context check rejected an overlong diner summary. Condensed responsibilities and retained detailed behavior in the linked preview document and bounded handoff.
+
+- 2026-11-14 portrait regression ran with Desktop Chrome fine-pointer CSS, so the coarse-pointer rotate hint correctly stayed hidden. The combined Quest/phone config now enables touch, matching the existing phone test contract.
