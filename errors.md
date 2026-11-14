@@ -2919,4 +2919,13 @@ Transient observations during Phase 3 verification:
 
 ```json
 {"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
 ```

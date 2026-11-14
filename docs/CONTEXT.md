@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite staff shell with optional consent-gated PostHog technical shell views. Authentication, publication and restaurant-scoped owner reports remain planned; shell views do not establish owner identity or business activity. An app-local accessible TextField foundation wraps the design-system ui/Input (from @peekaplate/ui) with label/hint/error wiring and a synthetic development-only demo excluded from production output; final visual integration remains separately reviewed. PR previews include the labelled synthetic foundations and owner-dashboard demos only when PEEKAPLATE_PREVIEW_DEMOS=true; normal builds exclude both. Invalid fields preserve error styling and gain a distinct keyboard-focus outline.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -231,7 +231,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/foundations/TextField.tsx",
         "frontend/console/src/foundations/field.css",
         "frontend/console/src/owner-dashboard/menu-api.ts",
-        "frontend/console/src/owner-dashboard/menu.test.tsx"
+        "frontend/console/src/owner-dashboard/menu.test.tsx",
+        "frontend/console/first-dashboard.html",
+        "frontend/console/src/owner/demo.tsx",
+        "frontend/console/src/owner/OwnerShell.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/setup.ts",
+        "frontend/console/src/owner/owner.css",
+        "frontend/console/src/owner/setup.test.tsx",
+        "frontend/console/src/owner/FirstDashboard.test.tsx",
+        "tests/e2e/owner-first-dashboard.spec.ts",
+        "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/owner/PublishSuccessDialog.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -241,7 +252,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3fb5f68d3246099957a785b4daac8f70b227e28face91ed635656db55639c03f"
+      "sourceFingerprint": "acc1c884bf0b477c2ee87556c0f34cbca1c8659e6660c929c2fae089ca8df31e"
     },
     {
       "id": "backend",
@@ -525,7 +536,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "099543eb11a0589da162bd56496130ba10e690ec39bd53430c5d092f9bea8c15"
+      "sourceFingerprint": "c891e50b5ef94678a3d85e763aefd8facaba18c43ec664f0524601b2e65cfb41"
     },
     {
       "id": "agents",
@@ -722,26 +733,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-11",
       "modules": [
         "contracts",
-        "processing"
-      ],
-      "summary": "PR51 aligned with current develop after the vision-first release. Local review-only ingredient sidecars are generated through common finalization for schema1/pipeline2 and schema2/pipeline3; unsupported bounded input records unavailability without failing valid extraction. Vision-model text never becomes independent ingredient grounding. Private hosted bundle format and owner correction/publication authority are unchanged. Unicode tests use explicit UTF-8 on Windows.",
-      "next": "Complete final review/CI and merge into develop. Ingredient-specific owner UI/import, recomputation from effective corrections, confirmation and representative food-domain acceptance remain separate; do not copy this sidecar into public food claims."
-    },
-    {
-      "date": "2026-11-08",
-      "summary": "November 8: S5-DATA-07 PR #120 review audit corrections: (A) runtime tracking activation lookup moved inside authorized tenant transaction with app.tenant_id established; (B) staff_membership FOR SHARE re-check acquired inside processing transaction before commit; (C) reviewer UUID provenance preserved via forward migration dropping restrictive FK to staff_membership; (D) canonical menu publication and withdrawal history resolved via app_private.es_event; (E) duplicate file SHA-256 re-checked under advisory lock; (F) order identity tuple formatted as JSON array [order_id, order_line_id, outcome_type]; (G) strict integer quantity validation (1-999); (H) downstream handoff fixture added with documentation; (I) raw CSV retention purge gated behind enableRawCsvPurge flag; (J) automatic tracking activation insert decoupled from publishMenu. 68/68 pgTAP assertions and 5/5 real PostgreSQL integration probes pass.",
-      "modules": [
-        "contracts",
-        "backend",
-        "database",
-        "measurement"
-      ],
-      "next": "Await explicit stakeholder sign-off on visit-matching and metric contracts before connecting outcomes to owner reports or causal attribution. No owner/editor mapping API or UI to be built for pilot."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "contracts",
         "backend",
         "database"
       ],
@@ -843,6 +834,35 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/menu.tsx"
       ],
       "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console",
+        "delivery"
+      ],
+      "summary": "PR125 reconciles owner first-dashboard setup shell with current develop, retaining the existing owner-dashboard/foundations previews, owner-menu adapters and shared context. All three synthetic demo pages remain preview-only and excluded from normal output. No auth/API/publication wiring is introduced.",
+      "sources": [
+        "frontend/console/src/owner/setup.ts",
+        "frontend/console/src/owner/OwnerShell.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/vite.config.ts",
+        "scripts/console-preview-demos.test.mjs"
+      ],
+      "next": "Run final checks and merge reviewed PR125 before reconciling PR139 onboarding states/dialog. Connected owner dashboard/auth acceptance remains separate."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
+      "sources": [
+        "frontend/console/src/owner/PublishSuccessDialog.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "tests/e2e/owner-onboarding.spec.ts"
+      ],
+      "next": "Reconcile/merge after PR125 and recheck develop. Connected restaurant setup/auth/publication and full owner journey remain separate acceptance work."
     },
     {
       "date": "2026-11-13",
