@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam. Typed AI result view validates venue/window and optional known report ID; the preview-only fictional wrapper retains desktop/mobile drawer mounts and cannot apply changes.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. Live token getter is an auth seam. Typed AI result view validates venue/window and report ID; the fictional preview wrapper cannot apply changes. S10 review (src/owner/review): dish table with Remove/Undo; Publish Menu only when every dish is Ready; allergens shown only when confirmed; no API change.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -261,7 +261,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/drawer.tsx",
         "frontend/console/src/owner-dashboard/owner-dashboard.css",
         "tests/e2e/owner-dashboard-drawer.spec.ts",
-        "frontend/console/src/owner-dashboard/chat.tsx"
+        "frontend/console/src/owner-dashboard/chat.tsx",
+        "frontend/console/review-dishes.html",
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "frontend/console/src/owner/review/reviewDishes.test.tsx",
+        "frontend/console/src/owner/review/MenuReview.tsx",
+        "frontend/console/src/owner/review/MenuReview.test.tsx",
+        "frontend/console/src/owner/review/fromMenuItem.ts",
+        "frontend/console/src/owner/review/fromMenuItem.test.tsx",
+        "frontend/console/src/owner/review/menuReviewDemo.tsx",
+        "frontend/console/src/owner/review/review.css",
+        "tests/e2e/menu-review.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -271,7 +281,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f43744603fa0d071df7ff8932b6a653c61fb52f235565326fb57a5b4a1c770c5"
+      "sourceFingerprint": "04fe590c532019f16e658789e0c19316fae1297a541fb5ea6194844ad21fcab3"
     },
     {
       "id": "backend",
@@ -579,7 +589,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "593ae6e887d9e6387caa1b752b9473f5f6224dee8516e0b96b918b2242f26478"
+      "sourceFingerprint": "d0ee8bcd3a963aab9ebbe58c367571eece1cf92596a62fa041fd51a8e42ac3fa"
     },
     {
       "id": "agents",
@@ -775,22 +785,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-13",
       "modules": [
-        "console",
-        "delivery"
-      ],
-      "summary": "PR125 reconciles owner first-dashboard setup shell with current develop, retaining the existing owner-dashboard/foundations previews, owner-menu adapters and shared context. All three synthetic demo pages remain preview-only and excluded from normal output. No auth/API/publication wiring is introduced.",
-      "sources": [
-        "frontend/console/src/owner/setup.ts",
-        "frontend/console/src/owner/OwnerShell.tsx",
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "frontend/console/vite.config.ts",
-        "scripts/console-preview-demos.test.mjs"
-      ],
-      "next": "Run final checks and merge reviewed PR125 before reconciling PR139 onboarding states/dialog. Connected owner dashboard/auth acceptance remains separate."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
         "console"
       ],
       "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
@@ -915,6 +909,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/restaurant-urls.md"
       ],
       "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "console"
+      ],
+      "summary": "S5-FE-10 owner S10 Menu Review and Publish screen: props-controlled component with pure dish rules, dish data mapped from the dashboard menu items (fromMenuItem.ts), a preview-only synthetic demo and Playwright keyboard/axe checks at desktop and 390px. Remove shows Undo, Undo restores the same dish, and Publish Menu is on only when every remaining dish is Ready. No API, contract or publication behavior changed; nothing publishes from this screen alone.",
+      "sources": [
+        "frontend/console/src/owner/review/reviewDishes.ts",
+        "frontend/console/src/owner/review/MenuReview.tsx",
+        "frontend/console/src/owner/review/fromMenuItem.ts",
+        "frontend/console/review-dishes.html",
+        "tests/e2e/menu-review.spec.ts",
+        "docs/previews.md"
+      ],
+      "next": "Wire to the real S09 form and owner draft API (owner-menu-workspace.md). After a real publish, show the diner URL returned by the API (Location header or GET diner-link), never one built in the frontend. Design to confirm: Back destination, pop-up copy, trash icon and 32px Edit."
     }
   ]
 }

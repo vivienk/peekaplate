@@ -1,0 +1,275 @@
+/* S5-FE-10 S10 "Menu Review and Publish" (Figma frames S10_Review, S10_Ready to publish).
+ * Every value comes from @peekaplate/tokens. Shared owner values (--owner-pending-*, buttons, focus
+ * ring, visually-hidden) come from owner.css through the .owner-root wrapper. Styling of the trash
+ * action and the Edit button height (32px) are still pending from design. */
+
+.review-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-32);
+  padding-bottom: var(--pp-space-48);
+}
+
+.review-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-16);
+  padding: var(--pp-space-24) var(--pp-space-32) 0;
+}
+.review-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+/* Figma shows the brand name in orange-500, which is only 2.05:1 on this background (WCAG AA needs
+ * 4.5:1). Neutral text until design confirms an accessible orange. */
+.review-brand__name {
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-bold);
+}
+.review-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.review-identity__kind {
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.review-identity__name {
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.review-card {
+  width: min(100% - var(--pp-space-32), 64rem);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-24);
+  padding: var(--pp-space-40);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-color-white);
+  box-shadow: var(--owner-pending-shadow-menu);
+}
+
+.review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pp-space-16);
+}
+.review-card h1 {
+  margin: 0;
+  font-size: var(--owner-pending-title-size);
+  line-height: var(--owner-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+}
+.review-sub {
+  margin: var(--pp-space-2) 0 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* Remove / restore notice (Figma "Dish removed." and "Dish restored.") */
+.review-notice-area:empty {
+  display: none;
+}
+.review-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-16);
+  padding: var(--pp-space-16) var(--pp-space-20);
+  border-radius: var(--pp-radius-12);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+}
+.review-notice--removed {
+  background: var(--pp-color-error-100);
+  color: var(--pp-color-error-700);
+}
+.review-notice--restored {
+  background: var(--pp-color-success-50);
+  color: var(--pp-color-success-900);
+}
+.review-undo {
+  padding: var(--pp-space-4) var(--pp-space-8);
+  border: 0;
+  border-radius: var(--pp-radius-8);
+  background: transparent;
+  color: var(--pp-role-on-surface-variant);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+  cursor: pointer;
+}
+.review-undo:hover {
+  background: var(--pp-role-outline-variant);
+}
+
+/* Table */
+.review-table-wrap {
+  overflow-x: auto;
+}
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.review-table thead th {
+  padding: var(--pp-space-8);
+  background: var(--pp-role-surface);
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.review-table tbody tr {
+  border-bottom: 1px solid color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent);
+}
+.review-table td,
+.review-table tbody th {
+  padding: var(--pp-space-12) var(--pp-space-8);
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+  font-weight: var(--pp-font-weight-regular);
+  vertical-align: middle;
+}
+.review-dish {
+  display: table-cell;
+}
+.review-dish__name {
+  display: block;
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.review-dish__meta {
+  display: block;
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+/* Status label: Figma "Status label" tones Success, Warning and Error. */
+.review-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--pp-space-4) var(--pp-space-12);
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+  white-space: nowrap;
+}
+.review-status--success {
+  background: var(--pp-color-success-50);
+  color: var(--pp-color-success-900);
+}
+.review-status--warning {
+  background: var(--pp-color-warning-50);
+  color: var(--pp-color-warning-900);
+}
+.review-status--error {
+  background: var(--pp-color-error-50);
+  color: var(--pp-color-error-700);
+}
+
+.review-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+}
+.review-edit.pp-button {
+  min-height: var(--pp-space-32);
+  padding-block: var(--pp-space-4);
+}
+.review-trash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-32);
+  height: var(--pp-space-32);
+  border: 0;
+  border-radius: var(--pp-radius-full);
+  background: transparent;
+  color: var(--pp-color-gray-600);
+  cursor: pointer;
+}
+.review-trash:hover {
+  background: var(--pp-role-outline-variant);
+}
+
+.review-empty {
+  margin: 0;
+  padding: var(--pp-space-32) 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  text-align: center;
+}
+.review-error {
+  margin: 0;
+  color: var(--pp-color-error-700);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-button-label);
+}
+.review-hint {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  text-align: center;
+}
+
+/* Figma "+ Add dish" text link: orange-800 (#983A14). */
+.review-add.pp-button {
+  color: var(--pp-color-orange-800);
+}
+
+/* Figma footer buttons: 48px high pills, 18px label, 208 to 280px wide. Cancel is Bold, the
+ * orange button is Semi Bold. */
+.review-footer .owner-button.pp-button {
+  flex: 1 1 var(--pp-space-80);
+  min-width: 208px; /* Figma button min width: no size token */
+  max-width: 280px; /* Figma button max width: no size token */
+  min-height: var(--pp-space-48);
+  padding: var(--pp-space-12) var(--pp-space-20);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+}
+.review-footer .owner-button.pp-button--outline {
+  font-weight: var(--pp-font-weight-bold);
+}
+
+.review-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-16);
+}
+
+.review-root :focus-visible {
+  outline: 2px solid var(--pp-role-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 899px) {
+  .review-card {
+    padding: var(--pp-space-24) var(--pp-space-16);
+  }
+  .review-topbar {
+    padding: var(--pp-space-16) var(--pp-space-16) 0;
+  }
+}
