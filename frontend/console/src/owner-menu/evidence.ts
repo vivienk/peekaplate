@@ -18,7 +18,10 @@ export function evidenceExcerpts(
   return item.candidate.evidence.flatMap((span) => {
     const segment = segments.get(span.segment_id);
     if (!segment || typeof segment.text !== 'string') return [];
-    const text = segment.text.slice(span.start, span.end).trim();
+    // Evidence offsets come from the Python producer and count Unicode code points, not
+    // JavaScript UTF-16 units (the convention in contracts' review-candidates.ts). Slicing the
+    // string directly cut an excerpt short after an emoji or other astral character.
+    const text = Array.from(segment.text).slice(span.start, span.end).join('').trim();
     return text === ''
       ? []
       : [{ page: segment.page_number ?? null, text, segmentId: span.segment_id }];
