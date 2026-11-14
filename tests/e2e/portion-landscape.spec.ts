@@ -90,29 +90,6 @@ for (const { supported, landscape } of [
       path: `/private/tmp/portion-fullscreen-${supported}-${landscape}.png`,
     });
     await expect(portal.locator('.pp-ar__scale-status')).toContainText(/approximate/i);
-    const canvas = portal.locator('.pp-ar__canvas');
-    const bounds = (await canvas.boundingBox())!;
-    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(bounds.x + bounds.width / 2 + 75, bounds.y + bounds.height / 2 + 40, {
-      steps: 8,
-    });
-    await page.mouse.up();
-    await expect(canvas).toHaveAttribute('aria-label', /Tilt [1-9]/);
-    await canvas.press('Home');
-    await expect(canvas).toHaveAttribute(
-      'aria-label',
-      /Tilt 0 degrees forward, 0 degrees sideways/,
-    );
-    await canvas.press('ArrowRight');
-    await expect(canvas).toHaveAttribute('aria-label', /1 degrees sideways/);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(canvas).toHaveAttribute(
-      'aria-label',
-      /Tilt 0 degrees forward, 0 degrees sideways/,
-    );
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-
     await portal.getByRole('button', { name: 'Original photo', exact: true }).click();
     await expect(portal.locator('.pp-ar__original')).toBeVisible();
     await expect(portal.locator('.pp-ar__original')).toHaveAttribute('src', originalUrl!);
@@ -125,7 +102,6 @@ for (const { supported, landscape } of [
     await expect(portal.locator('.pp-ar__original')).toBeHidden();
     await portal.getByText('Adjust view', { exact: true }).click();
     await expect(portal.getByRole('slider', { name: 'Rotate dish' })).toBeEnabled();
-    await portal.getByRole('button', { name: 'Reset tilt', exact: true }).click();
     await page.screenshot({ path: `/private/tmp/portion-landscape-${supported}-${landscape}.png` });
     await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
     if (supported)

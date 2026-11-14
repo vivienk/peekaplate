@@ -1,7 +1,6 @@
 import type { PublicPortion } from '@peekaplate/contracts';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { bindPortionTilt, tiltAngles } from './portionTilt';
 
 export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
@@ -33,8 +32,7 @@ export function bindPortionAR(
     dialog.setAttribute('aria-label', 'Dish on your table');
     dialog.setAttribute('aria-modal', 'true');
     dialog.innerHTML = `<video class="pp-ar__camera" muted playsinline aria-hidden="true"></video>
-      <div class="pp-ar__canvas" tabindex="0" role="img" aria-label="Dish preview. Drag or use arrow keys to tilt. Home resets tilt."></div>
-      <p class="pp-ar__tilt-hint">Drag to tilt the plate</p>
+      <div class="pp-ar__canvas"></div>
       <header class="pp-ar__header"><button class="pp-back pp-ar__back" type="button" data-action="close" aria-label="Back to preview"></button><button type="button" data-action="original" aria-pressed="false">Original photo</button><h2 class="pp-sr-only">Dish on your table</h2></header>
       <p class="pp-ar__rotate-hint" role="status">Rotate your phone sideways to view the dish.</p>
       <p class="pp-ar__scale-status" role="status"></p>
@@ -45,7 +43,6 @@ export function bindPortionAR(
           <button type="button" data-action="start" disabled>Start camera preview</button>
           <button type="button" data-action="place" hidden>Place dish</button>
           <button type="button" data-action="reset" hidden>Reposition</button>
-          <button type="button" data-action="tilt-reset">Reset tilt</button>
           <button type="button" data-action="mode" hidden>Show 3D</button>
         </div>
         <label>Rotate dish <input aria-label="Rotate dish" type="range" min="-180" max="180" value="0" disabled></label>
@@ -77,7 +74,6 @@ export function bindPortionAR(
       button('original').textContent = original.hidden ? 'Original photo' : 'Return to AR';
       button('original').setAttribute('aria-pressed', String(!original.hidden));
       dialog.classList.toggle('pp-ar--original', !original.hidden);
-      canvasHost.inert = !original.hidden;
     });
     const start = button('start');
     const place = button('place');
@@ -124,25 +120,15 @@ export function bindPortionAR(
     const width = portionWorldWidth(physicalSize);
     const height = width * (image.naturalHeight / image.naturalWidth);
     let cameraScale = 0.3 / width;
-    const cutout = new THREE.Group();
-    // Seven copies of the same captured cutout; darker back layers imply a thin rim.
-    // No generated food pixels or changes to the calibrated plate dimensions.
-    const geometry = new THREE.PlaneGeometry(width, height);
-    for (let layer = 0; layer < 7; layer++) {
-      const face = new THREE.Mesh(
-        geometry,
-        new THREE.MeshBasicMaterial({
-          map: texture,
-          color: new THREE.Color().setScalar(layer === 6 ? 1 : 0.35 + layer * 0.05),
-          transparent: true,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      );
-      face.position.z = ((layer - 6) * width * 1.6) / 320;
-      face.renderOrder = layer;
-      cutout.add(face);
-    }
+    const cutout = new THREE.Mesh(
+      new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
     cutout.position.y = height / 2;
     content.add(cutout);
     const plate = physicalSize?.plate;
@@ -169,7 +155,7 @@ export function bindPortionAR(
     if (footprint) {
       footprint.position.y = 0.001;
       footprint.visible = false;
-      anchor.add(footprint);
+      content.add(footprint);
     }
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.055, 0.07, 32).rotateX(-Math.PI / 2),
@@ -179,25 +165,6 @@ export function bindPortionAR(
     reticle.visible = false;
     scene.add(reticle);
 
-    const tilt = bindPortionTilt(
-      canvasHost,
-      () => running && placed && !use3d && original.hidden === true,
-      (x, y) => {
-        const angles = tiltAngles(x, y);
-        // Rotate only the appearance, never the measured footprint or its world anchor.
-        cutout.rotation.set(
-          THREE.MathUtils.degToRad(angles.pitch),
-          THREE.MathUtils.degToRad(angles.yaw),
-          THREE.MathUtils.degToRad(angles.roll),
-          'XZY',
-        );
-        canvasHost.setAttribute(
-          'aria-label',
-          `Dish preview. Tilt ${Math.round(angles.pitch)} degrees forward, ${Math.round(angles.yaw)} degrees sideways. Drag or use arrow keys; Home resets tilt.`,
-        );
-      },
-    );
-    button('tilt-reset').addEventListener('click', () => tilt.reset());
     const disposeObject = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
       object.traverse((node) => {
@@ -228,9 +195,6 @@ export function bindPortionAR(
       if (!renderer || session) return;
       const bounds = canvasHost.getBoundingClientRect();
       camera.aspect = bounds.width / Math.max(1, bounds.height);
-      camera.fov = THREE.MathUtils.radToDeg(
-        2 * Math.atan(Math.min(bounds.width, bounds.height) / (2 * 900)),
-      );
       camera.updateProjectionMatrix();
       renderer.setSize(bounds.width, bounds.height);
       if (placed && !tracked) placeDish();
@@ -239,7 +203,6 @@ export function bindPortionAR(
       if (!live) return;
       live = false;
       abort.abort();
-      tilt.dispose();
       orientation?.release();
       stopCamera();
       hits?.cancel();
@@ -339,12 +302,11 @@ export function bindPortionAR(
       changed();
       updateScaleStatus();
       message.textContent = tracked
-        ? 'Placed on the detected surface. Drag to tilt; Reposition finds a new table position.'
-        : 'Approximate camera placement — no surface tracking. Drag to tilt; Reposition recentres the dish.';
+        ? 'Placed on the detected surface. Move around the dish; use Rotate to turn it.'
+        : 'Manual camera placement — no surface tracking. Tap the camera view to reposition.';
     };
     place.addEventListener('click', placeDish);
     reset.addEventListener('click', () => {
-      tilt.reset(false);
       placed = false;
       anchor.visible = false;
       reset.hidden = true;
@@ -361,6 +323,20 @@ export function bindPortionAR(
         ? 'Move your phone slowly over a table. Wait for the placement ring.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     });
+    canvasHost.addEventListener('pointerup', (event) => {
+      if (!running || tracked || !placed) return;
+      const bounds = canvasHost.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+          (-(event.clientY - bounds.top) / bounds.height) * 2 + 1,
+        ),
+        camera,
+      );
+      ray.ray.at(0.85 / -ray.ray.direction.z, anchor.position);
+    });
+
     const activate = () => {
       running = true;
       start.hidden = tracked || !xrSupported;
@@ -471,10 +447,7 @@ export function bindPortionAR(
 
     mode.addEventListener('click', () => {
       if (!model) return;
-      tilt.reset(false);
       use3d = !use3d;
-      dialog.querySelector<HTMLElement>('.pp-ar__tilt-hint')!.hidden = use3d;
-      button('tilt-reset').hidden = use3d;
       model.visible = use3d;
       cutout.visible = !use3d;
       mode.textContent = use3d ? 'Show 2.5D' : 'Show 3D';

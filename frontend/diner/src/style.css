@@ -1471,28 +1471,3 @@ main:has(> .pp-detail) {
 .pp-ar--original .pp-ar__rotate-hint {
   visibility: hidden;
 }
-
-.pp-ar__canvas {
-  cursor: grab;
-}
-.pp-ar__canvas--dragging {
-  cursor: grabbing;
-}
-.pp-ar__canvas:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: -4px;
-}
-.pp-ar__tilt-hint {
-  position: absolute;
-  bottom: 68px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  pointer-events: none;
-  color: #fff;
-  text-shadow: 0 1px 4px #000;
-  font-size: 13px;
-}
-.pp-ar--original .pp-ar__tilt-hint {
-  visibility: hidden;
-}

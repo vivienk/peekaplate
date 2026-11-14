@@ -2857,10 +2857,3 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - 2026-11-13 context check rejected eleven handoffs after adding plate calibration. Kept the required ten most recent handoffs; older entries remain in Git history.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T05:49:50.231Z","exitCode":2}
-```
-
-- 2026-11-13 drag-tilt typecheck: DOM hidden is boolean or until-found in current TypeScript. The gesture predicate now explicitly checks hidden === true; this keeps the boolean eligibility contract.
