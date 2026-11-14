@@ -290,7 +290,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9261c56644069c53eb0a7fe54832b0a09ff11804d6db33aea3de046cf75d192d"
+      "sourceFingerprint": "a150011ed47765a1d627027f2c3b1bd4a4e4bb5add6d92f4f03022d34b26b604"
     },
     {
       "id": "backend",
@@ -743,14 +743,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-08",
-      "summary": "PR77 reconciled with current develop without dropping shared context or append-only failure history. Cached-page restore now reads the latest same-tab identity, preserves the higher sequence for the same producer and adopts a newer visit. Missing persistent state starts fresh. Three regressions failed before correction and pass with the existing identity, validation and clock suite. No destination delivery is added.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Review the pinned PR77 correction, then update PR80 from it. Consent, durable outbox and dispatch remain in PR80; HTTP delivery is PR84. Real publication/provider acceptance remains separate."
-    },
-    {
       "date": "2026-11-10",
       "modules": [
         "backend",
@@ -871,6 +863,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/live.tsx"
       ],
       "next": "Obtain final exact-commit approval, deploy staging API and console, and record hosted session/CORS evidence on the release PR. Keep menu setup/upload/publication UI integrations and production separate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "console"
+      ],
+      "summary": "Correct the hosted Pages callback mismatch: exact /auth-confirm and /auth-reset aliases share the existing same-purpose parser and entry classification. Existing .html allowlist, origin validation, PKCE and URL scrubbing remain unchanged. Both clean-path browser regressions fail against previous code.",
+      "sources": [
+        "frontend/console/src/auth/callback.ts",
+        "frontend/console/src/auth/live.tsx",
+        "tests/e2e/owner-auth-provider.spec.ts",
+        "docs/owner-auth.md"
+      ],
+      "next": "Finish pinned review/checks, promote the narrow correction to main, then verify the actual hosted clean callback paths. Genuine staff-session/email acceptance remains separate."
     }
   ]
 }
