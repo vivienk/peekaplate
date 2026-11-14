@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./owner-ai": "./src/owner-ai.ts",
     "./owner-report": "./src/owner-report.ts"
   },
   "scripts": {

@@ -66,7 +66,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-actions.test.ts",
         "docs/owner-insight-actions.md",
         "packages/contracts/src/owner-menu.ts",
-        "packages/contracts/src/owner-menu.test.ts"
+        "packages/contracts/src/owner-menu.test.ts",
+        "packages/contracts/package.json"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -74,7 +75,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
+      "sourceFingerprint": "2a2537123c75a557c01c39d1c8020ce24ae008adc511a1a0e70cc64f64e1cdda"
     },
     {
       "id": "tokens",
@@ -218,7 +219,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam. Typed AI result view validates venue/window and optional known report ID; the preview-only fictional wrapper retains desktop/mobile drawer mounts and cannot apply changes.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -244,7 +245,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-onboarding.spec.ts",
         "frontend/console/src/owner/PublishSuccessDialog.tsx",
         "frontend/console/src/owner-dashboard/report-api.ts",
-        "tests/e2e/owner-report-api.spec.ts"
+        "tests/e2e/owner-report-api.spec.ts",
+        "frontend/console/src/owner-dashboard/App.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.test.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/SyntheticAiPreviewDemo.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/fixtures.ts",
+        "frontend/console/src/owner-dashboard/ai-preview/ai-preview.css",
+        "tests/e2e/owner-ai-preview.spec.ts",
+        "docs/owner-ai-preview.md",
+        "frontend/console/src/owner-dashboard/drawer.tsx",
+        "frontend/console/src/owner-dashboard/owner-dashboard.css",
+        "tests/e2e/owner-dashboard-drawer.spec.ts",
+        "frontend/console/src/owner-dashboard/chat.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -254,7 +267,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a5d456a6c770c2f440b18a1f849816f0725054da222081dc995d42b7e25fff83"
+      "sourceFingerprint": "f43744603fa0d071df7ff8932b6a653c61fb52f235565326fb57a5b4a1c770c5"
     },
     {
       "id": "backend",
@@ -737,21 +750,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-11",
       "modules": [
         "backend",
-        "contracts"
-      ],
-      "summary": "PR134 restores PR123 validation files lost from its later branch revision while preserving current develop. Two real PostgreSQL regressions failed before fixes: a one-session opened cohort reconstructed via open_rate/count, and valid menu-card comparison engagement reported zero. Both now pass. Nine restored mocked-row cases retain independent denominator checks with complementary suppression. The cross-publication JSON fixture now executes against SQL and yields seventeen distinct sessions. Full local DB runner passes 281 pgTAP assertions and 107 integration cases; focused reader suite passes eleven cases. Repository checks pass: 1374 unit, 74 script tests, types/lint/context/docs and both builds/Worker dry-run. No UI runtime changed.",
-      "sources": [
-        "backend/src/comparison-report.ts",
-        "backend/src/comparison-report.integration.ts",
-        "backend/src/comparison-report.data05.test.ts",
-        "docs/comparison-reporting.md"
-      ],
-      "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "backend",
         "contracts",
         "database"
       ],
@@ -884,6 +882,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/report-api.ts",
         "frontend/console/src/owner-dashboard/report-data.tsx",
         "tests/e2e/owner-report-api.spec.ts"
+      ],
+      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR124 reconciled with current develop, preserving prior owner/report/CSV updates. Reusable result display remains separate from its fictional preview wrapper.",
+      "sources": [
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
+        "docs/owner-ai-preview.md",
+        "tests/e2e/owner-ai-preview.spec.ts"
       ],
       "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
     }
