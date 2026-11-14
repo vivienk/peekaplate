@@ -101,7 +101,9 @@ describe('ingredient artwork approval', () => {
         reviewArtwork(db as never, actor, venue, artworkInput(), { put: vi.fn() }),
       ).rejects.toThrow();
       expect(db.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
-      expect(db.query.mock.calls.some((c) => c[0] === 'COMMIT')).toBe(false);
+      const writeBeginIndex = db.query.mock.calls.map((c) => c[0]).lastIndexOf('BEGIN');
+      expect(writeBeginIndex).toBeGreaterThan(-1);
+      expect(db.query.mock.calls.slice(writeBeginIndex).some((c) => c[0] === 'COMMIT')).toBe(false);
     }
   });
   it('rejects mismatched bytes and unknown approval fields', () => {
@@ -133,5 +135,92 @@ describe('ingredient artwork approval', () => {
     await readArtwork(db as never, venue, ['coconut']);
     expect(db.query).toHaveBeenCalledWith("SELECT set_config('app.tenant_id', $1, true)", [venue]);
     expect(db.query.mock.calls.at(-1)?.[0]).toBe('COMMIT');
+  });
+  it('performs R2 upload outside any open PostgreSQL transaction', async () => {
+    let inTx = false;
+    let putInTx: boolean | null = null;
+    const db = {
+      query: vi.fn(async (sql: string) => {
+        if (sql === 'BEGIN' || sql === 'BEGIN READ ONLY') inTx = true;
+        if (sql === 'COMMIT' || sql === 'ROLLBACK') inTx = false;
+        if (sql.includes('SELECT permission')) return { rows: [{ permission: 'owner' }] };
+        if (sql.startsWith('SELECT request_hash')) return { rows: [] };
+        if (sql.startsWith('SELECT stream_id')) return { rows: [] };
+        return { rows: [] };
+      }),
+    };
+    const put = vi.fn(async () => {
+      putInTx = inTx;
+    });
+    await reviewArtwork(db as never, actor, venue, artworkInput(), { put });
+    expect(put).toHaveBeenCalledOnce();
+    expect(putInTx).toBe(false);
+    expect(inTx).toBe(false);
+  });
+  it('revalidates authorization and expectedVersion in Phase C after R2 upload', async () => {
+    // 1. Authorization revoked between Phase A preflight and Phase C commit.
+    let authCalls = 0;
+    const revokedAuthDb = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('SELECT permission')) {
+          authCalls++;
+          return { rows: [{ permission: authCalls === 1 ? 'owner' : 'viewer' }] };
+        }
+        if (sql.startsWith('SELECT request_hash')) return { rows: [] };
+        if (sql.startsWith('SELECT stream_id')) return { rows: [] };
+        return { rows: [] };
+      }),
+    };
+    await expect(
+      reviewArtwork(revokedAuthDb as never, actor, venue, artworkInput(), { put: vi.fn() }),
+    ).rejects.toMatchObject({ code: 'forbidden' });
+    expect(revokedAuthDb.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+
+    // 2. Concurrent review advances version between Phase A preflight and Phase C commit.
+    let versionCalls = 0;
+    const staleVersionDb = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('SELECT permission')) return { rows: [{ permission: 'owner' }] };
+        if (sql.startsWith('SELECT request_hash')) return { rows: [] };
+        if (sql.startsWith('SELECT stream_id')) {
+          versionCalls++;
+          return {
+            rows: versionCalls === 1 ? [] : [{ version: 1, stream_id: crypto.randomUUID() }],
+          };
+        }
+        return { rows: [] };
+      }),
+    };
+    await expect(
+      reviewArtwork(staleVersionDb as never, actor, venue, artworkInput(), { put: vi.fn() }),
+    ).rejects.toMatchObject({ code: 'version_conflict' });
+    expect(staleVersionDb.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+  });
+  it('verifies checksum when content-addressed object already exists and rejects mismatch', async () => {
+    const input = artworkInput();
+    const put = vi.fn(async () => null);
+    const matchingGet = vi.fn(async () => ({
+      size: artPng.byteLength,
+      arrayBuffer: async () => Uint8Array.from(artPng).buffer,
+    }));
+    const result = await reviewArtwork(client() as never, actor, venue, input, {
+      put,
+      get: matchingGet,
+    });
+    expect(result.status).toBe('approved');
+    expect(matchingGet).toHaveBeenCalledOnce();
+
+    const tampered = Buffer.from('corrupt-bytes');
+    const mismatchGet = vi.fn(async () => ({
+      size: tampered.byteLength,
+      arrayBuffer: async () => Uint8Array.from(tampered).buffer,
+    }));
+    const db = client();
+    await expect(
+      reviewArtwork(db as never, actor, venue, artworkInput(), { put, get: mismatchGet }),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(
+      db.query.mock.calls.some((c) => c[0].startsWith('INSERT INTO app_private.es_event')),
+    ).toBe(false);
   });
 });

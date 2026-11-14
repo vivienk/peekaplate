@@ -156,10 +156,35 @@ export type Bindings = {
    * tests bind put() alone; without it, review sessions outside local fail as artifact_unavailable.
    */
   INGESTION_REPORTS_BUCKET?: {
-    put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: {
+        customMetadata?: Record<string, string>;
+        httpMetadata?: { contentType?: string };
+        onlyIf?: { etagDoesNotMatch?: string };
+        sha256?: string;
+      },
+    ): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
     delete?(key: string): Promise<unknown>;
   };
+  INGREDIENT_ARTWORK_BUCKET?: {
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
+    ): Promise<unknown>;
+    get?(key: string): Promise<ReviewArtifactObject | null>;
+    list?(options: { prefix: string; cursor?: string | undefined }): Promise<{
+      objects: readonly { key: string; uploaded?: Date | string }[];
+      truncated?: boolean;
+      cursor?: string;
+    }>;
+    delete?(key: string): Promise<unknown>;
+  };
+  INGREDIENT_ARTWORK_ORPHAN_GRACE_MS?: string;
+  INGREDIENT_ARTWORK_CLEANUP_DRY_RUN?: string;
 
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
@@ -1978,6 +2003,37 @@ export const handleScheduled = async (event: any, env: any) => {
         }
       } catch {
         console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
+      }
+    }
+
+    const artworkStorage = env.INGREDIENT_ARTWORK_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+    if (
+      env.INGREDIENT_ARTWORK_ENABLED === 'true' &&
+      artworkStorage &&
+      typeof artworkStorage.list === 'function' &&
+      typeof artworkStorage.delete === 'function'
+    ) {
+      try {
+        const { cleanupOrphanedIngredientArtwork } = await import('./ingredient-artwork-retention');
+        const gracePeriodMs = env.INGREDIENT_ARTWORK_ORPHAN_GRACE_MS
+          ? Number.parseInt(env.INGREDIENT_ARTWORK_ORPHAN_GRACE_MS, 10)
+          : undefined;
+        const artworkResult = await cleanupOrphanedIngredientArtwork({
+          storage: artworkStorage,
+          client,
+          gracePeriodMs,
+          dryRun: env.INGREDIENT_ARTWORK_CLEANUP_DRY_RUN === 'true',
+        });
+        if (artworkResult.deleted > 0 || artworkResult.errors > 0) {
+          console.log(
+            JSON.stringify({
+              event: 'ingredient_artwork_cleanup',
+              ...artworkResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'ingredient_artwork_cleanup_error' }));
       }
     }
   } catch {

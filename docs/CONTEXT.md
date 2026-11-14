@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d2f3655a4bc13333a235de657b4d430e177748b7b28d76b464fa548d1c0ede56"
+      "sourceFingerprint": "be3ed070704481e4540961d145d5120e89cd62542f269d1437d36a10773995f0"
     },
     {
       "id": "console",
@@ -427,7 +427,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/data06/tsconfig.json",
         "backend/src/ingredient-artwork.ts",
         "backend/src/ingredient-artwork-routes.ts",
+        "backend/src/ingredient-artwork-retention.ts",
         "backend/src/ingredient-artwork.test.ts",
+        "backend/src/ingredient-artwork-retention.test.ts",
         "backend/src/ingredient-artwork.integration.ts"
       ],
       "adrs": [
@@ -441,7 +443,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8cbaf83127f48274d6eca16ea45dd153e02e4493420b4480bfa1121a1b193344"
+      "sourceFingerprint": "64db088a5b336660db11458081c9d151b337cfda645e0889c10e792122890872"
     },
     {
       "id": "database",

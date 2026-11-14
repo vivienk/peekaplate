@@ -373,8 +373,12 @@ function attachSave(bind: () => () => void): () => void {
 
 // Removes the previous mount's Saved-route listener, so remounting never navigates twice.
 let stopRouting: () => void = () => {};
+// Detaches the active screen's Save and live-artwork lifecycle before the next screen or remount renders.
+let leaveScreen: () => void = () => {};
 
 export function mountMenuScreen(container: HTMLElement): void {
+  leaveScreen();
+  leaveScreen = () => {};
   teardownTracking?.();
   teardownTracking = null;
   activeLoad?.abort();
@@ -394,8 +398,6 @@ export function mountMenuScreen(container: HTMLElement): void {
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
   let view: 'menu' | 'detail' | 'saved' = 'menu';
-  // Detaches the current screen's Save behaviour before the next screen renders.
-  let leaveScreen: () => void = () => {};
   // True when this page added the Saved route to history, so leaving it can go back instead.
   let savedRouteAdded = false;
   let isLoading = false;

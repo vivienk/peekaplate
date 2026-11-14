@@ -7,6 +7,9 @@ import type { Bindings } from './index';
 import { IngestionError } from './ingestion/repository';
 import { artworkKey, readArtwork, reviewArtwork } from './ingredient-artwork';
 
+export const resolveArtworkBucket = (env?: Bindings) =>
+  env?.INGREDIENT_ARTWORK_BUCKET ?? env?.INGESTION_REPORTS_BUCKET;
+
 type Services = {
   verify(authorization: string, env: Bindings): Promise<string>;
   authorizeVenue(actor: string, venue: string, env: Bindings): Promise<void>;
@@ -49,10 +52,10 @@ export function registerArtworkRoutes(app: Hono<{ Bindings: Bindings }>, service
     }
     const input = ArtworkCommandSchema.safeParse(raw);
     if (!input.success) return c.json({ error: 'invalid_request' }, 400);
-    const bucket = c.env.INGESTION_REPORTS_BUCKET;
-    if (!bucket) throw new AuthUnavailableError();
+    const bucket = resolveArtworkBucket(c.env);
+    if (input.data.status === 'approved' && !bucket) throw new AuthUnavailableError();
     const state = await services.database(c.env, (client) =>
-      reviewArtwork(client, actor, venue, input.data, bucket),
+      reviewArtwork(client, actor, venue, input.data, bucket ?? { put: async () => undefined }),
     );
     return c.json({ state });
   });
@@ -81,7 +84,7 @@ export function registerArtworkRoutes(app: Hono<{ Bindings: Bindings }>, service
         (state) => state.status === 'approved' && state.sha256 === hash,
       );
     if (!(await approved())) return c.json({ error: 'not_found' }, 404);
-    const bucket = c.env.INGESTION_REPORTS_BUCKET;
+    const bucket = resolveArtworkBucket(c.env);
     if (!bucket?.get) throw new AuthUnavailableError();
     const object = await bucket.get(artworkKey(venue, hash));
     if (!object || object.size > 1_000_000) return c.json({ error: 'not_found' }, 404);

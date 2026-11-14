@@ -306,4 +306,133 @@ describe('menu screen observer lifecycle', () => {
     expect(container.innerHTML).not.toContain('Fixture data');
     expect(container.innerHTML).not.toContain('Ember & Stone');
   });
+
+  it('aborts liveArtwork polling and clears its 30s timer when mountMenuScreen remounts from dish detail', async () => {
+    vi.stubEnv('VITE_PUBLIC_API_URL', 'https://api.example.test');
+    vi.stubGlobal('addEventListener', vi.fn());
+    vi.stubGlobal('removeEventListener', vi.fn());
+    const publishedMenu = {
+      ...createFixtureMenuSource('demo'),
+    };
+    const loaded = await publishedMenu.load();
+    if (loaded.status !== 'ready') throw new Error('Expected ready fixture menu');
+    const published = {
+      ...loaded.menu,
+      source: 'published' as const,
+      venueId: '11111111-1111-4111-8111-111111111111',
+      categories: loaded.menu.categories.map((cat) => ({
+        ...cat,
+        dishes: cat.dishes.map((d) => ({
+          ...d,
+          ingredients: [{ ingredientId: 'ing-1', name: 'coconut', description: null }],
+        })),
+      })),
+    };
+    vi.mocked(createFixtureMenuSource).mockImplementation(() => ({
+      load: () => Promise.resolve({ status: 'ready', menu: published }),
+    }));
+
+    const signals: AbortSignal[] = [];
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (init?.signal) signals.push(init.signal);
+      return Promise.resolve(
+        new Response(JSON.stringify({ schemaVersion: 1, icons: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const makeInteractiveContainer = () => {
+      const listeners = new Map<string, Array<() => void>>();
+      const base = new FakeContainer();
+      return {
+        get innerHTML() {
+          return base.innerHTML;
+        },
+        set innerHTML(v: string) {
+          listeners.clear();
+          base.innerHTML = v;
+        },
+        querySelectorAll(selector: string) {
+          return base.querySelectorAll(selector).map((el) => ({
+            ...el,
+            querySelector: (childSelector: string) => {
+              if (childSelector === '.pp-card__open') {
+                return {
+                  addEventListener: (event: string, fn: () => void) => {
+                    const key = `open-dish:${event}`;
+                    listeners.set(key, [...(listeners.get(key) ?? []), fn]);
+                  },
+                };
+              }
+              return null;
+            },
+            addEventListener: (event: string, fn: () => void) => {
+              const key = `${selector}:${event}`;
+              listeners.set(key, [...(listeners.get(key) ?? []), fn]);
+            },
+          }));
+        },
+        querySelector(selector: string) {
+          if (selector === '.pp-detail__back') {
+            return {
+              setAttribute: vi.fn(),
+              addEventListener: (_event: string, fn: () => void) => {
+                listeners.set('.pp-detail__back:click', [fn]);
+              },
+            };
+          }
+          return null;
+        },
+        appendChild: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        triggerClick(selector: string) {
+          listeners.get(`${selector}:click`)?.[0]?.();
+        },
+      };
+    };
+
+    const container1 = makeInteractiveContainer();
+    mountMenuScreen(container1 as unknown as HTMLElement);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container1.innerHTML).toContain('pp-card--dim');
+
+    // Open a published dish detail view and confirm liveArtwork polling starts.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    container1.triggerClick('open-dish');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(signals[0]?.aborted).toBe(false);
+
+    // Remount mountMenuScreen while the dish detail view is still open.
+    const container2 = makeInteractiveContainer();
+    mountMenuScreen(container2 as unknown as HTMLElement);
+    expect(signals[0]?.aborted).toBe(true);
+
+    // Advancing 30s must not trigger any further polling from the first mount.
+    vi.advanceTimersByTime(30_000);
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // The new mount can independently open and close dish detail, and normal navigation cleans up.
+    vi.useRealTimers();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(container2.innerHTML).toContain('pp-card--dim');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    container2.triggerClick('open-dish');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(signals[1]?.aborted).toBe(false);
+
+    container2.triggerClick('.pp-detail__back');
+    expect(signals[1]?.aborted).toBe(true);
+    vi.advanceTimersByTime(30_000);
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

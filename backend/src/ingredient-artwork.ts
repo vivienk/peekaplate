@@ -6,12 +6,21 @@ import {
   ArtworkStateSchema,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import { AuthUnavailableError } from './auth';
 import { CommandError, ReplayError } from './dish-command';
 import { IngestionError } from './ingestion/repository';
 import { withOwnerMenuTransaction } from './owner-menu';
+import { authorizeStaffVenue } from './staff-venue';
 
 export const artworkKey = (venue: string, sha: string) => `ingredient-artwork/${venue}/${sha}.png`;
-export type ArtworkStorage = { put(key: string, bytes: ArrayBuffer): Promise<unknown> };
+export type ArtworkStorage = {
+  put(
+    key: string,
+    bytes: ArrayBuffer,
+    options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
+  ): Promise<unknown>;
+  get?(key: string): Promise<{ size: number; arrayBuffer(): Promise<ArrayBuffer> } | null>;
+};
 
 export function reviewedPng(input: Extract<ArtworkCommand, { status: 'approved' }>): Uint8Array {
   const data = Buffer.from(input.pngBase64, 'base64');
@@ -83,6 +92,71 @@ export function replayArtwork(events: readonly ArtEvent[]): ArtworkState | null 
   return state;
 }
 
+async function preflightArtworkReview(
+  client: Client,
+  actor: string,
+  venue: string,
+  input: ArtworkCommand,
+  requestHash: string,
+): Promise<ArtworkState | null> {
+  await client.query('BEGIN READ ONLY');
+  try {
+    await authorizeStaffVenue(client, actor, venue, false);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venue]);
+    const receipt = await client.query<{ request_hash: string; result: unknown }>(
+      'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
+      [venue, actor, input.commandId],
+    );
+    if (receipt.rows[0]) {
+      if (receipt.rows[0].request_hash !== requestHash)
+        throw new CommandError('command_conflict', 409);
+      const cached = ArtworkStateSchema.parse(receipt.rows[0].result);
+      await client.query('COMMIT');
+      return cached;
+    }
+    const current = await client.query<{ stream_id: string; version: number }>(
+      'SELECT stream_id,version FROM app_private.ingredient_artwork_current WHERE tenant_id=$1 AND label=$2',
+      [venue, input.label],
+    );
+    if ((current.rows[0]?.version ?? 0) !== input.expectedVersion)
+      throw new CommandError('version_conflict', 409);
+    await client.query('COMMIT');
+    return null;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* Preserve the preflight failure. */
+    }
+    throw error;
+  }
+}
+
+async function uploadImmutableArtwork(
+  storage: ArtworkStorage,
+  venue: string,
+  sha256: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const key = artworkKey(venue, sha256);
+  const putResult = await storage.put(key, Uint8Array.from(bytes).buffer, {
+    onlyIf: { etagDoesNotMatch: '*' },
+    sha256,
+  });
+  if (putResult === null) {
+    if (!storage.get) throw new AuthUnavailableError();
+    const existing = await storage.get(key);
+    if (!existing || existing.size > 1_000_000) throw new AuthUnavailableError();
+    const existingBytes = await existing.arrayBuffer();
+    if (
+      existingBytes.byteLength > 1_000_000 ||
+      createHash('sha256').update(new Uint8Array(existingBytes)).digest('hex') !== sha256
+    ) {
+      throw new AuthUnavailableError();
+    }
+  }
+}
+
 export async function reviewArtwork(
   client: Client,
   actor: string,
@@ -96,6 +170,17 @@ export async function reviewArtwork(
   const hash = createHash('sha256')
     .update(JSON.stringify({ type: 'ingredient.artwork.review', ...metadata }))
     .digest('hex');
+
+  // Phase A: Preflight auth, idempotency, and expectedVersion without holding a write tx.
+  const cached = await preflightArtworkReview(client, actor, venue, input, hash);
+  if (cached) return cached;
+
+  // Phase B: Upload immutable content-addressed bytes outside any PostgreSQL transaction.
+  if (bytes && input.status === 'approved') {
+    await uploadImmutableArtwork(storage, venue, input.sha256, bytes);
+  }
+
+  // Phase C: Short write transaction revalidating auth, idempotency, and expectedVersion.
   return withOwnerMenuTransaction(client, actor, venue, async () => {
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venue}:${actor}:${input.commandId}`,
@@ -124,10 +209,6 @@ export async function reviewArtwork(
       status: input.status,
       sha256: input.status === 'approved' ? input.sha256 : null,
     };
-    // Store immutable bytes before exposing the pointer. A rollback may leave an
-    // unreachable content object; retries never expose it without a committed review.
-    if (bytes && input.status === 'approved')
-      await storage.put(artworkKey(venue, input.sha256), Uint8Array.from(bytes).buffer);
     const event = randomUUID();
     await client.query(
       `INSERT INTO app_private.es_event(id,tenant_id,stream_type,stream_id,version,schema_version,event_type,payload,metadata)
