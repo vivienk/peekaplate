@@ -113,4 +113,30 @@ describe('restaurant links', () => {
       }),
     ).rejects.toThrow();
   });
+  it('rejects a directory result that finishes after its load was cancelled', async () => {
+    const controller = new AbortController();
+    let release!: (value: unknown) => void;
+    let started!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const loading = resolveMenuRoute('/diner/noka_ramen', {
+      linksUrl: '/links',
+      signal: controller.signal,
+      fetcher: async () =>
+        ({
+          ok: true,
+          json: () => {
+            started();
+            return new Promise((resolve) => {
+              release = resolve;
+            });
+          },
+        }) as Response,
+    });
+    await reading;
+    controller.abort();
+    release(links);
+    await expect(loading).rejects.toThrow();
+  });
 });

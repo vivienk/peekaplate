@@ -3408,3 +3408,18 @@ domain, owner flow and real tracking remain NOT RUN. No DNS or deployment change
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T07:23:24.731Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
+```
+
+
+Restaurant URL follow-up: bounded context summaries were shortened to satisfy
+the graph validator. Corepack's initial fetch was blocked by sandbox networking;
+the approved recheck completed using the pinned runtime. After adding the final
+regressions, a check observed stale context before its refresh; fingerprints were
+refreshed after all source edits. These are preparation/tooling observations, not
+hosted application failures. Eight actual local Pages browser cases now pass,
+including directory JSON serving and trailing-slash URLs. A delayed-directory
+cancellation regression and the existing menu checks also pass. No cloud state changed.

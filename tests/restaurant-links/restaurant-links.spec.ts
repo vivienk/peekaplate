@@ -9,6 +9,15 @@ const bundle = JSON.parse(
 const scope = { venueId: bundle.venue_id, menuId: bundle.menu_id };
 const directory = { schemaVersion: 1, restaurants: [{ slug: 'noka_ramen', ...scope }] };
 
+test('Pages serves the actual directory JSON without rewriting it to HTML', async ({ request }) => {
+  const response = await request.get(`${base}/diner/config/restaurant-links.json`);
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('application/json');
+  expect(await response.json()).toEqual(
+    JSON.parse(readFileSync('frontend/diner/public/config/restaurant-links.json', 'utf8')),
+  );
+});
+
 async function arrange(page: Page, state: 'published' | 'withdrawn' | 'tampered' = 'published') {
   const publicReads: string[] = [];
   await page.route('**/restaurant-links.json', (route) => route.fulfill({ json: directory }));

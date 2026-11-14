@@ -126,6 +126,12 @@ links and tampered/withdrawn responses. It does not establish hosted publishing,
 production DNS/TLS, real PostHog/Queue delivery or owner-console acceptance.
 Restaurant enrollment and owner-button integration remain separate handoffs.
 
+Local preparation results: eight Pages/Chromium cases passed in 5.9 seconds;
+38 existing diner state/integrity/refresh/tracking cases passed in 29.4 seconds.
+The disposable database run passed 310 SQL assertions and 138 Worker/database
+tests, plus the local command smoke. Workspace builds pass with the Worker in
+dry-run mode. These results retain the hosted limitations above.
+
 References: [Pages custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/),
 [Pages routing](https://developers.cloudflare.com/pages/configuration/redirects/),
 [Vite public base](https://vite.dev/config/shared-options.html#base),
