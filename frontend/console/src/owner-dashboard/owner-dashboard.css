@@ -2865,6 +2865,7 @@ h1 {
   --s09-pending-photo: 120px;
   --s09-pending-textarea: 138px;
   --s09-pending-button: 280px;
+  --s09-pending-short: 160px;
   /* Figma H3/Bold 32/36; the h3 token is 24/32 (same gap as #139's --owner-pending-title-*). */
   --s09-pending-title-size: 2rem;
   --s09-pending-title-line: 2.25rem;
@@ -2917,9 +2918,11 @@ h1 {
   border-radius: var(--pp-radius-16);
   resize: vertical;
 }
-.s09-two {
+/* Category, Price and Serving Size share one row (3124:15892): Category fills, the two short
+ * fields are at most 160 wide, 16 apart. */
+.s09-row3 {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, var(--s09-pending-short)));
   gap: var(--pp-space-16);
 }
 .s09-desc,
@@ -3162,7 +3165,7 @@ h1 {
   }
 }
 @container (max-width: 35rem) {
-  .s09-two {
+  .s09-row3 {
     grid-template-columns: minmax(0, 1fr);
   }
   .s09-card {

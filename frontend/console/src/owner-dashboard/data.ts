@@ -680,6 +680,8 @@ export type MenuItem = {
   name: string;
   cat: string;
   price: number | string;
+  /** Serving size from Screen 9, e.g. "1 slice" (Figma S09, required). */
+  size: string;
   desc: string;
   ing: string[];
   aiIng: string[];
@@ -704,6 +706,7 @@ export const newDraft = (): MenuItem => ({
   name: '',
   cat: '',
   price: '',
+  size: '',
   desc: '',
   ing: [],
   aiIng: [],
@@ -722,6 +725,7 @@ export const initialMenu = (): MenuItem[] =>
     name: d.name,
     cat: d.cat,
     price: d.price,
+    size: '',
     desc: d.desc,
     ing: [...d.ing],
     aiIng: [],

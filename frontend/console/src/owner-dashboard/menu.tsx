@@ -172,6 +172,7 @@ export function DishForm({
     if (!d.cat) er['f-cat'] = 'Select a category';
     if (!/^\d+(\.\d{1,2})?$/.test(String(d.price).trim()) || !(Number(d.price) > 0))
       er['f-price'] = 'Enter a valid price';
+    if (!d.size.trim()) er['f-size'] = 'Enter a serving size';
     if (d.ing.length < 1) er['f-ing'] = 'Add at least one ingredient';
     if (d.upload && !d.rights) er['f-rights'] = 'Confirm you have the right to use this photo';
     if (d.aiUsed && !d.aiReviewed)
@@ -271,7 +272,7 @@ export function DishForm({
             {...errOf('f-name')}
             onChange={(e) => set({ name: e.target.value })}
           />
-          <div className="s09-two">
+          <div className="s09-row3">
             <div className="pp-field">
               <label className="pp-field__label" htmlFor="f-cat">
                 Category
@@ -302,6 +303,14 @@ export function DishForm({
               value={dr.price}
               {...errOf('f-price')}
               onChange={(e) => set({ price: e.target.value })}
+            />
+            <TextField
+              id="f-size"
+              label="Serving Size"
+              required
+              value={dr.size}
+              {...errOf('f-size')}
+              onChange={(e) => set({ size: e.target.value })}
             />
           </div>
           <div className="s09-desc">
@@ -530,6 +539,7 @@ function DinerCard({ d, showIng }: { d: MenuItem; showIng: boolean }) {
       <h3>{d.name || 'Dish name'}</h3>
       <span className="muted">
         {d.cat} · {d.price ? money(d.price) : '—'}
+        {d.size ? ` · ${d.size}` : ''}
       </span>
       <p style={{ fontSize: 13.5 }}>{d.desc || 'Description'}</p>
       {showIng ? (
@@ -576,6 +586,7 @@ export function Review({
         ch('name') && 'Name',
         ch('cat') && 'Category',
         ch('price') && 'Price',
+        ch('size') && 'Serving size',
         ch('desc') && 'Description',
         orig.ing.join('|') !== dr.ing.join('|') && 'Ingredients',
         orig.alg.join('|') !== dr.alg.join('|') && 'Allergens',
