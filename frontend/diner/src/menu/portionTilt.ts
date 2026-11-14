@@ -96,12 +96,6 @@ export function bindPortionTilt(
   const up = (event: PointerEvent) => {
     if (drag?.id === event.pointerId) end();
   };
-  const cancelled = (event: PointerEvent) => {
-    if (drag?.id === event.pointerId) {
-      cancel();
-      end();
-    }
-  };
   const key = (event: KeyboardEvent) => {
     if (!enabled()) return;
     const delta = reduced.matches ? 0.025 : 0.1;
@@ -119,9 +113,8 @@ export function bindPortionTilt(
   const preference = () => reset(false);
   host.addEventListener('pointerdown', down);
   host.addEventListener('pointermove', move);
-  host.addEventListener('pointerup', up);
-  for (const name of ['pointercancel', 'lostpointercapture'] as const)
-    host.addEventListener(name, cancelled);
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture'] as const)
+    host.addEventListener(name, up);
   host.addEventListener('keydown', key);
   reduced.addEventListener('change', preference);
   return {
@@ -131,9 +124,8 @@ export function bindPortionTilt(
       end();
       host.removeEventListener('pointerdown', down);
       host.removeEventListener('pointermove', move);
-      host.removeEventListener('pointerup', up);
-      for (const name of ['pointercancel', 'lostpointercapture'] as const)
-        host.removeEventListener(name, cancelled);
+      for (const name of ['pointerup', 'pointercancel', 'lostpointercapture'] as const)
+        host.removeEventListener(name, up);
       host.removeEventListener('keydown', key);
       reduced.removeEventListener('change', preference);
     },

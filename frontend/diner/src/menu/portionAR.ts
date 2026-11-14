@@ -186,9 +186,9 @@ export function bindPortionAR(
         const angles = tiltAngles(x, y);
         // Rotate only the appearance, never the measured footprint or its world anchor.
         cutout.rotation.set(
-          THREE.MathUtils.degToRad(-35 - angles.pitch),
+          THREE.MathUtils.degToRad(angles.pitch),
           THREE.MathUtils.degToRad(angles.yaw),
-          THREE.MathUtils.degToRad(-angles.roll),
+          THREE.MathUtils.degToRad(angles.roll),
           'XZY',
         );
         canvasHost.setAttribute(
@@ -197,7 +197,6 @@ export function bindPortionAR(
         );
       },
     );
-    tilt.reset(false);
     button('tilt-reset').addEventListener('click', () => tilt.reset());
     const disposeObject = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
@@ -229,7 +228,9 @@ export function bindPortionAR(
       if (!renderer || session) return;
       const bounds = canvasHost.getBoundingClientRect();
       camera.aspect = bounds.width / Math.max(1, bounds.height);
-      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(bounds.height / (2 * 900)));
+      camera.fov = THREE.MathUtils.radToDeg(
+        2 * Math.atan(Math.min(bounds.width, bounds.height) / (2 * 900)),
+      );
       camera.updateProjectionMatrix();
       renderer.setSize(bounds.width, bounds.height);
       if (placed && !tracked) placeDish();
