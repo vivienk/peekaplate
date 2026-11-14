@@ -2852,6 +2852,16 @@ The earlier otp_expired verifier blocker was resolved by selecting the newest Gm
 Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
 
 
+## Owner CSV valid-zero correction — November 12, 2026
+
+The PR131 serializer treated every non-NORMAL status as unavailable, so valid zero rates were blanked. Five visible-zero regressions failed with the expected numeric cell missing before the fix; explicit NORMAL/VALID_ZERO visibility now preserves zero while SUPPRESSED, NOT_MEASURABLE and MISSING stay blank. Existing signed-identity, source/venue and CORS cases are parameterized over the JSON and CSV routes, including attachment headers and membership-error responses. This is a local correction and does not certify hosted CSV or spreadsheet behavior.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T16:44:35.153Z","exitCode":2}
+```
+
+The first full check also caught strict indexed-access typing in the added test fixtures; the fixture assertions were corrected, and the complete type/unit/script/context/docs checks pass afterward.
 ## Diner first-consent dispatch — November 12, 2026
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
@@ -2908,6 +2918,46 @@ Transient observations during Phase 3 verification:
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
+```
+
+## DATA-12 review corrections — November 13, 2026
+
+```json
+{"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:04:12.523Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T05:06:18.153Z","exitCode":1}
+```
+
+## Report source correction — November 13, 2026
+
+```json
+{"id":"ERR-20261113-REPORT-SOURCE","status":"resolved","area":"console-report-source","cause":"Hook state survived source changes, leaving fetched values labelled as the saved synthetic sample.","prevention":"Reset request identity during render; select the saved report explicitly and reject late responses after cleanup.","sources":["frontend/console/src/owner-dashboard/report-data.tsx","tests/e2e/owner-report-api.spec.ts"],"regression":"Chromium live-to-saved assertion failed before correction; all five report browser cases pass afterward (11.9s). The harness initially used named imports for Vite CommonJS interop; corrected to actual default exports before reproducing the defect.","limit":"Intercepted browser requests use a stand-in token; hosted auth and provenance remain separate."}
 ```
 
 ## November 9 AI preview dependency setup boundary
