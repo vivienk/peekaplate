@@ -91,7 +91,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
+      "sourceFingerprint": "718ef1f80715da06acefcd2e2c14e99fb432e015b592a3882d9c4de9a47bb4ac"
     },
     {
       "id": "ui",
@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam. Typed AI result view validates venue/window and optional known report ID; the preview-only fictional wrapper retains desktop/mobile drawer mounts and cannot apply changes.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -261,7 +261,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/drawer.tsx",
         "frontend/console/src/owner-dashboard/owner-dashboard.css",
         "tests/e2e/owner-dashboard-drawer.spec.ts",
-        "frontend/console/src/owner-dashboard/chat.tsx"
+        "frontend/console/src/owner-dashboard/chat.tsx",
+        "docs/owner-auth.md",
+        "frontend/console/auth-confirm.html",
+        "frontend/console/email-templates/README.md",
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html",
+        "frontend/console/owner-auth.html",
+        "frontend/console/owner-sign-in.html",
+        "frontend/console/src/auth/OwnerAuth.tsx",
+        "frontend/console/src/auth/auth-service.ts",
+        "frontend/console/src/auth/auth.css",
+        "frontend/console/src/auth/callback.test.tsx",
+        "frontend/console/src/auth/callback.ts",
+        "frontend/console/src/auth/copy.ts",
+        "frontend/console/src/auth/demo.tsx",
+        "frontend/console/src/auth/live.tsx",
+        "frontend/console/src/auth/parts.tsx",
+        "frontend/console/src/auth/supabase-auth.test.tsx",
+        "frontend/console/src/auth/supabase-auth.ts",
+        "playwright.auth.config.ts",
+        "tests/e2e/owner-auth-provider.spec.ts",
+        "tests/e2e/owner-auth.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -271,7 +292,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f43744603fa0d071df7ff8932b6a653c61fb52f235565326fb57a5b4a1c770c5"
+      "sourceFingerprint": "19263226fe0d67d26729626cc2ee285636d19fdfd53638671d909f9818ca2820"
     },
     {
       "id": "backend",
@@ -440,7 +461,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "fcee71bdf74668d637838af2241dee3ddd0e275135abff377cbc85b5734ae9bf"
+      "sourceFingerprint": "b829dc3666a66b9ec134487e72b8c533a3a64b66a39843daa886b3d88492514d"
     },
     {
       "id": "database",
@@ -579,7 +600,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "593ae6e887d9e6387caa1b752b9473f5f6224dee8516e0b96b918b2242f26478"
+      "sourceFingerprint": "b3b8433939edde4eabf5310881269555646b7ecce60ce089bddd30a8e9b0235c"
     },
     {
       "id": "agents",
@@ -775,22 +796,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-13",
       "modules": [
-        "console",
-        "delivery"
-      ],
-      "summary": "PR125 reconciles owner first-dashboard setup shell with current develop, retaining the existing owner-dashboard/foundations previews, owner-menu adapters and shared context. All three synthetic demo pages remain preview-only and excluded from normal output. No auth/API/publication wiring is introduced.",
-      "sources": [
-        "frontend/console/src/owner/setup.ts",
-        "frontend/console/src/owner/OwnerShell.tsx",
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "frontend/console/vite.config.ts",
-        "scripts/console-preview-demos.test.mjs"
-      ],
-      "next": "Run final checks and merge reviewed PR125 before reconciling PR139 onboarding states/dialog. Connected owner dashboard/auth acceptance remains separate."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
         "console"
       ],
       "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
@@ -915,6 +920,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/restaurant-urls.md"
       ],
       "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR143 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
+      "sources": [
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html",
+        "frontend/console/email-templates/README.md",
+        "docs/owner-auth.md",
+        "frontend/console/vite.config.ts"
+      ],
+      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
     }
   ]
 }

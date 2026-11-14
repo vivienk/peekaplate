@@ -1,0 +1,653 @@
+/*
+ * Owner sign-in screens (S4-FE-04): values from the Figma file (l7A9n8tACJic0FIhY49Zjw) and its
+ * components: Card, Input / Text, Input / Password, Owner dashboard_Button, Error Message, Text link.
+ * Colours are design tokens where one matches exactly. Figma values with no token yet are kept as
+ * --pp-auth-pending-* until they land: the cream surfaces (color/surface, color/surface-container),
+ * the 32/36 title (H3/Bold) and the card shadow (Owner/Shadow/Menu card).
+ */
+.pp-auth {
+  --pp-auth-pending-surface: #faf4ef;
+  --pp-auth-pending-surface-container: #fffcfa;
+  --pp-auth-pending-title-size: 2rem;
+  --pp-auth-pending-title-line: 2.25rem;
+  --pp-auth-pending-card-shadow: 0 4px 16px rgba(28, 26, 23, 0.05);
+  --pp-auth-text: var(--pp-color-gray-900);
+  --pp-auth-text-secondary: var(--pp-color-gray-600);
+  /* Figma color/outline-solid (Outlined button edge) and color/outline (#71737A at 80%, the divider). */
+  --pp-auth-outline-solid: var(--pp-color-neutral-500);
+  --pp-auth-outline: color-mix(in srgb, var(--pp-color-neutral-500) 80%, transparent);
+  --pp-auth-focus: var(--pp-color-info-600);
+  --pp-auth-error: var(--pp-color-error-700);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--pp-space-48) var(--pp-space-16);
+  background: var(--pp-auth-pending-surface);
+  color: var(--pp-auth-text);
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-auth *,
+.pp-auth *::before,
+.pp-auth *::after {
+  box-sizing: border-box;
+}
+
+/* Wide screens follow the frames: the food photo fills the page and the card sits on the right,
+ * 96px from the edge at 1440. */
+@media (min-width: 64rem) {
+  .pp-auth {
+    justify-content: flex-end;
+    padding-inline: var(--pp-space-48) clamp(var(--pp-space-48), 6.67vw, 6rem);
+    background:
+      var(--pp-auth-pending-surface) url("./assets/login-background.jpg") center / cover no-repeat;
+  }
+}
+
+/* Card: 600 wide, 24 radius, 1px card border (white at 80%), surface-container, 48 padding (E1: 64
+ * top and bottom, S01: 40). */
+.pp-auth__card {
+  width: 100%;
+  max-width: 37.5rem;
+  padding: var(--pp-space-48);
+  border: 1px solid var(--pp-role-card-border);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: var(--pp-auth-pending-card-shadow);
+}
+
+.pp-auth__card--email {
+  padding-block: 4rem;
+}
+
+.pp-auth__card--create {
+  padding-block: var(--pp-space-40);
+}
+
+/* Logo and wordmark (H5/Bold, color/primary), 48 above the heading. A logotype has no contrast
+ * requirement (WCAG 1.4.3). */
+.pp-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+  margin: 0 0 var(--pp-space-48);
+  color: var(--pp-color-orange-500);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-bold);
+}
+
+/* Heading and its text: 4 apart (Rania, 12 Nov); 32 above the form. */
+.pp-auth__header {
+  display: grid;
+  gap: var(--pp-space-4);
+  margin-bottom: var(--pp-space-32);
+}
+
+.pp-auth__title {
+  margin: 0;
+  color: var(--pp-auth-text);
+  font-size: var(--pp-auth-pending-title-size);
+  line-height: var(--pp-auth-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+  letter-spacing: 0;
+}
+
+.pp-auth__title:focus {
+  outline: none;
+}
+
+.pp-auth__title:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 4px;
+  border-radius: var(--pp-radius-4);
+}
+
+.pp-auth__lead {
+  margin: 0;
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+/* Fields 20 apart (S02; S01: 16), and the button 48 below the last one. */
+.pp-auth__form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pp-auth__form > .pp-auth__submit {
+  margin-top: 1.75rem;
+}
+
+.pp-auth__card--create .pp-auth__form {
+  gap: var(--pp-space-16);
+}
+
+/* 24 between the password helper text and the checkbox (Rania, 12 Nov). */
+.pp-auth__card--create .pp-auth-terms {
+  margin-top: var(--pp-space-8);
+}
+
+.pp-auth__card--create .pp-auth__form > .pp-auth__submit {
+  margin-top: var(--pp-space-32);
+}
+
+/* Input / Text and Input / Password: label 14/24 semibold, 6 above a 44px box with a 1.5px edge in
+ * the shared input-border roles (color/outline at 80%; hover, focus, error), 12 radius and 16 side
+ * padding; hint or error 12/16, 8 in, 6 below. One real 1.5px border, without the shared inset line
+ * (Rania, 12 Nov). */
+.pp-auth .pp-field {
+  gap: var(--pp-space-6);
+}
+
+.pp-auth .pp-field__label {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth .pp-field__hint,
+.pp-auth .pp-field__error {
+  margin: 0;
+  padding-inline-start: var(--pp-space-8);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+
+.pp-auth .pp-field__hint {
+  color: var(--pp-auth-text-secondary);
+}
+
+.pp-auth .pp-field__error {
+  color: var(--pp-auth-error);
+}
+
+.pp-auth .pp-input {
+  --pp-input-edge: var(--pp-role-input-border);
+  border-width: 1.5px;
+  box-shadow: none;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding-block: 0;
+  padding-inline: var(--pp-space-16);
+  border-radius: var(--pp-radius-12);
+  background-color: var(--pp-auth-pending-surface-container);
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth .pp-input::placeholder {
+  color: var(--pp-auth-text-secondary);
+  opacity: 1;
+}
+
+.pp-auth .pp-input:hover {
+  --pp-input-edge: var(--pp-role-input-border-hover);
+}
+
+.pp-auth .pp-input:focus-visible {
+  --pp-input-edge: var(--pp-role-input-border-focus);
+}
+
+.pp-auth .pp-input[aria-invalid="true"] {
+  --pp-input-edge: var(--pp-role-input-border-error);
+  color: var(--pp-auth-text);
+}
+
+.pp-auth .pp-input[aria-invalid="true"]:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
+/* Input with a control inside it (show/hide, Change). */
+.pp-auth-field__box {
+  position: relative;
+}
+
+.pp-auth .pp-auth-field__input {
+  padding-inline-end: var(--pp-space-48);
+}
+
+.pp-auth-field__toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--pp-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: 0;
+  border-radius: var(--pp-radius-8);
+  background: transparent;
+  cursor: pointer;
+}
+
+.pp-auth-field__eye {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.pp-auth-field__toggle:focus-visible,
+.pp-auth-link:focus-visible,
+.pp-auth-terms__box:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
+/* Input / Text, State=Read-only: outline-variant fill, disabled border, on-surface text, with the
+ * accent "Change" link inside. */
+.pp-auth .pp-auth-field__locked,
+.pp-auth .pp-auth-field__locked:hover {
+  --pp-input-edge: var(--pp-role-input-border-disabled);
+  padding-inline-end: 6rem;
+  background-color: var(--pp-color-gray-200);
+  color: var(--pp-auth-text);
+}
+
+.pp-auth-field__change {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--pp-space-12);
+  margin-block: auto;
+}
+
+/* Text link: 16/24 medium in a 28px box with 4 padding. Tone=Neutral is text/secondary; Tone=Accent
+ * is color/link (Orange/800). Links change the screen, never the page address. */
+.pp-auth-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-4);
+  min-height: 1.75rem;
+  padding: var(--pp-space-4);
+  border: 0;
+  border-radius: var(--pp-radius-4);
+  background: transparent;
+  color: var(--pp-auth-text-secondary);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+  cursor: pointer;
+}
+
+.pp-auth-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.pp-auth-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pp-auth-link--accent {
+  color: var(--pp-color-orange-800);
+}
+
+/* Password with "Forgot password?" 8 below it on the right. */
+.pp-auth__password {
+  display: grid;
+  gap: var(--pp-space-8);
+}
+
+.pp-auth__forgot {
+  justify-self: end;
+}
+
+/* Checkbox row: the Figma Checkbox component (24px, a rounded square outlined in text/secondary on
+ * surface-container, with a tick when checked), 12 gap, 14/24 text/secondary. A real checkbox
+ * input, drawn with the component's exported images, so keyboard and screen readers work as usual. */
+.pp-auth-terms__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-12);
+}
+
+.pp-auth-terms__box {
+  flex: none;
+  width: var(--pp-space-24);
+  height: var(--pp-space-24);
+  margin: 0;
+  border-radius: var(--pp-radius-4);
+  background: url("./assets/checkbox-empty.svg") center / 19.58px 19.58px no-repeat;
+  appearance: none;
+  cursor: pointer;
+}
+
+.pp-auth-terms__box:checked {
+  background-image: url("./assets/checkbox-checked.svg");
+  background-size: 19.28px 19.28px;
+}
+
+.pp-auth-terms__box[aria-invalid="true"] {
+  outline: 1.5px solid var(--pp-auth-error);
+  outline-offset: 1px;
+}
+
+.pp-auth-terms__label {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth-terms__error {
+  margin-top: var(--pp-space-6);
+  padding-inline-start: var(--pp-space-40);
+}
+
+/* Owner dashboard_Button, size Large: 48 high, 20 side padding, pill, 18/28 label. */
+.pp-auth .pp-auth-btn {
+  width: 100%;
+  min-height: var(--pp-space-48);
+  padding: var(--pp-space-12) var(--pp-space-20);
+  border: 0;
+  border-radius: var(--pp-radius-full);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+  transform: none;
+}
+
+.pp-auth .pp-auth-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
+}
+
+/* Type=Primary: Default Orange/500, Hover Orange/300, Pressed slightly darker Orange/600 (Rania,
+ * 13 Nov), content Orange/950. */
+.pp-auth .pp-auth-btn--primary {
+  background-color: var(--pp-color-orange-500);
+  color: var(--pp-color-orange-950);
+}
+
+.pp-auth .pp-auth-btn--primary:hover {
+  background-color: var(--pp-color-orange-300);
+}
+
+.pp-auth .pp-auth-btn--primary:active {
+  background-color: var(--pp-color-orange-600);
+}
+
+/* Type=Outlined: surface-container with a 1px outline-solid edge (3px on hover), bold label;
+ * Pressed is Neutral/950 with a light label. */
+.pp-auth .pp-auth-btn--outlined {
+  background-color: var(--pp-auth-pending-surface-container);
+  color: var(--pp-color-orange-950);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
+  font-weight: var(--pp-font-weight-bold);
+}
+
+.pp-auth .pp-auth-btn--outlined:hover {
+  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
+}
+
+.pp-auth .pp-auth-btn--outlined:active {
+  background-color: var(--pp-color-neutral-950);
+  color: var(--pp-auth-pending-surface-container);
+  box-shadow: none;
+}
+
+/* Loading keeps the Default look, with a spinner, even under the pointer. */
+.pp-auth .pp-auth-btn--primary[aria-busy="true"] {
+  background-color: var(--pp-color-orange-500);
+  cursor: progress;
+}
+
+.pp-auth .pp-auth-btn--outlined[aria-busy="true"] {
+  background-color: var(--pp-auth-pending-surface-container);
+  color: var(--pp-color-orange-950);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
+  cursor: progress;
+}
+
+/* State=Disabled (used while the service asks the owner to wait): Neutral/200 with a Neutral/300
+ * edge and Neutral/400 label. aria-disabled, so it stays focusable. */
+.pp-auth .pp-auth-btn[aria-disabled="true"],
+.pp-auth .pp-auth-btn[aria-disabled="true"]:hover,
+.pp-auth .pp-auth-btn[aria-disabled="true"]:active {
+  background-color: var(--pp-color-neutral-200);
+  color: var(--pp-color-neutral-400);
+  box-shadow: inset 0 0 0 1px var(--pp-color-neutral-300);
+  font-weight: var(--pp-font-weight-semibold);
+  cursor: not-allowed;
+}
+
+.pp-auth .pp-auth-btn[aria-disabled="true"]:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
+}
+
+.pp-auth__spinner {
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--pp-radius-full);
+  animation: pp-auth-spin 0.8s linear infinite;
+}
+
+@keyframes pp-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-auth__spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* Row under the button: 20 below it, 16/24 text/secondary. */
+.pp-auth__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-2);
+  margin: 1.25rem 0 0;
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  text-align: center;
+}
+
+.pp-auth__card--create .pp-auth__footer {
+  margin-top: var(--pp-space-16);
+}
+
+/* "← Back to sign in": Arrow left icon and Text link Tone=Neutral, centred. */
+.pp-auth__back {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+
+/* Status screens (Figma "Check your email"): illustration, 64, heading and text 4 apart (centred),
+ * 32, the Resend group, 48, then the links 24 apart. */
+.pp-auth-status {
+  display: grid;
+  gap: var(--pp-space-48);
+}
+
+.pp-auth-status__top {
+  display: grid;
+  justify-items: center;
+  gap: 4rem;
+  text-align: center;
+}
+
+.pp-auth-status__text {
+  display: grid;
+  gap: var(--pp-space-4);
+}
+
+.pp-auth-status:has(> .pp-auth-resend) {
+  gap: 0;
+}
+
+.pp-auth-status:has(> .pp-auth-resend) > .pp-auth-resend {
+  margin: var(--pp-space-32) 0 var(--pp-space-48);
+}
+
+.pp-auth-status__links {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-24);
+}
+
+/* Envelope illustration: Envelope line art 320x150 with a 50px Orange/500 badge at (194, 30) and a
+ * 26px bold "1". */
+.pp-auth-mail {
+  position: relative;
+  display: block;
+  width: 20rem;
+  max-width: 100%;
+  aspect-ratio: 320 / 150;
+}
+
+.pp-auth-mail__art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pp-auth-mail__badge {
+  position: absolute;
+  top: 20%;
+  left: 60.625%;
+  width: 15.625%;
+  height: auto;
+}
+
+.pp-auth-mail__count {
+  position: absolute;
+  top: 27.33%;
+  left: 60.625%;
+  width: 15.625%;
+  color: var(--pp-auth-pending-surface);
+  font-size: 1.625rem;
+  line-height: 1;
+  font-weight: var(--pp-font-weight-bold);
+  text-align: center;
+}
+
+/* Resend group: the button, then its status line (14/24 text/secondary) 12 below. */
+.pp-auth-resend {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-12);
+}
+
+.pp-auth-resend__status {
+  max-width: 25.75rem;
+  min-height: var(--pp-line-height-paragraph-1);
+  margin: 0;
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  text-align: center;
+}
+
+/* Divider or: 190px outline lines, 12 apart from a 24/32 "or". */
+.pp-auth-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-12);
+  width: 100%;
+  height: 1.25rem;
+  margin: 0;
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+}
+
+.pp-auth-divider::before,
+.pp-auth-divider::after {
+  content: "";
+  flex: 0 1 11.875rem;
+  height: 1px;
+  background: var(--pp-auth-outline);
+}
+
+/* Error Message: Error/100 fill, 16 padding, 12 radius; 24px icon in a 32 box, 8 gap; title 18/28
+ * semibold, text 16/24, both Error/700. */
+.pp-auth-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-8);
+  margin-bottom: var(--pp-space-24);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-12);
+  background: var(--pp-color-error-100);
+  color: var(--pp-auth-error);
+}
+
+.pp-auth-banner__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-32);
+  height: var(--pp-space-32);
+}
+
+.pp-auth-banner__text {
+  display: grid;
+  gap: var(--pp-space-2);
+}
+
+.pp-auth-banner__title,
+.pp-auth-banner__body {
+  margin: 0;
+}
+
+.pp-auth-banner__title {
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth-banner__body {
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-auth-banner__action {
+  justify-self: start;
+  padding-inline: 0;
+  color: var(--pp-color-error-800);
+  font-weight: var(--pp-font-weight-semibold);
+  text-decoration: underline;
+}
+
+/* Phones (no Figma frame yet): the card fills the width with the page's 16px gutter. */
+@media (max-width: 40rem) {
+  .pp-auth {
+    align-items: flex-start;
+    padding: var(--pp-space-24) var(--pp-space-16);
+  }
+
+  .pp-auth__card,
+  .pp-auth__card--email,
+  .pp-auth__card--create {
+    padding: var(--pp-space-32) var(--pp-space-24);
+  }
+
+  .pp-auth__brand {
+    margin-bottom: var(--pp-space-32);
+  }
+
+  .pp-auth-status__top {
+    gap: var(--pp-space-32);
+  }
+}

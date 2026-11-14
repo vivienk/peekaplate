@@ -58,6 +58,7 @@ jobs:
               - 'scripts/verify*'
               - 'playwright.config.ts'
               - 'playwright.posthog.config.ts'
+              - 'playwright.auth.config.ts'
               - 'playwright.restaurant-links.config.ts'
               - 'scripts/prepare-app-site*'
               - 'scripts/serve-restaurant-routing-test.mjs'
