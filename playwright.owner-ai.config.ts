@@ -10,6 +10,8 @@ export default defineConfig({
     env: { OWNER_AI_LOCAL_MOCK: 'true' },
     url: 'http://127.0.0.1:5174/owner-dashboard.html',
     reuseExistingServer: false,
+    stdout: 'pipe',
+    stderr: 'pipe',
     timeout: 60_000,
   },
 });

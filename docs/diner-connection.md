@@ -1,8 +1,8 @@
 # Published diner menu connection
 
 For prepared `peekaplate.app/diner/<restaurant>` links and the Cloudflare/domain
-handoff, see [restaurant URLs](restaurant-urls.md). Hosting and owner-link
-enrollment remain separate from the existing published-menu reader below.
+handoff, see [restaurant URLs](restaurant-urls.md). Publication now assigns its diner link automatically; production hosting and
+owner-screen integration remain separate from the published-menu reader below.
 
 The diner can now read an approved menu through the existing public API, verify
 the exact downloaded bundle bytes, and display its approved public fields.

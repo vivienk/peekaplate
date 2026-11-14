@@ -3456,3 +3456,28 @@ Initial checks identified exact-optional-property construction errors and Node v
 ```
 
 - Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:35:16.211Z","exitCode":2}
+```
+
+Automatic diner-link preparation: the new pgTAP table assertion initially used
+the two-argument overload, which interpreted the schema as a table name. The
+schema-qualified three-argument assertion now passes with all 320 SQL checks.
+The concurrent-publish test's evolving command array needed an explicit element
+type under strict TypeScript. Context summaries were shortened to the graph's
+bound. After these test/documentation corrections, pnpm check and the real
+139-test Worker/database run pass. Seven local Pages and eleven existing diner
+browser cases pass. Hosted publication and custom-domain acceptance are pending;
+no provider calls or production changes were performed by these local checks.
+The dedicated URL-allocation fault injection now verifies rollback of every
+publication/event/receipt/outbox write and a successful identical retry: all
+140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
+push/PR creation because the operator email was unverified; after verification,
+the branch and draft PR #176 were created. No GitHub protection was bypassed.
