@@ -2857,3 +2857,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```
 
 - 2026-11-13 context check rejected eleven handoffs after adding plate calibration. Kept the required ten most recent handoffs; older entries remain in Git history.
+
+- 2026-11-13 interaction revert: browser checks initially failed with ERR_CONNECTION_REFUSED because the isolated local preview on5175 was stopped. Restarted the diner development server before rerunning; no application change required.
