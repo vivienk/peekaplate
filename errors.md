@@ -3541,3 +3541,12 @@ context/docs checks now pass for 13 modules, ten handoffs and 59 Markdown files.
 The existing pinned Biome CLI checks 346 files without fixes. The twelve-case
 acceptance section is byte-identical to its prior candidate, and all upstream
 runtime/contract sources match fixed develop96b8de1. No hosted case is executed.
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.
