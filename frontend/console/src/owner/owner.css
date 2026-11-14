@@ -11,6 +11,11 @@
   --owner-pending-title-line: 2.25rem;
   /* Figma periwinkle/100 (#e3ecfb) has no token; info-100 is the closest palette colour. */
   --owner-chip-bg: var(--pp-color-info-100);
+  /* Figma color/card variables (Rania, 13 Nov). #143 adds the same border-white value as
+   * --pp-role-card-border in tokens.css; switch to it once that merges. */
+  --owner-card-bg: color-mix(in srgb, var(--pp-color-white) 48%, transparent); /* card/bg */
+  /* card/border-white */
+  --owner-card-border: color-mix(in srgb, var(--pp-color-white) 80%, transparent);
 
   min-height: 100vh;
   background: var(--pp-role-surface);
@@ -74,8 +79,10 @@ body:has(.owner-root) {
   flex-direction: column;
   gap: var(--pp-space-24);
   padding: var(--pp-space-24) var(--pp-space-16);
+  box-sizing: border-box;
   background: var(--pp-role-surface);
-  border-right: 1px solid var(--pp-role-surface-container);
+  /* Figma Sidebar: 1px inside stroke on all sides, color/surface-container. */
+  border: 1px solid var(--pp-role-surface-container);
   box-shadow: var(--owner-pending-shadow-card);
 }
 .owner-brand {
@@ -329,9 +336,10 @@ body:has(.owner-root) {
 /* Cards */
 .owner-card {
   padding: var(--pp-space-24);
-  border: 1px solid var(--pp-role-outline-variant);
+  /* Figma dashboard cards: color/card/bg fill and a 1px inside color/card/border-white stroke. */
+  border: 1px solid var(--owner-card-border);
   border-radius: var(--pp-radius-24);
-  background: var(--pp-color-white);
+  background: var(--owner-card-bg);
   box-shadow: var(--owner-pending-shadow-menu);
 }
 .owner-card h2,
@@ -368,8 +376,7 @@ body:has(.owner-root) {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-16);
-  border-color: var(--pp-role-surface-container);
-  box-shadow: var(--owner-pending-shadow-card);
+  box-shadow: none; /* Figma Setup progress card has no effect */
 }
 .owner-progress__head {
   display: flex;
@@ -413,6 +420,7 @@ body:has(.owner-root) {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-20);
+  box-shadow: var(--owner-pending-shadow-card); /* Figma Setup step card: Card small */
 }
 .owner-step__top {
   display: flex;
@@ -506,7 +514,6 @@ body:has(.owner-root) {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-16);
-  border-color: var(--pp-color-white);
 }
 .owner-empty {
   gap: var(--pp-space-12);
