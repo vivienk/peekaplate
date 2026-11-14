@@ -9,6 +9,11 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
+  {
+    page: 'first-dashboard.html',
+    asset: /firstDashboard/,
+    label: /Synthetic demo/,
+  },
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
   // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
@@ -69,6 +74,7 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
     assert.match(html, /<meta name="robots" content="noindex"/);
     const scripts = (await pageScripts(dir, demo.page)).join('\n');
     assert.match(scripts, demo.label);
+    if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
     assert.doesNotMatch(scripts, /posthog/i);
   }
 });

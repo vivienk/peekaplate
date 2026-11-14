@@ -24,6 +24,7 @@ export default defineConfig({
           ? {
               foundations: page('foundations.html'),
               ownerSignIn: page('owner-sign-in.html'),
+              firstDashboard: page('first-dashboard.html'),
               ownerDashboard: page('owner-dashboard.html'),
             }
           : {

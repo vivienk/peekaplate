@@ -1,0 +1,82 @@
+{
+  "fixture_version": "data06-privacy-validation.v1",
+  "contract_status": "PROPOSED",
+  "description": "Synthetic privacy-boundary expectations; not production execution evidence.",
+  "minimum_eligible_sessions": 10,
+  "cases": [
+    {
+      "id": "D06-PRIVACY-09",
+      "description": "Nine distinct eligible sessions must suppress behavioral values",
+      "eligible_session_ids": ["s01", "s02", "s03", "s04", "s05", "s06", "s07", "s08", "s09"],
+      "expected": {
+        "distinct_eligible_sessions": 9,
+        "privacy_floor_met": false,
+        "value": null,
+        "status": "SUPPRESSED"
+      }
+    },
+    {
+      "id": "D06-PRIVACY-10",
+      "description": "Ten distinct eligible sessions meet the minimum privacy threshold, subject to other withholding rules",
+      "eligible_session_ids": [
+        "s01",
+        "s02",
+        "s03",
+        "s04",
+        "s05",
+        "s06",
+        "s07",
+        "s08",
+        "s09",
+        "s10"
+      ],
+      "expected": {
+        "distinct_eligible_sessions": 10,
+        "privacy_floor_met": true
+      }
+    },
+    {
+      "id": "D06-PRIVACY-11",
+      "description": "Eleven distinct eligible sessions meet the floor, without certifying other withholding or score rules",
+      "eligible_session_ids": [
+        "s01",
+        "s02",
+        "s03",
+        "s04",
+        "s05",
+        "s06",
+        "s07",
+        "s08",
+        "s09",
+        "s10",
+        "s11"
+      ],
+      "expected": {
+        "distinct_eligible_sessions": 11,
+        "privacy_floor_met": true
+      }
+    },
+    {
+      "id": "D06-PRIVACY-REPEAT",
+      "description": "Ten events from one session must not satisfy the privacy threshold",
+      "eligible_session_ids": [
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01",
+        "s01"
+      ],
+      "expected": {
+        "distinct_eligible_sessions": 1,
+        "privacy_floor_met": false,
+        "value": null,
+        "status": "SUPPRESSED"
+      }
+    }
+  ]
+}
