@@ -3237,6 +3237,11 @@ Transient observations during Phase 3 verification:
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T20:39:49.296Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
 ```
 
@@ -3244,6 +3249,11 @@ Transient observations during Phase 3 verification:
 
 ```json
 {"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T20:41:33.049Z","exitCode":2}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -3261,7 +3271,17 @@ Transient observations during Phase 3 verification:
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T20:44:01.719Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:04:12.523Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T20:45:27.056Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -3290,6 +3310,11 @@ bypass the sandbox limitation.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:41:35.066Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T21:08:43.974Z","exitCode":2}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -3462,6 +3487,11 @@ domain, owner flow and real tracking remain NOT RUN. No DNS or deployment change
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T21:10:39.273Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
 ```
 
@@ -3478,6 +3508,46 @@ cancellation regression and the existing menu checks also pass. No cloud state c
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T21:12:06.984Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T21:14:41.436Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T21:15:44.595Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T21:50:16.733Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T22:14:58.760Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T22:16:44.976Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T22:17:48.092Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T22:23:49.470Z","exitCode":1}
 ```
 
 <!-- automatic observation; not root cause -->
@@ -3499,3 +3569,13 @@ publication/event/receipt/outbox write and a successful identical retry: all
 140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
 push/PR creation because the operator email was unverified; after verification,
 the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T17:29:06.106Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T17:30:50.061Z","exitCode":1}
+```

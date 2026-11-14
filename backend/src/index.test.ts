@@ -134,6 +134,77 @@ describe('worker queue consumer wiring', () => {
       handleScheduled({}, { ORDER_OUTCOME_ARCHIVE_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
     ).resolves.toBeUndefined();
   });
+
+  it('invokes durable orphan cleanup retries during scheduled execution', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000801';
+    const batchId = '00000000-0000-4000-8000-000000000901';
+    const orphanKey = `order-imports/${venueId}/${batchId}/source.csv`;
+    let orphanStatus = 'pending';
+
+    const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+    const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined);
+    const querySpy = vi.spyOn(Client.prototype, 'query').mockImplementation((async (
+      sql: string,
+      params?: unknown[],
+    ) => {
+      const s = typeof sql === 'string' ? sql : '';
+      if (s.includes('list_pending_orphan_cleanup_tenants')) {
+        return { rows: [{ tenant_id: venueId }], rowCount: 1 };
+      }
+      if (s.includes('FROM app_private.order_import_orphan_cleanups')) {
+        return {
+          rows:
+            orphanStatus === 'pending'
+              ? [
+                  {
+                    id: '00000000-0000-4000-8000-000000000777',
+                    batch_id: batchId,
+                    storage_key: orphanKey,
+                    deletion_epoch: 0,
+                    retry_count: 1,
+                  },
+                ]
+              : [],
+          rowCount: orphanStatus === 'pending' ? 1 : 0,
+        };
+      }
+      if (s.includes('SELECT deletion_epoch')) {
+        return { rows: [{ deletion_epoch: 0 }], rowCount: 1 };
+      }
+      if (s.includes('UPDATE app_private.order_import_orphan_cleanups')) {
+        if (s.includes("SET status = 'cleaned'") && params?.[0] === venueId) {
+          orphanStatus = 'cleaned';
+        }
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }) as any);
+
+    const deleteMock = vi.fn().mockResolvedValue(undefined);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await handleScheduled(
+        {},
+        {
+          APP_ENV: 'local',
+          LOCAL_DATABASE_URL: 'postgres://localhost/test',
+          ORDER_OUTCOME_ARCHIVE_BUCKET: {
+            list: vi.fn().mockResolvedValue({ objects: [], truncated: false }),
+            delete: deleteMock,
+          },
+        },
+      );
+
+      expect(deleteMock).toHaveBeenCalledTimes(1);
+      expect(deleteMock).toHaveBeenCalledWith(orphanKey);
+      expect(orphanStatus).toBe('cleaned');
+    } finally {
+      connectSpy.mockRestore();
+      endSpy.mockRestore();
+      querySpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
 });
 
 describe('foundation API', () => {
@@ -1904,6 +1975,134 @@ describe('menu ingestion HTTP boundary', () => {
         error: 'payload_too_large',
         message: 'File exceeds maximum allowed rows (1000)',
       });
+    });
+
+    it('returns 403 agreement_not_accepted when pilot agreement has not been accepted', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError(
+            'agreement_not_accepted',
+            403,
+            'Pilot order-outcome agreement (v0.1) must be accepted for this venue before importing',
+          ),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'agreement_not_accepted',
+        message:
+          'Pilot order-outcome agreement (v0.1) must be accepted for this venue before importing',
+      });
+    });
+
+    it('accepts pilot order agreement via POST /venues/:venueId/orders/agreement-acceptance', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const acceptPilotOrderAgreement = vi.fn().mockResolvedValue({
+        venueId,
+        agreementVersion: 'v0.1',
+        acceptedBy: actorId,
+        acceptedAt: '2026-11-13T00:00:00.000Z',
+        alreadyAccepted: false,
+      });
+      const testApp = createApp({ verify, execute: vi.fn(), acceptPilotOrderAgreement });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/agreement-acceptance`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementVersion: 'v0.1', accepted: true }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(acceptPilotOrderAgreement).toHaveBeenCalledWith(actorId, venueId, 'v0.1', {});
+      expect(await response.json()).toMatchObject({
+        venueId,
+        agreementVersion: 'v0.1',
+        alreadyAccepted: false,
+      });
+    });
+
+    it('rejects invalid agreement acceptance payload with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/agreement-acceptance`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementVersion: 'v0.1', accepted: false }),
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('submits owner order-data deletion request via POST /venues/:venueId/orders/deletion-requests', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const requestId = '33333333-3333-4000-8000-000000000001';
+      const submitOrderDataDeletionRequest = vi.fn().mockResolvedValue({
+        requestId,
+        venueId,
+        status: 'requested',
+        reason: 'pilot_withdrawal',
+        requestedAt: '2026-11-13T00:00:00.000Z',
+        alreadyExists: false,
+      });
+      const testApp = createApp({ verify, execute: vi.fn(), submitOrderDataDeletionRequest });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/deletion-requests`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reason: 'pilot_withdrawal' }),
+      });
+
+      expect(response.status).toBe(202);
+      expect(submitOrderDataDeletionRequest).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        requestId,
+        'pilot_withdrawal',
+        {},
+      );
+      expect(await response.json()).toMatchObject({
+        requestId,
+        venueId,
+        status: 'requested',
+        reason: 'pilot_withdrawal',
+        alreadyExists: false,
+      });
+
+      // Free-text reason outside the bounded enum is rejected
+      const invalidReasonResponse = await testApp.request(
+        `/venues/${venueId}/orders/deletion-requests`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, reason: 'custom free text' }),
+        },
+      );
+      expect(invalidReasonResponse.status).toBe(400);
+
+      // Caller-supplied operatorId cannot be injected via HTTP body
+      const spoofOperatorResponse = await testApp.request(
+        `/venues/${venueId}/orders/deletion-requests`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            reason: 'pilot_withdrawal',
+            operatorId: '00000000-0000-4000-8000-000000000099',
+          }),
+        },
+      );
+      expect(spoofOperatorResponse.status).toBe(400);
     });
 
     it('returns 503 when database connection is unavailable in default importFn', async () => {

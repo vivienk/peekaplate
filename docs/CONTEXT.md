@@ -75,7 +75,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "ee8214487ae5a84788e49b17c20204a83bb9bfa6829f4710975de915820e7ce5"
+      "sourceFingerprint": "572a5fc4b37e46c1f513a6dcd6cdf368c959b590fc2d0f470529cf1a7657a8c2"
     },
     {
       "id": "tokens",
@@ -464,7 +464,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b829dc3666a66b9ec134487e72b8c533a3a64b66a39843daa886b3d88492514d"
+      "sourceFingerprint": "40409160c73085a3796badc70c5e68620d0762d7c6ce30ba2ace129b2d4b6f83"
     },
     {
       "id": "database",
@@ -513,7 +513,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "1866b27e329a5e6f02c640d7d1b231d129759f217023f9dbf1ea0796a770bc12"
+      "sourceFingerprint": "e34e52da93ea8077b32d92f2d762f0d48d7df5d2f5a3233686759d2e53916834"
     },
     {
       "id": "measurement",
@@ -523,10 +523,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/delivery.md",
         "docs/implementation_plan.md",
         "docs/pos-mapping-and-tracking-activation.md",
+        "docs/pilot-order-outcome-agreement.md",
         "packages/contracts/src/order-outcome.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/tracking-activation.ts",
-        "migrations/20261107120000_order_outcomes.sql"
+        "migrations/20261107120000_order_outcomes.sql",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
@@ -535,7 +537,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "61a94c827e8f542dd5f446af1da530956eb6add77d7acf3e6858d822cadf6ba1"
+      "sourceFingerprint": "abd06462f00d1b4b4af1d5fc2d020635f067c294b2f3c6c9dda270e082c01ca8"
     },
     {
       "id": "delivery",
@@ -797,19 +799,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-13",
+      "date": "2026-11-14",
       "modules": [
-        "backend"
+        "measurement",
+        "contracts",
+        "backend",
+        "database"
       ],
-      "summary": "PR167 fixes impossible mocked opening cohorts, explicitly checks EMPTY and all suppressed comparison metrics, and separates mocked serialization from actual SQL/staging evidence. Two PostgreSQL regressions reproduced inclusive-end exposure/checkpoint errors and pass with half-open owner SQL. Existing synthetic starter fixtures use test traffic and cannot prove the fixed allowlisted hosted venue is synthetic. is_stale remains null without a trusted completion signal.",
+      "summary": "Implemented and hardened S6-DATA-14.1 agreement acceptance gate and S6-DATA-14.2 manual-operator order-data deletion: replaced v0.1 agreement with revised Nov 13 draft + six corrections, atomic pilot_order_agreement_acceptances with fail-closed 403 on import, owner deletion-request intake blocking new imports (409 deletion_in_progress), operator/checker role separation, POST /internal/venues/:venueId/orders/deletions/:requestId/verify, handleScheduled orphan retries, and post-restore reconciliation.",
       "sources": [
-        "backend/src/owner-report.ts",
-        "backend/src/owner-report.test.ts",
-        "backend/src/owner-report.data12-reconciliation.test.ts",
-        "backend/src/comparison-report.integration.ts",
-        "tests/data12/reconciliation_findings.md"
+        "docs/pilot-order-outcome-agreement.md",
+        "packages/contracts/src/order-outcome.ts",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql",
+        "migrations/20261114020000_harden_s6_data_14_deletion_and_reconciliation.sql",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/index.ts"
       ],
-      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed."
+      "next": "Complete PR #166 CI and formal approvals (Vivien/Sai/Hemu77), confirm backup checker, and provision staging Hyperdrive/R2/allowlist bindings before real pilot owner uploads."
     },
     {
       "date": "2026-11-13",

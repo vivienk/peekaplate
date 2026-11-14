@@ -1,14 +1,24 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { PILOT_ORDER_AGREEMENT_VERSION } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../index';
-import { importOrderOutcomes, type OrderOutcomeStorage } from './service';
+import {
+  acceptPilotOrderAgreement,
+  deleteVenueOrderData,
+  importOrderOutcomes,
+  type OrderOutcomeStorage,
+  submitOrderDataDeletionRequest,
+  verifyVenueOrderDeletion,
+} from './service';
 import { recordVenueTrackingActivation } from './tracking-activation';
 
 const runtimeUrl = process.env.PEEKAPLATE_DB_TEST_URL;
 const adminUrl = process.env.PEEKAPLATE_DB_ADMIN_URL;
+const operatorUrl = process.env.PEEKAPLATE_DB_OPERATOR_URL;
+const checkerUrl = process.env.PEEKAPLATE_DB_CHECKER_URL;
 
-const hasDb = Boolean(runtimeUrl && adminUrl);
+const hasDb = Boolean(runtimeUrl && adminUrl && operatorUrl && checkerUrl);
 
 function sha256Hex(content: string): string {
   return createHash('sha256').update(content).digest('hex');
@@ -30,7 +40,7 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
     }
   });
 
-  async function createTestVenue() {
+  async function createTestVenue(options?: { acceptAgreement?: boolean }) {
     const venueId = randomUUID();
     const ownerId = randomUUID();
     const editorId = randomUUID();
@@ -45,6 +55,15 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
        VALUES ($1, $2, 'owner'), ($1, $3, 'editor')`,
       [venueId, ownerId, editorId],
     );
+
+    if (options?.acceptAgreement !== false) {
+      await acceptPilotOrderAgreement({
+        client: adminClient,
+        actorId: ownerId,
+        venueId,
+        agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+      });
+    }
 
     return { venueId, ownerId, editorId };
   }
@@ -1215,6 +1234,557 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
       expect(lines.rows[0].count).toBe(0);
     } finally {
       await client.end().catch(() => {});
+    }
+  });
+
+  // Probe 6: S6-DATA-14.1 & S6-DATA-14.2 real PostgreSQL RLS, trigger & deletion probes
+  it('enforces agreement acceptance and owner-scoped deletion with restricted runtime role', async () => {
+    const { venueId, ownerId, editorId } = await createTestVenue({ acceptAgreement: false });
+    const { venueId: otherVenueId, ownerId: otherOwnerId } = await createTestVenue();
+
+    const runtimeClient = new Client({ connectionString: runtimeUrl });
+    await runtimeClient.connect();
+    try {
+      const csv = [
+        'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity',
+        'pilot_order_outcome.v1,ORD-INT-1,LINE-1,2026-11-10T12:00:00Z,POS-1,ordered,1',
+      ].join('\n');
+
+      // 1. Import blocked before agreement acceptance
+      await expect(
+        importOrderOutcomes({
+          client: runtimeClient,
+          actorId: ownerId,
+          venueId,
+          csvText: csv,
+        }),
+      ).rejects.toMatchObject({ code: 'agreement_not_accepted', status: 403 });
+
+      // 2. Editor cannot accept agreement
+      await expect(
+        acceptPilotOrderAgreement({
+          client: runtimeClient,
+          actorId: editorId,
+          venueId,
+          agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+        }),
+      ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+      // 3. Owner accepts agreement (concurrent/idempotent safety)
+      const accepted = await acceptPilotOrderAgreement({
+        client: runtimeClient,
+        actorId: ownerId,
+        venueId,
+        agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+      });
+      expect(accepted.alreadyAccepted).toBe(false);
+
+      const acceptedAgain = await acceptPilotOrderAgreement({
+        client: runtimeClient,
+        actorId: ownerId,
+        venueId,
+        agreementVersion: PILOT_ORDER_AGREEMENT_VERSION,
+      });
+      expect(acceptedAgain.alreadyAccepted).toBe(true);
+
+      // 4. Direct DELETE and GUC-spoofed DELETE on order_outcome_lines are rejected for runtime
+      await expect(
+        runtimeClient.query(`DELETE FROM app_private.order_outcome_lines WHERE tenant_id = $1`, [
+          venueId,
+        ]),
+      ).rejects.toThrow();
+
+      await expect(
+        (async () => {
+          await runtimeClient.query('BEGIN');
+          await runtimeClient.query(
+            "SELECT set_config('app.order_data_deletion_active', 'on', true)",
+          );
+          await runtimeClient.query(
+            `DELETE FROM app_private.order_outcome_lines WHERE tenant_id = $1`,
+            [venueId],
+          );
+        })(),
+      ).rejects.toThrow();
+      await runtimeClient.query('ROLLBACK').catch(() => {});
+
+      // 5. Populate Venue A and Venue B order-outcome rows via adminClient, then run owner request + operator deletion
+      const batchA = randomUUID();
+      const batchB = randomUUID();
+      await adminClient.query(
+        `INSERT INTO app_private.order_outcome_import_batches
+           (id, tenant_id, schema_version, created_by, source_filename, file_sha256, storage_key, status, finished_at)
+         VALUES
+           ($1, $2, 'pilot_order_outcome.v1', $3, 'a.csv', $4, $5, 'completed', now()),
+           ($6, $7, 'pilot_order_outcome.v1', $8, 'b.csv', $9, $10, 'completed', now())`,
+        [
+          batchA,
+          venueId,
+          ownerId,
+          sha256Hex('a'),
+          `order-imports/${venueId}/b1/source.csv`,
+          batchB,
+          otherVenueId,
+          otherOwnerId,
+          sha256Hex('b'),
+          `order-imports/${otherVenueId}/b2/source.csv`,
+        ],
+      );
+      await adminClient.query(
+        `INSERT INTO app_private.order_outcome_lines
+           (tenant_id, batch_id, order_id, order_line_id, ordered_at, menu_revision_id, dish_id, dish_revision_id, outcome_type, quantity, payload_checksum)
+         VALUES
+           ($1, $2, 'ORD-A', 'L1', now(), $3, $4, $5, 'ordered', 1, $6),
+           ($7, $8, 'ORD-B', 'L1', now(), $9, $10, $11, 'ordered', 1, $12)`,
+        [
+          venueId,
+          batchA,
+          randomUUID(),
+          randomUUID(),
+          randomUUID(),
+          sha256Hex('line-a'),
+          otherVenueId,
+          batchB,
+          randomUUID(),
+          randomUUID(),
+          randomUUID(),
+          sha256Hex('line-b'),
+        ],
+      );
+
+      await adminClient.query(
+        `INSERT INTO app_private.order_outcome_quarantine
+           (id, tenant_id, batch_id, row_index, reason_code, diagnostic_message)
+         VALUES
+           ($1, $2, $3, 1, 'invalid_format', 'bad_row_a'),
+           ($4, $5, $6, 1, 'invalid_format', 'bad_row_b')`,
+        [randomUUID(), venueId, batchA, randomUUID(), otherVenueId, batchB],
+      );
+      await adminClient.query(
+        `INSERT INTO app_private.order_outcome_conflicts
+           (tenant_id, order_id, order_line_id, outcome_type, batch_id, existing_checksum, incoming_checksum)
+         VALUES
+           ($1, 'ORD-A', 'L2', 'ordered', $2, $3, $4),
+           ($5, 'ORD-B', 'L2', 'ordered', $6, $7, $8)`,
+        [
+          venueId,
+          batchA,
+          sha256Hex('c1'),
+          sha256Hex('c2'),
+          otherVenueId,
+          batchB,
+          sha256Hex('c3'),
+          sha256Hex('c4'),
+        ],
+      );
+
+      const r2Objects = new Map<string, string>([
+        [`order-imports/${venueId}/b1/source.csv`, 'csv-a'],
+        [`order-imports/${otherVenueId}/b2/source.csv`, 'csv-b'],
+      ]);
+      const storage: OrderOutcomeStorage = {
+        put: async (key, val) => {
+          r2Objects.set(key, typeof val === 'string' ? val : 'binary');
+        },
+        list: async (opts) => ({
+          objects: [...r2Objects.keys()]
+            .filter((k) => !opts?.prefix || k.startsWith(opts.prefix))
+            .map((key) => ({ key, uploaded: new Date() })),
+          truncated: false,
+        }),
+        delete: async (key) => {
+          r2Objects.delete(key);
+        },
+      };
+
+      const requestId = randomUUID();
+      const operatorId = randomUUID();
+      const authorizedOperatorIds = new Set([operatorId]);
+
+      // Cross-tenant submission by otherOwnerId against venueId is denied
+      await expect(
+        submitOrderDataDeletionRequest({
+          client: runtimeClient,
+          actorId: otherOwnerId,
+          venueId,
+          requestId,
+          reason: 'pilot_withdrawal',
+        }),
+      ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
+
+      // Owner submits deletion request for Venue A
+      const submitted = await submitOrderDataDeletionRequest({
+        client: runtimeClient,
+        actorId: ownerId,
+        venueId,
+        requestId,
+        reason: 'pilot_withdrawal',
+      });
+      expect(submitted.status).toBe('requested');
+
+      // Other venue owner can use the same requestId in their own tenant (composite PK (tenant_id, id))
+      const otherSubmitted = await submitOrderDataDeletionRequest({
+        client: runtimeClient,
+        actorId: otherOwnerId,
+        venueId: otherVenueId,
+        requestId,
+        reason: 'data_cleanup',
+      });
+      expect(otherSubmitted.status).toBe('requested');
+
+      // Runtime role CANNOT execute deleteVenueOrderData (permission denied on app_private.delete_venue_order_data)
+      await expect(
+        deleteVenueOrderData({
+          client: runtimeClient,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        }),
+      ).rejects.toThrow(/permission denied/i);
+
+      const operatorClient = new Client({ connectionString: operatorUrl });
+      const concurrentClient = new Client({ connectionString: operatorUrl });
+      const checkerClient = new Client({ connectionString: checkerUrl });
+      await operatorClient.connect();
+      await concurrentClient.connect();
+      await checkerClient.connect();
+      try {
+        let releaseFirstList!: () => void;
+        const firstListEntered = new Promise<void>((resolve) => {
+          const origList = storage.list!;
+          let intercepted = false;
+          storage.list = async (opts) => {
+            if (!intercepted && opts?.prefix === `order-imports/${venueId}/`) {
+              intercepted = true;
+              resolve();
+              await new Promise<void>((r) => {
+                releaseFirstList = r;
+              });
+            }
+            return origList(opts);
+          };
+        });
+
+        const firstDeletePromise = deleteVenueOrderData({
+          client: operatorClient,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+
+        await firstListEntered;
+
+        // Second concurrent execution for the same venue is rejected with 409 deletion_in_progress
+        await expect(
+          deleteVenueOrderData({
+            client: concurrentClient,
+            operatorId,
+            venueId,
+            requestId,
+            storage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        // Different venue (otherVenueId) is NOT blocked while Venue A is executing
+        const otherDeleted = await deleteVenueOrderData({
+          client: concurrentClient,
+          operatorId,
+          venueId: otherVenueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        expect(otherDeleted.status).toBe('awaiting_verification');
+        expect(otherDeleted.dbBatchesDeleted).toBe(1);
+
+        releaseFirstList();
+        const deleted = await firstDeletePromise;
+        expect(deleted.status).toBe('awaiting_verification');
+        expect(deleted.operatorId).toBe(operatorId);
+        expect(deleted.r2ObjectsDeleted).toBe(1);
+        expect(deleted.dbBatchesDeleted).toBe(1);
+        expect(deleted.dbLinesDeleted).toBe(1);
+        expect(deleted.dbQuarantineDeleted).toBe(1);
+        expect(deleted.dbConflictsDeleted).toBe(1);
+
+        // Independent checker verifies Venue A deletion -> transitions to 'verified'
+        const checkerId = randomUUID();
+        const verified = await verifyVenueOrderDeletion({
+          client: checkerClient,
+          checkerId,
+          authorizedCheckerIds: new Set([checkerId]),
+          venueId,
+          requestId,
+          outcome: 'PASS',
+          evidenceRef: 'CU-166',
+          verificationStorage: {
+            list: storage.list!,
+            get: async (key: string) => {
+              const val = r2Objects.get(key);
+              if (!val) return null;
+              return { text: async () => val, json: async () => JSON.parse(val) };
+            },
+          },
+        });
+        expect(verified.status).toBe('verified');
+
+        // C1 Real-DB role-boundary assertions across runtime, operator, checker, and admin logins
+        const forgedReqId = randomUUID();
+        await expect(
+          runtimeClient
+            .query(
+              `SELECT set_config('app.tenant_id', $1, false),
+                    set_config('app.actor_id', $2, false),
+                    set_config('app.deletion_lifecycle_context', 'reconciliation', false)`,
+              [venueId, ownerId],
+            )
+            .then(() =>
+              runtimeClient.query(
+                `INSERT INTO app_private.order_data_deletion_requests
+                 (id, tenant_id, requested_by, reason, status, reconciled_from_r2, verified_by, verification_outcome)
+               VALUES ($1, $2, $3, 'pilot_withdrawal', 'verified', true, $4, 'PASS')`,
+                [forgedReqId, venueId, ownerId, checkerId],
+              ),
+            ),
+        ).rejects.toThrow(/cannot insert reconciliation/i);
+
+        await expect(
+          checkerClient.query(
+            `SELECT * FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, now(), now(), 'completed', 0, 'ev')`,
+            [randomUUID(), venueId, forgedReqId, checkerId],
+          ),
+        ).rejects.toThrow(/permission denied/i);
+
+        await expect(
+          adminClient.query(
+            `INSERT INTO app_private.order_data_deletion_requests
+               (id, tenant_id, requested_by, reason, status, reconciled_from_r2)
+             VALUES ($1, $2, $3, 'pilot_withdrawal', 'awaiting_verification', true)`,
+            [forgedReqId, venueId, ownerId],
+          ),
+        ).rejects.toThrow(/cannot insert reconciliation/i);
+
+        await operatorClient.query('BEGIN');
+        await operatorClient.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+        await operatorClient.query("SELECT set_config('app.actor_id', $1, true)", [operatorId]);
+        const opReconcile = await operatorClient.query<{ outcome: string }>(
+          `SELECT outcome FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, now(), now(), 'completed', 0, 'order-deletion-ledger/test/completed.json')`,
+          [randomUUID(), venueId, forgedReqId, operatorId],
+        );
+        await operatorClient.query('COMMIT');
+        expect(opReconcile.rows[0]?.outcome).toBe('reconciled');
+      } finally {
+        await concurrentClient.end().catch(() => {});
+        await operatorClient.end().catch(() => {});
+        await checkerClient.end().catch(() => {});
+      }
+      expect(r2Objects.has(`order-imports/${venueId}/b1/source.csv`)).toBe(false);
+      expect(r2Objects.has(`order-deletion-ledger/${venueId}/${requestId}/intent.json`)).toBe(true);
+      expect(r2Objects.has(`order-deletion-ledger/${venueId}/${requestId}/completed.json`)).toBe(
+        true,
+      );
+      expect(r2Objects.has(`order-imports/${otherVenueId}/b2/source.csv`)).toBe(false);
+
+      // Verify both venues have 0 rows across all 4 tables after their respective deletions
+      const remainingA = await adminClient.query<{ total: string }>(
+        `SELECT (
+           (SELECT count(*) FROM app_private.order_outcome_import_batches WHERE tenant_id = $1) +
+           (SELECT count(*) FROM app_private.order_outcome_lines WHERE tenant_id = $1) +
+           (SELECT count(*) FROM app_private.order_outcome_quarantine WHERE tenant_id = $1) +
+           (SELECT count(*) FROM app_private.order_outcome_conflicts WHERE tenant_id = $1)
+         )::text AS total`,
+        [venueId],
+      );
+      expect(Number(remainingA.rows[0]?.total)).toBe(0);
+
+      const remainingB = await adminClient.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM app_private.order_outcome_lines WHERE tenant_id = $1`,
+        [otherVenueId],
+      );
+      expect(Number(remainingB.rows[0]?.count)).toBe(0);
+
+      // Same CSV file_sha256 can be re-uploaded as a new import for Venue A after deletion completes
+      const reuploadedBatchId = randomUUID();
+      await expect(
+        adminClient.query(
+          `INSERT INTO app_private.order_outcome_import_batches
+             (id, tenant_id, schema_version, created_by, source_filename, file_sha256, storage_key, status, finished_at)
+           VALUES
+             ($1, $2, 'pilot_order_outcome.v1', $3, 'a.csv', $4, $5, 'completed', now())`,
+          [
+            reuploadedBatchId,
+            venueId,
+            ownerId,
+            sha256Hex('a'),
+            `order-imports/${venueId}/b-reupload/source.csv`,
+          ],
+        ),
+      ).resolves.toBeDefined();
+
+      // Lease renewal (heartbeat) & stale-worker fencing test with controlled clock and separate DB connections:
+      // 1. Long-running deletion renews lease past initial lease duration so a second worker gets 409 deletion_in_progress
+      // 2. Stale paused worker whose lease expired is fenced out (409 deletion_lease_lost) when replacement worker takes over
+      const leaseRequestId = randomUUID();
+      const leaseClient1 = new Client({ connectionString: operatorUrl });
+      const leaseClient2 = new Client({ connectionString: operatorUrl });
+      await leaseClient1.connect();
+      await leaseClient2.connect();
+      try {
+        await submitOrderDataDeletionRequest({
+          client: runtimeClient,
+          actorId: ownerId,
+          venueId,
+          requestId: leaseRequestId,
+          reason: 'data_cleanup',
+        });
+
+        let clockMs = Date.parse('2026-11-13T12:00:00.000Z');
+        const controlledNow = () => new Date(clockMs);
+        const leaseMs = 150;
+
+        r2Objects.set(`order-imports/${venueId}/b-reupload/source.csv`, 'csv-reupload');
+
+        // Scenario A: Long-running R2 deletion advances clock beyond leaseMs while renewing heartbeat
+        let releaseSlowDelete!: () => void;
+        const slowDeleteStarted = new Promise<void>((resolve) => {
+          const origDelete = storage.delete!;
+          let intercepted = false;
+          storage.delete = async (key: string) => {
+            if (!intercepted && key.includes('b-reupload')) {
+              intercepted = true;
+              // Advance clock by 80ms (> leaseMs/3) so next step renews lease, and pause
+              clockMs += 80;
+              resolve();
+              await new Promise<void>((r) => {
+                releaseSlowDelete = r;
+              });
+            }
+            return origDelete(key);
+          };
+        });
+
+        const slowWorkerPromise = deleteVenueOrderData({
+          client: leaseClient1,
+          operatorId,
+          venueId,
+          requestId: leaseRequestId,
+          storage,
+          authorizedOperatorIds,
+          executionLeaseMs: leaseMs,
+          now: controlledNow,
+        });
+
+        await slowDeleteStarted;
+        // Second worker tries to take over while Worker 1's lease is still valid -> 409 deletion_in_progress
+        await expect(
+          deleteVenueOrderData({
+            client: leaseClient2,
+            operatorId,
+            venueId,
+            requestId: leaseRequestId,
+            storage,
+            authorizedOperatorIds,
+            executionLeaseMs: leaseMs,
+            now: controlledNow,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        releaseSlowDelete();
+        const slowRes = await slowWorkerPromise;
+        expect(slowRes.status).toBe('awaiting_verification');
+
+        // Scenario B: Stale worker pauses past lease expiry without renewing; replacement worker takes over and stale worker gets 409 deletion_lease_lost
+        const staleReqId = randomUUID();
+        await adminClient.query(
+          `INSERT INTO app_private.order_outcome_import_batches
+             (id, tenant_id, schema_version, created_by, source_filename, file_sha256, storage_key, status, finished_at)
+           VALUES ($1, $2, 'pilot_order_outcome.v1', $3, 'stale.csv', $4, $5, 'completed', now())`,
+          [
+            randomUUID(),
+            venueId,
+            ownerId,
+            sha256Hex('stale'),
+            `order-imports/${venueId}/b-stale/source.csv`,
+          ],
+        );
+        await submitOrderDataDeletionRequest({
+          client: runtimeClient,
+          actorId: ownerId,
+          venueId,
+          requestId: staleReqId,
+          reason: 'data_cleanup',
+        });
+
+        let releaseStaleWorker!: () => void;
+        const staleWorkerPaused = new Promise<void>((resolve) => {
+          const origList = storage.list!;
+          let intercepted = false;
+          storage.list = async (opts) => {
+            if (!intercepted && opts?.prefix === `order-imports/${venueId}/`) {
+              intercepted = true;
+              resolve();
+              await new Promise<void>((r) => {
+                releaseStaleWorker = r;
+              });
+            }
+            return origList(opts);
+          };
+        });
+
+        const staleWorkerPromise = deleteVenueOrderData({
+          client: leaseClient1,
+          operatorId,
+          venueId,
+          requestId: staleReqId,
+          storage,
+          authorizedOperatorIds,
+          executionLeaseMs: leaseMs,
+          now: controlledNow,
+        });
+
+        await staleWorkerPaused;
+        // Advance clock past lease expiry (leaseMs = 150ms -> +200ms) while Worker 1 is frozen
+        clockMs += 200;
+
+        // Replacement worker (Worker 2) safely takes over the expired lease and completes deletion
+        const replacementRes = await deleteVenueOrderData({
+          client: leaseClient2,
+          operatorId,
+          venueId,
+          requestId: staleReqId,
+          storage,
+          authorizedOperatorIds,
+          executionLeaseMs: leaseMs,
+          now: controlledNow,
+        });
+        expect(replacementRes.status).toBe('awaiting_verification');
+        expect(replacementRes.dbBatchesDeleted).toBe(1);
+
+        // Stale Worker 1 wakes up and tries to continue -> fenced out with 409 deletion_lease_lost
+        releaseStaleWorker();
+        await expect(staleWorkerPromise).rejects.toMatchObject({
+          code: 'deletion_lease_lost',
+          status: 409,
+        });
+
+        // Audit record remains awaiting_verification (never clobbered by stale Worker 1)
+        const finalAudit = await adminClient.query<{ status: string; executed_by: string }>(
+          `SELECT status, executed_by FROM app_private.order_data_deletion_requests WHERE tenant_id = $1 AND id = $2`,
+          [venueId, staleReqId],
+        );
+        expect(finalAudit.rows[0]?.status).toBe('awaiting_verification');
+        expect(finalAudit.rows[0]?.executed_by).toBe(operatorId);
+      } finally {
+        await leaseClient1.end().catch(() => {});
+        await leaseClient2.end().catch(() => {});
+      }
+    } finally {
+      await runtimeClient.end().catch(() => {});
     }
   });
 });
