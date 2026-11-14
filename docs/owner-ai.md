@@ -202,6 +202,12 @@ from a timestamp or require new producer database columns. Production identity
 issuance and how one report version binds a selected dish are still a shared
 producer/caller integration decision; the tests inject labelled synthetic IDs.
 
+PR #167 changes the report producer SQL to exclude the end (`occurred_at < end_time`).
+The AI path consumes the producer's preaggregated
+metrics and carries the producer's exact start and end strings through the
+request, each evidence item, and the result. The mock SQL seam checks that
+handoff. #167's PostgreSQL tests cover events and checkpoints at the endpoint.
+
 | Internal evidence | Existing core evidence |
 | --- | --- |
 | NORMAL / VALID_ZERO with verified freshness | Available value and its own checked cohort; numeric zero stays zero |

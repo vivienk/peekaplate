@@ -397,7 +397,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "cd839070e07f04b7851c44a73677bf4d6314b974b85eae31b793bd6bf1a7b716"
+      "sourceFingerprint": "c363598c3cb5601d58f3b0e53b52656f93a9de50ef1ca1e94a59909dd9ae473d"
     },
     {
       "id": "database",
@@ -848,13 +848,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     },
     {
       "date": "2026-11-13",
-      "summary": "Draft PR112 incorporates develop 385a19f, preserving menu verification and the trusted report adapter, synthetic UUIDv5 fixtures and opt-in synthetic GPT-6 Luna access probe. CI covers the probe with a mocked transport.",
+      "summary": "Draft PR112 incorporates develop 385a19f, preserving menu verification and the trusted report adapter, synthetic UUIDv5 fixtures and opt-in synthetic GPT-6 Luna access probe. CI covers the probe with a mocked transport. The AI consumer preserves producer window bounds through request, evidence and result. PR167 owns the end-exclusive SQL and its PostgreSQL boundary tests.",
       "modules": [
         "backend",
         "contracts"
       ],
       "sources": [
         "docs/owner-ai.md",
+        "backend/src/owner-ai/report-producer-seam.test.ts",
         "scripts/probe-owner-ai-luna.mjs",
         "scripts/probe-owner-ai-luna.test.mjs"
       ],

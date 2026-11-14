@@ -93,23 +93,31 @@ const policy = {
   ],
 };
 
-function expectUnknownFreshnessAbstention(input: unknown) {
+function expectUnknownFreshnessAbstention(
+  input: ReturnType<typeof InternalOwnerDishReportSchema.parse>,
+) {
   const before = structuredClone(input);
+  const { start_time, end_time } = input.report_metadata.date_window;
+  const producerWindow = { start: start_time, end: end_time };
   const request = toOwnerRecommendationRequest(input, scope);
   expect(request).toMatchObject({
     venueId,
     reportId: uuid(11),
     reportVersion: 1,
-    timeWindow: scope.snapshot.timeWindow,
+    timeWindow: producerWindow,
   });
   expect(request.evidence.map(({ metricKey, state }) => ({ metricKey, state }))).toEqual([
     { metricKey: 'open_rate', state: 'missing' },
     { metricKey: 'engagement_rate', state: 'missing' },
     { metricKey: 'save_rate', state: 'missing' },
   ]);
+  for (const evidence of request.evidence) {
+    expect(evidence.timeWindow).toEqual(producerWindow);
+  }
   expect(JSON.stringify(request)).not.toMatch(/"value"|eligibleSessions|eligible_sessions/);
   const result = buildOwnerRecommendation(request, { authorizedVenueId: venueId, policy });
   expect(result).toMatchObject({
+    timeWindow: producerWindow,
     status: 'abstained',
     reason: 'missing_evidence',
     evidenceRefs: [uuid(12)],
