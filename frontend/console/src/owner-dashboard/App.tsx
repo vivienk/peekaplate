@@ -325,8 +325,11 @@ export function App() {
     window.scrollTo(0, 0);
   };
 
+  // Figma S09 Add/Edit dish frames have no AI chat, so the panel and "Ask AI" are hidden there.
+  const showAi = !(page === 'menu' && ed.step === 'form');
+
   return (
-    <div className="app has-ai">
+    <div className={showAi ? 'app has-ai' : 'app'}>
       <aside className="side">
         <div className="brand">
           <img src={logo} alt="PeekaPlate logo" />
@@ -360,23 +363,27 @@ export function App() {
           <div className="l">
             <TodayChip className="chip" />
           </div>
-          <Btn
-            kind="primary"
-            size="md"
-            icon="spark"
-            className="aibtn-top"
-            onClick={() => setChatOpen(true)}
-            aria-haspopup="dialog"
-          >
-            Ask AI
-          </Btn>
+          {showAi && (
+            <Btn
+              kind="primary"
+              size="md"
+              icon="spark"
+              className="aibtn-top"
+              onClick={() => setChatOpen(true)}
+              aria-haspopup="dialog"
+            >
+              Ask AI
+            </Btn>
+          )}
         </div>
         <main id="content">{body}</main>
       </div>
-      <aside className="aipanel" aria-label="PeekaPlate AI">
-        <ChatBox chat={panelChat} panel ctxBar={ctxBar} />
-      </aside>
-      {chatOpen && (
+      {showAi && (
+        <aside className="aipanel" aria-label="PeekaPlate AI">
+          <ChatBox chat={panelChat} panel ctxBar={ctxBar} />
+        </aside>
+      )}
+      {showAi && chatOpen && (
         <ModalDrawer label="Ask PeekaPlate AI" onClose={() => setChatOpen(false)}>
           <ChatBox chat={panelChat} drawer onClose={() => setChatOpen(false)} ctxBar={ctxBar} />
         </ModalDrawer>

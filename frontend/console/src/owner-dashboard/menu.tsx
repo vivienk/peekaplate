@@ -206,7 +206,7 @@ function TagField({
         >
           Add
         </Btn>
-        <Btn kind="outlined" size="md" type="button" onClick={onSuggest}>
+        <Btn kind="primary" size="md" type="button" onClick={onSuggest}>
           Suggest with AI
         </Btn>
       </div>
