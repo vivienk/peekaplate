@@ -3518,3 +3518,28 @@ The first browser run overlapped source formatting/HMR; a later provider run ove
 The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
 
 The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+<!-- preserved QA-02 dependency check observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T18:43:51.688Z","exitCode":1}
+```
+
+
+## QA-02 reference integrity preparation - November 13, 2026
+
+The initial lint observation was JSON formatting in the new draft synthetic
+reference. Formatting was applied and the manifest hash refreshed before any
+prediction run; pnpm check subsequently passed. Historical menu keys were unchanged.
+
+Independent review reproduced source/reference check-then-read replacement and
+rejection of an explicitly qualified single-price null. The validator now hashes
+and parses the same bounded byte snapshots, and supports qualified null scalars
+with an explicit reason. A CLI regression also replaced an unhelpful generic
+pending-review failure with a controlled reason, without exposing private input.
+The 18 focused tests and 536-test offline Python suite pass. See
+processing/tests/test_qa02_reference.py and processing/eval/qa02/EVIDENCE.md.
+Integrity checks do not certify source truth, reviewer identity, model quality
+or hosted acceptance; the example's independent review remains pending.
+
+## Source/scorer integration preparation — November 14, 2026
+
+The isolated integration branch initially lacked a Git committer identity. The dependency merge was retried with the authenticated contributor's public noreply identity supplied only for that command, without changing global or shared repository identity settings. Current develop and PR169 had competing bounded context histories and append-only error entries; integration retained develop's recent handoffs and both historical error sequences. Runtime/provider behavior was not changed by this setup.

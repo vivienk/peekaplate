@@ -682,7 +682,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. QA-02 adds offline source/reference freeze and integrity checks, development-only inventory and pending-review fictional source annotations; no strict quality scorer, provider run or reference-truth approval.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -764,7 +764,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_ingredient_intelligence.py",
         "processing/tests/fixtures/ingredient-review.json",
         "docs/ingredient-intelligence.md",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "processing/src/peekaplate_processing/qa02_reference.py",
+        "processing/tests/test_qa02_reference.py",
+        "processing/eval/qa02/README.md",
+        "processing/eval/qa02/EVIDENCE.md",
+        "processing/eval/qa02/development.manifest.json",
+        "processing/eval/qa02/development-inventory.json",
+        "processing/eval/qa02/synthetic-menu.reference.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -773,7 +780,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "60216b87932a13fdf733bb4982bceac50ac1e4b689034bcb0f6ec5adaf92d160"
+      "sourceFingerprint": "06950812ad90066ad4ef3da3ca1d112dd6aa097f35db39c02fab46e84ad75990"
     },
     {
       "id": "assets",
