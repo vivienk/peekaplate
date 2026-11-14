@@ -99,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view. Prepared /diner aliases validate a public operator locator before the existing public reader. Legacy QR paths remain valid; enrollment and owner wiring stay separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -192,7 +192,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
         "tests/e2e/menu-triggers-live.spec.ts",
-        "docs/diner-tracking-staging.md"
+        "docs/diner-tracking-staging.md",
+        "frontend/diner/public/config/restaurant-links.json",
+        "docs/restaurant-urls.md",
+        "tests/restaurant-links/restaurant-links.spec.ts",
+        "playwright.restaurant-links.config.ts",
+        "scripts/serve-restaurant-routing-test.mjs"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -201,7 +206,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4a8479e9cea83db5a0ca8c5f78b703771bc8fd980fe517a5511740919860f4c1"
+      "sourceFingerprint": "1d057bbb0161439f8062d1ed7484c44bd41592ded770e47250a5edfb5f28d5fd"
     },
     {
       "id": "console",
@@ -357,7 +362,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "5ab9fa3e49b03df41d094bb05ed20c29c5a59699454bf8a7bd0ad0aebb3b3d64"
+      "sourceFingerprint": "22c59e4adb66cb55ed553d1ae54f292f53630f87f648835e8afc338d111e9f19"
     },
     {
       "id": "database",
@@ -468,7 +473,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/console-preview-demos.test.mjs",
         "scripts/node-ts-hooks.mjs",
         ".github/workflows/deploy-extraction-staging.yml",
-        "docs/staging-ingestion-release.md"
+        "docs/staging-ingestion-release.md",
+        "scripts/prepare-app-site.mjs",
+        "scripts/prepare-app-site.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -479,7 +486,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2943859e518870b721347ec55e6df7437543ec8424bbd6e89f96083552deb4b3"
+      "sourceFingerprint": "d190b9afb2d8cd250d8c01737acd4d0a3344925243c6cf6d31575ae6e6611a5c"
     },
     {
       "id": "agents",
@@ -669,19 +676,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
-      "summary": "S3-DIN-01.4 search screen: frontend/diner/src/menu/searchView.ts. searchViewState(menu, query, categoryId) is the pure view model (matches, per-tab count, no-results, staff line, live announcement). bindMenuSearch wires the header icon, the bar under the header, close, Escape, Enter (no submit) and the Figma \"No Result Found\" state with Clear search. It hides non-matching cards in place, so results are the same menu cards; a new search starts on All and a tab narrows it; the query survives dish detail and back. No request, no track() call, query never logged or put in the URL. Alternating cards use nth-child(even of :not([hidden])).",
-      "modules": [
-        "diner"
-      ],
-      "paths": [
-        "frontend/diner/src/menu/searchView.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/search.spec.ts"
-      ],
-      "next": "The Compare picker (DIN-02.3) reuses searchMenu with its own bar. The no-results icon is a placeholder ring until a plate/cutlery asset is exported from Figma. Save hearts from DIN-02.2 sit on the same cards and need no search changes."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
       "modules": [
         "console",
@@ -781,6 +775,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/diner-tracking-staging.md"
       ],
       "next": "Obtain final-commit approval, deploy the corrected exact main diner and rerun the intercepted hosted smoke. Jeffin/Uneeza then coordinate genuine PostHog readback, canonical durability and report reconciliation in an explicitly approved window; normal collection stays gated."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "diner",
+        "backend",
+        "delivery"
+      ],
+      "summary": "Narrow promotion of PR174 only: prepared .app/diner aliases, exact .app diner CORS and create-only Pages artifact with bounded clean-URL routing. Existing main APIs, publication/hash/token checks and unrelated release contents remain. No owner or production-domain activation.",
+      "sources": [
+        "docs/restaurant-urls.md",
+        "frontend/diner/src/menu/route.ts",
+        "scripts/prepare-app-site.mjs"
+      ],
+      "next": "Verify this exact main candidate on a branch-only deployment of the existing diner staging Pages project. Keep canonical staging root, .io and registrar nameservers unchanged; obtain actual Cloudflare nameservers from the pending Free .app zone."
     }
   ]
 }
