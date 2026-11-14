@@ -44,6 +44,32 @@ complementary suppression and internal cohort stripping. An empty fixture can
 return an empty dish list. Freshness is not certified by a successful response.
 Production reports remain disabled.
 
+## Console report connection
+
+PR 128 adds the report reader and validated screen states. With API/venue settings,
+the caller must supply a genuine owner-session token; the default token getter is
+still a sign-in integration seam and returns no token. PRs 143/146 remain separate.
+Without those settings the preview uses a clearly labelled saved synthetic report.
+Switching source, venue, API or token getter clears retained values before the next
+screen commit; a late response cannot replace the currently selected report.
+Browser tests intercept requests with a stand-in token. They verify rendering and
+failure handling, not hosted authentication, provenance or DATA-12 acceptance.
+
+## CSV export
+
+`GET /api/v1/venues/:venueId/analytics/dishes/export?source=synthetic` exports the
+same privacy-filtered owner aggregates. It retains the JSON route's current-owner,
+exact-origin and approved-synthetic-venue checks. The response is a no-store CSV
+attachment; it contains no raw observations or internal eligible-session counts.
+Every metric has a value and a status column. `NORMAL` and `VALID_ZERO` values are
+retained, including a literal `0`; suppressed, missing and unmeasurable values stay
+blank with their original status. Dish names are CSV-quoted and direct formula
+prefixes are escaped. Empty reports produce only the fixed header row.
+
+The CSV path has local route/serializer coverage. It has not been deployed or
+accepted on hosted staging by this PR; the existing hosted JSON report evidence
+does not certify CSV downloads or spreadsheet application behavior.
+
 ## Release and verification
 
 Deploy an exact reviewed main commit to the existing staging API Worker only,
