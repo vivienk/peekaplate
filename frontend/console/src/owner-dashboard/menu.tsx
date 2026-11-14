@@ -393,7 +393,7 @@ export function DishForm({
             </div>
             <div className="s09-airow">
               <Btn
-                kind={aiDraft ? 'primary' : 'outlined'}
+                kind="primary"
                 size="md"
                 type="button"
                 className={aiDraft ? 's09-on' : undefined}
