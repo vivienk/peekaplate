@@ -2918,3 +2918,7 @@ Transient observations during Phase 3 verification:
 ```json
 {"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
 ```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```

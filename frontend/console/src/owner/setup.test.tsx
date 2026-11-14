@@ -1,19 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { isFirstTimeArrival, type OwnerSetup, setupProgress, setupSteps } from './setup';
+import {
+  availablePages,
+  canPublish,
+  isFirstTimeArrival,
+  type OwnerSetup,
+  setupProgress,
+  setupSteps,
+  visiblePages,
+} from './setup';
 
 const base: OwnerSetup = {
+  venueId: 'venue-1',
   restaurantName: 'Ember & Stone',
-  detailsVerified: false,
+  detailsStatus: 'missing',
   menuAdded: false,
   published: false,
 };
 
-describe('first dashboard setup rules', () => {
-  it('nothing done: details and menu open, publish locked, no step labelled verified', () => {
+describe('owner onboarding setup rules', () => {
+  it('lists Restaurant Setup only until the menu is published', () => {
+    const before: OwnerSetup = { ...base, detailsStatus: 'verified', menuAdded: true };
+    expect(visiblePages(before).has('setup')).toBe(true);
+    expect(visiblePages(before).size).toBe(6);
+    const after = visiblePages({ ...before, published: true });
+    expect(after.has('setup')).toBe(false);
+    expect([...after]).toEqual(['overview', 'report', 'performance', 'menu', 'actions']);
+  });
+
+  it('nothing done: details and menu open, publish locked with no button', () => {
     const steps = setupSteps(base);
     expect(steps.map((s) => s.state)).toEqual(['current', 'current', 'locked']);
     expect(steps.map((s) => s.status)).toEqual([null, null, null]);
-    expect(steps[2]?.action).toEqual({ label: 'Start', disabled: true });
+    expect(steps[2]?.action).toBeNull();
+    expect(steps[2]?.lockedReason).toBe(
+      'Opens after your details are verified and your menu is added.',
+    );
     expect(setupProgress(base)).toEqual({
       done: 0,
       total: 3,
@@ -23,10 +44,11 @@ describe('first dashboard setup rules', () => {
   });
 
   it('details verified (the Figma state): 1 of 3, next is the menu, only step 1 is verified', () => {
-    const setup = { ...base, detailsVerified: true };
+    const setup: OwnerSetup = { ...base, detailsStatus: 'verified' };
     const steps = setupSteps(setup);
     expect(steps.map((s) => s.status?.text ?? null)).toEqual(['Verified', null, null]);
     expect(steps[0]?.action).toEqual({ label: 'Edit', disabled: false });
+    expect(steps[2]?.lockedReason).toBe('Opens after you add your menu.');
     expect(setupProgress(setup)).toMatchObject({
       done: 1,
       next: { id: 'menu', label: 'Add your menu' },
@@ -34,11 +56,35 @@ describe('first dashboard setup rules', () => {
     });
   });
 
-  it('verified but unpublished: publish is the next step and says not published', () => {
-    const setup = { ...base, detailsVerified: true, menuAdded: true };
+  it('details submitted: waiting for verification, still editable, not counted as done', () => {
+    const setup: OwnerSetup = { ...base, detailsStatus: 'submitted' };
+    const [details] = setupSteps(setup);
+    expect(details?.state).toBe('waiting');
+    expect(details?.status).toEqual({ text: 'Waiting for verification', tone: 'information' });
+    expect(details?.action).toEqual({ label: 'Edit', disabled: false });
+    expect(setupProgress(setup)).toMatchObject({ done: 0, next: { id: 'menu' } });
+  });
+
+  it('a menu without verified details keeps publishing locked (no early publish control)', () => {
+    for (const detailsStatus of ['missing', 'submitted'] as const) {
+      const setup: OwnerSetup = { ...base, detailsStatus, menuAdded: true };
+      expect(canPublish(setup)).toBe(false);
+      expect(setupSteps(setup)[2]).toMatchObject({ state: 'locked', action: null });
+    }
+    expect(setupSteps({ ...base, menuAdded: true })[2]?.lockedReason).toBe(
+      'Opens after we verify your restaurant details.',
+    );
+  });
+
+  it('verified and menu added: publish is the next step and says not published', () => {
+    const setup: OwnerSetup = { ...base, detailsStatus: 'verified', menuAdded: true };
     const steps = setupSteps(setup);
-    expect(steps[2]?.state).toBe('current');
-    expect(steps[2]?.status).toEqual({ text: 'Not published', tone: 'warning' });
+    expect(canPublish(setup)).toBe(true);
+    expect(steps[2]).toMatchObject({
+      state: 'current',
+      status: { text: 'Not published', tone: 'warning' },
+      action: { label: 'Start' },
+    });
     expect(setupProgress(setup)).toMatchObject({
       done: 2,
       next: { id: 'publish', label: 'Review and publish' },
@@ -46,16 +92,31 @@ describe('first dashboard setup rules', () => {
     expect(isFirstTimeArrival(setup)).toBe(true);
   });
 
-  it('a menu added before details are verified keeps details as the next step', () => {
-    const setup = { ...base, menuAdded: true };
-    expect(setupProgress(setup)).toMatchObject({ done: 1, next: { id: 'details' } });
-    expect(setupSteps(setup)[2]?.state).toBe('current');
+  it('published: setup is finished, Edit only on details and menu', () => {
+    const setup: OwnerSetup = {
+      ...base,
+      detailsStatus: 'verified',
+      menuAdded: true,
+      published: true,
+    };
+    const steps = setupSteps(setup);
+    expect(setupProgress(setup)).toMatchObject({ done: 3, next: null });
+    expect(steps[2]?.status).toEqual({ text: 'Published', tone: 'success' });
+    expect(steps.map((s) => s.action?.label ?? null)).toEqual(['Edit', 'Edit', null]);
+    expect(isFirstTimeArrival(setup)).toBe(false);
+    expect(canPublish(setup)).toBe(false);
   });
 
-  it('published: setup is finished and the first-time arrival ends', () => {
-    const setup = { ...base, detailsVerified: true, menuAdded: true, published: true };
-    expect(setupProgress(setup)).toMatchObject({ done: 3, next: null });
-    expect(setupSteps(setup)[2]?.status).toEqual({ text: 'Published', tone: 'success' });
-    expect(isFirstTimeArrival(setup)).toBe(false);
+  it('the sidebar is limited to Restaurant Setup until publication is confirmed', () => {
+    const before: OwnerSetup = { ...base, detailsStatus: 'verified', menuAdded: true };
+    expect([...availablePages(before)]).toEqual(['setup']);
+    expect([...availablePages({ ...before, published: true })]).toEqual([
+      'setup',
+      'overview',
+      'report',
+      'performance',
+      'menu',
+      'actions',
+    ]);
   });
 });

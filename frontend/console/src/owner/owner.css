@@ -11,6 +11,11 @@
   --owner-pending-title-line: 2.25rem;
   /* Figma periwinkle/100 (#e3ecfb) has no token; info-100 is the closest palette colour. */
   --owner-chip-bg: var(--pp-color-info-100);
+  /* Figma color/card variables (Rania, 13 Nov). #143 adds the same border-white value as
+   * --pp-role-card-border in tokens.css; switch to it once that merges. */
+  --owner-card-bg: color-mix(in srgb, var(--pp-color-white) 48%, transparent); /* card/bg */
+  /* card/border-white */
+  --owner-card-border: color-mix(in srgb, var(--pp-color-white) 80%, transparent);
 
   min-height: 100vh;
   background: var(--pp-role-surface);
@@ -74,8 +79,10 @@ body:has(.owner-root) {
   flex-direction: column;
   gap: var(--pp-space-24);
   padding: var(--pp-space-24) var(--pp-space-16);
+  box-sizing: border-box;
   background: var(--pp-role-surface);
-  border-right: 1px solid var(--pp-role-surface-container);
+  /* Figma Sidebar: 1px inside stroke on all sides, color/surface-container. */
+  border: 1px solid var(--pp-role-surface-container);
   box-shadow: var(--owner-pending-shadow-card);
 }
 .owner-brand {
@@ -161,6 +168,26 @@ body:has(.owner-root) {
   align-items: center;
   gap: var(--pp-space-12);
 }
+/* S6-FE-14: pages that open only after publication stay visible but locked. */
+.owner-nav__item[aria-disabled="true"] {
+  /* Design review 05: the disabled navigation role from the token set (Navigation component). */
+  color: var(--pp-role-nav-icon-disabled);
+  cursor: not-allowed;
+}
+.owner-nav__item[aria-disabled="true"] .owner-nav__label img {
+  opacity: 0.6;
+}
+.owner-nav__item[aria-disabled="true"]:hover {
+  background: transparent;
+}
+/* .owner-root p resets margins, so this needs the same specificity to keep the gap (design review, 11 Nov). */
+.owner-root .owner-nav-hint {
+  margin: var(--pp-space-16) 0 0;
+  padding: 0 14px;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
 
 /* Main column */
 .owner-main {
@@ -203,8 +230,11 @@ body:has(.owner-root) {
   outline: none;
 }
 
-/* Status label (Figma "Status label": Success / Warning) */
+/* Rania's "Status Label" component (Figma 2721:12212, read with Figwright on 11 Nov), Icons=Leading:
+ * 24px tall in total (4/12/4/8 padding, 6px gap, 16px icon), 12/16 Semi Bold. Onboarding uses four of
+ * its seven tones; the icon and label share the tone's "on" colour. */
 .owner-status {
+  box-sizing: border-box;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -225,22 +255,79 @@ body:has(.owner-root) {
   background: var(--pp-color-warning-50);
   color: var(--pp-color-warning-900);
 }
+.owner-status--information {
+  background: var(--pp-color-info-50);
+  color: var(--pp-color-info-900);
+}
+.owner-status--neutral {
+  border: 1px solid var(--pp-color-gray-200);
+  background: var(--owner-pending-surface-container);
+  color: var(--pp-color-gray-600);
+}
 
-/* Shared button shape: Figma "Owner dashboard_Button" is a pill with a 16px label. */
+/* Figma "Owner dashboard_Button" (component set 1563:8484), read with Figwright on 11 Nov: a pill
+ * with a 16px Semi Bold label. Figma draws every stroke inside the button, so the thicker hover,
+ * pressed and focus strokes are a 1px border plus an inset shadow: the button never changes size.
+ *   Primary  default Orange/500, label Orange/950; hover Orange/300; pressed Orange/700.
+ *   Outlined default color/surface-container (#fffcfa) with 1px Neutral/500, label Orange/950;
+ *            hover: no fill and a 3px Neutral/500 stroke (the Orange/500 fill is hidden in Figma);
+ *            pressed: Neutral/950 fill and 2px stroke, label #fffcfa.
+ *   Focus    2px inside stroke color/border/focus (Info/600) on the default fill.
+ *   Disabled Neutral/200 fill, 1px Neutral/300, label Neutral/400. */
+.owner-root {
+  --owner-pending-surface-container: #fffcfa; /* Figma color/surface-container: no Cream token yet */
+}
 .owner-button.pp-button {
+  /* Medium size (the S12 frame uses Medium): 40px tall with the 1px stroke inside, 7 + 24 + 7 + 2. */
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 7px var(--pp-space-16);
   border-radius: var(--pp-radius-full);
   font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
   font-weight: var(--pp-font-weight-semibold);
+  transition:
+    background-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    border-color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    box-shadow var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    color var(--pp-motion-duration-press) var(--pp-motion-ease-out),
+    transform var(--pp-motion-duration-press) var(--pp-motion-ease-out);
+}
+.owner-button.pp-button--action {
+  background-color: var(--pp-color-orange-500);
+  color: var(--pp-color-orange-950);
+}
+.owner-button.pp-button--action:hover:not(:disabled) {
+  background-color: var(--pp-color-orange-300);
+}
+.owner-button.pp-button--action:active:not(:disabled) {
+  background-color: var(--pp-color-orange-700);
 }
 .owner-button.pp-button--outline {
-  background: var(--pp-role-surface-container);
-  border-color: var(--pp-role-outline-solid);
-  color: var(--pp-role-button-action-text);
+  background-color: var(--owner-pending-surface-container);
+  border-color: var(--pp-color-neutral-500);
+  color: var(--pp-color-orange-950);
+}
+.owner-button.pp-button--outline:hover:not(:disabled) {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 2px var(--pp-color-neutral-500); /* + 1px border = 3px */
+}
+.owner-button.pp-button--outline:active:not(:disabled) {
+  background-color: var(--pp-color-neutral-950);
+  border-color: var(--pp-color-neutral-950);
+  box-shadow: inset 0 0 0 1px var(--pp-color-neutral-950); /* + 1px border = 2px */
+  color: var(--owner-pending-surface-container);
+}
+.owner-root .owner-button.pp-button:focus-visible {
+  outline: none;
+  border-color: var(--pp-color-info-600);
+  box-shadow: inset 0 0 0 1px var(--pp-color-info-600); /* + 1px border = 2px inside */
 }
 .owner-button.pp-button:disabled {
-  background: var(--pp-role-button-disabled-bg);
-  border-color: var(--pp-role-button-disabled-border);
-  color: var(--pp-role-button-disabled-text);
+  background-color: var(--pp-color-neutral-200);
+  border-color: var(--pp-color-neutral-300);
+  box-shadow: none;
+  color: var(--pp-color-neutral-400);
 }
 .owner-button.pp-button:disabled img {
   opacity: 0.5;
@@ -249,9 +336,10 @@ body:has(.owner-root) {
 /* Cards */
 .owner-card {
   padding: var(--pp-space-24);
-  border: 1px solid var(--pp-role-outline-variant);
+  /* Figma dashboard cards: color/card/bg fill and a 1px inside color/card/border-white stroke. */
+  border: 1px solid var(--owner-card-border);
   border-radius: var(--pp-radius-24);
-  background: var(--pp-color-white);
+  background: var(--owner-card-bg);
   box-shadow: var(--owner-pending-shadow-menu);
 }
 .owner-card h2,
@@ -288,8 +376,7 @@ body:has(.owner-root) {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-16);
-  border-color: var(--pp-role-surface-container);
-  box-shadow: var(--owner-pending-shadow-card);
+  box-shadow: none; /* Figma Setup progress card has no effect */
 }
 .owner-progress__head {
   display: flex;
@@ -320,10 +407,11 @@ body:has(.owner-root) {
 
 /* Setup steps */
 .owner-steps {
+  /* Design review 01: three equal columns and equal-height cards on desktop. */
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--pp-space-24);
-  align-items: start;
+  align-items: stretch;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -332,15 +420,18 @@ body:has(.owner-root) {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-20);
+  box-shadow: var(--owner-pending-shadow-card); /* Figma Setup step card: Card small */
 }
 .owner-step__top {
   display: flex;
+  flex-wrap: wrap; /* a long status ("Waiting for verification") moves under STEP n, never past the card */
   align-items: center;
   justify-content: space-between;
   gap: var(--pp-space-8);
-  min-height: var(--pp-space-24);
+  min-height: var(--pp-space-32); /* the status label's full height, so every title starts level */
 }
 .owner-step__number {
+  white-space: nowrap;
   color: var(--pp-role-on-surface-variant);
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
@@ -353,7 +444,62 @@ body:has(.owner-root) {
 }
 .owner-step__action {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  min-height: 40px; /* same height as the Medium step buttons, so cards stay aligned */
+  margin-top: auto; /* actions sit on the same line in every card */
+}
+/* Design review 06: secondary helper text, one step smaller than the body copy and dark orange
+ * (orange-800 on white is about 8:1). The extra class beats the generic `.owner-card p` rule. */
+.owner-step .owner-step__locked {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: var(--pp-space-8);
+  color: var(--pp-color-orange-800);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.owner-step__locked img {
+  flex: none;
+}
+
+/* S6-FE-14 success pop-up (replaces the old S11 confirmation screen) */
+.owner-dialog {
+  width: min(440px, calc(100vw - 2 * var(--pp-space-16)));
+  padding: var(--pp-space-32);
+  border: 1px solid var(--pp-role-outline-variant);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  box-shadow: var(--owner-pending-shadow-card);
+  text-align: center;
+}
+.owner-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-16);
+}
+.owner-dialog::backdrop {
+  background: rgba(28, 26, 23, 0.4); /* no scrim token yet */
+}
+.owner-dialog h2 {
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+  font-weight: var(--pp-font-weight-bold);
+}
+.owner-dialog p {
+  color: var(--pp-role-on-surface-variant);
+}
+.owner-dialog__tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-48);
+  height: var(--pp-space-48);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-success-50);
 }
 
 /* Verified vs published, and the empty state */
@@ -361,23 +507,32 @@ body:has(.owner-root) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: var(--pp-space-24);
-  align-items: start;
+  align-items: stretch; /* design feedback, 10 Nov: both cards share one height */
 }
 .owner-verify,
 .owner-empty {
   display: flex;
   flex-direction: column;
   gap: var(--pp-space-16);
-  border-color: var(--pp-color-white);
 }
 .owner-empty {
   gap: var(--pp-space-12);
 }
-.owner-verify__row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--pp-space-12);
+/* Design review 03: the badges share one column, so both descriptions start at the same x. */
+.owner-verify__rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--pp-space-16) var(--pp-space-12);
+  align-items: start;
 }
+.owner-verify__row {
+  display: contents;
+}
+.owner-verify__row .owner-status {
+  justify-self: start;
+}
+/* Figma "Icon Dashboard" (2319:11366): 48 square, radius sm (8), color/icon/accent-container
+ * (Orange/100) with the Card small shadow; the 24px icon is color/icon/accent (Orange/700). */
 .owner-empty__tile {
   display: inline-flex;
   align-items: center;
@@ -385,7 +540,8 @@ body:has(.owner-root) {
   width: var(--pp-space-48);
   height: var(--pp-space-48);
   border-radius: var(--pp-radius-8);
-  background: var(--pp-color-orange-500);
+  background: var(--pp-color-orange-100);
+  box-shadow: var(--owner-pending-shadow-card);
 }
 
 /* AI panel (empty state) */
@@ -417,7 +573,7 @@ body:has(.owner-root) {
   display: inline-flex;
   padding: var(--pp-space-8);
   border-radius: var(--pp-radius-full);
-  background: var(--pp-color-orange-500);
+  background: var(--pp-color-orange-100); /* Figma AI panel: light tile, dark-orange icon */
 }
 .owner-ai__body {
   flex: 1 1 auto;
@@ -465,9 +621,25 @@ body:has(.owner-root) {
   border-radius: var(--pp-radius-full);
   background: var(--pp-color-orange-500);
 }
-.owner-ai__input:disabled,
-.owner-ai__send:disabled {
+/* Onboarding: the composer uses the Figma disabled state (same as the Button component's Disabled:
+ * background, border and content colours), so the field, placeholder and send icon all read as off. */
+.owner-ai__input:disabled {
+  border-color: var(--pp-role-input-border-disabled);
+  background: var(--pp-role-input-bg-disabled);
+  color: var(--pp-role-input-text-disabled);
   cursor: not-allowed;
+}
+.owner-ai__input:disabled::placeholder {
+  color: var(--pp-role-input-text-disabled);
+}
+.owner-ai__send:disabled {
+  border: 1px solid var(--pp-role-input-border-disabled);
+  background: var(--pp-role-input-bg-disabled);
+  cursor: not-allowed;
+}
+.owner-ai__send:disabled img {
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 /* Responsive: the design is desktop-only (1440); Figma's responsive note is reference only.
@@ -484,6 +656,11 @@ body:has(.owner-root) {
     min-height: 0;
     border-left: 0;
     border-top: 1px solid var(--pp-role-outline-variant);
+  }
+}
+@media (max-width: 1023px) {
+  .owner-steps {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 899px) {
