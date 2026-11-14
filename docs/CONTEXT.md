@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Owner onboarding S05 (FE-05) and S06–S08 (FE-06, not Ready to review) are presentational: props in, callbacks out. Persisted setup and real publication/reporting integration remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -282,7 +282,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/supabase-auth.ts",
         "playwright.auth.config.ts",
         "tests/e2e/owner-auth-provider.spec.ts",
-        "tests/e2e/owner-auth.spec.ts"
+        "tests/e2e/owner-auth.spec.ts",
+        "frontend/console/owner-onboarding.html",
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/OnboardingLayout.tsx",
+        "frontend/console/src/onboarding/details.ts",
+        "frontend/console/src/onboarding/onboarding.css",
+        "frontend/console/src/onboarding/demo.tsx",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
+        "frontend/console/src/onboarding/AddMenuLink.tsx",
+        "frontend/console/src/onboarding/UploadMenu.tsx",
+        "frontend/console/src/onboarding/menu-source.ts",
+        "frontend/console/src/onboarding/menu-source.test.tsx",
+        "tests/e2e/owner-onboarding-screens.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -292,7 +305,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "19263226fe0d67d26729626cc2ee285636d19fdfd53638671d909f9818ca2820"
+      "sourceFingerprint": "fc98d09f18f93ebb0a28173aef0ed31768f16050662ebed96f39b12c67a9cf01"
     },
     {
       "id": "backend",
@@ -600,7 +613,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b3b8433939edde4eabf5310881269555646b7ecce60ce089bddd30a8e9b0235c"
+      "sourceFingerprint": "91080bea6ff01bda34540c3eee4388bc0514464a1c01517b4925f93140a29e82"
     },
     {
       "id": "agents",
