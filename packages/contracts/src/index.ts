@@ -1,5 +1,7 @@
 export * from './owner-ai';
 
+export * from './owner-workspace';
+
 import { z } from 'zod';
 import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
 

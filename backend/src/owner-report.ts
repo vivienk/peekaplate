@@ -65,7 +65,7 @@ const OWNER_REPORT_QUERY = `
       ON dish.tenant_id = obs.tenant_id AND dish.dish_id = obs.dish_id
     WHERE obs.tenant_id = $1
       AND obs.occurred_at >= $2
-      AND obs.occurred_at <= $3
+      AND obs.occurred_at < $3
       AND obs.dish_id IS NOT NULL
   ),
   opening_activity AS (
@@ -79,7 +79,7 @@ const OWNER_REPORT_QUERY = `
     FROM filtered_observations act
     WHERE act.event_type = 'dish_activity_checkpoint'
       AND act.occurred_at >= $2
-      AND act.occurred_at <= $3
+      AND act.occurred_at < $3
   ),
   event_order AS (
     SELECT
