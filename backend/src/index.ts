@@ -95,6 +95,11 @@ import {
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
+  buildOwnerReportExportFilename,
+  type ExportableOwnerReport,
+  serializeOwnerReportCsv,
+} from './owner-report-export';
+import {
   createPublicMenuResponse,
   menuJwks,
   type PublicMenuRecord,
@@ -151,7 +156,9 @@ export type Bindings = {
   INGESTION_REPORTS_BUCKET?: {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    delete?(key: string): Promise<unknown>;
   };
+
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
@@ -1038,6 +1045,70 @@ export function createApp(services: Dependencies = dependencies) {
     );
     return c.json(report);
   });
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes/export',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/api/v1/venues/:venueId/analytics/dishes/export', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const report = await services.readOwnerReport(
+      actorId,
+      approvedSyntheticVenue.data.venueId,
+      services.now?.() ?? new Date(),
+      env,
+      'synthetic',
+    );
+    const typedReport = report as ExportableOwnerReport;
+    const csv = serializeOwnerReportCsv(typedReport);
+    const filename = buildOwnerReportExportFilename(
+      typedReport.venue_id,
+      typedReport.report_metadata.generated_at,
+    );
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1845,6 +1916,56 @@ export const handleScheduled = async (event: any, env: any) => {
           retained: result.retained,
         }),
       );
+    }
+
+    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
+    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
+      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
+      : undefined;
+    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
+
+    const stagingStorage = env.INGESTION_REPORTS_BUCKET;
+    if (
+      stagingStorage &&
+      typeof stagingStorage.list === 'function' &&
+      typeof stagingStorage.delete === 'function' &&
+      (stagingRetentionDays !== undefined ||
+        stagingRejectedDays !== undefined ||
+        stagingOrphanDays !== undefined)
+    ) {
+      try {
+        const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
+        const stagingResult = await cleanupStagedMenuPhotos({
+          storage: stagingStorage,
+          client,
+          retentionConfig: {
+            promotedRetentionDays: stagingRetentionDays,
+            rejectedRetentionDays: stagingRejectedDays ?? 0,
+            orphanGraceDays: stagingOrphanDays ?? 0,
+          },
+          dryRun: stagingDryRun,
+        });
+        if (
+          stagingResult.promotedDeleted > 0 ||
+          stagingResult.rejectedDeleted > 0 ||
+          stagingResult.orphansDeleted > 0
+        ) {
+          console.log(
+            JSON.stringify({
+              event: 'menu_staging_cleanup',
+              ...stagingResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
+      }
     }
   } catch {
     console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
