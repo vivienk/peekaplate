@@ -781,8 +781,7 @@ main:has(> .pp-detail) {
 .pp-ingredient__icon {
   width: 36px;
   height: 36px;
-  background: #2d3038;
-  border-radius: 8px;
+  object-fit: contain;
 }
 
 .pp-ingredient__name {

@@ -25,6 +25,7 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
 import { menuRouteFromPath } from './route';
@@ -577,9 +578,20 @@ export function mountMenuScreen(container: HTMLElement): void {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
     }
     const state = saveState;
-    leaveScreen = attachSave(() =>
+    const stopArtwork =
+      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL
+        ? mountLiveArtwork(container, dish, {
+            apiBase: import.meta.env.VITE_PUBLIC_API_URL,
+            venueId: menu.venueId,
+          })
+        : () => {};
+    const stopSave = attachSave(() =>
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
+    leaveScreen = () => {
+      stopArtwork();
+      stopSave();
+    };
     window.scrollTo(0, 0);
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.

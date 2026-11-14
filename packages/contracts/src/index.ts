@@ -1432,6 +1432,7 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
+export * from './ingredient-artwork';
 export {
   type IngredientAssessment,
   IngredientAssessmentSchema,
