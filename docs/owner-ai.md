@@ -1,5 +1,21 @@
 # AI-01 safe recommendation core
 
+## November 13 merge boundary
+
+PR 112 is a mergeable internal validation/adapter foundation, following the
+report reader in PR 128 and synthetic result view in PR 124. Earlier dated
+Draft checkpoints below are historical. AI-01 remains In Progress: no endpoint
+issues trusted report/evidence identities, verifies current membership or supplies
+authoritative freshness to this adapter yet. Public reports deliberately omit
+internal cohorts and must not be reconstructed into trusted AI inputs.
+
+The current combination passes 1,559 unit tests, 79 script tests, the frozen
+21-case offline evaluation, 310 SQL assertions and 138 local database/Worker
+cases (26.95 seconds). The ten preview/drawer/report browser cases passed on
+the identical UI sources in PR 124 (15.1 seconds). Builds use Worker dry-run.
+These checks do not execute a paid model, establish hosted producer provenance
+or approve production policy. The opt-in Luna probe remains disabled by default.
+
 Status: local foundation for S3-AI-01, with a separate GPT-6 Luna API access check. The owner recommendation path uses deterministic rules.
 
 ## Boundary
@@ -201,6 +217,12 @@ against the selected report. It does not generate IDs, derive a report version
 from a timestamp or require new producer database columns. Production identity
 issuance and how one report version binds a selected dish are still a shared
 producer/caller integration decision; the tests inject labelled synthetic IDs.
+
+PR #167 changes the report producer SQL to exclude the end (`occurred_at < end_time`).
+The AI path consumes the producer's preaggregated
+metrics and carries the producer's exact start and end strings through the
+request, each evidence item, and the result. The mock SQL seam checks that
+handoff. #167's PostgreSQL tests cover events and checkpoints at the endpoint.
 
 | Internal evidence | Existing core evidence |
 | --- | --- |

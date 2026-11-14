@@ -44,6 +44,27 @@ existing tests. Those are historical results on the earlier branch. The current
 independent run adds the 11-session case and uses the verification scopes above.
 Full repository/CI results are recorded on the final PR commit.
 
+## November 13 retarget verification
+
+PR 112 is merged. PR 144 now targets `develop` and has been reconciled with
+`fb7ec54`, preserving the report reader, typed AI preview, internal report
+validator, reporting/CSV updates and the shared append-only error history.
+The fixture payloads, assertions and discovery/typecheck additions are unchanged
+from the previously reviewed `cedc960` preparation slice.
+
+| Fresh local check | Result |
+| --- | --- |
+| `pnpm exec vitest run tests/data06` | PASS: 14 tests, 0.311s |
+| `pnpm exec vitest run --config vitest.data06.config.ts` | PASS: 14 tests, 0.304s |
+| `pnpm exec tsc -p tests/data06/tsconfig.json --noEmit` | PASS |
+| `pnpm check` | PASS: 1,573 unit tests, four existing optional skips, 79 script tests; types/lint/context/docs pass, unit phase 8.72s |
+| `pnpm verify build` | PASS: both frontend builds and Worker dry-run; no deployment |
+
+No fresh local database/browser suite was run for this retarget: application,
+SQL and UI sources match the merged base. The earlier selected Worker/database
+journey remains historical supporting evidence for the existing owner report,
+not evidence of a DATA-06 producer. Exact-head repository CI is checked separately.
+
 ## Run these checks
 
 ```sh
@@ -66,11 +87,12 @@ database harness. It did not run the complete database suite.
 
 ## Merge order
 
-1. Review and merge **#112** into `develop` first; it remains a separate draft implementation PR.
-2. Retarget **#144** from `feat/ai01-report-input-validation` to `develop`, reconcile the then-current base and rerun checks before merging.
+1. **#112 is merged** into `develop`.
+2. **#144 now targets develop**; conflicts are reconciled and local checks pass.
+3. Obtain final-commit approval and green CI, then merge the fixture-preparation slice.
 
 This review approves preparation of the fixtures and checks. It does not approve
-#112's implementation or close DATA-06's application acceptance.
+live AI behavior or close DATA-06's application acceptance.
 
 ## What still needs evidence
 
