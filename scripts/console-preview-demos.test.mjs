@@ -9,9 +9,13 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
+  {
+    page: 'first-dashboard.html',
+    asset: /firstDashboard/,
+    label: /Synthetic demo/,
+  },
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
   { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
-  { page: 'first-dashboard.html', asset: /firstDashboard/, label: /Synthetic demo/ },
 ];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
@@ -64,19 +68,9 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
     assert.match(html, /<meta name="robots" content="noindex"/);
     const scripts = (await pageScripts(dir, demo.page)).join('\n');
     assert.match(scripts, demo.label);
+    if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
     assert.doesNotMatch(scripts, /posthog/i);
   }
-});
-
-test('a preview build adds the first dashboard demo, labelled synthetic, noindex and without analytics', async (t) => {
-  const dir = await build(t, true);
-  assert.ok((await readdir(dir)).includes('first-dashboard.html'));
-  const html = await readFile(join(dir, 'first-dashboard.html'), 'utf8');
-  assert.match(html, /<meta name="robots" content="noindex"/);
-  const scripts = (await pageScripts(dir, 'first-dashboard.html')).join('\n');
-  assert.match(scripts, /Synthetic demo/);
-  assert.match(scripts, /Illustrative sample data/);
-  assert.doesNotMatch(scripts, /posthog/i);
 });
 
 test('only the preview workflow turns the demo flag on', async () => {
