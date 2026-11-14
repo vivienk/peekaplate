@@ -3,8 +3,10 @@
 This is the backend handoff for [FE-06, S06–S09](https://app.clickup.com/t/90141746115/86bcthzjc).
 Ehab owns its screen integration; Nifemi/Harshita retain their assigned UI work.
 Jeffin's #105 Add/Edit reference and #125/#139 shell do not establish live persistence.
-Auth #143 → #146 remains a separate, unmerged connection. A signed-in user still
-needs an owner/editor membership for the requested restaurant.
+Auth #143 → #146 is merged. The [session bridge](owner-session-workspace.md)
+discovers the signed-in user's owner/editor restaurants; #156 must use its
+actor-bound token getter when the menu client is connected. Every later request
+still requires current restaurant membership.
 
 ## Storage and authority
 

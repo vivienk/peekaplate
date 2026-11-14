@@ -3499,3 +3499,15 @@ publication/event/receipt/outbox write and a successful identical retry: all
 140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
 push/PR creation because the operator email was unverified; after verification,
 the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```

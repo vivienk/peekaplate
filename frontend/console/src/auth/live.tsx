@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
+import { OwnerWorkspace } from '../owner/OwnerWorkspace';
+import { readWorkspaceApiBase } from '../owner/workspace-api';
 import { readConfirmationCode } from './callback';
 import { OwnerAuth } from './OwnerAuth';
 import {
@@ -21,6 +23,7 @@ if (window.location.search || window.location.hash)
   window.history.replaceState(null, '', window.location.pathname);
 const config = readOwnerAuthConfig(import.meta.env, window.location.origin);
 const runtime = config ? connectOwnerAuth(config) : null;
+const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
 
 function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
@@ -31,6 +34,38 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(!isCallback);
+  const identityGeneration = useRef(0);
+  const refreshOwner = useCallback(async () => {
+    const generation = ++identityGeneration.current;
+    setOwner(null);
+    setLoading(true);
+    try {
+      const current = await auth.signedInOwner();
+      if (generation === identityGeneration.current) {
+        setOwner(current);
+        if (current) setMessage('');
+      }
+    } catch {
+      if (generation === identityGeneration.current) setOwner(null);
+    } finally {
+      if (generation === identityGeneration.current) setLoading(false);
+    }
+  }, [auth]);
+  const sessionExpired = useCallback(() => {
+    identityGeneration.current++;
+    setOwner(null);
+    setLoading(false);
+    setMessage('Your session could not be verified. Please sign in again.');
+  }, []);
+  const signOut = useCallback(async () => {
+    setBusy(true);
+    if (await auth.signOut()) {
+      identityGeneration.current++;
+      setOwner(null);
+      setLoading(false);
+    } else setMessage('Sign-out could not be confirmed. Try again.');
+    setBusy(false);
+  }, [auth]);
 
   useEffect(() => {
     function rejectChangedCallback() {
@@ -47,33 +82,21 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = auth.onSignedOut(() => setOwner(null));
-    if (isCallback) return unsubscribe;
-    let active = true;
-    void auth
-      .signedInOwner()
-      .then((current) => {
-        if (active) {
-          setOwner(current);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
+    const restore = !isCallback || callbackState === 'none';
+    const unsubscribe = auth.onSessionChange(() => {
+      identityGeneration.current++;
+      setOwner(null);
+      if (restore) void refreshOwner();
+    });
+    if (restore) void refreshOwner();
     return () => {
-      active = false;
+      identityGeneration.current++;
       unsubscribe();
     };
-  }, [auth]);
+  }, [auth, callbackState, refreshOwner]);
 
   async function signedIn() {
-    const current = await auth.signedInOwner();
-    if (!current) {
-      await auth.signOut();
-      setMessage('Your session could not be verified. Please sign in again.');
-    }
-    setOwner(current);
+    await refreshOwner();
     setCallbackState('none');
   }
 
@@ -150,27 +173,20 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
 
   if (owner)
     return (
-      <main>
-        <h1>You’re signed in</h1>
-        <p>{owner.email}</p>
-        <p>
-          Restaurant setup and dashboard navigation are being connected. This page grants no
-          restaurant access.
-        </p>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            if (await auth.signOut()) setOwner(null);
-            else setMessage('Sign-out could not be confirmed. Try again.');
-            setBusy(false);
+      <>
+        <OwnerWorkspace
+          key={owner.id}
+          auth={auth}
+          owner={owner}
+          apiBase={apiBase}
+          onSessionExpired={sessionExpired}
+          onSignOut={() => {
+            void signOut();
           }}
-        >
-          Sign out
-        </button>
+          signingOut={busy}
+        />
         {message && <p role="alert">{message}</p>}
-      </main>
+      </>
     );
 
   return (
