@@ -15,6 +15,14 @@ export interface PublishSuccessDialogProps {
 export function PublishSuccessDialog({ restaurantName, onClose }: PublishSuccessDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
 
+  const returnToDashboard = () => {
+    const dialog = ref.current;
+    dialog?.close();
+    onClose();
+    // Publication removes the opener; return focus to the stable dashboard instead.
+    dialog?.ownerDocument.getElementById('owner-content')?.focus();
+  };
+
   useEffect(() => {
     const dialog = ref.current;
     // showModal() traps focus and makes the page behind inert; jsdom and old browsers lack it.
@@ -33,7 +41,7 @@ export function PublishSuccessDialog({ restaurantName, onClose }: PublishSuccess
       onCancel={(event) => {
         // Escape closes the pop-up the same way as the button.
         event.preventDefault();
-        onClose();
+        returnToDashboard();
       }}
     >
       <span className="owner-dialog__tile">
@@ -44,7 +52,7 @@ export function PublishSuccessDialog({ restaurantName, onClose }: PublishSuccess
         Diners can now see the {restaurantName} menu on PeekaPlate. Your dashboard pages are open,
         and reports appear once diners start using the menu.
       </p>
-      <Button variant="action" className="owner-button" autoFocus onClick={onClose}>
+      <Button variant="action" className="owner-button" autoFocus onClick={returnToDashboard}>
         Go to dashboard
       </Button>
     </dialog>
