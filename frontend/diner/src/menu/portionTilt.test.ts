@@ -78,3 +78,16 @@ it('uses immediate keyboard/reset updates, responds to reduced motion and respec
   expect(s.apply).not.toHaveBeenCalled();
   s.controller.dispose();
 });
+
+it('stops in-flight easing when a touch gesture is cancelled', () => {
+  const s = setup();
+  s.pointer('pointerdown', 100);
+  s.pointer('pointermove', 180);
+  vi.advanceTimersByTime(32);
+  expect(s.apply).toHaveBeenCalled();
+  s.pointer('pointercancel', 180);
+  s.apply.mockClear();
+  vi.advanceTimersByTime(500);
+  expect(s.apply).not.toHaveBeenCalled();
+  s.controller.dispose();
+});

@@ -1483,6 +1483,8 @@ main:has(> .pp-detail) {
   outline-offset: -4px;
 }
 .pp-ar__tilt-hint {
+  width: 100%;
+  max-width: none;
   position: absolute;
   bottom: 68px;
   left: 0;
@@ -1494,5 +1496,7 @@ main:has(> .pp-detail) {
   font-size: 13px;
 }
 .pp-ar--original .pp-ar__tilt-hint {
+  width: 100%;
+  max-width: none;
   visibility: hidden;
 }
