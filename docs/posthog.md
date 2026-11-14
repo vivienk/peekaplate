@@ -137,3 +137,8 @@ Once real dish callers exist, exploratory counts of `dish_open` and `portion_com
 A production owner dashboard still requires server-verified venue access, validated evidence, agreed metric denominators and minimum-ten-eligible-session suppression from [ADR 0006](adr/0006-orders-and-measurement.md). No owner report/query endpoint or dashboard is claimed here. Ingredient rates, saves, order linkage, revenue and causal lift cannot be calculated from this slice.
 
 References: [PostHog capture API](https://posthog.com/docs/api/capture), [anonymous events](https://posthog.com/docs/data/anonymous-vs-identified-events), [IP storage controls](https://posthog.com/docs/privacy/data-storage).
+
+
+## Consent-listener ordering
+
+The shared dispatch synchronizes the adapter from the current consent gate immediately before capture. A screen may emit its initial menu view from an earlier-registered consent listener; that event must reach both destinations. The real-adapter unit regression checks initial consent and re-consent with matching event IDs, and the SDK browser test uses the same screen-before-adapter order. Privacy signals, fixture mode and publication suspension keep their existing gates. Hosted destination persistence remains a separate acceptance check.

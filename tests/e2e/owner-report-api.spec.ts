@@ -99,3 +99,73 @@ test('without the API settings the page shows the labelled saved copy', async ({
   await expect(page.getByText('Saved copy of a report')).toBeVisible();
   await expect(page.getByRole('table')).toBeVisible();
 });
+
+test('report source changes clear old values and ignore delayed answers', async ({ page }) => {
+  const otherVenue = '00000000-0000-4000-8000-000000000456';
+  const pending = Promise.withResolvers<void>();
+  await page.route('**/src/owner-dashboard/main.tsx*', async (route) => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const react = original.match(/from "([^"]*\/react\.js[^"]*)"/)?.[1];
+    const dom = original.match(/from "([^"]*\/react-dom_client\.js[^"]*)"/)?.[1];
+    if (!react || !dom) throw new Error('React test harness imports did not resolve');
+    await route.fulfill({
+      response,
+      body: `
+      import React from ${JSON.stringify(react)};
+      import ReactDOM from ${JSON.stringify(dom)};
+      import { ReportData } from '/src/owner-dashboard/report-data.tsx';
+      const { createElement: h, useState, useLayoutEffect } = React;
+      const { createRoot } = ReactDOM;
+      const token = async () => 'test-owner-token';
+      window.reportSnapshots = [];
+      function Harness() {
+        const [mode, setMode] = useState('a');
+        useLayoutEffect(() => { window.reportSnapshots.push({ mode, text: document.body.textContent }); }, [mode]);
+        const source = mode === 'saved' ? { mode: 'saved' } : {
+          mode: 'live', apiBase: ${JSON.stringify(API)},
+          venueId: mode === 'a' ? ${JSON.stringify(VENUE)} : ${JSON.stringify(otherVenue)}, getAccessToken: token
+        };
+        return h('div', null,
+          h('button', { onClick: () => setMode('saved') }, 'Use saved copy'),
+          h('button', { onClick: () => setMode('b') }, 'Use other venue'),
+          h(ReportData, { source }));
+      }
+      createRoot(document.getElementById('root')).render(h(Harness));
+    `,
+    });
+  });
+  await page.route(`${API}/**`, async (route) => {
+    const other = route.request().url().includes(otherVenue);
+    if (other) await pending.promise;
+    const report = structuredClone(REPORT);
+    report.venue_id = other ? otherVenue : VENUE;
+    report.dishes[0].name = other ? 'Delayed other venue' : 'API-only bowl';
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(report) });
+  });
+  try {
+    await page.goto(demo);
+    await expect(page.getByRole('table')).toContainText('API-only bowl');
+    await page.getByRole('button', { name: 'Use saved copy', exact: true }).click();
+    await expect(page.getByRole('table')).not.toContainText('API-only bowl');
+    await expect(page.getByText('Saved copy of a report')).toBeVisible();
+    await page.getByRole('button', { name: 'Use other venue', exact: true }).click();
+    await expect(page.getByRole('table')).toHaveCount(0);
+    await expect(page.getByRole('status')).toContainText('Loading report');
+    const snapshots = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            reportSnapshots: { mode: string; text: string }[];
+          }
+        ).reportSnapshots,
+    );
+    expect(snapshots.findLast((entry) => entry.mode === 'b')?.text).not.toContain('Bowl');
+    await page.getByRole('button', { name: 'Use saved copy', exact: true }).click();
+    pending.resolve();
+    await expect(page.getByText('Saved copy of a report')).toBeVisible();
+    await expect(page.getByRole('table')).not.toContainText('Delayed other venue');
+  } finally {
+    pending.resolve();
+  }
+});

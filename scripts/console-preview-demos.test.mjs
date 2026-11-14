@@ -9,8 +9,13 @@ import { fileURLToPath } from 'node:url';
 // The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
 // staging or production. Agreed with Sai and Jeffin.
 const DEMOS = [
+  {
+    page: 'first-dashboard.html',
+    asset: /firstDashboard/,
+    label: /Synthetic demo/,
+  },
   { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
-  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Illustrative sample data/ },
+  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
 ];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
@@ -63,6 +68,7 @@ test('a preview build adds the demo pages, labelled synthetic, noindex and witho
     assert.match(html, /<meta name="robots" content="noindex"/);
     const scripts = (await pageScripts(dir, demo.page)).join('\n');
     assert.match(scripts, demo.label);
+    if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
     assert.doesNotMatch(scripts, /posthog/i);
   }
 });

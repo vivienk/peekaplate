@@ -2767,3 +2767,195 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 ```
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:18:39.671Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:20:13.453Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:21:52.245Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:22:37.515Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:29:39.568Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:33:09.330Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:36:07.834Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:37:27.047Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T07:38:29.044Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T07:43:38.201Z","exitCode":1}
+```
+
+## Owner menu workspace — November 12, 2026
+
+Local validation exposed and corrected: UUID/text parameter inference in the manual-draft INSERT; a row-lock attempt on immutable metadata without UPDATE privilege (replaced with a scoped advisory lock); stale automatic incomplete-job retries (now explicit); and a legacy text edit that could discard approved facts (now preserved, with a manual-origin fallback denied). Regressions exercise real PostgreSQL state, ownership, receipts, cancellation fences and snapshot preservation.
+
+Test setup corrections: use the installed PDF loading task cleanup API, a real loopback document for Chromium network-origin checks, and pgTAP's schema-qualified overloads with its extension enabled in each transactional script. Browser JavaScript cannot read an unexposed CORS response header; the browser's successful cross-origin request and independent preflight/header assertions establish the boundary instead. An RTK shorthand routed a root script incorrectly; recorded checks use explicit proxy invocation and process exit status. No credentials, real menu data or hosted mutation were involved in these failures.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-12T08:00:17.419Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T08:24:41.362Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-12T08:37:09.613Z","exitCode":1}
+```
+
+## Owner menu staging acceptance — November 12, 2026
+
+Independent review found approval could use a historical extraction after a retry, and bootstrap could register against a changed job. A real database regression reproduced incorrect approval before the fix; current report/session pointers, job-first locks and registration-time revalidation now reject both cases. All 130 integration cases pass. A CI tracking test also armed delivery after its fixed fake-time advance; bounded clock polling preserves the assertion and passed five repeated browser runs.
+
+Hosted migration and seven HTTP/CORS checks passed. Hosted staff checks did not execute: the dedicated account's email magic-link verification returned otp_expired, including a fresh dashboard-generated link. The account/password were preserved and its temporary synthetic permission restored to viewer. A rollback-only SQL probe stopped before writes because the dashboard role cannot SET ROLE peekaplate_runtime; no privilege expansion was made. Do not report those attempts as authenticated API or runtime-role acceptance. Shell helpers use files to avoid nested PowerShell variable expansion, and merge gates use the exact SHA returned by GitHub.
+
+## Owner menu authenticated acceptance resolved — November 12, 2026
+
+The earlier otp_expired verifier blocker was resolved by selecting the newest Gmail delivery explicitly. Gmail had cached/grouped repeated messages and hidden the fresh link under Show trimmed content; the refreshed newest message had zero visible sign-in links before expansion and one afterward. That complete link, verified once with its original type, returned a genuine session. No Auth settings, template, account or password change was needed.
+
+Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
+
+
+## Owner CSV valid-zero correction — November 12, 2026
+
+The PR131 serializer treated every non-NORMAL status as unavailable, so valid zero rates were blanked. Five visible-zero regressions failed with the expected numeric cell missing before the fix; explicit NORMAL/VALID_ZERO visibility now preserves zero while SUPPRESSED, NOT_MEASURABLE and MISSING stay blank. Existing signed-identity, source/venue and CORS cases are parameterized over the JSON and CSV routes, including attachment headers and membership-error responses. This is a local correction and does not certify hosted CSV or spreadsheet behavior.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T16:44:35.153Z","exitCode":2}
+```
+
+The first full check also caught strict indexed-access typing in the added test fixtures; the fixture assertions were corrected, and the complete type/unit/script/context/docs checks pass afterward.
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T23:13:45.676Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:15:08.763Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:18:21.084Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-12T23:22:28.818Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:24:43.503Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-12T23:48:17.584Z","exitCode":1}
+```
+
+## Menu verification lifecycle and retention resolution — November 13, 2026
+
+Independent review reproduced three failures on disposable PostgreSQL using the
+restricted runtime role: retention without tenant context misclassified pending
+originals, stale draft versions were accepted for verification, and approval
+receipt replay returned a storage deletion action. Corrected with scoped locked
+retention, expected content versions and effect-free approval retries. Photo
+event sequencing and extracted-draft verification now use independent contiguous
+streams; content edits/retries invalidate verification without mutating published
+projections. Regression evidence: `backend/src/owner-menu.integration.ts` and
+`backend/src/owner-menu-retention.test.ts`. Earlier counts below are historical;
+current verification is recorded in PR #161. Hosted migration/deployment remains
+NOT RUN for this change.
+
+Transient observations during Phase 3 verification:
+- `lint` (exit 1): CommonJS require syntax in initial test file. Resolved by standardizing ESM imports and running `biome check --write .`.
+- `typecheck` (exit 2): R2 storage bucket type missing optional `delete` member in `backend/src/index.ts`, `verification_status` missing on `DishDraftRow`, and console package missing local contracts export references. Resolved with typed storage interface, updated `DishDraftRow` type in `backend/src/ingestion/repository.ts`, and local contract type mirroring in `frontend/console/src/owner-dashboard/menu-api.ts`.
+- `test` (exit 1): `cleanupStagedMenuPhotos` early-exit guard incorrectly treated `promotedRetentionDays: 0` as disabled. Resolved in `backend/src/owner-menu-retention.ts` by checking `promotedRetentionDays !== undefined`. Regression verified with `backend/src/owner-menu-retention.test.ts` and `backend/src/owner-menu.integration.ts`. Full test suite (86 test files, 1,417 tests) and all repository checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
+```
+
+## DATA-12 review corrections — November 13, 2026
+
+```json
+{"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:04:12.523Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T05:06:18.153Z","exitCode":1}
+```
+
+## Report source correction — November 13, 2026
+
+```json
+{"id":"ERR-20261113-REPORT-SOURCE","status":"resolved","area":"console-report-source","cause":"Hook state survived source changes, leaving fetched values labelled as the saved synthetic sample.","prevention":"Reset request identity during render; select the saved report explicitly and reject late responses after cleanup.","sources":["frontend/console/src/owner-dashboard/report-data.tsx","tests/e2e/owner-report-api.spec.ts"],"regression":"Chromium live-to-saved assertion failed before correction; all five report browser cases pass afterward (11.9s). The harness initially used named imports for Vite CommonJS interop; corrected to actual default exports before reproducing the defect.","limit":"Intercepted browser requests use a stand-in token; hosted auth and provenance remain separate."}
+```

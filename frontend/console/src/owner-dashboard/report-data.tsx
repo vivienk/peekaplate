@@ -47,6 +47,12 @@ const COLUMNS: [keyof OwnerDishReport['dishes'][number]['metrics'], string, Kind
   ['engagement_rate', 'Engagement', 'rate'],
 ];
 
+// null means the reader abstains on freshness, so it must not read as "up to date".
+function freshnessLabel(isStale: boolean | null) {
+  if (isStale === null) return 'freshness not known';
+  return isStale ? 'out of date' : 'up to date';
+}
+
 const fmt = (iso: string) =>
   new Date(iso).toLocaleString('en-US', {
     month: 'short',
@@ -98,6 +104,16 @@ function useOwnerReport(source: ReportSource): { state: ReportState; retry: () =
   const apiBase = live?.apiBase;
   const venueId = live?.venueId;
   const getAccessToken = live?.getAccessToken;
+  const [identity, setIdentity] = useState({ apiBase, venueId, getAccessToken });
+  if (
+    identity.apiBase !== apiBase ||
+    identity.venueId !== venueId ||
+    identity.getAccessToken !== getAccessToken
+  ) {
+    // Reset during render so the previous source's values cannot reach the next commit.
+    setIdentity({ apiBase, venueId, getAccessToken });
+    setState({ kind: 'loading' });
+  }
   useEffect(() => {
     if (!apiBase || !venueId || !getAccessToken) return;
     // attempt is read so Retry runs this again.
@@ -120,7 +136,10 @@ function useOwnerReport(source: ReportSource): { state: ReportState; retry: () =
     })();
     return () => controller.abort();
   }, [apiBase, venueId, getAccessToken, attempt]);
-  return { state, retry: () => setAttempt((n) => n + 1) };
+  return {
+    state: source.mode === 'saved' ? { kind: 'ready', report: SAVED_REPORT } : state,
+    retry: () => setAttempt((n) => n + 1),
+  };
 }
 
 // Proposed wording for the page states; Adam, Shirley and Rania to confirm.
@@ -205,8 +224,7 @@ function ReportTable({ report: r, saved }: { report: OwnerDishReport; saved: boo
             <span className="sub">
               {m.coverage.measurable_dishes_count} of {m.coverage.total_dishes_monitored} dishes
               measurable · report {m.report_status.toLowerCase()} ·{' '}
-              {m.freshness.is_stale ? 'out of date' : 'up to date'} · {r.schema_version} ·{' '}
-              {m.calculation_version}
+              {freshnessLabel(m.freshness.is_stale)} · {r.schema_version} · {m.calculation_version}
             </span>
           </div>
         </div>

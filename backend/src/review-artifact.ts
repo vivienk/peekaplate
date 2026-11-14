@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
-import type { UpsertExtractionReviewSessionRequest } from '@peekaplate/contracts';
+import {
+  PrivateArtifactRefSchema,
+  ReviewCandidateResultSchema,
+  type UpsertExtractionReviewSessionRequest,
+} from '@peekaplate/contracts';
 import { canonicalStringify, ReviewCommandError } from './review-command';
 
 /** Same ceiling the extraction host applies when it stores the attempt bundle. */
@@ -85,6 +89,96 @@ const withoutBoxLinks = (metadata: unknown) => {
   const { candidate_box_evidence: _links, ...rest } = metadata;
   return rest;
 };
+
+/** Same public candidate projection as the Python exporter; the verifier below binds originals. */
+export function reviewInputFromReport(
+  report: unknown,
+  jobId: string,
+  commandId: string,
+): UpsertExtractionReviewSessionRequest {
+  try {
+    if (
+      !isRecord(report) ||
+      !isRecord(report.source) ||
+      !isRecord(report.configuration) ||
+      !Array.isArray(report.drafts) ||
+      !Array.isArray(report.evidence) ||
+      !Array.isArray(report.segments)
+    )
+      throw mismatch();
+    const evidence = report.evidence as Record<string, unknown>[];
+    const links = exporterBoxLinks(report.segments, evidence);
+    const source = report.source;
+    const pythonStartedAt = String(report.started_at).replace(
+      /(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/,
+      (_match, fraction: string | undefined, zone: string) =>
+        `${fraction && Number(fraction) !== 0 ? `.${fraction.padEnd(6, '0')}` : ''}${zone === 'Z' ? '+00:00' : zone}`,
+    );
+    const identity = `${source.source_id}:${pythonStartedAt}:${report.pipeline_version}`;
+    const fields = [
+      'description',
+      'category',
+      'price_amount',
+      'price_currency',
+      'ingredients',
+    ] as const;
+    const result = ReviewCandidateResultSchema.parse({
+      schema_version: report.schema_version,
+      extraction_id: `extraction:${createHash('sha256').update(identity).digest('hex').slice(0, 32)}`,
+      pipeline_version: report.pipeline_version,
+      status: report.status,
+      started_at: report.started_at,
+      finished_at: report.finished_at,
+      extraction_model: report.extraction_model,
+      source: {
+        source_id: source.source_id,
+        sha256: source.sha256,
+        kind: source.kind,
+        location: source.location,
+        retrieved_at: source.retrieved_at,
+        size_bytes: source.size_bytes,
+      },
+      segments: report.segments.map((segment) => {
+        if (!isRecord(segment)) throw mismatch();
+        const mapping = links.get(String(segment.segment_id));
+        return {
+          ...segment,
+          metadata: {
+            ...(isRecord(segment.metadata) ? segment.metadata : {}),
+            ...(mapping ? { candidate_box_evidence: mapping } : {}),
+          },
+        };
+      }),
+      candidates: report.drafts.map((draft, index) => {
+        if (!isRecord(draft)) throw mismatch();
+        const record = evidence.find((item) => item.draft_index === index);
+        if (!record) throw mismatch();
+        return {
+          candidate_id: record.draft_id,
+          original: draft,
+          evidence: record.spans,
+          missing_fields: fields.filter(
+            (field) =>
+              draft[field] === null && !(field === 'price_amount' && draft.price_text != null),
+          ),
+        };
+      }),
+      warnings: report.warnings,
+      errors: report.errors,
+    });
+    return {
+      commandId,
+      jobId,
+      privateArtifactRef: PrivateArtifactRefSchema.parse(
+        report.configuration.private_review_artifact,
+      ),
+      extractionResult: result,
+    };
+  } catch (error) {
+    if (error instanceof ReviewCommandError) throw error;
+    throw mismatch();
+  }
+}
 
 /**
  * Binds a review session's immutable originals to the producer's stored attempt bundle.

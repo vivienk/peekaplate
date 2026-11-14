@@ -27,7 +27,7 @@ import {
   Welcome,
 } from './pages';
 import { ReportData } from './report-data';
-import { Btn, Icon, type IconName } from './ui';
+import { Btn, Icon, type IconName, TodayChip } from './ui';
 
 function Controls({
   sim,
@@ -88,14 +88,15 @@ function Controls({
   );
 }
 
+// Restaurant Setup sits last, as in the owner shell (#139; design feedback, 10 Nov).
 const NAV: [Page, string, IconName][] = [
-  ['welcome', 'Restaurant Setup', 'store'],
   ['overview', 'Overview', 'home'],
   ['report', 'AI Insight Report', 'report'],
   ['perf', 'Dish performance', 'chart'],
   ['data', 'Report data', 'report'],
   ['menu', 'Menu', 'menu'],
   ['actions', 'Actions', 'action'],
+  ['welcome', 'Restaurant Setup', 'store'],
 ];
 
 const wideNow = () => window.matchMedia('(min-width:901px)').matches;
@@ -352,8 +353,7 @@ export function App() {
       <div className="main">
         <div className="topbar">
           <div className="l">
-            <span className="chip sample">Illustrative sample data</span>
-            <span className="chip">{REST.period}</span>
+            <TodayChip className="chip" />
           </div>
           <Btn
             kind="primary"
