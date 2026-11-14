@@ -2898,3 +2898,19 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - 2026-11-14 dining tests initially ran during Vite dependency optimization/HMR and observed a page reload; rerun after stabilization. Scoped order-result assertions to their status element because analytics has a separate live region. Strict typecheck required typing the test response JSON. No physical XR or database acceptance implied.
 
 - 2026-11-14 discovery context exceeded the backend summary bound; condensed module responsibilities and kept activation details in quest-dining.md. Seven browser checks passed after dependency stabilization and scoped selectors.
+
+- 2026-11-14 order self-review added the publication availability version to catalog/request validation: an unchanged publication UUID must not allow a stale availability snapshot to admit new requests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T09:43:37.687Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T10:58:22.452Z","exitCode":1}
+```
+
+### 2026-11-14 — Dining-only AR gate and local verification
+- Independent correctness review found that VITE_DINING_ENABLED-only builds passed manifest selection but were excluded by the AR binding gate. Allow diningPortion independently for AR and orientation; add a browser regression with reviewed synthetic assets.
+- Full-suite and Chromium sandbox runs hit localhost EPERM / MachPort permission errors and worker timeouts. Repeat with local-process permission and bounded unit workers; do not report the sandbox run as passing.

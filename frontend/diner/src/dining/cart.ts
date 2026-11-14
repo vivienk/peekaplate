@@ -34,6 +34,7 @@ export function createDiningCart() {
       pending ??= {
         commandId: crypto.randomUUID(),
         publicationId: menu.publicationId,
+        availabilityVersion: menu.availabilityVersion,
         fulfillment: 'pickup',
         lines: [...quantities].map(([id, quantity]) => ({
           dishId: id,

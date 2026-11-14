@@ -16,6 +16,7 @@ const menu: DiningMenu = {
   venueId: id(1),
   menuId: id(2),
   publicationId: id(3),
+  availabilityVersion: 1,
   currency: 'USD',
   acceptingOrders: true,
   items: [
@@ -32,6 +33,7 @@ const menu: DiningMenu = {
 const input = {
   commandId: id(6),
   publicationId: id(3),
+  availabilityVersion: 1,
   fulfillment: 'pickup' as const,
   lines: [{ dishId: id(4), revisionId: id(5), quantity: 2 }],
 };
@@ -43,7 +45,15 @@ function database(fail = false) {
       statements.push(sql);
       if (sql.startsWith('SELECT venue_id')) return { rows: [{ venue_id: id(1), menu_id: id(2) }] };
       if (sql.includes('SELECT catalog.menu'))
-        return { rows: [{ menu, publication_id: menu.publicationId }] };
+        return {
+          rows: [
+            {
+              menu,
+              publication_id: menu.publicationId,
+              availability_version: menu.availabilityVersion,
+            },
+          ],
+        };
       if (sql.includes('SELECT request_hash')) return { rows: receipt ? [receipt] : [] };
       if (sql.includes('INSERT INTO app_private.es_command'))
         receipt = { request_hash: args[4] as string, result: JSON.parse(args[5] as string) };
@@ -61,6 +71,7 @@ describe('order authority and transaction', () => {
       OrderRequestSchema.safeParse({ ...input, lines: [input.lines[0], input.lines[0]] }).success,
     ).toBe(false);
     expect(() => priceOrder(menu, { ...input, publicationId: id(8) })).toThrow('menu_changed');
+    expect(() => priceOrder(menu, { ...input, availabilityVersion: 2 })).toThrow('menu_changed');
     expect(() => priceOrder({ ...menu, acceptingOrders: false }, input)).toThrow(
       'orders_unavailable',
     );
@@ -152,7 +163,12 @@ it('replays only a valid v1 submitted order without effects', () => {
     version: 1,
     schemaVersion: 1,
     eventType: 'order.submitted',
-    payload: { ...receipt, publicationId: id(3), lines: priceOrder(menu, input) },
+    payload: {
+      ...receipt,
+      publicationId: id(3),
+      availabilityVersion: 1,
+      lines: priceOrder(menu, input),
+    },
   };
   expect(replayDiningOrder([event])?.receipt).toEqual(receipt);
   expect(() => replayDiningOrder([{ ...event, version: 2 }])).toThrow();

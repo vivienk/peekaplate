@@ -23,7 +23,11 @@ export class DiningError extends Error {
 }
 export function priceOrder(menu: DiningMenu, input: OrderRequest) {
   if (!menu.acceptingOrders) throw new DiningError('orders_unavailable', 503);
-  if (menu.publicationId !== input.publicationId) throw new DiningError('menu_changed', 409);
+  if (
+    menu.publicationId !== input.publicationId ||
+    menu.availabilityVersion !== input.availabilityVersion
+  )
+    throw new DiningError('menu_changed', 409);
   return input.lines.map((line) => {
     const dish = menu.items.find(
       (item) => item.id === line.dishId && item.revisionId === line.revisionId,
@@ -48,8 +52,12 @@ async function readMenuInTransaction(
   venueId: string,
   menuId: string,
 ) {
-  const result = await client.query<{ menu: unknown; publication_id: string }>(
-    `SELECT catalog.menu, catalog.publication_id FROM app_private.dining_catalog catalog
+  const result = await client.query<{
+    menu: unknown;
+    publication_id: string;
+    availability_version: number;
+  }>(
+    `SELECT catalog.menu, catalog.publication_id, publication.availability_version FROM app_private.dining_catalog catalog
      JOIN app_private.menu_publication_current publication
        ON publication.tenant_id = catalog.tenant_id AND publication.menu_id = catalog.menu_id
        AND publication.publication_id = catalog.publication_id AND publication.status = 'published'
@@ -62,7 +70,8 @@ async function readMenuInTransaction(
     menu.locationId !== locationId ||
     menu.venueId !== venueId ||
     menu.menuId !== menuId ||
-    menu.publicationId !== result.rows[0].publication_id
+    menu.publicationId !== result.rows[0].publication_id ||
+    menu.availabilityVersion !== result.rows[0].availability_version
   )
     throw new DiningError('menu_unavailable', 503);
   return menu;
@@ -133,7 +142,12 @@ export async function submitDiningOrder(client: Client, locationId: string, raw:
       createdAt: new Date().toISOString(),
     };
     const eventId = randomUUID();
-    const payload = JSON.stringify({ ...receipt, publicationId: input.publicationId, lines });
+    const payload = JSON.stringify({
+      ...receipt,
+      publicationId: input.publicationId,
+      availabilityVersion: input.availabilityVersion,
+      lines,
+    });
     await client.query(
       `INSERT INTO app_private.es_event (id,tenant_id,stream_type,stream_id,version,schema_version,event_type,payload,metadata)
       VALUES ($1,$2,'order',$3,1,1,'order.submitted',$4::jsonb,'{"source":"diner"}')`,
@@ -281,7 +295,12 @@ export function replayDiningOrder(
   if (event.version !== 1 || event.schemaVersion !== 1 || event.eventType !== 'order.submitted')
     throw new Error('Unsupported order event');
   const payload = OrderSubmittedPayloadSchema.parse(event.payload);
-  const { publicationId: _publication, lines: _lines, ...receiptFields } = payload;
+  const {
+    publicationId: _publication,
+    availabilityVersion: _availability,
+    lines: _lines,
+    ...receiptFields
+  } = payload;
   const receipt = OrderReceiptSchema.parse(receiptFields);
   if (receipt.orderId !== event.streamId || receipt.status !== 'submitted')
     throw new Error('Order event identity mismatch');

@@ -1,4 +1,16 @@
+main:has(> .pp-dining) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+body:has(.pp-dining) {
+  color: #17362c;
+  color-scheme: light;
+  background: #f6f4ee;
+}
 .pp-dining {
+  box-sizing: border-box;
+  color-scheme: light;
   max-width: 1440px;
   margin: 0 auto;
   padding: 32px;

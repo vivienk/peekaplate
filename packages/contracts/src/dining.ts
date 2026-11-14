@@ -26,6 +26,7 @@ export const DiningMenuSchema = z
     venueId: z.uuid(),
     menuId: z.uuid(),
     publicationId: z.uuid(),
+    availabilityVersion: z.number().int().positive().max(2147483647),
     currency: z.literal('USD'),
     acceptingOrders: z.boolean(),
     items: z.array(DiningItemSchema).max(500),
@@ -35,6 +36,7 @@ export const OrderRequestSchema = z
   .strictObject({
     commandId: z.uuid(),
     publicationId: z.uuid(),
+    availabilityVersion: z.number().int().positive().max(2147483647),
     fulfillment: z.literal('pickup'),
     lines: z
       .array(
@@ -64,6 +66,7 @@ export type OrderReceipt = z.infer<typeof OrderReceiptSchema>;
 
 export const OrderSubmittedPayloadSchema = OrderReceiptSchema.extend({
   publicationId: z.uuid(),
+  availabilityVersion: z.number().int().positive().max(2147483647),
   lines: z
     .array(
       z.strictObject({

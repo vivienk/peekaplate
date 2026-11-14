@@ -70,6 +70,8 @@ export async function mountDining(container: HTMLElement) {
           title: l.brand + ' ' + l.city,
           alt: l.brand + ' ' + l.city,
         }).addTo(markers);
+        marker.getElement()?.setAttribute('aria-label', `${l.brand} ${l.city} ${l.address}`);
+        marker.bindTooltip(`${l.brand} · ${l.city}`);
         marker.on('click', () => void showRestaurant(l.id));
       });
       container

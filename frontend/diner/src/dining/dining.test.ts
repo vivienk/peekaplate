@@ -10,6 +10,7 @@ const menu: DiningMenu = {
   venueId: id(1),
   menuId: id(2),
   publicationId: id(3),
+  availabilityVersion: 1,
   currency: 'USD',
   acceptingOrders: true,
   items: [

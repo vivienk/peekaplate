@@ -252,8 +252,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         sampleNotice ??
         (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
       if (
-        (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        (visualSelect || fixtureCamera || uploadedPortion || diningPortion)
+        diningPortion ||
+        ((import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+          (visualSelect || fixtureCamera || uploadedPortion))
       ) {
         if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
@@ -316,8 +317,9 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     history.pushState({ ...history.state, ppPortion: key }, '');
     void show();
     if (
-      (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-      (fixtureCamera || cameraSample || uploadedPortion)
+      diningPortion ||
+      ((import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+        (fixtureCamera || cameraSample || uploadedPortion))
     )
       orientation.request();
   };
