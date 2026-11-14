@@ -14,10 +14,11 @@ This is local report verification, not approval of the full DATA-12 staging jour
 | Below-floor comparison aggregate | All three comparison metrics INSUFFICIENT and null, with counts stripped | Tests serializer suppression. Does not execute comparison ordering/deduplication. |
 | Actual report SQL window | Include start, exclude end for exposures and final checkpoints | Two PostgreSQL regressions in `comparison-report.integration.ts` execute `readOwnerReport` against migrated facts. |
 
-The previously cited `tests/data06/privacy_boundaries.json`,
-`tests/data06/descriptive_signals.json` and `owner-report.data12.test.ts` are not
-in this pinned tree. PRs #144/#155 remain separate dependencies; this PR must not
-claim their exact fixtures were imported or that their application acceptance passed.
+The previously cited `tests/data06/privacy_boundaries.json` and
+`tests/data06/descriptive_signals.json` are not in this tree; #144 remains a
+separate dependency. Merged #155 now supplies `owner-report.data12.test.ts`,
+five additional aggregate-row unit checks and a staging runbook. Neither suite
+imports DATA-06 event fixtures or establishes application acceptance.
 
 Existing PostgreSQL tests provide additional, separately scoped evidence:
 
