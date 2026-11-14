@@ -682,7 +682,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. QA-02 adds offline source/reference freeze and integrity checks, development-only inventory and pending-review fictional source annotations; no strict quality scorer, provider run or reference-truth approval.",
+      "summary": "Source-linked needs_review drafts, vision-first processing with bounded private attempts, sanitized failures and isolated cascade credentials. Hosted V1 records actual extraction_mode separately from compatibility input_mode and excludes raw attempts. Existing OCR, capture, T0/spatial/presentation and review-only ingredient sidecars remain. QA-02 freezes source/reference bytes and checks declared review; strict offline scoring binds reports/exports, occurrence associations, complete emitted price text/scalar/currency, duplicates and missing/failed pages. The source proposal keeps exposed menus development and new metadata-only PDFs provisional holdouts. No authenticated review, structured option parsing, ingredient/geometry accuracy, fresh model run or release approval follows. Hosted activation stays separate.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -771,7 +771,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/eval/qa02/EVIDENCE.md",
         "processing/eval/qa02/development.manifest.json",
         "processing/eval/qa02/development-inventory.json",
-        "processing/eval/qa02/synthetic-menu.reference.json"
+        "processing/eval/qa02/synthetic-menu.reference.json",
+        "processing/src/peekaplate_processing/qa02_strict_score.py",
+        "processing/tests/test_qa02_strict_score.py",
+        "processing/eval/qa02/STRICT_SCORER.md",
+        "processing/eval/qa02/source-plan-v1.json",
+        "docs/qa02-strict-scorer-spec.md",
+        "docs/qa02-real-menu-source-plan-v1.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -780,7 +786,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "06950812ad90066ad4ef3da3ca1d112dd6aa097f35db39c02fab46e84ad75990"
+      "sourceFingerprint": "5d035f488dc977cce3d0945a6353d2e077efca7b546038a49d3ec5829809a9d7"
     },
     {
       "id": "assets",
@@ -815,20 +821,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR131 CSV export reconciled after owner UI and reporting/test merges. Preserve current routes, tenant/source guards, VALID_ZERO serialization, half-open owner report SQL and unknown freshness. No new export behavior beyond the previously approved CSV slice.",
-      "sources": [
-        "backend/src/owner-report-export.ts",
-        "backend/src/owner-report-export.test.ts",
-        "backend/src/index.ts",
-        "docs/owner-report-staging.md"
-      ],
-      "next": "Finish final review/CI and merge approved CSV slice into develop. Hosted export/download and full owner journey acceptance remain separate; no deployment."
-    },
     {
       "date": "2026-11-13",
       "modules": [
@@ -962,6 +954,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-workspace.spec.ts"
       ],
       "next": "Finish pinned reviews/checks and merge. Release API/console separately for genuine hosted staff acceptance; then integrate reviewed156/171/172 and163. Preserve diner publication/token flow; PostHog/canonical/report reconciliation remains a release gate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "processing"
+      ],
+      "summary": "VIS-04 source/scorer preparation reuses PR169 integrity checks and unchanged production/export contracts. The proposed six-source/nine-page pilot preserves development history and marks two metadata-only PDFs as candidate holdouts, not gold. The strict field scorer records complete emitted price text/scalar/currency, occurrence mapping, duplicates, null/zero and unavailable/failed pages. Ingredient, geometry, safety and routed-UI acceptance remain separate.",
+      "sources": [
+        "docs/qa02-strict-scorer-spec.md",
+        "docs/qa02-real-menu-source-plan-v1.md",
+        "processing/eval/qa02/STRICT_SCORER.md",
+        "processing/src/peekaplate_processing/qa02_strict_score.py",
+        "processing/tests/test_qa02_strict_score.py"
+      ],
+      "next": "Sai/Uneeza review exact sources and source-only answers, freeze references and agree strict measurement semantics; Vivien approves thresholds and bounded new-run authorization. Sai coordinates deployed auth/venue and Ehab156/Nifemi171/Jeffin172 connections. Mohammad supplies actual fresh extraction/evidence mapping then, reusing existing backend evidence. No provider call, deployment, independent acceptance or ticket closure is authorized by this preparation."
     }
   ]
 }

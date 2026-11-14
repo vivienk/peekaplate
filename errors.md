@@ -3543,3 +3543,17 @@ or hosted acceptance; the example's independent review remains pending.
 ## Source/scorer integration preparation — November 14, 2026
 
 The isolated integration branch initially lacked a Git committer identity. The dependency merge was retried with the authenticated contributor's public noreply identity supplied only for that command, without changing global or shared repository identity settings. Current develop and PR169 had competing bounded context histories and append-only error entries; integration retained develop's recent handoffs and both historical error sequences. Runtime/provider behavior was not changed by this setup.
+
+## Source/scorer runtime and draft metadata — November 14, 2026
+
+The isolated worktree's first offline dependency sync could not discover Python3.12 on PATH. Supplying the existing pinned CPython3.12.12 interpreter explicitly created a separate environment and installed62 cached packages offline; the shared runtime and user checkout were not changed.
+
+PR181's initial CI43640010150 failed only its existing PR-documentation guard: the draft body used `Specification` instead of the required `Spec, issue, or ADR` label. Correcting the body triggered a newer automatic run43640383806, which passed onb1b62c17039a8b570be87b0108fa0b56feff35a1. No manual rerun or extraction-code fix was needed. That result covers the initial specification/dependency commit, not the new scorer implementation subsequently prepared locally; preserve the original failed record.
+
+## Strict scorer focused verification — November 14, 2026
+
+The first combined guarded QA-02 reference/scorer run passed38 tests in4.193s with no network attempts. The changed source-plan JSON initially failed the existing Biome formatter on compact-array layout only; the repository formatter corrected that new file without semantic or source/hash changes. These synthetic checks are not real-menu accuracy, frozen-reference approval or hosted acceptance. New verification uses only the isolated worktree; real source material remains private.
+
+The added actual-CLI argument regression initially failed two subcases: argparse exited2 before reaching the scorer's sanitized JSON handler. Argument parsing now uses a private controlled-error parser inside that handler; the consumer test requires a nonzero result, structured failure JSON, empty stderr and no private marker. The focused module-CLI test passed in5.334s after correction, without changing field-scoring semantics.
+
+The isolated Node workspace initially lacked an invokable pnpm launcher and the offline metadata cache lacked the newer Supabase package records. Exposed the existing pinned pnpm11.25.0 launcher with its required owner execute permission, then completed a normal frozen-lockfile installation. All222 supply-chain policy entries passed; no engine, lockfile or supply-chain guard was disabled. Registered context/docs checks then passed (13 modules,10 handoffs,71 Markdown files); the changed source-plan JSON also passed its narrow Biome check.
