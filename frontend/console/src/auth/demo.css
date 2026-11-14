@@ -1,0 +1,64 @@
+/* Preview-only demo controls for the owner sign-in screens. Not part of the screens. */
+main:has(> .pp-auth) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pp-auth-demo {
+  padding: var(--pp-space-12) var(--pp-space-16);
+  border-bottom: 1px solid var(--pp-role-outline-variant);
+  background: var(--pp-color-info-100);
+  color: var(--pp-color-gray-900);
+  font-family: var(--pp-font-family-base);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+}
+
+.pp-auth-demo__label {
+  margin: 0 0 var(--pp-space-8);
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.pp-auth-demo__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-12) var(--pp-space-24);
+}
+
+.pp-auth-demo__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-auth-demo__choice select {
+  min-height: 2.75rem;
+  font: inherit;
+  font-weight: var(--pp-font-weight-regular);
+}
+
+.pp-auth-demo__done {
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-auth-demo__done button {
+  min-height: 2.75rem;
+  padding: 0 var(--pp-space-16);
+  font: inherit;
+}
+
+.pp-auth-demo__count {
+  align-self: center;
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.pp-auth-demo__choices > button {
+  min-height: 2.75rem;
+  padding: 0 var(--pp-space-12);
+  font: inherit;
+}
