@@ -139,6 +139,13 @@ function toDataUrl(file: File, cb: (url: string | null) => void) {
   r.readAsDataURL(file);
 }
 
+// Price (USD) keeps only digits and one decimal point with at most two decimals, so typing or
+// pasting "$14.50" or "14,5" becomes "14.50" / "145" and letters never appear.
+export const priceInput = (raw: string) => {
+  const [whole = '', ...rest] = raw.replace(/[^\d.]/g, '').split('.');
+  return rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole;
+};
+
 // Screen 9, Add dish (Figma 1496:8021: Empty, Partially completed, Validation error, Draft with
 // AI, Photo uploaded, Ready to review). Built only from the design system: TextField and the
 // .pp-input box for fields, Btn (ui/Button) for buttons, and @peekaplate/tokens for every value.
@@ -302,7 +309,7 @@ export function DishForm({
               inputMode="decimal"
               value={dr.price}
               {...errOf('f-price')}
-              onChange={(e) => set({ price: e.target.value })}
+              onChange={(e) => set({ price: priceInput(e.target.value) })}
             />
             <TextField
               id="f-size"

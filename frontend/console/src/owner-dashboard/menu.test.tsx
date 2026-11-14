@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { newDraft } from './data';
-import { DishForm, Review, Saved } from './menu';
+import { DishForm, priceInput, Review, Saved } from './menu';
 
 describe('Screen 8 (Review) and Screen 9 (Saved) menu verification UI', () => {
   const sampleDraft = {
@@ -115,5 +115,16 @@ describe('Screen 9 (Add dish) form', () => {
       aiReviewed: false,
     });
     expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
+  });
+});
+
+describe('Screen 9 price input', () => {
+  it('keeps only numbers with one decimal point and two decimals', () => {
+    expect(priceInput('14')).toBe('14');
+    expect(priceInput('$14.50')).toBe('14.50');
+    expect(priceInput('abc')).toBe('');
+    expect(priceInput('14.999')).toBe('14.99');
+    expect(priceInput('1.2.3')).toBe('1.23');
+    expect(priceInput('12 USD')).toBe('12');
   });
 });
