@@ -3423,3 +3423,23 @@ refreshed after all source edits. These are preparation/tooling observations, no
 hosted application failures. Eight actual local Pages browser cases now pass,
 including directory JSON serving and trailing-slash URLs. A delayed-directory
 cancellation regression and the existing menu checks also pass. No cloud state changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:35:16.211Z","exitCode":2}
+```
+
+Automatic diner-link preparation: the new pgTAP table assertion initially used
+the two-argument overload, which interpreted the schema as a table name. The
+schema-qualified three-argument assertion now passes with all 320 SQL checks.
+The concurrent-publish test's evolving command array needed an explicit element
+type under strict TypeScript. Context summaries were shortened to the graph's
+bound. After these test/documentation corrections, pnpm check and the real
+139-test Worker/database run pass. Seven local Pages and eleven existing diner
+browser cases pass. Hosted publication and custom-domain acceptance are pending;
+no provider calls or production changes were performed by these local checks.

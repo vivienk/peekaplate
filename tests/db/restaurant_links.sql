@@ -1,0 +1,14 @@
+BEGIN;
+SELECT plan(10);
+SELECT has_table('app_private', 'restaurant_menu_link', 'restaurant link table exists');
+SELECT ok((SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='app_private.restaurant_menu_link'::regclass), 'link table forces RLS');
+SELECT ok(has_table_privilege('peekaplate_runtime', 'app_private.restaurant_menu_link', 'SELECT'), 'runtime can read scoped locators');
+SELECT ok(has_table_privilege('peekaplate_runtime', 'app_private.restaurant_menu_link', 'INSERT'), 'runtime can assign locators');
+SELECT ok(NOT has_table_privilege('peekaplate_runtime', 'app_private.restaurant_menu_link', 'UPDATE'), 'runtime cannot rename links');
+SELECT ok(NOT has_table_privilege('peekaplate_runtime', 'app_private.restaurant_menu_link', 'DELETE'), 'runtime cannot recycle links');
+SELECT ok(NOT pg_has_role('peekaplate_runtime', 'peekaplate_public_link_reader', 'MEMBER'), 'runtime cannot become the resolver owner');
+SELECT ok((SELECT prosecdef AND proconfig @> ARRAY['search_path=pg_catalog'] FROM pg_proc WHERE oid='app_private.resolve_restaurant_link(text)'::regprocedure), 'resolver pins its definer search path');
+SELECT ok(NOT EXISTS (SELECT 1 FROM pg_proc, LATERAL aclexplode(proacl) a WHERE oid='app_private.resolve_restaurant_link(text)'::regprocedure AND a.grantee=0 AND a.privilege_type='EXECUTE'), 'PUBLIC cannot execute resolver');
+SELECT is((SELECT count(*)::integer FROM app_private.resolve_restaurant_link('owner')), 0, 'reserved missing link exposes no scope');
+SELECT * FROM finish();
+ROLLBACK;
