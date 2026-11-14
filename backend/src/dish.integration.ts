@@ -1412,6 +1412,89 @@ describe('real PostgreSQL staff command', () => {
 });
 
 describe('real PostgreSQL menu publication commands', () => {
+  it('allocates distinct restaurant links atomically, preserving retries and closing withdrawn links', async () => {
+    const restaurantName = `URL fixture ${crypto.randomUUID().slice(0, 8)}`;
+    const tenants = [crypto.randomUUID(), crypto.randomUUID()];
+    const menus = [crypto.randomUUID(), crypto.randomUUID()];
+    const commands: Array<{ commandId: string; expectedVersion: number; approvalId: string }> = [];
+    for (const [index, tenant] of tenants.entries()) {
+      const menu = menus[index]!;
+      await admin.query('INSERT INTO app_private.venues(id,name) VALUES ($1,$2)', [
+        tenant,
+        restaurantName,
+      ]);
+      await admin.query(
+        "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'owner')",
+        [tenant, actor],
+      );
+      const input = approvalCommand();
+      await registerReviewSubject(menu, input, tenant);
+      await registerPublicBundle(menu, input.menuRevisionId, tenant);
+      const approval = await requestPublication(menu, 'approvals', input, tenant);
+      const approved = MenuApprovalSchema.parse(await approval.json());
+      commands.push({
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: approved.approvalId,
+      });
+    }
+    const responses = await Promise.all(
+      tenants.map((tenant, index) =>
+        requestPublication(menus[index]!, 'publications', commands[index], tenant),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    const paths = responses.map((response) => response.headers.get('Location'));
+    expect(new Set(paths).size).toBe(2);
+    for (const path of paths)
+      expect(path).toMatch(/^http:\/\/127\.0\.0\.1:5186\/diner\/url_fixture_[a-z0-9_]+$/);
+    const expected = await responses[0]!.json();
+    const again = await requestPublication(menus[0]!, 'publications', commands[0], tenants[0]);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(expected);
+    expect(again.headers.get('Location')).toBe(paths[0]);
+    const slug = paths[0]!.split('/').at(-1)!;
+    const resolve = () => fetch(`http://127.0.0.1:${worker.port}/public/restaurants/${slug}`);
+    expect(await (await resolve()).json()).toEqual({ venueId: tenants[0], menuId: menus[0] });
+    const ownerLink = `/venues/${tenants[0]}/menus/${menus[0]}/diner-link`;
+    expect((await fetch(`http://127.0.0.1:${worker.port}${ownerLink}`)).status).toBe(401);
+    const denied = await fetch(`http://127.0.0.1:${worker.port}${ownerLink}`, {
+      headers: { Authorization: `Bearer ${await token({ sub: otherVenueOwner })}` },
+    });
+    expect(denied.status).toBe(403);
+    await admin.query('UPDATE app_private.venues SET name=$2 WHERE id=$1', [
+      tenants[0],
+      'Renamed restaurant',
+    ]);
+    expect(
+      (
+        await requestPublication(
+          menus[0]!,
+          'withdrawals',
+          { commandId: crypto.randomUUID(), expectedVersion: 1 },
+          tenants[0],
+        )
+      ).status,
+    ).toBe(200);
+    expect((await resolve()).status).toBe(404);
+    const republish = await requestPublication(
+      menus[0]!,
+      'publications',
+      { ...commands[0]!, commandId: crypto.randomUUID(), expectedVersion: 2 },
+      tenants[0],
+    );
+    expect(republish.status).toBe(200);
+    expect(republish.headers.get('Location')).toBe(paths[0]);
+    expect((await resolve()).status).toBe(200);
+    expect(
+      (
+        await admin.query(
+          'SELECT count(*)::int AS count FROM app_private.restaurant_menu_link WHERE tenant_id=$1',
+          [tenants[0]],
+        )
+      ).rows[0].count,
+    ).toBe(1);
+  });
   it('serves only an active approved bundle and binds its menu token to the publication', async () => {
     const menuId = crypto.randomUUID();
     const approvalInput = approvalCommand();
