@@ -65,7 +65,7 @@ export function createPortionXRPanel() {
   mesh.renderOrder = 100;
   mesh.visible = false;
   let previous = '';
-  const actions = ['place', 'mode', 'rotate', 'reset', 'original', 'close'] as const;
+  const actions = ['mode', 'rotate', 'reset', 'original', 'close'] as const;
   return {
     mesh,
     update(status: string, scale: string, modelLabel: string) {
@@ -79,14 +79,7 @@ export function createPortionXRPanel() {
       context.fillText(status, 24, 44, 976);
       context.font = '24px sans-serif';
       context.fillText(scale, 24, 84, 976);
-      const labels = [
-        'Place on surface',
-        modelLabel,
-        'Rotate 30°',
-        'Reposition',
-        'Original / dish',
-        'Back to preview',
-      ];
+      const labels = [modelLabel, 'Rotate 30°', 'Reposition', 'Original / dish', 'Back to preview'];
       labels.forEach((label, index) => {
         const y = 110 + index * 86;
         context.fillStyle = '#304d4d';

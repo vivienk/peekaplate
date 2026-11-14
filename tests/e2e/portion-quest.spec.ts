@@ -55,7 +55,7 @@ test('spatial controls can be selected by ray without DOM overlay', async ({ pag
     panel.update('Place dish', 'Approximate', 'Show 3D');
     // Reuse Three classes through mesh geometry rather than a second Three module instance.
     const results = [];
-    for (let index = 0; index < 6; index++) {
+    for (let index = 0; index < 5; index++) {
       const y = (0.5 - (110 + index * 86 + 37) / 640) * 0.4;
       const origin = panel.mesh.position.clone().set(0, y, 1);
       const direction = origin.clone().set(0, 0, -1);
@@ -64,5 +64,5 @@ test('spatial controls can be selected by ray without DOM overlay', async ({ pag
     }
     return results;
   });
-  expect(actions).toEqual(['place', 'mode', 'rotate', 'reset', 'original', 'close']);
+  expect(actions).toEqual(['mode', 'rotate', 'reset', 'original', 'close']);
 });

@@ -2880,3 +2880,5 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 
 - 2026-11-14 independent review found selection could reuse the other controller placement reticle. Recompute the surface intersection from the selecting input and retain that active input for subsequent frames.
 - 2026-11-14 dry-run build passed with an existing xr-overlay CSS minifier warning and a sandbox-denied Wrangler log write; no remote deployment was performed.
+
+- 2026-11-14 follow-up review removed the redundant spatial Place button: aiming at that panel loses the table ray. Direct surface selection is the single headset placement action; spatial controls retain mode, rotation, reposition, photo and exit.
