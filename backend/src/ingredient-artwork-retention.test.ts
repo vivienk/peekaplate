@@ -248,6 +248,90 @@ describe('artwork bucket resolution and retention cleanup', () => {
       }),
     ).rejects.toThrow('R2 list down');
   });
+
+  it('closes Phase C/D races via head timestamp refresh, DB recheck, head errors, and multi-venue batching', async () => {
+    const nowMs = Date.UTC(2026, 10, 14, 12, 0, 0);
+    const oldDate = new Date(nowMs - 2 * 3_600_000);
+    const refreshedDate = new Date(nowMs - 1_000);
+    const venue2 = '33333333-3333-4333-8333-333333333333';
+    const deletedKeys: string[] = [];
+
+    let dbCall = 0;
+    const tenantConfigs: string[] = [];
+    const client = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql.includes("set_config('app.tenant_id'")) {
+          tenantConfigs.push(String(params?.[0]));
+        }
+        if (sql.includes('SELECT DISTINCT sha256')) {
+          dbCall++;
+          const hashes = (params?.[1] as string[]) ?? [];
+          // Batched check returns none approved; per-key recheck for shaB simulates concurrent Phase C commit!
+          if (dbCall >= 2 && hashes.length === 1 && hashes[0] === shaB) {
+            return { rows: [{ sha256: shaB }] };
+          }
+          return { rows: [] };
+        }
+        return { rows: [] };
+      }),
+    };
+
+    const storage = {
+      list: vi.fn(async () => ({
+        objects: [
+          { key: `ingredient-artwork/${venue}/${shaA}.png`, uploaded: oldDate }, // head sees refreshed timestamp
+          { key: `ingredient-artwork/${venue}/${shaB}.png`, uploaded: oldDate }, // DB recheck sees concurrent approval
+          { key: `ingredient-artwork/${venue}/${shaC}.png`, uploaded: oldDate }, // head returns null (concurrent worker deleted)
+          { key: `ingredient-artwork/${venue2}/${shaA}.png`, uploaded: oldDate }, // head throws
+        ],
+        truncated: false,
+      })),
+      head: vi.fn(async (key: string) => {
+        if (key.includes(venue2)) throw new Error('head failed');
+        if (key.includes(shaA)) return { uploaded: refreshedDate };
+        if (key.includes(shaC)) return null;
+        return { uploaded: oldDate };
+      }),
+      delete: vi.fn(async (key: string) => {
+        deletedKeys.push(key);
+      }),
+    };
+
+    const res = await cleanupOrphanedIngredientArtwork({
+      storage,
+      client: client as never,
+      gracePeriodMs: 3_600_000,
+      nowMs,
+    });
+
+    expect(deletedKeys).toEqual([]);
+    expect(res.protectedInFlight).toBe(1);
+    expect(res.protectedApproved).toBe(1);
+    expect(res.errors).toBe(1);
+    expect(tenantConfigs).toContain(venue);
+    expect(tenantConfigs).toContain(venue2);
+  });
+
+  it('enforces maxPages across empty truncated pages', async () => {
+    const storage = {
+      list: vi.fn(async ({ cursor }: { prefix: string; cursor?: string | undefined }) => ({
+        objects: [],
+        truncated: true,
+        cursor: cursor ? `${cursor}x` : 'p1',
+      })),
+      delete: vi.fn(),
+    };
+    const client = { query: vi.fn(async () => ({ rows: [] })) };
+
+    const res = await cleanupOrphanedIngredientArtwork({
+      storage,
+      client: client as never,
+      maxPages: 3,
+    });
+    expect(res.pagesScanned).toBe(3);
+    expect(res.truncated).toBe(true);
+    expect(storage.list).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe('scheduled handler isolation and strict env parsing', () => {
@@ -352,5 +436,40 @@ describe('scheduled handler isolation and strict env parsing', () => {
         }) as never,
     );
     expect(connectSpy).not.toHaveBeenCalled();
+
+    // 6. Artwork feature flag disabled -> artwork cleanup does NOT run even with bucket configured.
+    const disabledArtBucket = makeBucket();
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        INGREDIENT_ARTWORK_ENABLED: 'false',
+        INGREDIENT_ARTWORK_BUCKET: disabledArtBucket,
+      },
+      () => fakeClient as never,
+    );
+    expect(disabledArtBucket.list).not.toHaveBeenCalled();
+
+    // 7. Staging bucket only + staging throws while artwork succeeds.
+    const stagingFailBucket = {
+      ...makeBucket(true),
+      get: vi.fn(async () => null),
+    };
+    const artOkBucket = makeBucket(false);
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        INGREDIENT_ARTWORK_ENABLED: 'true',
+        INGESTION_REPORTS_BUCKET: stagingFailBucket as never,
+        INGREDIENT_ARTWORK_BUCKET: artOkBucket,
+        MENU_STAGING_RETENTION_DAYS: '7',
+      },
+      () => fakeClient as never,
+    );
+    expect(stagingFailBucket.list).toHaveBeenCalled();
+    expect(artOkBucket.list).toHaveBeenCalled();
   });
 });
