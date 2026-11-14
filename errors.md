@@ -2909,3 +2909,12 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
