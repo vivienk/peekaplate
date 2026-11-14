@@ -8,10 +8,13 @@ import './onboarding.css';
 
 export function OnboardingLayout({
   restaurantName,
+  bare = false,
   children,
 }: {
   // Shown under "Owner Portal". Before S05 is saved there is no name yet.
   restaurantName?: string | undefined;
+  // The screen draws its own card (S07 Upload puts the upload list below the card).
+  bare?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -32,7 +35,7 @@ export function OnboardingLayout({
             </span>
           </div>
         </header>
-        <main className="pp-onboard__card">{children}</main>
+        <main className={bare ? 'pp-onboard__main' : 'pp-onboard__card'}>{children}</main>
       </div>
     </div>
   );

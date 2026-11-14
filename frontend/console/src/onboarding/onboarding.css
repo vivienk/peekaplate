@@ -8,6 +8,11 @@
 /* Page: surface, a 1200-wide column with 16 above the navbar, 96 between it and the card, 96
  * below. */
 .pp-onboard {
+  /* Preview card colours from Figma (color/button/nav/hover, color/border/card) that have no shared
+   * token yet. */
+  --pp-onboard-pending-preview-surface: #fff8ed;
+  --pp-onboard-pending-preview-border: #fddaab;
+
   min-height: 100vh;
   min-height: 100dvh;
   padding: 0 var(--pp-space-16);
@@ -85,9 +90,20 @@
 /* Card: surface-container, 24 radius, card border, menu-card shadow, 80 above and below; the
  * content is at most 800 wide and centred. */
 /* The card is the page's main landmark; reset the console's default main width and margin. */
-.pp-onboard main.pp-onboard__card {
+.pp-onboard main.pp-onboard__card,
+.pp-onboard main.pp-onboard__main {
   max-width: none;
   margin: 0;
+}
+
+.pp-onboard main.pp-onboard__main {
+  padding: 0;
+}
+
+/* S07 Upload: the card, then 32 to the upload list. */
+.pp-onboard__main {
+  display: grid;
+  gap: var(--pp-space-32);
 }
 
 .pp-onboard__card {
@@ -351,6 +367,447 @@
   font-weight: var(--pp-font-weight-semibold);
 }
 
+/* Inputs that stay focusable but invisible; their label is the visible control. */
+.pp-onboard-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pp-onboard-hidden-input:focus-visible + label {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
+/* The error message inside the S07 layouts: spacing comes from the layout, not the banner. */
+.pp-onboard-link .pp-auth-banner,
+.pp-onboard-upload .pp-auth-banner {
+  margin: 0;
+}
+
+/* S07 link: title, 48, the field and its message 24 apart, then 64 to the buttons. */
+.pp-onboard-link {
+  display: grid;
+  gap: 4rem;
+}
+
+.pp-onboard-link__content {
+  display: grid;
+  gap: var(--pp-space-48);
+}
+
+.pp-onboard-link__field {
+  display: grid;
+  gap: var(--pp-space-24);
+}
+
+/* Input Field Default with the 16px Link icon on the left (4 from the text) and the check on the
+ * right when the format is valid. */
+.pp-onboard-link__control {
+  position: relative;
+}
+
+.pp-onboard-link__icon,
+.pp-onboard-link__check {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.pp-onboard-link__icon {
+  left: calc(var(--pp-space-16) + 1.5px);
+}
+
+.pp-onboard-link__check {
+  right: calc(var(--pp-space-16) + 1.5px);
+}
+
+.pp-onboard .pp-onboard-link__input {
+  width: 100%;
+  padding-inline: calc(var(--pp-space-16) + var(--pp-space-20)) var(--pp-space-40);
+}
+
+/* S07 Upload card: 80 above and below, 48 at the sides; the upload area is up to 800 wide and
+ * the preview up to 1102. */
+.pp-onboard-upload {
+  display: grid;
+  gap: 4rem;
+  padding: var(--pp-space-80) var(--pp-space-48);
+}
+
+.pp-onboard-upload > * {
+  width: 100%;
+  max-width: 50rem;
+  margin-inline: auto;
+}
+
+.pp-onboard-upload > .pp-onboard-preview {
+  max-width: 68.875rem;
+}
+
+.pp-onboard-upload__main {
+  display: grid;
+  gap: 4rem;
+}
+
+/* Title, 48, the 150px cloud, 48, the text; the message 24 below the text. */
+.pp-onboard-upload__content {
+  display: grid;
+  gap: var(--pp-space-24);
+}
+
+.pp-onboard-drop {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-48);
+  margin-top: var(--pp-space-24);
+  border-radius: var(--pp-radius-24);
+}
+
+.pp-onboard-drop--active {
+  outline: 2px dashed var(--pp-color-orange-500);
+  outline-offset: var(--pp-space-8);
+}
+
+.pp-onboard-drop__icon {
+  display: block;
+  width: 9.375rem;
+  height: 9.375rem;
+}
+
+.pp-onboard-drop__text {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.pp-onboard-drop__line,
+.pp-onboard-drop__hint {
+  margin: 0;
+}
+
+/* 16/24 on-surface with the Accent text link (16/24 medium, 4 padding). */
+.pp-onboard-drop__line {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: 1.75rem;
+}
+
+/* With the spaces either side, 2 at the sides keeps the link 6 from the words as in Figma. */
+.pp-onboard-drop__line .pp-auth-link {
+  display: inline;
+  padding: var(--pp-space-4) var(--pp-space-2);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+  cursor: pointer;
+}
+
+/* 14/24 text/secondary. */
+.pp-onboard-drop__hint {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+/* Owner dashboard_Button, Outlined Medium: 40 high, 8/16 padding, 14/24 semibold. */
+.pp-onboard-small-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--pp-space-40);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
+  color: var(--pp-color-orange-950);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pp-onboard-small-btn:hover {
+  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
+}
+
+.pp-onboard-small-btn:active {
+  background: var(--pp-color-gray-200);
+}
+
+/* A 40px square icon button (the bin), 8 radius; Retry is 20px. */
+.pp-onboard-icon-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-40);
+  height: var(--pp-space-40);
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-8);
+  background: transparent;
+  cursor: pointer;
+}
+
+.pp-onboard-icon-btn:hover {
+  background: var(--pp-color-error-50);
+}
+
+.pp-onboard-icon-btn:focus-visible {
+  outline: 2px solid var(--pp-auth-focus);
+  outline-offset: 2px;
+}
+
+.pp-onboard-icon-btn--small {
+  width: var(--pp-space-24);
+  height: var(--pp-space-24);
+  margin-inline-start: var(--pp-space-8);
+}
+
+.pp-onboard-icon-btn--small:hover {
+  background: var(--pp-color-gray-200);
+}
+
+/* File name: 24px image icon, 6, then the name (18/28 semibold) over its size (14/24 medium), 4
+ * apart. Figma colours the size button/disabled/content (#A1A3AA), under 4.5:1 here, so it uses
+ * text/secondary (flagged for design). */
+.pp-onboard-file {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-6);
+  min-width: 0;
+}
+
+.pp-onboard-file img {
+  flex: none;
+}
+
+.pp-onboard-file__text {
+  display: grid;
+  gap: var(--pp-space-4);
+  min-width: 0;
+  margin: 0;
+}
+
+.pp-onboard-file__name {
+  overflow-wrap: anywhere;
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard-file__size {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+}
+
+/* in-progress-upload rows below the card: surface-container, 24 radius, card shadow, 20/24
+ * padding, 24 apart; the name row, 12, the progress row, then the error. */
+.pp-onboard-uploads {
+  display: grid;
+  gap: var(--pp-space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-onboard-upload-row {
+  display: grid;
+  gap: var(--pp-space-12);
+  padding: var(--pp-space-20) var(--pp-space-24);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: var(--pp-auth-pending-card-shadow);
+}
+
+.pp-onboard-upload-row__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--pp-space-16);
+}
+
+.pp-onboard-upload-row__buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--pp-space-16);
+}
+
+.pp-onboard-upload-row__progress {
+  display: flex;
+  align-items: center;
+}
+
+/* 14/24 medium outline-solid, 8 from the bar. */
+.pp-onboard-upload-row__percent {
+  flex: none;
+  min-width: 2.375rem;
+  padding-inline-start: var(--pp-space-8);
+  color: var(--pp-auth-outline-solid);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+  text-align: end;
+}
+
+/* Progress track: 8 high, outline-variant, fully rounded; the fill is color/primary, or color/error
+ * once the upload failed. */
+.pp-onboard-progress {
+  position: relative;
+  flex: 1;
+  height: var(--pp-space-8);
+  overflow: hidden;
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-gray-200);
+}
+
+.pp-onboard-progress__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: var(--pp-color-orange-500);
+  transition: width 0.2s ease;
+}
+
+.pp-onboard-upload-row--failed .pp-onboard-progress__fill {
+  background: var(--pp-auth-error);
+}
+
+/* No percentage from the upload: a third of the bar moves along the track. */
+.pp-onboard-progress--running .pp-onboard-progress__fill {
+  width: 33%;
+  animation: pp-onboard-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes pp-onboard-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-onboard-progress--running .pp-onboard-progress__fill {
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* The error: 24px warning icon, 6, 14/24 medium color/error. */
+.pp-onboard-upload-row__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-6);
+  margin: 0;
+  color: var(--pp-auth-error);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+}
+
+/* Preview: the heading (18/28 semibold, then 14/24 text/secondary, 8 apart, 16 at the sides), 48,
+ * then the preview cards 24 apart. */
+.pp-onboard-preview {
+  display: grid;
+  gap: var(--pp-space-48);
+}
+
+.pp-onboard-preview__head {
+  display: grid;
+  gap: var(--pp-space-8);
+  padding-inline: var(--pp-space-16);
+  text-align: center;
+}
+
+.pp-onboard-preview__title,
+.pp-onboard-preview__note {
+  margin: 0;
+}
+
+.pp-onboard-preview__title {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard-preview__note {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-onboard-preview__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--pp-space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Preview card: 32 padding, 24 radius, 1px edge, 16 between the name and the image; the buttons
+ * 24 below the image. Its fill (#FFF8ED) and edge (#FDDAAB) have no shared token yet. */
+.pp-onboard-preview__card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--pp-space-16);
+  padding: var(--pp-space-32);
+  border: 1px solid var(--pp-onboard-pending-preview-border);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-onboard-pending-preview-surface);
+}
+
+.pp-onboard-preview__body {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: var(--pp-space-24);
+}
+
+.pp-onboard-preview__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--pp-radius-24);
+}
+
+.pp-onboard-preview__none {
+  display: grid;
+  place-items: center;
+  min-height: 15rem;
+  margin: 0;
+  padding: var(--pp-space-24);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface-container);
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  text-align: center;
+}
+
+/* Replace (Outlined Medium) and Remove (Accent text link), 16 apart, centred. */
+.pp-onboard-preview__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-16);
+}
+
 @media (max-width: 40rem) {
   .pp-onboard__container {
     gap: var(--pp-space-32);
@@ -359,6 +816,10 @@
 
   .pp-onboard__card {
     padding: var(--pp-space-40) var(--pp-space-16);
+  }
+
+  .pp-onboard-upload-row__top {
+    flex-wrap: wrap;
   }
 
   .pp-onboard__portal-label,

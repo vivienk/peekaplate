@@ -206,11 +206,20 @@ export function LockedEmailField({
 
 // A recoverable error above the form (Error Message component). role="alert" announces it when it
 // appears; the text is always shown, so colour is never the only signal.
-export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: ReactNode }) {
+// icon: the error msg component's icon variant; the warning circle unless the screen picks another.
+export function ErrorBanner({
+  copy,
+  action,
+  icon = errorIcon,
+}: {
+  copy: BannerCopy;
+  action?: ReactNode;
+  icon?: string;
+}) {
   return (
     <div className="pp-auth-banner" role="alert">
       <span className="pp-auth-banner__icon" aria-hidden="true">
-        <img src={errorIcon} alt="" width="24" height="24" />
+        <img src={icon} alt="" width="24" height="24" />
       </span>
       <div className="pp-auth-banner__text">
         <p className="pp-auth-banner__title">{copy.title}</p>
