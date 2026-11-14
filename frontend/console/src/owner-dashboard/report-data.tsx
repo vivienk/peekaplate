@@ -67,7 +67,7 @@ const fmt = (iso: string) =>
 const SAVED_REPORT = OwnerDishReportSchema.parse(UNEEZA_REPORT);
 
 // Standalone demos have no identity. The real workspace passes its actor-bound SDK getter.
-async function noOwnerSession(): Promise<string | null> {
+export async function getOwnerAccessToken(): Promise<string | null> {
   return null;
 }
 
@@ -86,7 +86,7 @@ export function reportSourceFromEnv(
     VITE_PUBLIC_API_URL?: string;
     VITE_OWNER_REPORT_VENUE_ID?: string;
   },
-  getAccessToken = noOwnerSession,
+  getAccessToken = getOwnerAccessToken,
 ): ReportSource {
   const apiBase = env.VITE_PUBLIC_API_URL;
   const venueId = env.VITE_OWNER_REPORT_VENUE_ID;

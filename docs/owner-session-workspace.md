@@ -97,7 +97,9 @@ authenticated response). Local tests cover HTTP/contracts/token/client behavior,
 restricted runtime RLS, real workerd with signed synthetic JWTs, and the real
 browser SDK against synthetic provider/API HTTP. Browser cases include selection,
 report access, no membership, editor limits, revocation, expiry, late responses,
-cross-tab changes and accessibility. Exact counts/durations belong in the PR.
+cross-tab changes and accessibility. Additional cases exercise an expired SDK
+session refreshing its token and a delayed identity response arriving after
+another tab signs out. Exact counts/durations belong in the PR.
 
 These checks do not establish a hosted release or complete onboarding/upload/
 publish/report journey. Hosted acceptance must verify the released API/console,

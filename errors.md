@@ -3511,3 +3511,10 @@ The first browser run overlapped source formatting/HMR; a later provider run ove
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
 ```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.

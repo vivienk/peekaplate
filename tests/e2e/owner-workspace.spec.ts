@@ -26,26 +26,26 @@ const user = (id = ownerId) => ({
   user_metadata: {},
   created_at: '2026-11-11T00:00:00Z',
 });
-const token = (id: string) =>
-  `${Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: id, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.c3ludGhldGlj`;
-const session = (id: string) => ({
-  access_token: token(id),
+const token = (id: string, version = 0) =>
+  `${Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ sub: id, exp: Math.floor(Date.now() / 1000) + 3600, version })).toString('base64url')}.c3ludGhldGlj`;
+const session = (id: string, version = 0) => ({
+  access_token: token(id, version),
   refresh_token: `synthetic-refresh-${id}`,
   token_type: 'bearer',
   expires_in: 3600,
   user: user(id),
 });
 
-function subject(authorization: string | undefined) {
+function claims(authorization: string | undefined): { sub?: string; version?: number } {
   try {
     return JSON.parse(
       Buffer.from(
         authorization?.replace(/^Bearer /i, '').split('.')[1] ?? '',
         'base64url',
       ).toString(),
-    ).sub as string;
+    );
   } catch {
-    return '';
+    return {};
   }
 }
 
@@ -54,12 +54,16 @@ async function fixture(context: BrowserContext) {
     venues: [venue],
     reportStatus: 200,
     denyIdentity: false,
+    delayIdentity: false,
+    releaseIdentity: () => {},
+    identityRequests: 0,
+    tokenVersion: 0,
     invalidActor: false,
     delayMembership: false,
     releaseMembership: () => {},
     delayReport: false,
     releaseReport: () => {},
-    apiCalls: [] as Array<{ path: string; actor: string }>,
+    apiCalls: [] as Array<{ path: string; actor: string; version: number }>,
   };
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
@@ -69,8 +73,17 @@ async function fixture(context: BrowserContext) {
         status: 204,
         headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' },
       });
-    let actor = subject(request.headers().authorization) || ownerId;
+    let actor = claims(request.headers().authorization).sub || ownerId;
     if (path === 'token' && request.postDataJSON()?.email === 'other@example.test') actor = otherId;
+    if (path === 'token' && typeof request.postDataJSON()?.refresh_token === 'string')
+      actor = request.postDataJSON().refresh_token.replace('synthetic-refresh-', '');
+    if (path === 'user') {
+      state.identityRequests++;
+      if (state.delayIdentity)
+        await new Promise<void>((resolve) => {
+          state.releaseIdentity = resolve;
+        });
+    }
     const status = path === 'user' && state.denyIdentity ? 401 : 200;
     await route.fulfill({
       status,
@@ -78,7 +91,7 @@ async function fixture(context: BrowserContext) {
         status === 401
           ? { code: 'bad_jwt', message: 'Synthetic expired identity' }
           : path === 'token'
-            ? session(actor)
+            ? session(actor, ++state.tokenVersion)
             : path === 'user'
               ? user(actor)
               : {},
@@ -93,8 +106,12 @@ async function fixture(context: BrowserContext) {
         status: 204,
         headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': '*' },
       });
-    const actor = subject(request.headers().authorization);
-    state.apiCalls.push({ path: url.pathname, actor });
+    const actor = claims(request.headers().authorization).sub ?? '';
+    state.apiCalls.push({
+      path: url.pathname,
+      actor,
+      version: claims(request.headers().authorization).version ?? 0,
+    });
     if (url.pathname === '/staff/venues') {
       const body = {
         actorId: state.invalidActor ? otherId : actor,
@@ -279,6 +296,58 @@ test('a different account signing in in another tab replaces old state and a lat
   state.releaseReport();
   await expect(page.getByRole('table')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: venue.name })).toHaveCount(0);
+});
+
+test('SDK refresh supplies the new actor-bound token without keeping expired access', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await expect(page.locator('.owner-shell')).toBeVisible();
+  const before = state.tokenVersion;
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((key) => key.endsWith('-auth-token'));
+    if (!key) throw new Error('Synthetic SDK session missing');
+    const stored = JSON.parse(localStorage.getItem(key)!);
+    stored.expires_at = Math.floor(Date.now() / 1000) - 120;
+    localStorage.setItem(key, JSON.stringify(stored));
+  });
+  await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
+  await expect.poll(() => state.tokenVersion).toBeGreaterThan(before);
+  await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
+  expect(state.apiCalls.at(-1)?.version).toBe(state.tokenVersion);
+});
+
+test('late identity restoration cannot reopen a workspace after another tab signs out', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await expect(page.locator('.owner-shell')).toBeVisible();
+  const before = state.identityRequests;
+  state.delayIdentity = true;
+  await page.reload();
+  await expect.poll(() => state.identityRequests).toBeGreaterThan(before);
+  const other = await context.newPage();
+  await other.goto(origin);
+  expect(
+    await other.evaluate(async () => {
+      const path = '/src/auth/supabase-auth.ts';
+      const { connectOwnerAuth } = await import(path);
+      const auth = connectOwnerAuth({
+        url: 'https://auth-fixture.supabase.co',
+        publishableKey: 'sb_publishable_synthetic_fixture_only',
+        confirmationUrl: `${location.origin}/auth-confirm.html`,
+      });
+      return await auth.signOut();
+    }),
+  ).toBe(true);
+  state.delayIdentity = false;
+  state.releaseIdentity();
+  await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
+  await expect(page.locator('.owner-shell')).toHaveCount(0);
 });
 
 test('workspace supports keyboard, narrow screens and accessible labels', async ({
