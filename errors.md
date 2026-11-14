@@ -2953,3 +2953,9 @@ Transient observations during Phase 3 verification:
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T05:06:18.153Z","exitCode":1}
 ```
+
+## Report source correction — November 13, 2026
+
+```json
+{"id":"ERR-20261113-REPORT-SOURCE","status":"resolved","area":"console-report-source","cause":"Hook state survived source changes, leaving fetched values labelled as the saved synthetic sample.","prevention":"Reset request identity during render; select the saved report explicitly and reject late responses after cleanup.","sources":["frontend/console/src/owner-dashboard/report-data.tsx","tests/e2e/owner-report-api.spec.ts"],"regression":"Chromium live-to-saved assertion failed before correction; all five report browser cases pass afterward (11.9s). The harness initially used named imports for Vite CommonJS interop; corrected to actual default exports before reproducing the defect.","limit":"Intercepted browser requests use a stand-in token; hosted auth and provenance remain separate."}
+```

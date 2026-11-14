@@ -218,7 +218,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -242,7 +242,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/FirstDashboard.test.tsx",
         "tests/e2e/owner-first-dashboard.spec.ts",
         "tests/e2e/owner-onboarding.spec.ts",
-        "frontend/console/src/owner/PublishSuccessDialog.tsx"
+        "frontend/console/src/owner/PublishSuccessDialog.tsx",
+        "frontend/console/src/owner-dashboard/report-api.ts",
+        "tests/e2e/owner-report-api.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -252,7 +254,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "acc1c884bf0b477c2ee87556c0f34cbca1c8659e6660c929c2fae089ca8df31e"
+      "sourceFingerprint": "a5d456a6c770c2f440b18a1f849816f0725054da222081dc995d42b7e25fff83"
     },
     {
       "id": "backend",
@@ -405,7 +407,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "239f9c58c92d90406312f9c955c49343750c2a7a1891ae1c7f28354fd1075841"
+      "sourceFingerprint": "f7c0b32d5abb7819a3b8a4246957d5aa670c221d808f8cd4e92c015c1726a13e"
     },
     {
       "id": "database",
@@ -538,7 +540,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c891e50b5ef94678a3d85e763aefd8facaba18c43ec664f0524601b2e65cfb41"
+      "sourceFingerprint": "75a0d3ca5a70f2e9d66bbda273d347083d0f5d813faa5a44853ef2056d12491e"
     },
     {
       "id": "agents",
@@ -734,19 +736,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-11",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR78 reconciles develop while preserving ingredient/order-import work. Screens use the merged track, ID and clock modules; interim tracking remains removed. Local browser regressions reproduce preconsent timing/dangling exposure failures before fixes and pass afterward. Consent transitions create fresh eligible openings; refreshed publications cannot reuse old exposure IDs and record one menu view. Existing publication-withdrawal assertions still reject every post-withdrawal event. Local pnpm check/build pass: 1357 unit, 74 script, 137 Chromium and nine SDK/privacy cases; browser runs took 1.4 min and 10.4 s. CI exposed a withdrawal-fixture fake-time wait; the bounded poll now advances the delivery clock without weakening counts.",
-      "sources": [
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/menu-triggers-live.spec.ts",
-        "docs/posthog.md"
-      ],
-      "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
         "backend",
         "contracts"
       ],
@@ -884,6 +873,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-report-staging.md"
       ],
       "next": "Finish final review/CI and merge approved CSV slice into develop. Hosted export/download and full owner journey acceptance remain separate; no deployment."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR128 reconciled with current develop, preserving prior owner/report/CSV updates. Report source changes must never reuse another source’s data.",
+      "sources": [
+        "frontend/console/src/owner-dashboard/report-api.ts",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
+        "tests/e2e/owner-report-api.spec.ts"
+      ],
+      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
     }
   ]
 }

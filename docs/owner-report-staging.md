@@ -44,6 +44,17 @@ complementary suppression and internal cohort stripping. An empty fixture can
 return an empty dish list. Freshness is not certified by a successful response.
 Production reports remain disabled.
 
+## Console report connection
+
+PR 128 adds the report reader and validated screen states. With API/venue settings,
+the caller must supply a genuine owner-session token; the default token getter is
+still a sign-in integration seam and returns no token. PRs 143/146 remain separate.
+Without those settings the preview uses a clearly labelled saved synthetic report.
+Switching source, venue, API or token getter clears retained values before the next
+screen commit; a late response cannot replace the currently selected report.
+Browser tests intercept requests with a stand-in token. They verify rendering and
+failure handling, not hosted authentication, provenance or DATA-12 acceptance.
+
 ## CSV export
 
 `GET /api/v1/venues/:venueId/analytics/dishes/export?source=synthetic` exports the
