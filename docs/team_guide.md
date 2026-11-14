@@ -4,7 +4,9 @@
 lists the saved group/file APIs, draft/photo save-resume, cancel/retry and explicit
 owner confirmation. It reuses the ingestion/review pipeline and private R2; no
 new browser DB access is needed. Ehab's S06–S09 screen wiring remains his slice.
-The handoff separates local API/DB evidence from hosted activation and UI acceptance.
+Authenticated staging acceptance now passes 53 HTTP checks and 29 browser assertions,
+with independent database/storage verification. The handoff keeps Ehab’s real UI
+connection and the held auth/dashboard integration separate.
 
 Latest diner integration: [published-menu connection](diner-connection.md). It
 explains the verified QR/link flow, valid/tampered/withdrawn states, staging build
@@ -161,9 +163,11 @@ frontend code or receive them in chat. On October 28, the OCR.space key was adde
 to GitHub's protected staging environment and the extraction Worker's secret store.
 A fresh OCR-only test read three made-up dishes and their prices in 4.654 seconds.
 This proves that the OCR provider accepted the key for that image; it does not
-prove the complete hosted menu-processing flow. The AI step still needs its
-provider configuration, and menu-to-draft acceptance remains pending. The queues stay
-paused until that passes. Follow the
+prove the complete hosted menu-processing flow at that October 28 checkpoint.
+The latest [owner workspace acceptance](owner-menu-workspace.md#acceptance-record)
+now verifies genuine staff upload, draft/photo storage, corrections and approval
+against staging; a retained real extraction was used without another model call.
+Normal queues remain paused for controlled testing and the real UI handoff. Follow the
 [VIS-01 setup and handoff](menu-ingestion-infrastructure.md) for exact names,
 interfaces and who does what next. Provisioned infrastructure is not a completed
 menu-processing feature.
@@ -808,6 +812,11 @@ decisions remain PENDING.
 
 
 ## Owner-report staging API — November 10
+
+For the independent draft/photo verification APIs and retention controls, see
+[owner menu workspace](owner-menu-workspace.md#independent-draft-and-photo-verification-161).
+These additions need their own migration/release and hosted acceptance. The
+dashboard design previews still use synthetic state, with no live save/publish connection.
 
 The console may call the owner-report route from its exact staging origin or
 http://127.0.0.1:5174, using the signed-in owner’s Supabase access token.

@@ -154,6 +154,41 @@ and still requires independently approved images and menu publication. AI Draft/
 Suggest UI controls need their own reviewed integration; saving this work never
 invokes a model or invents a suggestion.
 
+## Independent draft and photo verification (#161)
+
+Migration `20261113010000` adds private draft/photo verification metadata. It is
+not part of the earlier hosted acceptance below and requires a separate staging
+migration/release. There is no new `dish_current` flag or publication bypass.
+
+POST `/venues/:venueId/drafts/:draftId/verify` accepts
+`{commandId,expectedVersion:<current draft_version>,verified:true}`. Only current
+owner/editor staff can verify a pending draft. A stale version returns 409.
+Verification records its own contiguous `owner_draft_verification` event stream,
+bound to the reviewed content version; it does not advance the content version.
+Manual edits and extraction retries clear verification. Replaying a command is
+effect-free and returns its historical receipt, not a fresh draft read.
+
+POST `/venues/:venueId/drafts/:draftId/photos/:photoId/approve` or `/reject` with
+`{commandId}` independently changes the photo status. Approval validates the
+source and copied destination SHA-256/size before committing the private
+`menu-assets/` reference. Only after commit may the original staging object be
+deleted. Replaying approval does not repeat that storage effect. Verification is
+separate from the existing approval/publication commands above; it never certifies
+food facts or makes an unapproved dish publicly eligible.
+
+Scheduled retention remains off until configured. `MENU_STAGING_RETENTION_DAYS`
+controls promoted originals (explicit zero permits immediate cleanup),
+`MENU_STAGING_REJECTED_RETENTION_DAYS` controls rejected originals, and
+`MENU_STAGING_ORPHAN_GRACE_DAYS` controls orphan uploads. Omitted rules stay off;
+use `MENU_STAGING_CLEANUP_DRY_RUN=true` before enabling deletion. The cleanup uses
+the ingestion bucket, exact tenant/draft/hash keys, tenant-scoped transactions,
+draft/photo locks and paginated R2 listings. Pending/unverified work, corrupt or
+missing promoted copies, malformed keys and failed lookups are retained.
+
+The #105/#161 dashboard pages are **synthetic preview screens**. Their labels
+and local state transitions do not establish connected API persistence; Ehab's
+screen integration and authenticated hosted acceptance remain separate work.
+
 ## Acceptance record
 
 Rollback: once enriched revision events/receipts or manual drafts exist, prefer a
@@ -180,16 +215,44 @@ Verified on 2026-11-12:
   allowed local/staging preflight and blocked unapproved origin. R2 managed public
   access remains disabled, with no custom domains or bucket CORS. Existing menu
   and observation Queues and their DLQs remain paused.
-- Hosted staff-authenticated workspace acceptance is **NOT RUN**. Fresh test
-  magic-link verification returned `otp_expired`; no password or account was
-  changed. A separate SQL runtime-role probe was **BLOCKED** because the dashboard
-  operator cannot `SET ROLE peekaplate_runtime`. Do not grant broader operator
-  privileges to make a test pass. The temporary synthetic membership was restored
-  to viewer; no workspace test records or R2 objects were created on staging.
+- **Authenticated workspace acceptance PASS**, superseding the initial NOT RUN
+  record in PR150. There were **53 hosted workspace HTTP checks** (16 server-side,
+  37 from real Chromium at `http://127.0.0.1:5174`), **29 browser assertions** and
+  three independent read-only Supabase postconditions. The browser phases took
+  **49.615 seconds** of active runtime, excluding email/interaction waiting.
+- Covered incomplete draft save/reload, photo upload/attachment/reload/byte readback,
+  duplicate receipts, stale saves, cross-draft photo rejection, PDF upload/hash and
+  11-page rejection, group resume/cancel, immutable originals, review corrections,
+  stale-review denial and current-version approval. Supabase confirms that the
+  approved price remains 9.00 after a later working-review correction to 9.50.
+  An independent remote R2 read matches the browser-uploaded PDF's SHA-256.
+- After restoring viewer permission, the same browser JWT receives 403 for draft,
+  photo, review and job reads. Both test sessions ended, the temporary local test
+  page was removed, and the original Auth sources/dev server were preserved.
+  Labelled synthetic audit rows and private objects remain as evidence; no menu
+  was published. All normal Queues/DLQs remain paused. The cancelled PDF delivery
+  may remain until normal handling or expiry; no unrelated backlog was purged.
 
-Next acceptance: use a genuine staff session for synthetic draft save/reload,
-private photo upload/read, cross-venue/viewer denial, group resume/cancel and the
-retained-report review bootstrap. Then connect and test the real S06–S09 controls.
-The API is deployed; these remaining checks prevent calling the complete owner
-screen journey accepted. Keep normal Queue delivery paused outside a bounded
-synthetic test window. Auth #143/#146 remains separate and unmerged.
+See the [sanitized acceptance results](evidence/owner-menu-staging-2026-11-12.json)
+for every status, assertion, phase timing and cleanup boundary. The earlier
+dashboard `SET ROLE` probe is not required: the successful deployed API calls
+exercise the actual restricted runtime connection without expanding operator access.
+
+## Fresh-link verification
+
+The earlier `otp_expired` blocker came from the QA verification workflow, not a
+required Auth configuration change. Gmail grouped the repeated messages and hid
+the newest link under **Show trimmed content**, while an older link remained
+visible. Refresh the conversation, check the newest delivery time and expand
+that message before using its link once. The verifier preserves the complete
+link's original verification type and keeps credentials in memory. A fresh link
+then passed with the genuine dedicated staging identity, both server-side and
+from the real local console browser origin. No password, account, email template,
+redirect allowlist or expiry setting was changed.
+
+The backend acceptance gate is cleared. Ehab can connect and test the actual
+S06–S09 controls using the contracts above. That real owner-screen journey,
+auth #143/#146 dashboard integration, new provider accuracy tests and production
+acceptance remain separate. This run reused retained genuine extraction output;
+it did not launch another OCR/model job. Keep normal delivery paused outside a
+controlled synthetic test window.

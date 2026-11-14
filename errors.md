@@ -2844,3 +2844,81 @@ Test setup corrections: use the installed PDF loading task cleanup API, a real l
 Independent review found approval could use a historical extraction after a retry, and bootstrap could register against a changed job. A real database regression reproduced incorrect approval before the fix; current report/session pointers, job-first locks and registration-time revalidation now reject both cases. All 130 integration cases pass. A CI tracking test also armed delivery after its fixed fake-time advance; bounded clock polling preserves the assertion and passed five repeated browser runs.
 
 Hosted migration and seven HTTP/CORS checks passed. Hosted staff checks did not execute: the dedicated account's email magic-link verification returned otp_expired, including a fresh dashboard-generated link. The account/password were preserved and its temporary synthetic permission restored to viewer. A rollback-only SQL probe stopped before writes because the dashboard role cannot SET ROLE peekaplate_runtime; no privilege expansion was made. Do not report those attempts as authenticated API or runtime-role acceptance. Shell helpers use files to avoid nested PowerShell variable expansion, and merge gates use the exact SHA returned by GitHub.
+
+## Owner menu authenticated acceptance resolved — November 12, 2026
+
+The earlier otp_expired verifier blocker was resolved by selecting the newest Gmail delivery explicitly. Gmail had cached/grouped repeated messages and hidden the fresh link under Show trimmed content; the refreshed newest message had zero visible sign-in links before expansion and one afterward. That complete link, verified once with its original type, returned a genuine session. No Auth settings, template, account or password change was needed.
+
+Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
+
+
+## Diner first-consent dispatch — November 12, 2026
+
+The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T23:13:45.676Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:15:08.763Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:18:21.084Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-12T23:22:28.818Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T23:24:43.503Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-12T23:48:17.584Z","exitCode":1}
+```
+
+## Menu verification lifecycle and retention resolution — November 13, 2026
+
+Independent review reproduced three failures on disposable PostgreSQL using the
+restricted runtime role: retention without tenant context misclassified pending
+originals, stale draft versions were accepted for verification, and approval
+receipt replay returned a storage deletion action. Corrected with scoped locked
+retention, expected content versions and effect-free approval retries. Photo
+event sequencing and extracted-draft verification now use independent contiguous
+streams; content edits/retries invalidate verification without mutating published
+projections. Regression evidence: `backend/src/owner-menu.integration.ts` and
+`backend/src/owner-menu-retention.test.ts`. Earlier counts below are historical;
+current verification is recorded in PR #161. Hosted migration/deployment remains
+NOT RUN for this change.
+
+Transient observations during Phase 3 verification:
+- `lint` (exit 1): CommonJS require syntax in initial test file. Resolved by standardizing ESM imports and running `biome check --write .`.
+- `typecheck` (exit 2): R2 storage bucket type missing optional `delete` member in `backend/src/index.ts`, `verification_status` missing on `DishDraftRow`, and console package missing local contracts export references. Resolved with typed storage interface, updated `DishDraftRow` type in `backend/src/ingestion/repository.ts`, and local contract type mirroring in `frontend/console/src/owner-dashboard/menu-api.ts`.
+- `test` (exit 1): `cleanupStagedMenuPhotos` early-exit guard incorrectly treated `promotedRetentionDays: 0` as disabled. Resolved in `backend/src/owner-menu-retention.ts` by checking `promotedRetentionDays !== undefined`. Regression verified with `backend/src/owner-menu-retention.test.ts` and `backend/src/owner-menu.integration.ts`. Full test suite (86 test files, 1,417 tests) and all repository checks pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```
