@@ -348,5 +348,8 @@ describe('ingredient artwork approval', () => {
     expect(cleanupResult?.deleted).toBe(0);
     expect(cleanupResult?.protectedInFlight).toBe(1);
     expect(r2Objects.has(key)).toBe(true);
+    expect(db.query).toHaveBeenCalledWith('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `ingredient-artwork-blob:${venue}:${input.sha256}`,
+    ]);
   });
 });

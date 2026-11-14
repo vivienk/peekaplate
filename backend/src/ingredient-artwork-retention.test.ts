@@ -256,21 +256,19 @@ describe('artwork bucket resolution and retention cleanup', () => {
     const venue2 = '33333333-3333-4333-8333-333333333333';
     const deletedKeys: string[] = [];
 
-    let dbCall = 0;
     const tenantConfigs: string[] = [];
+    const advisoryLocks: string[] = [];
     const client = {
       query: vi.fn(async (sql: string, params?: unknown[]) => {
         if (sql.includes("set_config('app.tenant_id'")) {
           tenantConfigs.push(String(params?.[0]));
         }
-        if (sql.includes('SELECT DISTINCT sha256')) {
-          dbCall++;
-          const hashes = (params?.[1] as string[]) ?? [];
-          // Batched check returns none approved; per-key recheck for shaB simulates concurrent Phase C commit!
-          if (dbCall >= 2 && hashes.length === 1 && hashes[0] === shaB) {
-            return { rows: [{ sha256: shaB }] };
-          }
-          return { rows: [] };
+        if (sql.includes('pg_advisory_xact_lock')) {
+          advisoryLocks.push(String(params?.[0]));
+        }
+        if (sql.includes("status = 'approved' LIMIT 1") && params?.[1] === shaB) {
+          // Per-blob locked DB check catches concurrent Phase C approval before R2 delete!
+          return { rows: [{ sha256: shaB }] };
         }
         return { rows: [] };
       }),
@@ -310,6 +308,8 @@ describe('artwork bucket resolution and retention cleanup', () => {
     expect(res.errors).toBe(1);
     expect(tenantConfigs).toContain(venue);
     expect(tenantConfigs).toContain(venue2);
+    expect(advisoryLocks).toContain(`ingredient-artwork-blob:${venue}:${shaA}`);
+    expect(advisoryLocks).toContain(`ingredient-artwork-blob:${venue}:${shaB}`);
   });
 
   it('enforces maxPages across empty truncated pages', async () => {

@@ -202,6 +202,11 @@ export async function reviewArtwork(
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `ingredient-artwork:${venue}:${input.label}`,
     ]);
+    if (input.status === 'approved') {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `ingredient-artwork-blob:${venue}:${input.sha256}`,
+      ]);
+    }
     const current = await client.query<{ stream_id: string; version: number }>(
       'SELECT stream_id,version FROM app_private.ingredient_artwork_current WHERE tenant_id=$1 AND label=$2',
       [venue, input.label],

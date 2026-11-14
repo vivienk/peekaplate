@@ -75,6 +75,59 @@ async function fetchApprovedHashesForVenue(
   }
 }
 
+async function deleteOrphanWithBlobLock(params: {
+  client: Client;
+  storage: ArtworkRetentionStorage;
+  venueId: string;
+  key: string;
+  sha256: string;
+  gracePeriodMs: number;
+  nowMs: number;
+  dryRun: boolean;
+}): Promise<'deleted' | 'protected_approved' | 'protected_in_flight' | 'missing'> {
+  const { client, storage, venueId, key, sha256, gracePeriodMs, nowMs, dryRun } = params;
+  await client.query('BEGIN READ ONLY');
+  try {
+    await client.query("SET LOCAL lock_timeout = '2s'");
+    await client.query("SET LOCAL statement_timeout = '5s'");
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+      `ingredient-artwork-blob:${venueId}:${sha256}`,
+    ]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+    const ref = await client.query<{ sha256: string }>(
+      "SELECT sha256 FROM app_private.ingredient_artwork_current WHERE tenant_id = $1 AND sha256 = $2 AND status = 'approved' LIMIT 1",
+      [venueId, sha256],
+    );
+    if (ref.rows.length > 0) {
+      await client.query('COMMIT');
+      return 'protected_approved';
+    }
+    if (storage.head) {
+      const latest = await storage.head(key);
+      if (!latest) {
+        await client.query('COMMIT');
+        return 'missing';
+      }
+      if (!isOlderThanGrace(latest.uploaded, gracePeriodMs, nowMs)) {
+        await client.query('COMMIT');
+        return 'protected_in_flight';
+      }
+    }
+    if (!dryRun) {
+      await storage.delete(key);
+    }
+    await client.query('COMMIT');
+    return 'deleted';
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* Preserve the cleanup failure. */
+    }
+    throw error;
+  }
+}
+
 /**
  * Deletes unreferenced, revoked, or superseded ingredient artwork objects under
  * `ingredient-artwork/` after a grace period, while protecting any object
@@ -184,28 +237,26 @@ export async function cleanupOrphanedIngredientArtwork({
           return result;
         }
 
-        // Recheck head metadata (if supported) and DB approval right before deleting
-        // to close any race with a concurrent Phase B timestamp refresh / Phase C commit.
+        // Serialize head + DB approval recheck + R2 delete under the per-blob advisory
+        // lock shared with Phase C of reviewArtwork so an approved object cannot be deleted.
         try {
-          if (storage.head) {
-            const latest = await storage.head(candidate.key);
-            if (!latest) continue;
-            if (!isOlderThanGrace(latest.uploaded, gracePeriodMs, nowMs)) {
-              result.protectedInFlight++;
-              continue;
-            }
-          }
-          const latestApproved = await fetchApprovedHashesForVenue(client, venueId, [
-            candidate.sha256,
-          ]);
-          if (latestApproved.has(candidate.sha256)) {
+          const outcome = await deleteOrphanWithBlobLock({
+            client,
+            storage,
+            venueId,
+            key: candidate.key,
+            sha256: candidate.sha256,
+            gracePeriodMs,
+            nowMs,
+            dryRun,
+          });
+          if (outcome === 'protected_approved') {
             result.protectedApproved++;
-            continue;
+          } else if (outcome === 'protected_in_flight') {
+            result.protectedInFlight++;
+          } else if (outcome === 'deleted') {
+            result.deleted++;
           }
-          if (!dryRun) {
-            await storage.delete(candidate.key);
-          }
-          result.deleted++;
         } catch {
           result.errors++;
         }
