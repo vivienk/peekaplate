@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque. Strict artwork commands and public decorative mappings separate artwork approval from food facts.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -66,7 +66,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-actions.test.ts",
         "docs/owner-insight-actions.md",
         "packages/contracts/src/owner-menu.ts",
-        "packages/contracts/src/owner-menu.test.ts"
+        "packages/contracts/src/owner-menu.test.ts",
+        "packages/contracts/src/ingredient-artwork.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -74,7 +75,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "425b532e1a6415e33f54c6056ce1da0cd083c2d998af6fddfb41a5fedb8b1222"
+      "sourceFingerprint": "d7c9bbc505ae14496b0bb6874f14b828ef503cbb8df23b078837cd203156f005"
     },
     {
       "id": "tokens",
@@ -112,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. Consent, exposure and publication-swap behavior is unchanged. Ingredient tiles render existing Figma SVGs, then exact-name artwork from an operator-reviewed build catalogue; missing art or load errors retain labels. Generated art is never requested during browsing and cannot authorize food facts. Hosted trigger acceptance and remaining Compare/ingredient controls are separate.",
+      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. Consent, exposure, publication refresh and allergen behavior are unchanged. Live dish details refresh approved decorative artwork every 30 seconds; missing/revoked/error restores bundled art or text. Fixtures make no artwork requests.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -205,7 +206,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
         "tests/e2e/menu-triggers-live.spec.ts",
-        "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json"
+        "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json",
+        "frontend/diner/src/menu/liveArtwork.ts",
+        "tests/e2e/ingredient-artwork.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -214,7 +217,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "514c4bfd1dad19e2c97d2fd74729209c7267b849595d46b709399df2999bf3f8"
+      "sourceFingerprint": "5f47e7cdc0907d068f568fb2e1cad3b195aa9091e90c6b95c3c6295543ccbea0"
     },
     {
       "id": "console",
@@ -247,7 +250,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. PR161 adds revision-bound private draft verification and independent content-checked photo promotion; tenant-scoped retention remains disabled until configured. Synthetic demo labels are not live screen integration.",
+      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner menu workspace adds versioned manual drafts/private photos, grouped per-file uploads, PDF limits, URL materialization and fenced cancel/explicit retry. Approved facts survive legacy text edits; public bundles still require content/image approval. Owner HTTP reports remain synthetic-source gated. Internal comparisons preserve ordered evidence, per-period cohorts and complementary suppression. Owner-only insight actions retain versioned idempotent writes. Owner workspace authenticated staging acceptance passed; real S06–S09 integration remains separate. Venue-scoped artwork review uses staff authorization, versioned events/receipts/outbox and private R2 bytes. Public reads serve only current approved hashes with no-store.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -378,7 +381,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/review-bootstrap.ts",
         "docs/evidence/owner-menu-staging-2026-11-12.json",
         "backend/src/owner-menu-retention.ts",
-        "backend/src/owner-menu-retention.test.ts"
+        "backend/src/owner-menu-retention.test.ts",
+        "backend/src/ingredient-artwork.ts",
+        "backend/src/ingredient-artwork-routes.ts",
+        "backend/src/ingredient-artwork.test.ts",
+        "backend/src/ingredient-artwork.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -391,12 +398,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "2876a6834b9501ac72c950d58f582c51b4d16102d9a56f29f146bd280f4c4537"
+      "sourceFingerprint": "f9dfad564faa2d9ccbcd27cb0498506b4fd1272bb34d65b14f7231461d9739c7"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate.",
+      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate. Ingredient artwork has a tenant/RLS projection backed by canonical review events; no food approval schema changes.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -427,7 +434,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
         "tests/db/owner_menu_workspace.sql",
-        "migrations/20261113010000_menu_verification_lifecycle.sql"
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "migrations/20261113020000_ingredient_artwork.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -438,7 +446,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
+      "sourceFingerprint": "55688bf6afbbf5a73610a4b678b58b11fc7015568be08589aa82a370b3519a6b"
     },
     {
       "id": "measurement",
@@ -591,7 +599,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. Artwork reuses extraction and unchanged ingredient rules. Novel names receive stable artwork IDs; bounded local Gemini generation and tool plan/completion APIs produce review-only transparent assets, Reviewed decorative artwork can be exported to a diner build catalogue; this does not publish ingredients or alter food review gates.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves bounded attempts privately, sanitizes provider failures and retains unknown price states. Hosted V1 excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Ingredient evidence, food rules and publication gates are unchanged. Local generation creates review-only artwork with cached provenance. Explicit generated PNG approval auto-delivers through configured staff API with durable pinned retry requests; no token persistence or food approval.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -680,7 +688,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/ingredient_icon_generation.py",
         "processing/tests/test_ingredient_icon_generation.py",
         "processing/src/peekaplate_processing/ingredient_icon_export.py",
-        "processing/tests/test_ingredient_icon_export.py"
+        "processing/tests/test_ingredient_icon_export.py",
+        "processing/src/peekaplate_processing/ingredient_icon_delivery.py",
+        "processing/tests/test_ingredient_icon_delivery.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -689,7 +699,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ebc33aad592331610a6cd897946cf425249165a14ba939bda1c7de096ccce134"
+      "sourceFingerprint": "2a6dd1205f94de2fe2277483eac1c4eaee4058bae02daad38bc94fe4d1e89423"
     },
     {
       "id": "assets",
@@ -724,6 +734,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "processing",
+        "contracts",
+        "backend",
+        "database",
+        "diner"
+      ],
+      "summary": "PR165 adds automatic approved artwork delivery: configured local review uploads exact PNG through authorized venue API; event/projection/receipt/outbox commit atomically. Live dish details refresh approved art without rebuild; revocation and failures restore fallback. Local unit/Python/type/build and synthetic browser refresh checks pass. Real DB integration is wired to CI; Docker absent locally. No deployment, hosted migration or real-candidate approval.",
+      "sources": [
+        "docs/ingredient-icon-pipeline.md",
+        "backend/src/ingredient-artwork.ts",
+        "frontend/diner/src/menu/liveArtwork.ts",
+        "processing/src/peekaplate_processing/ingredient_icon_delivery.py"
+      ],
+      "next": "Complete independent review and database CI; deploy migration/API/diner and configure trusted review delivery once. Then each explicit approval delivers without export/rebuild."
+    },
     {
       "date": "2026-11-13",
       "modules": [
@@ -819,19 +847,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       ],
       "summary": "PR120 reconciles current develop without changing the verified menu upload/report/tracking boundaries. Pilot order imports use owner authorization, reviewed administrative POS mappings, explicit administrative tracking activation, historical publication resolution, idempotency and row quarantine. Strict calendar/time validation prevents invalid dates from reaching PostgreSQL; absent runtime archive storage fails closed. Import window90 days; raw-retention approval and purge activation remain separate.",
       "next": "Complete final review/CI and merge into develop. Hosted migrations/bindings, reviewed pilot mappings and explicit tracking activation are operator release gates. No staging/production deployment or real POS import was performed."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "diner"
-      ],
-      "summary": "PR78 reconciles develop while preserving ingredient/order-import work. Screens use the merged track, ID and clock modules; interim tracking remains removed. Local browser regressions reproduce preconsent timing/dangling exposure failures before fixes and pass afterward. Consent transitions create fresh eligible openings; refreshed publications cannot reuse old exposure IDs and record one menu view. Existing publication-withdrawal assertions still reject every post-withdrawal event. Local pnpm check/build pass: 1357 unit, 74 script, 137 Chromium and nine SDK/privacy cases; browser runs took 1.4 min and 10.4 s. CI exposed a withdrawal-fixture fake-time wait; the bounded poll now advances the delivery clock without weakening counts.",
-      "sources": [
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/menu-triggers-live.spec.ts",
-        "docs/posthog.md"
-      ],
-      "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
     }
   ]
 }

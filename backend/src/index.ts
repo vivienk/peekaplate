@@ -72,6 +72,7 @@ import {
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
 import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
+import { registerArtworkRoutes } from './ingredient-artwork-routes';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -125,6 +126,7 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
 ];
 
 export type Bindings = {
+  INGREDIENT_ARTWORK_ENABLED?: string;
   APP_ENV?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
@@ -889,7 +891,13 @@ export function createApp(services: Dependencies = dependencies) {
     maxSize: 16_384,
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
+  const artworkLimit = bodyLimit({
+    maxSize: 1_350_000,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
   app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/ingredient-icons\/review$/.test(c.req.path))
+      return artworkLimit(c, next);
     if (
       c.req.method === 'PUT' &&
       /^\/venues\/[^/]+\/menus\/upload-groups\/[^/]+\/files\/[0-4]$/.test(c.req.path)
@@ -914,7 +922,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:menus\/(?:uploads|upload-groups|url|jobs)(?:\/|$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:ingredient-icons(?:\/|$)|menus\/(?:uploads|upload-groups|url|jobs)(?:\/|$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -939,6 +947,11 @@ export function createApp(services: Dependencies = dependencies) {
       maxAge: 86400,
     }),
   );
+  registerArtworkRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+  });
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);

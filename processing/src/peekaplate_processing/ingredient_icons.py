@@ -154,6 +154,11 @@ class IconStore:
         if not reviewer.strip() or not reason.strip():
             raise ValueError("Reviewer and reason cannot be blank")
         self._put("decisions", key, decision.model_dump(mode="json"))
+        if status == "approved":
+            from .ingredient_icon_delivery import HostedIconDelivery
+            delivery = HostedIconDelivery.from_environment()
+            if delivery is not None:
+                return delivery.deliver(self, key, reason)
 
     def resolve(self, key, ingredient_id):
         """Only reviewed artwork can be proposed; missing/corrupt art becomes text."""

@@ -36,45 +36,91 @@ or UI is claimed to match pixel-for-pixel. The diner integration reuses the
 repository's existing Figma SVG exports; no generated substitute is approved or
 shipped by default.
 
-## Diner ingredient component integration
+## Automatic approved artwork delivery
 
-`frontend/diner/src/menu/dishDetail.ts` now renders decorative ingredient artwork
-above the existing visible label. `icons.ts` looks up an existing Figma SVG first,
-then an exact normalized label in a reviewed, build-time generated catalogue.
-An absent mapping, missing bundled file or image-load error leaves the label
-visible. Images have empty alternative text and are hidden from assistive
-technology because the adjacent label already names the ingredient. Existing
-allergen notes, food contracts and approval/publication commands are unchanged.
+The implemented hosted path replaces the manual export/rebuild requirement for live
+menus. After one initial migration/API/diner deployment and review-environment
+configuration, `IconStore.review(..., status="approved")` automatically uploads
+that exact generated PNG and records its approval through the staff API. No
+per-icon source edit, export or diner rebuild is needed. The operator still makes
+the explicit visual review decision; generation alone does not publish artwork.
 
-The generation stage remains an ingestion/operator action, never a diner-browser
-request. The browser receives no provider credentials, extraction drafts, review
-records or arbitrary remote artwork URLs. It decorates only ingredient names
-already supplied by the existing fixture or verified published menu path.
+The dish-details controller asks for the approved artwork matching the existing
+published ingredient labels on entry and every 30 seconds while open. Hosted
+approved artwork takes precedence over bundled Figma decoration. A missing,
+revoked, malformed or unavailable hosted result restores the bundled Figma icon
+or visible ingredient text. An image loading failure does the same. Navigation
+aborts requests and stops refreshing. Fixture screens never mount this network
+controller. Food facts, allergen notes, publication hashes and tracking identities
+are not changed by decorative artwork updates.
 
-After a human reviews a generated illustration, record its exact asset decision
-using `IconStore.review`. Supply a separate export selection file mapping exact
-display names to approved asset IDs, for example `{"Coconut":"<asset ID>"}`.
-Export to a **new** directory:
+### One-time setup
+
+1. Apply `migrations/20261113020000_ingredient_artwork.sql` through the normal
+   migration workflow and deploy the updated API and diner once. Staging config
+   enables `INGREDIENT_ARTWORK_ENABLED=true`; other environments must enable it
+   explicitly. The API reuses the private ingestion R2 binding under a separate
+   `ingredient-artwork/<venue>/<sha256>.png` prefix. It exposes only the current
+   approved object through its authenticated-review/public-read routes.
+2. Keep the diner's existing live-menu `VITE_PUBLIC_API_URL` configuration. No
+   additional browser credential or artwork URL setting is needed.
+3. In the trusted review process, configure `INGREDIENT_ICON_API_URL` (HTTPS API
+   origin), `INGREDIENT_ICON_VENUE_ID`, and `INGREDIENT_ICON_STAFF_TOKEN` (a current
+   staff token with owner/editor membership in that venue). Never put this token
+   in `VITE_*`, Git, a browser, or a generation prompt. Local HTTP is allowed only
+   on localhost/127.0.0.1 for tests. Partial configuration fails explicitly.
+
+Approve the exact image using the existing Python API or the new review CLI:
 
 ```sh
-PYTHONPATH=processing/src python -m peekaplate_processing.ingredient_icon_export \
-  --catalogue work/ingredient-icons \
-  --selections work/diner-icon-selections.json \
-  --output work/diner-icon-export
+PYTHONPATH=processing/src python -m peekaplate_processing.ingredient_icon_delivery \
+  --catalogue work/ingredient-icons --asset-id <exact-asset-id> \
+  --status approved --reviewer <reviewer-name> --reason 'Ingredient and style checked'
 ```
 
-The command validates artwork identity, approval and content hashes before
-writing `catalogue.json` and content-addressed PNG/WebP files. Any invalid
-selection rejects the whole export. Review the output and replace the complete
-contents of `frontend/diner/src/assets/icons/generated-ingredients/` with that
-export, then commit and rebuild the diner. Replace the whole directory on removal
-or withdrawal so obsolete artwork is not retained. Revocation of deployed static
-art requires a new build; this is not a live catalogue service.
+With delivery configured, approval calls the API automatically. Without it, the
+CLI explicitly reports local-only review. Generated PNG is the hosted transport
+format; WebP must not be silently converted after its hash was reviewed. The
+existing static exporter remains an optional offline workflow, not a prerequisite
+for the live screen. The real coconut/chicken candidates remain unapproved until
+a human explicitly reviews them.
 
-The committed generated catalogue starts empty: the actual coconut candidate is
-still pending visual approval, so Coconut displays as text in the diner until its
-reviewed export is added. Tests exercise synthetic approved coconut bytes through
-the exporter and the frontend resolver. They do not approve the real candidate.
+### Routes and authority
+
+- `GET /venues/:venueId/ingredient-icons?label=<normalized label>` returns the
+  current review version to authorized staff.
+- `POST /venues/:venueId/ingredient-icons/review` takes the strict shared
+  `ArtworkCommandSchema`. Approval includes exact PNG bytes/hash, source asset,
+  recipe/style, rights confirmation, reason, command ID and expected version.
+  Revocation includes label, reason, command ID, expected version and
+  `status: "revoked"`. A new approval can replace revoked art at the next version.
+- `GET /public/venues/:venueId/ingredient-icons?label=...` returns only approved
+  decorative mappings for those labels. It does not declare that a dish contains
+  an ingredient. Reads are venue-scoped and return no reviewer/provenance data.
+- `GET /public/venues/:venueId/ingredient-icons/image?label=...&sha256=...` checks
+  current approval, reads the bounded object, checks its hash, then rechecks
+  approval. Old/revoked URLs return 404. Catalogue and image responses use
+  `Cache-Control: no-store`; an already-open screen refreshes within 30 seconds
+  plus request time. This is bounded refresh, not instantaneous push revocation.
+
+Review reauthorizes owner/editor membership inside the transaction. It locks the
+command and label stream, checks the expected version, stores bytes before the
+approved pointer, then atomically writes the canonical event, projection, command
+receipt and outbox. A failed upload never publishes a pointer. A failed database
+transaction may leave an unreachable private content object; no route serves it.
+Pure event replay updates no storage and emits no work. Repeated commands return
+the saved result without restoring a later-revoked pointer or writing bytes again.
+
+The Python delivery hook persists a credential-free request before sending it.
+Network retries use the same command and expected version; a lost reply can be
+recovered by repeating the same review. Version conflicts never silently rebase
+over another reviewer. Three bounded transport attempts are made; an outage
+returns an explicit error with the local decision/request retained. Recovery is
+a retry of that approval, not an export or rebuild. Tokens are never persisted.
+
+This code change does not deploy services, apply hosted migrations, provision
+credentials, or prove live Gemini acceptance. Hosted generation scheduling and a
+visual review UI remain separate from this approved-art delivery path.
 
 The curated vocabulary includes all 32 observed names and four explicit
 plural/seed aliases. Other explicit ingredient phrases now receive deterministic
@@ -111,7 +157,7 @@ The selection manifest pins that version. Missing decisions, rejection, wrong
 ingredient joins, missing bytes and checksum mismatches fall back to text. Identical
 imports/decisions are idempotent; conflicting overwrite attempts fail. Decisions
 are final in this offline store: revisions need a new asset recipe/version. A
-hosted revocation lifecycle must be implemented before this is a shared service.
+hosted approval/revocation path described above owns current diner delivery separately from these immutable local decisions.
 
 The deterministic output cache key covers source/draft evidence digests, mapping
 and style versions, and resolved artwork versions. Each build revalidates assets;
@@ -240,10 +286,9 @@ style is a candidate based on the inspected Figma geometry; exact exported Figma
 assets and final visual approval remain outstanding. The first concept is simpler;
 the request-generated candidate includes a whole coconut, half and pieces.
 
-Hosted durable queues, global spend limits, authenticated owner routes, asset
-revocation and publication integration remain the next implementation stages.
+Hosted generation queues, global spend limits and visual review UI remain future work. Authenticated decorative artwork review/delivery and revocation are now implemented as described above.
 
-### 3 Add shared contracts and private hosted storage
+### 3 Original broader hosted plan (automatic decorative delivery above now implemented)
 
 Introduce strict TypeScript schemas for icon proposals, generation recipes,
 asset metadata and review commands, with shared Python/TypeScript fixtures.
@@ -294,20 +339,15 @@ never expand into a guessed recipe. Missing artwork does not block reviewing
 valid facts. Ingredient corrections invalidate existing selections; neither an
 artwork approval nor a saved draft can skip the allergen/human-review gate.
 
-### 5 Publish only through the existing gate
+### 5 Food publication remains unchanged
 
-Extend the immutable public-menu bundle contract only after owner-confirmed
-ingredients and the existing publication checks pass. Pin the selected approved
-asset ID/hash and display label to the published dish revision. Public assets may
-use long-lived immutable caching; the current publication pointer and withdrawal
-mechanism remain authoritative. Revocation invalidates affected publication
-selections and retires public references through the existing workflow.
-
-Diner components use the inspected design tokens and exact exported artwork,
-show visible text labels, avoid duplicate screen-reader announcements, and retain
-text on image load/hash/decode failure. Do not create allergen-free badges from
-missing icons. Layout/accessibility, small-screen and physical-device checks are
-required after UI integration; none is claimed by this local processing change.
+The live artwork catalogue decorates ingredient labels already present in the
+verified published menu. It cannot add ingredients, change allergen facts, approve
+a draft or publish a menu. Artwork approval and revocation have their own
+versioned event stream. Dynamic artwork is deliberately outside the immutable
+food-content bundle; public responses contain only generic decorative mappings,
+not source text or unpublished dish associations. Existing menu withdrawal and
+publication refresh behavior remains authoritative for which dishes can be seen.
 
 ## Acceptance tests and rollout
 
@@ -326,7 +366,7 @@ publication-to-diner flow, then a restaurant-validated pilot. Roll out behind a
 default-off feature flag; disabling it restores text-only ingredients. The plan
 does not authorize deployment or change any existing food-safety review policy.
 
-## Recorded local verification
+## Historical verification before automatic delivery
 
 - PASS: `PYTHONPATH=processing/src ../noka-pr118-20261110/venv/bin/python -m unittest discover -s processing/tests` — final full suite: 527 tests in 68.976 seconds.
 
@@ -362,3 +402,11 @@ Final verification rerun: PASS — 538 Python tests in 51.950 seconds, including
 - PASS: `pnpm verify lint context:check docs:check`.
 - PASS: the ingredient rendering/error-fallback test and existing allergen accessibility test in `tests/e2e/menu-states.spec.ts`; screenshot inspected at 390px. A temporary configuration changed only the local port to 5283 and started only the diner server because port 5173 was occupied.
 - NOT RUN: hosted publication-to-diner acceptance, live Gemini API generation, or visual approval of the real coconut candidate. PR #147's fixture photos are separate and were not copied into this branch.
+
+## Automatic delivery verification
+
+- PASS: full local Python suite and 43 focused ingredient tests, including approval-triggered delivery, exact PNG bytes, safe replay after a lost response, and rejection of unreviewed art.
+- PASS: `pnpm verify typecheck test build` — 1,429 unit tests (4 skipped), 74 script tests, both frontends and Worker dry-run.
+- PASS: `tests/e2e/ingredient-artwork.spec.ts` in an isolated diner browser harness on port 5283: the same open screen acquires approved art, restores fallback after revocation and stops requests on teardown. API responses in this browser test are synthetic.
+- NOT RUN locally: real PostgreSQL suite (Docker is unavailable). `backend/src/ingredient-artwork.integration.ts` is included by the existing CI database runner and covers real approval/read/image/revocation routes, tenant/RLS boundaries, transaction failure, concurrency, receipt replay and event reconstruction.
+- NOT RUN: hosted deployment/migration, live configured staff-token delivery, live Gemini image generation. Initial deployment/configuration is required; subsequent artwork approvals need no export/rebuild.
