@@ -3773,6 +3773,171 @@ describe('importOrderOutcomes service', () => {
         expect(importRes.status).toBe('completed');
       });
 
+      it('keeps imports blocked on failed deletion until operator retries and independent checker verifies PASS', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        const checkerId = '00000000-0000-4000-8000-000000000777';
+        const authorizedCheckerIds = new Set([operatorId, checkerId]);
+        const client = createMockClient(state) as any;
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: storage.list!,
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+          reason: 'data_cleanup',
+        });
+
+        let failR2Delete = true;
+        const flakyStorage: Parameters<typeof deleteVenueOrderData>[0]['storage'] = {
+          ...storage,
+          delete: vi.fn(async (key: string) => {
+            if (failR2Delete) {
+              throw new Error('simulated R2 delete failure');
+            }
+            return storage.delete(key);
+          }),
+        };
+
+        await expect(
+          deleteVenueOrderData({
+            client,
+            operatorId,
+            venueId,
+            requestId,
+            storage: flakyStorage,
+            authorizedOperatorIds,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_storage_failed', status: 502 });
+
+        expect(state.deletionRequests?.get(`${venueId}:${requestId}`)?.status).toBe('failed');
+        expect(state.deletionRequests?.get(`${venueId}:${requestId}`)?.error_code).toBe(
+          'r2_delete_failed',
+        );
+
+        // Imports must remain blocked while request is in 'failed' state
+        await expect(
+          importOrderOutcomes({
+            client,
+            actorId: ownerId,
+            venueId,
+            csvText:
+              'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-FAIL,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+            now: () => new Date('2026-11-12T12:00:00Z'),
+            bundleLoader: async () => state.bundleContent!,
+          }),
+        ).rejects.toMatchObject({ code: 'deletion_in_progress', status: 409 });
+
+        // Operator retries recovery with the same requestId
+        failR2Delete = false;
+        const retryRes = await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage: flakyStorage,
+          authorizedOperatorIds,
+        });
+        expect(retryRes.status).toBe('awaiting_verification');
+
+        // Independent checker verifies PASS -> transitions to verified -> unblocks imports
+        const passRes = await verifyVenueOrderDeletion({
+          client,
+          checkerId,
+          venueId,
+          requestId,
+          outcome: 'PASS',
+          evidenceRef: 'clickup:recover-1',
+          verificationStorage,
+          authorizedCheckerIds,
+        });
+        expect(passRes.status).toBe('verified');
+
+        const importRes = await importOrderOutcomes({
+          client,
+          actorId: ownerId,
+          venueId,
+          csvText:
+            'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-RECOVERED,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+          now: () => new Date('2026-11-12T12:00:00Z'),
+          bundleLoader: async () => state.bundleContent!,
+        });
+        expect(importRes.status).toBe('completed');
+      });
+
+      it('retains stored v0.1 agreement acceptance after verified pilot_withdrawal deletion (current semantics)', async () => {
+        const { state, r2Objects, storage, operatorId, authorizedOperatorIds } =
+          makeDeletionFixture();
+        state.agreementAcceptances = new Map();
+        const checkerId = '00000000-0000-4000-8000-000000000777';
+        const authorizedCheckerIds = new Set([operatorId, checkerId]);
+        const client = createMockClient(state) as any;
+
+        await acceptPilotOrderAgreement({
+          client,
+          actorId: ownerId,
+          venueId,
+          agreementVersion: 'v0.1',
+        });
+
+        const verificationStorage: OrderDeletionVerificationStorage = {
+          list: storage.list!,
+          get: async (key: string) => {
+            const val = r2Objects.get(key);
+            if (!val) return null;
+            return { text: async () => val, json: async () => JSON.parse(val) };
+          },
+        };
+
+        await submitOrderDataDeletionRequest({
+          client,
+          actorId: ownerId,
+          venueId,
+          requestId,
+          reason: 'pilot_withdrawal',
+        });
+        await deleteVenueOrderData({
+          client,
+          operatorId,
+          venueId,
+          requestId,
+          storage,
+          authorizedOperatorIds,
+        });
+        const passRes = await verifyVenueOrderDeletion({
+          client,
+          checkerId,
+          venueId,
+          requestId,
+          outcome: 'PASS',
+          evidenceRef: 'clickup:withdraw-1',
+          verificationStorage,
+          authorizedCheckerIds,
+        });
+        expect(passRes.status).toBe('verified');
+        expect(state.agreementAcceptances.has(`${venueId}:v0.1`)).toBe(true);
+
+        const importRes = await importOrderOutcomes({
+          client,
+          actorId: ownerId,
+          venueId,
+          csvText:
+            'schema_version,order_id,order_line_id,ordered_at,pos_item_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-WITHDRAW-AFTER,LINE-1,2026-11-12T12:00:00Z,POS-1,ordered,1',
+          now: () => new Date('2026-11-12T12:00:00Z'),
+          bundleLoader: async () => state.bundleContent!,
+        });
+        expect(importRes.status).toBe('completed');
+      });
+
       it('reconciles completed and intent-only R2 ledger entries after restore, keeping freeze active on anomalies', async () => {
         const operatorId = '00000000-0000-4000-8000-000000000888';
         const authorizedOperatorIds = new Set([operatorId]);
