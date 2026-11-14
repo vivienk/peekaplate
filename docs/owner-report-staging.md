@@ -46,10 +46,11 @@ Production reports remain disabled.
 
 ## Console report connection
 
-PR 128 adds the report reader and validated screen states. With API/venue settings,
-the caller must supply a genuine owner-session token; the default token getter is
-still a sign-in integration seam and returns no token. PRs 143/146 remain separate.
-Without those settings the preview uses a clearly labelled saved synthetic report.
+PR 128 adds the report reader and validated screen states. The
+[session bridge](owner-session-workspace.md) connects merged #143/#146 using a
+verified actor-bound SDK token and server-returned restaurant ID. The live
+workspace supplies an explicit live source and never falls back to saved data.
+The separate synthetic preview keeps its labelled saved report without a session.
 Switching source, venue, API or token getter clears retained values before the next
 screen commit; a late response cannot replace the currently selected report.
 Browser tests intercept requests with a stand-in token. They verify rendering and
