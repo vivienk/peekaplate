@@ -78,6 +78,7 @@ export type DishDraftRow = {
   origin?: 'extracted' | 'manual';
   draft_version?: number;
   manual_fields?: unknown;
+  verification_status?: 'not_verified' | 'verified';
 };
 
 export const DEFAULT_LEASE_TIMEOUT_MINUTES = 15;
@@ -367,6 +368,7 @@ export async function persistExtractedDrafts(
             evidence = EXCLUDED.evidence,
             review_warnings = EXCLUDED.review_warnings,
             draft_version = app_private.dish_drafts.draft_version + 1,
+            verification_status = 'not_verified',
             updated_at = now()
         WHERE app_private.dish_drafts.review_status = 'pending';`,
         [

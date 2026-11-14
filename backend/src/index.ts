@@ -137,6 +137,7 @@ export type Bindings = {
   INGESTION_REPORTS_BUCKET?: {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    delete?(key: string): Promise<unknown>;
   };
   EXTRACTION_SERVICE_URL?: string;
   EXTRACTION_SERVICE_SECRET?: string;
