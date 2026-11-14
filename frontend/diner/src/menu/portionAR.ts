@@ -1,14 +1,6 @@
 import type { PublicPortion } from '@peekaplate/contracts';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import {
-  createPortionXRPanel,
-  intersectTable,
-  isQuestBrowser,
-  type PortionXRFrame,
-  portionInputRay,
-  portionXRSessionOptions,
-} from './portionXR';
 
 export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
@@ -96,12 +88,7 @@ export function bindPortionAR(
     video.muted = true;
     document.body.append(dialog);
     dialog.showModal();
-    const quest = isQuestBrowser(navigator.userAgent);
-    if (!quest) orientation?.request();
-    if (quest) {
-      dialog.querySelector<HTMLElement>('.pp-ar__rotate-hint')!.hidden = true;
-      dialog.querySelector<HTMLDetailsElement>('.pp-ar__settings')!.open = true;
-    }
+    orientation?.request();
     button('close').focus();
     const abort = new AbortController();
     let live = true;
@@ -177,36 +164,11 @@ export function bindPortionAR(
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
-    const xrPanel = createPortionXRPanel();
-    scene.add(xrPanel.mesh);
-    const xrRay = new THREE.Ray();
-    let xrPhoto: THREE.Mesh | undefined;
-    if (originalPhoto?.complete && originalPhoto.naturalWidth) {
-      const photoTexture = new THREE.Texture(originalPhoto);
-      photoTexture.colorSpace = THREE.SRGBColorSpace;
-      photoTexture.needsUpdate = true;
-      xrPhoto = new THREE.Mesh(
-        new THREE.PlaneGeometry(
-          0.5,
-          (0.5 * originalPhoto.naturalHeight) / originalPhoto.naturalWidth,
-        ),
-        new THREE.MeshBasicMaterial({ map: photoTexture, side: THREE.DoubleSide }),
-      );
-      xrPhoto.visible = false;
-      scene.add(xrPhoto);
-    }
-    const rayFor = (frame: XRFrame, input?: XRInputSource) => {
-      if (!space) return false;
-      const ray = portionInputRay(frame, space, input);
-      if (!ray) return false;
-      xrRay.copy(ray);
-      return true;
-    };
 
     const disposeObject = (object: THREE.Object3D) => {
       const textures = new Set<THREE.Texture>();
       object.traverse((node) => {
-        if (!(node instanceof THREE.Mesh) && !(node instanceof THREE.Line)) return;
+        if (!(node instanceof THREE.Mesh)) return;
         node.geometry.dispose();
         for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
           for (const value of Object.values(material))
@@ -279,11 +241,7 @@ export function bindPortionAR(
     const changed = () => {
       content.rotation.y = THREE.MathUtils.degToRad(Number(rotation.value));
       content.scale.setScalar(
-        tracked
-          ? physicalSize
-            ? 1
-            : Number(size.value) / 100
-          : (cameraScale * Number(size.value)) / 100,
+        tracked && physicalSize ? 1 : (cameraScale * Number(size.value)) / 100,
       );
     };
     rotation.addEventListener('input', changed);
@@ -328,13 +286,6 @@ export function bindPortionAR(
       }
       // Keep the cutout upright at its contact point; it remains a flat image, not inferred geometry.
       anchor.quaternion.identity();
-      if (tracked) {
-        const viewer = renderer!.xr.getCamera();
-        anchor.rotation.y = Math.atan2(
-          viewer.position.x - anchor.position.x,
-          viewer.position.z - anchor.position.z,
-        );
-      }
       placed = true;
       anchor.visible = true;
       reticle.visible = false;
@@ -369,7 +320,7 @@ export function bindPortionAR(
         return;
       }
       message.textContent = tracked
-        ? 'Look at a table and point at its surface. Select the ring to place the dish.'
+        ? 'Move your phone slowly over a table. Wait for the placement ring.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     });
     canvasHost.addEventListener('pointerup', (event) => {
@@ -386,38 +337,6 @@ export function bindPortionAR(
       ray.ray.at(0.85 / -ray.ray.direction.z, anchor.position);
     });
 
-    let activeInput: XRInputSource | undefined;
-    const updateReticle = (frame: XRFrame, input?: XRInputSource) => {
-      if (!space) return;
-      reticle.visible = false;
-      if (rayFor(frame, input)) {
-        let closest: THREE.Vector3 | undefined;
-        for (const plane of (frame as PortionXRFrame).detectedPlanes ?? []) {
-          const pose = frame.getPose(plane.planeSpace, space);
-          if (!pose) continue;
-          const point = intersectTable(
-            xrRay,
-            new THREE.Matrix4().fromArray(pose.transform.matrix),
-            plane.polygon,
-          );
-          if (
-            point &&
-            (!closest || point.distanceTo(xrRay.origin) < closest.distanceTo(xrRay.origin))
-          )
-            closest = point;
-        }
-        if (closest) {
-          reticle.matrix.makeTranslation(closest.x, closest.y + 0.002, closest.z);
-          reticle.visible = true;
-        }
-      }
-      if (!reticle.visible && hits && input?.targetRayMode !== 'tracked-pointer') {
-        const pose = frame.getHitTestResults(hits)[0]?.getPose(space!);
-        reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
-        if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
-      }
-      place.disabled = !reticle.visible;
-    };
     const activate = () => {
       running = true;
       start.hidden = tracked || !xrSupported;
@@ -426,42 +345,18 @@ export function bindPortionAR(
       resize();
       renderer!.setAnimationLoop((_time, frame) => {
         if (!live) return;
-        if (tracked && frame && space) {
-          const viewer = renderer!.xr.getCamera();
-          xrPanel.mesh.visible = true;
-          xrPanel.mesh.position
-            .set(0.55, 0, -1.2)
-            .applyQuaternion(viewer.quaternion)
-            .add(viewer.position);
-          xrPanel.mesh.quaternion.copy(viewer.quaternion);
-          if (xrPhoto) {
-            xrPhoto.position
-              .set(-0.4, 0, -1)
-              .applyQuaternion(viewer.quaternion)
-              .add(viewer.position);
-            xrPhoto.quaternion.copy(viewer.quaternion);
-          }
-          xrPanel.update(
-            placed ? 'Dish placed · point and select controls' : 'Aim at a table · select to place',
-            plate
-              ? 'Owner plate footprint · dish appearance approximate'
-              : 'Approximate size · no owner plate measurement',
-            mode.textContent || 'Show 3D',
-          );
-          if (!placed) {
-            const inputs = Array.from(session!.inputSources);
-            updateReticle(
-              frame,
-              activeInput && inputs.includes(activeInput)
-                ? activeInput
-                : inputs.find((item) => item.targetRayMode === 'tracked-pointer'),
-            );
-          }
+        if (tracked && frame && hits && space && !placed) {
+          const pose = frame.getHitTestResults(hits)[0]?.getPose(space);
+          // Only approximately horizontal, upward-facing surfaces qualify as tables/floors.
+          reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
+          if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
+          place.disabled = !reticle.visible;
+          if (reticle.visible) placeDish();
         }
         renderer!.render(scene, camera);
       });
       message.textContent = tracked
-        ? 'Look at a table, then select the placement ring. If no surface appears, complete your headset room setup.'
+        ? 'Move your phone slowly over a table. The dish will appear when a table is detected.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     };
     const startCamera = async (useTracked = false) => {
@@ -482,10 +377,11 @@ export function bindPortionAR(
         }
         if (tracked) {
           // Called directly from this click, before any await, preserving user activation.
-          const next = await navigator.xr!.requestSession(
-            'immersive-ar',
-            portionXRSessionOptions(dialog),
-          );
+          const next = await navigator.xr!.requestSession('immersive-ar', {
+            requiredFeatures: ['hit-test', 'dom-overlay'],
+            optionalFeatures: ['local-floor'],
+            domOverlay: { root: dialog },
+          });
           if (!live) {
             await next.end();
             return;
@@ -496,41 +392,17 @@ export function bindPortionAR(
           session = next;
           session.addEventListener('end', close, { once: true });
           renderer.xr.enabled = true;
-          for (let index = 0; index < 2; index++) {
-            const controller = renderer.xr.getController(index);
-            const beam = new THREE.Line(
-              new THREE.BufferGeometry().setFromPoints([
-                new THREE.Vector3(),
-                new THREE.Vector3(0, 0, -3),
-              ]),
-              new THREE.LineBasicMaterial({ color: 0xaaffee }),
-            );
-            controller.add(beam);
-            scene.add(controller);
-          }
           renderer.xr.setReferenceSpaceType('local');
           await renderer.xr.setSession(session);
           if (!live) return;
           space = await session.requestReferenceSpace('local');
           const viewer = await session.requestReferenceSpace('viewer');
-          hits = await session.requestHitTestSource?.({ space: viewer })?.catch(() => undefined);
+          hits = await session.requestHitTestSource!({ space: viewer });
           if (!live) {
             hits?.cancel();
             return;
           }
-          session.addEventListener('select', (event) => {
-            if (!live || !rayFor(event.frame, event.inputSource)) return;
-            activeInput = event.inputSource;
-            const action = xrPanel.select(xrRay);
-            if (!placed) updateReticle(event.frame, event.inputSource);
-            if (action === 'rotate') {
-              rotation.value = String(((Number(rotation.value) + 210) % 360) - 180);
-              changed();
-            } else if (action === 'original') {
-              if (xrPhoto) xrPhoto.visible = !xrPhoto.visible;
-            } else if (action) button(action).click();
-            else if (!placed) placeDish();
-          });
+          session.addEventListener('select', placeDish);
         } else {
           activate();
           placeDish();
@@ -558,25 +430,20 @@ export function bindPortionAR(
           void session.end().catch(close);
         } else {
           tracked = false;
-          if (!quest) xrSupported = false;
-          if (quest && renderer) {
-            activate();
-            placeDish();
-          }
+          xrSupported = false;
           start.hidden = false;
-          start.textContent = quest ? 'Enter Quest mixed reality' : 'Try camera preview';
+          start.textContent = 'Try camera preview';
           scaleStatus.textContent =
             'Approximate preview · camera unavailable · open Adjust view to retry';
-          message.textContent = quest
-            ? 'Mixed reality could not start. Try again or go Back to the 2.5D preview.'
-            : 'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
+          message.textContent =
+            'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
         }
       } finally {
         busy = false;
         if (live) start.disabled = false;
       }
     };
-    start.addEventListener('click', () => void startCamera(xrSupported));
+    start.addEventListener('click', () => void startCamera(xrSupported && running));
 
     mode.addEventListener('click', () => {
       if (!model) return;
@@ -589,10 +456,6 @@ export function bindPortionAR(
     dialog.dataset.visual = '2.5d';
     updateScaleStatus();
     const url = modelUrl();
-    if (!url) {
-      mode.disabled = true;
-      mode.textContent = '3D not generated · showing 2.5D';
-    }
     if (url) {
       mode.hidden = false;
       mode.disabled = true;
@@ -657,25 +520,16 @@ export function bindPortionAR(
     // Camera preview needs no immersive-session gesture: show the dish immediately,
     // then let the browser handle permission. Surface tracking remains an optional upgrade.
     start.textContent = 'Try camera preview';
-    if (!quest && isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function')
+    if (isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function')
       void startCamera();
     else
       message.textContent =
         'Camera access needs a secure connection and a supported browser. Back returns to the 2.5D preview.';
     void (navigator.xr?.isSessionSupported('immersive-ar') ?? Promise.resolve(false))
       .then((supported) => {
-        if (!live) return;
-        if (!supported) {
-          if (quest)
-            message.textContent = 'Immersive AR is unavailable. Back returns to the 2.5D preview.';
-          return;
-        }
+        if (!live || !supported) return;
         xrSupported = true;
-        if (quest)
-          message.textContent =
-            'Enter mixed reality, then point at your table and select to place the dish.';
-        start.textContent = quest ? 'Enter Quest mixed reality' : 'Start table AR';
-        start.disabled = false;
+        start.textContent = 'Start table AR';
         start.hidden = false;
       })
       .catch(() => {});

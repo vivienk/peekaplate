@@ -10,7 +10,6 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
-    "@types/leaflet": "1.9.21",
     "@types/three": "0.182.0",
     "vite": "8.3.4"
   },
@@ -19,7 +18,6 @@
     "@peekaplate/contracts": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
     "@peekaplate/ui": "workspace:*",
-    "leaflet": "1.9.4",
     "three": "0.182.0"
   }
 }

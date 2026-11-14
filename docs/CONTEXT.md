@@ -52,8 +52,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
-        "packages/contracts/src/portion.ts",
-        "packages/contracts/src/dining.ts"
+        "packages/contracts/src/portion.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -61,7 +60,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f4595b67db8e530b2fb1e23fdd7cfbb1770ae47d024fae6247e3ea994a22dd97"
+      "sourceFingerprint": "894aa3dd45d227e79c5959effd7bb344feafde1733b3103cffd90bd1791661ac"
     },
     {
       "id": "tokens",
@@ -99,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu, portions and gated Quest discovery. Quest home opens a sourced restaurant directory and self-hosted regional map; phone/direct-menu entry stays intact. Connected reviewed catalogs provide dish detail/portion and unpaid pickup-request carts; missing receiving service stays unavailable. PR162 retains calibrated footprint, approximate camera and generated-model paths. No production activation, real restaurant receipt or physical-device acceptance is established.",
+      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate. Photo preparation invokes reusable portion ingestion; PR147 fixtures are exports of this processor, with build-time freshness checks.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -190,10 +189,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionPreview.ts",
         "frontend/diner/src/menu/portion3d.ts",
         "frontend/diner/src/menu/portionAR.ts",
-        "frontend/diner/src/menu/portionXR.ts",
-        "frontend/diner/src/menu/portionXR.test.ts",
-        "tests/e2e/portion-quest.spec.ts",
-        "playwright.quest.config.ts",
         "scripts/local-model-proxy.mjs",
         "scripts/local-model-proxy.test.mjs",
         "frontend/diner/src/menu/portionRenderer.ts",
@@ -222,16 +217,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/portion_ingestion.py",
         "processing/src/peekaplate_processing/plate_calibration.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
-        "processing/tests/test_portion_ingestion.py",
-        "frontend/diner/src/dining/entry.ts",
-        "frontend/diner/src/dining/screen.ts",
-        "frontend/diner/src/dining/cart.ts",
-        "frontend/diner/src/dining/style.css",
-        "frontend/diner/src/dining/locations.json",
-        "frontend/diner/src/dining/region.json",
-        "frontend/diner/src/dining/dining.test.ts",
-        "tests/e2e/dining.spec.ts",
-        "docs/quest-dining.md"
+        "processing/tests/test_portion_ingestion.py"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -240,7 +226,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8fd90e6c1e989b8cfec2db0454f2621d623225ad06794387b62c2fdeaf26dc94"
+      "sourceFingerprint": "9ac3dc587c667b12a7774e9c135fbe8b43271ddb3d1dccb763bf67c159f3449f"
     },
     {
       "id": "console",
@@ -271,7 +257,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono API with verified staff auth, tenant-scoped commands, approved publication, bounded ingestion/review workflows, public menu delivery and token-scoped observation ingestion. Owner/team reports retain their separate authority and evidence boundaries. Gated dining API adds server-priced unpaid pickup requests, current-publication validation, atomic event/projection/receipt/outbox and a membership-checked inbox. Missing configuration fails closed; real PostgreSQL and restaurant delivery acceptance remain unverified.",
+      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence, with per-metric/cohort and complementary suppression. Local/staging HTTP reports require exactly one source=synthetic and a configured server-allowlisted venue; production fails closed. S4-RES CLI builds canonical immutable bundles from approved tenant-scoped dish/review facts and verified T0 assets, with explicit privileged transactional admission; no approval/publication is implied. AI-01 drafts/abstention and frozen offline evaluation remain separate. Existing ingestion/review commands are preserved. Diner verification/hosting are described in the diner node; full pilot acceptance remains gated and queues stay paused.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -370,11 +356,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/bundle-producer.integration.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
-        "docs/owner-report-staging.md",
-        "backend/src/dining.ts",
-        "backend/src/dining.test.ts",
-        "migrations/20261114120000_dining_orders.sql",
-        "docs/adr/0017-quest-dining-requests.md"
+        "docs/owner-report-staging.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -387,7 +369,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "aff127fad2e3d29fac5f95cd16c80ca0cd4c21f97b5610737295e8102c6f1c89"
+      "sourceFingerprint": "4f93ae528cd727e94068ee9f1ecbb0233d7f9d601c058c5075b949ad22eae702"
     },
     {
       "id": "database",
@@ -505,7 +487,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "2fe349d3c77c7f74936f6c302498e225b2d57119bcc086179ba95df2846b316d"
+      "sourceFingerprint": "dfb624c6547fa1e28c6c8e0d3bd402987f59c16c9998e4fe4e20fb4f1ab8f9c6"
     },
     {
       "id": "agents",
@@ -705,23 +687,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-14",
-      "summary": "Quest directory covers eleven source-verified locations across Noka, Son & Garden and Farmhouse. Unpaid pickup requests use server pricing and atomic order event/projection/receipt/outbox; unknown locations remain unavailable. Preview has no receiving backend. Phone and existing portion paths preserved.",
-      "modules": [
-        "diner",
-        "contracts"
-      ],
-      "next": "Review ADR0017; run PostgreSQL restricted-role/concurrency checks, bind real approved menus and staff receiver, then separately approve backend activation. No live orders or production changes."
-    },
-    {
-      "date": "2026-11-14",
-      "summary": "Quest is the primary headset portal: immersive-ar with optional hit-test/plane detection/DOM overlay, explicit surface selection, spatial rotate/reposition/model/photo/back controls. iPhone retains automatic camera preview. Generated 3D stays optional and approximate; no new generation or publication is triggered.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Run real Quest room setup, table placement, model switching and exit acceptance; browser mocks do not establish headset behavior."
-    },
-    {
       "date": "2026-11-13",
       "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. PR147 fixtures have no invented measurements.",
       "modules": [
@@ -793,6 +758,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
+    },
+    {
+      "date": "2026-11-10",
+      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
+    },
+    {
+      "date": "2026-11-09",
+      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
+      "modules": [
+        "backend",
+        "delivery"
+      ],
+      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
     }
   ]
 }
