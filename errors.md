@@ -3042,6 +3042,41 @@ The comparison SQL scope change also required updating both test clients that de
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
+
+
+## Owner auth integration - November 11, 2026
+
+Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.
+
+
+## Auth email editor - November 11, 2026
+
+An editor replacement retained part of the previous HTML. A complete-source
+comparison exposed the mismatch; the complete document was selected and pasted,
+then compared before the corrected save and on reopening. No email was sent
+from the intermediate source. Source equality, persisted preview and the actual
+branded Gmail recovery email now pass. Use whole-document selection/paste and
+verify copied source rather than assuming a generic editor set-value replaces
+all Monaco content. No provider credentials, accounts or mail links are recorded.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
+```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:18:39.671Z","exitCode":2}
 ```
 
@@ -3138,6 +3173,14 @@ The first full check also caught strict indexed-access typing in the added test 
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
 
+
+## Owner auth resend and reconciliation — November 12, 2026
+
+The provider adapter lacked the optional resendConfirmation method, so the live confirmation screen correctly hid Resend. The actual-SDK regression failed before the method existed; the adapter now calls signup resend with the exact confirmation callback and SDK-managed PKCE. Unit/provider browser checks cover the resent-link exchange, cooldown, throttling and sanitized errors. These use synthetic HTTP, not newly delivered real mail. Three document conflicts were reconciled by retaining both additive guide/error histories and current develop modules plus auth context; fingerprints are refreshed separately.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T20:07:34.810Z","exitCode":1}
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T23:13:45.676Z","exitCode":1}
@@ -3386,6 +3429,14 @@ contains the dashboard demo, and the normal build excludes it.
 
 The standalone DATA06 suite passed thirteen tests, but the default Vitest discovery returned an empty array and normal CI would not execute these cases. Four new files also failed Biome formatting, and the PR verification section lacked the required exact-command status entries. DATA06 paths are now included in normal test/typecheck commands; formatting and PR evidence are corrected. The expanded fourteen fixture tests pass; deliberate empty descriptive and missing suppression-status mutations fail at their assertions. One selected real local Worker/PostgreSQL owner-report journey passes; this is supporting report evidence, not an absent DATA06 producer. No provider request, hosted migration or deployment occurred.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T06:15:42.376Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-AUTH-CHECK-CACHE","status":"resolved","area":"local-auth-verification","cause":"The restricted execution environment redirected browser/Corepack caches, preventing a standalone renderer and a build command from starting normally.","prevention":"Use the existing installed Chromium executable for isolated HTML rendering and the authorized normal runtime for existing auth/build checks; do not install new dependencies or weaken tests.","regression":"Four local email render checks and the same provider/build checks pass. A stopped readiness attempt executed no provider assertions; it is not counted as a passed run."}
+```
 
 ## Restaurant URL preparation: local Pages routing
 
@@ -3448,6 +3499,25 @@ publication/event/receipt/outbox write and a successful identical retry: all
 140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
 push/PR creation because the operator email was unverified; after verification,
 the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
 
 ## November 10 evening DATA-01 acceptance synchronization
 
