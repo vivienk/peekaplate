@@ -1327,6 +1327,35 @@ The shell could not locate the repository-requested RTK wrapper; native commands
 
 Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
 
+## 2026-10-31 — Offline AI evaluation verification boundary
+
+The existing verification-runner test that invokes real pnpm failed before its
+check because automatic installation again hit the Windows store-symlink EPERM.
+The other seven runner tests passed. This is the previously recorded environment
+limit, not an AI case failure; do not disable the test. The source-pinned Vitest
+run passed all 46 AI tests, including 21 new synthetic development evaluation
+cases, and the focused strict TypeScript check passed. Full frozen installation,
+the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
+## 2026-11-03 — AI report input verification
+
+The new report-input suite initially failed collection because its implementation
+did not yet exist. After implementation, 20 report-input cases passed alongside
+46 existing AI cases using the source-pinned local configuration. Focused strict
+TypeScript also passed. A Biome invocation from the parent workspace encountered
+nested root configuration; running from this repository corrected the invocation.
+Frozen dependency installation still fails at pnpm store project symlink creation
+with EPERM, matching the earlier Windows limitation. Full workspace and hosted
+integration remain unverified in this environment; source aliases do not verify
+frozen dependency wiring.
+
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -2282,6 +2311,39 @@ Complete the frozen installation and rerun workspace checks before treating
 them as green. Dedicated development evidence is synthetic, not independent
 rubric, live model, hosted reporting or production acceptance.
 
+## November 8 PR112 stack synchronization
+
+The report-input implementation and its 20 tests are unchanged from the prior
+Draft. Synchronization inherits the reviewed core privacy fix and the corrected
+21-case evaluation oracle. All 67 focused core/contracts/evaluation/input cases,
+backend/contracts strict types and context/docs checks pass with the existing
+installation. The frozen-install and broader workspace limitations above remain
+open until dependencies are repaired and those checks are rerun. No unmerged
+report schema, SQL producer, live model or hosted integration was adopted.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T18:59:18.059Z","exitCode":1}
+```
+
+## November 8 normal-install validation follow-up
+
+The contributor completed normal `pnpm install --frozen-lockfile` on this
+checkout: eight workspace projects, 213 policy-checked lock entries, exit 0.
+The missing diner workspace import is resolved. Without the dependency-status
+warning override, lint, all seven package typechecks and all 57 application test
+files pass (925 tests passed, four skipped) on the synchronized #112 source.
+Build, context and documentation checks also pass; the Worker build is dry-run.
+Wrangler's optional log-file write reports a local permission warning, without
+changing the successful build exit or performing a deployment.
+
+The remaining `pnpm check` failure is observation
+2026-11-08T18:59:18.059Z: `scripts/preview.test.mjs` cannot create the junction
+needed to test artifact-symlink rejection. The other 66 script tests pass. This
+is a test-setup permission failure before the rejection assertion; retain that
+security regression and verify it in a normal terminal or Linux CI. Do not
+claim the aggregate check passed in this agent environment.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T19:03:06.421Z","exitCode":1}
@@ -2299,6 +2361,57 @@ inside the agent sandbox; the other 66 script tests pass. Do not skip or alter
 that rejection test. Normal-terminal/Linux verification remains necessary for
 the aggregate check. Initial installation/temporary-path failures above remain
 historical observations; they are not failures in the corrected AI oracle.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T19:06:08.980Z","exitCode":1}
+```
+
+## November 8 normal-terminal verification resolution
+
+The first contributor-terminal launch stopped before typechecking because the
+provided PATH omitted the pnpm executable required by nested package scripts
+(observation 2026-11-08T19:06:08.980Z). A task-local launcher now consistently
+selects existing Node 24.22.1 and project-pinned pnpm 11.25.0 for parent and child
+commands; no repository scripts, engine policy or dependency versions changed.
+
+The contributor reran normal `pnpm check` successfully: lint, all seven package
+typechecks, 925 application tests (four skipped), all 67 script tests including
+the artifact-symlink rejection regression, context and documentation links.
+This resolves the missing-workspace-link issue and supplies normal-terminal
+evidence for the test blocked by the agent's junction permission. Earlier agent
+failures remain recorded; none was bypassed by skipping or weakening a test.
+Only this ledger and documentation changed after that source validation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T19:06:55.022Z","exitCode":1}
+```
+
+
+## November 8 PR77 cached-page identity correction
+
+Three new core.test.ts cases reproduced cached-page sequence reuse, resurrection of an expired visit and reuse after stored state disappeared. identity.ts now reconciles the persisted identity before saving on pageshow, preserves the maximum sequence for the same producer, adopts a newer visit and starts fresh when persistent state cannot be recovered. All 44 tracking tests and four Chromium lifecycle/fixture tests pass. The first context handoff exceeded the 1000-character summary cap; its guard prevented any write. The summary was shortened and fingerprints refreshed without dropping either side of the append-only merge ledger.
+
+
+## November 8 PR80 withdrawal and atomic-store corrections
+
+Four RED storage/public-dispatch regressions reproduced cold-page withdrawal replay, 25 delayed additions crossing withdrawal/re-opt-in, interleaved event loss and stale snapshots after receipt/clear. Atomic IndexedDB transactions and Web-Locked localStorage now update the latest record; pending reads are authoritative. Retiring a pipeline synchronously invalidates its queued additions and stops its batcher. Reopening waits for durable clearing, retries an unconfirmed clear and uses visit memory if it still fails. A further RED fault test proved failed clearing could otherwise replay old work; it now passes. Browser checks cover two genuine tabs, transaction abort after request success, memory fallback without Web Locks and the actual banner with both destinations. Shared consent injection preserves console behavior and removes the separate legacy diner capture path.
+
+The first local merge helper stopped at the summary cap, but a missing exit guard allowed conflict markers into an unpublished merge commit. Recovery reconstructed both parent graphs and path sets, preserved both append-only ledger sides and amended only that unpublished merge. Legacy handoffs without date fields are retained without assuming a common date shape. Subsequent mutation steps stop at the first nonzero result; context:check and git diff --check verify the repaired result before push. A test-only LockGrantedCallback generic annotation was corrected after strict TypeScript rejected it.
+
+## November 8 PR80 failed-clear recovery follow-up
+
+Independent review identified two additional paths: failed clearing lost its pending state after a reload, and clearing a fallback memory store could incorrectly certify that a temporarily unavailable IndexedDB backend was empty. Both regressions replayed the old event before correction. Withdrawal now records deletion-work tokens in sessionStorage/localStorage and explicitly clears both durable backends; incomplete clearance keeps new work in memory and is retried on reopening. Completion records cannot erase a newer request. Eight withdrawal unit tests cover reload, fallback, overlap and unreadable markers; a real Chromium reload test seeds both backends, interrupts IndexedDB access and verifies that old records never reach delivery after recovery. All-storage-write failure remains an explicit documented limitation; no hosted acceptance is inferred.
+
+Tooling corrections: a Windows rg path containing a wildcard was treated literally; use directory paths with rg's glob filter instead. A revised PR description initially omitted the repository's three required context labels; the exact body now passes scripts/check-pr.mjs before publishing.
+
+
+## November 8 PR74 reconciliation and invalid-field focus
+
+The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
+
+The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
 
 ## November 9 append-only history reconciliation
 
@@ -2332,6 +2445,17 @@ Inter font dependency before a normal installation, and the existing artifact
 symlink rejection test cannot create its junction in this sandbox. Keep all
 three tests and install the frozen dependencies before the next full check.
 This is not an aggregate-check pass or live AI/report acceptance.
+
+## November 9 Draft report-input synchronization
+
+The Draft stack now includes the synchronized evaluation and develop 93194f2.
+AI core, report-input, contracts and evaluation source are byte-identical to
+the previous Draft head; only the inherited foundations and reconciliation
+documentation change. All 67 focused AI/contract/input cases pass, together
+with lint, all seven package typechecks, context freshness and documentation
+links using the existing installation. The new Inter font installation and
+sandbox junction limitations recorded above remain unresolved for the full
+aggregate check. Keep #112 Draft; this is not live report/model/UI acceptance.
 
 ## November 9 normal-terminal stack verification
 
@@ -2376,6 +2500,20 @@ The security test is retained unchanged. Lint, seven package typechecks,
 context freshness and local documentation links passed separately; Linux CI
 or a normal contributor terminal must establish the complete check.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:47:24.995Z","exitCode":1}
+```
+
+## November 9 evening Draft stack full-check boundary
+
+The synchronized Draft source 5d26fc8 passes lint, seven package typechecks and
+1084 application tests (four optional skips). Of 67 script tests, 66 pass;
+only the unchanged artifact-symlink regression cannot create its junction in
+this agent sandbox. The complete normal-terminal check remains to be supplied.
+The focused 67 AI/contract/input cases and clean 21-case standard evaluation
+already pass. This note does not claim live producer/report/model acceptance.
+
 ## November 9 final offline-evaluation environment
 
 The frozen offline installation could not load missing package metadata from the
@@ -2391,6 +2529,72 @@ fresh report, frozen dataset/counts and unique passing records before returning
 success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 Draft report-input compatibility synchronization
+
+PR112 synchronizes develop085ecfd after PR107 and PR82 merged. The merge has
+conflicts only in the shared context and append-only ledger. Both parent context
+path sets and complete historical ledger paragraphs are retained. The shell
+could not locate RTK, so native PowerShell commands use the existing pinned
+Node/pnpm launcher; no engine, lockfile or dependency policy is relaxed.
+
+The widened owner_report.v1 schema makes unknown pipeline freshness reachable
+as is_stale=null. A new synthetic NORMAL-report regression reproduces the old
+validator returning all three rates as available (20 existing cases passed,
+one new case failed). The minimal guard now returns value-free missing metrics
+for unknown freshness while preserving the original null metadata. Verified
+fresh numeric zero remains available. The combined AI/report/contract suites
+pass 122 cases, and all five inherited evaluation CLI completeness regressions
+pass. The frozen 21-case oracle, CLI runner, report gate and reporting behavior
+are not changed by this correction. Clean-source evaluation and aggregate CI
+remain separate evidence; this does not establish the internal producer
+identity/cohort/freshness handoff, live model/report integration or acceptance.
+
+The synchronized `pnpm check` passes lint, seven package typechecks and all 68
+application test files (1106 passed, four existing optional skips). Of 72 script
+tests, 71 pass; only the unchanged artifact-symlink security test fails because
+the Windows agent sandbox cannot create its junction. The full aggregate check
+is therefore FAIL, not PASS. Separate lint/type/context/docs checks pass with 13
+modules, ten handoffs and links in 56 Markdown files; frontend builds and Worker
+dry run also pass. Matching-head Linux CI must establish the complete quality,
+browser and database evidence without skipping or weakening any test.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T07:13:17.443Z","exitCode":1}
+```
+
+## November 10 AI report-to-core adapter development
+
+The new seam suite initially failed because the consumer mapping export did not
+exist (15 failing cases, one rejection case passing). After adding the pure
+adapter, all 16 cases pass against the unchanged deterministic core. The adapter
+binds explicit caller context and honors the shared complementary-suppression
+projection; it never generates producer identities or restores hidden values.
+An initial direct Biome check reported two test line-wrapping differences; the
+formatter corrected those without changing assertions. Backend typecheck passes.
+The frozen development oracle, shared contracts, producer SQL and model/API
+behavior are unchanged. Final aggregate checks and pinned review are recorded
+separately; this development result is not live producer or hosted acceptance.
+
+The first context refresh rejected the expanded backend summary because it
+exceeded the existing 1,000-character bound. The summary was compacted while
+retaining the parent responsibilities and source paths; the checker bound was
+not changed. Refresh and validation must pass before committing this candidate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:47:51.902Z","exitCode":1}
+```
+
+The corrected context refresh passes with all 13 modules and ten handoffs.
+`pnpm verify lint typecheck context:check docs:check` passes, including all seven
+package typechecks and links in 56 Markdown documents. `pnpm verify build`
+passes the frontend builds and Worker dry run, without deployment. `pnpm check`
+passes 1,122 application cases (four optional skips) and 71 of 72 script cases;
+its aggregate result is FAIL because the unchanged artifact-symlink security
+test cannot create a Windows junction in this sandbox (EPERM). The test remains
+intact. Linux CI must establish the complete aggregate result on the final head.
 
 ## November 10 published-menu refresh and browser verification
 
@@ -2451,6 +2655,48 @@ single-worker verification is recorded separately rather than hiding that run.
 All 111 browser checks then passed with one worker in 96.794 seconds, including
 the unchanged outbox-capacity case and the three refresh focus regressions.
 The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+## November 10 AI consumer forward synchronization after PR85
+
+Draft PR112 forward-merges develop e0eed262 without changing the AI adapter,
+frozen evaluation or upstream published-menu source. Shared context combines
+the separate backend and diner summaries, and both complete failure histories
+are preserved. Structural lint, seven workspace typechecks, context and local
+documentation checks pass.
+
+The first direct targeted run failed before collecting any tests because the
+sandbox denied a Vite SSR cache rename in the operating-system temporary
+directory. Using a task-owned temporary directory permits test collection. A
+parallel retry passes 171 cases but times out one unchanged upstream live-menu
+dynamic-import assertion. No implementation or assertion was altered. A
+single-worker rerun passes all 172 targeted AI/report/menu-state cases across
+11 files, and all five evaluation-CLI completeness regressions pass. These
+results do not erase the preceding failed runs or establish browser/hosted
+acceptance. The known junction-limited aggregate check is not repeated; exact
+head Linux CI remains required after pushing this synchronization.
+
+## November 10 internal producer-constructor consumer test seam
+
+Three added tests call the real owner report reader/private constructor with
+mock SQL aggregate rows and observe its internal input to the real disclosure
+projector. The first unchanged run passes all three. No production defect or
+RED-to-GREEN production fix is claimed: the existing constructor intentionally
+retains unknown freshness, so normal/zero/suppressed examples abstain in AI.
+
+A separate controlled test-side probe falsely labelled only the captured
+freshness copy as verified while the real projector still received the original
+input. All three tests failed their null-freshness assertions as expected. The
+test file was restored byte-for-byte and the production source was never
+altered. This is assertion sensitivity evidence, not a failed production run,
+SQL verification, authority proof or permission to enable live recommendations.
+
+After restoration, all 52 scoped reader/input/adapter/seam cases pass across
+four files. `pnpm verify lint typecheck context:check docs:check` passes, including
+seven workspace typechecks and the existing 13-module/10-handoff graph. The
+frozen standard evaluation is checked separately on the final clean commit.
+The full junction-dependent aggregate, database and hosted checks are not rerun
+for this test/documentation-only addition; final matching-head CI remains a
+separate check.
 
 
 ## PR117 reconciliation and capture-reference validation — 2026-11-10
@@ -2529,6 +2775,32 @@ the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
 
+
+## November 10 evening AI consumer synchronization
+
+Fixed develop96b8de1 includes the reviewed bundle producer, report CORS/release
+records and exact-byte diner connection/publication-suspension work. This
+forward merge resolves only shared context and append-only error-history conflicts;
+both complete ledger tails and all parent source paths are retained. AI
+runtime, production policy and the frozen evaluation source are unchanged.
+New context records identify the exact synchronized source; refreshed hashes
+do not establish hosted readiness. Verification results belong to this new
+clean commit and are recorded in the handoff. No service, deployment, database
+or provider action is performed by this synchronization.
+
+The normal pnpm context-refresh entry attempted dependency synchronization
+after the upstream manifest/lock metadata changed. Windows sandbox project-link
+creation failed with EPERM before the context command ran. No dependency policy,
+engine, lockfile or security test is changed. Direct pinned-Node context/docs
+commands and the existing standard evaluation script provide bounded local
+evidence; the normal aggregate/frozen-install lane remains for exact-head Linux CI.
+
+Direct pinned-Node lint checks 351 files without fixes. Context validates all
+13 modules and ten bounded handoffs, and local links in 59 Markdown documents
+pass. Protected-source comparisons retain the previous AI runtime/oracle and
+the exact new upstream producer/diner implementation. Standard clean-source
+evaluation follows the merge commit; no full suite, database or browser run is
+implied by this documentation-conflict synchronization.
 
 ## Extraction release observations retained during reconciliation
 
