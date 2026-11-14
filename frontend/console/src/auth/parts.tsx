@@ -6,8 +6,10 @@ import { type ReactNode, type Ref, useId, useState } from 'react';
 import { Button, Input } from '../ui';
 import arrowLeft from './assets/arrow-left.svg';
 import badge from './assets/badge.svg';
+import checkIcon from './assets/check.svg';
 import envelopeLineArt from './assets/envelope-line-art.svg';
 import errorIcon from './assets/error.svg';
+import errorMark from './assets/error-mark.svg';
 import eyeOpen from './assets/eye.svg';
 import eyeOff from './assets/eye-off.svg';
 import type { BannerCopy } from './copy';
@@ -308,6 +310,24 @@ export function OrDivider() {
     <p className="pp-auth-divider">
       <span>or</span>
     </p>
+  );
+}
+
+// S04 "Password updated": the Figma 96px Orange/500 circle with the 32px check icon. Decorative.
+export function DoneMark() {
+  return (
+    <span className="pp-auth-mark pp-auth-mark--done" aria-hidden="true">
+      <img src={checkIcon} alt="" width="32" height="32" />
+    </span>
+  );
+}
+
+// S04 "This reset link can't be used": the Figma 96px Error mark. Decorative.
+export function ErrorMark() {
+  return (
+    <span className="pp-auth-mark" aria-hidden="true">
+      <img src={errorMark} alt="" width="96" height="96" />
+    </span>
   );
 }
 

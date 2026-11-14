@@ -56,3 +56,9 @@ main:has(> .pp-auth) {
   font-size: inherit;
   line-height: inherit;
 }
+
+.pp-auth-demo__choices > button {
+  min-height: 2.75rem;
+  padding: 0 var(--pp-space-12);
+  font: inherit;
+}

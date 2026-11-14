@@ -20,7 +20,7 @@ const DEMOS = [
   { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
 ];
 // Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
-const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html'];
+const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
 

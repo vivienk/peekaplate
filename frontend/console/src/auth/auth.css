@@ -504,6 +504,36 @@
   gap: var(--pp-space-24);
 }
 
+/* S04 result screens (Password updated, link can't be used): 80 top and bottom, a 96px mark 48 above
+ * the heading, the button and Back to sign in 20 apart. */
+.pp-auth__card--reset-done,
+.pp-auth__card--reset-signout-pending,
+.pp-auth__card--reset-invalid {
+  padding-block: var(--pp-space-80);
+}
+
+.pp-auth-status__top:has(> .pp-auth-mark) {
+  gap: var(--pp-space-48);
+}
+
+.pp-auth-status__actions {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pp-auth-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 6rem;
+  height: 6rem;
+}
+
+.pp-auth-mark--done {
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+}
+
 /* Envelope illustration: Envelope line art 320x150 with a 50px Orange/500 badge at (194, 30) and a
  * 26px bold "1". */
 .pp-auth-mail {
@@ -650,4 +680,9 @@
   .pp-auth-status__top {
     gap: var(--pp-space-32);
   }
+}
+
+/* S03 / S04 forms: Back to sign in 20 below the button. */
+.pp-auth__form + .pp-auth__back {
+  margin-top: 1.25rem;
 }

@@ -11,7 +11,11 @@ import {
 } from './supabase-auth';
 
 const isConfirmation = window.location.pathname === '/auth-confirm.html';
-let confirmationCode = isConfirmation ? readConfirmationCode(window.location.href) : null;
+const isRecovery = window.location.pathname === '/auth-reset.html';
+const isCallback = isConfirmation || isRecovery;
+let confirmationCode = isCallback
+  ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
+  : null;
 // No query-controlled redirects. Callback code stays in this tab's memory, never rendered/stored.
 if (window.location.search || window.location.hash)
   window.history.replaceState(null, '', window.location.pathname);
@@ -22,16 +26,17 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
   const [message, setMessage] = useState('');
   const [callbackState, setCallbackState] = useState(
-    isConfirmation ? (confirmationCode ? 'ready' : 'invalid') : 'none',
+    isCallback ? (confirmationCode ? 'ready' : 'invalid') : 'none',
   );
+  const [recoveryEmail, setRecoveryEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(!isConfirmation);
+  const [loading, setLoading] = useState(!isCallback);
 
   useEffect(() => {
     function rejectChangedCallback() {
       confirmationCode = null;
       window.history.replaceState(null, '', window.location.pathname);
-      if (isConfirmation) setCallbackState('invalid');
+      if (isCallback) setCallbackState('invalid');
     }
     window.addEventListener('hashchange', rejectChangedCallback);
     window.addEventListener('popstate', rejectChangedCallback);
@@ -42,9 +47,9 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, []);
 
   useEffect(() => {
-    if (isConfirmation) return;
-    let active = true;
     const unsubscribe = auth.onSignedOut(() => setOwner(null));
+    if (isCallback) return unsubscribe;
+    let active = true;
     void auth
       .signedInOwner()
       .then((current) => {
@@ -69,7 +74,20 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
       setMessage('Your session could not be verified. Please sign in again.');
     }
     setOwner(current);
+    setCallbackState('none');
   }
+
+  if (isRecovery && (callbackState === 'recovery' || callbackState === 'invalid'))
+    return (
+      <OwnerAuth
+        service={auth.service}
+        onSignedIn={signedIn}
+        onAccountCreated={signedIn}
+        initialStep={callbackState === 'recovery' ? 'reset' : 'reset-invalid'}
+        initialEmail={recoveryEmail}
+        key={callbackState}
+      />
+    );
 
   if (callbackState !== 'none')
     return (
@@ -79,14 +97,18 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
             ? 'Email confirmed'
             : callbackState === 'invalid'
               ? 'This confirmation link cannot be used'
-              : 'Confirm your email'}
+              : isRecovery
+                ? 'Open password reset'
+                : 'Confirm your email'}
         </h1>
         <p>
           {callbackState === 'invalid'
             ? 'Use the newest email in the same browser where you registered, or return to sign in.'
             : callbackState === 'confirmed'
               ? 'Your email is confirmed. Sign in to continue.'
-              : 'Select Continue to finish confirming your email. This does not grant access to a restaurant.'}
+              : isRecovery
+                ? 'Select Continue to verify the newest recovery link before choosing a password.'
+                : 'Select Continue to finish confirming your email. This does not grant access to a restaurant.'}
         </p>
         {callbackState === 'ready' && (
           <button
@@ -97,8 +119,16 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
               setBusy(true);
               const code = confirmationCode;
               confirmationCode = null;
-              const result = await auth.confirmEmail(code ?? '');
-              setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
+              if (isRecovery) {
+                const result = await auth.openRecovery(code ?? '');
+                if (result.kind === 'ready') {
+                  setRecoveryEmail(result.email);
+                  setCallbackState('recovery');
+                } else setCallbackState('invalid');
+              } else {
+                const result = await auth.confirmEmail(code ?? '');
+                setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
+              }
               setBusy(false);
             }}
           >

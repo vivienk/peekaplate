@@ -3040,10 +3040,17 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
+
 
 ## Owner auth integration - November 11, 2026
 
 Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.
 
 
 ## Auth email editor - November 11, 2026
@@ -3055,6 +3062,18 @@ from the intermediate source. Source equality, persisted preview and the actual
 branded Gmail recovery email now pass. Use whole-document selection/paste and
 verify copied source rather than assuming a generic editor set-value replaces
 all Monaco content. No provider credentials, accounts or mail links are recorded.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
+```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
 
 <!-- automatic observation; not root cause -->
 ```json

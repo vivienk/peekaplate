@@ -96,6 +96,15 @@ PR preview builds force the connection off even if ambient config is present.
 - Recovery must prove a fresh recovery exchange before changing a password;
   merely visiting the reset page or having a normal session is insufficient.
   Reset completion signs out and returns to Sign in. PR #146 owns that behavior.
+  If the password changed but server sign-out cannot be confirmed, the success
+  screen explicitly warns about that partial result instead of suggesting the
+  password update failed. The pinned SDK removes the local session before its
+  local-scope revocation request. Failed callback exchanges preserve any unrelated
+  existing owner session.
+  Recovery permission is bound to that exchange's token, and password updates use
+  an isolated in-memory SDK session. Another tab signing in/out or refreshing the
+  shared session cancels recovery; an in-flight account switch cannot change the
+  password request's actor. A cancelled attempt requires a fresh recovery email.
 
 ## Verification and remaining gates
 
@@ -214,5 +223,9 @@ acceptance; a hosted console deployment, production acceptance and complete
 owner/dashboard navigation are not included in these PASS results.
 
 ## November 13 email refinement and reconciliation (143)
+
+Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.
+
+## November 13 email refinement and reconciliation (146)
 
 Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.

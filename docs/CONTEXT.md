@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Stacked recovery binds purpose/session and isolates password changes in memory. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -282,7 +282,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/supabase-auth.ts",
         "playwright.auth.config.ts",
         "tests/e2e/owner-auth-provider.spec.ts",
-        "tests/e2e/owner-auth.spec.ts"
+        "tests/e2e/owner-auth.spec.ts",
+        "frontend/console/auth-reset.html",
+        "frontend/console/src/auth/recovery-provider.test.tsx",
+        "tests/e2e/owner-recovery.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -292,7 +295,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "19263226fe0d67d26729626cc2ee285636d19fdfd53638671d909f9818ca2820"
+      "sourceFingerprint": "3e792a869a0e1d87cb23674ba88b33b20b532865c25f4103702b9de1cec23e47"
     },
     {
       "id": "backend",
@@ -600,7 +603,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "b3b8433939edde4eabf5310881269555646b7ecce60ce089bddd30a8e9b0235c"
+      "sourceFingerprint": "91feea8dab260e402258bf4786b287eb0154d6701de0faa51eb258330424248f"
     },
     {
       "id": "agents",
@@ -796,19 +799,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-13",
       "modules": [
-        "console"
-      ],
-      "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
-      "sources": [
-        "frontend/console/src/owner/PublishSuccessDialog.tsx",
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "tests/e2e/owner-onboarding.spec.ts"
-      ],
-      "next": "Reconcile/merge after PR125 and recheck develop. Connected restaurant setup/auth/publication and full owner journey remain separate acceptance work."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
         "backend"
       ],
       "summary": "PR167 fixes impossible mocked opening cohorts, explicitly checks EMPTY and all suppressed comparison metrics, and separates mocked serialization from actual SQL/staging evidence. Two PostgreSQL regressions reproduced inclusive-end exposure/checkpoint errors and pass with half-open owner SQL. Existing synthetic starter fixtures use test traffic and cannot prove the fixed allowlisted hosted venue is synthetic. is_stale remains null without a trusted completion signal.",
@@ -927,6 +917,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console"
       ],
       "summary": "PR143 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
+      "sources": [
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html",
+        "frontend/console/email-templates/README.md",
+        "docs/owner-auth.md",
+        "frontend/console/vite.config.ts"
+      ],
+      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR146 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
       "sources": [
         "frontend/console/email-templates/confirm-signup.html",
         "frontend/console/email-templates/reset-password.html",
