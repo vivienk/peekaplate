@@ -60,7 +60,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fa54092261206ba84a8b76fd29a370b886cf79a6832bd20ba0b32da463015ae6"
+      "sourceFingerprint": "894aa3dd45d227e79c5959effd7bb344feafde1733b3103cffd90bd1791661ac"
     },
     {
       "id": "tokens",
@@ -226,7 +226,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2b7c0efdcdbc4d6c797e335da120fdfa2caed4a328b0d755170c96e4bc5d0d3b"
+      "sourceFingerprint": "9ac3dc587c667b12a7774e9c135fbe8b43271ddb3d1dccb763bf67c159f3449f"
     },
     {
       "id": "console",
@@ -649,7 +649,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "59e7770e4033da0eafb3bed04eedc17c61a248a02e942322661bd5d6a5b6d68a"
+      "sourceFingerprint": "2260c927521b7d38b93b3e8c20e6b43f0cb9b79ae9cd446438062f6a35f71a81"
     },
     {
       "id": "assets",
@@ -682,14 +682,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "processing"
       ],
-      "sourceFingerprint": "579848ba03985e69d91446fb235c91b4d1ba33eed5a1d40b03a8d88bb4be7ac6"
+      "sourceFingerprint": "7554bbacde3d96dbcb782fd6a7dfba5f0aae72e8b4e7f0fd857561e5bd7cfc85"
     }
   ],
   "handoffs": [
     {
       "date": "2026-11-13",
       "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. PR147 fixtures have no invented measurements.",
-      "modules": ["diner", "contracts", "processing"],
+      "modules": [
+        "diner",
+        "contracts",
+        "processing"
+      ],
       "next": "Verify measured footprint on physical supported phones against the real plate. Owner console/public authenticated ingestion and approved publication remain separate; local review UI is DEV-only."
     },
     {
@@ -771,15 +775,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
-    },
-    {
-      "date": "2026-11-09",
-      "summary": "PR107 final re-review verifies opening-based timing coverage, ordered pair attribution, small timed/opened cohort masking and the reserved synthetic-venue HTTP gate. Both Sol review lanes clear the author fixes. Fresh local checks pass: 113 focused tests, 1068 unit/67 script tests, 213 SQL assertions and 77 real PostgreSQL/Worker tests. Builds pass. No runtime fix was needed; this handoff corrects the contract summary and records evidence.",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "next": "Merge the tested report foundation into develop. Keep the route gated to the explicitly configured reserved synthetic venue. DATA08 overlapping-filter suppression, verified pipeline freshness and hosted/product acceptance remain gates before real-data reporting."
     }
   ]
 }

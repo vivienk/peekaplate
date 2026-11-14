@@ -2848,3 +2848,12 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T05:18:59.690Z","exitCode":1}
 ```
+
+- 2026-11-13 calibration final verification: initial full suite could not bind test HTTP servers (EPERM); rerunning with authorized local networking passed 1225 unit and81 script checks. Concurrent Playwright runs shared the default artifact directory and one trace cleanup failed (ENOENT); isolated output directories resolved it, with3 landscape/original-photo checks passing.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:21:51.981Z","exitCode":1}
+```
+
+- 2026-11-13 context check rejected eleven handoffs after adding plate calibration. Kept the required ten most recent handoffs; older entries remain in Git history.
