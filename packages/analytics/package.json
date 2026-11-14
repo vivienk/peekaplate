@@ -14,6 +14,6 @@
   },
   "dependencies": {
     "@peekaplate/contracts": "workspace:*",
-    "posthog-js": "1.444.4"
+    "posthog-js": "1.447.12"
   }
 }
