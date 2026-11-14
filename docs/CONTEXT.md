@@ -63,7 +63,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "d60e1f7a783ef65b658ed2fb6f521acd65a14c4ec6577282bc44a7fc367e0dde"
+      "sourceFingerprint": "f10a8489c334d20df018b282c05d04a45ddb1c0ff17c9f429ca23615fb83cc43"
     },
     {
       "id": "tokens",
@@ -415,7 +415,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-workspace-http.test.ts",
         "backend/src/owner-workspace.integration.ts",
         "backend/src/owner-report-window.integration.ts",
-        "backend/src/owner-report.data12.test.ts"
+        "backend/src/owner-report.data12.test.ts",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu-retention.test.ts",
+        "docs/fe064-staging-setup.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -428,7 +431,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "14afc6c39c173de0037d3b5c49d860ca3ba77825c54a082e5362f19699c196c8"
+      "sourceFingerprint": "9e58fc6e9c9a5b8ac7b6c5ee900fafc0cbc9b788f39cf7f992895736872e1f76"
     },
     {
       "id": "database",
@@ -460,7 +463,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261112010000_owner_menu_workspace.sql",
         "tests/db/owner_menu_workspace.sql",
         "migrations/20261114010000_restaurant_menu_links.sql",
-        "tests/db/restaurant_links.sql"
+        "tests/db/restaurant_links.sql",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -471,7 +475,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "4d229302f1531d64db8ff6268a3cafc43feba6338b95464163b75b75efe90481"
+      "sourceFingerprint": "fddecfbbd520d63d37b42c6ad95127370471437e687f3b9b97ccd079681a7b9d"
     },
     {
       "id": "measurement",
@@ -554,7 +558,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "7d66c529cb72e033fad7648d9c620219977da9f7e01485fb40f29511e38363bb"
+      "sourceFingerprint": "261010ff91fde4b8939600bffbc55e277f64b9460d40f8406c358a3501e3ed2d"
     },
     {
       "id": "agents",
@@ -745,16 +749,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-10",
       "modules": [
-        "backend",
-        "processing",
-        "delivery"
-      ],
-      "summary": "Reconciled current release foundations; regression and release verification are in progress.",
-      "next": "Record final check evidence and exact reviewed commit before merge; hosted activation remains separate."
-    },
-    {
-      "date": "2026-11-10",
-      "modules": [
         "diner"
       ],
       "summary": "PR122 preserves current verified menu cancellation/expiry and shared consent/delivery gates. Two browser regressions reproduced stale Saved revisions and lost keyboard focus; both fixed. pnpm check passed 1200 unit tests (four optional skips) and 72 scripts; build passed. Full Chromium rerun passed 127 cases with two workers after one eight-worker outbox-capacity timeout; SDK browser suite passed nine cases. Independent review and final CI remain separate.",
@@ -877,6 +871,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-auth.md"
       ],
       "next": "Finish pinned review/checks, promote the narrow correction to main, then verify the actual hosted clean callback paths. Genuine staff-session/email acceptance remains separate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "backend",
+        "database",
+        "contracts"
+      ],
+      "summary": "Narrow #161 staging candidate adds independent draft/photo verification, version invalidation and byte-verified photo promotion/rejection with its immutable lifecycle migration. Retention source/tests are preserved for integration dependency closure; no scheduler/cron or unrelated imports/actions are promoted.",
+      "sources": [
+        "docs/fe064-staging-setup.md",
+        "backend/src/owner-menu.ts",
+        "backend/src/owner-menu-routes.ts",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
+      ],
+      "next": "Complete pinned release checks/reviews and final approval; inspect/apply hosted migration and resolve confirmed tester identities. Keep all Queues paused until the controlled request budget and window are agreed; #184 counter alone does not enforce provider requests."
     }
   ]
 }

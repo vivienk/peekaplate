@@ -2677,3 +2677,16 @@ recognised only `.html`, so a real confirmation/recovery return lost its purpose
 and code. Added exact same-purpose aliases in one shared matcher. Unit and real
 SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
 and path checks remain strict. No Supabase allowlist or credential policy changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T22:19:18.712Z","exitCode":1}
+```
+
+## 2026-11-14 — menu verification release closure
+
+The first narrow-release database run passed 235 SQL assertions and 97 tests,
+but the owner-menu suite could not load its existing retention-helper import.
+Promoted the unchanged helper and unit tests with the original integration
+suite; no scheduler, cron or retention settings are activated. The source
+contracts and migration remain the previously merged #161 implementation.

@@ -830,3 +830,10 @@ report reader #128. Use the [workspace guide](owner-session-workspace.md) for th
 exact staging entry, permission states, release evidence boundary and next UI/API
 connections. Signup alone never grants restaurant access. Existing report
 acceptance remains restricted to its labelled synthetic staging venue.
+
+## FE-06.4 controlled staging setup
+
+The [operator/tester handoff](fe064-staging-setup.md) separates the narrow #161
+release, lifecycle migration, staff identity setup and proposed two-request
+provider window. Do not treat the read-only harness counter as an upstream
+request cap or open Queues before the actual budget is pinned.
