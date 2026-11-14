@@ -13,45 +13,45 @@ Prepared production layout, following the selected domain split:
 subdomains. This preparation changes no hosting, DNS, accounts or live resources.
 The production domain is not connected yet. Netlify is not part of app hosting.
 
-## Assign a restaurant link
+## Automatic link on publication
 
-After review and publication, add its approved locator to
-[restaurant-links.json](../frontend/diner/public/config/restaurant-links.json):
+The existing owner-only publication command allocates a permanent restaurant
+link in the same database transaction as the event, projection, command receipt
+and outbox. No directory edit or diner rebuild is needed for each restaurant.
+The first publish uses a URL-friendly seed from the server-owned venue name:
+Noka Ramen becomes noka_ramen. A globally unique database constraint and bounded
+collision suffix allocation handle duplicate names and concurrent publications.
+Names without ASCII letters/digits use restaurant; reserved routing words get
+a restaurant_ prefix. Links remain unchanged on retry, rename and republish and
+are never recycled after withdrawal. Failed publication rolls allocation back.
 
-```json
-{
-  "schemaVersion": 1,
-  "restaurants": [
-    {
-      "slug": "example_bistro",
-      "venueId": "11111111-1111-4111-8111-111111111111",
-      "menuId": "22222222-2222-4222-8222-222222222222"
-    }
-  ]
-}
-```
+The seed is routing metadata, not an approved restaurant fact. The diner still
+displays only restaurant.name from the approved, byte-verified bundle. The
+immutable relational link setting survives publication projection replay;
+existing v1 publication events and command-receipt JSON stay unchanged.
 
-The IDs above are fictional; the shipped directory is empty. Never add tokens,
-credentials, drafts or restaurant facts. Slugs are unique, lowercase, 1–64
-characters, begin/end with a letter or digit and allow hyphens/underscores.
-Routing names including `assets`, `venues`, `owner` and `diner` are reserved.
-Invalid IDs, duplicate slugs and extra fields fail closed. The route unit tests
-validate the actual committed directory.
+POST /venues/:venueId/menus/:menuId/publications returns the existing v1 JSON,
+plus a Location header containing the environment-specific full diner URL.
+GET /venues/:venueId/menus/:menuId/diner-link requires a current owner session
+and returns {path, url}. The new endpoint never accepts an owner-supplied slug,
+origin, venue authority or menu token. An old pre-feature publication needs a
+new publish command before it receives a link; old command retries stay effect-free.
 
-For this pilot slice, assignment is a reviewed config update and diner rebuild.
-Automatic slug allocation, owner Copy link/QR and private preview are not added
-here. The owner publish screen must hand off its published menu ID for enrollment;
-Preview alone must not activate a public link. Keep that integration with the
-screen's current owner rather than modifying their unfinished branch.
+The diner resolves /diner/:slug through GET /public/restaurants/:slug. A bounded
+security-definer lookup returns only the published venue/menu IDs; the existing
+public reader, token issuance, exact-byte hash and identity checks remain the
+content authority. Missing/withdrawn links return 404. There is no list endpoint,
+draft fallback, cross-tenant write or browser database credential.
 
-The directory is a public locator, not publication or tenant authority. The
-existing public API still requires an approved current publication; the diner
-verifies exact bundle bytes and identity before displaying dishes or using the
-in-memory observation token. Unknown/withdrawn menus remain unavailable;
-malformed/tampered data never falls back to fixtures. Query parameters cannot
-override menu IDs or supply a token. Revisions under the same venue/menu keep
-the link; a new menu ID needs a config update. Old unprefixed UUID links remain
-supported on existing diner hosting.
+The production URL origin is https://peekaplate.app. Staging explicitly uses the
+isolated routing-staging Pages branch configured by DINER_PUBLIC_ORIGIN. Only
+that exact extra staging origin receives public-read CORS; production does not.
+The existing root-based staging site and .io marketing homepage stay separate.
+
+The current console has no real publication HTTP caller. The owner-review screen
+in PR #163 must use the existing publication API and show its returned Location
+or diner-link URL. Its synthetic Preview button must not claim publication or
+allocate a link. This backend feature does not merge that unfinished screen.
 
 ## Build the Cloudflare Pages artifact
 
@@ -66,8 +66,8 @@ pnpm prepare:app-site --diner work/diner-prefixed --output work/app-site
 The output path must be new. The assembler refuses to overwrite an existing
 homepage/output, rejects source/output overlap and artifact symlinks, then copies
 the diner under `diner/`. It adds bounded Pages menu-path rules and a generic
-404 page. JS/CSS and directory JSON are actual files under `/diner/assets/` and
-`/diner/config/`; no external proxy, gateway Worker or new runtime is needed.
+404 page. JS/CSS are actual files under `/diner/assets/`; no external proxy,
+gateway Worker or new runtime is needed.
 Do not deploy a partial output after an assembly error.
 
 The shell rewrite target is outside `/diner/` to avoid Pages clean-URL loop
@@ -124,7 +124,7 @@ Wrangler's local Pages server. API/bundle responses are intercepted synthetic
 fixtures. It checks assets, refresh, canonical and restaurant paths, unknown
 links and tampered/withdrawn responses. It does not establish hosted publishing,
 production DNS/TLS, real PostHog/Queue delivery or owner-console acceptance.
-Restaurant enrollment and owner-button integration remain separate handoffs.
+Owner-button integration and production domain activation remain separate handoffs.
 
 Local preparation results: eight Pages/Chromium cases passed in 5.9 seconds;
 38 existing diner state/integrity/refresh/tracking cases passed in 29.4 seconds.
