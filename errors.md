@@ -3527,3 +3527,18 @@ recognised only `.html`, so a real confirmation/recovery return lost its purpose
 and code. Added exact same-purpose aliases in one shared matcher. Unit and real
 SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
 and path checks remain strict. No Supabase allowlist or credential policy changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T23:34:03.526Z","exitCode":2}
+```
+
+## 2026-11-14 — Read-only ingestion verifier false acceptance
+
+Nine focused regressions reproduced missing/failed/foreign-record acceptance,
+unpaired report versions, wrong viewer probe, unsupported provider accounting,
+and unsafe evidence/origin handling. The verifier now fails closed, binds source
+and producer identities, rejects redirects and reports upstream calls as unknown.
+The real Worker/PostgreSQL regression covers the owner, viewer and cross-venue
+routes. Its initial typed fixture omitted required nullable fields; those fields
+were restored to match the production contract. Final typecheck and checks passed.
