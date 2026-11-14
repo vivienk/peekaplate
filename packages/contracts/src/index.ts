@@ -135,6 +135,16 @@ export const WithdrawMenuSchema = z.strictObject({
   expectedVersion: commandVersion,
 });
 
+export const RestaurantSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/)
+  .refine(
+    (slug) => !['diner', 'owner', 'venues', 'assets', 'api', 'auth', 'constructor'].includes(slug),
+  );
+export const DinerLinkSchema = z.strictObject({
+  path: z.string().regex(/^\/diner\/[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/),
+});
+
 export const MenuPublicationSchema = z.strictObject({
   menuId: uuid,
   publicationId: uuid,

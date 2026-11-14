@@ -7,20 +7,16 @@ const bundle = JSON.parse(
   readFileSync('packages/contracts/fixtures/public-menu-bundle.v1/bundle.json', 'utf8'),
 );
 const scope = { venueId: bundle.venue_id, menuId: bundle.menu_id };
-const directory = { schemaVersion: 1, restaurants: [{ slug: 'noka_ramen', ...scope }] };
-
-test('Pages serves the actual directory JSON without rewriting it to HTML', async ({ request }) => {
-  const response = await request.get(`${base}/diner/config/restaurant-links.json`);
-  expect(response.status()).toBe(200);
-  expect(response.headers()['content-type']).toContain('application/json');
-  expect(await response.json()).toEqual(
-    JSON.parse(readFileSync('frontend/diner/public/config/restaurant-links.json', 'utf8')),
-  );
-});
 
 async function arrange(page: Page, state: 'published' | 'withdrawn' | 'tampered' = 'published') {
   const publicReads: string[] = [];
-  await page.route('**/restaurant-links.json', (route) => route.fulfill({ json: directory }));
+  await page.route('**/public/restaurants/*', (route) =>
+    route.fulfill(
+      route.request().url().endsWith('/noka_ramen') && state !== 'withdrawn'
+        ? { json: scope }
+        : { status: 404, json: { error: 'not_found' } },
+    ),
+  );
   await page.route('**/public/venues/**', (route) => {
     publicReads.push(route.request().url());
     return route.fulfill(
@@ -101,9 +97,9 @@ test('restaurant link loads the built app, CSS and chunks, and survives refresh'
   expect(page.url()).toBe(path);
 });
 
-test('prefixed canonical QR link works without reading the alias directory', async ({ page }) => {
+test('prefixed canonical QR link works without calling the alias resolver', async ({ page }) => {
   await arrange(page);
-  await page.route('**/restaurant-links.json', (route) => route.abort());
+  await page.route('**/public/restaurants/*', (route) => route.abort());
   await page.goto(`${base}/diner/venues/${scope.venueId}/menus/${scope.menuId}`);
   await expect(
     page.getByRole('heading', { name: bundle.restaurant.name, exact: true }),

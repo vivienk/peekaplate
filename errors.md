@@ -2635,3 +2635,7 @@ The first external smoke harness used the default headless user agent and the SD
 ## Narrow restaurant URL staging release
 
 PR174 promotion resolves context/package/error-ledger conflicts against main, keeping its unrelated release state. Routing-only paths are carried forward. Source preparation already reproduced and corrected Pages clean-URL rewrite loops and canonical redirects; this candidate must repeat local checks and hosted static routing before acceptance. No registrar or .io change is included.
+
+Automatic restaurant URLs: main release includes only the reviewed publication/link/routing slice. Local source checks pass; exact-main release checks and hosted acceptance are tracked separately. No unrelated develop features, production DNS, .io or provider changes are promoted.
+
+The additional real database allocation-failure test verifies complete publication rollback and retry. Source branch results: 320 SQL assertions and 140 Worker/database tests pass.

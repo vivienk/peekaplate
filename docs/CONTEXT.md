@@ -61,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "636e7fd4f528ac0c641cd35791bcef114b102264207eacfb4a6d16bf62350d45"
+      "sourceFingerprint": "5d8f3a529f89b3a6e415dd93670e75dd7e05a3502a065dab08ba98c2c983cd2e"
     },
     {
       "id": "tokens",
@@ -99,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Save/Saved and verified published-menu loading retain expiry and withdrawal safeguards. Reviewed PR78 menu/detail triggers now use the shared track(), exposure/opening identities and activity clock; consent starts fresh timing and publication changes clear prior exposure links. Fixture traffic remains silent. Hosted PostHog/canonical/read-model acceptance remains a separate coordinated DATA-12 run. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view. Prepared /diner aliases validate a public operator locator before the existing public reader. Legacy QR paths remain valid; enrollment and owner wiring stay separate.",
+      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -193,7 +193,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/menu-triggers.spec.ts",
         "tests/e2e/menu-triggers-live.spec.ts",
         "docs/diner-tracking-staging.md",
-        "frontend/diner/public/config/restaurant-links.json",
         "docs/restaurant-urls.md",
         "tests/restaurant-links/restaurant-links.spec.ts",
         "playwright.restaurant-links.config.ts",
@@ -206,7 +205,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1d057bbb0161439f8062d1ed7484c44bd41592ded770e47250a5edfb5f28d5fd"
+      "sourceFingerprint": "d50cc35ae1cddf81f5dde196c8b072ffee3fc1923c934f0d0a0029552e49c692"
     },
     {
       "id": "console",
@@ -237,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Staff JWT and current tenant membership protect commands, publication, extraction/review and synthetic-source owner reports. Owner workspace adds versioned manual drafts/private photos, ordered verified uploads, source-ready claims, URL provenance, fenced cancel/retry and retained-report review bootstrap. Corrected facts freeze at approval; public images/content still require independent approval. S06–S09 UI connection and auth143/146 remain separate. Hosted acceptance is recorded in the owner workspace guide.",
+      "summary": "Staff JWT and current tenant membership protect commands, publication, extraction/review and synthetic-source owner reports. Owner workspace adds versioned manual drafts/private photos, ordered verified uploads, source-ready claims, URL provenance, fenced cancel/retry and retained-report review bootstrap. Corrected facts freeze at approval; public images/content still require independent approval. S06–S09 UI connection and auth143/146 remain separate. Hosted acceptance is recorded in the owner workspace guide. Publishing atomically reserves permanent name-seeded diner links, with owner URL retrieval and published-only public lookup.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -349,7 +348,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/pdf-fixture.ts",
         "backend/src/ingestion/review-bootstrap.ts",
         "docs/owner-menu-workspace.md",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
+        "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/restaurant-link.ts",
+        "backend/src/restaurant-link.test.ts",
+        "backend/src/restaurant-link-http.test.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -362,12 +364,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "22c59e4adb66cb55ed553d1ae54f292f53630f87f648835e8afc338d111e9f19"
+      "sourceFingerprint": "c24a12cc8a637656e60b6bcc16b1e467c5bdd66e14866cd9b843b63ff976c335"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Workspace migration is applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted.",
+      "summary": "Private venues, commands/events/outbox, memberships and projections force tenant RLS. Local tests cover upgrades, atomic commands, connection reuse and TCP startup; restore remains unverified. Isolated PostHog export has eight raw/four unique synthetic events, protected project675372 scope and denied browser/runtime raw reads. Exporter cannot access app schema. Owner oracle tests NULL IDs, retries/conflicts and ten-session floor. Canonical index/conflicts, nine typed fact families and live-only tenant views exist; activity uses greatest checkpoint. Transactional facts/backfill pass synthetic hosted checks; report authorization/suppression remains separate. RES-02 has immutable approval subjects, tenant/menu/hash keys and runtime-read-only public bundles. Workspace migration is applied; synthetic hosted approval/publication/withdrawal passed. Production is unaccepted. Immutable tenant URL settings have unique slugs and a narrow public resolver.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -392,7 +394,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261030120000_review_candidate_persistence.sql",
         "tests/db/review_persistence.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "tests/db/owner_menu_workspace.sql"
+        "tests/db/owner_menu_workspace.sql",
+        "migrations/20261114010000_restaurant_menu_links.sql",
+        "tests/db/restaurant_links.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -403,7 +407,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "0846016d62a8a9f14aa86ad2704e99ae603977098c2fad6b062cf25685e8ebc5"
+      "sourceFingerprint": "4d229302f1531d64db8ff6268a3cafc43feba6338b95464163b75b75efe90481"
     },
     {
       "id": "measurement",
@@ -676,15 +680,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-08",
-      "summary": "PR74 reconciles current develop, preserving TextField over shared ui/Input, self-hosted Latin Inter 400/500/600 and input-token refinements. Both documentation/error histories are retained. A browser regression reproduced identical focused/blurred invalid fields; a shared token-based outline now preserves the red error edge while exposing keyboard focus. All 14 focused Chromium cases pass, including narrow-screen accessibility and local font loading; the 390px focused-error rendering was inspected.",
-      "modules": [
-        "console",
-        "tokens"
-      ],
-      "next": "Use TextField for console forms without duplicating input styling or description wiring. Complete final design acceptance, real-device and manual screen-reader checks separately."
-    },
-    {
-      "date": "2026-11-08",
       "summary": "PR80 incorporates corrected PR77/current develop. Atomic shared stores prevent stale-tab loss; retirement stops delayed additions. The diner reuses the existing consent UI with one shared gate for canonical/PostHog, preserving console behavior. Pending deletion markers survive reload; withdrawal explicitly clears IDB and locked localStorage, never treating fallback memory as durable clearance. Failed or unreadable clearance keeps new work in memory. Total storage-write failure and already-started requests remain documented limits.",
       "modules": [
         "diner",
@@ -790,6 +785,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/prepare-app-site.mjs"
       ],
       "next": "Verify this exact main candidate on a branch-only deployment of the existing diner staging Pages project. Keep canonical staging root, .io and registrar nameservers unchanged; obtain actual Cloudflare nameservers from the pending Free .app zone."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "backend",
+        "database",
+        "diner"
+      ],
+      "summary": "Automatic restaurant links allocate with owner publication; public resolution reuses existing publication/token/bundle verification. V1 events and receipts are unchanged; .io remains untouched.",
+      "sources": [
+        "backend/src/restaurant-link.ts",
+        "migrations/20261114010000_restaurant_menu_links.sql",
+        "docs/restaurant-urls.md"
+      ],
+      "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
     }
   ]
 }

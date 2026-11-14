@@ -8,6 +8,7 @@ import {
   CandidateCorrectedFieldsSchema,
   CandidateReviewScopeSchema,
   CreateDishRevisionSchema,
+  DinerLinkSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
@@ -22,6 +23,7 @@ import {
   OwnerDishFieldsSchema,
   type PublicMenuResponse,
   PublishMenuSchema,
+  RestaurantSlugSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
@@ -83,8 +85,10 @@ import {
   approveMenuRevision,
   PublicationCommandError,
   publishMenu,
+  readDinerLink,
   withdrawMenu,
 } from './publication-command';
+import { resolveRestaurantLink } from './restaurant-link';
 import { retrieveMenuEvidence } from './retrieval';
 import { type ReviewArtifactObject, verifyReviewArtifact } from './review-artifact';
 import {
@@ -105,6 +109,7 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
 
 export type Bindings = {
   APP_ENV?: string;
+  DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
@@ -191,6 +196,13 @@ type Dependencies = {
     menuId: string,
     env: Bindings,
   ) => Promise<PublicMenuRecord | undefined>;
+  resolveRestaurantLink?: (slug: string, env: Bindings) => ReturnType<typeof resolveRestaurantLink>;
+  readDinerLink?: (
+    actorId: string,
+    venueId: string,
+    menuId: string,
+    env: Bindings,
+  ) => ReturnType<typeof readDinerLink>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -291,6 +303,24 @@ export const DINER_CORS_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ] as const;
+
+function dinerLinkResponse(link: { path: string }, env: Bindings) {
+  const origin =
+    env.APP_ENV === 'production'
+      ? 'https://peekaplate.app'
+      : env.APP_ENV === 'local'
+        ? 'http://127.0.0.1:5186'
+        : env.APP_ENV === 'staging' &&
+            [
+              'https://peekaplate-diner-staging.pages.dev',
+              'https://routing-staging.peekaplate-diner-staging.pages.dev',
+            ].includes(env.DINER_PUBLIC_ORIGIN ?? '')
+          ? env.DINER_PUBLIC_ORIGIN
+          : undefined;
+  if (!origin) throw new AuthUnavailableError();
+  const path = DinerLinkSchema.parse(link).path;
+  return { path, url: `${origin}${path}` };
+}
 
 /**
  * Exact console-origin allowlist for the owner report route only (S3-RES-03; agreed with Sai,
@@ -480,6 +510,10 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  resolveRestaurantLink: (slug, env) =>
+    withDatabase(env, (client) => resolveRestaurantLink(client, slug)),
+  readDinerLink: (actorId, venueId, menuId, env) =>
+    withDatabase(env, (client) => readDinerLink(client, actorId, venueId, menuId)),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -842,7 +876,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:menus\/(?:uploads|upload-groups|url|jobs)(?:\/|$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -851,6 +885,7 @@ export function createApp(services: Dependencies = dependencies) {
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+      exposeHeaders: ['Location'],
       maxAge: 86400,
     })(c, next);
   });
@@ -860,13 +895,27 @@ export function createApp(services: Dependencies = dependencies) {
     database: withDatabase,
   });
   app.use(
-    '/public/venues/*',
+    '/public/*',
     cors({
-      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) =>
+        DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
+        (c.env?.APP_ENV === 'staging' &&
+          c.env.DINER_PUBLIC_ORIGIN ===
+            'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
+          origin === c.env.DINER_PUBLIC_ORIGIN)
+          ? origin
+          : undefined,
       allowMethods: ['GET', 'OPTIONS'],
       maxAge: 86400,
     }),
   );
+  app.get('/public/restaurants/:slug', async (c) => {
+    const slug = RestaurantSlugSchema.safeParse(c.req.param('slug'));
+    if (!slug.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.resolveRestaurantLink) throw new AuthUnavailableError();
+    const scope = await services.resolveRestaurantLink(slug.data, c.env ?? {});
+    return scope ? c.json(MenuScopeSchema.parse(scope)) : c.json({ error: 'not_found' }, 404);
+  });
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
@@ -1048,6 +1097,7 @@ export function createApp(services: Dependencies = dependencies) {
       | NonNullable<Dependencies['publish']>
       | NonNullable<Dependencies['withdraw']>
       | undefined,
+    includeDinerLink = false,
   ) => {
     app.post(path, async (c) => {
       const authorization = c.req.header('Authorization');
@@ -1075,6 +1125,15 @@ export function createApp(services: Dependencies = dependencies) {
         { ...parsed.data, menuId: scope.data.menuId } as never,
         c.env ?? {},
       );
+      if (includeDinerLink && services.readDinerLink) {
+        const link = await services.readDinerLink(
+          actorId,
+          scope.data.venueId,
+          scope.data.menuId,
+          c.env ?? {},
+        );
+        if (link) c.header('Location', dinerLinkResponse(link, c.env ?? {}).url);
+      }
       return c.json(result);
     });
   };
@@ -1087,12 +1146,32 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/:venueId/menus/:menuId/publications',
     PublishMenuSchema,
     services.publish,
+    true,
   );
   publicationRoute(
     '/venues/:venueId/menus/:menuId/withdrawals',
     WithdrawMenuSchema,
     services.withdraw,
   );
+  app.get('/venues/:venueId/menus/:menuId/diner-link', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = MenuScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readDinerLink) throw new AuthUnavailableError();
+    const link = await services.readDinerLink(
+      actorId,
+      scope.data.venueId,
+      scope.data.menuId,
+      c.env ?? {},
+    );
+    return link
+      ? c.json(dinerLinkResponse(link, c.env ?? {}))
+      : c.json({ error: 'not_found' }, 404);
+  });
+
   app.post('/venues/:venueId/menu-evidence', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {

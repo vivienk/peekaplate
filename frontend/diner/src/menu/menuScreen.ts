@@ -799,7 +799,7 @@ export function mountMenuScreen(container: HTMLElement): void {
             const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
             if (!apiBase) return { status: 'error' };
             const route = await resolveMenuRoute(window.location.pathname, {
-              linksUrl: `${import.meta.env.BASE_URL}config/restaurant-links.json`,
+              apiBase,
               signal: controller.signal,
             });
             controller.signal.throwIfAborted();
