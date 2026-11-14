@@ -3385,3 +3385,41 @@ contains the dashboard demo, and the normal build excludes it.
 ## PR144 fixture preparation review - November 11, 2026
 
 The standalone DATA06 suite passed thirteen tests, but the default Vitest discovery returned an empty array and normal CI would not execute these cases. Four new files also failed Biome formatting, and the PR verification section lacked the required exact-command status entries. DATA06 paths are now included in normal test/typecheck commands; formatting and PR evidence are corrected. The expanded fourteen fixture tests pass; deliberate empty descriptive and missing suppression-status mutations fail at their assertions. One selected real local Worker/PostgreSQL owner-report journey passes; this is supporting report evidence, not an absent DATA06 producer. No provider request, hosted migration or deployment occurred.
+
+
+## Restaurant URL preparation: local Pages routing
+
+Initial new browser checks used non-existent failure headings, then a status
+locator matching both the menu and analytics notice. Assertions now use the
+existing state text; these were test-authoring failures, not product defects.
+The first local Pages readiness URL returned 404, so readiness now checks
+/diner/. The pinned workerd binary supports compatibility dates through
+2026-10-13; the local harness uses that supported date rather than today's date.
+
+Actual Pages testing rejected trailing-slash rewrites back to /diner/index.html
+as loops. An outside .html shell initially produced a 308 clean-URL redirect,
+which lost the restaurant pathname and displayed unavailable. Rewriting to the
+outside shell's extensionless URL fixes the cause. The browser checks assert
+the unchanged address, real built CSS/JS, reload, canonical/alias reads and
+unknown/tampered/withdrawn states. Six local Pages/Chromium checks pass; hosted
+domain, owner flow and real tracking remain NOT RUN. No DNS or deployment changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T07:23:24.731Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
+```
+
+
+Restaurant URL follow-up: bounded context summaries were shortened to satisfy
+the graph validator. Corepack's initial fetch was blocked by sandbox networking;
+the approved recheck completed using the pinned runtime. After adding the final
+regressions, a check observed stale context before its refresh; fingerprints were
+refreshed after all source edits. These are preparation/tooling observations, not
+hosted application failures. Eight actual local Pages browser cases now pass,
+including directory JSON serving and trailing-slash URLs. A delayed-directory
+cancellation regression and the existing menu checks also pass. No cloud state changed.

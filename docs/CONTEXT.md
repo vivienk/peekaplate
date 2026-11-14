@@ -113,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Prepared /diner aliases validate an operator directory before the existing public reader; legacy QR paths remain. Enrollment is manual; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -205,7 +205,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save.css",
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "frontend/diner/public/config/restaurant-links.json",
+        "docs/restaurant-urls.md",
+        "tests/restaurant-links/restaurant-links.spec.ts",
+        "playwright.restaurant-links.config.ts",
+        "scripts/serve-restaurant-routing-test.mjs"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -214,7 +219,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3656ea958c81e35f36da9c5f112b1e6bfa31929d7af3b023e44c9836c4102a2b"
+      "sourceFingerprint": "f9c1c47426f6f34ef2a811388ab5f4b73ebf34aae33664347536ff0a3fb12a20"
     },
     {
       "id": "console",
@@ -272,7 +277,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands/publication, signed menus and canonical observations. Owner workspace supports versioned private drafts/photos, grouped uploads, PDF limits, URL materialization, fenced cancel/retry, revision-bound verification and content-checked photo promotion; retention stays disabled until configured. Public bundles still require approval. Synthetic-gated owner reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression. CSV export reuses owner/source/venue guards, preserving VALID_ZERO while withholding unavailable cells. Owner insight writes remain versioned/idempotent. Connected owner UI and hosted DATA-12 provenance/reconciliation remain separate from local fixtures. Owner-AI validates privacy/IDs; trusted issuance, freshness and live AI remain unwired.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands/publication, signed menus and canonical observations. Owner workspace has versioned private drafts/photos, uploads, PDF limits, URL materialization, fenced cancel/retry, revision-bound verification and content-checked photo promotion; retention is disabled until configured. Public bundles require approval. Synthetic-gated reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression. CSV reuses owner/source/venue guards and preserves VALID_ZERO. Owner actions are versioned/idempotent. Owner-AI validates privacy/IDs; trusted issuance, freshness and live AI remain unwired. Prepared exact peekaplate.app diner CORS keeps authorization unchanged. Hosted DATA-12 provenance/reconciliation, connected owner UI and custom-domain deployment remain separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -433,7 +438,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b38b6008d15a11f569d0f6e0185dc717d75e3384b4f744f564bfcdc5f0ff1b08"
+      "sourceFingerprint": "3a46f51c354e8045288cb62d1027e462799235f35b009fd4331e0a6d9bed5d0a"
     },
     {
       "id": "database",
@@ -557,7 +562,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         ".github/workflows/deploy-extraction-staging.yml",
         "docs/staging-ingestion-release.md",
         "vitest.config.ts",
-        "vitest.data06.config.ts"
+        "vitest.data06.config.ts",
+        "scripts/prepare-app-site.mjs",
+        "scripts/prepare-app-site.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -568,7 +575,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "26a8d27ffa63d06cf9ef0e86888b765b3b60aad1a213bbea875a04018ff9be5c"
+      "sourceFingerprint": "593ae6e887d9e6387caa1b752b9473f5f6224dee8516e0b96b918b2242f26478"
     },
     {
       "id": "agents",
@@ -762,20 +769,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-12",
-      "modules": [
-        "diner",
-        "analytics"
-      ],
-      "summary": "Synchronizes the narrow first-consent release correction into develop without promoting other runtime work. The real-adapter regression reproduces a menu view lost only from PostHog when the screen listener runs first; current-gate synchronization before capture preserves matching IDs on initial and renewed consent. No new consent policy, provider configuration or Queue change.",
-      "paths": [
-        "frontend/diner/src/tracking/index.ts",
-        "frontend/diner/src/tracking/dispatch.test.ts",
-        "tests/e2e/posthog-adapter.spec.ts"
-      ],
-      "next": "Merge the reviewed correction and its exact-main staging release after final approval. Record corrected intercepted browser evidence separately from DATA-12 real destination persistence and metric reconciliation."
-    },
-    {
       "date": "2026-11-13",
       "modules": [
         "backend",
@@ -906,6 +899,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/data06/tsconfig.json"
       ],
       "next": "Complete exact-head checks/review and merge fixture preparation. Connect approved DATA06 producer/policy and execute raw-event/hosted evidence separately."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "diner",
+        "backend",
+        "delivery"
+      ],
+      "summary": "Prepare peekaplate.app/diner/<restaurant> with a validated public locator directory and create-only Pages artifact. Existing QR/publication/token/hash checks remain; .io marketing and live resources are unchanged. Root/owner are not implemented by the diner-only artifact. Real local Pages routing catches clean-URL redirects; hosted domain and owner integration remain pending.",
+      "sources": [
+        "docs/restaurant-urls.md",
+        "frontend/diner/src/menu/route.ts",
+        "scripts/prepare-app-site.mjs",
+        "tests/restaurant-links/restaurant-links.spec.ts"
+      ],
+      "next": "Complete pinned review and repository checks, then review the preparation PR. Enroll approved restaurant IDs and run an approved staging candidate before production DNS/Pages association. Align owner base/auth callbacks separately."
     }
   ]
 }
