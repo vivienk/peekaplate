@@ -1,5 +1,11 @@
 # PeekaPlate: team guide
 
+**Owner authentication (integration in progress, PR143 → PR146):** read the
+[owner auth guide](owner-auth.md) for Supabase/Resend email, exact confirmation
+and reset URLs, public-only browser config and the remaining dashboard handoff.
+The PR previews are synthetic; real credentials belong only on the configured
+owner auth entry. These PRs stay unmerged until the owner/dashboard flow is ready.
+
 **Owner menu backend:** [upload, processing and Add Dish handoff](owner-menu-workspace.md)
 lists the saved group/file APIs, draft/photo save-resume, cancel/retry and explicit
 owner confirmation. It reuses the ingestion/review pipeline and private R2; no
