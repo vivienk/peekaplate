@@ -516,7 +516,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "delivery",
       "status": "foundation",
-      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending.",
+      "summary": "Reviewed main release is deployed to staging only with exact SHA checks. A manual extraction workflow deploys the paired private host/container; menu consumer is single-message/concurrency with three retries and DLQ. Existing diner connection, owner report release, protected credentials and observation settings remain. Migration, controlled menu activation and owner upload-to-draft evidence are pending. The DATA-01 runbook in observation-infrastructure.md records twelve planned dual-destination acceptance cases and separate capture, receipt, persistence and report checkpoints.",
       "paths": [
         "README.md",
         "SECURITY.md",
@@ -579,7 +579,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "593ae6e887d9e6387caa1b752b9473f5f6224dee8516e0b96b918b2242f26478"
+      "sourceFingerprint": "c0e80bd01f32923c8f16a895517a0dca82547320887f018372db840955ee3a8c"
     },
     {
       "id": "agents",
@@ -812,9 +812,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-report.test.ts",
         "backend/src/owner-report.data12-reconciliation.test.ts",
         "backend/src/comparison-report.integration.ts",
-        "tests/data12/reconciliation_findings.md"
+        "tests/data12/reconciliation_findings.md",
+        "docs/observation-infrastructure.md"
       ],
-      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed."
+      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed. Coordinate the twelve pending DATA-01 cases through Jeffin's S6-REL-02 run after the Compare and release prerequisites are confirmed."
     },
     {
       "date": "2026-11-13",
