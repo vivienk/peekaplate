@@ -1,15 +1,104 @@
 import { parseArgs } from 'node:util';
 
+export const MAX_PROVIDER_CALLS = 2;
+const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const USAGE = `Usage: node scripts/verify-ingestion-e2e.mjs --job-id <uuid> --venue-id <uuid> [options]
 
 Options:
-  --job-id <uuid>         Ingestion job UUID to verify (required)
-  --venue-id <uuid>       Tenant / venue UUID (required)
-  --api-url <url>         API base URL (default: https://peekaplate-api-staging.vxkong.workers.dev)
-  --token <bearer-token>  Staff Bearer authorization token for API verification
-  --report-json <path>    Local path to downloaded extraction report JSON (optional)
-  --help, -h              Show this help message
+  --job-id <uuid>              Ingestion job UUID to verify (required)
+  --venue-id <uuid>            Tenant / venue UUID (required)
+  --api-url <url>              API base URL (default: https://peekaplate-api-staging.vxkong.workers.dev)
+  --token <bearer-token>       Staff Bearer authorization token for API verification
+  --cross-tenant-venue-id <id> Secondary venue UUID expected to return 403 for --token
+  --viewer-token <token>       Viewer/unauthorized token expected to return 403 on --venue-id
+  --require-pr161              Require PR #161 verification_status fields and /verify route check
+  --max-provider-calls <n>     Hard provider call cap (default: 2, max: 2)
+  --report-json <path>         Local path to downloaded extraction report JSON (optional)
+  --evidence-out <path>        Write sanitized JSON evidence report to path (optional)
+  --help, -h                   Show this help message
 `;
+
+/**
+ * Redacts bearer tokens, JWTs, and sensitive query parameters from strings.
+ */
+export function redactSecrets(value) {
+  return String(value)
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]')
+    .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED_JWT]')
+    .replace(
+      /([?&](?:token|access_token|api_key|apikey|key|secret|password|auth)=)[^&\s]+/gi,
+      '$1[REDACTED]',
+    );
+}
+
+/**
+ * Enforces the hard two-call provider budget and prevents uncontrolled retries.
+ * Synchronous counter increment guarantees concurrent calls cannot bypass the limit.
+ */
+export function createProviderCallGuard(maxCalls = MAX_PROVIDER_CALLS) {
+  if (!Number.isInteger(maxCalls) || maxCalls < 0 || maxCalls > MAX_PROVIDER_CALLS) {
+    throw new Error(`maxProviderCalls must be an integer between 0 and ${MAX_PROVIDER_CALLS}`);
+  }
+  let consumed = 0;
+  return {
+    get consumed() {
+      return consumed;
+    },
+    get limit() {
+      return maxCalls;
+    },
+    consume(label = 'provider_call') {
+      if (consumed + 1 > maxCalls) {
+        throw new Error(
+          `Provider call budget exceeded (${consumed}/${maxCalls}) before "${label}"; aborting without retry.`,
+        );
+      }
+      consumed += 1;
+      return consumed;
+    },
+    async execute(syntheticInput, label, fn) {
+      assertSyntheticInput(syntheticInput);
+      this.consume(label);
+      return await fn();
+    },
+  };
+}
+
+/**
+ * Ensures active test inputs are explicitly marked as synthetic.
+ */
+export function assertSyntheticInput({ venueId, label, url }) {
+  if (!UUID_RE.test(venueId ?? '')) {
+    throw new Error(`Invalid synthetic venueId: "${venueId}"`);
+  }
+  const combined = `${label ?? ''} ${url ?? ''}`.toLowerCase();
+  if (!combined.includes('synthetic') && !combined.includes('test')) {
+    throw new Error('Active E2E inputs must be explicitly labelled as synthetic/test.');
+  }
+}
+
+/**
+ * Returns a sanitized, secret-free evidence object suitable for committing to docs/evidence/.
+ */
+export function sanitizeEvidence(results, { verifiedAt = new Date().toISOString() } = {}) {
+  return {
+    verifiedAt,
+    jobId: results.jobId,
+    venueId: results.venueId,
+    passed: results.passed,
+    providerCallsConsumed: results.providerCallsConsumed ?? 0,
+    maxProviderCalls: results.maxProviderCalls ?? MAX_PROVIDER_CALLS,
+    requestIds: results.requestIds ?? [],
+    evidenceIds: results.evidenceIds ?? {},
+    checks: (results.checks ?? []).map((c) => ({
+      name: c.name,
+      passed: c.passed,
+      details: redactSecrets(c.details),
+    })),
+  };
+}
 
 /**
  * Validates whether an extraction report matches the expected contract.
@@ -56,29 +145,43 @@ export async function verifyIngestionE2E({
   venueId,
   apiUrl = 'https://peekaplate-api-staging.vxkong.workers.dev',
   token,
+  crossTenantVenueId,
+  viewerToken,
+  requirePr161 = false,
+  maxProviderCalls = MAX_PROVIDER_CALLS,
   reportJson,
   request = fetch,
   readFileFn,
   progress = console.log,
 }) {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const providerGuard = createProviderCallGuard(maxProviderCalls);
 
-  if (!uuidRegex.test(jobId ?? '')) {
+  if (!UUID_RE.test(jobId ?? '')) {
     throw new Error(`Invalid or missing --job-id UUID: "${jobId}"\n${USAGE}`);
   }
-  if (!uuidRegex.test(venueId ?? '')) {
+  if (!UUID_RE.test(venueId ?? '')) {
     throw new Error(`Invalid or missing --venue-id UUID: "${venueId}"\n${USAGE}`);
   }
 
+  const baseUrl = apiUrl.replace(/\/+$/, '');
   const results = {
     jobId,
     venueId,
     checks: [],
     passed: true,
+    providerCallsConsumed: providerGuard.consumed,
+    maxProviderCalls: providerGuard.limit,
+    requestIds: [],
+    evidenceIds: { jobId, venueId },
     job: null,
     drafts: [],
     report: null,
   };
+
+  function recordRequestId(res) {
+    const reqId = res?.headers?.get?.('x-request-id');
+    if (reqId) results.requestIds.push(reqId);
+  }
 
   function recordCheck(name, passed, details) {
     results.checks.push({ name, passed, details });
@@ -97,8 +200,9 @@ export async function verifyIngestionE2E({
     };
 
     try {
-      const jobUrl = `${apiUrl.replace(/\/+$/, '')}/venues/${venueId}/menus/jobs/${jobId}`;
+      const jobUrl = `${baseUrl}/venues/${venueId}/menus/jobs/${jobId}`;
       const jobRes = await request(jobUrl, { method: 'GET', headers });
+      recordRequestId(jobRes);
       if (!jobRes.ok) {
         recordCheck('API Job Fetch', false, `HTTP ${jobRes.status} from ${jobUrl}`);
       } else {
@@ -111,6 +215,15 @@ export async function verifyIngestionE2E({
     }
 
     if (results.job) {
+      if (typeof results.job.source_hash === 'string') {
+        results.evidenceIds.sourceHash = results.job.source_hash;
+        recordCheck(
+          'Source Hash Format',
+          SHA256_HEX_RE.test(results.job.source_hash),
+          `source_hash=${results.job.source_hash.slice(0, 12)}...`,
+        );
+      }
+
       // 2. Terminal state check
       const isTerminal = ['complete', 'incomplete', 'failed'].includes(results.job.status);
       recordCheck(
@@ -133,6 +246,9 @@ export async function verifyIngestionE2E({
         typeof results.job.result_storage_key === 'string' &&
         results.job.result_storage_key.startsWith(expectedPrefix) &&
         results.job.result_storage_key.endsWith('/extraction.json');
+      if (hasReportKey) {
+        results.evidenceIds.resultStorageKey = results.job.result_storage_key;
+      }
       recordCheck(
         'Result Storage Key Scope',
         hasReportKey,
@@ -143,13 +259,15 @@ export async function verifyIngestionE2E({
     // 5. Drafts verification via API
     progress('Checking dish drafts via API...');
     try {
-      const draftsUrl = `${apiUrl.replace(/\/+$/, '')}/venues/${venueId}/drafts?jobId=${jobId}`;
+      const draftsUrl = `${baseUrl}/venues/${venueId}/drafts?jobId=${jobId}`;
       const draftsRes = await request(draftsUrl, { method: 'GET', headers });
+      recordRequestId(draftsRes);
       if (!draftsRes.ok) {
         recordCheck('API Drafts Fetch', false, `HTTP ${draftsRes.status} from ${draftsUrl}`);
       } else {
         const draftsData = await draftsRes.json();
         results.drafts = draftsData.drafts ?? [];
+        results.evidenceIds.draftIds = results.drafts.map((d) => d.id).filter(Boolean);
         recordCheck('API Drafts Fetch', true, `Retrieved ${results.drafts.length} drafts`);
 
         if (results.job) {
@@ -165,6 +283,7 @@ export async function verifyIngestionE2E({
         let allNeedsReview = true;
         let allPending = true;
         let allHaveEvidence = true;
+        let allHaveValidVerification = true;
         const indices = new Set();
         let uniqueIndices = true;
 
@@ -172,6 +291,13 @@ export async function verifyIngestionE2E({
           if (draft.extraction_status !== 'needs_review') allNeedsReview = false;
           if (draft.review_status !== 'pending') allPending = false;
           if (!draft.evidence || typeof draft.evidence !== 'object') allHaveEvidence = false;
+          if (
+            requirePr161 &&
+            draft.verification_status !== 'not_verified' &&
+            draft.verification_status !== 'verified'
+          ) {
+            allHaveValidVerification = false;
+          }
           if (indices.has(draft.draft_index)) uniqueIndices = false;
           indices.add(draft.draft_index);
         }
@@ -204,9 +330,89 @@ export async function verifyIngestionE2E({
             ? `All ${indices.size} drafts have unique non-colliding draft_index`
             : 'Duplicate draft_index detected',
         );
+        if (requirePr161) {
+          recordCheck(
+            'PR #161 Verification Status Field',
+            allHaveValidVerification,
+            allHaveValidVerification
+              ? 'All drafts expose valid verification_status'
+              : 'Missing or invalid verification_status on one or more drafts',
+          );
+        }
       }
     } catch (err) {
       recordCheck('API Drafts Fetch', false, `Request failed: ${err.message}`);
+    }
+
+    // 5b. PR #161 route presence check (non-mutating invalid-body probe expects 400, not 404)
+    if (requirePr161) {
+      const verifyProbeUrl = `${baseUrl}/venues/${venueId}/drafts/00000000-0000-4000-8000-000000000001/verify`;
+      try {
+        const probeRes = await request(verifyProbeUrl, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        recordRequestId(probeRes);
+        recordCheck(
+          'PR #161 /verify Route Deployed',
+          probeRes.status === 400,
+          `Expected HTTP 400 on empty-body /verify probe, got HTTP ${probeRes.status}`,
+        );
+      } catch (err) {
+        recordCheck('PR #161 /verify Route Deployed', false, `Request failed: ${err.message}`);
+      }
+    }
+
+    // 5c. Cross-tenant isolation check (Restaurant B -> 403)
+    if (crossTenantVenueId) {
+      if (!UUID_RE.test(crossTenantVenueId)) {
+        recordCheck('Cross-Tenant Isolation (403)', false, 'Invalid crossTenantVenueId UUID');
+      } else {
+        try {
+          const crossRes = await request(
+            `${baseUrl}/venues/${crossTenantVenueId}/menus/jobs/${jobId}`,
+            { method: 'GET', headers },
+          );
+          recordRequestId(crossRes);
+          recordCheck(
+            'Cross-Tenant Isolation (403)',
+            crossRes.status === 403,
+            crossRes.status === 401
+              ? 'Authentication failed (401) — token invalid/expired, not an authorization denial (403)'
+              : `Expected HTTP 403 for cross-tenant venue, got HTTP ${crossRes.status}`,
+          );
+        } catch (err) {
+          recordCheck('Cross-Tenant Isolation (403)', false, `Request failed: ${err.message}`);
+        }
+      }
+    }
+
+    // 5d. Viewer / unauthorized write denial check (403)
+    if (viewerToken) {
+      try {
+        const viewerRes = await request(
+          `${baseUrl}/venues/${venueId}/drafts/00000000-0000-4000-8000-000000000001/approve`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${viewerToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          },
+        );
+        recordRequestId(viewerRes);
+        recordCheck(
+          'Viewer Write Denial (403)',
+          viewerRes.status === 403,
+          viewerRes.status === 401
+            ? 'Authentication failed (401) — viewer token invalid/expired, not an authorization denial (403)'
+            : `Expected HTTP 403 for viewer write attempt, got HTTP ${viewerRes.status}`,
+        );
+      } catch (err) {
+        recordCheck('Viewer Write Denial (403)', false, `Request failed: ${err.message}`);
+      }
     }
   } else {
     progress('Note: No --token provided; skipping authenticated API checks.');
@@ -219,6 +425,9 @@ export async function verifyIngestionE2E({
       const rawContent = await readFileFn(reportJson);
       const parsedReport = JSON.parse(rawContent);
       results.report = parsedReport;
+      if (typeof parsedReport.extraction_id === 'string') {
+        results.evidenceIds.extractionId = parsedReport.extraction_id;
+      }
 
       const reportValidation = validateExtractionReport(parsedReport);
       recordCheck(
@@ -253,6 +462,7 @@ export async function verifyIngestionE2E({
     );
   }
 
+  results.providerCallsConsumed = providerGuard.consumed;
   results.passed = results.checks.length > 0 && results.checks.every((c) => c.passed);
 
   return results;
@@ -266,7 +476,12 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
       'venue-id': { type: 'string' },
       'api-url': { type: 'string', default: 'https://peekaplate-api-staging.vxkong.workers.dev' },
       token: { type: 'string' },
+      'cross-tenant-venue-id': { type: 'string' },
+      'viewer-token': { type: 'string' },
+      'require-pr161': { type: 'boolean', default: false },
+      'max-provider-calls': { type: 'string' },
       'report-json': { type: 'string' },
+      'evidence-out': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
     allowPositionals: false,
@@ -277,7 +492,11 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
     process.exit(values.help ? 0 : 1);
   }
 
-  const { readFile } = await import('node:fs/promises');
+  const { readFile, writeFile } = await import('node:fs/promises');
+  const maxProviderCalls =
+    values['max-provider-calls'] !== undefined
+      ? Number(values['max-provider-calls'])
+      : MAX_PROVIDER_CALLS;
 
   try {
     const outcome = await verifyIngestionE2E({
@@ -285,10 +504,20 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
       venueId: values['venue-id'],
       apiUrl: values['api-url'],
       token: values.token,
+      crossTenantVenueId: values['cross-tenant-venue-id'],
+      viewerToken: values['viewer-token'],
+      requirePr161: values['require-pr161'],
+      maxProviderCalls,
       reportJson: values['report-json'],
       readFileFn: (p) => readFile(p, 'utf8'),
       progress: console.log,
     });
+
+    if (values['evidence-out']) {
+      const sanitized = sanitizeEvidence(outcome);
+      await writeFile(values['evidence-out'], `${JSON.stringify(sanitized, null, 2)}\n`, 'utf8');
+      console.log(`Sanitized evidence written to ${values['evidence-out']}`);
+    }
 
     console.log('\n--- Verification Summary ---');
     console.log(`Job ID:  ${outcome.jobId}`);
