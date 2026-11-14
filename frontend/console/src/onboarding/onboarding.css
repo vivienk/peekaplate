@@ -774,15 +774,21 @@
   background: var(--pp-color-error-50);
 }
 
-/* The loading indicator: the sync icon turns once every 1.2 s (Rania, 14 Nov: 1–1.5 s, continuous;
- * still for reduced motion). */
+/* The loading indicator: the sync icon turns clockwise once every 1.2 s (Rania, 14 Nov: 1–1.5 s,
+ * continuous, still for reduced motion; Vivien, 14 Nov: clockwise). Figma's Sync arrows point
+ * counter-clockwise, so the icon is mirrored first and its arrows follow the motion. */
 .pp-onboard-process__spinner {
+  transform: scaleX(-1);
   animation: pp-onboard-spin 1.2s linear infinite;
 }
 
 @keyframes pp-onboard-spin {
+  from {
+    transform: rotate(0deg) scaleX(-1);
+  }
+
   to {
-    transform: rotate(360deg);
+    transform: rotate(360deg) scaleX(-1);
   }
 }
 
