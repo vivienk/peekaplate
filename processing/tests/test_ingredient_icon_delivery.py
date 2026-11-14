@@ -53,6 +53,16 @@ class HostedArtworkTests(unittest.TestCase):
             self.assertEqual(retried.call_count, 1)
             self.assertEqual(retried.call_args.args[1], original)
 
+    def test_transparent_indexed_png_approval_preserves_exact_bytes_for_delivery(self):
+        import base64
+        data = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEUAAAD/eFCXci8oAAAAAXRSTlMAQObYZgAAAA9JREFUeJxjYKA6aKCmYQAnIACBGPqPSwAAAABJRU5ErkJggg==")
+        request = generation_request("coconut", provider="test", model="test")
+        key = complete_generation(self.store, request, data, rights_confirmed=True)["asset_id"]
+        with patch.object(HostedIconDelivery, "from_environment", return_value=self.delivery), \
+             patch.object(self.delivery, "request", side_effect=self.response) as sent:
+            self.store.review(key, status="approved", reviewer="test", reason="Style checked")
+        self.assertEqual(base64.b64decode(sent.call_args.args[1]["pngBase64"]), data)
+
     def test_unreviewed_or_rejected_art_never_delivers(self):
         with patch.object(self.delivery, "request") as request:
             with self.assertRaises(ValueError):

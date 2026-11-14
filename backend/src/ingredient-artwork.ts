@@ -25,11 +25,30 @@ export function reviewedPng(input: Extract<ArtworkCommand, { status: 'approved' 
     data.readUInt32BE(16) !== data.readUInt32BE(20) ||
     data.readUInt32BE(16) < 16 ||
     data.readUInt32BE(16) > 2048 ||
-    ![4, 6].includes(data[25] ?? 0) ||
+    ![0, 2, 3, 4, 6].includes(data[25] ?? -1) ||
     createHash('sha256').update(data).digest('hex') !== input.sha256
   ) {
     throw new IngestionError('invalid_artwork', 400);
   }
+  // Pillow preserves palette/grayscale/RGB PNGs using tRNS transparency. Accept
+  // their exact reviewed bytes too; do not silently re-encode after approval.
+  let hasAlpha = [4, 6].includes(data[25] ?? -1);
+  let hasData = false;
+  let ended = false;
+  let offset = 8;
+  while (offset + 12 <= data.length) {
+    const length = data.readUInt32BE(offset);
+    if (length > data.length - offset - 12) break;
+    const chunk = data.toString('ascii', offset + 4, offset + 8);
+    if (chunk === 'tRNS' && length > 0) hasAlpha = true;
+    if (chunk === 'IDAT') hasData = true;
+    offset += length + 12;
+    if (chunk === 'IEND') {
+      ended = length === 0 && offset === data.length;
+      break;
+    }
+  }
+  if (!hasAlpha || !hasData || !ended) throw new IngestionError('invalid_artwork', 400);
   // Bounds/format defense here; the operator reviews the exact hash and the
   // generator's importer performs full image decoding and alpha validation.
   return data;

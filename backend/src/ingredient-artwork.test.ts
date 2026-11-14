@@ -42,6 +42,28 @@ function client(
   return { query };
 }
 describe('ingredient artwork approval', () => {
+  it('accepts the exact reviewed bytes of transparent indexed PNGs', () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgAQMAAABJtOi3AAAABlBMVEUAAAD/eFCXci8oAAAAAXRSTlMAQObYZgAAAA9JREFUeJxjYKA6aKCmYQAnIACBGPqPSwAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const input = artworkInput();
+    if (input.status !== 'approved') throw Error();
+    const approved = {
+      ...input,
+      pngBase64: png.toString('base64'),
+      sha256: createHash('sha256').update(png).digest('hex'),
+    };
+    expect(Buffer.from(reviewedPng(approved))).toEqual(png);
+    const truncated = png.subarray(0, -1);
+    expect(() =>
+      reviewedPng({
+        ...approved,
+        pngBase64: truncated.toString('base64'),
+        sha256: createHash('sha256').update(truncated).digest('hex'),
+      }),
+    ).toThrow();
+  });
   it('commits immutable bytes, event, projection, receipt and outbox together', async () => {
     const db = client();
     const put = vi.fn();

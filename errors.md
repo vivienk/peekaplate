@@ -2951,3 +2951,5 @@ Follow-up: full JavaScript tests initially failed when authentication fixtures c
 ## Automatic ingredient artwork delivery verification — November 13, 2026
 
 The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
+
+Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
