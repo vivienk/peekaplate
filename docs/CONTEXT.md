@@ -215,6 +215,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/generate-fixture-portions.test.mjs",
         "frontend/diner/src/menu/fixture-assets/portion-ingestion-input.json",
         "processing/src/peekaplate_processing/portion_ingestion.py",
+        "processing/src/peekaplate_processing/plate_calibration.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
         "processing/tests/test_portion_ingestion.py"
       ],
@@ -637,6 +638,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
         "processing/src/peekaplate_processing/portion_ingestion.py",
+        "processing/src/peekaplate_processing/plate_calibration.py",
         "processing/tests/test_portion_ingestion.py",
         "processing/src/peekaplate_processing/prepare_assets.py"
       ],
@@ -685,8 +687,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-13",
+      "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. PR147 fixtures have no invented measurements.",
+      "modules": ["diner", "contracts", "processing"],
+      "next": "Verify measured footprint on physical supported phones against the real plate. Owner console/public authenticated ingestion and approved publication remain separate; local review UI is DEV-only."
+    },
+    {
       "date": "2026-11-12",
-      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha, automatic local U2NetP segmentation or optional masks, bounded encoding, source/model/mask/revision hashing and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. Owner serving width flows through ingestion into measured tracked-AR scale; camera scale stays approximate. Fullscreen landscape portal keeps original back/action controls. Private authenticated upload route feeds DEV View Portion; no public upload endpoint or publication bypass.",
+      "summary": "Photo ingestion now generates review-only 2.5D artifacts automatically from prepare_assets. Generic single/batch processor handles alpha, automatic local U2NetP segmentation or optional masks, bounded encoding, source/model/mask/revision hashing and photo fallback. PR147 fixture export invokes the same processor; diner builds reject stale source/provenance/processor bindings. Owner-confirmed plate dimensions and photo-boundary calibration now replace silhouette-width scaling; camera scale stays approximate. Fullscreen landscape portal keeps original back/action controls. Private authenticated upload route feeds DEV View Portion; no public upload endpoint or publication bypass.",
       "modules": [
         "diner",
         "processing"

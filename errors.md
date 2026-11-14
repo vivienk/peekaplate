@@ -2836,3 +2836,15 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - Fullscreen browser instrumentation initially accessed documentElement before page creation, preventing its orientation mock from installing. Moved the mock to Element.prototype; application lifecycle tests already passed.
 
 - Review found the direct single-photo CLI parsed the serving width but did not forward it. Added forwarding and CLI regressions for retained dimensions and invalid-width rejection; batch and HTTP paths were already connected.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T05:17:08.271Z","exitCode":1}
+```
+
+- 2026-11-13 plate calibration verification: temporary Node24.16 cache was absent, so initial pnpm used unsupported24.14. Restored required Node to /private/tmp and reran checks. Local server bind was blocked by execution restrictions (reported as port in use); isolated5175/5184 server started with authorized local networking. No existing server was stopped.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T05:18:59.690Z","exitCode":1}
+```

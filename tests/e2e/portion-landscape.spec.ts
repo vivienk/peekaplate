@@ -64,6 +64,9 @@ for (const { supported, landscape } of [
       b = await compare.boundingBox();
     expect(a!.y).toBe(b!.y);
     expect(Math.abs(a!.width - b!.width)).toBeLessThanOrEqual(2);
+    const originalUrl = await page
+      .locator('img.pp-detail__image')
+      .evaluate((img: HTMLImageElement) => img.currentSrc || img.src);
     await portion.click();
     const portal = page.getByRole('dialog', { name: 'Dish on your table' });
     await expect(portal).toBeVisible({ timeout: 20000 });
@@ -86,6 +89,17 @@ for (const { supported, landscape } of [
     await page.screenshot({
       path: `/private/tmp/portion-fullscreen-${supported}-${landscape}.png`,
     });
+    await expect(portal.locator('.pp-ar__scale-status')).toContainText(/approximate/i);
+    await portal.getByRole('button', { name: 'Original photo', exact: true }).click();
+    await expect(portal.locator('.pp-ar__original')).toBeVisible();
+    await expect(portal.locator('.pp-ar__original')).toHaveAttribute('src', originalUrl!);
+    expect(
+      await portal
+        .locator('.pp-ar__original')
+        .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+    ).toBe(true);
+    await portal.getByRole('button', { name: 'Return to AR', exact: true }).click();
+    await expect(portal.locator('.pp-ar__original')).toBeHidden();
     await portal.getByText('Adjust view', { exact: true }).click();
     await expect(portal.getByRole('slider', { name: 'Rotate dish' })).toBeEnabled();
     await page.screenshot({ path: `/private/tmp/portion-landscape-${supported}-${landscape}.png` });

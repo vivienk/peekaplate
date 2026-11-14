@@ -1446,3 +1446,28 @@ main:has(> .pp-detail) {
   max-width: 100%;
   margin-top: 6px;
 }
+
+.pp-ar__original {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #151515;
+  z-index: 2;
+}
+.pp-ar__original[hidden] {
+  display: none;
+}
+.pp-ar__header {
+  z-index: 4;
+}
+.pp-ar__header [data-action="original"] {
+  margin-left: auto;
+  pointer-events: auto;
+}
+.pp-ar--original .pp-ar__settings,
+.pp-ar--original .pp-ar__scale-status,
+.pp-ar--original .pp-ar__rotate-hint {
+  visibility: hidden;
+}

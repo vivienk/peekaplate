@@ -80,13 +80,34 @@ it('does not upload oversized input or expose service errors', async () => {
 it('forwards owner dimensions and rejects nonphysical input before uploading', async () => {
   const fetch = vi.fn(async () => Response.json(result()));
   vi.stubGlobal('fetch', fetch);
-  const uploaded = await uploadPortion(file, dish, revision, new AbortController().signal, 280);
+  const calibration = {
+    shape: 'round' as const,
+    width_mm: 280,
+    depth_mm: 280,
+    source_sha256: 'a'.repeat(64),
+    source_width_px: 80,
+    source_height_px: 60,
+    boundary: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+    confirmed: true as const,
+  };
+  const uploaded = await uploadPortion(
+    file,
+    dish,
+    revision,
+    new AbortController().signal,
+    calibration,
+  );
   expect(fetch).toHaveBeenCalledWith(
     expect.any(String),
-    expect.objectContaining({ headers: expect.objectContaining({ 'X-Serving-Width-Mm': '280' }) }),
+    expect.objectContaining({
+      headers: expect.objectContaining({ 'X-Plate-Calibration': JSON.stringify(calibration) }),
+    }),
   );
   uploaded.dispose();
   await expect(
-    uploadPortion(file, dish, revision, new AbortController().signal, 0),
-  ).rejects.toThrow('Serving width');
+    uploadPortion(file, dish, revision, new AbortController().signal, {
+      ...calibration,
+      width_mm: 0,
+    }),
+  ).rejects.toThrow();
 });

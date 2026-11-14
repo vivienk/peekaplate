@@ -18,7 +18,7 @@ from peekaplate_processing.assets import read_source
 from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.spatial import open_layer_image
 
-RECIPE = 'photo-to-portion-v2'
+RECIPE = 'photo-to-portion-v3'
 MAX_BUDGET = 180_000
 
 
@@ -28,7 +28,7 @@ def digest(data):
 
 def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
                       capture_evidence, mask_path=None, expected_sha256=None,
-                      budget_bytes=MAX_BUDGET, serving_width_mm=None):
+                      budget_bytes=MAX_BUDGET, serving_width_mm=None, plate_calibration=None):
     """Create/reuse an immutable review artifact from one ingested photo.
 
     Mask dimensions refer to the EXIF-oriented source, not a resized T0 variant.
@@ -46,6 +46,12 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
         raise ExtractionError('Photo source hash conflict.')
     mask_bytes = read_source(Path(mask_path)) if mask_path else None
     image_format, has_alpha, image = open_layer_image(data)
+    from peekaplate_processing.plate_calibration import validate_plate
+    try:
+        plate = validate_plate(plate_calibration, source_hash, image.size)
+    except Exception:
+        image.close()
+        raise
     automatic = None
     segmentation_failed = False
     if not mask_bytes:
@@ -61,7 +67,7 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
     identity = {'recipe': RECIPE, 'dish_id': dish_id, 'revision_id': revision_id,
                 'source_sha256': source_hash, 'mask_sha256': digest(mask_bytes) if mask_bytes else None,
                 'budget_bytes': budget_bytes, 'capture_evidence': capture_evidence,
-                'serving_width_mm': serving_width_mm, 'segmentation': automatic, 'segmentation_failed': segmentation_failed}
+                'serving_width_mm': serving_width_mm, 'plate_calibration': plate, 'segmentation': automatic, 'segmentation_failed': segmentation_failed}
     asset_id = 'portion_' + digest(json.dumps(identity, sort_keys=True).encode())[:32]
     prefix = f'https://portion-ingestion.invalid/{asset_id}/'
     files = {'photo.' + {'PNG': 'png', 'WEBP': 'webp', 'JPEG': 'jpg'}[image_format]: data}
@@ -85,7 +91,6 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
 
             alpha = rgba.getchannel('A')
             low, high = alpha.getextrema()
-            foreground_bounds = alpha.point(lambda value: 255 if value >= 128 else 0).getbbox()
             alpha.close()
             if reason is None and (low != 0 or high == 0):
                 reason = 'cutout_requires_visible_subject_and_transparent_background'
@@ -115,14 +120,9 @@ def ingest_dish_photo(*, input_path, dish_id, revision_id, output_root,
                                'layers': [{'url': prefix + name, 'sha256': digest(files[name]),
                                            'size_bytes': len(files[name]), 'depth': depth}
                                           for name, depth in [('background.svg', 0), ('dish.webp', 1)]]}
-                    if serving_width_mm is not None and foreground_bounds:
-                        fraction = (foreground_bounds[2] - foreground_bounds[0]) / image.width
-                        if fraction < 0.01:
-                            portion = None
-                            reason = 'foreground_too_small_to_measure'
-                        else:
-                            portion['physical_size'] = {'width_mm': serving_width_mm,
-                                'foreground_width_fraction': fraction, 'source': 'owner'}
+                    if plate is not None:
+                        portion['physical_size'] = {'plate': plate, 'source': 'owner',
+                            'validation_status': 'pending', 'foreground_sha256': digest(foreground)}
                     break
                 if portion is None:
                     reason = reason or 'delivery_budget_exceeded'
@@ -172,7 +172,8 @@ def main(argv=None):
     parser.add_argument('--capture-evidence')
     parser.add_argument('--mask', type=Path)
     parser.add_argument('--expected-sha256')
-    parser.add_argument('--serving-width-mm', type=int)
+    parser.add_argument('--serving-width-mm', type=int, help='Legacy descriptive width; never enables calibrated scale.')
+    parser.add_argument('--plate-calibration', type=Path, help='Owner-confirmed JSON plate boundary and dimensions.')
     parser.add_argument('--budget-bytes', type=int, default=MAX_BUDGET)
     parser.add_argument('--output-root', required=True, type=Path)
     parser.add_argument('--batch', type=Path, help='JSON photo ingestion jobs; source paths are relative to source-root.')
@@ -194,7 +195,7 @@ def main(argv=None):
                 directory, record = ingest_dish_photo(input_path=source, dish_id=job['dish_id'],
                     revision_id=job['revision_id'], capture_evidence=job['capture_evidence'],
                     expected_sha256=job.get('sha256'), output_root=args.output_root,
-                    budget_bytes=args.budget_bytes, serving_width_mm=job.get('serving_width_mm'))
+                    budget_bytes=args.budget_bytes, serving_width_mm=job.get('serving_width_mm'), plate_calibration=job.get('plate_calibration'))
                 results.append({'source': job['source'], 'directory': str(directory), 'record': record})
             print(json.dumps({'results': results}))
             return 0
@@ -204,7 +205,8 @@ def main(argv=None):
             revision_id=args.revision_id, capture_evidence=args.capture_evidence,
             mask_path=args.mask, expected_sha256=args.expected_sha256,
             budget_bytes=args.budget_bytes, output_root=args.output_root,
-            serving_width_mm=args.serving_width_mm)
+            serving_width_mm=args.serving_width_mm,
+            plate_calibration=json.loads(read_source(args.plate_calibration)) if args.plate_calibration else None)
         print(json.dumps({'directory': str(directory), **record}))
         return 0
     except (ExtractionError, OSError, ValueError, KeyError, TypeError) as error:

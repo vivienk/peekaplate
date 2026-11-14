@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export function portionWorldWidth(size?: PublicPortion['physical_size']) {
-  return size ? size.width_mm / 1000 / size.foreground_width_fraction : 0.3;
+  return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
 }
 
 // Local review only. The caller imports this module behind the explicit DEV fixture gate.
@@ -14,6 +14,7 @@ export function bindPortionAR(
   sampleNotice?: string,
   orientation?: { request: () => void; release: () => void },
   physicalSize?: PublicPortion['physical_size'],
+  originalSource?: () => HTMLImageElement | null,
 ) {
   const open = document.createElement('button');
   open.type = 'button';
@@ -32,7 +33,7 @@ export function bindPortionAR(
     dialog.setAttribute('aria-modal', 'true');
     dialog.innerHTML = `<video class="pp-ar__camera" muted playsinline aria-hidden="true"></video>
       <div class="pp-ar__canvas"></div>
-      <header class="pp-ar__header"><button class="pp-back pp-ar__back" type="button" data-action="close" aria-label="Back to preview"></button><h2 class="pp-sr-only">Dish on your table</h2></header>
+      <header class="pp-ar__header"><button class="pp-back pp-ar__back" type="button" data-action="close" aria-label="Back to preview"></button><button type="button" data-action="original" aria-pressed="false">Original photo</button><h2 class="pp-sr-only">Dish on your table</h2></header>
       <p class="pp-ar__rotate-hint" role="status">Rotate your phone sideways to view the dish.</p>
       <p class="pp-ar__scale-status" role="status"></p>
       <details class="pp-ar__settings"><summary>Adjust view</summary><div class="pp-ar__panel">
@@ -55,6 +56,25 @@ export function bindPortionAR(
     }
     const button = (name: string) =>
       dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
+    const original = document.createElement('img');
+    original.className = 'pp-ar__original';
+    original.hidden = true;
+    const originalPhoto = originalSource?.();
+    button('original').hidden = !originalPhoto?.src;
+    if (originalPhoto) {
+      original.src = originalPhoto.currentSrc || originalPhoto.src;
+      original.alt = originalPhoto.alt || 'Original dish photo';
+      original.addEventListener('error', () => {
+        original.alt = 'Original photo unavailable. Return to AR to continue.';
+      });
+    }
+    dialog.append(original);
+    button('original').addEventListener('click', () => {
+      original.hidden = !original.hidden;
+      button('original').textContent = original.hidden ? 'Original photo' : 'Return to AR';
+      button('original').setAttribute('aria-pressed', String(!original.hidden));
+      dialog.classList.toggle('pp-ar--original', !original.hidden);
+    });
     const start = button('start');
     const place = button('place');
     const reset = button('reset');
@@ -97,7 +117,6 @@ export function bindPortionAR(
     const texture = new THREE.Texture(image);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    const physicalWidth = physicalSize ? physicalSize.width_mm / 1000 : undefined;
     const width = portionWorldWidth(physicalSize);
     const height = width * (image.naturalHeight / image.naturalWidth);
     let cameraScale = 0.3 / width;
@@ -112,6 +131,32 @@ export function bindPortionAR(
     );
     cutout.position.y = height / 2;
     content.add(cutout);
+    const plate = physicalSize?.plate;
+    const footprint = plate
+      ? new THREE.Mesh(
+          plate.shape === 'round'
+            ? new THREE.RingGeometry(
+                plate.width_mm / 2000 - 0.002,
+                plate.width_mm / 2000,
+                64,
+              ).rotateX(-Math.PI / 2)
+            : new THREE.PlaneGeometry(plate.width_mm / 1000, plate.depth_mm / 1000).rotateX(
+                -Math.PI / 2,
+              ),
+          new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.45,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          }),
+        )
+      : undefined;
+    if (footprint) {
+      footprint.position.y = 0.001;
+      footprint.visible = false;
+      content.add(footprint);
+    }
     const reticle = new THREE.Mesh(
       new THREE.RingGeometry(0.055, 0.07, 32).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xffffff }),
@@ -189,9 +234,9 @@ export function bindPortionAR(
         : 'Review preview · ';
       scaleStatus.textContent =
         prefix +
-        (physicalSize
-          ? `Owner serving width: ${physicalSize.width_mm / 10} cm · ${tracked ? 'tracked scale' : 'camera scale is approximate'}`
-          : 'owner dimensions not supplied');
+        (plate
+          ? `Owner plate: ${plate.width_mm / 10} × ${plate.depth_mm / 10} cm · ${tracked ? 'measured footprint; appearance approximate, device validation pending' : 'camera scale is approximate'}`
+          : 'Approximate preview · owner plate calibration not supplied');
     };
     const changed = () => {
       content.rotation.y = THREE.MathUtils.degToRad(Number(rotation.value));
@@ -248,6 +293,12 @@ export function bindPortionAR(
       reset.hidden = false;
       rotation.disabled = false;
       size.disabled = tracked && !!physicalSize;
+      if (footprint) footprint.visible = tracked;
+      cutout.position.set(
+        tracked && plate ? width * (0.5 - plate.boundary.x - plate.boundary.width / 2) : 0,
+        tracked && plate ? height * (plate.boundary.y + plate.boundary.height - 0.5) : height / 2,
+        0,
+      );
       changed();
       updateScaleStatus();
       message.textContent = tracked
@@ -382,7 +433,8 @@ export function bindPortionAR(
           xrSupported = false;
           start.hidden = false;
           start.textContent = 'Try camera preview';
-          scaleStatus.textContent = 'Camera unavailable · open Adjust view to retry';
+          scaleStatus.textContent =
+            'Approximate preview · camera unavailable · open Adjust view to retry';
           message.textContent =
             'Camera or table AR could not start. Allow camera access and try again, or go Back to preview.';
         }
@@ -451,8 +503,8 @@ export function bindPortionAR(
           gltf.scene.position.y += dimensions.y / 2;
           model = new THREE.Group();
           model.add(gltf.scene);
-          if (physicalWidth && dimensions.x <= 0) throw new Error('Invalid model width');
-          model.scale.setScalar(physicalWidth ? physicalWidth / dimensions.x : 0.3 / extent);
+          // Generated mesh bounds are not a calibrated plate boundary. Keep appearance approximate.
+          model.scale.setScalar(0.3 / extent);
           model.visible = false;
           content.add(model);
           mode.disabled = false;

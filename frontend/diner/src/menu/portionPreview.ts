@@ -1,4 +1,5 @@
 import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
+import { createPlateCalibration } from './portionCalibration';
 import { createPortionMotion } from './portionMotion';
 import { createPortionOrientation } from './portionOrientation';
 import type { PortionRenderer } from './portionRenderer';
@@ -66,8 +67,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
   let uploadPhotoUrl: string | undefined;
   let uploadInput: HTMLInputElement | undefined;
   let uploadLabel: HTMLLabelElement | undefined;
-  let servingWidth: HTMLInputElement | undefined;
-  let servingLabel: HTMLLabelElement | undefined;
+  let calibration: ReturnType<typeof createPlateCalibration> | undefined;
   let uploadStatus: HTMLParagraphElement | undefined;
   if (import.meta.env.DEV) {
     uploadLabel = document.createElement('label');
@@ -77,19 +77,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     uploadInput.accept = 'image/jpeg,image/png,image/webp';
     uploadInput.setAttribute('aria-label', 'Upload dish photo for 2.5D preview');
     uploadLabel.append(uploadInput);
-    servingLabel = document.createElement('label');
-    servingLabel.textContent =
-      'Owner serving width (cm, optional; full visible dish including plate)';
-    servingWidth = document.createElement('input');
-    servingWidth.type = 'number';
-    servingWidth.min = '3';
-    servingWidth.max = '100';
-    servingWidth.step = '0.1';
-    servingWidth.setAttribute('aria-label', 'Owner serving width in centimetres');
-    servingLabel.append(servingWidth);
+    calibration = createPlateCalibration();
     uploadStatus = document.createElement('p');
     uploadStatus.setAttribute('role', 'status');
-    open.closest('.pp-detail__actions')?.after(servingLabel, uploadLabel, uploadStatus);
+    open.closest('.pp-detail__actions')?.after(uploadLabel, calibration.element, uploadStatus);
   }
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let active = false;
@@ -278,6 +269,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           sampleNotice,
           orientation,
           renderManifest.physical_size,
+          () => stage.querySelector<HTMLImageElement>('img.pp-detail__image'),
         );
         if (!portalOffered) {
           portalOffered = true;
@@ -466,6 +458,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     const controller = new AbortController();
     uploadAbort = controller;
     uploadInput!.disabled = true;
+    if (calibration) calibration.element.disabled = true;
     uploadStatus.textContent = 'Removing background and preparing your dish…';
     try {
       const { uploadPortion } = await import('./portionUpload');
@@ -474,7 +467,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         dish.dishId,
         dish.dishRevisionId,
         controller.signal,
-        servingWidth?.value ? Math.round(Number(servingWidth.value) * 10) : undefined,
+        await calibration?.value(),
       );
       if (disposed || controller.signal.aborted) {
         result.dispose();
@@ -512,9 +505,15 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
           error instanceof Error ? error.message : 'Photo processing unavailable.';
     } finally {
       if (!disposed && uploadInput) uploadInput.disabled = false;
+      if (!disposed && calibration) calibration.element.disabled = false;
     }
   };
-  uploadInput?.addEventListener('change', uploadPhoto);
+  const selectPhoto = () => {
+    const file = uploadInput?.files?.[0];
+    if (file) calibration?.select(file);
+  };
+  uploadInput?.addEventListener('change', selectPhoto);
+  calibration?.generate.addEventListener('click', uploadPhoto);
   compare.addEventListener('click', comparePhoto);
   resetButton.addEventListener('click', resetView);
   retry.addEventListener('click', retryPreview);
@@ -534,9 +533,10 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     uploadAbort?.abort();
     releaseUpload?.();
     if (uploadPhotoUrl) URL.revokeObjectURL(uploadPhotoUrl);
-    uploadInput?.removeEventListener('change', uploadPhoto);
+    uploadInput?.removeEventListener('change', selectPhoto);
+    calibration?.generate.removeEventListener('click', uploadPhoto);
     uploadLabel?.remove();
-    servingLabel?.remove();
+    calibration?.dispose();
     uploadStatus?.remove();
     stop();
     photoObserver.disconnect();

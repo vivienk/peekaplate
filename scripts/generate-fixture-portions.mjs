@@ -17,6 +17,7 @@ const pipelineHash = hash(
   Buffer.concat([
     readFileSync(pipeline),
     readFileSync(join(repo, 'processing/src/peekaplate_processing/cutout.py')),
+    readFileSync(join(repo, 'processing/src/peekaplate_processing/plate_calibration.py')),
   ]),
 );
 const prefix = 'https://portion-fixtures.invalid/';

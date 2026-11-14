@@ -1,3 +1,5 @@
+import json
+import hashlib
 import io
 import tempfile
 import unittest
@@ -32,15 +34,16 @@ class PortionServiceTests(unittest.TestCase):
         with Image.new('L', (80, 60), 0) as image:
             image.paste(255, (20, 15, 60, 45))
             image.save(mask, format='PNG')
+        calibration = {'shape': 'rectangular', 'width_mm': 280, 'depth_mm': 220, 'source_sha256': hashlib.sha256(photo.getvalue()).hexdigest(), 'source_width_px': 80, 'source_height_px': 60, 'boundary': {'x': 0.2, 'y': 0.2, 'width': 0.6, 'height': 0.6}, 'confirmed': True}
         with patch('peekaplate_processing.cutout.automatic_mask', return_value=(mask.getvalue(), {'model': 'test'})):
-            response = self.client.post(self.path, content=photo.getvalue(), headers={**self.headers, 'X-Serving-Width-Mm': '280'})
+            response = self.client.post(self.path, content=photo.getvalue(), headers={**self.headers, 'X-Plate-Calibration': json.dumps(calibration)})
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(result['status'], 'ready')
         self.assertEqual(result['portion']['dish_id'], DISH)
         self.assertEqual(result['portion']['dish_revision_id'], REV)
         self.assertEqual(len(result['layers']), 2)
-        self.assertEqual(result['portion']['physical_size']['width_mm'], 280)
+        self.assertEqual(result['portion']['physical_size']['plate']['width_mm'], 280)
         self.assertFalse(result['publication_eligible'])
         self.assertNotIn(str(self.temp.name), response.text)
 

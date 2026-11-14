@@ -40,7 +40,6 @@ for (const variant of [
         .click({ timeout: 20000 });
       await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
     }
-    await page.getByLabel('Owner serving width in centimetres').fill('28');
     const reply = page.waitForResponse(
       (response) =>
         response.url().includes('/v1/portion-uploads/') && response.request().method() === 'POST',
@@ -49,6 +48,12 @@ for (const variant of [
     await page
       .getByLabel('Upload dish photo for 2.5D preview')
       .setInputFiles(resolve('frontend/diner/src/menu/fixture-assets/portion-demo/photo.jpg'));
+    await page.getByLabel('Plate width in centimetres').fill('28');
+    await page.getByLabel('I measured this plate').check();
+    await page.getByLabel('Plate boundary left percent').fill('12');
+    await expect(page.getByLabel('I measured this plate')).not.toBeChecked();
+    await page.getByLabel('I measured this plate').check();
+    await page.getByRole('button', { name: 'Generate preview', exact: true }).click();
     const response = await reply;
     expect(response.ok()).toBe(true);
     await expect(page.getByRole('dialog', { name: 'Dish on your table' })).toBeVisible({
@@ -63,8 +68,13 @@ for (const variant of [
         .getByRole('dialog', { name: 'Dish on your table' })
         .getByText(/Your uploaded photo. Automatic cutout/),
     ).toBeVisible();
-    await expect(page.locator('.pp-ar__scale-status')).toContainText('28 cm');
+    await expect(page.locator('.pp-ar__scale-status')).toContainText('28 × 28 cm');
     await expect(page.locator('.pp-ar__scale-status')).toContainText('approximate');
+    await page.getByRole('button', { name: 'Original photo', exact: true }).click();
+    await expect(page.locator('.pp-ar__original')).toBeVisible();
+    await expect(page.locator('.pp-ar__original')).toHaveAttribute('src', /^blob:/);
+    await page.getByRole('button', { name: 'Return to AR', exact: true }).click();
+    await expect(page.locator('.pp-ar__original')).toBeHidden();
     const rotation = page.getByRole('slider', { name: 'Rotate dish' });
     await rotation.fill('30');
     await expect(rotation).toHaveValue('30');

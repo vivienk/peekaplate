@@ -1,7 +1,12 @@
 import { PublicPortionSchema } from './portion';
 
 export * from './owner-ai';
-export { type PublicPortion, PublicPortionSchema } from './portion';
+export {
+  type PlateCalibration,
+  PlateCalibrationSchema,
+  type PublicPortion,
+  PublicPortionSchema,
+} from './portion';
 
 import { z } from 'zod';
 

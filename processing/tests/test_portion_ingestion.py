@@ -67,12 +67,23 @@ class PortionIngestionTests(unittest.TestCase):
         _, third = self.ingest()
         self.assertNotEqual(first['asset_id'], third['asset_id'])
 
-    def test_owner_serving_width_tracks_visible_foreground_and_changes_identity(self):
-        _, baseline = self.ingest()
-        _, measured = self.ingest(serving_width_mm=280)
+    def calibration(self):
+        return {'shape': 'round', 'width_mm': 280, 'depth_mm': 280,
+            'source_sha256': digest(self.source.read_bytes()), 'source_width_px': 80, 'source_height_px': 60,
+            'boundary': {'x': 0.3, 'y': 0.3, 'width': 0.4, 'height': 0.4}, 'confirmed': True}
+
+    def test_plate_boundary_not_foreground_defines_size(self):
+        _, baseline = self.ingest(serving_width_mm=280)
+        self.assertNotIn('physical_size', baseline['portion'])
+        plate = self.calibration()
+        directory, measured = self.ingest(plate_calibration=plate)
         self.assertNotEqual(baseline['asset_id'], measured['asset_id'])
-        self.assertEqual(measured['portion']['physical_size'], {
-            'width_mm': 280, 'foreground_width_fraction': 0.5, 'source': 'owner'})
+        self.assertEqual(measured['portion']['physical_size']['plate'], plate)
+        self.assertEqual(measured['portion']['physical_size']['foreground_sha256'], digest((directory / 'dish.webp').read_bytes()))
+        self.assertEqual(measured['portion']['physical_size']['validation_status'], 'pending')
+        for change in ({'source_sha256': 'a' * 64}, {'source_width_px': 100}, {'confirmed': False}, {'width_mm': True}, {'depth_mm': 300}, {'boundary': {'x': 0.8, 'y': 0, 'width': 0.5, 'height': 1}}):
+            with self.assertRaises(ExtractionError):
+                self.ingest(plate_calibration={**plate, **change})
         for invalid in (0, 1001, True, 28.5):
             with self.assertRaises(ExtractionError):
                 self.ingest(serving_width_mm=invalid)
@@ -165,7 +176,13 @@ class PortionIngestionTests(unittest.TestCase):
             code = main([*arguments, '--serving-width-mm', '280'])
         self.assertEqual(code, 0)
         record = json.loads(stdout.getvalue())
-        self.assertEqual(record['portion']['physical_size']['width_mm'], 280)
+        self.assertNotIn('physical_size', record['portion'])
+        calibration = self.root / 'plate.json'
+        calibration.write_text(json.dumps(self.calibration()))
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            self.assertEqual(main([*arguments, '--plate-calibration', str(calibration)]), 0)
+        self.assertEqual(json.loads(stdout.getvalue())['portion']['physical_size']['plate'], self.calibration())
         self.assertEqual(record['provenance']['serving_width_mm'], 280)
         with redirect_stdout(io.StringIO()):
             self.assertEqual(main([*arguments, '--serving-width-mm', '1001']), 2)

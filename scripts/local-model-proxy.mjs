@@ -47,6 +47,9 @@ export function localModelProxy({ token, fetchImpl = fetch, port = 5173, apiPort
           ...(upload && req.headers['x-serving-width-mm']
             ? { 'X-Serving-Width-Mm': req.headers['x-serving-width-mm'] }
             : {}),
+          ...(upload && req.headers['x-plate-calibration']
+            ? { 'X-Plate-Calibration': req.headers['x-plate-calibration'] }
+            : {}),
           'Content-Type': upload ? 'application/octet-stream' : 'application/json',
         },
         body: post ? Buffer.concat(chunks) : undefined,

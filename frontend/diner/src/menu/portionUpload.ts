@@ -1,4 +1,9 @@
-import { type PublicPortion, PublicPortionSchema } from '@peekaplate/contracts';
+import {
+  type PlateCalibration,
+  PlateCalibrationSchema,
+  type PublicPortion,
+  PublicPortionSchema,
+} from '@peekaplate/contracts';
 
 // Local review only; bytes never become public menu data or durable browser storage.
 const layers = new Map<string, { encoded: string; refs: number }>();
@@ -13,14 +18,10 @@ export async function uploadPortion(
   dishId: string,
   revisionId: string,
   signal: AbortSignal,
-  servingWidthMm?: number,
+  calibration?: PlateCalibration,
 ): Promise<{ portion: PublicPortion | null; dispose: () => void }> {
   if (!file.size || file.size > 12_000_000) throw new Error('Choose a photo under 12 MB.');
-  if (
-    servingWidthMm !== undefined &&
-    (!Number.isInteger(servingWidthMm) || servingWidthMm < 30 || servingWidthMm > 1000)
-  )
-    throw new Error('Serving width must be between 3 and 100 cm.');
+  if (calibration) PlateCalibrationSchema.parse(calibration);
   const response = await fetch(`/__local3d/v1/portion-uploads/${dishId}/${revisionId}`, {
     method: 'POST',
     body: file,
@@ -29,7 +30,7 @@ export async function uploadPortion(
     redirect: 'error',
     headers: {
       'Content-Type': 'application/octet-stream',
-      ...(servingWidthMm === undefined ? {} : { 'X-Serving-Width-Mm': String(servingWidthMm) }),
+      ...(calibration ? { 'X-Plate-Calibration': JSON.stringify(calibration) } : {}),
     },
   });
   if (!response.ok)

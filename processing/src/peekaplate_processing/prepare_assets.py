@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Sequence
 from uuid import UUID
 
-from peekaplate_processing.assets import prepare_t0_bundle
+from peekaplate_processing.assets import prepare_t0_bundle, read_source
 from peekaplate_processing.portion_ingestion import ingest_dish_photo
 from peekaplate_processing.errors import ExtractionError
 
@@ -39,6 +39,7 @@ def main(argv:Sequence[str]|None=None)->int:
     parser.add_argument("--mask", type=Path, help="Optional grayscale dish mask for opaque input photos.")
     parser.add_argument("--portion-budget-bytes", type=positive_int, default=180_000)
     parser.add_argument("--serving-width-mm", type=int)
+    parser.add_argument("--plate-calibration", type=Path)
     args=parser.parse_args(argv)
     try:
         prepared=prepare_t0_bundle(
@@ -56,6 +57,7 @@ def main(argv:Sequence[str]|None=None)->int:
             output_root=prepared.directory/"portion", capture_evidence=args.capture_evidence,
             expected_sha256=prepared.manifest.source.sha256, mask_path=args.mask,
             budget_bytes=args.portion_budget_bytes, serving_width_mm=args.serving_width_mm,
+            plate_calibration=json.loads(read_source(args.plate_calibration)) if args.plate_calibration else None,
         )
         portion_result = {"status": portion["status"], "manifest": str(portion_dir/"portion-ingestion.json"),
                           "reason": portion["reason"], "publication_eligible": False}
