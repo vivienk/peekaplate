@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque. The owner-ai subpath exposes the existing result schema to console previews.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque. The existing owner-analysis contract defines the connected panel request and review-only result.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -76,7 +76,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "ad16d84039f7de2c25931fed5a98a9e78e43c9e2a0ae1e571516402d6e35863e"
+      "sourceFingerprint": "05d0a66de5175251c44ea1aacd373b68fe7e6d6193fa888bc6cf6c908b836f7e"
     },
     {
       "id": "tokens",
@@ -114,7 +114,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Prepared /diner aliases validate an operator directory before the existing public reader; legacy QR paths remain. Enrollment is manual; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -206,7 +206,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save.css",
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "frontend/diner/public/config/restaurant-links.json",
+        "docs/restaurant-urls.md",
+        "tests/restaurant-links/restaurant-links.spec.ts",
+        "playwright.restaurant-links.config.ts",
+        "scripts/serve-restaurant-routing-test.mjs"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -215,12 +220,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "91d0574ec00a8c3a0be4bd83d18ff767df79ac2655d7f7ebf57e757b2688829e"
+      "sourceFingerprint": "f9c1c47426f6f34ef2a811388ab5f4b73ebf34aae33664347536ff0a3fb12a20"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console has light-theme dashboard demos, typed synthetic AI preview and an optional connected analysis panel. The new panel sends only dish/goal through an owner-session client, validates returned venue/dish/goal, and clears stale/failing results. The private local harness enables it with a synthetic session/report; standard previews remain synthetic and production builds exclude demos. Real owner identity, report freshness and hosted acceptance remain separate.",
+      "summary": "React/Vite console fields and preview-only owner/onboarding/dashboard demos. Setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Button and Escape dismissal close the native dialog before restoring dashboard focus. The AI composer is disabled. Normal builds exclude demos. Report data checks public report shape and venue, handles failure, resets on source changes and labels saved data. The token getter is an auth seam. The typed synthetic AI preview checks venue, exact window and optional report ID, mounts on desktop and mobile and cannot apply changes. The optional analysis panel sends dish and goal through its session client and checks returned venue, dish and goal. Its local harness uses a synthetic session and report. Connected auth, persisted setup, publication and reporting remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -232,6 +237,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/vite.config.ts",
         "frontend/console/src/foundations/TextField.tsx",
         "frontend/console/src/foundations/field.css",
+        "frontend/console/src/owner-dashboard/menu-api.ts",
+        "frontend/console/src/owner-dashboard/menu.test.tsx",
+        "frontend/console/first-dashboard.html",
+        "frontend/console/src/owner/demo.tsx",
+        "frontend/console/src/owner/OwnerShell.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/setup.ts",
+        "frontend/console/src/owner/owner.css",
+        "frontend/console/src/owner/setup.test.tsx",
+        "frontend/console/src/owner/FirstDashboard.test.tsx",
+        "tests/e2e/owner-first-dashboard.spec.ts",
+        "tests/e2e/owner-onboarding.spec.ts",
+        "frontend/console/src/owner/PublishSuccessDialog.tsx",
+        "frontend/console/src/owner-dashboard/report-api.ts",
+        "tests/e2e/owner-report-api.spec.ts",
         "frontend/console/src/owner-dashboard/App.tsx",
         "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
         "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.test.tsx",
@@ -258,12 +278,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7ecc52110f580d480c387ede6961098c328c4b70f9c8d7992a198e93729beae0"
+      "sourceFingerprint": "240d55b5ba884435901ebb3a3d61dd88b79c22cd3a07896b188fe02a19f1c669"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, command/publication transactions, signed menus, canonical observations, extraction and artifact-verified review. Owner workspace supports versioned drafts/private photos, grouped uploads and fenced retry/cancel. Owner HTTP reports remain synthetic-source gated; internal comparisons preserve cohort suppression. AI report validation preserves unknown freshness. New optional Responses route reads authorized reports, sends only three public rates and returns fixed review-only suggestions. Production is disabled; staging needs explicit secrets and rate limiting. Private local harness uses synthetic identity/report only. Hosted owner analysis is not activated.",
+      "summary": "Worker enforces staff JWT and tenant authority, transactional commands/publication, signed menus and canonical observations. Owner workspace provides versioned private drafts/photos, uploads, PDF limits, URL materialization, fenced cancel/retry, revision-bound verification and content-checked photo promotion. Retention needs configuration; public bundles require approval. Synthetic-gated reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression. CSV preserves owner/source/venue guards and VALID_ZERO. Owner actions are versioned and idempotent. Owner-AI validates privacy and IDs. The optional Responses route sends only disclosed rates from the authorized report and returns fixed review-only suggestions. Local identity/report data are synthetic. Production is disabled; staging needs explicit configuration and rate limiting. Trusted issuance, freshness, DATA-12 reconciliation, connected owner UI and exact diner CORS deployment remain separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -393,6 +413,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingestion/intake.source.test.ts",
         "backend/src/ingestion/review-bootstrap.ts",
         "docs/evidence/owner-menu-staging-2026-11-12.json",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu-retention.test.ts",
+        "backend/src/owner-report.data12-reconciliation.test.ts",
+        "tests/data12/reconciliation_findings.md",
+        "backend/src/owner-report-export.ts",
+        "backend/src/owner-report-export.test.ts",
         "backend/src/owner-ai/report-input.ts",
         "backend/src/owner-ai/report-input.test.ts",
         "backend/src/owner-ai/report-adapter.ts",
@@ -400,6 +426,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-producer-seam.test.ts",
         "scripts/probe-owner-ai-luna.mjs",
         "scripts/probe-owner-ai-luna.test.mjs",
+        "tests/data06/VALIDATION_REPORT.md",
+        "tests/data06/descriptive_signals.json",
+        "tests/data06/descriptive_signals.test.ts",
+        "tests/data06/privacy_boundaries.json",
+        "tests/data06/privacy_boundaries.test.ts",
+        "tests/data06/tsconfig.json",
         "backend/src/owner-ai/responses.ts",
         "backend/src/owner-ai/responses.test.ts",
         "backend/src/owner-ai/routes.ts",
@@ -420,7 +452,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "56beb4609af939ab09fa385355981a9d505346dbe79cf331318a083fbd3fffb7"
+      "sourceFingerprint": "2918951ce8f3e72747d1bd23f32059eee1db69d164a93ec4f5497125367e44e0"
     },
     {
       "id": "database",
@@ -455,7 +487,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "migrations/20261109120000_owner_insight_actions.sql",
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
-        "tests/db/owner_menu_workspace.sql"
+        "tests/db/owner_menu_workspace.sql",
+        "migrations/20261113010000_menu_verification_lifecycle.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -466,7 +499,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "5632a1ab9b4a8ea7279ec2789bfe43262f2aaa14c57f80a241503e63037c71d4"
+      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
     },
     {
       "id": "measurement",
@@ -514,7 +547,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/operations.md",
         "scripts/verify.mjs",
         "scripts/verify.test.mjs",
-        "scripts/owner-ai-launcher.test.mjs",
         "docs/verification.md",
         "vitest.db.config.ts",
         ".github/main-ruleset.json",
@@ -542,7 +574,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/console-preview-demos.test.mjs",
         "scripts/node-ts-hooks.mjs",
         ".github/workflows/deploy-extraction-staging.yml",
-        "docs/staging-ingestion-release.md"
+        "docs/staging-ingestion-release.md",
+        "vitest.config.ts",
+        "vitest.data06.config.ts",
+        "scripts/prepare-app-site.mjs",
+        "scripts/prepare-app-site.test.mjs",
+        "scripts/owner-ai-launcher.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -553,7 +590,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "88f3283e85eaeee986d5bf452e45ad01832aada007f24fb7644047340143ada0"
+      "sourceFingerprint": "f5bb04accffb88131ffab358417e0627baf11e30c344e5d73d9ac1443fa21636"
     },
     {
       "id": "agents",
@@ -747,135 +784,156 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "summary": "AI-02 P0 adds deterministic evidence-bound ingredient candidates to the local VIS-02 pipeline and a separate strict RES-01 review contract. No model training, external fallback, recipe completion or inferred absence/suitability. All output requires owner confirmation and cannot represent approval/publication. Initial PR51 head e67a574 passed full Linux CI40461046251, including frozen Python/package, browser and DB checks; Intel Mac native dependency limits are documented in errors.md. Independent automated review found no supported defect after disproving an assumed Zod Unicode mismatch; a boundary regression was added. See ingredient-intelligence.md for remaining authenticated RES-01 integration.",
-      "modules": [
-        "processing",
-        "contracts"
-      ],
-      "next": "Complete independent review and hosted pipeline checks, then integrate trusted imports, authenticated owner corrections/confirmation and publication enforcement through RES-01/RES-02."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "contracts",
-        "processing"
-      ],
-      "summary": "PR51 aligned with current develop after the vision-first release. Local review-only ingredient sidecars are generated through common finalization for schema1/pipeline2 and schema2/pipeline3; unsupported bounded input records unavailability without failing valid extraction. Vision-model text never becomes independent ingredient grounding. Private hosted bundle format and owner correction/publication authority are unchanged. Unicode tests use explicit UTF-8 on Windows.",
-      "next": "Complete final review/CI and merge into develop. Ingredient-specific owner UI/import, recomputation from effective corrections, confirmation and representative food-domain acceptance remain separate; do not copy this sidecar into public food claims."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "contracts",
-        "backend",
-        "database"
-      ],
-      "summary": "PR120 reconciles current develop without changing the verified menu upload/report/tracking boundaries. Pilot order imports use owner authorization, reviewed administrative POS mappings, explicit administrative tracking activation, historical publication resolution, idempotency and row quarantine. Strict calendar/time validation prevents invalid dates from reaching PostgreSQL; absent runtime archive storage fails closed. Import window90 days; raw-retention approval and purge activation remain separate.",
-      "next": "Complete final review/CI and merge into develop. Hosted migrations/bindings, reviewed pilot mappings and explicit tracking activation are operator release gates. No staging/production deployment or real POS import was performed."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "diner"
-      ],
-      "summary": "PR78 reconciles develop while preserving ingredient/order-import work. Screens use the merged track, ID and clock modules; interim tracking remains removed. Local browser regressions reproduce preconsent timing/dangling exposure failures before fixes and pass afterward. Consent transitions create fresh eligible openings; refreshed publications cannot reuse old exposure IDs and record one menu view. Existing publication-withdrawal assertions still reject every post-withdrawal event. Local pnpm check/build pass: 1357 unit, 74 script, 137 Chromium and nine SDK/privacy cases; browser runs took 1.4 min and 10.4 s. CI exposed a withdrawal-fixture fake-time wait; the bounded poll now advances the delivery clock without weakening counts.",
-      "sources": [
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/menu-triggers-live.spec.ts",
-        "docs/posthog.md"
-      ],
-      "next": "Complete exact-head independent review/CI, obtain final-commit human approval, merge and recheck develop. No staging deployment, Queue activation or hosted PostHog acceptance is included. The proposed 31-minute detail-resumption rule remains separate from the current shared clock expiry behavior."
-    },
-    {
-      "date": "2026-11-11",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
-      "summary": "PR134 restores PR123 validation files lost from its later branch revision while preserving current develop. Two real PostgreSQL regressions failed before fixes: a one-session opened cohort reconstructed via open_rate/count, and valid menu-card comparison engagement reported zero. Both now pass. Nine restored mocked-row cases retain independent denominator checks with complementary suppression. The cross-publication JSON fixture now executes against SQL and yields seventeen distinct sessions. Full local DB runner passes 281 pgTAP assertions and 107 integration cases; focused reader suite passes eleven cases. Repository checks pass: 1374 unit, 74 script tests, types/lint/context/docs and both builds/Worker dry-run. No UI runtime changed.",
-      "sources": [
-        "backend/src/comparison-report.ts",
-        "backend/src/comparison-report.integration.ts",
-        "backend/src/comparison-report.data05.test.ts",
-        "docs/comparison-reporting.md"
-      ],
-      "next": "Complete independent final-commit review and CI, obtain human approval, merge PR134 into develop and recheck CI. Comparison HTTP/dashboard integration, source/release policy, cross-query disclosure controls, hosted privacy/freshness and product acceptance remain separate. No hosted migration or deployment."
-    },
-    {
-      "date": "2026-11-11",
+      "date": "2026-11-13",
       "modules": [
         "backend",
         "contracts",
         "database"
       ],
-      "summary": "PR142 owner-only insight-action HTTP/persistence/contracts preserve develop PR134/123. Shared context/history conflicts and stale local port/evidence docs are reconciled. New real-Worker cases cover competing updates, old receipt replay, changed command reuse and dual-owner tenant isolation. A full DB run exposed six inherited comparison-reader statement timeouts; tenant/time-scoped materialization replaces repeated view expansion while preserving period/privacy/order semantics. The full runner passes 298 SQL assertions and 114 DB/Worker cases; 11 focused comparison cases include 1000 unrelated synthetic observations. pnpm check passes 1397 unit (4 optional skips), 74 script tests, types/lint/context/docs. Both builds/Worker dry-run, 137 Chromium and 9 SDK/privacy tests pass.",
+      "summary": "PR161 verification correction: expected draft version required; separate verification event sequence supports manual and extracted drafts without changing content versions or published projections. Manual edits/extraction retries invalidate verification. Photo transitions serialize successive event versions; identical retries are storage-effect-free. Retention establishes tenant RLS scope and row locks, validates promoted bytes and exact keys, paginates R2 and retains on lookup failures. Review/Saved pages remain synthetic preview state, not connected persistence.",
       "sources": [
-        "backend/src/owner-insight-actions.ts",
-        "backend/src/dish.integration.ts",
-        "backend/src/comparison-report.ts",
-        "migrations/20261109120000_owner_insight_actions.sql",
-        "docs/owner-insight-actions.md"
-      ],
-      "next": "Complete final pinned review and CI, obtain human approval and merge into develop. Hosted migration, role grant verification, deployment, dashboard wiring and product permission/insight identity decisions remain separate. No auth screen changes or Queue activation."
-    },
-    {
-      "date": "2026-11-12",
-      "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
-      "sources": [
-        "docs/owner-menu-workspace.md",
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "packages/contracts/src/owner-menu.ts",
         "backend/src/owner-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "migrations/20261112010000_owner_menu_workspace.sql",
-        "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
+        "backend/src/owner-menu-routes.ts",
+        "backend/src/owner-menu-retention.ts",
+        "backend/src/owner-menu.integration.ts",
+        "frontend/console/src/owner-dashboard/menu.tsx"
       ],
-      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
+      "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
     },
     {
-      "date": "2026-11-12",
+      "date": "2026-11-13",
       "modules": [
-        "diner",
-        "analytics"
+        "console",
+        "delivery"
       ],
-      "summary": "Synchronizes the narrow first-consent release correction into develop without promoting other runtime work. The real-adapter regression reproduces a menu view lost only from PostHog when the screen listener runs first; current-gate synchronization before capture preserves matching IDs on initial and renewed consent. No new consent policy, provider configuration or Queue change.",
-      "paths": [
-        "frontend/diner/src/tracking/index.ts",
-        "frontend/diner/src/tracking/dispatch.test.ts",
-        "tests/e2e/posthog-adapter.spec.ts"
-      ],
-      "next": "Merge the reviewed correction and its exact-main staging release after final approval. Record corrected intercepted browser evidence separately from DATA-12 real destination persistence and metric reconciliation."
-    },
-    {
-      "date": "2026-11-12",
-      "summary": "Draft PR112 syncs with develop e9be312, preserving owner menu and first-consent changes, the trusted report adapter, synthetic UUIDv5 fixtures and the opt-in synthetic GPT-6 Luna access probe. CI covers the probe with a mocked transport.",
-      "modules": [
-        "backend",
-        "contracts"
-      ],
+      "summary": "PR125 reconciles owner first-dashboard setup shell with current develop, retaining the existing owner-dashboard/foundations previews, owner-menu adapters and shared context. All three synthetic demo pages remain preview-only and excluded from normal output. No auth/API/publication wiring is introduced.",
       "sources": [
-        "docs/owner-ai.md",
-        "scripts/probe-owner-ai-luna.mjs",
-        "scripts/probe-owner-ai-luna.test.mjs"
+        "frontend/console/src/owner/setup.ts",
+        "frontend/console/src/owner/OwnerShell.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/vite.config.ts",
+        "scripts/console-preview-demos.test.mjs"
       ],
-      "next": "Verify current-head CI. Run the one-request probe only after dedicated project setup and recorded approval. Database-backed internal issuance and the recommendation evaluation remain separate."
+      "next": "Run final checks and merge reviewed PR125 before reconciling PR139 onboarding states/dialog. Connected owner dashboard/auth acceptance remains separate."
     },
     {
-      "date": "2026-11-12",
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
+      "sources": [
+        "frontend/console/src/owner/PublishSuccessDialog.tsx",
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "tests/e2e/owner-onboarding.spec.ts"
+      ],
+      "next": "Reconcile/merge after PR125 and recheck develop. Connected restaurant setup/auth/publication and full owner journey remain separate acceptance work."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR167 fixes impossible mocked opening cohorts, explicitly checks EMPTY and all suppressed comparison metrics, and separates mocked serialization from actual SQL/staging evidence. Two PostgreSQL regressions reproduced inclusive-end exposure/checkpoint errors and pass with half-open owner SQL. Existing synthetic starter fixtures use test traffic and cannot prove the fixed allowlisted hosted venue is synthetic. is_stale remains null without a trusted completion signal.",
+      "sources": [
+        "backend/src/owner-report.ts",
+        "backend/src/owner-report.test.ts",
+        "backend/src/owner-report.data12-reconciliation.test.ts",
+        "backend/src/comparison-report.integration.ts",
+        "tests/data12/reconciliation_findings.md"
+      ],
+      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR131 CSV export reconciled after owner UI and reporting/test merges. Preserve current routes, tenant/source guards, VALID_ZERO serialization, half-open owner report SQL and unknown freshness. No new export behavior beyond the previously approved CSV slice.",
+      "sources": [
+        "backend/src/owner-report-export.ts",
+        "backend/src/owner-report-export.test.ts",
+        "backend/src/index.ts",
+        "docs/owner-report-staging.md"
+      ],
+      "next": "Finish final review/CI and merge approved CSV slice into develop. Hosted export/download and full owner journey acceptance remain separate; no deployment."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR128 reconciled with current develop, preserving prior owner/report/CSV updates. Report source changes must never reuse another source’s data.",
+      "sources": [
+        "frontend/console/src/owner-dashboard/report-api.ts",
+        "frontend/console/src/owner-dashboard/report-data.tsx",
+        "tests/e2e/owner-report-api.spec.ts"
+      ],
+      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR124 reconciled with current develop, preserving prior owner/report/CSV updates. Reusable result display remains separate from its fictional preview wrapper.",
+      "sources": [
+        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
+        "docs/owner-ai-preview.md",
+        "tests/e2e/owner-ai-preview.spec.ts"
+      ],
+      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
+    },
+    {
+      "date": "2026-11-13",
       "modules": [
         "backend",
         "console",
         "contracts"
       ],
-      "summary": "Connect bounded Responses review through a synthetic-only authenticated route and optional dashboard panel. Keep OpenAI credentials in server memory, all suggestions review-only, production disabled, and unknown freshness withheld. Local harness uses synthetic identity/report; hosted owner session integration remains separate.",
-      "next": "Run local browser/provider checks, independent review, and private synthetic live trial before hosted activation. Resolve trusted freshness and owner session handoff before real restaurant use.",
+      "summary": "PR112 reconciled with current develop, preserving prior owner/report/CSV updates. Internal validation stays separate from trusted issuance and paid model execution. PR164 adds the optional review-only Responses route and dashboard panel. Its local harness supplies a synthetic session and report.",
       "sources": [
-        "docs/owner-ai-responses.md"
-      ]
+        "backend/src/owner-ai/report-adapter.ts",
+        "backend/src/owner-ai/report-input.ts",
+        "docs/owner-ai.md",
+        "docs/owner-ai-responses.md",
+        "tests/owner-ai-browser/connection.spec.ts"
+      ],
+      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included. PR164 still needs mock browser and repository checks on the synchronized branch. Hosted owner authentication, trusted report provenance and freshness, and staging configuration remain separate."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "contracts",
+        "delivery"
+      ],
+      "summary": "PR144 retargeted to develop after PR112 merged. DATA06 fixtures remain in default Vitest discovery and workspace typechecking. Prepared descriptive-ID counts, 9/10/11 distinct-session boundaries and null below-floor expectations remain preparation evidence, not production classification, scoring or hosted acceptance.",
+      "sources": [
+        "tests/data06/VALIDATION_REPORT.md",
+        "tests/data06/descriptive_signals.test.ts",
+        "tests/data06/privacy_boundaries.test.ts",
+        "vitest.config.ts",
+        "tests/data06/tsconfig.json"
+      ],
+      "next": "Complete exact-head checks/review and merge fixture preparation. Connect approved DATA06 producer/policy and execute raw-event/hosted evidence separately."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "diner",
+        "backend",
+        "delivery"
+      ],
+      "summary": "Prepare peekaplate.app/diner/<restaurant> with a validated public locator directory and create-only Pages artifact. Existing QR/publication/token/hash checks remain; .io marketing and live resources are unchanged. Root/owner are not implemented by the diner-only artifact. Real local Pages routing catches clean-URL redirects; hosted domain and owner integration remain pending.",
+      "sources": [
+        "docs/restaurant-urls.md",
+        "frontend/diner/src/menu/route.ts",
+        "scripts/prepare-app-site.mjs",
+        "tests/restaurant-links/restaurant-links.spec.ts"
+      ],
+      "next": "Complete pinned review and repository checks, then review the preparation PR. Enroll approved restaurant IDs and run an approved staging candidate before production DNS/Pages association. Align owner base/auth callbacks separately."
     }
   ]
 }

@@ -102,6 +102,27 @@ const LAB_TEXT: Record<string, string> = {
   unk: 'Unknown',
   rsn: 'Possible reason',
 };
+// Today's date, formatted like the S6-FE-14 owner shell (#139), for example "Nov 13, 2026".
+const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+/** YYYY-MM-DD in the owner's local time zone (toISOString would give the UTC day). */
+const localDate = (date: Date) =>
+  [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join('-');
+
+export function TodayChip({ className, today = new Date() }: { className?: string; today?: Date }) {
+  return (
+    <time className={className} dateTime={localDate(today)}>
+      {DATE_FORMAT.format(today)}
+    </time>
+  );
+}
+
 export function Lab({ k, children }: { k: string; children?: ReactNode }) {
   return <span className={`lab ${k}`}>{children || LAB_TEXT[k] || ''}</span>;
 }

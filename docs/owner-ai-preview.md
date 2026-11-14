@@ -102,5 +102,6 @@ Exact executed results are recorded in the PR handoff; the presence of these
 tests is not evidence that they ran. Full shell accessibility, manual mobile
 and screen-reader checks, design acceptance, current membership, real producer
 identity/freshness/cohorts, approved production policy, model evaluation and
-hosted report/AI acceptance remain separate. #112 stays Draft and AI-01 stays
-In Progress until their own acceptance requirements are satisfied.
+hosted report/AI acceptance remain separate. #112 provides the separate internal
+report-validation utility; neither utility connects trusted report issuance or
+enables paid model calls. AI-01 stays In Progress until its live acceptance is met.

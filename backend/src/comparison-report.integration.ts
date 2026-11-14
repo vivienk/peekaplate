@@ -1,7 +1,9 @@
+import { OwnerDishReportSchema } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import revisionCases from '../../tests/data05/comparison_revision_cases.json';
 import { readComparisonReport } from './comparison-report';
+import { readOwnerReport } from './owner-report';
 
 const admin = new Client({ connectionString: process.env.PEEKAPLATE_DB_ADMIN_URL });
 const runtime = new Client({ connectionString: process.env.PEEKAPLATE_DB_TEST_URL });
@@ -417,4 +419,63 @@ it('denies a venue without current membership and permits the next authorized re
     readComparisonReport(runtime, actorId, crypto.randomUUID(), day, end, day, end),
   ).rejects.toMatchObject({ code: 'forbidden', status: 403 });
   expect((await readDay(day)).venue_id).toBe(venueId);
+});
+
+it('uses a start-inclusive, end-exclusive owner-report window for exposures', async () => {
+  const start = '2035-02-01T00:00:00.000Z';
+  const end = new Date('2035-02-02T00:00:00.000Z');
+  const ownerId = crypto.randomUUID();
+  await admin.query(
+    "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner')",
+    [venueId, ownerId],
+  );
+  for (let index = 0; index < 10; index++) {
+    await insertFact('dish_viewed', crypto.randomUUID(), start, {
+      exposureId: crypto.randomUUID(),
+    });
+  }
+  for (const outside of ['2035-01-31T23:59:59.999Z', end.toISOString()]) {
+    await insertFact('dish_viewed', crypto.randomUUID(), outside, {
+      exposureId: crypto.randomUUID(),
+    });
+  }
+  const report = OwnerDishReportSchema.parse(
+    await readOwnerReport(runtime, ownerId, venueId, end, 'synthetic'),
+  );
+  expect(report.dishes[0]!.metrics.active_sessions).toEqual({ value: 10, status: 'NORMAL' });
+  expect(report.report_metadata.date_window).toMatchObject({
+    start_time: start,
+    end_time: end.toISOString(),
+  });
+  expect(report.report_metadata.freshness.is_stale).toBeNull();
+});
+
+it('excludes a final checkpoint at the owner-report window end until the next instant', async () => {
+  const openingTime = '2035-02-03T12:00:00.000Z';
+  const end = new Date('2035-02-04T00:00:00.000Z');
+  const ownerId = crypto.randomUUID();
+  await admin.query(
+    "INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1, $2, 'owner')",
+    [venueId, ownerId],
+  );
+  for (let index = 0; index < 11; index++) {
+    const sessionId = crypto.randomUUID();
+    const openingId = crypto.randomUUID();
+    await insertFact('dish_viewed', sessionId, openingTime, { exposureId: crypto.randomUUID() });
+    await insertFact('dish_detail_opened', sessionId, openingTime, { openingId, source: 'direct' });
+    await insertFact(
+      'dish_activity_checkpoint',
+      sessionId,
+      index === 10 ? end.toISOString() : '2035-02-03T23:59:59.999Z',
+      { openingId },
+    );
+  }
+  const report = OwnerDishReportSchema.parse(
+    await readOwnerReport(runtime, ownerId, venueId, end, 'synthetic'),
+  );
+  expect(report.dishes[0]!.metrics.timing_coverage).toEqual({ value: 0.909, status: 'NORMAL' });
+  const next = OwnerDishReportSchema.parse(
+    await readOwnerReport(runtime, ownerId, venueId, new Date(end.getTime() + 1), 'synthetic'),
+  );
+  expect(next.dishes[0]!.metrics.timing_coverage).toEqual({ value: 1, status: 'NORMAL' });
 });

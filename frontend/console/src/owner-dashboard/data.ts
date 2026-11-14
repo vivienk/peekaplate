@@ -689,6 +689,9 @@ export type MenuItem = {
   aiReviewed: boolean;
   has25: boolean;
   status: 'draft' | 'ready' | 'live';
+  dishVerificationStatus?: 'not_verified' | 'verified';
+  photoVerificationStatus?: 'not_verified' | 'verified' | 'rejected';
+  photoId?: string | null;
 };
 
 export const imgOf = (m: Pick<MenuItem, 'upload' | 'id'>) =>

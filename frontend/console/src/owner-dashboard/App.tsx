@@ -29,7 +29,7 @@ import {
   Welcome,
 } from './pages';
 import { ReportData } from './report-data';
-import { Btn, Icon, type IconName } from './ui';
+import { Btn, Icon, type IconName, TodayChip } from './ui';
 
 function Controls({
   sim,
@@ -361,8 +361,7 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
       <div className="main">
         <div className="topbar">
           <div className="l">
-            <span className="chip sample">Illustrative sample data</span>
-            <span className="chip">{REST.period}</span>
+            <TodayChip className="chip" />
           </div>
           <Btn
             kind="primary"

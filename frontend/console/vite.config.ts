@@ -36,6 +36,7 @@ export default defineConfig(({ command }) => ({
         input: {
           main: page('index.html'),
           foundations: page('foundations.html'),
+          firstDashboard: page('first-dashboard.html'),
           ownerDashboard: page('owner-dashboard.html'),
         },
       },

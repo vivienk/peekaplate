@@ -2,7 +2,7 @@
 // sent to any model or server.
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { type Answer, INSIGHTS, QUESTIONS, QUICK, REST, SEC } from './data';
-import { Btn, Icon, Lab } from './ui';
+import { Btn, Icon, Lab, TodayChip } from './ui';
 
 export type Message =
   | { role: 'user'; id: string; text: string }
@@ -103,7 +103,9 @@ export function ChatBox({
           </div>
           <div className="aih-chips">
             <span>{REST.name}</span>
-            <span>{REST.period}</span>
+            <span>
+              <TodayChip />
+            </span>
           </div>
         </div>
       )}
