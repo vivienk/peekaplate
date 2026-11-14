@@ -1,24 +1,60 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
-test('local launcher propagates frontend startup failure without disclosing configuration', {
-  skip: process.platform === 'win32',
-}, async () => {
+test('local launcher starts installed Vite directly and propagates frontend failure', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'owner-ai-launcher-'));
   try {
-    const stub = join(directory, 'pnpm');
-    await writeFile(stub, '#!/bin/sh\nexit 17\n');
-    await chmod(stub, 0o700);
+    const hook = join(directory, 'frontend-hook.mjs');
+    await writeFile(
+      hook,
+      `import { registerHooks } from 'node:module';
+      const stub = new URL('./frontend-stub.mjs', import.meta.url).href;
+      registerHooks({
+        resolve(specifier, context, nextResolve) {
+          if (specifier === 'node:child_process' && context.parentURL?.endsWith('/backend/scripts/owner-ai-local.ts')) {
+            return nextResolve(stub, context);
+          }
+          return nextResolve(specifier, context);
+        },
+      });`,
+    );
+    await writeFile(
+      join(directory, 'frontend-stub.mjs'),
+      `import assert from 'node:assert/strict';
+      import { spawn as realSpawn } from 'node:child_process';
+      import { join } from 'node:path';
+      export function spawn(command, args, options) {
+        assert.equal(command, process.execPath);
+        assert.equal(args[0], join(options.cwd, 'node_modules', 'vite', 'bin', 'vite.js'));
+        assert.deepEqual(args.slice(1), ['--host', '127.0.0.1', '--port', '5174', '--strictPort']);
+        assert.equal(options.env.OWNER_AI_LOCAL_PREVIEW, 'true');
+        assert.equal(options.env.OWNER_AI_OPENAI_API_KEY, undefined);
+        assert.equal(options.env.OWNER_AI_OPENAI_PROJECT_ID, undefined);
+        return realSpawn(command, ['-e', 'process.exit(17)']);
+      }`,
+    );
     const child = spawn(
       process.execPath,
-      ['--import', './scripts/node-ts-hooks.mjs', 'backend/scripts/owner-ai-local.ts'],
+      [
+        '--import',
+        './scripts/node-ts-hooks.mjs',
+        '--import',
+        pathToFileURL(hook).href,
+        'backend/scripts/owner-ai-local.ts',
+      ],
       {
-        env: { PATH: directory, OWNER_AI_LOCAL_MOCK: 'true' },
+        env: {
+          ...process.env,
+          OWNER_AI_LOCAL_MOCK: 'true',
+          OWNER_AI_OPENAI_API_KEY: 'sk-proj-fake-test-key',
+          OWNER_AI_OPENAI_PROJECT_ID: 'proj_test',
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 30_000,
       },
@@ -30,9 +66,9 @@ test('local launcher propagates frontend startup failure without disclosing conf
     child.stderr.on('data', (data) => {
       output += data;
     });
-    const [code] = await once(child, 'exit');
-    assert.equal(code, 17);
+    const [code] = await once(child, 'close');
     assert.doesNotMatch(output, /Bearer|sk-proj-/);
+    assert.equal(code, 17, output);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

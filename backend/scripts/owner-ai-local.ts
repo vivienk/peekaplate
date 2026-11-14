@@ -113,12 +113,21 @@ server.listen(8792, '127.0.0.1', () => {
     'Synthetic data only. At most ten requests per run; 128 output tokens each. Ctrl+C stops both servers.',
   );
 });
-// Only an explicit small environment reaches the frontend dev server. Never inherit the key.
+const consoleDirectory = new URL('../../frontend/console/', import.meta.url);
+// Use the installed CLI directly. pnpm exec can try to reinstall dependencies when launched
+// with a reduced environment. Keep provider credentials out of the frontend process.
 const frontend = spawn(
-  'pnpm',
-  ['exec', 'vite', '--host', '127.0.0.1', '--port', '5174', '--strictPort'],
+  process.execPath,
+  [
+    fileURLToPath(new URL('node_modules/vite/bin/vite.js', consoleDirectory)),
+    '--host',
+    '127.0.0.1',
+    '--port',
+    '5174',
+    '--strictPort',
+  ],
   {
-    cwd: fileURLToPath(new URL('../../frontend/console/', import.meta.url).href),
+    cwd: fileURLToPath(consoleDirectory),
     stdio: 'inherit',
     env: {
       PATH: process.env.PATH ?? '',
