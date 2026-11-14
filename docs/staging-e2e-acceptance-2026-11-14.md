@@ -89,3 +89,23 @@ until its controlled session records evidence. Re-review reproduced nine regress
 failures before correction. Focused tests, real PostgreSQL/Worker checks and hosted
 smoke results are recorded separately on the PR; mocked responses do not count as hosted acceptance.
 
+---
+
+## Reconciled author preflight
+
+Author commit `3c9bd3c` independently corrected the viewer route and version pairing,
+added optional expected-source pins and documented why the verifier cannot limit upstream calls.
+The final implementation retains those source pins as `--expected-source-id` and
+`--expected-source-hash`, adds identity/shape/privacy regressions and removes the unused
+local guard instead of reporting a fabricated zero. Source/report mismatches fail.
+
+The author's earlier read-only preflight saw API health 200 and protected routes 401.
+That is an authentication signal; owner/viewer/cross-venue acceptance still needs fresh
+authorized sessions. Private staff identifiers are omitted from this public document.
+Cloudflare access is delegated through the approved invitation, so the tester can operate
+existing staging resources after accepting it. No new extraction deployment is required
+merely because GitHub Actions has no extraction runs; the existing operator deployment
+is pinned above. Actual provider accounting/enforcement remains a separate gate before
+paid execution; no large new budget subsystem is implemented by this read-only PR.
+
+

@@ -5,6 +5,7 @@ import {
   redactSecrets,
   sanitizeEvidence,
   validateExtractionReport,
+  validateReportProvenance,
   verifyIngestionE2E,
 } from './verify-ingestion-e2e.mjs';
 
@@ -88,4 +89,41 @@ test('credentials are redacted and evidence carries unknown upstream usage expli
   assert.ok(!JSON.stringify(evidence).includes('eyJhbGciOiJIUzI1NiJ9'));
   assert.equal(evidence.providerCallsConsumed, null);
   assert.equal(evidence.providerBudgetEnforced, false);
+});
+test('author source pins and optional job identity reject mismatches without echoing values', () => {
+  const report = {
+    job_id: ids.jobId,
+    source: { source_id: 'synthetic-source', sha256: 'a'.repeat(64) },
+    drafts: [{ draft_id: 'dish-0' }],
+    evidence: [{ draft_id: 'dish-0', draft_index: 0 }],
+  };
+  assert.equal(
+    validateReportProvenance(report, {
+      ...ids,
+      expectedSourceId: 'synthetic-source',
+      expectedSourceHash: 'a'.repeat(64),
+    }).valid,
+    true,
+  );
+  assert.equal(
+    validateReportProvenance({
+      ...report,
+      drafts: [{ draft_id: 'dish-0', draft_index: 7 }],
+      evidence: [{ draft_id: 'dish-0', draft_index: 7 }],
+    }).valid,
+    true,
+  );
+  for (const pins of [
+    { jobId: ids.venueId },
+    { expectedSourceId: 'other-source' },
+    { expectedSourceHash: 'b'.repeat(64) },
+  ])
+    assert.equal(validateReportProvenance(report, pins).valid, false);
+  const bad = validateReportProvenance({
+    drafts: [{ draft_id: 'dish-0' }],
+    evidence: [{ draft_id: 'unrelated', draft_index: 5 }],
+  });
+  assert.equal(bad.valid, false);
+  assert.ok(bad.issues.some((x) => x.includes('unknown draft_id')));
+  assert.ok(bad.issues.some((x) => x.includes('out-of-range')));
 });

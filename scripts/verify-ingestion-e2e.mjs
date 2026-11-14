@@ -26,6 +26,8 @@ export const USAGE =
   '  --require-pr161              Verification fields and non-mutating /verify probe\n' +
   '  --expected-status <status>   complete (default) or explicit incomplete diagnostics\n' +
   '  --max-provider-calls <n>     Declared allowance, 0–2; NOT enforced here\n' +
+  '  --expected-source-id <id>    Pin the original source identity\n' +
+  '  --expected-source-hash <hex> Pin the original source SHA-256\n' +
   '  --report-json <path>         Downloaded attempt-scoped extraction report\n' +
   '  --evidence-out <path>        Write allowlisted, redacted evidence\n' +
   '  --help, -h                  Show help\n\n' +
@@ -98,6 +100,47 @@ export function validateExtractionReport(report) {
   return { valid: issues.length === 0, issues };
 }
 
+export function validateReportProvenance(
+  report,
+  { jobId, expectedSourceId, expectedSourceHash } = {},
+) {
+  const issues = [];
+  if (!object(report)) return { valid: false, issues: ['Report is not an object'] };
+  if (report.job_id !== undefined && jobId && report.job_id !== jobId)
+    issues.push('Report job_id mismatch');
+  if (!object(report.source)) issues.push('Report missing source provenance');
+  else {
+    if (typeof report.source.source_id !== 'string' || !report.source.source_id.trim())
+      issues.push('Missing source_id');
+    if (expectedSourceId !== undefined && report.source.source_id !== expectedSourceId)
+      issues.push('Report source_id mismatch');
+    if (
+      !hash(report.source.sha256) ||
+      (expectedSourceHash !== undefined && report.source.sha256 !== expectedSourceHash)
+    )
+      issues.push('Report source SHA-256 mismatch');
+  }
+  const drafts = Array.isArray(report.drafts) ? report.drafts : [];
+  const evidence = Array.isArray(report.evidence) ? report.evidence : [];
+  const ids = new Set(drafts.map((d) => d?.draft_id).filter((id) => typeof id === 'string'));
+  const indices = new Set(drafts.map((d, index) => d?.draft_index ?? index));
+  for (const row of evidence) {
+    if (
+      !object(row) ||
+      typeof row.draft_id !== 'string' ||
+      !row.draft_id ||
+      (ids.size > 0 && !ids.has(row.draft_id))
+    )
+      issues.push('Evidence references unknown draft_id');
+    if (
+      row?.draft_index !== undefined &&
+      (!Number.isInteger(row.draft_index) || row.draft_index < 0 || !indices.has(row.draft_index))
+    )
+      issues.push('Evidence has out-of-range draft_index');
+  }
+  return { valid: issues.length === 0, issues };
+}
+
 export async function verifyIngestionE2E({
   jobId,
   venueId,
@@ -108,6 +151,8 @@ export async function verifyIngestionE2E({
   requirePr161 = false,
   expectedStatus = 'complete',
   maxProviderCalls = MAX_PROVIDER_CALLS,
+  expectedSourceId,
+  expectedSourceHash,
   reportJson,
   request = fetch,
   readFileFn,
@@ -123,6 +168,15 @@ export async function verifyIngestionE2E({
     throw new Error('Declared provider allowance must be an integer between 0 and 2');
   if (!['complete', 'incomplete'].includes(expectedStatus))
     throw new Error('Invalid expected status');
+  if (expectedSourceHash !== undefined && !hash(expectedSourceHash))
+    throw new Error('Invalid expected source hash');
+  if (
+    expectedSourceId !== undefined &&
+    (typeof expectedSourceId !== 'string' ||
+      !expectedSourceId.trim() ||
+      expectedSourceId.length > 2048)
+  )
+    throw new Error('Invalid expected source ID');
   const base = new URL(apiUrl);
   if (
     ![API_ORIGIN, 'http://127.0.0.1:8787'].includes(base.origin) ||
@@ -227,6 +281,12 @@ export async function verifyIngestionE2E({
       if (valid) {
         results.job = job;
         results.evidenceIds.sourceHash = job.source_hash;
+        if (expectedSourceHash)
+          check(
+            'Expected Input Source Hash',
+            job.source_hash === expectedSourceHash,
+            'Job source hash must match the pinned original bytes',
+          );
         check(
           'Expected Job Outcome',
           job.status === expectedStatus,
@@ -337,6 +397,18 @@ export async function verifyIngestionE2E({
         if (validation.valid) {
           results.report = report;
           results.evidenceIds.reportSha256 = createHash('sha256').update(bytes).digest('hex');
+          const provenance = validateReportProvenance(report, {
+            jobId,
+            expectedSourceId,
+            expectedSourceHash: expectedSourceHash ?? results.job?.source_hash,
+          });
+          check(
+            'Report Job & Source Provenance',
+            provenance.valid,
+            provenance.valid
+              ? 'Pinned source identity/hash and report evidence references agree'
+              : provenance.issues.join('; '),
+          );
           check(
             'Report Source and Outcome',
             results.job &&
@@ -388,6 +460,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       'require-pr161': { type: 'boolean', default: false },
       'expected-status': { type: 'string', default: 'complete' },
       'max-provider-calls': { type: 'string', default: '2' },
+      'expected-source-id': { type: 'string' },
+      'expected-source-hash': { type: 'string' },
       'report-json': { type: 'string' },
       'evidence-out': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
@@ -410,6 +484,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       requirePr161: values['require-pr161'],
       expectedStatus: values['expected-status'],
       maxProviderCalls: Number(values['max-provider-calls']),
+      expectedSourceId: values['expected-source-id'],
+      expectedSourceHash: values['expected-source-hash'],
       reportJson: values['report-json'],
       readFileFn: (p) => readFile(p, 'utf8'),
     });
