@@ -122,17 +122,35 @@ describe('RES-02 public menu token', () => {
 describe('RES-02 anonymous public menu HTTP boundary', () => {
   const path = `/public/venues/${venueId}/menus/${menuId}`;
   const baseDependencies = { verify: vi.fn(), execute: vi.fn() };
+  it('does not treat the branded diner origin as authorization to ingest', async () => {
+    const enqueueObservation = vi.fn();
+    const app = createApp({ ...baseDependencies, enqueueObservation });
+    const response = await app.request('/observations', {
+      method: 'POST',
+      headers: { Origin: 'https://peekaplate.app', 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://peekaplate.app');
+    expect(enqueueObservation).not.toHaveBeenCalled();
+  });
   it('allows only the configured diner origin to read public menu responses in a browser', async () => {
     const app = createApp({
       ...baseDependencies,
       readPublicMenu: vi.fn().mockResolvedValue(undefined),
       issuePublicMenu: vi.fn(),
     });
-    const origin = 'https://peekaplate-diner-staging.pages.dev';
-    const allowed = await app.request(path, { headers: { Origin: origin } });
-    expect(allowed.headers.get('access-control-allow-origin')).toBe(origin);
-    const denied = await app.request(path, { headers: { Origin: 'https://untrusted.example' } });
-    expect(denied.headers.get('access-control-allow-origin')).toBeNull();
+    for (const origin of ['https://peekaplate-diner-staging.pages.dev', 'https://peekaplate.app']) {
+      const allowed = await app.request(path, { headers: { Origin: origin } });
+      expect(allowed.headers.get('access-control-allow-origin')).toBe(origin);
+    }
+    for (const origin of [
+      'https://untrusted.example',
+      'https://peekaplate.app.untrusted.example',
+    ]) {
+      const denied = await app.request(path, { headers: { Origin: origin } });
+      expect(denied.headers.get('access-control-allow-origin')).toBeNull();
+    }
   });
 
   it('returns only the active typed bundle and issued token without staff authentication', async () => {
