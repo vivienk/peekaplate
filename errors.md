@@ -2852,6 +2852,16 @@ The earlier otp_expired verifier blocker was resolved by selecting the newest Gm
 Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
 
 
+## Owner CSV valid-zero correction — November 12, 2026
+
+The PR131 serializer treated every non-NORMAL status as unavailable, so valid zero rates were blanked. Five visible-zero regressions failed with the expected numeric cell missing before the fix; explicit NORMAL/VALID_ZERO visibility now preserves zero while SUPPRESSED, NOT_MEASURABLE and MISSING stay blank. Existing signed-identity, source/venue and CORS cases are parameterized over the JSON and CSV routes, including attachment headers and membership-error responses. This is a local correction and does not certify hosted CSV or spreadsheet behavior.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T16:44:35.153Z","exitCode":2}
+```
+
+The first full check also caught strict indexed-access typing in the added test fixtures; the fixture assertions were corrected, and the complete type/unit/script/context/docs checks pass afterward.
 ## Diner first-consent dispatch — November 12, 2026
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
@@ -2932,4 +2942,14 @@ Transient observations during Phase 3 verification:
 
 ```json
 {"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:04:12.523Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T05:06:18.153Z","exitCode":1}
 ```
