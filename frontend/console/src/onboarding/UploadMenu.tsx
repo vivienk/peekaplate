@@ -12,11 +12,13 @@ import {
   useState,
 } from 'react';
 import { ActionButton, ErrorBanner, SubmitButton } from '../auth/parts';
+import { Button } from '../ui';
 import cloudIcon from './assets/cloud-upload.svg';
 import fileErrorIcon from './assets/file-error.svg';
 import imageIcon from './assets/image.svg';
 import retryIcon from './assets/retry.svg';
 import trashIcon from './assets/trash.svg';
+import { FileButton } from './FileButton';
 import { checkMenuFiles, formatFileSize, MENU_FILE_ACCEPT, type MenuFileKind } from './menu-source';
 
 export type MenuUploadStatus = 'uploading' | 'uploaded' | 'failed';
@@ -165,8 +167,7 @@ export function UploadMenu({
                   to upload.
                 </p>
                 <p className="pp-onboard-drop__hint" id={hintId}>
-                  JPEG, PNG or PDF. Up to 5 images or 1 PDF, with up to 10 pages. Maximum 12 MB per
-                  file.
+                  JPEG, PNG or PDF · Up to 5 images or 1 PDF (10 pages) · 12 MB per file.
                 </p>
               </div>
             </section>
@@ -260,27 +261,17 @@ function FileName({ file }: { file: MenuUpload }) {
   );
 }
 
-// Owner dashboard_Button, Outlined Medium, as the label of a hidden file input.
+// Replace: the Outlined Medium button that picks one file to upload in place of this one.
 function ReplaceButton({ file, onChoose }: { file: MenuUpload; onChoose: (file: File) => void }) {
-  const id = useId();
   return (
-    <>
-      <input
-        id={id}
-        className="pp-onboard-hidden-input"
-        type="file"
-        accept={MENU_FILE_ACCEPT.join(',')}
-        aria-label={`Replace ${file.name}`}
-        onChange={(event) => {
-          const chosen = event.target.files?.[0];
-          event.target.value = '';
-          if (chosen) onChoose(chosen);
-        }}
-      />
-      <label htmlFor={id} className="pp-onboard-small-btn" aria-hidden="true">
-        Replace
-      </label>
-    </>
+    <FileButton
+      label="Replace"
+      accessibleLabel={`Replace ${file.name}`}
+      accept={MENU_FILE_ACCEPT.join(',')}
+      onChoose={([chosen]) => {
+        if (chosen) onChoose(chosen);
+      }}
+    />
   );
 }
 
@@ -305,14 +296,14 @@ function UploadRow({
   let end: ReactNode = null;
   if (failed) {
     end = (
-      <button
-        type="button"
+      <Button
+        variant="text"
         className="pp-onboard-icon-btn pp-onboard-icon-btn--small"
         aria-label={`Retry ${file.name}`}
         onClick={onRetry}
       >
         <img src={retryIcon} alt="" width="20" height="20" />
-      </button>
+      </Button>
     );
   } else if (known || file.status === 'uploaded') {
     end = (
@@ -327,14 +318,14 @@ function UploadRow({
         <FileName file={file} />
         <div className="pp-onboard-upload-row__buttons">
           <ReplaceButton file={file} onChoose={onReplace} />
-          <button
-            type="button"
+          <Button
+            variant="text"
             className="pp-onboard-icon-btn"
             aria-label={`Remove ${file.name}`}
             onClick={onRemove}
           >
             <img src={trashIcon} alt="" width="24" height="24" />
-          </button>
+          </Button>
         </div>
       </div>
       <div className="pp-onboard-upload-row__progress">

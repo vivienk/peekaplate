@@ -8,10 +8,8 @@
 /* Page: surface, a 1200-wide column with 16 above the navbar, 96 between it and the card, 96
  * below. */
 .pp-onboard {
-  /* Preview card colours from Figma (color/button/nav/hover, color/border/card) that have no shared
-   * token yet. */
-  --pp-onboard-pending-preview-surface: #fff8ed;
-  --pp-onboard-pending-preview-border: #fddaab;
+  /* S08 icon tile fill from Figma (color/icon/accent-container), not a shared token yet. */
+  --pp-onboard-pending-icon-container: #fff8ed;
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -62,8 +60,7 @@
   text-align: end;
 }
 
-/* Figma uses on-surface-variant #A8A59E for this label, which is under 4.5:1 on the surface;
- * text/secondary keeps it readable (flagged for design). */
+/* text/secondary #57554E across the navbar (Rania, 14 Nov; Figma's #A8A59E was under 4.5:1). */
 .pp-onboard__portal-label {
   color: var(--pp-auth-text-secondary);
   font-size: var(--pp-font-size-small);
@@ -234,46 +231,12 @@
 }
 
 /* The file input stays focusable but invisible; its label is the visible button. */
-.pp-onboard-photo__input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
+/* The Outlined Medium button sits 20 from the photo's bottom, centred. */
 .pp-onboard-photo__button {
   position: absolute;
   bottom: var(--pp-space-20);
   left: 50%;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--pp-space-40);
-  padding: var(--pp-space-8) var(--pp-space-16);
-  border-radius: var(--pp-radius-full);
-  background: var(--pp-auth-pending-surface-container);
-  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
-  color: var(--pp-color-orange-950);
-  font-size: var(--pp-font-size-paragraph-2);
-  line-height: var(--pp-line-height-paragraph-1);
-  font-weight: var(--pp-font-weight-semibold);
-  white-space: nowrap;
-  cursor: pointer;
   transform: translateX(-50%);
-}
-
-.pp-onboard-photo__button:hover {
-  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
-}
-
-.pp-onboard-photo__input:focus-visible + .pp-onboard-photo__button {
-  box-shadow: inset 0 0 0 2px var(--pp-auth-focus);
-}
-
-.pp-onboard-photo__input:disabled + .pp-onboard-photo__button {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .pp-onboard-photo__problem {
@@ -507,56 +470,24 @@
   cursor: pointer;
 }
 
-/* 14/24 text/secondary. */
+/* 12/16 text/secondary #57554E (Rania, 14 Nov). */
 .pp-onboard-drop__hint {
   color: var(--pp-auth-text-secondary);
-  font-size: var(--pp-font-size-paragraph-2);
-  line-height: var(--pp-line-height-paragraph-1);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
 }
 
-/* Owner dashboard_Button, Outlined Medium: 40 high, 8/16 padding, 14/24 semibold. */
-.pp-onboard-small-btn {
-  display: inline-flex;
+/* Icon-only Design System Buttons (text variant): the 40px bin, 8 radius; Retry is 24px. */
+.pp-onboard .pp-onboard-icon-btn {
   flex: none;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--pp-space-40);
-  padding: var(--pp-space-8) var(--pp-space-16);
-  border-radius: var(--pp-radius-full);
-  background: var(--pp-auth-pending-surface-container);
-  box-shadow: inset 0 0 0 1px var(--pp-auth-outline-solid);
-  color: var(--pp-color-orange-950);
-  font-size: var(--pp-font-size-paragraph-2);
-  line-height: var(--pp-line-height-paragraph-1);
-  font-weight: var(--pp-font-weight-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.pp-onboard-small-btn:hover {
-  box-shadow: inset 0 0 0 3px var(--pp-auth-outline-solid);
-}
-
-.pp-onboard-small-btn:active {
-  background: var(--pp-color-gray-200);
-}
-
-/* A 40px square icon button (the bin), 8 radius; Retry is 20px. */
-.pp-onboard-icon-btn {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
   width: var(--pp-space-40);
+  min-height: 0;
   height: var(--pp-space-40);
   padding: 0;
-  border: 0;
   border-radius: var(--pp-radius-8);
-  background: transparent;
-  cursor: pointer;
 }
 
-.pp-onboard-icon-btn:hover {
+.pp-onboard .pp-onboard-icon-btn:hover {
   background: var(--pp-color-error-50);
 }
 
@@ -565,19 +496,18 @@
   outline-offset: 2px;
 }
 
-.pp-onboard-icon-btn--small {
+.pp-onboard .pp-onboard-icon-btn--small {
   width: var(--pp-space-24);
   height: var(--pp-space-24);
   margin-inline-start: var(--pp-space-8);
 }
 
-.pp-onboard-icon-btn--small:hover {
+.pp-onboard .pp-onboard-icon-btn--small:hover {
   background: var(--pp-color-gray-200);
 }
 
 /* File name: 24px image icon, 6, then the name (18/28 semibold) over its size (14/24 medium), 4
- * apart. Figma colours the size button/disabled/content (#A1A3AA), under 4.5:1 here, so it uses
- * text/secondary (flagged for design). */
+ * apart. The size is text/secondary #57554E in every file state (Rania, 14 Nov). */
 .pp-onboard-file {
   display: flex;
   align-items: flex-start;
@@ -761,16 +691,16 @@
   list-style: none;
 }
 
-/* Preview card: 32 padding, 24 radius, 1px edge, 16 between the name and the image; the buttons
- * 24 below the image. Its fill (#FFF8ED) and edge (#FDDAAB) have no shared token yet. */
+/* Preview card: 32 padding, 24 radius, 16 between the name and the image; the buttons 24 below the
+ * image. surface-container with a 1px outline-variant edge (Rania, 14 Nov). */
 .pp-onboard-preview__card {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: var(--pp-space-16);
   padding: var(--pp-space-32);
-  border: 1px solid var(--pp-onboard-pending-preview-border);
+  border: 1px solid var(--pp-color-gray-200);
   border-radius: var(--pp-radius-24);
-  background: var(--pp-onboard-pending-preview-surface);
+  background: var(--pp-auth-pending-surface-container);
 }
 
 .pp-onboard-preview__body {
@@ -837,16 +767,17 @@
   width: 9.375rem;
   height: 9.375rem;
   border-radius: var(--pp-radius-24);
-  background: var(--pp-onboard-pending-preview-surface);
+  background: var(--pp-onboard-pending-icon-container);
 }
 
 .pp-onboard-process__tile--error {
   background: var(--pp-color-error-50);
 }
 
-/* The handoff asks for a loading indicator; Figma has no motion, so the sync icon turns slowly. */
+/* The loading indicator: the sync icon turns once every 1.2 s (Rania, 14 Nov: 1–1.5 s, continuous;
+ * still for reduced motion). */
 .pp-onboard-process__spinner {
-  animation: pp-onboard-spin 2.4s linear infinite;
+  animation: pp-onboard-spin 1.2s linear infinite;
 }
 
 @keyframes pp-onboard-spin {

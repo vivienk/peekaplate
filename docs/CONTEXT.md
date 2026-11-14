@@ -306,7 +306,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/onboarding/menu-source.ts",
         "frontend/console/src/onboarding/menu-source.test.tsx",
         "tests/e2e/owner-onboarding-screens.spec.ts",
-        "frontend/console/src/onboarding/MenuProcessing.tsx"
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/onboarding/FileButton.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -316,7 +317,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a58772eaff095c28906fb4f03e50a7ff77c6e796243b047b515b83017e825b8f"
+      "sourceFingerprint": "f51bd01575a86f80fbcbe74a404e143c4ae7d7a237819cb0d415e1c18f112581"
     },
     {
       "id": "backend",

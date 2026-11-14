@@ -2,15 +2,7 @@
 // Saved details, Dashboard — Unsaved changes; Amr's S05 handoff). A presentational screen: values
 // and save status come in as props, and the owner's actions go out as callbacks, so the API can be
 // connected without changing the UI (Ehab, FE-06.2).
-import {
-  type ChangeEvent,
-  type FormEvent,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ActionButton, ErrorBanner, SubmitButton } from '../auth/parts';
 import { Input } from '../ui';
 import contactIcon from './assets/contact.svg';
@@ -28,6 +20,7 @@ import {
   photoError,
   trimDetails,
 } from './details';
+import { FileButton } from './FileButton';
 import '../foundations/field.css';
 
 export type RestaurantDetailsProps = {
@@ -103,9 +96,7 @@ export function RestaurantDetails({
     onSave(trimDetails(values), photo);
   }
 
-  function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
+  function choosePhoto(file: File | undefined) {
     if (!file || saving) return;
     const problem = photoError(file);
     setPhotoProblem(problem);
@@ -285,7 +276,7 @@ function DetailsInput({
   );
 }
 
-// Upload photo: the 250px photo (or the placeholder) with an Outlined Medium button over it.
+// Upload photo: the 250px photo (or the placeholder) with the Outlined Medium button over it.
 function PhotoPicker({
   url,
   problem,
@@ -295,7 +286,7 @@ function PhotoPicker({
   url: string | null;
   problem: string | undefined;
   disabled: boolean;
-  onChoose: (event: ChangeEvent<HTMLInputElement>) => void;
+  onChoose: (file: File | undefined) => void;
 }) {
   const id = useId();
   const problemId = problem ? `${id}-problem` : undefined;
@@ -309,18 +300,15 @@ function PhotoPicker({
           width="250"
           height="250"
         />
-        <input
-          id={id}
-          className="pp-onboard-photo__input"
-          type="file"
-          accept={PHOTO_TYPES.join(',')}
-          disabled={disabled}
-          aria-describedby={problemId}
-          onChange={onChoose}
-        />
-        <label htmlFor={id} className="pp-onboard-photo__button">
-          {url ? 'Change photo' : 'Upload photo'}
-        </label>
+        <div className="pp-onboard-photo__button">
+          <FileButton
+            label={url ? 'Change photo' : 'Upload photo'}
+            accept={PHOTO_TYPES.join(',')}
+            disabled={disabled}
+            describedBy={problemId}
+            onChoose={([file]) => onChoose(file)}
+          />
+        </div>
       </div>
       {problem && (
         <p className="pp-field__error pp-onboard-photo__problem" id={problemId} role="alert">

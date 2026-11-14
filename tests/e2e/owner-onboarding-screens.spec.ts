@@ -102,6 +102,13 @@ test('choosing a photo previews it and rejects other file types', async ({ page 
   await expect(page.getByText('Change photo')).toBeVisible();
 });
 
+test('S05 Upload photo is a Design System button that opens the file picker', async ({ page }) => {
+  await page.goto(demo);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Upload photo' }).click();
+  expect((await chooser).isMultiple()).toBe(false);
+});
+
 test('S05 passes the accessibility scan, with and without errors', async ({ page }) => {
   const scan = async () => {
     const { violations } = await new AxeBuilder({ page })
@@ -271,6 +278,9 @@ test('S07 upload: files show progress, then a preview, and Continue opens S08', 
   page,
 }) => {
   await openS07Upload(page);
+  await expect(
+    page.getByText('JPEG, PNG or PDF · Up to 5 images or 1 PDF (10 pages) · 12 MB per file.'),
+  ).toBeVisible();
   const next = page.getByRole('button', { name: 'Continue' });
   await expect(next).toHaveAttribute('aria-disabled', 'true');
   await chooseFiles(page).setInputFiles([png('menu-1.png'), png('menu-2.png')]);
@@ -335,7 +345,9 @@ test('S07 upload: Remove and Replace work on each file', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Preview', level: 2 })).toBeVisible();
   await page.getByRole('button', { name: 'Remove menu-2.png' }).click();
   await expect(page.getByRole('img', { name: 'Preview of menu-2.png' })).toHaveCount(0);
-  await page.getByLabel('Replace menu-1.png').setInputFiles(png('menu-new.png'));
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Replace menu-1.png' }).click();
+  await (await chooser).setFiles(png('menu-new.png'));
   await expect(page.getByRole('img', { name: 'Preview of menu-new.png' })).toBeVisible();
   await expect(page.getByRole('img', { name: 'Preview of menu-1.png' })).toHaveCount(0);
   const { violations } = await new AxeBuilder({ page })
