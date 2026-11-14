@@ -3418,3 +3418,65 @@ The standalone DATA06 suite passed thirteen tests, but the default Vitest discov
 ```json
 {"id":"ERR-20261113-AUTH-CHECK-CACHE","status":"resolved","area":"local-auth-verification","cause":"The restricted execution environment redirected browser/Corepack caches, preventing a standalone renderer and a build command from starting normally.","prevention":"Use the existing installed Chromium executable for isolated HTML rendering and the authorized normal runtime for existing auth/build checks; do not install new dependencies or weaken tests.","regression":"Four local email render checks and the same provider/build checks pass. A stopped readiness attempt executed no provider assertions; it is not counted as a passed run."}
 ```
+
+## Restaurant URL preparation: local Pages routing
+
+Initial new browser checks used non-existent failure headings, then a status
+locator matching both the menu and analytics notice. Assertions now use the
+existing state text; these were test-authoring failures, not product defects.
+The first local Pages readiness URL returned 404, so readiness now checks
+/diner/. The pinned workerd binary supports compatibility dates through
+2026-10-13; the local harness uses that supported date rather than today's date.
+
+Actual Pages testing rejected trailing-slash rewrites back to /diner/index.html
+as loops. An outside .html shell initially produced a 308 clean-URL redirect,
+which lost the restaurant pathname and displayed unavailable. Rewriting to the
+outside shell's extensionless URL fixes the cause. The browser checks assert
+the unchanged address, real built CSS/JS, reload, canonical/alias reads and
+unknown/tampered/withdrawn states. Six local Pages/Chromium checks pass; hosted
+domain, owner flow and real tracking remain NOT RUN. No DNS or deployment changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T07:23:24.731Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
+```
+
+
+Restaurant URL follow-up: bounded context summaries were shortened to satisfy
+the graph validator. Corepack's initial fetch was blocked by sandbox networking;
+the approved recheck completed using the pinned runtime. After adding the final
+regressions, a check observed stale context before its refresh; fingerprints were
+refreshed after all source edits. These are preparation/tooling observations, not
+hosted application failures. Eight actual local Pages browser cases now pass,
+including directory JSON serving and trailing-slash URLs. A delayed-directory
+cancellation regression and the existing menu checks also pass. No cloud state changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:35:16.211Z","exitCode":2}
+```
+
+Automatic diner-link preparation: the new pgTAP table assertion initially used
+the two-argument overload, which interpreted the schema as a table name. The
+schema-qualified three-argument assertion now passes with all 320 SQL checks.
+The concurrent-publish test's evolving command array needed an explicit element
+type under strict TypeScript. Context summaries were shortened to the graph's
+bound. After these test/documentation corrections, pnpm check and the real
+139-test Worker/database run pass. Seven local Pages and eleven existing diner
+browser cases pass. Hosted publication and custom-domain acceptance are pending;
+no provider calls or production changes were performed by these local checks.
+The dedicated URL-allocation fault injection now verifies rollback of every
+publication/event/receipt/outbox write and a successful identical retry: all
+140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
+push/PR creation because the operator email was unverified; after verification,
+the branch and draft PR #176 were created. No GitHub protection was bypassed.
