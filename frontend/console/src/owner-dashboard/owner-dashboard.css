@@ -2854,3 +2854,325 @@ h1 {
   width: 15px;
   height: 15px;
 }
+
+/* Screen 9, Add dish (Figma 1496:8021). Every colour, space, radius and type value is a
+ * @peekaplate/tokens variable taken from Rania's frames (Ready to review 2470:19031, Draft with
+ * AI 2470:19261). Fields use the design-system TextField / .pp-input; buttons use ui/Button.
+ * Fixed sizes with no token category yet (side column 282, photo box 120, textarea 138, button
+ * width 280) are Figma values, kept in --s09-pending-* so they can move into tokens later. */
+.s09 {
+  --s09-pending-side: 282px;
+  --s09-pending-photo: 120px;
+  --s09-pending-textarea: 138px;
+  --s09-pending-button: 280px;
+  --s09-pending-short: 160px;
+  /* Figma H3/Bold 32/36; the h3 token is 24/32 (same gap as #139's --owner-pending-title-*). */
+  --s09-pending-title-size: 2rem;
+  --s09-pending-title-line: 2.25rem;
+  container-type: inline-size;
+}
+.s09-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--s09-pending-side);
+  gap: var(--pp-space-24);
+  align-items: start;
+}
+/* Content card 2470:19265: surface-container fill, card/border-white stroke, radius 24,
+ * padding 80, fields 24 apart. */
+.s09 .card.s09-card,
+.s09 .card.s09-sidecard {
+  border: 1px solid color-mix(in srgb, var(--pp-color-white) 80%, transparent);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-role-surface-container);
+}
+.s09-card {
+  display: grid;
+  gap: var(--pp-space-24);
+  padding: var(--pp-space-80);
+}
+.s09-card h1 {
+  margin: 0;
+  text-align: center;
+  color: var(--pp-role-on-surface);
+  font-size: var(--s09-pending-title-size);
+  line-height: var(--s09-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+}
+/* Input Field Default "star": a red * after the label of every required field. */
+.s09 .pp-field:has([required]) > .pp-field__label::after {
+  content: "*" / "";
+  margin-inline-start: var(--pp-space-2);
+  color: var(--pp-role-error);
+}
+.s09 .pp-input {
+  box-sizing: border-box;
+  inline-size: 100%;
+}
+.s09 select.pp-input.s09-ph {
+  color: var(--pp-role-input-placeholder);
+}
+/* Description input 2470:19277: radius 16, padding 16, 138 tall. */
+.s09 .s09-textarea {
+  min-block-size: var(--s09-pending-textarea);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-16);
+  resize: vertical;
+}
+/* Category, Price and Serving Size share one row (3124:15892): Category fills, the two short
+ * fields are at most 160 wide, 16 apart. */
+.s09-row3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, var(--s09-pending-short)));
+  gap: var(--pp-space-16);
+}
+.s09-desc,
+.s09-list {
+  display: grid;
+  gap: var(--pp-space-16);
+}
+.s09-list {
+  gap: var(--pp-space-8);
+}
+.s09-row,
+.s09-airow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+/* "Draft with AI": Primary by default; Outlined/Pressed (neutral-950, 2px inside stroke) while the
+ * AI draft is open (2470:19261). */
+.s09-airow .ob.s09-on.pp-button,
+.s09-airow .ob.s09-on.pp-button:hover:not(:disabled) {
+  background-color: var(--pp-color-neutral-950);
+  border-color: var(--pp-color-neutral-950);
+  box-shadow: inset 0 0 0 1px var(--pp-color-neutral-950);
+  color: var(--pp-color-white);
+}
+.s09-hint {
+  color: var(--pp-color-info-900);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+/* AI draft box 2470:19447: color/surface fill, radius 8, padding 16, 24 gap. */
+.s09-aibox {
+  display: grid;
+  justify-items: start;
+  gap: var(--pp-space-24);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-role-surface);
+}
+.s09-aibox p {
+  margin: 0;
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+}
+/* Status label, Tone=Neutral (2470:19452): surface-container fill, gray-200 stroke, 4/12/4/8. */
+.s09-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--pp-space-4) var(--pp-space-12) var(--pp-space-4) var(--pp-space-8);
+  border: 1px solid var(--pp-color-gray-200);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-role-surface-container);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-medium);
+}
+.s09-chip.good {
+  border-color: var(--pp-color-success-500);
+}
+/* Input, Add and Suggest with AI on one row, buttons level with the input box. */
+.s09-inrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--pp-space-16);
+}
+.s09-inrow > .pp-field {
+  flex: 1 1 15rem;
+}
+.s09-inrow > .ob {
+  margin-block-start: calc(
+    var(--pp-line-height-paragraph-1) +
+    var(--pp-space-4) +
+    var(--pp-space-2)
+  );
+}
+/* Tag 2324:15403: 24 tall, full radius, 4/4/4/8 padding, 12/16 SemiBold gray-600. */
+.s09 .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pp-space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.s09 .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pp-space-6);
+  padding: var(--pp-space-4) var(--pp-space-4) var(--pp-space-4) var(--pp-space-8);
+  border: 1px solid var(--pp-color-gray-200);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-color-gray-600);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.s09 .tag.ai {
+  border-style: dashed;
+  border-color: var(--pp-color-error-500);
+}
+.s09 .tag button {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--pp-space-16);
+  block-size: var(--pp-space-16);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.s09 .ai-mark {
+  padding: 0 var(--pp-space-4);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-color-error-50);
+  color: var(--pp-color-error-700);
+  font-weight: var(--pp-font-weight-medium);
+}
+/* Checkbox rows: 24 box, 8 gap, 14/24 SemiBold label (2768:12765). */
+.s09-check {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  color: var(--pp-role-on-surface);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
+  cursor: pointer;
+}
+.s09-check input {
+  flex: none;
+  inline-size: var(--pp-space-20);
+  block-size: var(--pp-space-20);
+  margin: var(--pp-space-2);
+  accent-color: var(--pp-color-orange-500);
+}
+/* error msg 2224:4337: error-100 fill, 16 padding, radius 12, 18/28 SemiBold error-700. */
+.s09-errmsg {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-12);
+  background: var(--pp-color-error-100);
+  color: var(--pp-color-error-700);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+}
+.s09-errmsg b {
+  font-weight: var(--pp-font-weight-semibold);
+}
+/* Buttons: centred, 24 apart, 40 below the last field (24 gap + 16). */
+.s09-btns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pp-space-24);
+  margin-block-start: var(--pp-space-16);
+}
+.s09-btns > .ob {
+  flex: 1 1 13rem;
+  max-inline-size: var(--s09-pending-button);
+}
+/* Looks like the disabled button (button-disabled roles) but stays clickable to list what is
+ * missing. */
+.s09-btns > .ob--primary.pp-button.s09-off {
+  background-color: var(--pp-role-button-disabled-bg);
+  border-color: var(--pp-role-button-disabled-border);
+  color: var(--pp-role-button-disabled-text);
+  cursor: pointer;
+}
+.s09-side {
+  display: grid;
+  gap: var(--pp-space-24);
+}
+/* Side cards 2767:6879 (Photo, 8 gap) and 2767:6888 (2.5D, 24 gap): padding 24, 12/16 SemiBold
+ * titles. */
+.s09-sidecard {
+  display: grid;
+  gap: var(--pp-space-8);
+  padding: var(--pp-space-24);
+}
+.s09-sidecard--25d {
+  gap: var(--pp-space-24);
+  justify-items: start;
+}
+.s09-sidecard h2 {
+  margin: 0;
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.s09-sidecard p {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.s09-sidecard > .ob {
+  inline-size: 100%;
+  margin-block-start: var(--pp-space-8);
+}
+/* Photo box 2767:6884: gray-400 fill, radius 8, 120 tall. */
+.s09-photo {
+  display: grid;
+  place-items: center;
+  block-size: var(--s09-pending-photo);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-color-gray-400);
+  color: var(--pp-color-gray-800);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.s09-photo.has {
+  background: var(--pp-role-surface);
+}
+.s09-photo img {
+  max-inline-size: 100%;
+  max-block-size: var(--s09-pending-photo);
+  object-fit: contain;
+}
+/* Figma medium buttons: 14/24 SemiBold label on one line. */
+.s09 .ob.pp-button:not(.ob--lg) {
+  font-size: var(--pp-font-size-button-label);
+  white-space: nowrap;
+}
+@container (max-width: 62.5rem) {
+  .s09-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .s09-side {
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    align-items: start;
+  }
+  .s09-card {
+    padding: var(--pp-space-40);
+  }
+}
+@container (max-width: 35rem) {
+  .s09-row3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .s09-card {
+    padding: var(--pp-space-24) var(--pp-space-16);
+  }
+  .s09-card h1 {
+    font-size: var(--pp-font-size-h3);
+    line-height: var(--pp-line-height-h3);
+  }
+}
