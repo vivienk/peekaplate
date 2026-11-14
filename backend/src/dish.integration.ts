@@ -1412,6 +1412,40 @@ describe('real PostgreSQL staff command', () => {
 });
 
 describe('real PostgreSQL menu publication commands', () => {
+  it('rolls back publication, receipt and outbox if link allocation fails, then permits retry', async () => {
+    const menuId = crypto.randomUUID();
+    const input = approvalCommand();
+    await registerReviewSubject(menuId, input);
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', input)).json(),
+    );
+    const command = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const before = await publicationCounts(menuId);
+    await admin.query(
+      `ALTER TABLE app_private.restaurant_menu_link ADD CONSTRAINT link_test_fault CHECK (menu_id <> '${menuId}'::uuid)`,
+    );
+    try {
+      expect((await requestPublication(menuId, 'publications', command)).status).toBe(503);
+      expect(await publicationCounts(menuId)).toEqual(before);
+      expect(
+        (
+          await admin.query(
+            'SELECT count(*)::int AS count FROM app_private.restaurant_menu_link WHERE menu_id=$1',
+            [menuId],
+          )
+        ).rows[0].count,
+      ).toBe(0);
+    } finally {
+      await admin.query(
+        'ALTER TABLE app_private.restaurant_menu_link DROP CONSTRAINT link_test_fault',
+      );
+    }
+    expect((await requestPublication(menuId, 'publications', command)).status).toBe(200);
+  });
   it('allocates distinct restaurant links atomically, preserving retries and closing withdrawn links', async () => {
     const restaurantName = `URL fixture ${crypto.randomUUID().slice(0, 8)}`;
     const tenants = [crypto.randomUUID(), crypto.randomUUID()];

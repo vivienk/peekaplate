@@ -3443,3 +3443,8 @@ bound. After these test/documentation corrections, pnpm check and the real
 139-test Worker/database run pass. Seven local Pages and eleven existing diner
 browser cases pass. Hosted publication and custom-domain acceptance are pending;
 no provider calls or production changes were performed by these local checks.
+The dedicated URL-allocation fault injection now verifies rollback of every
+publication/event/receipt/outbox write and a successful identical retry: all
+140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
+push/PR creation because the operator email was unverified; after verification,
+the branch and draft PR #176 were created. No GitHub protection was bypassed.
