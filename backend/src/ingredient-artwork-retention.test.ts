@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
-import type { Bindings } from './index';
+import { type Bindings, handleScheduled, parseNonNegativeIntEnv } from './index';
 import { cleanupOrphanedIngredientArtwork } from './ingredient-artwork-retention';
 import { registerArtworkRoutes, resolveArtworkBucket } from './ingredient-artwork-routes';
 
@@ -62,7 +62,7 @@ describe('artwork bucket resolution and retention cleanup', () => {
     });
   });
 
-  it('deletes unreferenced/revoked/superseded objects past grace period while protecting approved, shared, in-flight, and non-artwork keys', async () => {
+  it('batches DB checks per page/venue and protects approved, shared, in-flight, and non-artwork keys', async () => {
     const nowMs = Date.UTC(2026, 10, 14, 12, 0, 0);
     const oldDate = new Date(nowMs - 2 * 3_600_000);
     const recentDate = new Date(nowMs - 60_000);
@@ -89,11 +89,9 @@ describe('artwork bucket resolution and retention cleanup', () => {
 
     const client = {
       query: vi.fn(async (sql: string, params?: unknown[]) => {
-        if (sql.includes('FROM app_private.ingredient_artwork_current')) {
-          const sha = params?.[1];
-          return sha === shaA
-            ? { rowCount: 1, rows: [{ '?column?': 1 }] }
-            : { rowCount: 0, rows: [] };
+        if (sql.includes('SELECT DISTINCT sha256')) {
+          const hashes = (params?.[1] as string[]) ?? [];
+          return { rows: hashes.includes(shaA) ? [{ sha256: shaA }] : [] };
         }
         return { rows: [] };
       }),
@@ -109,6 +107,7 @@ describe('artwork bucket resolution and retention cleanup', () => {
     expect(deletedKeys).toEqual([`ingredient-artwork/${venue}/${shaB}.png`]);
     expect(result).toEqual({
       scanned: 4,
+      pagesScanned: 1,
       deleted: 1,
       protectedApproved: 1,
       protectedInFlight: 1,
@@ -118,7 +117,77 @@ describe('artwork bucket resolution and retention cleanup', () => {
     });
   });
 
-  it('bounds batch deletes and continues after partial delete failures for safe retry', async () => {
+  it('bounds thousands of approved objects with maxScanned, maxPages, and dryRun', async () => {
+    const nowMs = Date.UTC(2026, 10, 14, 12, 0, 0);
+    const oldDate = new Date(nowMs - 2 * 3_600_000);
+    const page1 = Array.from({ length: 1000 }, (_, i) => ({
+      key: `ingredient-artwork/${venue}/${i.toString(16).padStart(64, '0')}.png`,
+      uploaded: oldDate,
+    }));
+    const page2 = Array.from({ length: 500 }, (_, i) => ({
+      key: `ingredient-artwork/${venue}/${(i + 1000).toString(16).padStart(64, '0')}.png`,
+      uploaded: oldDate,
+    }));
+
+    const storage = {
+      list: vi.fn(async ({ cursor }: { prefix: string; cursor?: string | undefined }) =>
+        cursor === 'p2'
+          ? { objects: page2, truncated: false }
+          : { objects: page1, truncated: true, cursor: 'p2' },
+      ),
+      delete: vi.fn(),
+    };
+    const client = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql.includes('SELECT DISTINCT sha256')) {
+          const hashes = (params?.[1] as string[]) ?? [];
+          return { rows: hashes.map((sha256) => ({ sha256 })) };
+        }
+        return { rows: [] };
+      }),
+    };
+
+    const bounded = await cleanupOrphanedIngredientArtwork({
+      storage,
+      client: client as never,
+      gracePeriodMs: 3_600_000,
+      maxScanned: 1200,
+      maxPages: 5,
+      nowMs,
+    });
+    expect(bounded.scanned).toBe(1200);
+    expect(bounded.pagesScanned).toBe(2);
+    expect(bounded.protectedApproved).toBe(1200);
+    expect(bounded.deleted).toBe(0);
+    expect(bounded.truncated).toBe(true);
+    // Only 2 batched SELECT DISTINCT queries across 1200 approved objects.
+    const selectCalls = client.query.mock.calls.filter(([s]) =>
+      String(s).includes('SELECT DISTINCT sha256'),
+    );
+    expect(selectCalls).toHaveLength(2);
+
+    // Dry-run mode reports deleted without calling storage.delete.
+    const dryClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+    };
+    const dry = await cleanupOrphanedIngredientArtwork({
+      storage: {
+        list: vi.fn(async () => ({
+          objects: [{ key: `ingredient-artwork/${venue}/${shaA}.png`, uploaded: oldDate }],
+          truncated: false,
+        })),
+        delete: storage.delete,
+      },
+      client: dryClient as never,
+      gracePeriodMs: 3_600_000,
+      dryRun: true,
+      nowMs,
+    });
+    expect(dry.deleted).toBe(1);
+    expect(storage.delete).not.toHaveBeenCalled();
+  });
+
+  it('handles DB failures, R2 list failures, and partial delete failures safely', async () => {
     const nowMs = Date.UTC(2026, 10, 14, 12, 0, 0);
     const oldDate = new Date(nowMs - 2 * 3_600_000);
     const deletedKeys: string[] = [];
@@ -128,7 +197,6 @@ describe('artwork bucket resolution and retention cleanup', () => {
         objects: [
           { key: `ingredient-artwork/${venue}/${shaA}.png`, uploaded: oldDate },
           { key: `ingredient-artwork/${venue}/${shaB}.png`, uploaded: oldDate },
-          { key: `ingredient-artwork/${venue}/${shaC}.png`, uploaded: oldDate },
         ],
         truncated: false,
       })),
@@ -138,25 +206,151 @@ describe('artwork bucket resolution and retention cleanup', () => {
       }),
     };
     const client = {
-      query: vi.fn(async (sql: string) => {
-        if (sql.includes('FROM app_private.ingredient_artwork_current')) {
-          return { rowCount: 0, rows: [] };
-        }
-        return { rows: [] };
-      }),
+      query: vi.fn(async () => ({ rows: [] })),
     };
 
-    const result = await cleanupOrphanedIngredientArtwork({
+    const partial = await cleanupOrphanedIngredientArtwork({
       storage,
       client: client as never,
       gracePeriodMs: 3_600_000,
-      maxDeletes: 1,
       nowMs,
     });
-
     expect(deletedKeys).toEqual([`ingredient-artwork/${venue}/${shaB}.png`]);
-    expect(result.errors).toBe(1);
-    expect(result.deleted).toBe(1);
-    expect(result.truncated).toBe(true);
+    expect(partial.errors).toBe(1);
+    expect(partial.deleted).toBe(1);
+
+    // DB lookup failure increments errors and skips deletes.
+    const failingDb = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('SELECT DISTINCT sha256')) throw new Error('DB down');
+        return { rows: [] };
+      }),
+    };
+    const dbErr = await cleanupOrphanedIngredientArtwork({
+      storage: { ...storage, delete: vi.fn() },
+      client: failingDb as never,
+      gracePeriodMs: 3_600_000,
+      nowMs,
+    });
+    expect(dbErr.errors).toBe(2);
+    expect(dbErr.deleted).toBe(0);
+
+    // R2 list failure propagates cleanly.
+    await expect(
+      cleanupOrphanedIngredientArtwork({
+        storage: {
+          list: vi.fn(async () => {
+            throw new Error('R2 list down');
+          }),
+          delete: vi.fn(),
+        },
+        client: client as never,
+      }),
+    ).rejects.toThrow('R2 list down');
+  });
+});
+
+describe('scheduled handler isolation and strict env parsing', () => {
+  it('strictly parses non-negative integer env vars and rejects malformed values', () => {
+    expect(parseNonNegativeIntEnv(undefined, 'err')).toBeUndefined();
+    expect(parseNonNegativeIntEnv('0', 'err')).toBe(0);
+    expect(parseNonNegativeIntEnv('3600000', 'err')).toBe(3600000);
+    for (const bad of ['', 'abc', '1000abc', '-1', '1.5', ' 10 ']) {
+      expect(() => parseNonNegativeIntEnv(bad, 'invalid_artwork_grace_period')).toThrow(
+        'invalid_artwork_grace_period',
+      );
+    }
+  });
+
+  it('runs artwork cleanup independently of order-import bucket presence and failures', async () => {
+    const fakeClient = {
+      connect: vi.fn(async () => {}),
+      query: vi.fn(async () => ({ rows: [] })),
+      end: vi.fn(async () => {}),
+    };
+    const makeBucket = (failList = false) => ({
+      put: vi.fn(async () => {}),
+      list: vi.fn(async () => {
+        if (failList) throw new Error('list failed');
+        return { objects: [], truncated: false };
+      }),
+      delete: vi.fn(async () => {}),
+    });
+
+    // 1. Dedicated artwork bucket only (no order-import bucket).
+    const artOnly = makeBucket();
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        INGREDIENT_ARTWORK_ENABLED: 'true',
+        INGREDIENT_ARTWORK_BUCKET: artOnly,
+      },
+      () => fakeClient as never,
+    );
+    expect(artOnly.list).toHaveBeenCalledWith({ prefix: 'ingredient-artwork/', cursor: undefined });
+
+    // 2. Order-import bucket only (artwork disabled).
+    const orderOnly = makeBucket();
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        ORDER_IMPORT_BUCKET: orderOnly as never,
+      },
+      () => fakeClient as never,
+    );
+    expect(orderOnly.list).toHaveBeenCalledWith(
+      expect.objectContaining({ prefix: 'order-imports/' }),
+    );
+
+    // 3. Order-import cleanup throws -> artwork cleanup still runs!
+    const failingOrder = makeBucket(true);
+    const workingArt = makeBucket(false);
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        INGREDIENT_ARTWORK_ENABLED: 'true',
+        ORDER_IMPORT_BUCKET: failingOrder as never,
+        INGREDIENT_ARTWORK_BUCKET: workingArt,
+      },
+      () => fakeClient as never,
+    );
+    expect(failingOrder.list).toHaveBeenCalled();
+    expect(workingArt.list).toHaveBeenCalled();
+
+    // 4. Artwork cleanup throws -> order-import cleanup still runs!
+    const workingOrder = makeBucket(false);
+    const failingArt = makeBucket(true);
+    await handleScheduled(
+      {},
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: 'postgres://local',
+        INGREDIENT_ARTWORK_ENABLED: 'true',
+        ORDER_IMPORT_BUCKET: workingOrder as never,
+        INGREDIENT_ARTWORK_BUCKET: failingArt,
+      },
+      () => fakeClient as never,
+    );
+    expect(workingOrder.list).toHaveBeenCalled();
+    expect(failingArt.list).toHaveBeenCalled();
+
+    // 5. Neither bucket configured -> returns early without connecting DB.
+    const connectSpy = vi.fn(async () => {});
+    await handleScheduled(
+      {},
+      { APP_ENV: 'local', LOCAL_DATABASE_URL: 'postgres://local' },
+      () =>
+        ({
+          ...fakeClient,
+          connect: connectSpy,
+        }) as never,
+    );
+    expect(connectSpy).not.toHaveBeenCalled();
   });
 });

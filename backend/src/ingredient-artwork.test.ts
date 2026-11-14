@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { type ArtworkCommand, ArtworkCommandSchema } from '@peekaplate/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { readArtwork, replayArtwork, reviewArtwork, reviewedPng } from './ingredient-artwork';
+import { cleanupOrphanedIngredientArtwork } from './ingredient-artwork-retention';
 
 // Valid 32x32 transparent PNG with one visible pixel, used only as a transport fixture.
 export const artPng = Buffer.from(
@@ -222,5 +223,130 @@ describe('ingredient artwork approval', () => {
     expect(
       db.query.mock.calls.some((c) => c[0].startsWith('INSERT INTO app_private.es_event')),
     ).toBe(false);
+  });
+  it('enforces real PostgreSQL transaction, FOR SHARE, and RLS tenant invariants in Phase A and C', async () => {
+    let inTx = false;
+    let readOnly = false;
+    let tenantId: string | null = null;
+    const strictDb = {
+      query: vi.fn(async (sql: string, params?: unknown[]) => {
+        if (sql === 'BEGIN') {
+          if (inTx) throw new Error('Nested BEGIN');
+          inTx = true;
+          readOnly = false;
+          tenantId = null;
+          return { rows: [] };
+        }
+        if (sql === 'BEGIN READ ONLY') {
+          if (inTx) throw new Error('Nested BEGIN READ ONLY');
+          inTx = true;
+          readOnly = true;
+          tenantId = null;
+          return { rows: [] };
+        }
+        if (sql === 'COMMIT' || sql === 'ROLLBACK') {
+          inTx = false;
+          readOnly = false;
+          tenantId = null;
+          return { rows: [] };
+        }
+        if (sql.includes('FOR SHARE')) {
+          if (readOnly)
+            throw new Error('ERROR: cannot execute SELECT FOR SHARE in a read-only transaction');
+          return { rows: [{ permission: 'owner' }] };
+        }
+        if (sql.startsWith("SELECT set_config('app.tenant_id'")) {
+          if (inTx) tenantId = String(params?.[0] ?? '');
+          return { rows: [] };
+        }
+        if (
+          sql.includes('app_private.es_command') ||
+          sql.includes('app_private.ingredient_artwork_current')
+        ) {
+          if (!inTx || tenantId !== venue) {
+            throw new Error('RLS violation: app.tenant_id not active in transaction');
+          }
+          return { rows: [] };
+        }
+        return { rows: [] };
+      }),
+    };
+    const result = await reviewArtwork(strictDb as never, actor, venue, artworkInput(), {
+      put: vi.fn(),
+    });
+    expect(result.status).toBe('approved');
+    expect(inTx).toBe(false);
+  });
+  it('protects reused content-addressed object from concurrent cleanup deletion between Phase B and Phase C', async () => {
+    const input = artworkInput();
+    if (input.status !== 'approved') throw Error();
+    const key = `ingredient-artwork/${venue}/${input.sha256}.png`;
+    let nowMs = Date.UTC(2026, 10, 14, 12, 0, 0);
+    const oldDate = new Date(nowMs - 2 * 3_600_000);
+    const r2Objects = new Map<string, { bytes: ArrayBuffer; uploaded: Date }>([
+      [key, { bytes: Uint8Array.from(artPng).buffer, uploaded: oldDate }],
+    ]);
+    let committedApproved = false;
+    let cleanupResult: Awaited<ReturnType<typeof cleanupOrphanedIngredientArtwork>> | undefined;
+
+    const storage = {
+      put: vi.fn(
+        async (
+          k: string,
+          bytes: ArrayBuffer,
+          opts?: { onlyIf?: { etagDoesNotMatch?: string } },
+        ) => {
+          if (opts?.onlyIf?.etagDoesNotMatch === '*' && r2Objects.has(k)) {
+            return null;
+          }
+          nowMs += 1000;
+          r2Objects.set(k, { bytes, uploaded: new Date(nowMs) });
+          return { key: k };
+        },
+      ),
+      get: vi.fn(async (k: string) => {
+        const obj = r2Objects.get(k);
+        return obj ? { size: obj.bytes.byteLength, arrayBuffer: async () => obj.bytes } : null;
+      }),
+      head: vi.fn(async (k: string) => {
+        const obj = r2Objects.get(k);
+        return obj ? { uploaded: obj.uploaded } : null;
+      }),
+      list: vi.fn(async () => ({
+        objects: [...r2Objects.entries()].map(([k, v]) => ({ key: k, uploaded: v.uploaded })),
+        truncated: false,
+      })),
+      delete: vi.fn(async (k: string) => {
+        r2Objects.delete(k);
+      }),
+    };
+
+    const db = {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('SELECT permission')) return { rows: [{ permission: 'owner' }] };
+        if (sql.startsWith('SELECT request_hash')) return { rows: [] };
+        if (sql.startsWith('SELECT stream_id')) return { rows: [] };
+        if (sql.includes('SELECT DISTINCT sha256')) {
+          return { rows: committedApproved ? [{ sha256: input.sha256 }] : [] };
+        }
+        if (sql.startsWith('INSERT INTO app_private.ingredient_artwork_current')) {
+          // Interleave cleanup check right before Phase C commits the approved row.
+          cleanupResult = await cleanupOrphanedIngredientArtwork({
+            storage,
+            client: db as never,
+            gracePeriodMs: 3_600_000,
+            nowMs,
+          });
+          committedApproved = true;
+        }
+        return { rows: [] };
+      }),
+    };
+
+    const state = await reviewArtwork(db as never, actor, venue, input, storage);
+    expect(state.status).toBe('approved');
+    expect(cleanupResult?.deleted).toBe(0);
+    expect(cleanupResult?.protectedInFlight).toBe(1);
+    expect(r2Objects.has(key)).toBe(true);
   });
 });

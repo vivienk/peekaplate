@@ -376,9 +376,18 @@ let stopRouting: () => void = () => {};
 // Detaches the active screen's Save and live-artwork lifecycle before the next screen or remount renders.
 let leaveScreen: () => void = () => {};
 
-export function mountMenuScreen(container: HTMLElement): void {
-  leaveScreen();
+function runLeaveScreen(): void {
+  const prev = leaveScreen;
   leaveScreen = () => {};
+  prev();
+}
+
+export function mountMenuScreen(container: HTMLElement): void {
+  try {
+    runLeaveScreen();
+  } catch {
+    /* Ensure remaining mount teardown still runs if a screen cleanup callback throws. */
+  }
   teardownTracking?.();
   teardownTracking = null;
   activeLoad?.abort();
@@ -539,8 +548,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const switchScreen = (next: typeof view) => {
     if (view === 'menu') savedScroll = window.scrollY;
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     disposeObserver();
     // Leaving a screen ends its tracking: exposure timers and the detail clock's final checkpoint.
     cleanupExposure();
@@ -742,8 +750,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       }
     }
     cleanupExposure();
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     renderMenu(container, next, (dish) => showDetail(dish, 'menu_card'));
     const state = saveState;
     if (state) {

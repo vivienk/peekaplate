@@ -20,6 +20,7 @@ export type ArtworkStorage = {
     options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
   ): Promise<unknown>;
   get?(key: string): Promise<{ size: number; arrayBuffer(): Promise<ArrayBuffer> } | null>;
+  head?(key: string): Promise<{ uploaded?: Date | string } | null>;
 };
 
 export function reviewedPng(input: Extract<ArtworkCommand, { status: 'approved' }>): Uint8Array {
@@ -99,9 +100,11 @@ async function preflightArtworkReview(
   input: ArtworkCommand,
   requestHash: string,
 ): Promise<ArtworkState | null> {
-  await client.query('BEGIN READ ONLY');
+  // Use a writable transaction because authorizeStaffVenue acquires FOR SHARE
+  // on app_private.staff_membership, which PostgreSQL rejects in READ ONLY mode.
+  await client.query('BEGIN');
   try {
-    await authorizeStaffVenue(client, actor, venue, false);
+    await authorizeStaffVenue(client, actor, venue, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venue]);
     const receipt = await client.query<{ request_hash: string; result: unknown }>(
       'SELECT request_hash,result FROM app_private.es_command WHERE tenant_id=$1 AND actor_id=$2 AND idempotency_key=$3',
@@ -154,6 +157,9 @@ async function uploadImmutableArtwork(
     ) {
       throw new AuthUnavailableError();
     }
+    // Refresh the R2 uploaded timestamp for the verified immutable content so
+    // scheduled cleanup treats this re-approved object as in-flight until Phase C commits.
+    await storage.put(key, Uint8Array.from(bytes).buffer, { sha256 });
   }
 }
 
