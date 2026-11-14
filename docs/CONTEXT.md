@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate. Photo preparation invokes reusable portion ingestion; PR147 fixtures are exports of this processor, with build-time freshness checks.",
+      "summary": "Diner fixture and published menus preserve verified dish identity, original photos and photo fallback. PR162 review-only View Portion supports generated cutouts, owner plate boundary calibration, optional local Tripo models and automatic approximate phone camera preview. Quest entry uses optional XR features, detected surface selection and ray-selectable spatial controls without mandatory DOM overlay. Generated appearance remains approximate; serving count never sets physical scale. Production fixture gates remain unchanged; real headset and phone acceptance pending.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -189,6 +189,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionPreview.ts",
         "frontend/diner/src/menu/portion3d.ts",
         "frontend/diner/src/menu/portionAR.ts",
+        "frontend/diner/src/menu/portionXR.ts",
+        "frontend/diner/src/menu/portionXR.test.ts",
+        "tests/e2e/portion-quest.spec.ts",
+        "playwright.quest.config.ts",
         "scripts/local-model-proxy.mjs",
         "scripts/local-model-proxy.test.mjs",
         "frontend/diner/src/menu/portionRenderer.ts",
@@ -226,7 +230,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9ac3dc587c667b12a7774e9c135fbe8b43271ddb3d1dccb763bf67c159f3449f"
+      "sourceFingerprint": "5d2756149afa79950eb4aa4af2fa31b37b84f81ca3d809a129909ab3134a2600"
     },
     {
       "id": "console",
@@ -687,6 +691,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-14",
+      "summary": "Quest is the primary headset portal: immersive-ar with optional hit-test/plane detection/DOM overlay, explicit surface selection, spatial rotate/reposition/model/photo/back controls. iPhone retains automatic camera preview. Generated 3D stays optional and approximate; no new generation or publication is triggered.",
+      "modules": [
+        "diner"
+      ],
+      "next": "Run real Quest room setup, table placement, model switching and exit acceptance; browser mocks do not establish headset behavior."
+    },
+    {
       "date": "2026-11-13",
       "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. PR147 fixtures have no invented measurements.",
       "modules": [
@@ -766,15 +778,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
-    },
-    {
-      "date": "2026-11-09",
-      "summary": "PR82 preserves current develop after PR107 and adds the frozen 21-case offline deterministic evaluation. A real partial-discovery probe ran only 1/21 cases, wrote DEVELOPMENT_CHECK_FAIL, yet returned exit0. The runner now requires a fresh matching-version complete passing artifact; five CLI regressions cover stale/missing/incomplete/failed/duplicate evidence and child failure. The original oracle and recommendation behavior are unchanged. Parent context and complete ledger blocks are preserved.",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "next": "Run the official evaluation on the clean final commit and inspect source/dirty provenance. Merge after checks; then synchronize draft #112 separately. No model, independent rubric, producer mapping, hosted acceptance or release policy is certified."
     }
   ]
 }

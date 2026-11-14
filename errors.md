@@ -2859,3 +2859,19 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - 2026-11-13 context check rejected eleven handoffs after adding plate calibration. Kept the required ten most recent handoffs; older entries remain in Git history.
 
 - 2026-11-13 interaction revert: browser checks initially failed with ERR_CONNECTION_REFUSED because the isolated local preview on5175 was stopped. Restarted the diner development server before rerunning; no application change required.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:11:01.233Z","exitCode":2}
+```
+
+- 2026-11-14 Quest typecheck caught an optional hit-test source promise being possibly undefined. Optional-chain the catch as well; plane detection remains available without hit-test support.
+
+- 2026-11-14 Quest browser tests could not launch Chromium inside the sandbox (MachPort permission denied); rerun with local browser execution permission. This failure occurred before application tests ran.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T08:13:22.525Z","exitCode":1}
+```
+
+- 2026-11-14 context check rejected an overlong diner summary. Condensed responsibilities and retained detailed behavior in the linked preview document and bounded handoff.
