@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../style.css';
 import { OwnerWorkspace } from '../owner/OwnerWorkspace';
 import { readWorkspaceApiBase } from '../owner/workspace-api';
-import { readConfirmationCode } from './callback';
+import { isAuthCallbackPath, readConfirmationCode } from './callback';
 import { OwnerAuth } from './OwnerAuth';
 import {
   connectOwnerAuth,
@@ -12,8 +12,8 @@ import {
   type SignedInOwner,
 } from './supabase-auth';
 
-const isConfirmation = window.location.pathname === '/auth-confirm.html';
-const isRecovery = window.location.pathname === '/auth-reset.html';
+const isConfirmation = isAuthCallbackPath(window.location.pathname, 'confirmation');
+const isRecovery = isAuthCallbackPath(window.location.pathname, 'recovery');
 const isCallback = isConfirmation || isRecovery;
 let confirmationCode = isCallback
   ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
