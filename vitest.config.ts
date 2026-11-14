@@ -10,6 +10,7 @@ export default defineConfig({
       'frontend/console/src/**/*.test.ts',
       'frontend/console/src/**/*.test.tsx',
       'frontend/diner/src/**/*.test.ts',
+      'tests/data06/**/*.test.ts',
     ],
   },
 });

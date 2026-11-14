@@ -10,6 +10,7 @@ import {
   CreateDishRevisionSchema,
   type CreateOwnerInsightActionRequest,
   CreateOwnerInsightActionRequestSchema,
+  DinerLinkSchema,
   type DishRevision,
   DishRevisionScopeSchema,
   DraftScopeSchema,
@@ -29,6 +30,7 @@ import {
   OwnerInsightActionListQuerySchema,
   type PublicMenuResponse,
   PublishMenuSchema,
+  RestaurantSlugSchema,
   type ReviewCandidateCommand,
   ReviewCandidateCommandSchema,
   type ReviewCandidateItemResponse,
@@ -95,6 +97,11 @@ import {
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
+  buildOwnerReportExportFilename,
+  type ExportableOwnerReport,
+  serializeOwnerReportCsv,
+} from './owner-report-export';
+import {
   createPublicMenuResponse,
   menuJwks,
   type PublicMenuRecord,
@@ -104,8 +111,10 @@ import {
   approveMenuRevision,
   PublicationCommandError,
   publishMenu,
+  readDinerLink,
   withdrawMenu,
 } from './publication-command';
+import { resolveRestaurantLink } from './restaurant-link';
 import { retrieveMenuEvidence } from './retrieval';
 import { type ReviewArtifactObject, verifyReviewArtifact } from './review-artifact';
 import {
@@ -126,6 +135,7 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
 
 export type Bindings = {
   APP_ENV?: string;
+  DINER_PUBLIC_ORIGIN?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
   LOCAL_DATABASE_URL?: string;
@@ -151,7 +161,9 @@ export type Bindings = {
   INGESTION_REPORTS_BUCKET?: {
     put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    delete?(key: string): Promise<unknown>;
   };
+
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_HISTORICAL_DAYS?: string;
@@ -217,6 +229,13 @@ type Dependencies = {
     menuId: string,
     env: Bindings,
   ) => Promise<PublicMenuRecord | undefined>;
+  resolveRestaurantLink?: (slug: string, env: Bindings) => ReturnType<typeof resolveRestaurantLink>;
+  readDinerLink?: (
+    actorId: string,
+    venueId: string,
+    menuId: string,
+    env: Bindings,
+  ) => ReturnType<typeof readDinerLink>;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -337,11 +356,30 @@ let menuVerifier: {
  * Preview and arbitrary origins are rejected; wildcard '*' is not used.
  */
 export const DINER_CORS_ALLOWED_ORIGINS = [
+  'https://peekaplate.app',
   'https://diner.peekaplate.com',
   'https://peekaplate-diner-staging.pages.dev',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ] as const;
+
+function dinerLinkResponse(link: { path: string }, env: Bindings) {
+  const origin =
+    env.APP_ENV === 'production'
+      ? 'https://peekaplate.app'
+      : env.APP_ENV === 'local'
+        ? 'http://127.0.0.1:5186'
+        : env.APP_ENV === 'staging' &&
+            [
+              'https://peekaplate-diner-staging.pages.dev',
+              'https://routing-staging.peekaplate-diner-staging.pages.dev',
+            ].includes(env.DINER_PUBLIC_ORIGIN ?? '')
+          ? env.DINER_PUBLIC_ORIGIN
+          : undefined;
+  if (!origin) throw new AuthUnavailableError();
+  const path = DinerLinkSchema.parse(link).path;
+  return { path, url: `${origin}${path}` };
+}
 
 /**
  * Exact console-origin allowlist for the owner report route only (S3-RES-03; agreed with Sai,
@@ -542,6 +580,10 @@ const dependencies: Dependencies = {
       await client.end();
     }
   },
+  resolveRestaurantLink: (slug, env) =>
+    withDatabase(env, (client) => resolveRestaurantLink(client, slug)),
+  readDinerLink: (actorId, venueId, menuId, env) =>
+    withDatabase(env, (client) => readDinerLink(client, actorId, venueId, menuId)),
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -912,7 +954,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:menus\/(?:uploads|upload-groups|url|jobs)(?:\/|$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -921,6 +963,7 @@ export function createApp(services: Dependencies = dependencies) {
       origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
+      exposeHeaders: ['Location'],
       maxAge: 86400,
     })(c, next);
   });
@@ -930,13 +973,27 @@ export function createApp(services: Dependencies = dependencies) {
     database: withDatabase,
   });
   app.use(
-    '/public/venues/*',
+    '/public/*',
     cors({
-      origin: [...DINER_CORS_ALLOWED_ORIGINS],
+      origin: (origin, c) =>
+        DINER_CORS_ALLOWED_ORIGINS.some((allowed) => allowed === origin) ||
+        (c.env?.APP_ENV === 'staging' &&
+          c.env.DINER_PUBLIC_ORIGIN ===
+            'https://routing-staging.peekaplate-diner-staging.pages.dev' &&
+          origin === c.env.DINER_PUBLIC_ORIGIN)
+          ? origin
+          : undefined,
       allowMethods: ['GET', 'OPTIONS'],
       maxAge: 86400,
     }),
   );
+  app.get('/public/restaurants/:slug', async (c) => {
+    const slug = RestaurantSlugSchema.safeParse(c.req.param('slug'));
+    if (!slug.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.resolveRestaurantLink) throw new AuthUnavailableError();
+    const scope = await services.resolveRestaurantLink(slug.data, c.env ?? {});
+    return scope ? c.json(MenuScopeSchema.parse(scope)) : c.json({ error: 'not_found' }, 404);
+  });
   app.get('/public/venues/:venueId/menus/:menuId', async (c) => {
     const scope = MenuScopeSchema.safeParse(c.req.param());
     if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
@@ -1038,6 +1095,70 @@ export function createApp(services: Dependencies = dependencies) {
     );
     return c.json(report);
   });
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes/export',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/api/v1/venues/:venueId/analytics/dishes/export', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const report = await services.readOwnerReport(
+      actorId,
+      approvedSyntheticVenue.data.venueId,
+      services.now?.() ?? new Date(),
+      env,
+      'synthetic',
+    );
+    const typedReport = report as ExportableOwnerReport;
+    const csv = serializeOwnerReportCsv(typedReport);
+    const filename = buildOwnerReportExportFilename(
+      typedReport.venue_id,
+      typedReport.report_metadata.generated_at,
+    );
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization)) {
@@ -1118,6 +1239,7 @@ export function createApp(services: Dependencies = dependencies) {
       | NonNullable<Dependencies['publish']>
       | NonNullable<Dependencies['withdraw']>
       | undefined,
+    includeDinerLink = false,
   ) => {
     app.post(path, async (c) => {
       const authorization = c.req.header('Authorization');
@@ -1145,6 +1267,15 @@ export function createApp(services: Dependencies = dependencies) {
         { ...parsed.data, menuId: scope.data.menuId } as never,
         c.env ?? {},
       );
+      if (includeDinerLink && services.readDinerLink) {
+        const link = await services.readDinerLink(
+          actorId,
+          scope.data.venueId,
+          scope.data.menuId,
+          c.env ?? {},
+        );
+        if (link) c.header('Location', dinerLinkResponse(link, c.env ?? {}).url);
+      }
       return c.json(result);
     });
   };
@@ -1157,12 +1288,31 @@ export function createApp(services: Dependencies = dependencies) {
     '/venues/:venueId/menus/:menuId/publications',
     PublishMenuSchema,
     services.publish,
+    true,
   );
   publicationRoute(
     '/venues/:venueId/menus/:menuId/withdrawals',
     WithdrawMenuSchema,
     services.withdraw,
   );
+  app.get('/venues/:venueId/menus/:menuId/diner-link', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = MenuScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readDinerLink) throw new AuthUnavailableError();
+    const link = await services.readDinerLink(
+      actorId,
+      scope.data.venueId,
+      scope.data.menuId,
+      c.env ?? {},
+    );
+    return link
+      ? c.json(dinerLinkResponse(link, c.env ?? {}))
+      : c.json({ error: 'not_found' }, 404);
+  });
 
   app.get('/venues/:venueId/owner-insight-actions', async (c) => {
     const authorization = c.req.header('Authorization');
@@ -1845,6 +1995,56 @@ export const handleScheduled = async (event: any, env: any) => {
           retained: result.retained,
         }),
       );
+    }
+
+    // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
+    const stagingRetentionDays = env.MENU_STAGING_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingRejectedDays = env.MENU_STAGING_REJECTED_RETENTION_DAYS
+      ? Number.parseInt(env.MENU_STAGING_REJECTED_RETENTION_DAYS, 10)
+      : undefined;
+    const stagingOrphanDays = env.MENU_STAGING_ORPHAN_GRACE_DAYS
+      ? Number.parseInt(env.MENU_STAGING_ORPHAN_GRACE_DAYS, 10)
+      : undefined;
+    const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
+
+    const stagingStorage = env.INGESTION_REPORTS_BUCKET;
+    if (
+      stagingStorage &&
+      typeof stagingStorage.list === 'function' &&
+      typeof stagingStorage.delete === 'function' &&
+      (stagingRetentionDays !== undefined ||
+        stagingRejectedDays !== undefined ||
+        stagingOrphanDays !== undefined)
+    ) {
+      try {
+        const { cleanupStagedMenuPhotos } = await import('./owner-menu-retention');
+        const stagingResult = await cleanupStagedMenuPhotos({
+          storage: stagingStorage,
+          client,
+          retentionConfig: {
+            promotedRetentionDays: stagingRetentionDays,
+            rejectedRetentionDays: stagingRejectedDays ?? 0,
+            orphanGraceDays: stagingOrphanDays ?? 0,
+          },
+          dryRun: stagingDryRun,
+        });
+        if (
+          stagingResult.promotedDeleted > 0 ||
+          stagingResult.rejectedDeleted > 0 ||
+          stagingResult.orphansDeleted > 0
+        ) {
+          console.log(
+            JSON.stringify({
+              event: 'menu_staging_cleanup',
+              ...stagingResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
+      }
     }
   } catch {
     console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
