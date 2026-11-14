@@ -15,7 +15,7 @@
     "build": "pnpm -r --if-present build",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "typecheck": "corepack pnpm -r --if-present typecheck",
+    "typecheck": "corepack pnpm -r --if-present typecheck && tsc -p tests/data06/tsconfig.json --noEmit",
     "test": "vitest run && node --test scripts/*.test.mjs",
     "eval:owner-ai": "node scripts/evaluate-owner-ai.mjs",
     "probe:owner-ai:luna": "node scripts/probe-owner-ai-luna.mjs",

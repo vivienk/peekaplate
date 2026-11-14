@@ -214,7 +214,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "4ecdecff1dfde64970970b57f2c8fc2475583f72ab21cb8061f9894224125013"
+      "sourceFingerprint": "3656ea958c81e35f36da9c5f112b1e6bfa31929d7af3b023e44c9836c4102a2b"
     },
     {
       "id": "console",
@@ -414,7 +414,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-ai/report-adapter.test.ts",
         "backend/src/owner-ai/report-producer-seam.test.ts",
         "scripts/probe-owner-ai-luna.mjs",
-        "scripts/probe-owner-ai-luna.test.mjs"
+        "scripts/probe-owner-ai-luna.test.mjs",
+        "tests/data06/VALIDATION_REPORT.md",
+        "tests/data06/descriptive_signals.json",
+        "tests/data06/descriptive_signals.test.ts",
+        "tests/data06/privacy_boundaries.json",
+        "tests/data06/privacy_boundaries.test.ts",
+        "tests/data06/tsconfig.json"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -427,7 +433,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6da23a6b56a69b1a1a211025d2463ba3f978f93b325dd97c7e4dfd045c6034c2"
+      "sourceFingerprint": "b38b6008d15a11f569d0f6e0185dc717d75e3384b4f744f564bfcdc5f0ff1b08"
     },
     {
       "id": "database",
@@ -549,7 +555,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/console-preview-demos.test.mjs",
         "scripts/node-ts-hooks.mjs",
         ".github/workflows/deploy-extraction-staging.yml",
-        "docs/staging-ingestion-release.md"
+        "docs/staging-ingestion-release.md",
+        "vitest.config.ts",
+        "vitest.data06.config.ts"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -560,7 +568,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "f0e2b8303963933f65cb5e44d3f3a6539464756025df5389340e71592d8689d8"
+      "sourceFingerprint": "26a8d27ffa63d06cf9ef0e86888b765b3b60aad1a213bbea875a04018ff9be5c"
     },
     {
       "id": "agents",
@@ -756,24 +764,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-12",
       "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "Owner workspace release149 fad0eb0/API58034c48 and migration20261112010000 now pass genuine authenticated staging acceptance: 53 workspace HTTP checks, 29 Chromium assertions, independent R2 PDF hash and three Supabase postconditions. Browser calls from local console5174 prove private photo persistence, PDF boundaries, durable corrections, frozen approval and current viewer denial. Gmail trimmed the newest sign-in link; expanding that fresh delivery resolved the verifier’s otp_expired without Auth/password changes. Test sessions ended and viewer access restored; normal Queues/DLQs remain paused. Synthetic evidence is retained; no new model call or public menu.",
-      "sources": [
-        "docs/owner-menu-workspace.md",
-        "backend/src/owner-menu.ts",
-        "backend/src/ingestion/intake.ts",
-        "migrations/20261112010000_owner_menu_workspace.sql",
-        "backend/src/ingestion/review-bootstrap.ts",
-        "docs/evidence/owner-menu-staging-2026-11-12.json"
-      ],
-      "next": "Ehab connects and validates real S06–S09 UI using owner-menu-workspace.md and review-api.md. Auth143/146 remain held for dashboard integration. No fresh provider or production accuracy claim. Evidence: docs/evidence/owner-menu-staging-2026-11-12.json."
-    },
-    {
-      "date": "2026-11-12",
-      "modules": [
         "diner",
         "analytics"
       ],
@@ -900,6 +890,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-ai.md"
       ],
       "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
+    },
+    {
+      "date": "2026-11-13",
+      "modules": [
+        "contracts",
+        "delivery"
+      ],
+      "summary": "PR144 retargeted to develop after PR112 merged. DATA06 fixtures remain in default Vitest discovery and workspace typechecking. Prepared descriptive-ID counts, 9/10/11 distinct-session boundaries and null below-floor expectations remain preparation evidence, not production classification, scoring or hosted acceptance.",
+      "sources": [
+        "tests/data06/VALIDATION_REPORT.md",
+        "tests/data06/descriptive_signals.test.ts",
+        "tests/data06/privacy_boundaries.test.ts",
+        "vitest.config.ts",
+        "tests/data06/tsconfig.json"
+      ],
+      "next": "Complete exact-head checks/review and merge fixture preparation. Connect approved DATA06 producer/policy and execute raw-event/hosted evidence separately."
     }
   ]
 }
