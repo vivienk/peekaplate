@@ -3426,6 +3426,39 @@ cancellation regression and the existing menu checks also pass. No cloud state c
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:15:53.963Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:18:40.227Z","exitCode":2}
+```
+
+## Owner Responses local integration — November 12, 2026
+
+Initial checks identified exact-optional-property construction errors and Node versus Worker URL type overlap in the local launcher; explicit optional spreads and a file-path cwd resolve them. The local plain-Node harness also exposed an unrelated contracts-barrel .js import that exists only as TypeScript source. Narrow public owner-report/owner-analysis exports avoid loading unrelated modules; the shared resolver and provider policy are unchanged. The default Node 24.14 could not install this repository, and offline package metadata was incomplete; the existing Node 24.16 runtime and normal frozen installation succeeded without changing engine or lockfile requirements. No live provider request or credential was involved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T00:21:54.000Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T00:25:10.668Z","exitCode":1}
+```
+
+- Owner Responses integration verification: full test suite passed with local ports permitted (1515 tests, 4 skipped; 79 script checks). The context check detected the newly changed E2E script fingerprint; refreshed after reviewing the delivery summary. Build dry-run succeeded, but Wrangler could not write its default external log directory; retry uses a temporary log path. No deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-13T00:29:15.673Z","exitCode":1}
+```
+
+- Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
 ```
 

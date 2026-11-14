@@ -10,7 +10,25 @@ import { defineConfig } from 'vite';
 const includeDemos = process.env.PEEKAPLATE_PREVIEW_DEMOS === 'true';
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  define: {
+    __OWNER_AI_LOCAL_PREVIEW__: JSON.stringify(
+      command === 'serve' && process.env.OWNER_AI_LOCAL_PREVIEW === 'true',
+    ),
+  },
+  ...(command === 'serve' && process.env.OWNER_AI_LOCAL_PREVIEW === 'true'
+    ? {
+        server: {
+          proxy: {
+            '/__owner-ai': {
+              target: 'http://127.0.0.1:8792',
+              changeOrigin: true,
+              rewrite: (path: string) => path.replace(/^\/__owner-ai/, ''),
+            },
+          },
+        },
+      }
+    : {}),
   plugins: [react()],
   ...(includeDemos && {
     build: {
@@ -24,4 +42,4 @@ export default defineConfig({
       },
     },
   }),
-});
+}));
