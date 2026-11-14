@@ -52,7 +52,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/bundle.wrong-revision.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/local-validation.json",
         "packages/contracts/fixtures/public-menu-bundle.v1/res02-review-vectors/manifest.json",
-        "packages/contracts/src/portion.ts"
+        "packages/contracts/src/portion.ts",
+        "packages/contracts/src/dining.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -60,7 +61,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "894aa3dd45d227e79c5959effd7bb344feafde1733b3103cffd90bd1791661ac"
+      "sourceFingerprint": "563877ba907f2df0a509d0d9e10314b9b3c1db8cc2c2e8baada06952f5a1b2a7"
     },
     {
       "id": "tokens",
@@ -98,7 +99,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture and published menus preserve verified dish identity, original photos and photo fallback. PR162 review-only View Portion supports generated cutouts, owner plate boundary calibration, optional local Tripo models and automatic approximate phone camera preview. Quest entry uses optional XR features, detected surface selection and ray-selectable spatial controls without mandatory DOM overlay. Generated appearance remains approximate; serving count never sets physical scale. Production fixture gates remain unchanged; real headset and phone acceptance pending.",
+      "summary": "Diner menu, portions and gated Quest discovery. Quest home opens a sourced restaurant directory and self-hosted regional map; phone/direct-menu entry stays intact. Connected reviewed catalogs provide dish detail/portion and unpaid pickup-request carts; missing receiving service stays unavailable. PR162 retains calibrated footprint, approximate camera and generated-model paths. No production activation, real restaurant receipt or physical-device acceptance is established.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -221,7 +222,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/portion_ingestion.py",
         "processing/src/peekaplate_processing/plate_calibration.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
-        "processing/tests/test_portion_ingestion.py"
+        "processing/tests/test_portion_ingestion.py",
+        "frontend/diner/src/dining/entry.ts",
+        "frontend/diner/src/dining/screen.ts",
+        "frontend/diner/src/dining/cart.ts",
+        "frontend/diner/src/dining/style.css",
+        "frontend/diner/src/dining/locations.json",
+        "frontend/diner/src/dining/region.json",
+        "frontend/diner/src/dining/dining.test.ts",
+        "tests/e2e/dining.spec.ts",
+        "docs/quest-dining.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -230,7 +240,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a5363806f41532c69f5886412ad7859ac98d4a064a7b1f7a2c6992935039822a"
+      "sourceFingerprint": "c0f52a7fd69206618e73e8f6c2301913959fb2b10683da6df8b8495e05ba8088"
     },
     {
       "id": "console",
@@ -261,7 +271,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Create-only R2 precedes atomic tenant-scoped observations/facts; retries dedupe and conflicts quarantine. Own-token checks retain ES256/claim verification. Owner reports authorize current owner membership and 24h evidence, with per-metric/cohort and complementary suppression. Local/staging HTTP reports require exactly one source=synthetic and a configured server-allowlisted venue; production fails closed. S4-RES CLI builds canonical immutable bundles from approved tenant-scoped dish/review facts and verified T0 assets, with explicit privileged transactional admission; no approval/publication is implied. AI-01 drafts/abstention and frozen offline evaluation remain separate. Existing ingestion/review commands are preserved. Diner verification/hosting are described in the diner node; full pilot acceptance remains gated and queues stay paused.",
+      "summary": "Hono API with verified staff auth, tenant-scoped commands, approved publication, bounded ingestion/review workflows, public menu delivery and token-scoped observation ingestion. Owner/team reports retain their separate authority and evidence boundaries. Gated dining API adds server-priced unpaid pickup requests, current-publication validation, atomic event/projection/receipt/outbox and a membership-checked inbox. Missing configuration fails closed; real PostgreSQL and restaurant delivery acceptance remain unverified.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -360,7 +370,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/bundle-producer/bundle-producer.integration.ts",
         "backend/scripts/produce-menu-bundle.ts",
         "docs/s4-res-bundle-producer.md",
-        "docs/owner-report-staging.md"
+        "docs/owner-report-staging.md",
+        "backend/src/dining.ts",
+        "backend/src/dining.test.ts",
+        "migrations/20261114120000_dining_orders.sql",
+        "docs/adr/0017-quest-dining-requests.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -373,7 +387,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4f93ae528cd727e94068ee9f1ecbb0233d7f9d601c058c5075b949ad22eae702"
+      "sourceFingerprint": "026edcf777d33f677165c78a1fbac61c7a4240f58a072fc8d3648116e3681e75"
     },
     {
       "id": "database",
@@ -491,7 +505,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "dfb624c6547fa1e28c6c8e0d3bd402987f59c16c9998e4fe4e20fb4f1ab8f9c6"
+      "sourceFingerprint": "2fe349d3c77c7f74936f6c302498e225b2d57119bcc086179ba95df2846b316d"
     },
     {
       "id": "agents",
@@ -692,6 +706,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-14",
+      "summary": "Quest directory covers eleven source-verified locations across Noka, Son & Garden and Farmhouse. Unpaid pickup requests use server pricing and atomic order event/projection/receipt/outbox; unknown locations remain unavailable. Preview has no receiving backend. Phone and existing portion paths preserved.",
+      "modules": [
+        "diner",
+        "contracts"
+      ],
+      "next": "Review ADR0017; run PostgreSQL restricted-role/concurrency checks, bind real approved menus and staff receiver, then separately approve backend activation. No live orders or production changes."
+    },
+    {
+      "date": "2026-11-14",
       "summary": "Quest is the primary headset portal: immersive-ar with optional hit-test/plane detection/DOM overlay, explicit surface selection, spatial rotate/reposition/model/photo/back controls. iPhone retains automatic camera preview. Generated 3D stays optional and approximate; no new generation or publication is triggered.",
       "modules": [
         "diner"
@@ -770,14 +793,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "delivery"
       ],
       "next": "Merge the tested producer into develop. DIN-03 must adopt the exact-byte verifier; immutable HTTPS hosting/CORS, restaurant/source approval and genuine hosted diner/dual-destination tracking acceptance remain separate gates. No live activation or deployment is included."
-    },
-    {
-      "date": "2026-11-10",
-      "summary": "PR85 adds shared-schema pointer/bundle loading and token refresh behind explicit live mode; fixtures remain default and live byte verification rejects all bundles until #117. Parent review fixed refresh focus loss and missing-opener return, with three RED-to-GREEN Chromium regressions, and removed a real DNS/error race from the image fallback test. All 111 Chromium checks pass (96.794 s); refresh tests use synthetic sources. No runtime configuration or deployment changes.",
-      "modules": [
-        "diner"
-      ],
-      "next": "Adopt the shared byte verifier and add a menu-availability collection gate before enabling live: 404 must stop new canonical and PostHog events without changing consent. Then verify token refresh, remount cancellation and real browser-to-both-destinations behavior. Hash/hosted acceptance remains unverified."
     }
   ]
 }

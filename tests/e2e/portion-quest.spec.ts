@@ -21,7 +21,9 @@ test('Quest offers immersive entry without requesting a phone camera, rejection 
       },
     });
   });
-  await page.goto(process.env.PEEKAPLATE_UPLOAD_URL || 'http://127.0.0.1:5175/');
+  await page.goto(
+    (process.env.PEEKAPLATE_UPLOAD_URL || 'http://127.0.0.1:5175/') + '?experience=menu',
+  );
   await page.getByRole('button', { name: 'Open Avocado Toast', exact: true }).click();
   await page.getByRole('button', { name: 'View Portion', exact: true }).click();
   const portal = page.getByRole('dialog', { name: 'Dish on your table' });

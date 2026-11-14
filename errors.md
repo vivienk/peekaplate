@@ -2882,3 +2882,19 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - 2026-11-14 dry-run build passed with an existing xr-overlay CSS minifier warning and a sandbox-denied Wrangler log write; no remote deployment was performed.
 
 - 2026-11-14 follow-up review removed the redundant spatial Place button: aiming at that panel loses the table ray. Direct surface selection is the single headset placement action; spatial controls retain mode, rotation, reposition, photo and exit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T09:01:14.305Z","exitCode":2}
+```
+
+- 2026-11-14 dining typecheck rejected an explicitly undefined optional portion. Omit the property when absent. PDF reading used isolated pypdf after system pdftotext was unavailable; an initial workspace uv resolution was stopped before installing unrelated dependencies.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T09:34:25.181Z","exitCode":2}
+```
+
+- 2026-11-14 dining tests initially ran during Vite dependency optimization/HMR and observed a page reload; rerun after stabilization. Scoped order-result assertions to their status element because analytics has a separate live region. Strict typecheck required typing the test response JSON. No physical XR or database acceptance implied.
+
+- 2026-11-14 discovery context exceeded the backend summary bound; condensed module responsibilities and kept activation details in quest-dining.md. Seven browser checks passed after dependency stabilization and scoped selectors.

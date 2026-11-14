@@ -1,0 +1,123 @@
+[
+  {
+    "id": "noka-oakland",
+    "brand": "N\u014dKA Ramen & Bar",
+    "name": "N\u014dKA Ramen & Bar",
+    "city": "Oakland",
+    "address": "90 Franklin St, Oakland, CA 94607",
+    "latitude": 37.7946098,
+    "longitude": -122.2755029,
+    "website": "https://nokaramen.com/",
+    "menuSource": "https://qr.codes/GMn9C8"
+  },
+  {
+    "id": "son-garden-menlo-park",
+    "brand": "Son & Garden",
+    "name": "Son & Garden",
+    "city": "Menlo Park",
+    "address": "1195 Merrill St, Menlo Park, CA 94025",
+    "latitude": 37.45496,
+    "longitude": -122.1835112,
+    "website": "https://sonandgarden.com/menlo-park",
+    "menuSource": "https://sonandgarden.com/menu"
+  },
+  {
+    "id": "son-garden-san-francisco",
+    "brand": "Son & Garden",
+    "name": "Son and Garden",
+    "city": "San Francisco",
+    "address": "700 Polk St, San Francisco, CA 94109",
+    "latitude": 37.7832435,
+    "longitude": -122.4190094,
+    "website": "https://sonandgarden.com/san-francisco",
+    "menuSource": "https://sonandgarden.com/menu"
+  },
+  {
+    "id": "farmhouse-los-angeles",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine LA",
+    "city": "Los Angeles",
+    "address": "5560 W Adams Blvd, Los Angeles, CA 90016",
+    "latitude": 34.0322533,
+    "longitude": -118.3643942,
+    "website": "https://farmhousethai.com/los-angeles",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-menlo-park",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine",
+    "city": "Menlo Park",
+    "address": "1165 Merrill St, Menlo Park, CA 94025",
+    "latitude": 37.4548649,
+    "longitude": -122.1833409,
+    "website": "https://farmhousethai.com/menlo-park",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-san-francisco",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine",
+    "city": "San Francisco",
+    "address": "710 Florida St, San Francisco, CA 94110",
+    "latitude": 37.76017909999999,
+    "longitude": -122.4112667,
+    "website": "https://farmhousethai.com/san-francisco",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-berkeley",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine",
+    "city": "Berkeley",
+    "address": "1549 Shattuck Ave., Berkeley, CA 94709",
+    "latitude": 37.8786083,
+    "longitude": -122.2687838,
+    "website": "https://farmhousethai.com/berkeley",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-oakland",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine",
+    "city": "Oakland",
+    "address": "336 Water St, Oakland, CA 94607",
+    "latitude": 37.7941932,
+    "longitude": -122.2754769,
+    "website": "https://farmhousethai.com/oakland",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-portland",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine",
+    "city": "Portland",
+    "address": "3354 SE Hawthorne Blvd, Portland, OR 97214",
+    "latitude": 45.51187909999999,
+    "longitude": -122.6297626,
+    "website": "https://farmhousethai.com/portland",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-pearl-district",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Cuisine | Pearl District",
+    "city": "Portland",
+    "address": "121 NW 9th Ave, Portland, OR 97209",
+    "latitude": 45.5238253,
+    "longitude": -122.6802712,
+    "website": "https://farmhousethai.com/pearl-district",
+    "menuSource": "https://farmhousethai.com/menu"
+  },
+  {
+    "id": "farmhouse-express",
+    "brand": "Farmhouse Kitchen Thai",
+    "name": "Farmhouse Kitchen Thai Express",
+    "city": "San Francisco",
+    "address": "700 Polk St, San Francisco, CA 94109",
+    "latitude": 37.7833359,
+    "longitude": -122.4190494,
+    "website": "https://farmhousethai.com/express",
+    "menuSource": "https://farmhousethai.com/menu"
+  }
+]

@@ -21,3 +21,5 @@ Accepted decisions express intent, not proof of completed implementation. Review
 - [0012 — Promote a main commit through staging and production](0012-main-environment-promotion.md) — Accepted; supersedes deployment branch selection in ADRs 0010 and 0011.
 - [0015 — Integration contracts and owner-evidence boundary](0015-integration-contracts-and-owner-evidence.md) — Proposed; S3-ARC-01 approval required.
 - [0016 — Unified Menu Ingestion Orchestration](0016-unified-menu-ingestion-orchestration.md) — Proposed; execution and resource architecture confirmation required.
+
+- [0017 — Quest discovery and unpaid pickup requests](0017-quest-dining-requests.md) — Proposed; user-requested scope, activation and hardware acceptance pending.

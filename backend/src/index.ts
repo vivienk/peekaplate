@@ -41,6 +41,7 @@ import {
   createQueueHandler as createObservationQueueHandler,
   type QueueHandlerServices,
 } from './consumer';
+import { createDiningRoutes, type DiningBindings } from './dining';
 import { CommandError, createDishRevision, type DishRevisionResult } from './dish-command';
 import {
   type PythonExtractor,
@@ -94,7 +95,7 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
   '00000000-0000-4000-8000-000000000123',
 ];
 
-export type Bindings = {
+export type Bindings = DiningBindings & {
   APP_ENV?: string;
   SYNTHETIC_REPORT_VENUE_ID?: string;
   AUTH_ISSUER?: string;
@@ -651,6 +652,10 @@ export function createApp(services: Dependencies = dependencies) {
     c.header('X-Request-ID', crypto.randomUUID());
     await next();
   });
+  app.route(
+    '/public/dining',
+    createDiningRoutes<Bindings>({ database: withDatabase, verify: services.verify }),
+  );
   app.get('/health', (c) =>
     c.json({
       status: 'ok',

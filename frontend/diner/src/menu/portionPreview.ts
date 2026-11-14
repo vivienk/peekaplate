@@ -45,6 +45,12 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && dish.cameraSample === true;
   const fixtureCamera =
     (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) && !!dish.previewPortion;
+  const diningPortion =
+    (import.meta.env.DEV ||
+      import.meta.env.VITE_PORTION_DEMO ||
+      import.meta.env.VITE_DINING_ENABLED === 'true') &&
+    new URLSearchParams(location.search).get('experience') === 'quest' &&
+    !!dish.portion;
   let sampleNotice = cameraSample
     ? `Camera test for ${dish.name}: shared sample cutout, not this dish’s appearance or portion size.`
     : fixtureCamera
@@ -247,7 +253,7 @@ export function bindPortionPreview(container: HTMLElement, dish: CompleteDish): 
         (reduced.matches ? '2.5D preview. Motion is reduced.' : 'Drag to tilt the plate');
       if (
         (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
-        (visualSelect || fixtureCamera || uploadedPortion)
+        (visualSelect || fixtureCamera || uploadedPortion || diningPortion)
       ) {
         if (import.meta.env.DEV && visualSelect && uploadedPortion === undefined) {
           const module = await import('./portion3d').catch(() => null);
