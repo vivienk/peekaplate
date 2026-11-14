@@ -212,3 +212,7 @@ The QA session was signed out after verification. No accounts or linked records
 were deleted. Keep PR143 and stacked PR146 unmerged until dashboard/setup flow
 acceptance; a hosted console deployment, production acceptance and complete
 owner/dashboard navigation are not included in these PASS results.
+
+## November 13 email refinement and reconciliation (143)
+
+Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.

@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/inter": "5.3.0",
     "@peekaplate/analytics": "workspace:*",
+    "@peekaplate/contracts": "workspace:*",
     "@peekaplate/tokens": "workspace:*",
     "@peekaplate/ui": "workspace:*",
     "@supabase/supabase-js": "2.119.0",

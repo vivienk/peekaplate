@@ -49,3 +49,17 @@ link rejection. The account holder entered credentials; the app/email results
 were independently observed. See [live acceptance](../../../docs/owner-auth.md).
 Outlook/mobile-client rendering and the complete hosted owner/dashboard journey
 remain NOT RUN. Keep PR143 and stacked PR146 unmerged until owner-flow acceptance.
+
+## Rania's spacing/button refinement — November 13, 2026
+
+The two sources now match the editable HTML downloads in Rania's reviewed file.
+Copy, links, placeholders, colours and branding are unchanged. Buttons have a
+48px outer height, natural content width and pill corners; logo/content spacing,
+tip/footer spacing and mobile outer padding follow her revision. Desktop Outlook
+may display square corners because it ignores border-radius; that is expected.
+
+Local Chromium previews passed at 360px and 1024px for both emails: 48px outer
+button height, content-sized width, pill corners and no horizontal overflow.
+This is browser rendering, not real email-client acceptance. These source changes
+have not been reapplied to hosted Supabase templates or sent as fresh real emails.
+Use the installation/reopen comparison above when scheduling that update.
