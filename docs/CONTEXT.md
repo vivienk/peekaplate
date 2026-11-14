@@ -226,7 +226,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9ac3dc587c667b12a7774e9c135fbe8b43271ddb3d1dccb763bf67c159f3449f"
+      "sourceFingerprint": "61fc5da95d58d1524c0043d796eb3293c9d93740a289be97d1141a5194f11606"
     },
     {
       "id": "console",
@@ -688,7 +688,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   "handoffs": [
     {
       "date": "2026-11-13",
-      "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. PR147 fixtures have no invented measurements.",
+      "summary": "PR162 binds owner plate dimensions and normalized boundary to exact original-photo SHA/dimensions and rendered foreground SHA. Local review upload offers round/rectangular measurements, boundary overlay and explicit confirmation; edits revoke confirmation. Tracked AR uses metric plate footprint with fixed scale; flat cutout and generated model appearance remain approximate and device validation pending. Plain camera is always approximate. Fullscreen Original photo/Return to AR restores direct access without replacing source bytes or changing back/actions. Direct drag-to-tilt uses seven captured-image layers and bounded pitch/yaw/roll; the calibrated footprint is outside the animated group. Keyboard/reset/reduced-motion and pointer cleanup are included. PR147 fixtures have no invented measurements.",
       "modules": [
         "diner",
         "contracts",
