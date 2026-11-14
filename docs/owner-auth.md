@@ -8,8 +8,10 @@ credentials and service-role/secret keys never belong in the frontend.
 
 PR #143 connects signup, confirmed-email sign-in, confirmation callbacks, session
 restoration and local-device sign-out. PR #146 adds password-recovery email and
-reset. Review and merge #143 before #146, after the dashboard/owner flow is ready.
-Both PRs remain unmerged during this integration task.
+reset. #143 and then #146 merged into develop on November 14. The
+[session bridge](owner-session-workspace.md) connects their verified identity to
+the owner shell/report client. Historical checks below retain their original
+dates and narrower acceptance boundaries.
 
 `/owner-auth.html` is the real auth entry. `/owner-sign-in.html` stays a labelled
 synthetic preview demo: never enter a real password there. PR previews cannot
@@ -36,10 +38,11 @@ than bypassing confirmation. A confirmed sign-in identifies a person only: the
 Worker still checks restaurant membership on every private restaurant request.
 No account creation, email confirmation or browser field creates that membership.
 
-The current backend has no authenticated restaurant-list/setup-progress contract.
-The auth entry therefore shows an honest signed-in handoff state, not an invented
-dashboard or publication status. Connect that state to #139 using server-returned
-venue/setup facts before merging or calling the owner flow complete.
+Authenticated `GET /staff/venues` returns current owner/editor restaurants. The
+auth entry opens the shell with that server-returned identity; no memberships
+shows a no-access state. Persisted setup, verification and complete menu/dashboard
+navigation remain separate. Membership does not establish those facts, and the
+live workspace never opens the synthetic dashboard App.
 
 ## Exact redirect allowlist
 
@@ -96,6 +99,15 @@ PR preview builds force the connection off even if ambient config is present.
 - Recovery must prove a fresh recovery exchange before changing a password;
   merely visiting the reset page or having a normal session is insufficient.
   Reset completion signs out and returns to Sign in. PR #146 owns that behavior.
+  If the password changed but server sign-out cannot be confirmed, the success
+  screen explicitly warns about that partial result instead of suggesting the
+  password update failed. The pinned SDK removes the local session before its
+  local-scope revocation request. Failed callback exchanges preserve any unrelated
+  existing owner session.
+  Recovery permission is bound to that exchange's token, and password updates use
+  an isolated in-memory SDK session. Another tab signing in/out or refreshing the
+  shared session cancels recovery; an in-flight account switch cannot change the
+  password request's actor. A cancelled attempt requires a fresh recovery email.
 
 ## Verification and remaining gates
 
@@ -214,5 +226,9 @@ acceptance; a hosted console deployment, production acceptance and complete
 owner/dashboard navigation are not included in these PASS results.
 
 ## November 13 email refinement and reconciliation (143)
+
+Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.
+
+## November 13 email refinement and reconciliation (146)
 
 Rania’s editable signup/reset email downloads are applied as source-only changes. Text, action/fallback placeholders, links, colours and branding are unchanged. Local Chromium render checks passed at 360px and 1024px for both templates, with 48px outer-height natural-width pill buttons and no horizontal overflow. Outlook’s square-corner fallback remains expected. Current develop updates and the latest auth screen/session safeguards are preserved. Both auth PRs remain unmerged pending the owner/dashboard handoff. No hosted email-template replacement, real email send, account deletion or provider configuration change is included.

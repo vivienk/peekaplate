@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
+import { OwnerWorkspace } from '../owner/OwnerWorkspace';
+import { readWorkspaceApiBase } from '../owner/workspace-api';
 import { readConfirmationCode } from './callback';
 import { OwnerAuth } from './OwnerAuth';
 import {
@@ -11,27 +13,65 @@ import {
 } from './supabase-auth';
 
 const isConfirmation = window.location.pathname === '/auth-confirm.html';
-let confirmationCode = isConfirmation ? readConfirmationCode(window.location.href) : null;
+const isRecovery = window.location.pathname === '/auth-reset.html';
+const isCallback = isConfirmation || isRecovery;
+let confirmationCode = isCallback
+  ? readConfirmationCode(window.location.href, isRecovery ? 'recovery' : 'confirmation')
+  : null;
 // No query-controlled redirects. Callback code stays in this tab's memory, never rendered/stored.
 if (window.location.search || window.location.hash)
   window.history.replaceState(null, '', window.location.pathname);
 const config = readOwnerAuthConfig(import.meta.env, window.location.origin);
 const runtime = config ? connectOwnerAuth(config) : null;
+const apiBase = readWorkspaceApiBase(import.meta.env.VITE_PUBLIC_API_URL);
 
 function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   const [owner, setOwner] = useState<SignedInOwner | null>(null);
   const [message, setMessage] = useState('');
   const [callbackState, setCallbackState] = useState(
-    isConfirmation ? (confirmationCode ? 'ready' : 'invalid') : 'none',
+    isCallback ? (confirmationCode ? 'ready' : 'invalid') : 'none',
   );
+  const [recoveryEmail, setRecoveryEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(!isConfirmation);
+  const [loading, setLoading] = useState(!isCallback);
+  const identityGeneration = useRef(0);
+  const refreshOwner = useCallback(async () => {
+    const generation = ++identityGeneration.current;
+    setOwner(null);
+    setLoading(true);
+    try {
+      const current = await auth.signedInOwner();
+      if (generation === identityGeneration.current) {
+        setOwner(current);
+        if (current) setMessage('');
+      }
+    } catch {
+      if (generation === identityGeneration.current) setOwner(null);
+    } finally {
+      if (generation === identityGeneration.current) setLoading(false);
+    }
+  }, [auth]);
+  const sessionExpired = useCallback(() => {
+    identityGeneration.current++;
+    setOwner(null);
+    setLoading(false);
+    setMessage('Your session could not be verified. Please sign in again.');
+  }, []);
+  const signOut = useCallback(async () => {
+    setBusy(true);
+    if (await auth.signOut()) {
+      identityGeneration.current++;
+      setOwner(null);
+      setLoading(false);
+    } else setMessage('Sign-out could not be confirmed. Try again.');
+    setBusy(false);
+  }, [auth]);
 
   useEffect(() => {
     function rejectChangedCallback() {
       confirmationCode = null;
       window.history.replaceState(null, '', window.location.pathname);
-      if (isConfirmation) setCallbackState('invalid');
+      if (isCallback) setCallbackState('invalid');
     }
     window.addEventListener('hashchange', rejectChangedCallback);
     window.addEventListener('popstate', rejectChangedCallback);
@@ -42,34 +82,35 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
   }, []);
 
   useEffect(() => {
-    if (isConfirmation) return;
-    let active = true;
-    const unsubscribe = auth.onSignedOut(() => setOwner(null));
-    void auth
-      .signedInOwner()
-      .then((current) => {
-        if (active) {
-          setOwner(current);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
+    const restore = !isCallback || callbackState === 'none';
+    const unsubscribe = auth.onSessionChange(() => {
+      identityGeneration.current++;
+      setOwner(null);
+      if (restore) void refreshOwner();
+    });
+    if (restore) void refreshOwner();
     return () => {
-      active = false;
+      identityGeneration.current++;
       unsubscribe();
     };
-  }, [auth]);
+  }, [auth, callbackState, refreshOwner]);
 
   async function signedIn() {
-    const current = await auth.signedInOwner();
-    if (!current) {
-      await auth.signOut();
-      setMessage('Your session could not be verified. Please sign in again.');
-    }
-    setOwner(current);
+    await refreshOwner();
+    setCallbackState('none');
   }
+
+  if (isRecovery && (callbackState === 'recovery' || callbackState === 'invalid'))
+    return (
+      <OwnerAuth
+        service={auth.service}
+        onSignedIn={signedIn}
+        onAccountCreated={signedIn}
+        initialStep={callbackState === 'recovery' ? 'reset' : 'reset-invalid'}
+        initialEmail={recoveryEmail}
+        key={callbackState}
+      />
+    );
 
   if (callbackState !== 'none')
     return (
@@ -79,14 +120,18 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
             ? 'Email confirmed'
             : callbackState === 'invalid'
               ? 'This confirmation link cannot be used'
-              : 'Confirm your email'}
+              : isRecovery
+                ? 'Open password reset'
+                : 'Confirm your email'}
         </h1>
         <p>
           {callbackState === 'invalid'
             ? 'Use the newest email in the same browser where you registered, or return to sign in.'
             : callbackState === 'confirmed'
               ? 'Your email is confirmed. Sign in to continue.'
-              : 'Select Continue to finish confirming your email. This does not grant access to a restaurant.'}
+              : isRecovery
+                ? 'Select Continue to verify the newest recovery link before choosing a password.'
+                : 'Select Continue to finish confirming your email. This does not grant access to a restaurant.'}
         </p>
         {callbackState === 'ready' && (
           <button
@@ -97,8 +142,16 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
               setBusy(true);
               const code = confirmationCode;
               confirmationCode = null;
-              const result = await auth.confirmEmail(code ?? '');
-              setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
+              if (isRecovery) {
+                const result = await auth.openRecovery(code ?? '');
+                if (result.kind === 'ready') {
+                  setRecoveryEmail(result.email);
+                  setCallbackState('recovery');
+                } else setCallbackState('invalid');
+              } else {
+                const result = await auth.confirmEmail(code ?? '');
+                setCallbackState(result.kind === 'confirmed' ? 'confirmed' : 'invalid');
+              }
               setBusy(false);
             }}
           >
@@ -120,27 +173,20 @@ function LiveOwnerAuth({ auth }: { auth: OwnerAuthRuntime }) {
 
   if (owner)
     return (
-      <main>
-        <h1>You’re signed in</h1>
-        <p>{owner.email}</p>
-        <p>
-          Restaurant setup and dashboard navigation are being connected. This page grants no
-          restaurant access.
-        </p>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            if (await auth.signOut()) setOwner(null);
-            else setMessage('Sign-out could not be confirmed. Try again.');
-            setBusy(false);
+      <>
+        <OwnerWorkspace
+          key={owner.id}
+          auth={auth}
+          owner={owner}
+          apiBase={apiBase}
+          onSessionExpired={sessionExpired}
+          onSignOut={() => {
+            void signOut();
           }}
-        >
-          Sign out
-        </button>
+          signingOut={busy}
+        />
         {message && <p role="alert">{message}</p>}
-      </main>
+      </>
     );
 
   return (

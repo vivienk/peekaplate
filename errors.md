@@ -3040,10 +3040,17 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
+
 
 ## Owner auth integration - November 11, 2026
 
 Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.
 
 
 ## Auth email editor - November 11, 2026
@@ -3055,6 +3062,18 @@ from the intermediate source. Source equality, persisted preview and the actual
 branded Gmail recovery email now pass. Use whole-document selection/paste and
 verify copied source rather than assuming a generic editor set-value replaces
 all Monaco content. No provider credentials, accounts or mail links are recorded.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
+```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -3480,3 +3499,22 @@ publication/event/receipt/outbox write and a successful identical retry: all
 140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
 push/PR creation because the operator email was unverified; after verification,
 the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.

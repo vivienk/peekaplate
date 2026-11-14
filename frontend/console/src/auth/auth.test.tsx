@@ -7,6 +7,7 @@ import {
   fullNameError,
   newPasswordError,
   rateLimitedBanner,
+  resetPasswordError,
   signInPasswordError,
   waitText,
 } from './copy';
@@ -31,6 +32,11 @@ describe('owner sign-in field checks (S4-FE-04.1)', () => {
     expect(newPasswordError('12345678')).toBeUndefined();
     // Characters, not UTF-16 units: four emoji are four characters.
     expect(newPasswordError('🍅🍅🍅🍅')).toBe('Use at least 8 characters');
+  });
+
+  it('asks for a new password on S04 without inventing rules', () => {
+    expect(resetPasswordError('')).toBe('Enter a new password');
+    expect(resetPasswordError('x')).toBeUndefined();
   });
 
   it('asks for a full name that is not just spaces', () => {
@@ -60,7 +66,13 @@ describe('too many attempts', () => {
 });
 
 describe('until the auth provider is connected', () => {
-  it('answers every call as unavailable, never as a sign-in', async () => {
+  it('answers every call as unavailable, never as a sign-in or a sent link', async () => {
+    expect(await notConnectedAuthService.requestPasswordReset('owner@restaurant.com')).toEqual({
+      kind: 'unavailable',
+    });
+    expect(await notConnectedAuthService.resetPassword('new-password')).toEqual({
+      kind: 'unavailable',
+    });
     expect(await notConnectedAuthService.checkEmail('owner@restaurant.com')).toEqual({
       kind: 'unavailable',
     });
@@ -103,10 +115,23 @@ describe('OwnerAuth screens', () => {
     expect(page).toContain('aria-label="Show password"');
   });
 
-  it('hides "Forgot password?" until recovery exists', () => {
-    const signIn = { initialStep: 'signin' as const, initialEmail: 'owner@restaurant.com' };
-    expect(html(signIn)).not.toContain('Forgot password?');
-    expect(html({ ...signIn, onForgotPassword: () => {} })).toContain('Forgot password?');
+  it('offers "Forgot password?" on Sign in', () => {
+    expect(html({ initialStep: 'signin', initialEmail: 'owner@restaurant.com' })).toContain(
+      'Forgot password?',
+    );
+  });
+
+  it('opens S04 from the reset link with the logo and a new-password field', () => {
+    const page = html({ initialStep: 'reset' });
+    expect(page).toContain('Reset your password');
+    expect(page).toContain('autoComplete="new-password"');
+    expect(page).toContain('pp-auth__brand');
+  });
+
+  it('shows the expired-link screen without the logo', () => {
+    const page = html({ initialStep: 'reset-invalid' });
+    expect(page).toContain('This reset link can’t be used');
+    expect(page).not.toContain('pp-auth__brand');
   });
 
   it('create account asks for a new password with the 8-character hint', () => {

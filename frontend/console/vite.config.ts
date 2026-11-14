@@ -31,6 +31,7 @@ export default defineConfig({
           : {
               ownerAuth: page('owner-auth.html'),
               authConfirm: page('auth-confirm.html'),
+              authReset: page('auth-reset.html'),
             }),
       },
     },

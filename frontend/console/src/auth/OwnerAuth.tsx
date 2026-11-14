@@ -1,8 +1,10 @@
-// S4-FE-04.1: owner account access. E1 Enter email, S01 Create account and S02 Sign in (Figma
-// l7A9n8tACJic0FIhY49Zjw, nodes 1912:9859, 1447:10910, 1918:9980). Every provider call goes through
+// S4-FE-04: owner account access. E1 Enter email, S01 Create account and S02 Sign in (Figma
+// l7A9n8tACJic0FIhY49Zjw, nodes 1912:9859, 1447:10910, 1918:9980), and password recovery: S03 Forgot
+// password and S04 Reset password (S03/S04 handoff). Every provider call goes through
 // OwnerAuthService; these screens only react to its results.
 import { type FormEvent, type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { TextField } from '../foundations/TextField';
+import { Button } from '../ui';
 import logo from './assets/logo.png';
 import type { OwnerAuthService, RateLimited } from './auth-service';
 import {
@@ -12,13 +14,16 @@ import {
   fullNameError,
   newPasswordError,
   rateLimitedBanner,
+  resetPasswordError,
   signInPasswordError,
   TERMS_ERROR,
 } from './copy';
 import {
   BackLink,
+  DoneMark,
   EmailField,
   ErrorBanner,
+  ErrorMark,
   LockedEmailField,
   MailIllustration,
   OrDivider,
@@ -29,10 +34,28 @@ import {
 } from './parts';
 import './auth.css';
 
-export type AuthStep = 'email' | 'create' | 'signin' | 'confirm-email';
+export type AuthStep =
+  | 'email'
+  | 'create'
+  | 'signin'
+  | 'confirm-email'
+  // S03 Forgot password, then S03 Check email.
+  | 'forgot'
+  | 'forgot-sent'
+  // S04, opened from the reset email: the form, Password updated, and This reset link can't be used.
+  | 'reset'
+  | 'reset-done'
+  | 'reset-signout-pending'
+  | 'reset-invalid';
 
-// Result screens show no logo (Figma "Check your email").
-const WITHOUT_BRAND: readonly AuthStep[] = ['confirm-email'];
+// Result screens show no logo (Figma "Check your email", "Password updated", "link can't be used").
+const WITHOUT_BRAND: readonly AuthStep[] = [
+  'confirm-email',
+  'forgot-sent',
+  'reset-done',
+  'reset-signout-pending',
+  'reset-invalid',
+];
 
 export type OwnerAuthProps = {
   service: OwnerAuthService;
@@ -41,8 +64,8 @@ export type OwnerAuthProps = {
   // The provider created an account that needs no email confirmation. The caller opens the first
   // setup step. When confirmation is required the screens show "Check your email" instead.
   onAccountCreated: () => void;
-  // Opens password recovery (S03). Without it the "Forgot password?" link is not shown.
-  onForgotPassword?: () => void;
+  // 'reset' when the owner arrives from the reset email; 'reset-invalid' when the caller already
+  // knows the link cannot be used (the S04 handoff proposes checking it when the page opens).
   initialStep?: AuthStep;
   initialEmail?: string;
 };
@@ -51,7 +74,6 @@ export function OwnerAuth({
   service,
   onSignedIn,
   onAccountCreated,
-  onForgotPassword,
   initialStep = 'email',
   initialEmail = '',
 }: OwnerAuthProps) {
@@ -60,6 +82,8 @@ export function OwnerAuth({
   // Focus moves to the new screen's heading only after the owner moves between screens, never on
   // first load.
   const [moved, setMoved] = useState(false);
+  // How long "Resend email" waits after a reset link is sent, if the service said.
+  const [resendWait, setResendWait] = useState<number>();
 
   const go = (next: AuthStep, nextEmail = email) => {
     setEmail(nextEmail);
@@ -103,7 +127,6 @@ export function OwnerAuth({
             service={service}
             onRoute={go}
             onSignedIn={onSignedIn}
-            {...(onForgotPassword ? { onForgotPassword } : {})}
           />
         )}
         {step === 'confirm-email' && (
@@ -114,6 +137,50 @@ export function OwnerAuth({
             service={service}
             onRoute={go}
           />
+        )}
+        {step === 'forgot' && (
+          <ForgotStep
+            key="forgot"
+            email={email}
+            focusHeading={moved}
+            service={service}
+            onRoute={go}
+            onSent={(address, wait) => {
+              setResendWait(wait);
+              go('forgot-sent', address);
+            }}
+          />
+        )}
+        {step === 'forgot-sent' && (
+          <ForgotSentStep
+            key="forgot-sent"
+            email={email}
+            focusHeading={moved}
+            service={service}
+            onRoute={go}
+            resendAfterSeconds={resendWait}
+          />
+        )}
+        {step === 'reset' && (
+          <ResetStep
+            key="reset"
+            email={email}
+            focusHeading={moved}
+            service={service}
+            onRoute={go}
+          />
+        )}
+        {(step === 'reset-done' || step === 'reset-signout-pending') && (
+          <ResetDoneStep
+            key="reset-done"
+            email={email}
+            focusHeading={moved}
+            onRoute={go}
+            signOutPending={step === 'reset-signout-pending'}
+          />
+        )}
+        {step === 'reset-invalid' && (
+          <ResetInvalidStep key="reset-invalid" email={email} focusHeading={moved} onRoute={go} />
         )}
       </div>
     </div>
@@ -439,8 +506,7 @@ function SignInStep({
   service,
   onRoute,
   onSignedIn,
-  onForgotPassword,
-}: StepProps & { onSignedIn: () => void; onForgotPassword?: () => void }) {
+}: StepProps & { onSignedIn: () => void }) {
   const heading = useHeadingFocus(focusHeading);
   const passwordInput = useRef<HTMLInputElement>(null);
   const [password, setPassword] = useState('');
@@ -509,16 +575,14 @@ function SignInStep({
               setError(undefined);
             }}
           />
-          {onForgotPassword && (
-            <button
-              type="button"
-              className="pp-auth-link pp-auth__forgot"
-              disabled={busy}
-              onClick={onForgotPassword}
-            >
-              Forgot password?
-            </button>
-          )}
+          <button
+            type="button"
+            className="pp-auth-link pp-auth__forgot"
+            disabled={busy}
+            onClick={() => onRoute('forgot')}
+          >
+            Forgot password?
+          </button>
         </div>
         <SubmitButton
           busy={busy}
@@ -621,6 +685,302 @@ function ConfirmEmailStep({ email, focusHeading, service, onRoute }: StepProps) 
     >
       We’ve sent a confirmation link to your email address. Check your inbox and spam folder to
       complete your account setup.
+    </StatusPanel>
+  );
+}
+
+// "Back to sign in" and "Sign in" open S02 when the email is known, otherwise Enter email (E1).
+function signInStep(email: string): AuthStep {
+  return email ? 'signin' : 'email';
+}
+
+// S03 Forgot password: Default, Validation error and Request failed (S03 handoff).
+function ForgotStep({
+  email,
+  focusHeading,
+  service,
+  onRoute,
+  onSent,
+}: StepProps & { onSent: (email: string, resendAfterSeconds: number | undefined) => void }) {
+  const heading = useHeadingFocus(focusHeading);
+  const input = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(email);
+  const [error, setError] = useState<string>();
+  const [banner, setBanner] = useState<BannerCopy | null>(null);
+  const [failed, setFailed] = useState(false);
+  const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (running.current || cooldown.blocked) return;
+    const problem = emailError(value);
+    setError(problem);
+    if (problem) {
+      input.current?.focus();
+      return;
+    }
+    const address = value.trim();
+    setBanner(null);
+    const result = await run(() => service.requestPasswordReset(address), {
+      kind: 'failed' as const,
+    });
+    if (!result) return;
+    if (result.kind === 'sent') {
+      onSent(address, result.resendAfterSeconds);
+      return;
+    }
+    if (result.kind === 'rate_limited') {
+      cooldown.start(result);
+      setBanner(rateLimitedBanner(result.retryAfterSeconds));
+    } else {
+      // The entered email is kept; "Try again" sends the same request (S03 handoff, section 5).
+      setFailed(result.kind === 'failed');
+      setBanner(result.kind === 'unavailable' ? BANNERS.unavailable : BANNERS.resetLinkFailed);
+    }
+  }
+
+  return (
+    <>
+      <StepHeader heading={heading} title="Forgot password?">
+        Enter the email address you use for PeekaPlate and we’ll send you a link to reset your
+        password
+      </StepHeader>
+      {banner && <ErrorBanner copy={banner} />}
+      <form className="pp-auth__form" noValidate onSubmit={submit}>
+        <EmailField
+          label="Email address"
+          value={value}
+          inputRef={input}
+          readOnly={busy}
+          {...(error ? { error } : {})}
+          onChange={(next) => {
+            setValue(next);
+            setError(undefined);
+          }}
+        />
+        <SubmitButton
+          busy={busy}
+          blocked={cooldown.blocked}
+          label={failed ? 'Try again' : 'Send reset link'}
+          busyLabel="Sending…"
+        />
+      </form>
+      <BackLink disabled={busy} onClick={() => onRoute(signInStep(email))} />
+    </>
+  );
+}
+
+// S03 Check email, with Resend email (available, waiting, resent), Edit email address and Back to
+// sign in. The text never confirms that an account exists (S03 handoff, section 4).
+function ForgotSentStep({
+  email,
+  focusHeading,
+  service,
+  onRoute,
+  resendAfterSeconds,
+}: StepProps & { resendAfterSeconds: number | undefined }) {
+  const heading = useHeadingFocus(focusHeading);
+  const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
+  const [status, setStatus] = useState<'sent' | 'resent' | 'failed' | BannerCopy>('sent');
+
+  // The link was just sent, so Resend starts in its waiting state. Runs once, when the screen opens.
+  useEffect(() => {
+    cooldown.start({
+      kind: 'rate_limited',
+      retryAfterSeconds: resendAfterSeconds ?? DEFAULT_RESEND_WAIT_SECONDS,
+    });
+  }, []);
+
+  async function resend() {
+    if (running.current || cooldown.blocked) return;
+    const result = await run(() => service.requestPasswordReset(email), {
+      kind: 'failed' as const,
+    });
+    if (!result) return;
+    if (result.kind === 'sent') {
+      setStatus('resent');
+      cooldown.start({
+        kind: 'rate_limited',
+        retryAfterSeconds: result.resendAfterSeconds ?? DEFAULT_RESEND_WAIT_SECONDS,
+      });
+    } else if (result.kind === 'rate_limited') {
+      setStatus(rateLimitedBanner(result.retryAfterSeconds));
+      cooldown.start(result);
+    } else {
+      setStatus(result.kind === 'unavailable' ? BANNERS.unavailable : 'failed');
+    }
+  }
+
+  return (
+    <StatusPanel
+      art={<MailIllustration />}
+      title="Check your email"
+      heading={heading}
+      actions={
+        <>
+          <ResendGroup
+            busy={busy}
+            blocked={cooldown.blocked}
+            status={resendStatus(status, cooldown.blocked)}
+            onResend={resend}
+          />
+          <div className="pp-auth-status__links">
+            <OrDivider />
+            <button
+              type="button"
+              className="pp-auth-link pp-auth-link--accent"
+              disabled={busy}
+              onClick={() => onRoute('forgot')}
+            >
+              Edit email address
+            </button>
+            <BackLink disabled={busy} onClick={() => onRoute(signInStep(email))} />
+          </div>
+        </>
+      }
+    >
+      If an account exists for this email address, we’ll send a link to reset your password. Check
+      your inbox and spam folder.
+    </StatusPanel>
+  );
+}
+
+// S04 Reset password: Default, Validation error and Request failed (S04 handoff).
+function ResetStep({ email, focusHeading, service, onRoute }: StepProps) {
+  const heading = useHeadingFocus(focusHeading);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string>();
+  const [banner, setBanner] = useState<BannerCopy | null>(null);
+  const { busy, run, running } = useRequest();
+  const cooldown = useCooldown();
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (running.current || cooldown.blocked) return;
+    const problem = resetPasswordError(password);
+    setError(problem);
+    if (problem) {
+      passwordInput.current?.focus();
+      return;
+    }
+    setBanner(null);
+    const result = await run(() => service.resetPassword(password), { kind: 'failed' as const });
+    if (!result) return;
+    if (result.kind === 'updated')
+      onRoute(
+        result.signOutPending ? 'reset-signout-pending' : 'reset-done',
+        result.email ?? email,
+      );
+    else if (result.kind === 'invalid_link') onRoute('reset-invalid');
+    else if (result.kind === 'weak_password') setBanner(BANNERS.weakPassword);
+    else if (result.kind === 'same_password')
+      setBanner({
+        title: 'Choose a different password',
+        body: 'Your new password must differ from the current one.',
+      });
+    else if (result.kind === 'rate_limited') {
+      cooldown.start(result);
+      setBanner(rateLimitedBanner(result.retryAfterSeconds));
+    } else {
+      // Whether the password is kept after a failure is not decided (S04 handoff, section 6); it is
+      // kept here so the same request can be sent again.
+      setBanner(result.kind === 'unavailable' ? BANNERS.unavailable : BANNERS.resetFailed);
+    }
+  }
+
+  return (
+    <>
+      <StepHeader heading={heading} title="Reset your password">
+        Choose a new password for your PeekaPlate account.
+      </StepHeader>
+      {banner && <ErrorBanner copy={banner} />}
+      <form className="pp-auth__form" noValidate onSubmit={submit}>
+        <PasswordField
+          label="New password"
+          value={password}
+          inputRef={passwordInput}
+          autoComplete="new-password"
+          placeholder="Enter your new password"
+          hint="Choose a password that’s hard to guess."
+          readOnly={busy}
+          {...(error ? { error } : {})}
+          onChange={(next) => {
+            setPassword(next);
+            setError(undefined);
+          }}
+        />
+        <SubmitButton
+          busy={busy}
+          blocked={cooldown.blocked}
+          label="Reset password"
+          busyLabel="Resetting…"
+        />
+      </form>
+      <BackLink disabled={busy} onClick={() => onRoute(signInStep(email))} />
+    </>
+  );
+}
+
+type ResultStepProps = {
+  email: string;
+  focusHeading: boolean;
+  onRoute: (step: AuthStep, email?: string) => void;
+};
+
+// S04 Password updated. The owner is not signed in automatically; Sign in opens S02.
+function ResetDoneStep({
+  email,
+  focusHeading,
+  onRoute,
+  signOutPending = false,
+}: ResultStepProps & { signOutPending?: boolean }) {
+  const heading = useHeadingFocus(focusHeading);
+  return (
+    <StatusPanel
+      art={<DoneMark />}
+      title="Password updated"
+      heading={heading}
+      actions={
+        <Button
+          className="pp-auth-btn pp-auth-btn--primary"
+          onClick={() => onRoute(signInStep(email))}
+        >
+          Sign in
+        </Button>
+      }
+    >
+      Your password has been changed. Sign in with your new password.
+      {signOutPending && (
+        <span role="alert">
+          {' '}
+          We could not confirm server sign-out. Close this page, then sign in again.
+        </span>
+      )}
+    </StatusPanel>
+  );
+}
+
+// S04 Invalid or expired link: Request a new link opens S03.
+function ResetInvalidStep({ email, focusHeading, onRoute }: ResultStepProps) {
+  const heading = useHeadingFocus(focusHeading);
+  return (
+    <StatusPanel
+      art={<ErrorMark />}
+      title="This reset link can’t be used"
+      heading={heading}
+      actions={
+        <div className="pp-auth-status__actions">
+          <Button className="pp-auth-btn pp-auth-btn--primary" onClick={() => onRoute('forgot')}>
+            Request a new link
+          </Button>
+          <BackLink onClick={() => onRoute(signInStep(email))} />
+        </div>
+      }
+    >
+      This link may have expired or be invalid. Request a new link to continue.
     </StatusPanel>
   );
 }

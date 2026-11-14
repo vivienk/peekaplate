@@ -1,9 +1,12 @@
 // Read once, then remove all URL credentials before mounting or starting provider calls.
-export function readConfirmationCode(url: string): string | null {
+export function readConfirmationCode(
+  url: string,
+  purpose: 'confirmation' | 'recovery' = 'confirmation',
+): string | null {
   const callback = new URL(url);
   const codes = callback.searchParams.getAll('code');
   if (
-    callback.pathname !== '/auth-confirm.html' ||
+    callback.pathname !== (purpose === 'recovery' ? '/auth-reset.html' : '/auth-confirm.html') ||
     callback.hash ||
     codes.length !== 1 ||
     [...callback.searchParams.keys()].some((key) => key !== 'code')

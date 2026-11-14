@@ -44,10 +44,26 @@ export type CreateAccountResult =
   | { kind: 'unavailable' }
   | RateLimited;
 
+// S03: request a password reset link. "sent" must be the answer whether or not an account exists
+// for the address, so the screen never reveals which emails are registered (S03 handoff, section 4).
+// resendAfterSeconds is how long "Resend email" stays unavailable, if the service says.
+export type ResetLinkResult =
+  | { kind: 'sent'; resendAfterSeconds?: number }
+  | { kind: 'failed' }
+  | { kind: 'unavailable' }
+  | RateLimited;
+
 // "Resend email" on Check your email after Create account (Figma S03 layout). resendAfterSeconds is
 // how long the button stays unavailable, if the service says.
-export type ResendConfirmationResult =
-  | { kind: 'sent'; resendAfterSeconds?: number }
+export type ResendConfirmationResult = ResetLinkResult;
+
+// S04: set a new password from the reset link. email, when known, lets "Sign in" open S02 directly.
+export type ResetPasswordResult =
+  | { kind: 'updated'; email?: string; signOutPending?: true }
+  | { kind: 'weak_password' }
+  | { kind: 'same_password' }
+  // The link is invalid, expired or already used (S04 handoff, section 2).
+  | { kind: 'invalid_link' }
   | { kind: 'failed' }
   | { kind: 'unavailable' }
   | RateLimited;
@@ -67,6 +83,9 @@ export interface OwnerAuthService {
   checkEmail(email: string): Promise<EmailCheckResult>;
   signIn(request: SignInRequest): Promise<SignInResult>;
   createAccount(request: CreateAccountRequest): Promise<CreateAccountResult>;
+  requestPasswordReset(email: string): Promise<ResetLinkResult>;
+  // Uses the recovery session from the reset link; the link itself never reaches the screens.
+  resetPassword(newPassword: string): Promise<ResetPasswordResult>;
   // Optional until the provider supports it; without it Check your email shows no Resend button.
   resendConfirmation?(email: string): Promise<ResendConfirmationResult>;
 }
@@ -76,4 +95,6 @@ export const notConnectedAuthService: OwnerAuthService = {
   checkEmail: async () => ({ kind: 'unavailable' }),
   signIn: async () => ({ kind: 'unavailable' }),
   createAccount: async () => ({ kind: 'unavailable' }),
+  requestPasswordReset: async () => ({ kind: 'unavailable' }),
+  resetPassword: async () => ({ kind: 'unavailable' }),
 };
