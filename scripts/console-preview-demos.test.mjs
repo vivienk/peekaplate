@@ -89,3 +89,16 @@ test('only the preview workflow turns the demo flag on', async () => {
     assert.doesNotMatch(await read(other), /PEEKAPLATE_PREVIEW_DEMOS/);
   }
 });
+
+// The FE-06.1 owner menu integration harness calls the real staging API with a pasted token. It is
+// for the local dev server only (the API allows that origin), so no build ever contains it.
+test('no console build contains the owner menu integration harness', async (t) => {
+  for (const previewDemos of [false, true]) {
+    const dir = await build(t, previewDemos);
+    const files = await readdir(dir);
+    assert.ok(!files.includes('owner-menu-harness.html'));
+    for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /harness/);
+    const scripts = (await pageScripts(dir, 'index.html')).join('\n');
+    assert.doesNotMatch(scripts, /Integration harness/);
+  }
+});

@@ -218,12 +218,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "938a1e45b102a63bab3ec33c2819ebfccd0314962d908d1d07d6e9b2a6152ace"
+      "sourceFingerprint": "9355eb4048be7ce42cb6f69426c66f7c654b4e58c21cf7cc14e977198be1d816"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Stacked recovery binds purpose/session and isolates password changes in memory. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Stacked recovery binds purpose/session and isolates password changes in memory. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate. FE-06.2 adds an owner menu client.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -285,7 +285,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-auth.spec.ts",
         "frontend/console/auth-reset.html",
         "frontend/console/src/auth/recovery-provider.test.tsx",
-        "tests/e2e/owner-recovery.spec.ts"
+        "tests/e2e/owner-recovery.spec.ts",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/api.test.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/jobs.test.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/dishForm.test.ts",
+        "frontend/console/src/owner-menu/fixtures.test-helpers.ts",
+        "frontend/console/src/owner-menu/evidence.ts",
+        "frontend/console/src/owner-menu/evidence.test.ts",
+        "frontend/console/src/owner-menu/harness.tsx",
+        "frontend/console/owner-menu-harness.html",
+        "scripts/console-preview-demos.test.mjs",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/DishEditor.test.tsx",
+        "frontend/console/src/owner-menu/dishEditor.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -295,7 +310,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3e792a869a0e1d87cb23674ba88b33b20b532865c25f4103702b9de1cec23e47"
+      "sourceFingerprint": "e0a6ac5692794851b448e64c1d572192975b1200dceaa4717f2dca729a8b1bd2"
     },
     {
       "id": "backend",
@@ -603,7 +618,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "91feea8dab260e402258bf4786b287eb0154d6701de0faa51eb258330424248f"
+      "sourceFingerprint": "77da3ac6111716cad6d78a1dea6685f6de45d8afc2ac7f4b1cae6564626d8d1b"
     },
     {
       "id": "agents",
@@ -797,6 +812,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-12",
+      "summary": "FE-06.2 owner menu client: frontend/console/src/owner-menu. createOwnerMenuClient(baseUrl, getToken, fetch) wraps docs/owner-menu-workspace.md with contract-validated requests, bearer token, no cookies and typed OwnerMenuApiError (isConflict/isRetryable). menuProcessingState(jobs) gives Screen 8 one phase (uploading/processing/ready/partial/empty/failed/cancelled) with counts only. dishForm maps review items and manual drafts to Screen 9 values: OCR ingredients stay proposed, allergens unknown; extracted saves send only changed fields as review corrections, manual saves replace the snapshot; approval binds the review version and never publishes. DishEditor is Screen 9 on these values (adapted from #105 DishForm, no AI drafting): scanned dishes show menu evidence and cannot save allergens yet. Requests time out (30 s, uploads 120 s). owner-menu-harness.html (pnpm dev at 127.0.0.1:5174 only, excluded from every build) runs upload, job status, drafts, fields with evidence/unknowns and retry/cancel against staging for FE-06.1.",
+      "modules": [
+        "console"
+      ],
+      "paths": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/jobs.ts"
+      ],
+      "next": "Wire into Nifemi's Screens 6-8 and Jeffin's Screen 9 (#105) once they land, with the staff token from #143/#146. Hosted staging journey (FE-06.4) and error/resume regression (FE-06.5) follow."
+    },
+    {
       "date": "2026-11-13",
       "modules": [
         "backend"
@@ -917,21 +945,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console"
       ],
       "summary": "PR143 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
-      "sources": [
-        "frontend/console/email-templates/confirm-signup.html",
-        "frontend/console/email-templates/reset-password.html",
-        "frontend/console/email-templates/README.md",
-        "docs/owner-auth.md",
-        "frontend/console/vite.config.ts"
-      ],
-      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR146 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
       "sources": [
         "frontend/console/email-templates/confirm-signup.html",
         "frontend/console/email-templates/reset-password.html",
