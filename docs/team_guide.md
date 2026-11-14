@@ -822,3 +822,11 @@ checks](owner-report-staging.md). Deployment evidence belongs in the narrow
 owner-report release PR; merging into develop alone does not deploy the Worker.
 
 Current release and hosted results: [PR 135](https://github.com/vivienk/peekaplate/pull/135).
+
+## Owner session/workspace release
+
+The merged owner connection is Auth #143/#146 → bridge #179 → shell #125/#139 →
+report reader #128. Use the [workspace guide](owner-session-workspace.md) for the
+exact staging entry, permission states, release evidence boundary and next UI/API
+connections. Signup alone never grants restaurant access. Existing report
+acceptance remains restricted to its labelled synthetic staging venue.

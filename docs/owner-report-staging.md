@@ -61,3 +61,12 @@ membership denial and unchanged provider bindings. Record the exact main SHA,
 Worker version, measured checks and any gaps in the release PR before announcing
 hosted readiness. The [release PR 135 deployment comment](https://github.com/vivienk/peekaplate/pull/135) is the current hosted evidence;
 local checks alone do not establish it.
+
+## Workspace release alignment
+
+The merged owner-workspace release also promotes the agreed report interval
+`[start_time, end_time)`: observations and activity checkpoints exactly at the
+upper boundary belong to the next interval. Actual PostgreSQL exposure and
+checkpoint cases reproduce the old inclusive-end behavior and verify the
+correction. This does not enable production reports or certify data freshness.
+See the [workspace guide](owner-session-workspace.md) for entry and access states.

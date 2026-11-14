@@ -2639,3 +2639,32 @@ PR174 promotion resolves context/package/error-ledger conflicts against main, ke
 Automatic restaurant URLs: main release includes only the reviewed publication/link/routing slice. Local source checks pass; exact-main release checks and hosted acceptance are tracked separately. No unrelated develop features, production DNS, .io or provider changes are promoted.
 
 The additional real database allocation-failure test verifies complete publication rollback and retry. Source branch results: 320 SQL assertions and 140 Worker/database tests pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T20:27:48.761Z","exitCode":1}
+```
+
+## 2026-11-14 — narrow owner-workspace release preparation
+
+- Resolved local tooling: root `pnpm exec wrangler` could not find the package-local
+  CLI; rerunning from `backend` used the pinned Wrangler successfully. No deployment
+  happened during this failure.
+- Resolved local tooling: inline PowerShell backticks corrupted a context-reading
+  expression. Moved the helper to an external Node module and used JSON boundaries;
+  context refresh then passed. No credentials or runtime behavior were involved.
+- A preparation assertion correctly rejected copying the whole backend context
+  node, which referenced unrelated develop-only modules. Added only workspace
+  paths to the existing main backend node and kept the wider release excluded.
+
+The first release database run passed 235 SQL assertions and 110 integration
+tests, then the unchanged local demo command timed out. An isolated identical
+command and a complete rerun passed. The transient cause is unconfirmed; no
+timeout was raised or runtime workaround added. Separately, two deliberate
+negative controls reproduced the existing inclusive-end report defect; the
+merged half-open query passed both actual PostgreSQL cases.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T20:35:08.044Z","exitCode":1}
+```

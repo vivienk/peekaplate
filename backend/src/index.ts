@@ -21,6 +21,7 @@ import {
   type ObservationQueueEnvelope,
   ObservationQueueEnvelopeSchema,
   OwnerDishFieldsSchema,
+  OwnerWorkspaceResponseSchema,
   type PublicMenuResponse,
   PublishMenuSchema,
   RestaurantSlugSchema,
@@ -75,6 +76,7 @@ import {
 import { ingestObservations } from './observation-ingest';
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
+import { listOwnerVenues } from './owner-workspace';
 import {
   createPublicMenuResponse,
   menuJwks,
@@ -144,6 +146,7 @@ export type Bindings = {
 
 type Dependencies = {
   verify: (authorization: string, env: Bindings) => Promise<string>;
+  readOwnerVenues?: (actorId: string, env: Bindings) => ReturnType<typeof listOwnerVenues>;
   execute: (
     actorId: string,
     venueId: string,
@@ -365,6 +368,8 @@ async function withDatabase<T>(env: Bindings, run: (client: Client) => Promise<T
 }
 
 const dependencies: Dependencies = {
+  readOwnerVenues: (actorId, env) =>
+    withDatabase(env, (client) => listOwnerVenues(client, actorId)),
   async verify(authorization, env) {
     if (!env.AUTH_ISSUER) throw new AuthUnavailableError();
     const local = env.APP_ENV === 'local';
@@ -842,6 +847,32 @@ export function createApp(services: Dependencies = dependencies) {
       stage: 'foundation',
     } satisfies HealthResponse),
   );
+  app.use(
+    '/staff/venues',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/staff/venues', async (c) => {
+    const env = c.env ?? {};
+    if (!['local', 'staging'].includes(env.APP_ENV ?? ''))
+      return c.json({ error: 'not_found' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer \S+$/i.test(authorization))
+      return c.json({ error: 'unauthorized' }, 401);
+    const actorId = await services.verify(authorization, env);
+    if (new URL(c.req.url).search) return c.json({ error: 'invalid_request' }, 400);
+    if (!services.readOwnerVenues) throw new AuthUnavailableError();
+    const response = OwnerWorkspaceResponseSchema.safeParse({
+      actorId,
+      venues: await services.readOwnerVenues(actorId, env),
+    });
+    if (!response.success) throw new AuthUnavailableError();
+    return c.json(response.data);
+  });
   app.get('/.well-known/jwks.json', async (c) => {
     if (!services.readMenuJwks) throw new AuthUnavailableError();
     c.header('Content-Type', 'application/jwk-set+json');
