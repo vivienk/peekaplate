@@ -3551,3 +3551,12 @@ The first browser run overlapped source formatting/HMR; a later provider run ove
 The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
 
 The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.
