@@ -107,3 +107,14 @@ export function createPortionXRPanel() {
     },
   };
 }
+
+/** Derive the current selecting input ray; never reuse another controller's pose. */
+export function portionInputRay(frame: XRFrame, space: XRReferenceSpace, input?: XRInputSource) {
+  const pose = input ? frame.getPose(input.targetRaySpace, space) : frame.getViewerPose(space);
+  if (!pose) return null;
+  const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
+  return new THREE.Ray(
+    new THREE.Vector3().setFromMatrixPosition(matrix),
+    new THREE.Vector3(0, 0, -1).transformDirection(matrix),
+  );
+}

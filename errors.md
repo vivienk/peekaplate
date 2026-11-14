@@ -2877,3 +2877,6 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - 2026-11-14 context check rejected an overlong diner summary. Condensed responsibilities and retained detailed behavior in the linked preview document and bounded handoff.
 
 - 2026-11-14 portrait regression ran with Desktop Chrome fine-pointer CSS, so the coarse-pointer rotate hint correctly stayed hidden. The combined Quest/phone config now enables touch, matching the existing phone test contract.
+
+- 2026-11-14 independent review found selection could reuse the other controller placement reticle. Recompute the surface intersection from the selecting input and retain that active input for subsequent frames.
+- 2026-11-14 dry-run build passed with an existing xr-overlay CSS minifier warning and a sandbox-denied Wrangler log write; no remote deployment was performed.

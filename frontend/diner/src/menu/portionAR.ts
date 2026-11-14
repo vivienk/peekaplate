@@ -6,6 +6,7 @@ import {
   intersectTable,
   isQuestBrowser,
   type PortionXRFrame,
+  portionInputRay,
   portionXRSessionOptions,
 } from './portionXR';
 
@@ -196,11 +197,9 @@ export function bindPortionAR(
     }
     const rayFor = (frame: XRFrame, input?: XRInputSource) => {
       if (!space) return false;
-      const pose = input ? frame.getPose(input.targetRaySpace, space) : frame.getViewerPose(space);
-      if (!pose) return false;
-      const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
-      xrRay.origin.setFromMatrixPosition(matrix);
-      xrRay.direction.set(0, 0, -1).transformDirection(matrix);
+      const ray = portionInputRay(frame, space, input);
+      if (!ray) return false;
+      xrRay.copy(ray);
       return true;
     };
 
@@ -387,6 +386,38 @@ export function bindPortionAR(
       ray.ray.at(0.85 / -ray.ray.direction.z, anchor.position);
     });
 
+    let activeInput: XRInputSource | undefined;
+    const updateReticle = (frame: XRFrame, input?: XRInputSource) => {
+      if (!space) return;
+      reticle.visible = false;
+      if (rayFor(frame, input)) {
+        let closest: THREE.Vector3 | undefined;
+        for (const plane of (frame as PortionXRFrame).detectedPlanes ?? []) {
+          const pose = frame.getPose(plane.planeSpace, space);
+          if (!pose) continue;
+          const point = intersectTable(
+            xrRay,
+            new THREE.Matrix4().fromArray(pose.transform.matrix),
+            plane.polygon,
+          );
+          if (
+            point &&
+            (!closest || point.distanceTo(xrRay.origin) < closest.distanceTo(xrRay.origin))
+          )
+            closest = point;
+        }
+        if (closest) {
+          reticle.matrix.makeTranslation(closest.x, closest.y + 0.002, closest.z);
+          reticle.visible = true;
+        }
+      }
+      if (!reticle.visible && hits && input?.targetRayMode !== 'tracked-pointer') {
+        const pose = frame.getHitTestResults(hits)[0]?.getPose(space!);
+        reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
+        if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
+      }
+      place.disabled = !reticle.visible;
+    };
     const activate = () => {
       running = true;
       start.hidden = tracked || !xrSupported;
@@ -418,37 +449,13 @@ export function bindPortionAR(
             mode.textContent || 'Show 3D',
           );
           if (!placed) {
-            reticle.visible = false;
-            const input = Array.from(session!.inputSources).find(
-              (item) => item.targetRayMode === 'tracked-pointer',
+            const inputs = Array.from(session!.inputSources);
+            updateReticle(
+              frame,
+              activeInput && inputs.includes(activeInput)
+                ? activeInput
+                : inputs.find((item) => item.targetRayMode === 'tracked-pointer'),
             );
-            if (rayFor(frame, input)) {
-              let closest: THREE.Vector3 | undefined;
-              for (const plane of (frame as PortionXRFrame).detectedPlanes ?? []) {
-                const pose = frame.getPose(plane.planeSpace, space);
-                if (!pose) continue;
-                const point = intersectTable(
-                  xrRay,
-                  new THREE.Matrix4().fromArray(pose.transform.matrix),
-                  plane.polygon,
-                );
-                if (
-                  point &&
-                  (!closest || point.distanceTo(xrRay.origin) < closest.distanceTo(xrRay.origin))
-                )
-                  closest = point;
-              }
-              if (closest) {
-                reticle.matrix.makeTranslation(closest.x, closest.y + 0.002, closest.z);
-                reticle.visible = true;
-              }
-            }
-            if (!reticle.visible && hits) {
-              const pose = frame.getHitTestResults(hits)[0]?.getPose(space);
-              reticle.visible = !!pose && pose.transform.matrix[5]! > 0.85;
-              if (reticle.visible && pose) reticle.matrix.fromArray(pose.transform.matrix);
-            }
-            place.disabled = !reticle.visible;
           }
         }
         renderer!.render(scene, camera);
@@ -513,7 +520,9 @@ export function bindPortionAR(
           }
           session.addEventListener('select', (event) => {
             if (!live || !rayFor(event.frame, event.inputSource)) return;
+            activeInput = event.inputSource;
             const action = xrPanel.select(xrRay);
+            if (!placed) updateReticle(event.frame, event.inputSource);
             if (action === 'rotate') {
               rotation.value = String(((Number(rotation.value) + 210) % 360) - 180);
               changed();

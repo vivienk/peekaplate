@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { intersectTable, isQuestBrowser, portionXRSessionOptions } from './portionXR';
+import {
+  intersectTable,
+  isQuestBrowser,
+  portionInputRay,
+  portionXRSessionOptions,
+} from './portionXR';
 
 const polygon = [
   { x: -0.5, z: -0.5 },
@@ -33,4 +38,23 @@ describe('Quest portion placement', () => {
     expect(intersectTable(ray, new THREE.Matrix4().makeTranslation(0, -5, 0), polygon)).toBeNull();
     expect(intersectTable(ray, new THREE.Matrix4(), [])).toBeNull();
   });
+});
+
+it('selects each controller own table point and rejects a selecting controller miss', () => {
+  const space = {} as XRReferenceSpace;
+  const inputs = [0, 0.3, 2].map((x) => ({ targetRaySpace: { x } }) as unknown as XRInputSource);
+  const frame = {
+    getPose: (target: { x: number }) => ({
+      transform: {
+        matrix: new THREE.Matrix4().makeRotationX(-Math.PI / 2).setPosition(target.x, 1, 0)
+          .elements,
+      },
+    }),
+  } as unknown as XRFrame;
+  const points = inputs.map((input) =>
+    intersectTable(portionInputRay(frame, space, input)!, new THREE.Matrix4(), polygon),
+  );
+  expect(points[0]!.x).toBeCloseTo(0);
+  expect(points[1]!.x).toBeCloseTo(0.3);
+  expect(points[2]).toBeNull();
 });
