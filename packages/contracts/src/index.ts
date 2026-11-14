@@ -1,6 +1,16 @@
+export * from './owner-actions';
 export * from './owner-ai';
 
 import { z } from 'zod';
+import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
+
+export {
+  type ComparisonReport,
+  ComparisonReportSchema,
+  ComparisonStatus,
+  type ComparisonStatus as ComparisonStatusValue,
+} from './comparison-report';
+export * from './owner-menu';
 
 export {
   type ReviewCandidate,
@@ -82,6 +92,7 @@ export const CreateDishRevisionSchema = z.strictObject({
   expectedVersion: z.number().int().nonnegative().max(2_147_483_646),
   name: postgresText.trim().min(1).max(160),
   description: postgresText.trim().max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export const DishRevisionSchema = z.strictObject({
@@ -90,6 +101,7 @@ export const DishRevisionSchema = z.strictObject({
   version: z.number().int().positive().max(2_147_483_647),
   name: postgresText.min(1).max(160),
   description: postgresText.max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
@@ -179,18 +191,6 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(false),
 });
-
-export const PublicMenuAllergenCodeSchema = z.enum([
-  'milk',
-  'egg',
-  'fish',
-  'crustacean shellfish',
-  'nuts',
-  'peanut',
-  'wheat',
-  'soy',
-  'sesame',
-]);
 
 export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
 
@@ -1417,6 +1417,10 @@ export type SubmitMenuIngestionRequest = z.infer<typeof SubmitMenuIngestionReque
 export const ApproveDishDraftRequestSchema = z.strictObject({
   commandId: uuid,
   expectedVersion: z.number().int().nonnegative().default(0),
+  expectedDraftVersion: z.number().int().positive().optional(),
+  expectedReviewVersion: z.number().int().nonnegative().optional(),
+  extractionId: postgresText.trim().min(1).max(128).optional(),
+  confirmed: z.literal(true).optional(),
 });
 export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;
 
@@ -1427,3 +1431,43 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
   queuedAt: z.string().datetime(),
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
+
+export {
+  type IngredientAssessment,
+  IngredientAssessmentSchema,
+  IngredientReviewHandoffSchema,
+  ingredientAssessmentForReview,
+} from './ingredient-intelligence.js';
+export {
+  ALL_ALLOWED_CSV_HEADERS,
+  BASE_REQUIRED_CSV_HEADERS,
+  CANONICAL_REVISION_HEADERS,
+  type ClassifyTimestampOptions,
+  type CsvParseResult,
+  classifyOrderTimestampWindow,
+  computeOrderLineChecksum,
+  DEFAULT_HISTORICAL_IMPORT_WINDOW_DAYS,
+  DEFAULT_RAW_CSV_RETENTION_DAYS,
+  ISO_EXPLICIT_TIMEZONE_PATTERN,
+  MAX_ORDER_OUTCOME_FILE_BYTES,
+  MAX_ORDER_OUTCOME_ROWS,
+  NINETY_DAYS_MICROS,
+  OPTIONAL_CSV_HEADERS,
+  OPTIONAL_PRICING_HEADERS,
+  type OrderOutcomeImportResponse,
+  OrderOutcomeImportResponseSchema,
+  type OrderOutcomeLine,
+  OrderOutcomeLineSchema,
+  type OrderOutcomeQuarantineReason,
+  OrderOutcomeQuarantineReasonSchema,
+  type OrderOutcomeType,
+  OrderOutcomeTypeSchema,
+  OrderTokenIdentifierSchema,
+  type ParsedCsvRow,
+  PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
+  POS_ITEM_HEADERS,
+  parseOrderOutcomeCsv,
+  REQUIRED_CSV_HEADERS,
+  type SanitizedRowDiagnostic,
+  SanitizedRowDiagnosticSchema,
+} from './order-outcome';

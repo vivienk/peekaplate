@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+﻿import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
@@ -325,10 +325,14 @@ beforeAll(async () => {
   config.main = fileURLToPath(new URL('./index.ts', import.meta.url));
   config.r2_buckets = [
     { binding: 'OBSERVATION_ARCHIVE_BUCKET', bucket_name: 'local-observation-fixtures' },
+    { binding: 'INGESTION_REPORTS_BUCKET', bucket_name: 'local-menu-workspace' },
   ];
   config.ratelimits = config.env.staging.ratelimits;
   config.queues = {
-    producers: [{ binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' }],
+    producers: [
+      { binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' },
+      { binding: 'INGESTION_QUEUE', queue: 'local-menu-workspace' },
+    ],
     consumers: [
       {
         queue: 'local-observation-fixtures',
@@ -375,6 +379,108 @@ afterAll(async () => {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+});
+
+describe('owner menu browser transport', () => {
+  it('saves and resumes a private draft/photo through Chromium and the actual Worker/database', async () => {
+    const browser = await chromium.launch();
+    const consoleServer = createServer((_, res) =>
+      res
+        .writeHead(200, { 'Content-Type': 'text/html' })
+        .end('<!doctype html><title>Synthetic owner workspace transport</title>'),
+    );
+    let ownsServer = false;
+    await new Promise<void>((resolve, reject) => {
+      consoleServer.once('error', (error: NodeJS.ErrnoException) =>
+        error.code === 'EADDRINUSE' ? resolve() : reject(error),
+      );
+      consoleServer.listen(5174, '127.0.0.1', () => {
+        ownsServer = true;
+        resolve();
+      });
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto('http://127.0.0.1:5174/workspace-check.html');
+      const id = crypto.randomUUID();
+      const bearer = await token({ sub: actor });
+      const api = `http://127.0.0.1:${worker.port}`;
+      const first = await page.evaluate(
+        async ({ api, id, venue, bearer }) => {
+          const response = await fetch(`${api}/venues/${venue}/drafts/${id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              commandId: crypto.randomUUID(),
+              expectedVersion: 0,
+              fields: { name: 'Browser fictional soup' },
+            }),
+          });
+          return {
+            status: response.status,
+            body: await response.json(),
+          };
+        },
+        { api, id, venue, bearer },
+      );
+      expect(first.status).toBe(200);
+      await page.reload();
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=',
+        'base64',
+      );
+      const result = await page.evaluate(
+        async ({ api, id, venue, otherVenue, bearer, png }) => {
+          const headers = { Authorization: `Bearer ${bearer}` };
+          const resumed = await fetch(`${api}/venues/${venue}/drafts/${id}`, { headers });
+          const draft = (await resumed.json()) as {
+            draft: { name: string; draft_version: number };
+          };
+          const uploaded = await fetch(`${api}/venues/${venue}/drafts/${id}/photos`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'image/png',
+              'Idempotency-Key': crypto.randomUUID(),
+            },
+            body: new Uint8Array(png),
+          });
+          const photo = (await uploaded.json()) as { photo: { id: string } };
+          const read = await fetch(`${api}/venues/${venue}/drafts/${id}/photos/${photo.photo.id}`, {
+            headers,
+          });
+          const denied = await fetch(`${api}/venues/${otherVenue}/drafts/${id}`, { headers });
+          const anonymous = await fetch(`${api}/venues/${venue}/drafts/${id}`);
+          return {
+            resumed: resumed.status,
+            name: draft.draft.name,
+            version: draft.draft.draft_version,
+            upload: uploaded.status,
+            photo: read.status,
+            type: read.headers.get('content-type'),
+            size: (await read.arrayBuffer()).byteLength,
+            denied: denied.status,
+            anonymous: anonymous.status,
+          };
+        },
+        { api, id, venue, otherVenue, bearer, png: [...png] },
+      );
+      expect(result).toEqual({
+        resumed: 200,
+        name: 'Browser fictional soup',
+        version: 1,
+        upload: 201,
+        photo: 200,
+        type: 'image/png',
+        size: png.length,
+        denied: 403,
+        anonymous: 401,
+      });
+    } finally {
+      await browser.close();
+      if (ownsServer) await new Promise<void>((resolve) => consoleServer.close(() => resolve()));
+    }
+  });
 });
 
 describe('real team analytics API', () => {
@@ -1791,6 +1897,330 @@ describe('real PostgreSQL menu publication commands', () => {
     });
   });
 });
+
+describe('real PostgreSQL owner insight actions', () => {
+  function createInput(menuId: string, menuRevisionId: string) {
+    return {
+      commandId: crypto.randomUUID(),
+      insightKey: `insight-${crypto.randomUUID()}`,
+      menuId,
+      menuRevisionId,
+      category: 'description_update',
+      note: 'Update the menu description',
+    };
+  }
+
+  async function createAction(body: unknown, tenant = venue, subject = actor) {
+    return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await token({ sub: subject })}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function listActions(tenant = venue, subject = actor) {
+    return fetch(`http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions`, {
+      headers: { Authorization: `Bearer ${await token({ sub: subject })}` },
+    });
+  }
+
+  async function updateAction(actionId: string, body: unknown, tenant = venue, subject = actor) {
+    return fetch(
+      `http://127.0.0.1:${worker.port}/venues/${tenant}/owner-insight-actions/${actionId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${await token({ sub: subject })}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
+  it('persists create, update and list results against the canonical menu revision', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const created = await createAction(input);
+
+    expect(created.status).toBe(201);
+    const createdBody = (await created.json()) as {
+      schemaVersion: number;
+      action: { actionId: string; status: string; version: number };
+    };
+    expect(createdBody).toMatchObject({
+      schemaVersion: 1,
+      action: {
+        status: 'planned',
+        version: 1,
+      },
+    });
+
+    const actionId = createdBody.action.actionId;
+    const updated = await updateAction(actionId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      status: 'active',
+    });
+
+    expect(updated.status).toBe(200);
+    expect(await updated.json()).toMatchObject({
+      schemaVersion: 1,
+      action: {
+        actionId,
+        status: 'active',
+        version: 2,
+      },
+    });
+
+    const listed = await listActions();
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toMatchObject({
+      schemaVersion: 1,
+      actions: [
+        {
+          actionId,
+          menuId,
+          menuRevisionId: revision.menuRevisionId,
+          status: 'active',
+          version: 2,
+        },
+      ],
+    });
+
+    const persisted = await admin.query(
+      `SELECT category, status, note, version, created_by, updated_by
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, actionId],
+    );
+    expect(persisted.rows).toHaveLength(1);
+    expect(persisted.rows[0]).toMatchObject({
+      category: 'description_update',
+      status: 'active',
+      note: input.note,
+      version: 2,
+      created_by: actor,
+      updated_by: actor,
+    });
+  });
+
+  it('coalesces concurrent identical creates and replays the committed receipt', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const responses = await Promise.all([createAction(input), createAction(input)]);
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+
+    const results = await Promise.all(
+      responses.map(
+        async (response) => (await response.json()) as { action: { actionId: string } },
+      ),
+    );
+    expect(results[0]).toEqual(results[1]);
+
+    expect(results).toHaveLength(2);
+    const firstResult = results[0];
+    if (!firstResult) throw new Error('Missing first concurrent create result');
+    const actionId = firstResult.action.actionId;
+    const retry = await createAction(input);
+    expect(retry.status).toBe(201);
+    expect(await retry.json()).toEqual(results[0]);
+
+    const actions = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(actions.rows).toEqual([{ action_id: actionId }]);
+
+    const receipts = await admin.query(
+      `SELECT idempotency_key
+       FROM app_private.es_command
+       WHERE tenant_id = $1 AND actor_id = $2
+         AND idempotency_key = $3
+         AND command_type = 'owner.insight_action.create'`,
+      [venue, actor, input.commandId],
+    );
+    expect(receipts.rows).toHaveLength(1);
+  });
+
+  it('rejects competing updates and replays an earlier receipt without reverting later state', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+    const created = await createAction(createInput(menuId, revision.menuRevisionId));
+    expect(created.status).toBe(201);
+    const { action: createdAction } = (await created.json()) as {
+      action: { actionId: string };
+    };
+    const updates = ['First change', 'Second change'].map((note) => ({
+      commandId: crypto.randomUUID(),
+      expectedVersion: 1,
+      status: 'active',
+      note,
+    }));
+    const responses = await Promise.all(
+      updates.map((input) => updateAction(createdAction.actionId, input)),
+    );
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winnerIndex = responses.findIndex((response) => response.status === 200);
+    const winnerInput = updates[winnerIndex]!;
+    const winnerResult = await responses[winnerIndex]!.json();
+    expect(winnerResult).toMatchObject({ action: { version: 2, note: winnerInput.note } });
+    expect(await responses.find((response) => response.status === 409)!.json()).toEqual({
+      error: 'version_conflict',
+    });
+
+    const later = await updateAction(createdAction.actionId, {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 2,
+      status: 'archived',
+    });
+    expect(later.status).toBe(200);
+    expect(await later.json()).toMatchObject({ action: { version: 3, status: 'archived' } });
+    const retry = await updateAction(createdAction.actionId, winnerInput);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(winnerResult);
+
+    const reused = await updateAction(createdAction.actionId, {
+      ...winnerInput,
+      note: 'Different command payload',
+    });
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toEqual({ error: 'command_conflict' });
+    const persisted = await admin.query(
+      `SELECT status, version FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, createdAction.actionId],
+    );
+    expect(persisted.rows).toEqual([{ status: 'archived', version: 3 }]);
+  });
+
+  it('keeps list and update tenant-scoped even when an actor owns both venues', async () => {
+    const dualOwner = crypto.randomUUID();
+    await admin.query(
+      `INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission)
+       VALUES ($1, $3, 'owner'), ($2, $3, 'owner')`,
+      [venue, otherVenue, dualOwner],
+    );
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+    const created = await createAction(createInput(menuId, revision.menuRevisionId));
+    expect(created.status).toBe(201);
+    const { action: createdAction } = (await created.json()) as {
+      action: { actionId: string };
+    };
+    const listed = await listActions(otherVenue, dualOwner);
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toEqual({ schemaVersion: 1, actions: [] });
+    const denied = await updateAction(
+      createdAction.actionId,
+      { commandId: crypto.randomUUID(), expectedVersion: 1, status: 'archived' },
+      otherVenue,
+      dualOwner,
+    );
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ error: 'not_found' });
+    const persisted = await admin.query(
+      `SELECT status, version FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND action_id = $2`,
+      [venue, createdAction.actionId],
+    );
+    expect(persisted.rows).toEqual([{ status: 'planned', version: 1 }]);
+  });
+
+  it('rejects editor, viewer and cross-venue access without creating actions', async () => {
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+
+    expect((await createAction(input, venue, otherActor)).status).toBe(403);
+    expect((await createAction(input, venue, viewer)).status).toBe(403);
+    expect((await createAction(input, otherVenue, actor)).status).toBe(403);
+
+    const listedAsEditor = await listActions(venue, otherActor);
+    expect(listedAsEditor.status).toBe(403);
+
+    const actions = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(actions.rows).toHaveLength(0);
+  });
+
+  it('reauthorizes a revoked owner before replaying an existing receipt', async () => {
+    const revokedActor = crypto.randomUUID();
+    const menuId = crypto.randomUUID();
+    const revision = approvalCommand();
+
+    await admin.query(
+      `INSERT INTO app_private.staff_membership
+        (tenant_id, actor_id, permission)
+       VALUES ($1, $2, 'owner')`,
+      [venue, revokedActor],
+    );
+    await registerReviewSubject(menuId, revision);
+
+    const input = createInput(menuId, revision.menuRevisionId);
+    const first = await createAction(input, venue, revokedActor);
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { action: { actionId: string } };
+
+    await admin.query(
+      `DELETE FROM app_private.staff_membership
+       WHERE tenant_id = $1 AND actor_id = $2`,
+      [venue, revokedActor],
+    );
+
+    const retry = await createAction(input, venue, revokedActor);
+    expect(retry.status).toBe(403);
+    expect(await retry.json()).toEqual({ error: 'forbidden' });
+
+    const persisted = await admin.query(
+      `SELECT action_id
+       FROM app_private.owner_insight_action_current
+       WHERE tenant_id = $1 AND menu_id = $2`,
+      [venue, menuId],
+    );
+    expect(persisted.rows).toEqual([{ action_id: firstBody.action.actionId }]);
+  });
+
+  it('rejects a menu revision that is not registered for the route venue', async () => {
+    const input = createInput(crypto.randomUUID(), crypto.randomUUID());
+    const response = await createAction(input);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      error: 'menu_revision_not_found',
+    });
+
+    const receipts = await admin.query(
+      `SELECT idempotency_key
+       FROM app_private.es_command
+       WHERE tenant_id = $1 AND actor_id = $2
+         AND idempotency_key = $3`,
+      [venue, actor, input.commandId],
+    );
+    expect(receipts.rows).toHaveLength(0);
+  });
+});
+
 describe('Multi-tenant owner report isolation', () => {
   it('isolates reports and counts distinct reportable sessions', async () => {
     const dishId = crypto.randomUUID();

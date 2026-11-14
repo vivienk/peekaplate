@@ -12,6 +12,7 @@ import {
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { createStaffVerifier } from './auth';
 import app, {
@@ -20,10 +21,14 @@ import app, {
   createApp,
   createWorker,
   handleQueueBatch,
+  handleScheduled,
+  OrderImportError,
   queue,
   SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+  scheduled,
 } from './index';
 import { ingestObservations } from './observation-ingest';
+import { OwnerInsightActionError } from './owner-insight-actions';
 import { ReviewCommandError } from './review-command';
 
 const fixtureV2 = JSON.parse(
@@ -106,6 +111,27 @@ describe('worker queue consumer wiring', () => {
     await worker.queue(batch, {});
     expect(processBatchCalled).toBe(true);
     expect(cleanupCalled).toBe(true);
+  });
+
+  it('exports scheduled cron handler on default app and as named export', () => {
+    expect(typeof scheduled).toBe('function');
+    expect(typeof (app as any).scheduled).toBe('function');
+    expect((app as any).scheduled).toBe(scheduled);
+  });
+
+  it('safely completes scheduled invocation when bucket or database binding is missing', async () => {
+    // Missing storage
+    await expect(handleScheduled({}, {})).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_IMPORT_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_IMPORT_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_OUTCOME_ARCHIVE_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_OUTCOME_ARCHIVE_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -1637,6 +1663,217 @@ describe('menu ingestion HTTP boundary', () => {
     expect(approveDraft).not.toHaveBeenCalled();
   });
 
+  describe('order outcome import route', () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const actorId = '00000000-0000-4000-8000-000000000002';
+    const validCsv =
+      'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-1,L-1,2026-11-01T12:00:00Z,00000000-0000-4000-8000-000000000010,00000000-0000-4000-8000-000000000020,00000000-0000-4000-8000-000000000030,ordered,1';
+
+    const mockSuccessResult = {
+      batchId: '00000000-0000-4000-8000-000000000099',
+      venueId,
+      status: 'completed',
+      totalRows: 1,
+      acceptedRows: 1,
+      duplicateRows: 0,
+      quarantinedRows: 0,
+      conflictRows: 0,
+      isDuplicateFile: false,
+      fileSha256: 'abc123hash',
+      diagnostics: [],
+      createdAt: '2026-11-07T12:00:00.000Z',
+      finishedAt: '2026-11-07T12:00:01.000Z',
+    };
+
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('fails closed before connecting when import archive storage is missing', async () => {
+      const connect = vi
+        .spyOn(Client.prototype, 'connect')
+        .mockRejectedValue(new Error('must not connect'));
+      try {
+        const testApp = createApp({ verify: async () => actorId, execute: vi.fn() });
+        const response = await testApp.request(
+          `/venues/${venueId}/orders/import`,
+          {
+            method: 'POST',
+            headers: { Authorization: 'Bearer synthetic-token', 'Content-Type': 'text/csv' },
+            body: validCsv,
+          },
+          { APP_ENV: 'local', LOCAL_DATABASE_URL: 'postgres://unused.test/synthetic' },
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: 'service_unavailable' });
+        expect(connect).not.toHaveBeenCalled();
+      } finally {
+        connect.mockRestore();
+      }
+    });
+
+    it('rejects invalid venueId UUID with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request('/venues/invalid-uuid/orders/import', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('rejects unsupported Content-Type with 415', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'unsupported_media_type' });
+    });
+
+    it('successfully processes text/csv upload and sets security headers', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Request-ID')).toMatch(/^[0-9a-f-]{36}$/);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'orders.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('successfully processes multipart/form-data upload', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const formData = new FormData();
+      const fileBlob = new Blob([validCsv], { type: 'text/csv' });
+      formData.append('file', fileBlob, 'pos_export_2026.csv');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'pos_export_2026.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('rejects multipart/form-data with missing file field with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const formData = new FormData();
+      formData.append('unrelated', 'hello');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'missing_file' });
+    });
+
+    it('returns 403 when user is not owner', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError('forbidden', 403, 'Order outcome import requires owner permission'),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'forbidden',
+        message: 'Order outcome import requires owner permission',
+      });
+    });
+
+    it('returns 413 when import fails with payload_too_large', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError(
+            'payload_too_large',
+            413,
+            'File exceeds maximum allowed rows (1000)',
+          ),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({
+        error: 'payload_too_large',
+        message: 'File exceeds maximum allowed rows (1000)',
+      });
+    });
+
+    it('returns 503 when database connection is unavailable in default importFn', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    });
+  });
+
   describe('Cloudflare Queue Worker Handler', () => {
     it('retries all messages when database connection string is unavailable', async () => {
       const msg1 = { ack: vi.fn(), retry: vi.fn() };
@@ -2064,5 +2301,236 @@ describe('review candidate HTTP boundaries', () => {
         expect(await response.json()).toEqual({ error: code });
       }
     });
+  });
+});
+
+describe('owner insight action HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000101';
+  const actorId = '00000000-0000-4000-8000-000000000102';
+  const actionId = '00000000-0000-4000-8000-000000000103';
+  const menuId = '00000000-0000-4000-8000-000000000104';
+  const menuRevisionId = '00000000-0000-4000-8000-000000000105';
+  const commandId = '00000000-0000-4000-8000-000000000106';
+  const basePath = `/venues/${venueId}/owner-insight-actions`;
+
+  const action = {
+    actionId,
+    venueId,
+    insightKey: 'dish.low_conversion',
+    menuId,
+    menuRevisionId,
+    category: 'description_update',
+    status: 'planned' as const,
+    note: null,
+    version: 1,
+    createdBy: actorId,
+    updatedBy: actorId,
+    createdAt: '2026-11-10T00:00:00.000Z',
+    updatedAt: '2026-11-10T00:00:00.000Z',
+  };
+
+  it('lists actions using the verified actor, route venue and validated query', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [action],
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      listOwnerActions,
+    }).request(`${basePath}?insightKey=dish.low_conversion&limit=10`, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ schemaVersion: 1, actions: [action] });
+    expect(listOwnerActions).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      {
+        insightKey: 'dish.low_conversion',
+        limit: 10,
+      },
+      {},
+    );
+  });
+
+  it('uses the default list limit and rejects invalid or unknown query parameters', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [],
+    });
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions,
+    });
+
+    const valid = await testApp.request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+    expect(valid.status).toBe(200);
+    expect(listOwnerActions).toHaveBeenCalledWith(actorId, venueId, { limit: 50 }, {});
+
+    for (const query of [
+      '?limit=101',
+      '?unknown=value',
+      '?menuRevisionId=invalid',
+      '?limit=10&limit=20',
+    ]) {
+      const response = await testApp.request(`${basePath}${query}`, {
+        headers: { Authorization: 'Bearer signed' },
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(listOwnerActions).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an action without accepting a browser-supplied venue', async () => {
+    const createOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action,
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const request = {
+      commandId,
+      insightKey: 'dish.low_conversion',
+      menuId,
+      menuRevisionId,
+      category: 'description_update',
+      note: 'Check the current description',
+    };
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ schemaVersion: 1, action });
+    expect(createOwnerAction).toHaveBeenCalledWith(actorId, venueId, request, {});
+
+    const forged = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, venueId }),
+    });
+
+    expect(forged.status).toBe(400);
+    expect(createOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates only the action in the route venue with a validated patch', async () => {
+    const updateOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action: { ...action, status: 'active', version: 2 },
+    });
+    const patch = {
+      commandId,
+      expectedVersion: 1,
+      status: 'active',
+    };
+
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/${actionId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateOwnerAction).toHaveBeenCalledWith(actorId, venueId, actionId, patch, {});
+
+    const invalidPath = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/not-a-uuid`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(invalidPath.status).toBe(400);
+    expect(updateOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unauthenticated, malformed JSON and wrong content types before service calls', async () => {
+    const createOwnerAction = vi.fn();
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    });
+
+    const unauthenticated = await testApp.request(basePath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(unauthenticated.status).toBe(401);
+
+    const malformed = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: '{',
+    });
+    expect(malformed.status).toBe(400);
+
+    const wrongType = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'text/plain',
+      },
+      body: '{}',
+    });
+    expect(wrongType.status).toBe(415);
+
+    expect(createOwnerAction).not.toHaveBeenCalled();
+  });
+
+  it('maps owner authorization errors to their intended HTTP status', async () => {
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions: async () => {
+        throw new OwnerInsightActionError('forbidden', 403);
+      },
+    }).request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
   });
 });

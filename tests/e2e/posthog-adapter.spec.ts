@@ -47,7 +47,7 @@ async function open(page: Page, status: (n: number) => number) {
       body: '{}',
     });
   });
-  await page.goto(diner);
+  await page.goto(`${diner}/?scenario=empty`);
   const before = await storage(page);
   await page.addScriptTag({
     type: 'module',
@@ -78,6 +78,14 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
   const { requests } = await open(page, () => 200);
   await page.evaluate(async () => {
     const tracking = await import(/* @vite-ignore */ '/src/tracking/index.ts');
+    // The real screen subscribes before the app connects its PostHog adapter.
+    tracking.onTrackingAllowedChange((allowed) => {
+      if (allowed)
+        tracking.track('menu_viewed', {
+          publication_revision_id: 'a5000000-0000-4000-8000-000000000001',
+          entry_source: 'qr',
+        });
+    });
     tracking.connectPostHogFromEnv({
       MODE: 'staging',
       VITE_POSTHOG_ENABLED: 'true',
@@ -105,7 +113,6 @@ test('the actual diner banner dispatches one live event to the real SDK and cano
         entry_source: 'qr',
       });
     });
-  await emit();
   await expect.poll(() => requests.length).toBe(1);
   await page.clock.runFor(5000);
   const canonical = () =>

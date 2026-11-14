@@ -56,7 +56,7 @@ function createMockClient() {
         text.includes('UPDATE app_private.menu_ingestion_jobs') &&
         text.includes('claim_token = gen_random_uuid()')
       ) {
-        if (!store.job || (store.job.status !== 'queued' && store.job.status !== 'incomplete')) {
+        if (!store.job || store.job.status !== 'queued') {
           return { rows: [], rowCount: 0 };
         }
         store.job.status = 'running';
