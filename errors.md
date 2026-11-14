@@ -2630,3 +2630,8 @@ The first preparation check passed code, types and unit/script suites but correc
 The compiled staging check after PR158 reproduced an initial menu view in the canonical sender with no matching PostHog capture. The menu's consent listener was registered before the adapter's listener, so it emitted while the adapter still held the previous consent state. Synchronizing the adapter from the current shared gate immediately before capture fixes the ordering dependency. The real-adapter unit regression failed before the correction and passes afterward, including re-consent; the SDK browser case now uses the same listener order. Corrected hosted verification remains pending release approval.
 
 The first external smoke harness used the default headless user agent and the SDK correctly filtered all its events as bot traffic. Reusing the repository's Desktop Chrome profile isolated the actual first-event defect. No raw payloads, credentials or private provider traffic are stored in this record.
+
+
+## Narrow restaurant URL staging release
+
+PR174 promotion resolves context/package/error-ledger conflicts against main, keeping its unrelated release state. Routing-only paths are carried forward. Source preparation already reproduced and corrected Pages clean-URL rewrite loops and canonical redirects; this candidate must repeat local checks and hosted static routing before acceptance. No registrar or .io change is included.

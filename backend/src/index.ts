@@ -285,6 +285,7 @@ let menuVerifier: {
  * Preview and arbitrary origins are rejected; wildcard '*' is not used.
  */
 export const DINER_CORS_ALLOWED_ORIGINS = [
+  'https://peekaplate.app',
   'https://diner.peekaplate.com',
   'https://peekaplate-diner-staging.pages.dev',
   'http://localhost:5173',
