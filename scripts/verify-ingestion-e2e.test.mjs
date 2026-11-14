@@ -7,6 +7,7 @@ import {
   redactSecrets,
   sanitizeEvidence,
   validateExtractionReport,
+  validateReportProvenance,
   verifyIngestionE2E,
 } from './verify-ingestion-e2e.mjs';
 
@@ -214,11 +215,11 @@ test('verifyIngestionE2E checks PR #161, cross-tenant 403, viewer 403, request I
     if (url.includes(`/venues/${otherVenueId}/menus/jobs/${testJobId}`)) {
       return { ok: false, status: 403, headers };
     }
+    if (url.endsWith('/verify') && init?.headers?.Authorization === 'Bearer viewer-jwt') {
+      return { ok: false, status: 403, headers };
+    }
     if (url.endsWith('/verify')) {
       return { ok: false, status: 400, headers };
-    }
-    if (url.endsWith('/approve') && init?.headers?.Authorization === 'Bearer viewer-jwt') {
-      return { ok: false, status: 403, headers };
     }
     if (url.includes(`/venues/${testVenueId}/menus/jobs/${testJobId}`)) {
       return { ok: true, status: 200, headers, json: async () => ({ job: mockJob }) };
@@ -318,4 +319,100 @@ test('verifyIngestionE2E distinguishes 401 auth failure from 403 authz denial', 
   const crossCheck = outcome.checks.find((c) => c.name === 'Cross-Tenant Isolation (403)');
   assert.equal(crossCheck?.passed, false);
   assert.match(crossCheck?.details ?? '', /Authentication failed \(401\)/);
+});
+
+test('validateExtractionReport rejects mismatched schema/pipeline pairs (1,"3") and (2,"2")', () => {
+  const mismatch13 = validateExtractionReport({
+    schema_version: 1,
+    pipeline_version: '3',
+    status: 'complete',
+    drafts: [],
+    segments: [],
+    evidence: [],
+  });
+  assert.equal(mismatch13.valid, false);
+  assert.ok(mismatch13.issues.some((i) => i.includes('schema_version/pipeline_version')));
+
+  const mismatch22 = validateExtractionReport({
+    schema_version: 2,
+    pipeline_version: '2',
+    status: 'complete',
+    drafts: [],
+    segments: [],
+    evidence: [],
+  });
+  assert.equal(mismatch22.valid, false);
+});
+
+test('validateReportProvenance detects job, source_id, sha256, and evidence mismatches', () => {
+  const validHash = 'b'.repeat(64);
+  const baseReport = {
+    job_id: '11111111-1111-1111-1111-111111111111',
+    source: { source_id: 'src-1', sha256: validHash },
+    drafts: [{ draft_id: 'd-1' }],
+    evidence: [{ draft_id: 'd-1', draft_index: 0 }],
+  };
+
+  assert.equal(
+    validateReportProvenance(baseReport, {
+      jobId: '11111111-1111-1111-1111-111111111111',
+      expectedSourceId: 'src-1',
+      expectedSourceHash: validHash,
+    }).valid,
+    true,
+  );
+
+  // Job ID mismatch
+  assert.equal(
+    validateReportProvenance(baseReport, {
+      jobId: '99999999-9999-9999-9999-999999999999',
+    }).valid,
+    false,
+  );
+
+  // Source ID mismatch
+  assert.equal(
+    validateReportProvenance(baseReport, {
+      expectedSourceId: 'src-other',
+    }).valid,
+    false,
+  );
+
+  // Source hash mismatch
+  assert.equal(
+    validateReportProvenance(baseReport, {
+      expectedSourceHash: 'c'.repeat(64),
+    }).valid,
+    false,
+  );
+
+  // Missing provenance identifiers & orphan evidence
+  const missingProv = validateReportProvenance({
+    drafts: [{ draft_id: 'd-1' }],
+    evidence: [{ draft_id: 'd-unknown', draft_index: 5 }],
+  });
+  assert.equal(missingProv.valid, false);
+  assert.ok(missingProv.issues.some((i) => i.includes('missing source provenance')));
+  assert.ok(missingProv.issues.some((i) => i.includes('unknown draft_id')));
+  assert.ok(missingProv.issues.some((i) => i.includes('out-of-range draft_index')));
+});
+
+test('verifyIngestionE2E reports providerBudgetEnforcedAtBoundary as false', async () => {
+  const testJobId = '11111111-1111-1111-1111-111111111111';
+  const testVenueId = '22222222-2222-2222-2222-222222222222';
+  const outcome = await verifyIngestionE2E({
+    jobId: testJobId,
+    venueId: testVenueId,
+    token: 'owner-jwt',
+    requirePr161: true,
+    request: async (url) => {
+      if (url.endsWith('/verify')) return { ok: false, status: 400, headers: new Headers() };
+      return { ok: false, status: 404, headers: new Headers() };
+    },
+    progress: () => {},
+  });
+  assert.equal(outcome.providerBudgetEnforcedAtBoundary, false);
+  const evidence = sanitizeEvidence(outcome);
+  assert.equal(evidence.localHarnessGuardOnly, true);
+  assert.equal(evidence.providerBudgetEnforcedAtBoundary, false);
 });

@@ -14,7 +14,9 @@ Options:
   --cross-tenant-venue-id <id> Secondary venue UUID expected to return 403 for --token
   --viewer-token <token>       Viewer/unauthorized token expected to return 403 on --venue-id
   --require-pr161              Require PR #161 verification_status fields and /verify route check
-  --max-provider-calls <n>     Hard provider call cap (default: 2, max: 2)
+  --max-provider-calls <n>     Hard local harness call cap (default: 2, max: 2; does NOT enforce Queue/Python boundary)
+  --expected-source-id <id>    Expected report.source.source_id for provenance verification (optional)
+  --expected-source-hash <hex> Expected 64-hex SHA-256 of synthetic source for provenance verification (optional)
   --report-json <path>         Local path to downloaded extraction report JSON (optional)
   --evidence-out <path>        Write sanitized JSON evidence report to path (optional)
   --help, -h                   Show this help message
@@ -90,6 +92,8 @@ export function sanitizeEvidence(results, { verifiedAt = new Date().toISOString(
     passed: results.passed,
     providerCallsConsumed: results.providerCallsConsumed ?? 0,
     maxProviderCalls: results.maxProviderCalls ?? MAX_PROVIDER_CALLS,
+    localHarnessGuardOnly: true,
+    providerBudgetEnforcedAtBoundary: results.providerBudgetEnforcedAtBoundary ?? false,
     requestIds: results.requestIds ?? [],
     evidenceIds: results.evidenceIds ?? {},
     checks: (results.checks ?? []).map((c) => ({
@@ -102,7 +106,7 @@ export function sanitizeEvidence(results, { verifiedAt = new Date().toISOString(
 
 /**
  * Validates whether an extraction report matches the expected contract.
- * Supports schema 1/pipeline 2 and schema 2/pipeline 3.
+ * Accepts ONLY exact pairs: (1, "2") or (2, "3").
  */
 export function validateExtractionReport(report) {
   const issues = [];
@@ -110,12 +114,13 @@ export function validateExtractionReport(report) {
     return { valid: false, issues: ['Report is not an object'] };
   }
 
-  if (report.schema_version !== 1 && report.schema_version !== 2) {
-    issues.push(`Invalid schema_version: expected 1 or 2, got ${report.schema_version}`);
-  }
-
-  if (report.pipeline_version !== '2' && report.pipeline_version !== '3') {
-    issues.push(`Invalid pipeline_version: expected "2" or "3", got ${report.pipeline_version}`);
+  const validPair =
+    (report.schema_version === 1 && report.pipeline_version === '2') ||
+    (report.schema_version === 2 && report.pipeline_version === '3');
+  if (!validPair) {
+    issues.push(
+      `Invalid schema_version/pipeline_version pair: expected (1, "2") or (2, "3"), got (${JSON.stringify(report.schema_version)}, ${JSON.stringify(report.pipeline_version)})`,
+    );
   }
 
   if (!['complete', 'incomplete', 'failed'].includes(report.status)) {
@@ -138,6 +143,78 @@ export function validateExtractionReport(report) {
 }
 
 /**
+ * Validates that an extraction report's job, source identity, source SHA-256,
+ * and draft/evidence identifiers bind to the requested job and synthetic source.
+ */
+export function validateReportProvenance(
+  report,
+  { jobId, expectedSourceId, expectedSourceHash } = {},
+) {
+  const issues = [];
+  if (!report || typeof report !== 'object') {
+    return { valid: false, issues: ['Report is not an object'] };
+  }
+
+  if (report.job_id !== undefined && jobId && report.job_id !== jobId) {
+    issues.push(`Report job_id "${report.job_id}" does not match requested jobId "${jobId}"`);
+  }
+
+  const source = report.source;
+  if (!source || typeof source !== 'object') {
+    issues.push('Report missing source provenance object');
+  } else {
+    if (typeof source.source_id !== 'string' || source.source_id.trim().length === 0) {
+      issues.push('Report source.source_id is missing');
+    } else if (expectedSourceId && source.source_id !== expectedSourceId) {
+      issues.push(
+        `Report source.source_id "${source.source_id}" does not match expected "${expectedSourceId}"`,
+      );
+    }
+
+    if (typeof source.sha256 !== 'string' || !SHA256_HEX_RE.test(source.sha256)) {
+      issues.push('Report source.sha256 is missing or invalid 64-hex SHA-256');
+    } else if (expectedSourceHash && source.sha256 !== expectedSourceHash) {
+      issues.push(
+        `Report source.sha256 "${source.sha256}" does not match expected "${expectedSourceHash}"`,
+      );
+    }
+  }
+
+  const drafts = Array.isArray(report.drafts) ? report.drafts : [];
+  const evidence = Array.isArray(report.evidence) ? report.evidence : [];
+  const draftIds = new Set();
+
+  for (let i = 0; i < drafts.length; i += 1) {
+    const draftId = drafts[i]?.draft_id;
+    if (draftId !== undefined) {
+      if (typeof draftId !== 'string' || draftId.length === 0) {
+        issues.push(`Draft at index ${i} has invalid draft_id`);
+      } else {
+        draftIds.add(draftId);
+      }
+    }
+  }
+
+  for (let i = 0; i < evidence.length; i += 1) {
+    const ev = evidence[i];
+    const evDraftId = ev?.draft_id;
+    if (typeof evDraftId !== 'string' || evDraftId.length === 0) {
+      issues.push(`Evidence at index ${i} missing draft_id`);
+    } else if (draftIds.size > 0 && !draftIds.has(evDraftId)) {
+      issues.push(`Evidence at index ${i} references unknown draft_id "${evDraftId}"`);
+    }
+    if (
+      ev?.draft_index !== undefined &&
+      (!Number.isInteger(ev.draft_index) || ev.draft_index < 0 || ev.draft_index >= drafts.length)
+    ) {
+      issues.push(`Evidence at index ${i} has out-of-range draft_index ${ev.draft_index}`);
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+/**
  * Performs read-only verification of a completed menu ingestion job and its drafts.
  */
 export async function verifyIngestionE2E({
@@ -149,6 +226,8 @@ export async function verifyIngestionE2E({
   viewerToken,
   requirePr161 = false,
   maxProviderCalls = MAX_PROVIDER_CALLS,
+  expectedSourceId,
+  expectedSourceHash,
   reportJson,
   request = fetch,
   readFileFn,
@@ -171,6 +250,7 @@ export async function verifyIngestionE2E({
     passed: true,
     providerCallsConsumed: providerGuard.consumed,
     maxProviderCalls: providerGuard.limit,
+    providerBudgetEnforcedAtBoundary: false,
     requestIds: [],
     evidenceIds: { jobId, venueId },
     job: null,
@@ -344,7 +424,7 @@ export async function verifyIngestionE2E({
       recordCheck('API Drafts Fetch', false, `Request failed: ${err.message}`);
     }
 
-    // 5b. PR #161 route presence check (non-mutating invalid-body probe expects 400, not 404)
+    // 5b. PR #161 identity-first /verify probe (owner empty-body expects 400; proves auth passed before body validation, NOT migration/lifecycle correctness)
     if (requirePr161) {
       const verifyProbeUrl = `${baseUrl}/venues/${venueId}/drafts/00000000-0000-4000-8000-000000000001/verify`;
       try {
@@ -355,12 +435,18 @@ export async function verifyIngestionE2E({
         });
         recordRequestId(probeRes);
         recordCheck(
-          'PR #161 /verify Route Deployed',
+          'PR #161 /verify Owner Auth Probe (400)',
           probeRes.status === 400,
-          `Expected HTTP 400 on empty-body /verify probe, got HTTP ${probeRes.status}`,
+          probeRes.status === 401
+            ? 'Authentication failed (401) — owner token invalid/expired'
+            : `Expected HTTP 400 on empty-body /verify probe (auth before body validation), got HTTP ${probeRes.status}`,
         );
       } catch (err) {
-        recordCheck('PR #161 /verify Route Deployed', false, `Request failed: ${err.message}`);
+        recordCheck(
+          'PR #161 /verify Owner Auth Probe (400)',
+          false,
+          `Request failed: ${err.message}`,
+        );
       }
     }
 
@@ -388,11 +474,11 @@ export async function verifyIngestionE2E({
       }
     }
 
-    // 5d. Viewer / unauthorized write denial check (403)
+    // 5d. Viewer / unauthorized write denial check on identity-first PR #161 /verify (403)
     if (viewerToken) {
       try {
         const viewerRes = await request(
-          `${baseUrl}/venues/${venueId}/drafts/00000000-0000-4000-8000-000000000001/approve`,
+          `${baseUrl}/venues/${venueId}/drafts/00000000-0000-4000-8000-000000000001/verify`,
           {
             method: 'POST',
             headers: {
@@ -404,14 +490,14 @@ export async function verifyIngestionE2E({
         );
         recordRequestId(viewerRes);
         recordCheck(
-          'Viewer Write Denial (403)',
+          'PR #161 /verify Viewer Denial (403)',
           viewerRes.status === 403,
           viewerRes.status === 401
             ? 'Authentication failed (401) — viewer token invalid/expired, not an authorization denial (403)'
-            : `Expected HTTP 403 for viewer write attempt, got HTTP ${viewerRes.status}`,
+            : `Expected HTTP 403 on empty-body /verify probe for viewer, got HTTP ${viewerRes.status}`,
         );
       } catch (err) {
-        recordCheck('Viewer Write Denial (403)', false, `Request failed: ${err.message}`);
+        recordCheck('PR #161 /verify Viewer Denial (403)', false, `Request failed: ${err.message}`);
       }
     }
   } else {
@@ -438,7 +524,27 @@ export async function verifyIngestionE2E({
           : reportValidation.issues.join('; '),
       );
 
-      // Verify report provenance matches target
+      // Verify report provenance matches target job, source identity, and SHA-256
+      const resolvedSourceHash = expectedSourceHash ?? results.job?.source_hash;
+      const provenance = validateReportProvenance(parsedReport, {
+        jobId,
+        expectedSourceId,
+        expectedSourceHash: resolvedSourceHash,
+      });
+      if (parsedReport.source?.source_id) {
+        results.evidenceIds.reportSourceId = parsedReport.source.source_id;
+      }
+      if (parsedReport.source?.sha256) {
+        results.evidenceIds.reportSourceHash = parsedReport.source.sha256;
+      }
+      recordCheck(
+        'Report Job & Source Provenance',
+        provenance.valid,
+        provenance.valid
+          ? `Source ${parsedReport.source?.source_id} (${parsedReport.source?.sha256?.slice(0, 12)}...) verified`
+          : provenance.issues.join('; '),
+      );
+
       const reportDraftsCount = parsedReport.drafts?.length ?? 0;
       if (results.job) {
         const reportMatchesJob = reportDraftsCount === results.job.draft_count;
@@ -480,6 +586,8 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
       'viewer-token': { type: 'string' },
       'require-pr161': { type: 'boolean', default: false },
       'max-provider-calls': { type: 'string' },
+      'expected-source-id': { type: 'string' },
+      'expected-source-hash': { type: 'string' },
       'report-json': { type: 'string' },
       'evidence-out': { type: 'string' },
       help: { type: 'boolean', short: 'h' },
@@ -508,6 +616,8 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
       viewerToken: values['viewer-token'],
       requirePr161: values['require-pr161'],
       maxProviderCalls,
+      expectedSourceId: values['expected-source-id'],
+      expectedSourceHash: values['expected-source-hash'],
       reportJson: values['report-json'],
       readFileFn: (p) => readFile(p, 'utf8'),
       progress: console.log,

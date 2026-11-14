@@ -197,3 +197,45 @@ Per execution discipline, **0 provider calls** were consumed, no queues were mod
 3. End temporary staff sessions and do not commit any tokens or raw provider payloads.
 4. If the promoted `main` API/extraction deployment exhibits regressions, roll back via `wrangler rollback --env staging` (or re-deploy the prior verified `main` SHA `fad0eb0`) while keeping queues paused.
 
+---
+
+## 10. PR #184 Alignment & Read-Only Staging Preflight (2026-11-15)
+
+**Authoritative Setup Reference:** `docs/fe064-staging-setup.md` (`origin/main` `20e52a3`)  
+**Preflight Timestamp:** `2026-11-14T22:50:45Z` (`2026-11-15T04:20+05:30`)  
+**Readiness Status:** **BLOCKED** (for paid provider execution; **PARTIALLY READY** for read-only harness & PR #184 review)
+
+### 10.1 PR #184 Alignment Summary
+
+- `scripts/verify-ingestion-e2e.mjs`:
+  - **Gap A (Provider Budget Boundary):** Marked `providerBudgetEnforcedAtBoundary: false` and `localHarnessGuardOnly: true` in results and `sanitizeEvidence()`, documenting that the local harness guard does not enforce outbound requests made by the Queue consumer or Python extraction service.
+  - **Gap B (Viewer Authorization Probe):** Switched `viewerToken` probe from `/approve` to the identity-first PR #161 `POST /venues/:venueId/drafts/:draftId/verify` handler (`400` for owner empty body = auth before body validation; `403` for viewer; `401` = auth failure).
+  - **Gap C (Exact Schema/Pipeline Pairing):** Updated `validateExtractionReport()` to accept **only** `(1, "2")` or `(2, "3")` and reject mismatched pairs `(1, "3")` / `(2, "2")`.
+  - **Gap D (Job/Source Provenance):** Added `validateReportProvenance()` checking `report.job_id`, `report.source.source_id`, `report.source.sha256`, and `draft_id` / `draft_index` consistency between `drafts` and `evidence`.
+- `scripts/verify-ingestion-e2e.test.mjs`: Expanded to `15` unit tests covering all four gaps and secret redaction.
+
+### 10.2 Real Outbound Provider-Call Budget Architecture
+
+Real outbound call path:
+`API (intake) → peekaplate-staging-menu-ingestion (max_retries=3, 4 deliveries) → consumer (orchestrator.ts) → POST /extract (service.py) → run_pipeline.py → create_cascading_clients() [google_studio, qwen, glm, openrouter] + extract_vision_v4() (vision_llm.ainvoke) + ocr_space fallback`
+
+Why local harness counting is insufficient:
+- Once a job is enqueued, `orchestrator.ts` can retry up to 3 times on transient errors, and `run_pipeline.py` can cascade across up to 4 providers and fall back to OCR + image LLM calls independently of the caller.
+- **Required Atomic Shared Enforcement (Out of PR #184 Scope):** An atomic shared counter (e.g., Postgres `app_private.provider_call_budget` updated via `UPDATE ... SET used = used + 1 WHERE run_id = $1 AND used < $2 RETURNING used`, or a Cloudflare Durable Object / Python container atomic gate) checked **immediately before** every `vision_llm.ainvoke()` and `ocr_space` outbound request, counting initial requests, retries, fallbacks, concurrent attempts, and Queue redeliveries. Because `peekaplate-api-staging` (`20e52a3`) and `peekaplate-extraction-staging` (`60b99488`) are already deployed without this shared atomic gate, **paid provider execution remains BLOCKED**.
+
+### 10.3 Read-Only Staging Preflight Report
+
+| Check | Result | Evidence |
+|---|---|---|
+| **API deployment** | **PASS** | `GET /health` → HTTP `200` (`x-request-id: 350cb7aa-82ef-4288-a20b-ecd3957eb2aa`, `cf-ray: a5a993af6d3754c8-DEL`); Sai confirmed `main` `20e52a3` deployed. |
+| **PR #161 routes** | **PASS (Unauth Route)** | Unauthenticated `POST /venues/4c1b9f0d-cc45-4229-828e-e239b6906ac8/drafts/.../verify` → HTTP `401` (route active, up from `404` on Nov 14). |
+| **Migration** | **PASS (Sai-confirmed)** | `20261113010000_menu_verification_lifecycle.sql` applied and verified by Sai; direct DB query unavailable from local env. |
+| **Extraction Worker** | **PASS (Auth Signal)** | `GET /health` → HTTP `401 {"error":"unauthorized"}` (`cf-ray: a5a993b1dd9654c8-DEL`); Sai confirmed `60b99488-78f3-4d6a-a497-2ff1597f1ab7`. |
+| **Owner access** | **PENDING (No Session)** | Sai confirmed temporary `owner` on `4c1b9f0d-cc45-4229-828e-e239b6906ac8` for `bf16b637-0648-4d72-b958-7c281569672b`; no staff JWT in local env. |
+| **Viewer check** | **Sai-owned / pending** | Sai owns separate Viewer session; not executed from tester env. |
+| **Cross-tenant denial** | **PENDING (No Session)** | Target `00000000-0000-4000-8000-000000000123` confirmed; requires authenticated staff session for `403` probe. |
+| **Queue/DLQ** | **PASS (Sai-confirmed)** | Sai confirmed menu and observation Queues/DLQs empty and paused; local Wrangler lacks `51eda1917fd22a9478808a82d2980741` access. |
+| **Provider budget** | **BLOCKED (Boundary)** | Local harness guard verified (`15/15` tests), but outbound `Queue → Python → provider` boundary lacks atomic shared 2-call enforcement. |
+| **Report provenance** | **PASS (Local)** | `validateExtractionReport()` and `validateReportProvenance()` verified locally against `(1,"2")`/`(2,"3")`, `job_id`, `source_id`, `sha256`, and `draft_id`. |
+
+
