@@ -321,8 +321,8 @@ describe('readOwnerReport report contract and session metrics', () => {
     expect(sql).toContain('opened.local_sequence < comp_order.local_sequence');
     expect(sql).toContain('FROM app_private.observation_event event');
     expect(sql).toContain('participant.dish_id');
-    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at <= $3');
-    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at <= $3');
+    expect(sql).toContain('obs.occurred_at >= $2 AND obs.occurred_at < $3');
+    expect(sql).toContain('act.occurred_at >= $2 AND act.occurred_at < $3');
     expect(reportQuery?.[1]).toEqual([venueId, new Date('2026-11-05T10:00:00Z'), now]);
     expect(sql).toContain('GROUP BY obs.dish_id, obs.session_id');
     expect(sql).toContain('COUNT(DISTINCT');

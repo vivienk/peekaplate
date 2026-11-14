@@ -1434,6 +1434,7 @@ describe('real PostgreSQL menu publication commands', () => {
 
     const response = await requestPublicMenu(menuId);
     expect(response.status).toBe(200);
+    expect((await requestPublicMenu(menuId, otherVenue)).status).toBe(404);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const body = PublicMenuResponseSchema.parse(await response.json());
     expect(body).toMatchObject({

@@ -96,6 +96,11 @@ import {
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import {
+  buildOwnerReportExportFilename,
+  type ExportableOwnerReport,
+  serializeOwnerReportCsv,
+} from './owner-report-export';
+import {
   createPublicMenuResponse,
   menuJwks,
   type PublicMenuRecord,
@@ -1052,6 +1057,70 @@ export function createApp(services: Dependencies = dependencies) {
       'synthetic',
     );
     return c.json(report);
+  });
+  app.use(
+    '/api/v1/venues/:venueId/analytics/dishes/export',
+    cors({
+      origin: [...CONSOLE_REPORT_CORS_ALLOWED_ORIGINS],
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Authorization'],
+      maxAge: 86400,
+    }),
+  );
+  app.get('/api/v1/venues/:venueId/analytics/dishes/export', async (c) => {
+    const authorization = c.req.header('Authorization');
+    if (!authorization || !/^Bearer /.test(authorization)) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const actorId = await services.verify(authorization, c.env ?? {});
+    const scope = VenueScopeSchema.safeParse(c.req.param());
+    if (!scope.success) return c.json({ error: 'invalid_request' }, 400);
+    const env = c.env ?? {};
+    const sources = new URL(c.req.url).searchParams.getAll('source');
+    if (
+      !['local', 'staging'].includes(env.APP_ENV ?? '') ||
+      sources.length !== 1 ||
+      sources[0] !== 'synthetic'
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const approvedSyntheticVenue = VenueScopeSchema.safeParse({
+      venueId: env.SYNTHETIC_REPORT_VENUE_ID,
+    });
+    if (!approvedSyntheticVenue.success) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    const isSyntheticVenue = SYNTHETIC_REPORT_VENUE_ALLOWLIST.includes(
+      approvedSyntheticVenue.data.venueId.toLowerCase(),
+    );
+    if (
+      !isSyntheticVenue ||
+      scope.data.venueId.toLowerCase() !== approvedSyntheticVenue.data.venueId.toLowerCase()
+    ) {
+      return c.json({ error: 'service_unavailable' }, 503);
+    }
+    if (!services.readOwnerReport) throw new AuthUnavailableError();
+    const report = await services.readOwnerReport(
+      actorId,
+      approvedSyntheticVenue.data.venueId,
+      services.now?.() ?? new Date(),
+      env,
+      'synthetic',
+    );
+    const typedReport = report as ExportableOwnerReport;
+    const csv = serializeOwnerReportCsv(typedReport);
+    const filename = buildOwnerReportExportFilename(
+      typedReport.venue_id,
+      typedReport.report_metadata.generated_at,
+    );
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
   });
   app.post('/observations', async (c) => {
     const authorization = c.req.header('Authorization');
