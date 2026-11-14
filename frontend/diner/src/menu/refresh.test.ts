@@ -72,6 +72,124 @@ describe('menu refresher', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
+  // S5-FE-10: a confirmed 404 is the only server report that the menu is gone. It must reach the
+  // screen so the old menu stops being shown; errors, offline and token expiry must not.
+  describe('onWithdrawn (S5-FE-10)', () => {
+    function withdrawable(results: MenuLoadResult[]) {
+      const load = vi.fn(
+        async (): Promise<MenuLoadResult> => results.shift() ?? { status: 'error' },
+      );
+      const onStop = vi.fn();
+      const onWithdrawn = vi.fn();
+      const refresher = createMenuRefresher({
+        source: { load },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop,
+        onWithdrawn,
+      });
+      return { load, onStop, onWithdrawn, refresher };
+    }
+
+    it('calls onWithdrawn once after stopping collection when the server answers 404', async () => {
+      const order: string[] = [];
+      const refresher = createMenuRefresher({
+        source: { load: async () => ({ status: 'unavailable' }) },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop: () => order.push('stop'),
+        onWithdrawn: () => order.push('withdrawn'),
+      });
+      await expect(refresher.refresh()).resolves.toBe('stopped');
+      await expect(refresher.refresh()).resolves.toBe('kept');
+      expect(order).toEqual(['stop', 'withdrawn']);
+    });
+
+    it('does not call onWithdrawn for an error, offline or empty read', async () => {
+      const { onWithdrawn, onStop, refresher } = withdrawable([
+        { status: 'error' },
+        { status: 'offline' },
+        { status: 'empty' },
+      ]);
+      for (let index = 0; index < 3; index++) {
+        await expect(refresher.refresh()).resolves.toBe('kept');
+      }
+      expect(onWithdrawn).not.toHaveBeenCalled();
+      expect(onStop).not.toHaveBeenCalled();
+    });
+
+    it('does not call onWithdrawn when a thrown load becomes an error', async () => {
+      const onWithdrawn = vi.fn();
+      const refresher = createMenuRefresher({
+        source: {
+          load: async () => {
+            throw new Error('boom');
+          },
+        },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop: vi.fn(),
+        onWithdrawn,
+      });
+      await refresher.refresh();
+      expect(onWithdrawn).not.toHaveBeenCalled();
+    });
+
+    it('does not call onWithdrawn when the token merely expires', async () => {
+      const { onStop, onWithdrawn, refresher } = withdrawable([]);
+      const hung = createMenuRefresher({
+        source: { load: () => new Promise(() => {}) },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop,
+        onWithdrawn,
+      });
+      hung.schedule(30 * MIN);
+      refresher.stop();
+      await vi.advanceTimersByTimeAsync(30 * MIN);
+      expect(onStop).toHaveBeenCalledOnce();
+      expect(onWithdrawn).not.toHaveBeenCalled();
+    });
+
+    it('does not call onWithdrawn for a replacement or the same publication', async () => {
+      const { onWithdrawn, refresher } = withdrawable([
+        { status: 'ready', menu: menu('pub-2') },
+        { status: 'ready', menu: menu('pub-1') },
+      ]);
+      await expect(refresher.refresh()).resolves.toBe('swapped');
+      await expect(refresher.refresh()).resolves.toBe('same');
+      expect(onWithdrawn).not.toHaveBeenCalled();
+    });
+
+    it('is optional: a 404 still stops collection without it', async () => {
+      const { onStop, refresher } = setup([{ status: 'unavailable' }]);
+      await expect(refresher.refresh()).resolves.toBe('stopped');
+      expect(onStop).toHaveBeenCalledOnce();
+    });
+
+    it('calls onRecovered only when a re-read succeeds on the same publication', async () => {
+      const results: MenuLoadResult[] = [
+        { status: 'error' },
+        { status: 'ready', menu: menu('pub-1') },
+        { status: 'ready', menu: menu('pub-2') },
+      ];
+      const onRecovered = vi.fn();
+      const refresher = createMenuRefresher({
+        source: { load: async () => results.shift() ?? { status: 'error' } },
+        getCurrent: () => menu('pub-1'),
+        onSwap: vi.fn(),
+        onStop: vi.fn(),
+        onRecovered,
+      });
+      await refresher.refresh();
+      expect(onRecovered).not.toHaveBeenCalled();
+      await expect(refresher.refresh()).resolves.toBe('same');
+      expect(onRecovered).toHaveBeenCalledOnce();
+      await expect(refresher.refresh()).resolves.toBe('swapped');
+      expect(onRecovered).toHaveBeenCalledOnce();
+    });
+  });
+
   it('on an error keeps the menu and retries once halfway to expiry', async () => {
     const { load, onSwap, onStop, refresher } = setup([{ status: 'error' }, { status: 'error' }]);
     refresher.schedule(30 * MIN);

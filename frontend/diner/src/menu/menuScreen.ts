@@ -118,21 +118,26 @@ function renderLoading(container: HTMLElement): void {
 
 function renderFailure(
   container: HTMLElement,
-  status: MenuLoadResult['status'],
+  status: MenuLoadResult['status'] | 'withdrawn',
   onRetry?: () => void,
 ): void {
   const messages: Record<string, string> = {
     empty: 'No dishes are available right now.',
     unavailable: 'This menu is unavailable right now.',
+    // INTERIM copy for S5-FE-10 (the server reported the menu gone); design confirmation pending.
+    withdrawn:
+      'This menu is no longer available. The restaurant may have updated or withdrawn it. Please check again.',
     error: 'We could not load the menu. Please try again.',
     offline: 'You appear to be offline. Please check your connection.',
   };
-  const showRetry = (status === 'error' || status === 'offline') && Boolean(onRetry);
+  const showRetry =
+    (status === 'error' || status === 'offline' || status === 'withdrawn') && Boolean(onRetry);
+  const retryLabel = status === 'withdrawn' ? 'Check again' : 'Try again';
   container.innerHTML = `
     <h1 class="pp-sr-only">${escapeHtml(stateHeading())}</h1>
     <div class="pp-menu pp-menu--state" role="status" aria-live="polite">
       <p class="pp-state-text">${escapeHtml(messages[status] ?? 'We could not load the menu.')}</p>
-      ${showRetry ? '<button class="pp-button" type="button" data-retry>Try again</button>' : ''}
+      ${showRetry ? `<button class="pp-button" type="button" data-retry>${retryLabel}</button>` : ''}
       ${fixtureNotice()}
     </div>
   `;
@@ -399,6 +404,8 @@ export function mountMenuScreen(container: HTMLElement): void {
   let savedRouteAdded = false;
   let isLoading = false;
   let retryCount = 0;
+  // True after a re-read failed for a transient reason; the old menu stays and Retry is offered.
+  let refreshFailed = false;
 
   // Tracking state. IDs, timing and dispatch belong to the shared tracking layer.
   let openingClock: ReturnType<typeof startOpeningClock> | null = null;
@@ -534,6 +541,44 @@ export function mountMenuScreen(container: HTMLElement): void {
     }
   };
 
+  const clearRefreshNotice = () => {
+    container.querySelectorAll('.pp-refresh-notice').forEach((element) => {
+      element.remove();
+    });
+  };
+
+  // S5-FE-10: a failed re-read keeps the menu but must not look like a success. INTERIM copy;
+  // design confirmation pending. Re-applied after every screen render while the failure stands.
+  const applyRefreshNotice = () => {
+    clearRefreshNotice();
+    if (!refreshFailed || currentMenu === null) return;
+    const element = document.createElement('div');
+    element.className = 'pp-refresh-notice';
+    element.setAttribute('role', 'status');
+    element.innerHTML = `<p class="pp-notice">We could not refresh the menu. What you see may be out of date.</p><button class="pp-button" type="button" data-refresh-retry>Retry</button>`;
+    container.prepend(element);
+    element.querySelector('[data-refresh-retry]')?.addEventListener('click', () => {
+      void retryRefresh();
+    });
+  };
+
+  // The visitor's Retry reuses the same re-read. A same publication fires no menu_viewed, and a
+  // failed read never reaches the analytics trigger, so a retry cannot duplicate events.
+  async function retryRefresh(): Promise<void> {
+    const refresher = activeRefresher;
+    if (!refresher) return;
+    container.querySelector('[data-refresh-retry]')?.setAttribute('disabled', '');
+    const outcome = await refresher.refresh();
+    if (outcome === 'same') {
+      refreshFailed = false;
+      clearRefreshNotice();
+      focusAfterRetry(container, true);
+    } else if (outcome === 'kept') {
+      applyRefreshNotice();
+      container.querySelector<HTMLButtonElement>('[data-refresh-retry]')?.focus();
+    }
+  }
+
   const switchScreen = (next: typeof view) => {
     if (view === 'menu') savedScroll = window.scrollY;
     leaveScreen();
@@ -560,6 +605,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     else restoreOpenerFocus();
     if (canTrackUi()) menuViewedTrigger(menu, entrySource);
     startExposureTracking(menu);
+    applyRefreshNotice();
   };
 
   const showDetail = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
@@ -581,6 +627,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
     window.scrollTo(0, 0);
+    applyRefreshNotice();
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.
     if (fromSaved) {
@@ -646,6 +693,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     const title = container.querySelector<HTMLElement>('.pp-saved__title');
     title?.setAttribute('tabindex', '-1');
     title?.focus();
+    applyRefreshNotice();
   };
 
   // The header heart: adds the Saved route, and the route change shows the screen.
@@ -681,34 +729,51 @@ export function mountMenuScreen(container: HTMLElement): void {
   window.addEventListener('hashchange', onRouteChange);
   stopRouting = () => window.removeEventListener('hashchange', onRouteChange);
 
+  // S5-FE-10: the server reported the menu gone (404 on a re-read). Stop showing it at once, on
+  // whatever screen is open (list, dish detail or Saved), explain, and offer "Check again".
+  // Saved dishes stay stored; they are shown again only after a fresh load succeeds.
+  const showWithdrawn = (onRetry: () => void) => {
+    switchScreen('menu');
+    currentMenu = null;
+    refreshFailed = false;
+    exposureIds.clear();
+    activeCategoryId = null;
+    searchQuery = null;
+    openerDishId = null;
+    savedScroll = 0;
+    renderFailure(container, 'withdrawn', onRetry);
+    window.scrollTo(0, 0);
+    // The focused control was just removed; move focus to the explanation so it is announced.
+    const text = container.querySelector<HTMLElement>('.pp-state-text');
+    text?.setAttribute('tabindex', '-1');
+    text?.focus({ preventScroll: true });
+  };
+
   // Called by the re-read timer when a new publication replaced the old one. The swap is a single
-  // assignment. The list is redrawn only if it is on screen; an open dish detail stays as it is
-  // and going back shows the new menu.
+  // assignment. The list is redrawn in place; from a dish detail or Saved the diner returns to the
+  // new list with a notice.
   const swapMenu = (next: Menu) => {
+    refreshFailed = false;
     exposureIds.clear();
     currentMenu = next;
     // A new publication is a successful load: withdrawn saved dishes drop out (no event).
     saveState?.reconcile(next);
-    if (view === 'saved') {
-      const focused = document.activeElement;
-      const dishId = focused?.closest<HTMLElement>('.pp-saved__item')?.dataset.dishId;
-      const wasHeart = focused?.matches('.pp-saved__save');
-      const scrollY = window.scrollY;
-      showSaved(false);
-      if (dishId) {
-        const row = Array.from(container.querySelectorAll<HTMLElement>('.pp-saved__item')).find(
-          (item) => item.dataset.dishId === dishId,
-        );
-        row
-          ?.querySelector<HTMLElement>(wasHeart ? '.pp-saved__save' : '.pp-saved__open')
-          ?.focus({ preventScroll: true });
+    // S5-FE-10 (Option A, approved for P0): if a dish detail or the Saved screen is open, return
+    // to the new list and say so, so the old content is never shown as current.
+    if (view !== 'menu') {
+      if (isSavedRoute()) {
+        savedRouteAdded = false;
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
-      window.scrollTo(0, scrollY);
+      savedScroll = 0;
+      showMenu();
+      const notice = document.createElement('p');
+      notice.className = 'pp-notice';
+      notice.setAttribute('role', 'status');
+      notice.textContent = 'This menu was updated.';
+      container.querySelector('.pp-menu')?.prepend(notice);
       return;
     }
-    // Only the list is redrawn. An open dish detail or Saved screen stays as it is, and going back
-    // shows the new menu.
-    if (view !== 'menu') return;
     const scrollY = window.scrollY;
     const focused = document.activeElement;
     let selector: string | null = null;
@@ -780,6 +845,7 @@ export function mountMenuScreen(container: HTMLElement): void {
     activeLoad = controller;
     const mode = menuMode(import.meta.env.VITE_MENU_SOURCE);
     fixtureMode = mode === 'fixture';
+    refreshFailed = false;
     renderLoading(container);
 
     // Re-reading scenario and delay from the query on each load allows retry recovery
@@ -829,12 +895,22 @@ export function mountMenuScreen(container: HTMLElement): void {
               source: { load: () => source.load(controller.signal) },
               getCurrent: () => currentMenu,
               onSwap: swapMenu,
-              // The publication is gone. The menu on screen stays, but nothing more is delivered.
+              // The publication is gone. Nothing more is delivered, and onWithdrawn removes the menu.
               onStop: () => {
                 menuToken = null;
                 controller.abort();
                 liveTrackingOn = false;
                 void tracking.suspendLiveTracking();
+              },
+              onWithdrawn: () => showWithdrawn(handleRetry),
+              onTransientFailure: () => {
+                refreshFailed = true;
+                applyRefreshNotice();
+              },
+              onRecovered: () => {
+                if (!refreshFailed) return;
+                refreshFailed = false;
+                clearRefreshNotice();
               },
             });
             return source.load(controller.signal);
@@ -852,7 +928,10 @@ export function mountMenuScreen(container: HTMLElement): void {
         if (controller.signal.aborted) return;
         isLoading = false;
         if (result.status !== 'ready') {
-          renderFailure(container, result.status, handleRetry);
+          // After "Check again" a 404 must keep offering it, or the visitor is stuck (S5-FE-10).
+          const failure =
+            result.status === 'unavailable' && retryCount > 0 ? 'withdrawn' : result.status;
+          renderFailure(container, failure, handleRetry);
           if (retryCount > 0) {
             focusAfterRetry(container, false);
           }

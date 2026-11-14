@@ -49,6 +49,12 @@ export function createSaveState({
   let inMenu: Set<string> | null = null;
   const listeners = new Set<() => void>();
 
+  // S5-FE-10: saved IDs stay in storage, but only dishes in the current published menu are shown or
+  // counted. A dish missing from a new menu is hidden, not deleted, and returns if it is published
+  // again. Before the first successful menu load nothing is filtered (nothing is shown yet).
+  const visibleIds = (ids: readonly string[]): readonly string[] =>
+    inMenu === null ? ids : ids.filter((id) => inMenu?.has(id));
+
   // One broken screen must not stop the others from updating.
   function notify() {
     for (const listener of listeners) {
@@ -83,43 +89,43 @@ export function createSaveState({
     const next = update(dishIds);
     if (next === dishIds) {
       if (read === 'refreshed') notify();
-      return { changed: false, persisted: false, savedCount: dishIds.length };
+      return { changed: false, persisted: false, savedCount: visibleIds(dishIds).length };
     }
     const persisted = read === 'unreadable' ? false : persistence.persist(next);
     dishIds = next;
     notify();
-    return { changed: true, persisted, savedCount: next.length };
+    return { changed: true, persisted, savedCount: visibleIds(next).length };
   }
 
   return {
-    isSaved: (dishId) => dishIds.includes(dishId),
-    savedDishIds: () => dishIds,
-    savedCount: () => dishIds.length,
+    isSaved: (dishId) => visibleIds(dishIds).includes(dishId),
+    savedDishIds: () => visibleIds(dishIds),
+    savedCount: () => visibleIds(dishIds).length,
     isSaveAvailable: () => persistence.mode() === 'persistent',
     mode: () => persistence.mode(),
 
     // Complete or incomplete dishes in the current menu, so Undo can restore an incomplete one.
     save(dishId) {
       if (!inMenu?.has(dishId)) {
-        return { changed: false, persisted: false, savedCount: dishIds.length };
+        return { changed: false, persisted: false, savedCount: visibleIds(dishIds).length };
       }
       return change((ids) => addNewest(ids, dishId));
     },
 
     unsave: (dishId) => change((ids) => withoutDish(ids, dishId)),
 
-    // Call only after a successful menu load: a failed load must never wipe saves. Withdrawn
-    // dishes are removed (not a diner action, so no event); incomplete ones stay as placeholders.
+    // Call only after a successful menu load: a failed load must never touch saves. Dishes missing
+    // from the menu are hidden (S5-FE-10), never deleted from storage, so no event fires and they
+    // reappear if published again; incomplete ones stay as placeholders. `removed` lists the hidden IDs.
     reconcile(menu) {
       if (menu.venueId !== venueId) return { removed: [] };
+      // Screens are told only when what they show changes (a dish hidden or shown again).
+      const before = visibleIds(dishIds);
       const current = menuDishIds(menu);
       inMenu = current;
-      let removed: string[] = [];
-      change((ids) => {
-        removed = ids.filter((id) => !current.has(id));
-        return removed.length > 0 ? ids.filter((id) => current.has(id)) : ids;
-      });
-      return { removed };
+      refresh();
+      if (!sameIds(before, visibleIds(dishIds))) notify();
+      return { removed: dishIds.filter((id) => !current.has(id)) };
     },
 
     subscribe(listener) {
