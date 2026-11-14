@@ -223,7 +223,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Owner onboarding S05 (FE-05) and S06–S07 (FE-06) are presentational (props in, callbacks out). Persisted setup and real publication/reporting integration remain separate.",
+      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Rania-approved editable signup/reset email sources preserve token placeholders. Owner onboarding S05 (FE-05) and S06–S08 (FE-06, not Ready to review) are presentational: props in, callbacks out. Persisted setup and real publication/reporting integration remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -294,7 +294,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/onboarding/UploadMenu.tsx",
         "frontend/console/src/onboarding/menu-source.ts",
         "frontend/console/src/onboarding/menu-source.test.tsx",
-        "tests/e2e/owner-onboarding-screens.spec.ts"
+        "tests/e2e/owner-onboarding-screens.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -304,7 +305,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3b4c035713e7eced6abd50c8a954d366ca7be3ec1f4af6b3f4b6267a3197f7c6"
+      "sourceFingerprint": "fc98d09f18f93ebb0a28173aef0ed31768f16050662ebed96f39b12c67a9cf01"
     },
     {
       "id": "backend",
@@ -612,7 +613,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "46d50930e85b64f193ddf67e9e31ed95bd131ba3c832fca2c1d0126d87afbda7"
+      "sourceFingerprint": "91080bea6ff01bda34540c3eee4388bc0514464a1c01517b4925f93140a29e82"
     },
     {
       "id": "agents",

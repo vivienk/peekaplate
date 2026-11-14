@@ -808,6 +808,210 @@
   gap: var(--pp-space-16);
 }
 
+/* S08: the 150px icon tile, 48, the text, then 64 to the buttons. */
+.pp-onboard-process {
+  display: grid;
+  gap: 4rem;
+}
+
+.pp-onboard-process__content {
+  display: grid;
+  justify-items: center;
+  gap: var(--pp-space-48);
+}
+
+.pp-onboard-process__content > :not(.pp-onboard-process__tile) {
+  justify-self: stretch;
+}
+
+.pp-onboard-process .pp-onboard__title:focus {
+  outline: none;
+}
+
+/* Icon tile: 150, 24 radius, icon/accent-container with the 96px icon/accent icon; error-container
+ * with the bowl when extraction failed. */
+.pp-onboard-process__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 9.375rem;
+  height: 9.375rem;
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-onboard-pending-preview-surface);
+}
+
+.pp-onboard-process__tile--error {
+  background: var(--pp-color-error-50);
+}
+
+/* The handoff asks for a loading indicator; Figma has no motion, so the sync icon turns slowly. */
+.pp-onboard-process__spinner {
+  animation: pp-onboard-spin 2.4s linear infinite;
+}
+
+@keyframes pp-onboard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-onboard-process__spinner {
+    animation: none;
+  }
+}
+
+/* Title, 24, the step and text (8 apart), 24, the information box; the error message and the
+ * sources follow the same 24. */
+.pp-onboard-process__body,
+.pp-onboard-process__head {
+  display: grid;
+  gap: var(--pp-space-24);
+}
+
+.pp-onboard-process__intro,
+.pp-onboard-process__lead {
+  display: grid;
+  gap: var(--pp-space-8);
+  text-align: center;
+}
+
+.pp-onboard-process__step,
+.pp-onboard-process__text {
+  margin: 0;
+}
+
+/* 18/28 semibold on-surface. */
+.pp-onboard-process__step {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* 14/24 text/secondary. */
+.pp-onboard-process__text {
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-onboard-process .pp-auth-banner {
+  margin: 0;
+}
+
+/* Information box: information-container, 1.5px white edge, 12 radius, 16 padding; the 20px File
+ * icon in a 32 box, 8, then the title (18/28 semibold), text (16/24) and note (14/24 on-surface),
+ * 8 apart, in on-information-container. */
+.pp-onboard-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-8);
+  padding: var(--pp-space-16);
+  border: 1.5px solid var(--pp-color-white);
+  border-radius: var(--pp-radius-12);
+  background: var(--pp-color-info-50);
+  color: var(--pp-color-info-900);
+}
+
+.pp-onboard-info__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-32);
+  height: var(--pp-space-32);
+}
+
+.pp-onboard-info__text {
+  display: grid;
+  gap: var(--pp-space-8);
+}
+
+.pp-onboard-info__title,
+.pp-onboard-info__body,
+.pp-onboard-info__note {
+  margin: 0;
+}
+
+.pp-onboard-info__title {
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard-info__body {
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-onboard-info__note {
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+/* Your source: 1px outline edge, 12 radius, 8 below; the outline-variant header (8/16 padding,
+ * 18/28 semibold), 8, then one row per file (16 at the sides, 4 apart): image icon, 6, the name
+ * (14/24), and the type and size (12/16 medium text/secondary) on the right. */
+.pp-onboard-sources {
+  display: grid;
+  gap: var(--pp-space-8);
+  padding-bottom: var(--pp-space-8);
+  overflow: hidden;
+  border: 1px solid var(--pp-role-input-border);
+  border-radius: var(--pp-radius-12);
+}
+
+.pp-onboard-sources__title {
+  margin: 0;
+  padding: var(--pp-space-8) var(--pp-space-16);
+  background: var(--pp-color-gray-200);
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-onboard-sources__list {
+  display: grid;
+  gap: var(--pp-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-onboard-sources__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pp-space-6);
+  padding-inline: var(--pp-space-16);
+}
+
+.pp-onboard-sources__item img {
+  flex: none;
+}
+
+.pp-onboard-sources__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--pp-auth-text);
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-onboard-sources__meta {
+  display: flex;
+  flex: 1 0 auto;
+  justify-content: flex-end;
+  gap: var(--pp-space-6);
+  color: var(--pp-auth-text-secondary);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-medium);
+  white-space: nowrap;
+}
+
 @media (max-width: 40rem) {
   .pp-onboard__container {
     gap: var(--pp-space-32);

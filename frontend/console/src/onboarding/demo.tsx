@@ -1,6 +1,8 @@
-// Preview-only demo of the owner onboarding screens (FE-05 S05; FE-06 S06 and S07; S08 follows),
-// built only for PR previews like the sign-in demo. The demo stands in for the caller: it answers
-// saves, link imports and uploads with the outcomes picked below. Nothing is sent or kept.
+// Preview-only demo of the owner onboarding screens (FE-05 S05; FE-06 S06–S08), built only for PR
+// previews like the sign-in demo. The demo stands in for the caller: it answers saves, link imports,
+// uploads and menu processing with the outcomes picked below. Nothing is sent or kept. S08 "Your
+// menu is ready to review" is not part of this work (Harshita, with S10): when dishes are found the
+// demo only names that screen.
 import { StrictMode, useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../style.css';
@@ -10,6 +12,7 @@ import { ChooseMenuSource, type MenuSource } from './ChooseMenuSource';
 import sampleMenu1 from './demo-assets/sample-menu-1.jpg';
 import sampleMenu2 from './demo-assets/sample-menu-2.jpg';
 import type { RestaurantDetails as Details } from './details';
+import { MenuProcessing, type MenuProcessingState, type MenuSourceItem } from './MenuProcessing';
 import { menuFileKind } from './menu-source';
 import { OnboardingLayout } from './OnboardingLayout';
 import { RestaurantDetails } from './RestaurantDetails';
@@ -33,7 +36,23 @@ const SCREENS: Record<string, string> = {
   s06: 'S06 Choose how to add your menu',
   's07-url': 'S07 Add your menu link',
   's07-upload': 'S07 Upload your menu',
+  s08: 'S08 Processing your menu',
 };
+
+const PROCESS_ANSWERS: Record<string, string> = {
+  dishes: 'Dishes found',
+  'no-dishes': 'No dishes found',
+  failed: 'Extraction failed',
+};
+
+// Shown under "Your source" when S08 is opened from the demo bar.
+const SAMPLE_SOURCES: MenuSourceItem[] = [
+  { name: 'Ember_Stone_Diner_Menu01.jpeg', kind: 'image', size: 15_000 },
+  { name: 'Ember_Stone_Diner_Menu02.jpeg', kind: 'image', size: 15_000 },
+];
+
+// Long enough to read the processing screen.
+const PROCESS_MS = 2500;
 
 const LINK_ANSWERS: Record<string, string> = {
   accepted: 'Link accepted',
@@ -94,6 +113,28 @@ function Demo() {
   const [linkFailure, setLinkFailure] = useState<MenuLinkFailure>();
   const [uploadAnswer, setUploadAnswer] = useState('progress');
   const uploads = useUploads(uploadAnswer, () => setRequests((n) => n + 1));
+  const [processAnswer, setProcessAnswer] = useState('failed');
+  const [processState, setProcessState] = useState<MenuProcessingState>('processing');
+  const [processSources, setProcessSources] = useState<MenuSourceItem[]>(SAMPLE_SOURCES);
+
+  // S08 follows the extraction on its own: processing, then the result picked in the demo bar.
+  useEffect(() => {
+    if (screen !== 's08' || done) return;
+    setProcessState('processing');
+    const timer = setTimeout(() => {
+      if (processAnswer === 'dishes') {
+        setDone('S08 Your menu is ready to review (Harshita, with S10; not part of this demo)');
+      } else {
+        setProcessState(processAnswer as MenuProcessingState);
+      }
+    }, PROCESS_MS);
+    return () => clearTimeout(timer);
+  }, [screen, run, processAnswer, done]);
+
+  const startProcessing = (sources: MenuSourceItem[]) => {
+    setProcessSources(sources);
+    go('s08');
+  };
 
   const restart = () => {
     setDone(null);
@@ -110,13 +151,13 @@ function Demo() {
     restart();
   };
 
-  const importLink = () => {
+  const importLink = (url: string) => {
     setRequests((n) => n + 1);
     setImporting(true);
     setLinkFailure(undefined);
     setTimeout(() => {
       setImporting(false);
-      if (linkAnswer === 'accepted') setDone('S08 Processing');
+      if (linkAnswer === 'accepted') startProcessing([{ name: url, kind: 'link' }]);
       else setLinkFailure(linkAnswer as MenuLinkFailure);
     }, DELAY_MS);
   };
@@ -178,6 +219,14 @@ function Demo() {
               options={LINK_ANSWERS}
               value={linkAnswer}
               onChange={setLinkAnswer}
+            />
+          )}
+          {screen === 's08' && (
+            <Choice
+              label="Processing ends with"
+              options={PROCESS_ANSWERS}
+              value={processAnswer}
+              onChange={setProcessAnswer}
             />
           )}
           {screen === 's07-upload' && (
@@ -252,8 +301,18 @@ function Demo() {
               onReplace={uploads.replace}
               onRemove={uploads.remove}
               onRetry={uploads.retry}
-              onContinue={() => setDone('S08 Processing')}
+              onContinue={() =>
+                startProcessing(uploads.files.map(({ name, kind, size }) => ({ name, kind, size })))
+              }
               onBack={() => go('s06')}
+            />
+          )}
+          {screen === 's08' && (
+            <MenuProcessing
+              state={processState}
+              sources={processSources}
+              onCancel={() => setDone('S12 Dashboard')}
+              onTryAnother={() => go('s06')}
             />
           )}
         </OnboardingLayout>

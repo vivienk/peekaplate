@@ -196,7 +196,7 @@ test('S07 link: Import menu waits for a valid address, then shows Loading and op
   await expect(importMenu(page)).not.toHaveAttribute('aria-disabled');
   await importMenu(page).click();
   await expect(page.getByRole('button', { name: 'Loading' })).toHaveAttribute('aria-busy', 'true');
-  await expect(page.getByText('In the product this opens S08 Processing')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Processing your menu', level: 1 })).toBeVisible();
   await expect(page.getByText('Requests sent: 1')).toBeVisible();
 });
 
@@ -282,7 +282,7 @@ test('S07 upload: files show progress, then a preview, and Continue opens S08', 
   await expect(page.getByRole('img', { name: 'Preview of menu-2.png' })).toBeVisible();
   await expect(next).not.toHaveAttribute('aria-disabled');
   await next.click();
-  await expect(page.getByText('In the product this opens S08 Processing')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Processing your menu', level: 1 })).toBeVisible();
 });
 
 test('S07 upload: unsupported and too-large files are not uploaded', async ({ page }) => {
@@ -367,5 +367,98 @@ test('S07 screens fit a phone without sideways scrolling', async ({ page }) => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow, screen).toBeLessThanOrEqual(0);
+  }
+});
+
+// FE-06 S08 menu processing. The demo ends processing with the result picked in its bar. S08 "Your
+// menu is ready to review" is not built here (Harshita, with S10).
+async function openS08(page: Page, answer: string) {
+  await page.goto(demo);
+  await page.getByLabel('Screen', { exact: true }).selectOption('s08');
+  await page.getByLabel('Processing ends with').selectOption(answer);
+}
+
+test('S08 shows processing with only Cancel, then the result on its own', async ({ page }) => {
+  await openS08(page, 'no-dishes');
+  await expect(page.getByRole('heading', { name: 'Processing your menu', level: 1 })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('Identifying menu sections...');
+  await expect(page.getByText('No items will go live or be published')).toBeVisible();
+  await expect(page.getByRole('button')).toHaveText(['Start again', 'Cancel']);
+  const result = page.getByRole('heading', { name: 'No dishes found', level: 1 });
+  await expect(result).toBeVisible();
+  await expect(result).toBeFocused();
+  await page.getByRole('button', { name: 'Try another source' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Choose how to add your menu', level: 1 }),
+  ).toBeVisible();
+});
+
+test('S08 extraction failed shows the error and the files used, and Cancel opens S12', async ({
+  page,
+}) => {
+  await openS08(page, 'failed');
+  await expect(
+    page.getByRole('heading', { name: 'We couldn’t process your menu', level: 1 }),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText(
+    'Extraction error — Unable to read file content',
+  );
+  const sources = page.getByRole('region', { name: 'Your source' });
+  await expect(sources.getByRole('listitem')).toHaveCount(2);
+  await expect(sources).toContainText('Ember_Stone_Diner_Menu01.jpeg');
+  await expect(sources).toContainText('JPEG image');
+  const { violations } = await new AxeBuilder({ page })
+    .include('.pp-onboard')
+    .exclude('.pp-onboard__brand')
+    .analyze();
+  expect(violations).toEqual([]);
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByText('In the product this opens S12 Dashboard')).toBeVisible();
+});
+
+test('S08 does not include Ready to review: found dishes hand over to that screen', async ({
+  page,
+}) => {
+  await openS08(page, 'dishes');
+  const { violations } = await new AxeBuilder({ page })
+    .include('.pp-onboard')
+    .exclude('.pp-onboard__brand')
+    .analyze();
+  expect(violations).toEqual([]);
+  await expect(
+    page.getByText(/In the product this opens S08 Your menu is ready to review/),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: /ready to review/i })).toHaveCount(0);
+});
+
+test('uploaded files and an imported link are listed as the source when extraction fails', async ({
+  page,
+}) => {
+  await openS07Upload(page);
+  await page.getByLabel('Choose file').setInputFiles(png('menu-1.png'));
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByLabel('Processing ends with').selectOption('failed');
+  const sources = page.getByRole('region', { name: 'Your source' });
+  await expect(sources).toContainText('menu-1.png');
+  await expect(sources).toContainText('PNG image');
+  await openS07Link(page);
+  await page.getByLabel('Menu URL').fill('https://ember.example/menu');
+  await page.getByRole('button', { name: 'Import menu' }).click();
+  await page.getByLabel('Processing ends with').selectOption('failed');
+  await expect(page.getByRole('region', { name: 'Your source' })).toContainText(
+    'https://ember.example/menu',
+  );
+  await expect(page.getByRole('region', { name: 'Your source' })).toContainText('Web page');
+});
+
+test('S08 fits a phone without sideways scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  for (const answer of ['no-dishes', 'failed']) {
+    await openS08(page, answer);
+    await expect(page.getByRole('button', { name: 'Try another source' })).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, answer).toBeLessThanOrEqual(0);
   }
 });
