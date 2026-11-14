@@ -475,7 +475,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "16c5244cbcf3ceaa8b7d39b866e2cc41b5cae0ee746fa8bf520b6b117e9c0a94"
+      "sourceFingerprint": "f0fc552f807e63d9f465e3b7b011db98938dea2bacce5a1f5a7a217dd5c47f14"
     },
     {
       "id": "database",
@@ -682,7 +682,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. FE-06.4 has a read-only job/draft verifier with tenant and attempt identity checks, strict report version pairing and explicit unknown upstream provider usage; it cannot enforce provider budgets or replace hosted UI/accuracy acceptance.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -764,7 +764,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_ingredient_intelligence.py",
         "processing/tests/fixtures/ingredient-review.json",
         "docs/ingredient-intelligence.md",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "scripts/verify-ingestion-e2e.mjs",
+        "scripts/verify-ingestion-e2e.test.mjs",
+        "scripts/verify-ingestion-e2e.regression.test.mjs",
+        "docs/staging-e2e-acceptance-2026-11-14.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -773,7 +777,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "60216b87932a13fdf733bb4982bceac50ac1e4b689034bcb0f6ec5adaf92d160"
+      "sourceFingerprint": "2f0607e4fe7706134f99c8c9e646b43c03169b11baa3531c0833f47c84120a13"
     },
     {
       "id": "assets",
@@ -808,19 +812,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR128 reconciled with current develop, preserving prior owner/report/CSV updates. Report source changes must never reuse another source’s data.",
-      "sources": [
-        "frontend/console/src/owner-dashboard/report-api.ts",
-        "frontend/console/src/owner-dashboard/report-data.tsx",
-        "tests/e2e/owner-report-api.spec.ts"
-      ],
-      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
-    },
     {
       "date": "2026-11-13",
       "modules": [
@@ -955,6 +946,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-auth.md"
       ],
       "next": "Finish pinned review/checks, promote the narrow correction to main, then verify the actual hosted clean callback paths. Genuine staff-session/email acceptance remains separate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "processing",
+        "backend"
+      ],
+      "summary": "PR184 verifier fails closed on missing/failed/foreign records, uses the identity-first viewer probe, checks source/producer identities and redacts evidence. Provider usage stays unknown; no fake hard cap. Real local Worker/DB coverage exercises owner/viewer/cross-venue routes.",
+      "sources": [
+        "scripts/verify-ingestion-e2e.mjs",
+        "scripts/verify-ingestion-e2e.test.mjs",
+        "scripts/verify-ingestion-e2e.regression.test.mjs",
+        "docs/staging-e2e-acceptance-2026-11-14.md",
+        "backend/src/ingestion/ingestion.integration.ts"
+      ],
+      "next": "Use the current PR185 staging deployment and own sessions for the controlled fictional-menu run; verify actual provider budget before intake, then record UI/save/reload and cleanup separately."
     }
   ]
 }
