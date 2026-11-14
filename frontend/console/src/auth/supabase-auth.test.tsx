@@ -66,6 +66,28 @@ describe('owner provider configuration', () => {
   });
 });
 
+describe('actor-bound owner tokens', () => {
+  it('verifies each requested token and refuses another actor or a signed-out session', async () => {
+    const { runtime } = fixture([{ body: session }, { body: user }, { body: user }, { body: {} }]);
+    expect(
+      await runtime.service.signIn({ email: user.email, password: 'synthetic-password' }),
+    ).toEqual({ kind: 'signed_in' });
+    expect(await runtime.accessTokenFor(user.id)).toBe(session.access_token);
+    expect(await runtime.accessTokenFor('22222222-2222-4222-8222-222222222222')).toBeNull();
+    await runtime.signOut();
+    expect(await runtime.accessTokenFor(user.id)).toBeNull();
+  });
+  it('does not expose a token if the provider cannot verify the user', async () => {
+    const { runtime } = fixture([
+      { body: session },
+      { body: user },
+      { status: 401, body: { code: 'bad_jwt', message: 'synthetic denial' } },
+    ]);
+    await runtime.service.signIn({ email: user.email, password: 'synthetic-password' });
+    expect(await runtime.accessTokenFor(user.id)).toBeNull();
+  });
+});
+
 describe('Supabase owner adapter (real SDK, synthetic HTTP)', () => {
   it('resends signup confirmation through PKCE at the exact callback and can confirm it', async () => {
     const { runtime, calls } = fixture([

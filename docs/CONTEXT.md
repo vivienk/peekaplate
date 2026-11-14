@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque. Strict owner workspace lists only actor-bound owner/editor restaurant identity, never setup status.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -67,7 +67,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md",
         "packages/contracts/src/owner-menu.ts",
         "packages/contracts/src/owner-menu.test.ts",
-        "packages/contracts/package.json"
+        "packages/contracts/package.json",
+        "packages/contracts/src/owner-workspace.ts",
+        "packages/contracts/src/owner-workspace.test.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -75,7 +77,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "ee8214487ae5a84788e49b17c20204a83bb9bfa6829f4710975de915820e7ce5"
+      "sourceFingerprint": "d08528e0a4356957ceda030d5bad6c906e7035174124f3c7ab70031d5e4cee15"
     },
     {
       "id": "tokens",
@@ -223,7 +225,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication; success dismissal restores stable dashboard focus. AI composer stays disabled. Report data validates public owner reports, venue and failure states; saved samples stay labelled. Typed AI result view validates venue/window and cannot apply changes. Signup/sign-in and confirmation use the pinned Supabase browser SDK, public config and server-owned venue authority. Preview builds disable provider auth and keep demos; normal builds carry provider entry/callback pages. Stacked recovery binds purpose/session and isolates password changes in memory. Rania-approved editable signup/reset email sources preserve token placeholders. Persisted setup and real publication/reporting integration remain separate.",
+      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. Persisted setup, menu intake/edit/publish UI and hosted full-journey acceptance remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -285,7 +287,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-auth.spec.ts",
         "frontend/console/auth-reset.html",
         "frontend/console/src/auth/recovery-provider.test.tsx",
-        "tests/e2e/owner-recovery.spec.ts"
+        "tests/e2e/owner-recovery.spec.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/owner/workspace-api.ts",
+        "frontend/console/src/owner/workspace-api.test.tsx",
+        "frontend/console/src/owner/workspace.css",
+        "docs/owner-session-workspace.md",
+        "tests/e2e/owner-workspace.spec.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -295,12 +303,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3e792a869a0e1d87cb23674ba88b33b20b532865c25f4103702b9de1cec23e47"
+      "sourceFingerprint": "2d0eb8025dd76dc74888eb1e85ec6de3ba633abc8c7049bf9d8cd664fadbe53b"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, atomic commands/publication, signed menus and canonical observations. Owner workspace supports versioned private drafts/photos, uploads, fenced recovery and content-checked promotion; retention needs configuration. Synthetic-gated reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression; CSV preserves guards/VALID_ZERO. Owner actions are idempotent. Owner-AI validates privacy/IDs; trusted issuance and live AI remain unwired. Publishing reserves permanent name-seeded diner links atomically; scoped public resolution and owner URL retrieval preserve v1 receipts. Connected owner UI, hosted reconciliation and production domain acceptance remain separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, atomic commands/publication, signed menus and canonical observations. Owner workspace supports versioned private drafts/photos, uploads, fenced recovery and content-checked promotion; retention needs configuration. Synthetic-gated reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression; CSV preserves guards/VALID_ZERO. Owner actions are idempotent. Owner-AI validates privacy/IDs; trusted issuance and live AI remain unwired. Publishing reserves permanent name-seeded diner links atomically; scoped public resolution and owner URL retrieval preserve v1 receipts. Read-only staff restaurant discovery uses actor membership locks and tenant-scoped names under existing runtime RLS. Hosted bridge release, upload/publish UI and production domain acceptance remain separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -451,7 +459,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/data06/tsconfig.json",
         "backend/src/restaurant-link.ts",
         "backend/src/restaurant-link.test.ts",
-        "backend/src/restaurant-link-http.test.ts"
+        "backend/src/restaurant-link-http.test.ts",
+        "backend/src/owner-workspace.ts",
+        "backend/src/owner-workspace-http.test.ts",
+        "backend/src/owner-workspace.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -464,7 +475,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b829dc3666a66b9ec134487e72b8c533a3a64b66a39843daa886b3d88492514d"
+      "sourceFingerprint": "16c5244cbcf3ceaa8b7d39b866e2cc41b5cae0ee746fa8bf520b6b117e9c0a94"
     },
     {
       "id": "database",
@@ -592,7 +603,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "vitest.config.ts",
         "vitest.data06.config.ts",
         "scripts/prepare-app-site.mjs",
-        "scripts/prepare-app-site.test.mjs"
+        "scripts/prepare-app-site.test.mjs",
+        "playwright.workspace.config.ts"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -603,7 +615,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "91feea8dab260e402258bf4786b287eb0154d6701de0faa51eb258330424248f"
+      "sourceFingerprint": "c7edb94a7be54408916e6b62c2daf05bb72c8d63a7d7b5413df6fcf1e44ad267"
     },
     {
       "id": "agents",
@@ -801,21 +813,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "backend"
       ],
-      "summary": "PR167 fixes impossible mocked opening cohorts, explicitly checks EMPTY and all suppressed comparison metrics, and separates mocked serialization from actual SQL/staging evidence. Two PostgreSQL regressions reproduced inclusive-end exposure/checkpoint errors and pass with half-open owner SQL. Existing synthetic starter fixtures use test traffic and cannot prove the fixed allowlisted hosted venue is synthetic. is_stale remains null without a trusted completion signal.",
-      "sources": [
-        "backend/src/owner-report.ts",
-        "backend/src/owner-report.test.ts",
-        "backend/src/owner-report.data12-reconciliation.test.ts",
-        "backend/src/comparison-report.integration.ts",
-        "tests/data12/reconciliation_findings.md"
-      ],
-      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "backend"
-      ],
       "summary": "PR131 CSV export reconciled after owner UI and reporting/test merges. Preserve current routes, tenant/source guards, VALID_ZERO serialization, half-open owner report SQL and unknown freshness. No new export behavior beyond the previously approved CSV slice.",
       "sources": [
         "backend/src/owner-report-export.ts",
@@ -940,6 +937,24 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/vite.config.ts"
       ],
       "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "contracts",
+        "backend",
+        "console",
+        "delivery"
+      ],
+      "summary": "Connect merged Auth143/146, shell125/139 and report128 with read-only staff restaurant discovery and actor-bound tokens. No migration, automatic membership, fictional setup state, fixture report fallback or deployment. Restricted-role database/workerd and synthetic-provider browser checks exercise access, revocation and identity switches.",
+      "sources": [
+        "backend/src/owner-workspace.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/auth/supabase-auth.ts",
+        "docs/owner-session-workspace.md",
+        "tests/e2e/owner-workspace.spec.ts"
+      ],
+      "next": "Finish pinned reviews/checks and merge. Release API/console separately for genuine hosted staff acceptance; then integrate reviewed156/171/172 and163. Preserve diner publication/token flow; PostHog/canonical/report reconciliation remains a release gate."
     }
   ]
 }
