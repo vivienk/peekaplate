@@ -1,3 +1,4 @@
+import { renderComparePicker } from '../compare/pickerScreen';
 import { createSaveState, type SaveState } from '../save/save-state';
 import { renderSavedScreen } from '../save/saved-screen';
 import {
@@ -392,7 +393,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   let currentMenu: Menu | null = null;
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
-  let view: 'menu' | 'detail' | 'saved' = 'menu';
+  let view: 'menu' | 'detail' | 'saved' | 'compare' = 'menu';
   // Detaches the current screen's Save behaviour before the next screen renders.
   let leaveScreen: () => void = () => {};
   // True when this page added the Saved route to history, so leaving it can go back instead.
@@ -562,7 +563,12 @@ export function mountMenuScreen(container: HTMLElement): void {
     startExposureTracking(menu);
   };
 
-  const showDetail = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+  // returning: back from the Compare picker, so the new opening is a back navigation.
+  const showDetail = (
+    dish: CompleteDish,
+    from: 'menu_card' | 'saved_screen',
+    returning = false,
+  ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
     switchScreen('detail');
@@ -572,6 +578,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       dish,
       fromSaved ? () => showSaved() : () => showMenu(),
       menu.notice,
+      () => showPicker(dish, from),
     );
     if (fromSaved) {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
@@ -588,6 +595,7 @@ export function mountMenuScreen(container: HTMLElement): void {
         trackDishDetailOpened(menu, dish, {
           source: 'saved_screen',
           saveAvailable: state.isSaveAvailable(),
+          ...(returning ? { navRelation: 'back_navigation' as const } : {}),
         });
       } catch {}
       return;
@@ -601,6 +609,7 @@ export function mountMenuScreen(container: HTMLElement): void {
         source: 'menu_card',
         saveAvailable: state.isSaveAvailable(),
         ...(exposureId === undefined ? {} : { fromExposureId: exposureId }),
+        ...(returning ? { navRelation: 'back_navigation' as const } : {}),
       };
       const openingId = trackDishDetailOpened(menu, dish, opening, track, newOpeningId);
       if (!openingId) return;
@@ -628,6 +637,23 @@ export function mountMenuScreen(container: HTMLElement): void {
       };
     };
     resumeDetailTracking();
+  };
+
+  // Compare on a detail opens the picker (DIN-02.3); closing it returns to that detail's Compare
+  // button. The picker itself sends nothing.
+  const showPicker = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+    if (!currentMenu) return;
+    const menu = currentMenu;
+    switchScreen('compare');
+    renderComparePicker(container, {
+      menu,
+      keptDish: dish,
+      onClose: () => {
+        showDetail(dish, from, true);
+        container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
+      },
+    });
+    window.scrollTo(0, 0);
   };
 
   const showSaved = (recordView = true) => {
