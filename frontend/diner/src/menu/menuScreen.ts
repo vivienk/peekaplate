@@ -1,3 +1,14 @@
+import {
+  type CompareAction,
+  type CompareSide,
+  type Comparison,
+  dishComparedPayload,
+  replaceExclusions,
+  replaceSide,
+  startComparison,
+} from '../compare/comparison';
+import { renderComparePicker } from '../compare/pickerScreen';
+import { type CompareResultOptions, renderCompareResult } from '../compare/resultScreen';
 import { createSaveState, type SaveState } from '../save/save-state';
 import { renderSavedScreen } from '../save/saved-screen';
 import {
@@ -12,6 +23,7 @@ import {
 import {
   isLiveTracking,
   isTrackingAllowed,
+  newComparisonId,
   newExposureId,
   newOpeningId,
   onTrackingAllowedChange,
@@ -103,6 +115,15 @@ function stateHeading(): string {
 
 function fixtureNotice(): string {
   return fixtureMode ? `<p class="pp-notice">${FIXTURE_LABEL}</p>` : '';
+}
+
+function completeDishById(menu: Menu, dishId: string): CompleteDish | undefined {
+  for (const category of menu.categories) {
+    for (const dish of category.dishes) {
+      if (dish.kind === 'complete' && dish.dishId === dishId) return dish;
+    }
+  }
+  return undefined;
 }
 
 function renderLoading(container: HTMLElement): void {
@@ -392,7 +413,7 @@ export function mountMenuScreen(container: HTMLElement): void {
   let currentMenu: Menu | null = null;
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
-  let view: 'menu' | 'detail' | 'saved' = 'menu';
+  let view: 'menu' | 'detail' | 'saved' | 'compare' = 'menu';
   // Detaches the current screen's Save behaviour before the next screen renders.
   let leaveScreen: () => void = () => {};
   // True when this page added the Saved route to history, so leaving it can go back instead.
@@ -562,7 +583,15 @@ export function mountMenuScreen(container: HTMLElement): void {
     startExposureTracking(menu);
   };
 
-  const showDetail = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+  // returning: back from the Compare picker, so the new opening is a back navigation.
+  // compareBack: opened with View details on a Compare result (source compare_view); Back returns
+  // to that result and the detail offers no Compare of its own.
+  const showDetail = (
+    dish: CompleteDish,
+    from: 'menu_card' | 'saved_screen',
+    returning = false,
+    compareBack?: () => void,
+  ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
     switchScreen('detail');
@@ -570,10 +599,12 @@ export function mountMenuScreen(container: HTMLElement): void {
     renderDishDetail(
       container,
       dish,
-      fromSaved ? () => showSaved() : () => showMenu(),
+      compareBack ?? (fromSaved ? () => showSaved() : () => showMenu()),
       menu.notice,
+      compareBack ? undefined : () => showPicker(dish, from),
+      Boolean(compareBack),
     );
-    if (fromSaved) {
+    if (fromSaved && !compareBack) {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
     }
     const state = saveState;
@@ -583,11 +614,12 @@ export function mountMenuScreen(container: HTMLElement): void {
     window.scrollTo(0, 0);
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.
-    if (fromSaved) {
+    if (fromSaved && !compareBack) {
       try {
         trackDishDetailOpened(menu, dish, {
           source: 'saved_screen',
           saveAvailable: state.isSaveAvailable(),
+          ...(returning ? { navRelation: 'back_navigation' as const } : {}),
         });
       } catch {}
       return;
@@ -596,11 +628,16 @@ export function mountMenuScreen(container: HTMLElement): void {
     // Consent begins a fresh opening; time from a disallowed stretch is never reused.
     resumeDetailTracking = () => {
       if (!canTrackUi()) return;
-      const exposureId = exposureIds.get(dish.dishId);
+      const exposureId = compareBack ? undefined : exposureIds.get(dish.dishId);
       const opening: DetailOpening = {
-        source: 'menu_card',
+        source: compareBack ? 'compare_view' : 'menu_card',
         saveAvailable: state.isSaveAvailable(),
         ...(exposureId === undefined ? {} : { fromExposureId: exposureId }),
+        ...(compareBack
+          ? { navRelation: 'from_compare' as const }
+          : returning
+            ? { navRelation: 'back_navigation' as const }
+            : {}),
       };
       const openingId = trackDishDetailOpened(menu, dish, opening, track, newOpeningId);
       if (!openingId) return;
@@ -628,6 +665,93 @@ export function mountMenuScreen(container: HTMLElement): void {
       };
     };
     resumeDetailTracking();
+  };
+
+  // Compare on a detail opens the picker (DIN-02.3); closing it returns to that detail's Compare
+  // button. The picker itself sends nothing.
+  const showPicker = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+    if (!currentMenu) return;
+    const menu = currentMenu;
+    switchScreen('compare');
+    renderComparePicker(container, {
+      menu,
+      keptDish: dish,
+      onClose: () => {
+        showDetail(dish, from, true);
+        container.querySelector<HTMLElement>('.pp-detail__compare')?.focus();
+      },
+      onConfirm: (pickedDishId) => {
+        const comparison = startComparison(menu, dish.dishId, pickedDishId, newComparisonId);
+        if (comparison) showResult(comparison, 'start');
+      },
+    });
+    window.scrollTo(0, 0);
+  };
+
+  // Shows a comparison (DIN-02.4). dish_compared fires only when a result is actually displayed
+  // after a start or a replacement; coming back from a detail or a cancelled Replace shows it again
+  // silently. The same comparison_id is kept across Replace (matrix v0.1h D7).
+  let compareScroll = 0;
+  const showResult = (
+    comparison: Comparison,
+    action?: CompareAction,
+    focus?: CompareResultOptions['focus'],
+  ) => {
+    if (!currentMenu || !saveState) return;
+    const menu = currentMenu;
+    const state = saveState;
+    switchScreen('compare');
+    const shown = renderCompareResult(container, {
+      menu,
+      comparison,
+      focus,
+      onBackToMenu: () => showMenu(),
+      onReplace: (side) => {
+        compareScroll = window.scrollY;
+        showReplacePicker(comparison, side);
+      },
+      onViewDetails: (dish, side) => {
+        compareScroll = window.scrollY;
+        showDetail(dish, 'menu_card', false, () =>
+          showResult(comparison, undefined, { side, control: 'view' }),
+        );
+      },
+    });
+    if (!shown) {
+      showMenu();
+      return;
+    }
+    // Coming back to the result (focus set) restores where the diner was, so the focused View
+    // details / Replace button is on screen (Azoz review #13); a new result starts at the top.
+    window.scrollTo(0, focus ? compareScroll : 0);
+    if (!action || !canTrackUi()) return;
+    try {
+      const payload = dishComparedPayload(menu, comparison, action, state.isSaveAvailable());
+      if (payload) track('dish_compared', payload);
+    } catch {}
+  };
+
+  // Replace opens the picker for one side, keeping the other dish; both shown dishes are excluded.
+  const showReplacePicker = (comparison: Comparison, side: CompareSide) => {
+    if (!currentMenu) return;
+    const menu = currentMenu;
+    const keptId = side === 'first' ? comparison.otherDishId : comparison.firstDishId;
+    const keptDish = completeDishById(menu, keptId);
+    if (!keptDish) return;
+    const back = { side, control: 'replace' } as const;
+    switchScreen('compare');
+    renderComparePicker(container, {
+      menu,
+      keptDish,
+      exclude: replaceExclusions(comparison),
+      confirmLabel: 'Replace Dish',
+      onClose: () => showResult(comparison, undefined, back),
+      onConfirm: (pickedDishId) => {
+        const next = replaceSide(menu, comparison, side, pickedDishId);
+        if (next !== comparison) showResult(next, 'replace', back);
+      },
+    });
+    window.scrollTo(0, 0);
   };
 
   const showSaved = (recordView = true) => {

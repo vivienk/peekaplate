@@ -181,7 +181,9 @@ p {
 }
 
 main:has(> .pp-menu),
-main:has(> .pp-detail) {
+main:has(> .pp-detail),
+main:has(> .pp-picker),
+main:has(> .pp-compare) {
   max-width: none;
   margin: 0;
   padding: 0;
@@ -434,7 +436,8 @@ main:has(> .pp-detail) {
   padding: 4px 0 0;
 }
 
-.pp-search-panel .pp-search-bar {
+.pp-search-panel .pp-search-bar,
+.pp-picker__search {
   position: relative;
 }
 
@@ -449,14 +452,16 @@ main:has(> .pp-detail) {
   pointer-events: none;
 }
 
-.pp-search-panel .pp-search-input {
+.pp-search-panel .pp-search-input,
+.pp-picker__search .pp-search-input {
   height: 36px;
   padding: 6px 12px 6px 34px;
   border: 1px solid transparent;
   font-size: 14px;
 }
 
-.pp-search-panel .pp-search-input:focus {
+.pp-search-panel .pp-search-input:focus,
+.pp-picker__search .pp-search-input:focus {
   outline: none;
   border-color: #f89537;
   box-shadow: 0 0 0 2px rgba(248, 149, 55, 0.35);
@@ -891,4 +896,609 @@ main:has(> .pp-detail) {
     width: 100%;
     height: 160px;
   }
+}
+
+/* Compare picker (S3-DIN-02.3, Figma "Compare Dish"). Spacing follows the frame's auto layout:
+   24px between sections, 8px from a label to its content, 12px between cards. */
+.pp-picker {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-picker button,
+.pp-picker input {
+  font-family: inherit;
+}
+
+.pp-picker__close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.pp-picker__close:focus-visible,
+.pp-picker__confirm:focus-visible,
+.pp-picker__choose:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+/* Values from the Figma "Compare_Picker" auto layout: Keeping has 20px above, 12px from its
+   label to the card and 32px below; Dishes has 20px above and 16px between the heading block,
+   the search field and the list. */
+.pp-picker__keeping {
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+.pp-picker__keeping .pp-picker__label {
+  margin-bottom: 12px;
+}
+
+.pp-picker__choose-section {
+  display: flex;
+  flex-direction: column;
+  padding-top: 20px;
+  padding-bottom: 32px;
+}
+
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
+.pp-picker__label {
+  margin: 0 0 10px;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Figma kept-dish card: 12px padding, 16px gap, 16px radius, surface-container with outline. */
+.pp-picker__kept {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+  /* Inside stroke, as in Figma, so the card is 72px tall (48px photo + 2 × 12px). */
+  box-shadow: inset 0 0 0 1px var(--pp-role-outline);
+}
+
+.pp-picker__kept-image {
+  display: block;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.pp-picker__kept-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
+.pp-picker__hint,
+.pp-picker__none {
+  margin: 0 0 16px;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+/* Figma "Search_ compare screen": a 42px pill, 12px padding, a 16px icon and a 6px gap,
+   surface-container with an outline, placeholder Small/Regular 12/16. Typed text stays 16px so
+   phones do not zoom the page when the field is focused. */
+.pp-picker__search {
+  margin: 0 0 16px;
+}
+
+.pp-picker__search-icon {
+  position: absolute;
+  top: 50%;
+  left: 13px;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--pp-role-on-surface-variant);
+  mask: url("./assets/icons/ui/search.svg") center / contain no-repeat;
+  pointer-events: none;
+}
+
+.pp-picker__search .pp-search-input:hover {
+  border-color: var(--pp-role-input-border-hover);
+}
+
+.pp-picker__search .pp-search-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--pp-role-outline);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pp-picker__search .pp-search-input::placeholder {
+  color: var(--pp-role-on-surface-variant);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pp-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-picker__list[hidden] {
+  display: none;
+}
+
+/* Figma component "Dishes Menu-Compare": no fill or border by default; Selected adds a 3px
+   color/primary outline with an 8px radius and a 50px check badge. The text column sits beside a
+   220px photo (Direction Right/Left alternates) and aligns toward the photo. */
+.pp-picker__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 220px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pp-picker__option:nth-child(even) {
+  flex-direction: row-reverse;
+}
+
+.pp-picker__option--selected {
+  outline: 3px solid var(--pp-role-primary);
+  outline-offset: 0;
+}
+
+.pp-picker__option-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 16px 0 8px;
+  text-align: right;
+}
+
+.pp-picker__option:nth-child(even) .pp-picker__option-body {
+  align-items: flex-start;
+  padding: 0 8px 0 16px;
+  text-align: left;
+}
+
+/* Figma H5/Bold 18/28. */
+.pp-picker__option-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.pp-picker__choose {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pp-role-on-surface);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.pp-picker__option-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pp-picker__option:nth-child(even) .pp-picker__option-meta {
+  flex-direction: row-reverse;
+}
+
+.pp-picker__option-heart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pp-role-on-surface);
+}
+
+.pp-picker__heart-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.pp-picker__option-heart:disabled {
+  cursor: not-allowed;
+}
+
+.pp-picker__option-price {
+  margin: 0;
+  color: var(--pp-role-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.pp-picker__option-media {
+  position: static;
+  flex: 0 0 min(220px, 60%);
+  min-width: 0;
+}
+
+.pp-picker__option-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+/* Figma check badge: 50px, color/primary, drop shadow, 20px from the top and 12px in from the
+   card's outer edge on the photo side, so it always sits on the photo's outer corner (never over
+   the middle of the card). The tick is centered in the circle. */
+.pp-picker__check {
+  display: none;
+  position: absolute;
+  align-items: center;
+  justify-content: center;
+  top: 20px;
+  left: 12px;
+  box-sizing: border-box;
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: var(--pp-role-primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: var(--pp-role-on-surface);
+  line-height: 1;
+}
+
+.pp-picker__option:nth-child(odd) .pp-picker__check {
+  left: auto;
+  right: 12px;
+}
+
+.pp-picker__option--selected .pp-picker__check {
+  display: flex;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button and input roles. */
+.pp-picker__option:hover:not(.pp-picker__option--selected) {
+  outline: 1px solid var(--pp-role-outline-solid);
+}
+
+.pp-picker__option:active {
+  transform: scale(0.99);
+}
+
+.pp-picker .pp-btn--primary:hover:not(:disabled),
+.pp-compare .pp-btn--primary:hover:not(:disabled) {
+  background: var(--pp-role-button-action-pressed-bg);
+}
+
+.pp-picker .pp-btn--primary:active:not(:disabled),
+.pp-compare .pp-btn--primary:active:not(:disabled) {
+  background: var(--pp-role-button-action-pressed-bg);
+  transform: scale(0.98);
+}
+
+.pp-picker__close:hover,
+.pp-compare__close:hover {
+  background: var(--pp-role-button-outline-pressed-bg);
+}
+
+.pp-picker__close:active,
+.pp-compare__close:active {
+  transform: scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-picker__option:active,
+  .pp-picker .pp-btn--primary:active,
+  .pp-compare .pp-btn--primary:active,
+  .pp-picker__close:active,
+  .pp-compare__close:active {
+    transform: none;
+  }
+}
+
+/* The Compare action stays in the picker's column, pinned to the bottom of the viewport while the
+   list scrolls, and never covers content outside the picker. */
+.pp-picker__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  margin: auto -16px 0;
+  padding: 12px 16px 16px;
+  background: #2a2d36;
+  text-align: center;
+}
+
+.pp-picker__confirm {
+  width: 100%;
+  min-height: 48px;
+}
+
+.pp-picker__footer .pp-notice {
+  margin: 8px 0 0;
+}
+
+/* Compare result (S3-DIN-02.4, Figma "Compare result allergens"): a dish header, then bordered
+   sections with the two dishes side by side and a divider, so every row lines up. */
+.pp-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-compare button {
+  font-family: inherit;
+}
+
+.pp-compare__close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.pp-compare__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.pp-compare__divider {
+  background: rgba(113, 115, 122, 0.3);
+}
+
+.pp-compare__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pp-compare__image {
+  display: block;
+  width: 100%;
+  max-width: 128px;
+  height: auto;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Figma dish header: centered, Paragraph 1/Bold 16/24 name and Paragraph 1/Semi Bold 16/24
+   price in color/primary, 24px above the first section. */
+/* Figma: 16px bottom padding in the header, then a 24px gap: 40px from the prices to the first
+   section (Azoz review #9). The column gap already gives 16px. */
+.pp-compare__header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.pp-compare__name {
+  margin: 4px 0 0;
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__price {
+  margin: 0;
+  color: var(--pp-role-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+/* Figma comparison section: 16px padding and gap, 16px radius, surface-container with an
+   outline. */
+.pp-compare__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--pp-role-outline);
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+}
+
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
+.pp-compare__label {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
+.pp-compare__description,
+.pp-compare__ingredient-names {
+  margin: 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__actions {
+  align-items: center;
+  gap: 8px;
+}
+
+/* Figma Dietary & Allergen Info: icons with room around them, wrapping inside each column; the
+   column divider spans the whole row. */
+.pp-compare__icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.pp-compare__icon {
+  display: flex;
+}
+
+.pp-compare__icon img {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.pp-compare__none {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.pp-compare__pair {
+  align-items: stretch;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button roles. */
+.pp-compare__view:hover {
+  border-color: var(--pp-role-outline-solid);
+}
+
+.pp-compare__view:active {
+  background: var(--pp-role-button-outline-pressed-bg);
+}
+
+.pp-compare__replace:hover {
+  background: var(--pp-role-button-text-hover-bg);
+  border-radius: 999px;
+}
+
+.pp-compare__replace:active {
+  background: var(--pp-role-button-text-pressed-bg);
+  border-radius: 999px;
+}
+
+/* Figma Buttons (Medium, Outlined, trailing icon): a 40px pill, 20px side padding, 4px gap; and
+   a text-style color/primary "Replace" under it. */
+.pp-compare__view {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.pp-compare__replace {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--pp-role-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-compare__staff {
+  margin: 0;
+  padding: 0;
+}
+
+/* Figma: Back to Menu follows the sections (24px after them) and the frame ends with 32px. */
+.pp-compare__footer {
+  margin-top: 8px;
+  padding-bottom: 32px;
+}
+
+.pp-compare__back {
+  width: 100%;
+  min-height: 48px;
+}
+
+.pp-compare__close:focus-visible,
+.pp-compare__back:focus-visible,
+.pp-compare__view:focus-visible,
+.pp-compare__replace:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+/* Chips keep their own height when the other dish's side of the row is taller. */
+.pp-compare__cell .pp-chip-group {
+  flex: none;
+  align-items: flex-start;
+}
+
+/* The header shares its rows (photo, name, price) across both dishes, so a name that wraps on
+   one side keeps the two prices level. */
+.pp-compare__header {
+  grid-template-rows: repeat(3, auto);
+}
+
+.pp-compare__header > .pp-compare__cell {
+  display: grid;
+  grid-row: 1 / span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-content: start;
+}
+
+.pp-compare__header > .pp-compare__divider {
+  grid-row: 1 / span 3;
 }

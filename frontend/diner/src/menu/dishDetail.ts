@@ -11,7 +11,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function allergenChips(dish: CompleteDish): string {
+export function allergenChips(dish: CompleteDish): string {
   if (dish.allergens.length === 0) return '';
   return dish.allergens
     .map(
@@ -24,7 +24,7 @@ function allergenChips(dish: CompleteDish): string {
     .join('');
 }
 
-function dietaryChips(dish: CompleteDish): string {
+export function dietaryChips(dish: CompleteDish): string {
   if (dish.dietary.length === 0) return '';
   return dish.dietary
     .map(
@@ -54,6 +54,11 @@ export function renderDishDetail(
   dish: CompleteDish,
   onBack: () => void,
   notice: string | null = null,
+  // Opens the Compare picker (DIN-02.3); without it the Compare button stays disabled.
+  onCompare?: () => void,
+  // Detail opened from a Compare result (DIN-02.4): Back returns to that result, and the Compare
+  // button is hidden because the diner is already comparing.
+  fromCompare = false,
 ): void {
   const image = dish.images?.detail ?? dish.images?.card;
   const imageMarkup = image
@@ -67,7 +72,7 @@ export function renderDishDetail(
   container.innerHTML = `
     <div class="pp-detail">
       <header class="pp-detail__topbar">
-        <button class="pp-detail__back" type="button" aria-label="Back to menu">←</button>
+        <button class="pp-detail__back" type="button" aria-label="${fromCompare ? 'Back to compare' : 'Back to menu'}">←</button>
         <h1 class="pp-detail__title" tabindex="-1">Dish details</h1>
         ${saveHeartMarkup(dish, 'pp-detail__save')}
       </header>
@@ -125,15 +130,20 @@ export function renderDishDetail(
 
         <div class="pp-detail__actions">
           <button class="pp-btn pp-btn--primary" type="button" disabled>View Portion</button>
-          <button class="pp-btn pp-btn--outlined" type="button" disabled>Compare <span aria-hidden="true">→</span></button>
+          ${fromCompare ? '' : `<button class="pp-btn pp-btn--outlined pp-detail__compare" type="button"${onCompare ? '' : ' disabled'}>Compare <span aria-hidden="true">→</span></button>`}
         </div>
-        <p class="pp-notice">View Portion and Compare are not available yet.</p>
+        <p class="pp-notice">${onCompare || fromCompare ? 'View Portion is' : 'View Portion and Compare are'} not available yet.</p>
       </section>
     </div>
   `;
 
   const backButton = container.querySelector<HTMLButtonElement>('.pp-detail__back');
   backButton?.addEventListener('click', onBack);
+  if (onCompare) {
+    container
+      .querySelector<HTMLButtonElement>('.pp-detail__compare')
+      ?.addEventListener('click', onCompare);
+  }
   container.querySelector<HTMLElement>('.pp-detail__title')?.focus();
 
   const detailImg = container.querySelector<HTMLImageElement>('img.pp-detail__image');

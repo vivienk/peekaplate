@@ -113,7 +113,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
+      "summary": "Fixture/live menu, detail, Search, Save/Saved and Compare picker/result/Replace screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -209,7 +209,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/restaurant-urls.md",
         "tests/restaurant-links/restaurant-links.spec.ts",
         "playwright.restaurant-links.config.ts",
-        "scripts/serve-restaurant-routing-test.mjs"
+        "scripts/serve-restaurant-routing-test.mjs",
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/compare/pickerScreen.test.ts",
+        "tests/e2e/compare-picker.spec.ts",
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/compare/resultScreen.test.ts",
+        "tests/e2e/compare-result.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -218,7 +224,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "938a1e45b102a63bab3ec33c2819ebfccd0314962d908d1d07d6e9b2a6152ace"
+      "sourceFingerprint": "d4c814df954a9747079ca8408c1b87fa51b5e6b3bb2cb4af3502d58e21f92503"
     },
     {
       "id": "console",
@@ -464,7 +470,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "b829dc3666a66b9ec134487e72b8c533a3a64b66a39843daa886b3d88492514d"
+      "sourceFingerprint": "3363c645f1b98259dc64f8712c93c84e1ea32a2b9196266662ba7b857656791d"
     },
     {
       "id": "database",
@@ -603,7 +609,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "91feea8dab260e402258bf4786b287eb0154d6701de0faa51eb258330424248f"
+      "sourceFingerprint": "3b8e8b99d2827269cb4c4581437a09601b01ebfc6c779f1e737182894297f25c"
     },
     {
       "id": "agents",
@@ -797,6 +803,32 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
+      "date": "2026-11-11",
+      "summary": "S3-DIN-02.4 Compare result on current develop: frontend/diner/src/compare/resultScreen.ts. compareView(menu, comparison) is the pure view model. renderCompareResult shows a dish header (round photo, name, price), then bordered Description, Key ingredients, Contains and Dietary info sections with both dishes side by side and a divider, then outlined View details and text-style Replace (Rania review points 5, 6, 8). menuScreen fires dish_compared start/replace only when a result is displayed, keeps comparison_id across Replace and reads save_available from the shared Save state. View details opens the detail as compare_view/from_compare with the opening clock; Back returns to the result without a new comparison event.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/compare-result.spec.ts"
+      ],
+      "next": "Rania review point 7 (dietary icons) waits for the icon work (Harshita). Design re-check of the new layout (Rania/Amr) and matrix field check (Sai) remain."
+    },
+    {
+      "date": "2026-11-08",
+      "summary": "S3-DIN-02.3 Compare picker screen: frontend/diner/src/compare/pickerScreen.ts. pickerViewState(menu, exclude, query) is the pure view model over pickerOptions (shared searchMenu rules, incomplete and excluded dishes never offered, noOptions for a menu with no other dish). renderComparePicker shows Compare Dish, the Keeping dish, the search bar with No Result Found/Clear and the staff line, and single selection (aria-pressed, orange border and check). Close and Escape return to the detail Compare button. No request, no track() call, query never logged or put in the URL. Stacked on #121 to reuse its search markup and styles.",
+      "modules": [
+        "diner"
+      ],
+      "paths": [
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/menu/dishDetail.ts",
+        "tests/e2e/compare-picker.spec.ts"
+      ],
+      "next": "DIN-02.4 passes onConfirm (and exclude for Replace) to enable the Compare button and show the result. The no-other-dish copy is a placeholder until Rania/Amr design it; the heart stays disabled like the menu cards until DIN-02.2 Save is wired."
+    },
+    {
       "date": "2026-11-13",
       "modules": [
         "backend"
@@ -910,36 +942,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/restaurant-urls.md"
       ],
       "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR143 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
-      "sources": [
-        "frontend/console/email-templates/confirm-signup.html",
-        "frontend/console/email-templates/reset-password.html",
-        "frontend/console/email-templates/README.md",
-        "docs/owner-auth.md",
-        "frontend/console/vite.config.ts"
-      ],
-      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR146 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
-      "sources": [
-        "frontend/console/email-templates/confirm-signup.html",
-        "frontend/console/email-templates/reset-password.html",
-        "frontend/console/email-templates/README.md",
-        "docs/owner-auth.md",
-        "frontend/console/vite.config.ts"
-      ],
-      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
     }
   ]
 }
