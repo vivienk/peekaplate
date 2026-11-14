@@ -1,0 +1,63 @@
+{
+  "fixture_version": "data06-independent-validation.v1",
+  "contract_status": "PROPOSED",
+  "description": "Synthetic descriptive-signal validation cases. Expected behavior only; not producer execution evidence.",
+  "score": {
+    "value": null,
+    "status": "MISSING",
+    "reason": "POLICY_PENDING"
+  },
+  "cases": [
+    {
+      "id": "D06-EXPOSURE-01",
+      "description": "Count distinct eligible exposure events",
+      "input": {
+        "eligible_exposure_event_ids": ["evt-001", "evt-002", "evt-003"]
+      },
+      "expected": {
+        "eligible_exposure_events": 3
+      }
+    },
+    {
+      "id": "D06-OPEN-01",
+      "description": "Count readable detail-open events",
+      "input": {
+        "readable_detail_open_event_ids": ["evt-004", "evt-005"]
+      },
+      "expected": {
+        "readable_detail_open_events": 2
+      }
+    },
+    {
+      "id": "D06-COMPARE-01",
+      "description": "Count qualifying comparison events after producer validation",
+      "input": {
+        "qualifying_comparison_event_ids": ["evt-006", "evt-007"]
+      },
+      "expected": {
+        "qualifying_comparison_events": 2
+      }
+    },
+    {
+      "id": "D06-SAVE-01",
+      "description": "Count direct Save events, excluding Undo",
+      "input": {
+        "direct_save_event_ids": ["evt-008", "evt-009"],
+        "undo_event_ids": ["evt-010"]
+      },
+      "expected": {
+        "direct_save_events": 2
+      }
+    },
+    {
+      "id": "D06-DEDUPE-01",
+      "description": "Duplicate canonical event IDs must not increase descriptive counts",
+      "input": {
+        "eligible_exposure_event_ids": ["evt-011", "evt-011", "evt-012"]
+      },
+      "expected": {
+        "eligible_exposure_events": 2
+      }
+    }
+  ]
+}
