@@ -2,6 +2,7 @@
 // renders into a container and navigates through callbacks; it is built with DOM methods, so dish
 // text is never parsed as markup. Copy and look are provisional until the Figma Saved frames are
 // applied.
+import { BACK_ICON } from '../menu/navButton';
 import { formatPrice } from '../menu/price';
 import type { CompleteDish, Menu } from '../menu/types';
 import type { SendEvent } from './events';
@@ -37,6 +38,9 @@ export type SavedScreenOptions = {
   recordView?: boolean;
 };
 
+const SAVED_HEART_ICON =
+  '<svg class="pp-saved__heart" viewBox="0 2 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.5009 3.91699C16.3749 3.93451 15.2734 4.24885 14.3077 4.82826C13.342 5.40768 12.5463 6.23166 12.0009 7.21699C11.4556 6.23166 10.6599 5.40768 9.69417 4.82826C8.72848 4.24885 7.62698 3.93451 6.50094 3.91699C4.70588 3.99498 3.01464 4.78025 1.79672 6.10122C0.578794 7.4222 -0.0668157 9.17152 0.000934853 10.967C0.000934853 15.514 4.78693 20.48 8.80093 23.847C9.69715 24.6001 10.8303 25.013 12.0009 25.013C13.1716 25.013 14.3047 24.6001 15.2009 23.847C19.2149 20.48 24.0009 15.514 24.0009 10.967C24.0687 9.17152 23.4231 7.4222 22.2052 6.10122C20.9872 4.78025 19.296 3.99498 17.5009 3.91699Z"/></svg>';
+
 // Call once per readable display of the Saved screen (navigating to it, going back to it, or a
 // reload while on it); each call sends one shortlist_viewed. Changes while it is shown (removing a
 // dish, Undo, the session-only switch) redraw the list without another view. Returns cleanup.
@@ -47,7 +51,9 @@ export function renderSavedScreen(
   // Not .pp-saved: that is the menu header's Saved button.
   const screen = el('div', 'pp-saved-screen');
   const header = el('header', 'pp-saved__topbar');
-  const back = el('button', 'pp-saved__back', '←');
+  // Figma Nav Button (back), shared with Dish details and the Compare result view.
+  const back = el('button', 'pp-nav-btn pp-nav-btn--back pp-saved__back');
+  back.innerHTML = BACK_ICON;
   back.type = 'button';
   back.setAttribute('aria-label', 'Back to menu');
   back.addEventListener('click', onBack);
@@ -76,9 +82,8 @@ export function renderSavedScreen(
       'aria-label',
       item.kind === 'complete' ? `Save ${item.dish.name}` : 'Remove this dish from Saved',
     );
-    const icon = el('span', '', '♥');
-    icon.setAttribute('aria-hidden', 'true');
-    button.append(icon);
+    // Figma fi-sr-heart, 24px (Azoz QA report 03, V3), filled because the dish is saved.
+    button.innerHTML = SAVED_HEART_ICON;
     stopHearts.push(
       mountSaveHeart(button, { saveState, menu, dish: item.dish, surface: 'saved_screen', send }),
     );

@@ -231,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1b89390233e2b1a73d637b33acef65bd49b083dc695af794878855ffe268fcbe"
+      "sourceFingerprint": "46949161d1bc8c315ad3bb68c574c855acc1708589950be08ec68c79d91f7377"
     },
     {
       "id": "console",
@@ -917,21 +917,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-14",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR188 adds a required hosted tenant/job provider-attempt gate backed by transactional DO SQLite. Queue redeliveries share the two-attempt counter; Python vision/OCR/model retries reserve before transport and fail closed. Real local workerd concurrency, replay/scope, process-restart and SQL rollback checks pass; 576 offline Python tests pass. Hosted Worker+image rollout and provider acceptance remain NOT RUN.",
-      "files": [
-        "backend/src/extraction-host.ts",
-        "backend/src/extraction-budget.workerd.test.ts",
-        "backend/tests/provider-budget-worker.ts",
-        "processing/src/peekaplate_processing/provider_budget.py",
-        "docs/provider-call-budget.md"
-      ],
-      "next": "Deploy matching Worker and container image before any controlled provider test; keep the existing allowance and Queue controls. This is not an account-wide spending limit."
-    },
-    {
       "date": "2026-11-15",
       "modules": [
         "console"
@@ -1054,6 +1039,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/attention.test.ts"
       ],
       "next": "Retain the synthetic label; connect real owner AI only through validated server report semantics."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR196 preserves the authored Compare/navigation/search design changes and fixes focused placeholder contrast with a token colour. A browser regression reproduces 2.36:1 before correction and passes afterward; 66 related Chromium checks pass.",
+      "files": [
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "Review physical-device design separately; no hosted release follows from this merge."
     }
   ]
 }

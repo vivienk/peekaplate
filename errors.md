@@ -3946,6 +3946,12 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 {"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
 ```
 
+## 2026-11-15 full Chromium run flakes on the Compare design follow-up
+
+- Check: `pnpm exec playwright test tests/e2e --project=chromium` on feat/s6-din-05-compare-design-followup.
+- Result: `search.spec.ts:154` (two `dish_viewed` fixture logs during search) and `tracking-outbox.spec.ts:218` failed only in the full parallel run; both pass alone, and `search.spec.ts --repeat-each 4 --workers 4` passed 28/28 both with and without this branch's diner changes.
+- Cause: not confirmed; timing-sensitive under full-suite load (1 s visibility timer and outbox fill), not the search styling.
+- Prevention: rerun a single full-suite failure in isolation and with `--repeat-each` before treating it as a regression.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
@@ -3981,3 +3987,7 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
 ```
+
+## PR196 focused search placeholder contrast — November 15, 2026
+
+The empty focused search kept its dark-surface placeholder colour on a light surface. A browser-computed WCAG contrast check reproduced 2.3557:1 (required 4.5:1); the generic axe scan alone did not catch this pseudo-element. The focused placeholder now uses the existing neutral-600 token. `tests/e2e/search.spec.ts` covers the actual focused placeholder; 66 related Chromium checks pass in 1.1 minutes.
