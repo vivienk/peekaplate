@@ -24,7 +24,7 @@ def degenerate_ocr_text(text: str) -> bool:
     return len(visible) >= 200 and sum(c in ".…·_" for c in visible) > 0.6 * len(visible)
 
 
-def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-cache", timeout=120, ocr_provider: OCRProvider | None = None, is_table: bool = True) -> MenuExtractionResult:
+def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-cache", timeout=120, ocr_provider: OCRProvider | None = None, is_table: bool = True, budget_gate=None) -> MenuExtractionResult:
     result = MenuExtractionResult(started_at=datetime.now(timezone.utc))
     result.configuration = {"stage": "text_acquisition", "pdf_engine": "pymupdf", "max_pdf_pages": 40, "min_pdf_native_text_chars": MIN_NATIVE_TEXT_CHARS, "ocr_is_table": bool(is_table)}
     try:
@@ -33,7 +33,7 @@ def extract_source(source: str | Path, *, ocr_api_key=None, cache_dir="work/ocr-
         digest = hashlib.sha256(data).hexdigest()
         source_id = f"sha256:{digest}"
         result.source = SourceRecord(source_id=source_id, sha256=digest, kind=kind, location=Path(source).name, retrieved_at=datetime.now(timezone.utc), size_bytes=len(data), snapshot_base64=base64.b64encode(data).decode())
-        ocr = ocr_provider if ocr_provider is not None else OCRSpaceClient(ocr_api_key, cache_dir=cache_dir, timeout=timeout, is_table=is_table)
+        ocr = ocr_provider if ocr_provider is not None else OCRSpaceClient(ocr_api_key, cache_dir=cache_dir, timeout=timeout, is_table=is_table, budget_gate=budget_gate)
 
         if kind == "pdf":
             result.segments = extract_pdf(data, source_id, ocr)
