@@ -6,9 +6,11 @@
 //
 // The parent owns loading and saving (api.ts). This component only edits values, shows what is
 // missing for verification, and calls onSave / onVerify / onCancel.
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { TextField } from '../foundations/TextField';
-import { Button } from '../ui';
+import { CategoryField } from '../owner-dashboard/category-field';
+import { Btn as Button } from '../owner-dashboard/controls';
+import { DishFormFrame } from '../owner-dashboard/menu-presentation';
 import {
   type AllergenCode,
   type ApprovalIssue,
@@ -54,6 +56,8 @@ const ISSUE_TEXT: Record<ApprovalIssue, { field: string; text: string }> = {
 
 export type DishEditorProps = {
   value: DishForm;
+  photo?: ReactNode;
+  categories?: string[];
   onChange: (next: DishForm) => void;
   // Saves the draft as it is; fields may still be incomplete.
   onSave: () => void;
@@ -69,6 +73,8 @@ export type DishEditorProps = {
 
 export function DishEditor({
   value,
+  photo,
+  categories = [],
   onChange,
   onSave,
   onVerify,
@@ -77,6 +83,7 @@ export function DishEditor({
   error = null,
   evidence = [],
 }: DishEditorProps) {
+  const [addedCategories, setAddedCategories] = useState<string[]>([]);
   const [issues, setIssues] = useState<ApprovalIssue[]>([]);
   const [ingredient, setIngredient] = useState('');
   const summaryId = useId();
@@ -118,236 +125,280 @@ export function DishEditor({
   const allergens = allergenOutcome(value);
 
   return (
-    <form className="pp-dish-editor" onSubmit={verify} noValidate aria-busy={busy}>
-      <p className="eyebrow">{extracted ? 'Review scanned dish' : 'Add dish'} · Screen 9</p>
-      <h1>{value.name.trim() || 'New dish'}</h1>
+    <form
+      className="pp-dish-editor s09 owner-menu-design"
+      onSubmit={verify}
+      noValidate
+      aria-busy={busy}
+    >
+      <DishFormFrame
+        title={value.name.trim() ? 'Edit dish' : 'Add dish'}
+        aside={
+          <>
+            <section className="card s09-sidecard" aria-labelledby="dish-photo-title">
+              <h2 id="dish-photo-title">Photo</h2>
+              {photo ?? (
+                <div className="s09-photo">
+                  <span>No photo available</span>
+                </div>
+              )}
+            </section>
+            <section
+              className="card s09-sidecard s09-sidecard--25d"
+              aria-labelledby="dish-preview-title"
+            >
+              <h2 id="dish-preview-title">2.5D preview</h2>
+              <span className="s09-chip">Not connected</span>
+              <p>This draft editor does not publish preview assets.</p>
+            </section>
+            {extracted && (
+              <aside className="pp-dish-editor__evidence" aria-label="From the menu">
+                <h2>From the menu</h2>
+                {evidence.length === 0 ? (
+                  <p className="pp-field__hint">No source text was kept for this dish.</p>
+                ) : (
+                  evidence.map((excerpt) => (
+                    <figure key={`${excerpt.segmentId}-${excerpt.text.slice(0, 24)}`}>
+                      <figcaption>Page {excerpt.page ?? '?'}</figcaption>
+                      <pre>{excerpt.text}</pre>
+                    </figure>
+                  ))
+                )}
+              </aside>
+            )}
+          </>
+        }
+      >
+        {issues.length > 0 && (
+          <div id={summaryId} tabIndex={-1} role="alert" className="pp-dish-editor__summary">
+            <strong>
+              Fix {issues.length} thing{issues.length > 1 ? 's' : ''} before approval
+            </strong>
+            <ul>
+              {issues.map((issue) => (
+                <li key={issue}>
+                  <a
+                    href={`#${ISSUE_TEXT[issue].field}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      document.getElementById(ISSUE_TEXT[issue].field)?.focus();
+                    }}
+                  >
+                    {ISSUE_TEXT[issue].text}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="pp-dish-editor__error">
+            {error}
+          </p>
+        )}
 
-      {issues.length > 0 && (
-        <div id={summaryId} tabIndex={-1} role="alert" className="pp-dish-editor__summary">
-          <strong>
-            Fix {issues.length} thing{issues.length > 1 ? 's' : ''} before approval
-          </strong>
-          <ul>
-            {issues.map((issue) => (
-              <li key={issue}>
-                <a
-                  href={`#${ISSUE_TEXT[issue].field}`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    document.getElementById(ISSUE_TEXT[issue].field)?.focus();
+        <TextField
+          id="dish-name"
+          label="Dish name"
+          value={value.name}
+          onChange={(event) => set({ name: event.target.value })}
+          error={issueFor('name') ?? issueFor('rejected') ?? ''}
+        />
+        <div className="s09-row3">
+          <div>
+            <CategoryField
+              id="dish-category"
+              value={value.category}
+              categories={[
+                ...new Set([...categories, ...addedCategories, value.category].filter(Boolean)),
+              ]}
+              onSelect={(category) => set({ category })}
+              onAddCategory={(category) => setAddedCategories((list) => [...list, category])}
+              error={issueFor('category')}
+            />
+            {issueFor('category') && (
+              <p id="dish-category-error" className="pp-field__error">
+                {issueFor('category')}
+              </p>
+            )}
+            {check('category', 'Not read from the menu. Check it.') && (
+              <p className="pp-field__hint">Not read from the menu. Check it.</p>
+            )}
+          </div>
+          <div>
+            {' '}
+            <TextField
+              id="dish-price"
+              label="Price"
+              inputMode="decimal"
+              value={value.priceAmount}
+              onChange={(event) => set({ priceAmount: event.target.value })}
+              error={issueFor('price') ?? ''}
+              hint={
+                value.source?.priceText
+                  ? `Printed on the menu: ${value.source.priceText}`
+                  : (check('price_amount', 'Not read from the menu. Check it.') ?? '')
+              }
+            />
+            <TextField
+              id="dish-currency"
+              label="Currency"
+              maxLength={3}
+              value={value.priceCurrency}
+              onChange={(event) => set({ priceCurrency: event.target.value.toUpperCase() })}
+              error={issueFor('currency') ?? ''}
+            />
+          </div>
+          <TextField
+            id="dish-serving"
+            label="Serving Size"
+            value=""
+            disabled
+            hint="Not connected to saved drafts yet."
+          />
+        </div>
+        <div className="pp-field">
+          <label className="pp-field__label" htmlFor="dish-description">
+            Description
+          </label>
+          <textarea
+            id="dish-description"
+            className="pp-input s09-textarea"
+            rows={4}
+            value={value.description}
+            onChange={(event) => set({ description: event.target.value })}
+          />
+          {uncertain.has('description') && (
+            <p className="pp-field__hint">Not read from the menu. Add one if you like.</p>
+          )}
+        </div>
+
+        <fieldset className="pp-dish-editor__group">
+          <legend>Ingredients</legend>
+          {extracted ? (
+            <p className="pp-field__hint">
+              Read from the menu, so they stay a draft until you approve the dish.
+            </p>
+          ) : (
+            <StatusChoice
+              name="ingredients-status"
+              value={value.ingredients.status}
+              onChange={(status) =>
+                set({
+                  ingredients: {
+                    status,
+                    items: status === 'unknown' ? [] : value.ingredients.items,
+                  },
+                })
+              }
+            />
+          )}
+          <ul className="pp-dish-editor__tags tags" aria-label="Ingredients">
+            {value.ingredients.items.map((item) => (
+              <li key={item}>
+                {item}{' '}
+                <button
+                  type="button"
+                  aria-label={`Remove ${item}`}
+                  onClick={() => {
+                    const items = value.ingredients.items.filter((x) => x !== item);
+                    set({
+                      ingredients: {
+                        status: items.length === 0 ? 'unknown' : value.ingredients.status,
+                        items,
+                      },
+                    });
                   }}
                 >
-                  {ISSUE_TEXT[issue].text}
-                </a>
+                  ×
+                </button>
               </li>
             ))}
           </ul>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="pp-dish-editor__error">
-          {error}
-        </p>
-      )}
-
-      <div className="pp-dish-editor__grid">
-        <section className="pp-dish-editor__fields" aria-label="Dish details">
-          <TextField
-            id="dish-name"
-            label="Dish name"
-            value={value.name}
-            onChange={(event) => set({ name: event.target.value })}
-            error={issueFor('name') ?? issueFor('rejected') ?? ''}
-          />
-          <TextField
-            id="dish-category"
-            label="Category"
-            value={value.category}
-            onChange={(event) => set({ category: event.target.value })}
-            error={issueFor('category') ?? ''}
-            hint={check('category', 'Not read from the menu. Check it.') ?? ''}
-          />
-          <TextField
-            id="dish-price"
-            label="Price"
-            inputMode="decimal"
-            value={value.priceAmount}
-            onChange={(event) => set({ priceAmount: event.target.value })}
-            error={issueFor('price') ?? ''}
-            hint={
-              value.source?.priceText
-                ? `Printed on the menu: ${value.source.priceText}`
-                : (check('price_amount', 'Not read from the menu. Check it.') ?? '')
-            }
-          />
-          <TextField
-            id="dish-currency"
-            label="Currency"
-            maxLength={3}
-            value={value.priceCurrency}
-            onChange={(event) => set({ priceCurrency: event.target.value.toUpperCase() })}
-            error={issueFor('currency') ?? ''}
-          />
-          <div className="pp-field">
-            <label className="pp-field__label" htmlFor="dish-description">
-              Description
-            </label>
-            <textarea
-              id="dish-description"
-              className="pp-input pp-field__control"
-              rows={4}
-              value={value.description}
-              onChange={(event) => set({ description: event.target.value })}
+          <div className="pp-dish-editor__row s09-inrow">
+            <input
+              className="pp-input"
+              aria-label="Add an ingredient"
+              placeholder="Add an ingredient"
+              value={ingredient}
+              onChange={(event) => setIngredient(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  addIngredient();
+                }
+              }}
             />
-            {uncertain.has('description') && (
-              <p className="pp-field__hint">Not read from the menu. Add one if you like.</p>
-            )}
+            <Button kind="outlined" onClick={addIngredient}>
+              Add
+            </Button>
           </div>
+        </fieldset>
 
-          <fieldset className="pp-dish-editor__group">
-            <legend>Ingredients</legend>
-            {extracted ? (
-              <p className="pp-field__hint">
-                Read from the menu, so they stay a draft until you approve the dish.
-              </p>
-            ) : (
+        <fieldset className="pp-dish-editor__group">
+          <legend>Allergens</legend>
+          {extracted ? (
+            <p className="pp-field__hint">
+              Allergens are not read from menus and cannot be saved on a scanned dish yet. Until
+              they are added and confirmed, diners see: “{STAFF_ALLERGY_LINE}”
+            </p>
+          ) : (
+            <>
               <StatusChoice
-                name="ingredients-status"
-                value={value.ingredients.status}
+                name="allergens-status"
+                value={value.allergens.status}
                 onChange={(status) =>
                   set({
-                    ingredients: {
+                    allergens: {
                       status,
-                      items: status === 'unknown' ? [] : value.ingredients.items,
+                      items: status === 'unknown' ? [] : value.allergens.items,
                     },
                   })
                 }
               />
-            )}
-            <ul className="pp-dish-editor__tags" aria-label="Ingredients">
-              {value.ingredients.items.map((item) => (
-                <li key={item}>
-                  {item}{' '}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${item}`}
-                    onClick={() => {
-                      const items = value.ingredients.items.filter((x) => x !== item);
-                      set({
-                        ingredients: {
-                          status: items.length === 0 ? 'unknown' : value.ingredients.status,
-                          items,
-                        },
-                      });
-                    }}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="pp-dish-editor__row">
-              <input
-                className="pp-input"
-                aria-label="Add an ingredient"
-                placeholder="Add an ingredient"
-                value={ingredient}
-                onChange={(event) => setIngredient(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    addIngredient();
-                  }
-                }}
-              />
-              <Button variant="outline" onClick={addIngredient}>
-                Add
-              </Button>
-            </div>
-          </fieldset>
-
-          <fieldset className="pp-dish-editor__group">
-            <legend>Allergens</legend>
-            {extracted ? (
-              <p className="pp-field__hint">
-                Allergens are not read from menus and cannot be saved on a scanned dish yet. Until
-                they are added and confirmed, diners see: “{STAFF_ALLERGY_LINE}”
-              </p>
-            ) : (
-              <>
-                <StatusChoice
-                  name="allergens-status"
-                  value={value.allergens.status}
-                  onChange={(status) =>
-                    set({
-                      allergens: {
-                        status,
-                        items: status === 'unknown' ? [] : value.allergens.items,
-                      },
-                    })
-                  }
-                />
-                <div className="pp-dish-editor__checks">
-                  {ALLERGEN_CODES.map((code) => (
-                    <label key={code}>
-                      <input
-                        type="checkbox"
-                        disabled={value.allergens.status === 'unknown'}
-                        checked={value.allergens.items.includes(code)}
-                        onChange={(event) =>
-                          set({
-                            allergens: {
-                              status: value.allergens.status,
-                              items: event.target.checked
-                                ? [...value.allergens.items, code]
-                                : value.allergens.items.filter((x) => x !== code),
-                            },
-                          })
-                        }
-                      />{' '}
-                      {ALLERGEN_LABEL(code)}
-                    </label>
-                  ))}
-                </div>
-              </>
-            )}
-            <p className="pp-field__hint" aria-live="polite">
-              Diners will see: {allergens.label}. {STAFF_ALLERGY_LINE}
-            </p>
-          </fieldset>
-        </section>
-
-        {extracted && (
-          <aside className="pp-dish-editor__evidence" aria-label="From the menu">
-            <h2>From the menu</h2>
-            {evidence.length === 0 ? (
-              <p className="pp-field__hint">No source text was kept for this dish.</p>
-            ) : (
-              evidence.map((excerpt) => (
-                <figure key={`${excerpt.segmentId}-${excerpt.text.slice(0, 24)}`}>
-                  <figcaption>Page {excerpt.page ?? '?'}</figcaption>
-                  <pre>{excerpt.text}</pre>
-                </figure>
-              ))
-            )}
-          </aside>
-        )}
-      </div>
-
-      <div className="pp-dish-editor__row">
-        <Button variant="outline" onClick={onSave} disabled={busy}>
-          Save draft
-        </Button>
-        {onVerify && (
-          <Button type="submit" disabled={busy}>
-            Approve dish
+              <div className="pp-dish-editor__checks">
+                {ALLERGEN_CODES.map((code) => (
+                  <label key={code}>
+                    <input
+                      type="checkbox"
+                      disabled={value.allergens.status === 'unknown'}
+                      checked={value.allergens.items.includes(code)}
+                      onChange={(event) =>
+                        set({
+                          allergens: {
+                            status: value.allergens.status,
+                            items: event.target.checked
+                              ? [...value.allergens.items, code]
+                              : value.allergens.items.filter((x) => x !== code),
+                          },
+                        })
+                      }
+                    />{' '}
+                    {ALLERGEN_LABEL(code)}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+          <p className="pp-field__hint" aria-live="polite">
+            Diners will see: {allergens.label}. {STAFF_ALLERGY_LINE}
+          </p>
+        </fieldset>
+        <div className="s09-btns">
+          <Button kind="outlined" onClick={onCancel} disabled={busy}>
+            Cancel
           </Button>
-        )}
-        <Button variant="text" onClick={onCancel} disabled={busy}>
-          Cancel
-        </Button>
-      </div>
-      <p className="pp-field__hint">Approving a dish does not publish your menu.</p>
+          <Button kind="primary" onClick={onSave} disabled={busy}>
+            Save draft
+          </Button>
+          {onVerify && (
+            <Button type="submit" disabled={busy}>
+              Approve dish
+            </Button>
+          )}
+        </div>
+        <p className="pp-field__hint">Approving a dish does not publish your menu.</p>
+      </DishFormFrame>
     </form>
   );
 }

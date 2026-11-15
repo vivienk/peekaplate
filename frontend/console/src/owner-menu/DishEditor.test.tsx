@@ -30,7 +30,8 @@ describe('DishEditor (Screen 9)', () => {
         onCancel={noop}
       />,
     );
-    expect(html).toContain('Review scanned dish');
+    expect(html).toContain('Edit dish');
+    expect(html).toContain('s09-grid');
     expect(html).toContain('value="Garden Soup"');
     expect(html).toContain('Printed on the menu: 8.50 / 12.50 CAD');
     expect(html).toContain('From the menu');
@@ -60,7 +61,7 @@ describe('DishEditor (Screen 9)', () => {
     const html = renderToStaticMarkup(
       <DishEditor value={form} onChange={noop} onSave={noop} onCancel={noop} />,
     );
-    expect(html).not.toContain('disabled=""');
+    expect(html).not.toMatch(/type="checkbox" disabled=""/);
     expect(html).toContain('Diners will see: Contains: milk, wheat.');
   });
 

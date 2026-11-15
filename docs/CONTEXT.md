@@ -213,7 +213,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. Persisted setup, menu intake/edit/publish UI and hosted full-journey acceptance remain separate. The merged menu client and source/draft/photo/review controls are connected to actor-bound workspace access. Opt-in owner AI uses separate evidence-period labels and typed denial cleanup; model activation remains off.",
+      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -306,7 +306,14 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
-        "frontend/console/src/owner/api-origin.ts"
+        "frontend/console/src/owner/api-origin.ts",
+        "scripts/console-preview-demos.test.mjs",
+        "docs/owner-onboarding-wiring.md",
+        "playwright.workspace.config.ts",
+        "frontend/console/src/owner-dashboard/controls.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.css",
+        "frontend/console/src/owner-dashboard/dish-presentation.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -316,7 +323,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "1f5845bae4caaeb138e12b4272b5cebde13d41931d7407d050b1d384b7b9f5d8"
+      "sourceFingerprint": "12537e06733a5c2bedfa37624d7e17ae3e0b14780d9190bf331018001627729c"
     },
     {
       "id": "backend",
@@ -779,15 +786,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-10",
-      "modules": [
-        "backend",
-        "delivery"
-      ],
-      "summary": "PR115 and PR122 merged into develop; PR118 merged into main 86ba7a0. Both branch CI runs passed. Staging API cdbb7ea6, extraction host 60b99488 and diner b6d0d097 deployed. Two staging migrations applied (ten history entries); RLS and browser-role denial verified. Genuine upload auth/idempotency and hosted Save/Unsave/Undo/reload passed. Queue extraction stopped before the provider on same-account Worker fetch error1042; both Queues are paused. Added staging-only public-fetch routing flag and a regression that failed before the fix. No production deployment.",
-      "next": "Review the routing correction, obtain final-commit release approval, deploy exact main API and rerun the bounded synthetic job. Verify private artifacts/drafts, withdraw the menu, restore viewer and end the staff session. Provider output and Queue ACK remain unverified."
-    },
-    {
       "date": "2026-11-12",
       "modules": [
         "backend",
@@ -925,6 +923,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-ai-responses.md"
       ],
       "next": "Verify exact main API/console deployment and synthetic/denial behavior. Keep paid AI activation, unknown freshness, restaurant-details persistence and final publish UI separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress.",
+      "files": [
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
     }
   ]
 }

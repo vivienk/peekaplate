@@ -138,3 +138,17 @@ Pattern: eval.artifact-exit-consistency; first occurrence, no policy promotion.
 Programmatic Wrangler local mode with forceLocal did not establish remote R2 writes, despite a remote binding flag. A local201 and independently hosted404 exposed the gap. Use actual remote mode or an explicit remote CLI operation for hosted evidence, then verify through an independent deployed reader. Local source/conditional-write tests remain useful but must be labelled local. Correct the acceptance record when this distinction changes its conclusion.
 
 Related: docs/menu-ingestion-infrastructure.md, docs/operations.md. First task occurrence; no policy promotion.
+
+## LRN-20261115-OWNER-COMPOSITION · Functional wiring is not visual acceptance
+
+**Logged**: November 15, 2026 · **Status**: resolved · **Area**: frontend
+
+Connecting existing controls through a new plain wrapper bypassed merged page
+composition. Passing save/upload tests did not detect the missing dashboard,
+onboarding frame or Screen 9 cards. Reuse authored presentation with data-free
+inputs, retain the existing controller, and compare actual desktop/mobile pages
+before claiming alignment. Unknown API facts must not become synthetic setup
+progress. Keep sample design content confined to labelled demos.
+
+Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
+Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.

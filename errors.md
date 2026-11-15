@@ -2702,3 +2702,7 @@ The context validator rejected an appended backend summary at 1,024 characters.
 Removed a redundant configuration-preservation clause rather than changing the
 1,000-character limit. Context refresh/check verifies the bounded summary; no
 runtime behavior, migration or hosted resource changed during this failure.
+
+```json
+{"id":"ERR-20261115-OWNER-COMPOSITION","status":"resolved","area":"owner-console-presentation","cause":"The authenticated wiring wrapper bypassed merged dashboard/onboarding composition; broad workspace styles also hid icons and changed authored form spacing.","prevention":"Reuse the original dashboard, source picker and shared form/table presentation; scope demo styles and record every connected page at desktop/mobile widths.","sources":["frontend/console/src/owner/FirstDashboard.tsx","frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/owner-dashboard/menu-presentation.tsx","tests/e2e/owner-workspace.spec.ts"],"regression":"Two missing-composition checks failed before correction. Workspace suite 36/36 and authored-screen suite 48/48 passed; optional approval category error also has a browser regression. Final hosted screenshot acceptance is separate."}
+```
