@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
+      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected. S01 Terms of Service and Privacy Policy links open the owner documents in pop-ups.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -285,6 +285,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/auth/OwnerAuth.tsx",
         "frontend/console/src/auth/auth-service.ts",
         "frontend/console/src/auth/auth.css",
+        "frontend/console/src/legal/LegalDialog.tsx",
+        "frontend/console/src/legal/markdown.tsx",
+        "frontend/console/src/legal/markdown.test.tsx",
+        "frontend/console/src/legal/legal.css",
+        "frontend/console/src/legal/terms.md",
+        "frontend/console/src/legal/privacy-policy.md",
         "frontend/console/src/auth/callback.test.tsx",
         "frontend/console/src/auth/callback.ts",
         "frontend/console/src/auth/copy.ts",
@@ -356,7 +362,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8ea6a96a455d0be1e3d41f51761f26d45800e6108801b101ed5aa57d31fcd021"
+      "sourceFingerprint": "99ffd05febb9ba478e6086746f85ac97657fa7ce0c6b1780e108158d0eb5a99f"
     },
     {
       "id": "backend",
@@ -687,7 +693,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "fda2d9d1a36ed450bf9498df6c7fd51960806d03c23d1ce744566ee74bd6ce40"
+      "sourceFingerprint": "16dbc3dcb7756bcade23859ccd3b93038d00ced96c764c5e7cae481ec18a42f4"
     },
     {
       "id": "agents",

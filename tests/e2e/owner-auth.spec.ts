@@ -124,6 +124,58 @@ test('Create account checks every field and focuses the first problem', async ({
   await expect(page.getByText('Demo only: nobody is signed in.')).toBeVisible();
 });
 
+test('Terms of Service and Privacy Policy open their documents in pop-ups', async ({ page }) => {
+  await openCreate(page);
+  // Opening the documents sends no tracking: every request from here on stays on the preview
+  // server and none goes to PostHog (Sai, 15 Nov).
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(request.url()));
+  const terms = page.getByRole('checkbox', { name: /I agree to the Terms of Service/ });
+  const termsLink = page.getByRole('button', { name: 'Terms of Service' });
+
+  // Opening a document doesn't tick the agreement.
+  await termsLink.click();
+  const dialog = page.getByRole('dialog', { name: 'Terms and Conditions' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'The legal bits' })).toBeVisible();
+  await expect(terms).not.toBeChecked();
+  expect(
+    (await new AxeBuilder({ page }).include('dialog').analyze()).violations.map((v) => v.id),
+  ).toEqual([]);
+
+  // The text scrolls inside the pop-up; the footer Close button returns focus to the link.
+  const body = dialog.getByRole('region', { name: 'Terms and Conditions' });
+  await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(dialog.getByText('You are choosing to try PeekaPlate.')).toBeInViewport();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).last().click();
+  await expect(dialog).toBeHidden();
+  await expect(termsLink).toBeFocused();
+  await expect(terms).not.toBeChecked();
+
+  // Escape closes the Privacy Policy, and a click outside it does too.
+  const privacyLink = page.getByRole('button', { name: 'Privacy Policy' });
+  await privacyLink.focus();
+  await page.keyboard.press('Enter');
+  const privacy = page.getByRole('dialog', { name: 'Privacy Policy' });
+  await expect(privacy).toBeVisible();
+  await expect(privacy.getByRole('table').first()).toContainText('Supabase');
+  expect(
+    (await new AxeBuilder({ page }).include('dialog').analyze()).violations.map((v) => v.id),
+  ).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(privacy).toBeHidden();
+  await expect(privacyLink).toBeFocused();
+
+  await privacyLink.click();
+  await expect(privacy).toBeVisible();
+  await page.mouse.click(5, 5);
+  await expect(privacy).toBeHidden();
+  await expect(terms).not.toBeChecked();
+
+  expect(requests.filter((url) => !url.startsWith('http://127.0.0.1:5174/'))).toEqual([]);
+  expect(requests.filter((url) => /posthog/i.test(url))).toEqual([]);
+});
+
 async function fillCreate(page: Page) {
   await page.getByLabel('Full name').fill('Sam Rivera');
   await passwordField(page).fill('long-enough');

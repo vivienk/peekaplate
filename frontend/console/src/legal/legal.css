@@ -1,0 +1,181 @@
+/* Terms and Conditions / Privacy Policy pop-up. There is no Figma frame for it yet, so it reuses the
+ * owner pop-up surface (owner-dialog: surface-container, outline-variant edge, 24 radius) with a
+ * header, a scrolling body and a footer, the same shape as the pop-up Adam shared. */
+.pp-legal {
+  width: min(40rem, calc(100vw - 2 * var(--pp-space-16)));
+  max-height: min(85dvh, 45rem);
+  padding: 0;
+  border: 1px solid var(--pp-role-outline-variant);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-role-surface-container);
+  color: var(--pp-color-gray-900);
+  box-shadow: 0 4px 16px rgba(28, 26, 23, 0.05);
+  overflow: hidden;
+}
+
+.pp-legal::backdrop {
+  background: rgba(28, 26, 23, 0.4); /* no scrim token yet; same as owner-dialog */
+}
+
+/* Keep the page behind still while a document is open. */
+html:has(.pp-legal[open]) {
+  overflow: hidden;
+}
+
+.pp-legal__panel {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+
+.pp-legal__header {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+  padding: var(--pp-space-16) var(--pp-space-16) var(--pp-space-16) var(--pp-space-24);
+  border-bottom: 1px solid var(--pp-role-outline-variant);
+}
+
+.pp-legal__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--pp-font-size-h4);
+  line-height: var(--pp-line-height-h4);
+  font-weight: var(--pp-font-weight-bold);
+}
+
+.pp-legal__close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-40);
+  height: var(--pp-space-40);
+  padding: 0;
+  border: 0;
+  border-radius: var(--pp-radius-full);
+  background: transparent;
+  color: var(--pp-color-gray-900);
+  cursor: pointer;
+}
+
+.pp-legal__close:hover {
+  background: var(--pp-color-gray-200);
+}
+
+.pp-legal__close:focus-visible,
+.pp-legal__body:focus-visible {
+  outline: 2px solid var(--pp-color-info-600);
+  outline-offset: 2px;
+}
+
+.pp-legal__body:focus-visible {
+  outline-offset: -2px;
+}
+
+.pp-legal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--pp-space-16) var(--pp-space-24) var(--pp-space-24);
+  color: var(--pp-color-gray-600);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+/* Paragraph 1 throughout; the console's global p style would make paragraphs larger than lists. */
+.pp-legal__body :is(p, li) {
+  margin-bottom: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.pp-legal__body > * + * {
+  margin-top: var(--pp-space-12);
+}
+
+.pp-legal__body > :first-child {
+  margin-top: 0;
+}
+
+.pp-legal__body :is(h3, h4) {
+  color: var(--pp-color-gray-900);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-legal__body h3 {
+  margin-top: var(--pp-space-24);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+}
+
+.pp-legal__body h4 {
+  margin-top: var(--pp-space-16);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+
+.pp-legal__body strong {
+  color: var(--pp-color-gray-900);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+.pp-legal__body ul {
+  margin: 0;
+  padding-inline-start: var(--pp-space-24);
+  list-style: disc;
+}
+
+.pp-legal__body p + ul {
+  margin-top: var(--pp-space-4);
+}
+
+.pp-legal__body li + li,
+.pp-legal__body li > ul {
+  margin-top: var(--pp-space-4);
+}
+
+.pp-legal__body hr {
+  border: 0;
+  border-top: 1px solid var(--pp-role-outline-variant);
+}
+
+/* Tables wrap to the pop-up width, so nothing needs a sideways scroll a keyboard can't reach. */
+.pp-legal__table table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: break-word;
+  font-size: var(--pp-font-size-paragraph-2);
+  line-height: var(--pp-line-height-paragraph-2);
+}
+
+.pp-legal__table :is(th, td) {
+  padding: var(--pp-space-8);
+  border: 1px solid var(--pp-role-outline-variant);
+  text-align: start;
+  vertical-align: top;
+}
+
+.pp-legal__table th {
+  background: var(--pp-color-gray-200);
+  color: var(--pp-color-gray-900);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+@media (max-width: 30rem) {
+  .pp-legal__body {
+    padding-inline: var(--pp-space-16);
+  }
+
+  .pp-legal__table :is(th, td) {
+    padding: var(--pp-space-6);
+  }
+}
+
+.pp-legal__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--pp-space-16) var(--pp-space-24);
+  border-top: 1px solid var(--pp-role-outline-variant);
+}
