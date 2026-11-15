@@ -22,7 +22,11 @@ async function open(page: Page) {
       response,
       body: (await response.text())
         .replaceAll('import.meta.env.VITE_MENU_SOURCE', '"live"')
-        .replaceAll('import.meta.env.VITE_PUBLIC_API_URL', '"http://127.0.0.1:5173"'),
+        .replaceAll('import.meta.env.VITE_PUBLIC_API_URL', '"http://127.0.0.1:5173"')
+        .replace(
+          'currentMenu = next;',
+          'currentMenu = next; window.refreshedPublication = next.publicationRevisionId;',
+        ),
     });
   });
   await page.route('**/public/venues/**', async (route) =>
@@ -199,4 +203,65 @@ test('a readable replacement records its menu once and cannot reuse the old expo
       publicationB,
     ),
   ).toBe(1);
+});
+
+for (const removed of [false, true]) {
+  test(`closing a refreshed picker ${removed ? 'cannot reopen a removed dish' : 'uses the current dish revision'}`, async ({
+    page,
+  }) => {
+    const state = await open(page);
+    await consent(page, true);
+    await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+    await page.locator('.pp-detail__compare').click();
+    const dishId = state.bundle.categories[0].dishes[0].dish_id;
+    state.publication = publicationB;
+    state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+    state.bundle.categories[0].dishes[0].dish_revision_id = '00000000-0000-4000-8000-000000000221';
+    state.bundle.categories[0].dishes[0].name = 'Refreshed synthetic dish';
+    if (removed) state.bundle.categories[0].dishes.shift();
+    await page.clock.fastForward(25 * 60_000);
+    await page.waitForFunction(
+      (publication) =>
+        (window as unknown as { refreshedPublication: string }).refreshedPublication ===
+        publication,
+      publicationB,
+      { polling: 100 },
+    );
+    await page.locator('.pp-picker__close').click();
+    if (removed) {
+      await expect(page.locator('.pp-detail')).toHaveCount(0);
+      await expect(page.locator('.pp-card__open').first()).toBeVisible();
+      expect(
+        (await captured(page, 'dish_detail_opened')).filter(
+          (event) => event.payload.dish_id === dishId,
+        ),
+      ).toHaveLength(1);
+    } else {
+      await expect(page.locator('.pp-detail')).toContainText('Refreshed synthetic dish');
+      expect((await captured(page, 'dish_detail_opened')).at(-1)?.payload.dish_revision_id).toBe(
+        '00000000-0000-4000-8000-000000000221',
+      );
+    }
+  });
+}
+
+test('Compare from an old detail resolves the kept dish from the refreshed menu', async ({
+  page,
+}) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes[0].dish_revision_id = '00000000-0000-4000-8000-000000000221';
+  state.bundle.categories[0].dishes[0].name = 'Refreshed synthetic dish';
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('.pp-detail__compare').click();
+  await expect(page.locator('.pp-picker__kept-name')).toHaveText('Refreshed synthetic dish');
 });
