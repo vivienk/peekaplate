@@ -2,6 +2,7 @@
 // Changes live only in this page's memory.
 import { type FormEvent, type KeyboardEvent, useRef, useState } from 'react';
 import { TextField } from '../foundations/TextField';
+import { CategoryField } from './category-field';
 import { CATS, DISH, INSIGHTS, imgOf, type MenuItem, money, suggestAlg, suggestIng } from './data';
 import type { Acts } from './pages';
 import { Btn, Icon, Note } from './ui';
@@ -166,6 +167,10 @@ export function DishForm({
 }) {
   const dr = ed.draft;
   const [errs, setErrs] = useState<Record<string, string>>({});
+  // Categories offered in the Category field: the demo's, plus the dish's own and any the owner adds.
+  const [cats, setCats] = useState<string[]>(() =>
+    dr.cat && !CATS.includes(dr.cat) ? [...CATS, dr.cat] : [...CATS],
+  );
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [ingText, setIngText] = useState('');
   const [algText, setAlgText] = useState('');
@@ -280,26 +285,15 @@ export function DishForm({
             onChange={(e) => set({ name: e.target.value })}
           />
           <div className="s09-row3">
-            <div className="pp-field">
-              <label className="pp-field__label" htmlFor="f-cat">
-                Category
-              </label>
-              <select
+            <div>
+              <CategoryField
                 id="f-cat"
-                required
-                className={`pp-input pp-field__control${dr.cat ? '' : ' s09-ph'}`}
                 value={dr.cat}
-                aria-invalid={err('f-cat') ? true : undefined}
-                aria-describedby={err('f-cat') ? 'f-cat-error' : undefined}
-                onChange={(e) => set({ cat: e.target.value })}
-              >
-                <option value="" disabled>
-                  Select category
-                </option>
-                {CATS.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+                categories={cats}
+                error={err('f-cat')}
+                onSelect={(cat) => set({ cat })}
+                onAddCategory={(cat) => setCats((list) => [...list, cat])}
+              />
               {fieldErr('f-cat')}
             </div>
             <TextField

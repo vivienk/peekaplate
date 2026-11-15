@@ -2869,6 +2869,11 @@ h1 {
   /* Figma H3/Bold 32/36; the h3 token is 24/32 (same gap as #139's --owner-pending-title-*). */
   --s09-pending-title-size: 2rem;
   --s09-pending-title-line: 2.25rem;
+  /* Category dropdown (2985:15555): Figma color/surface-container, color/accent-hover and the
+   * list's drop shadow (0 16 40, #1E283C at 14%) have no token yet. */
+  --s09-pending-surface: #fffcfa;
+  --s09-pending-option-hover: #d3e1f8;
+  --s09-pending-menu-shadow: 0 16px 34px rgb(30 40 60 / 14%);
   container-type: inline-size;
 }
 .s09-grid {
@@ -2899,7 +2904,8 @@ h1 {
   font-weight: var(--pp-font-weight-bold);
 }
 /* Input Field Default "star": a red * after the label of every required field. */
-.s09 .pp-field:has([required]) > .pp-field__label::after {
+.s09 .pp-field:has([required]) > .pp-field__label::after,
+.s09 .pp-field:has([aria-required="true"]) > .pp-field__label::after {
   content: "*" / "";
   margin-inline-start: var(--pp-space-2);
   color: var(--pp-role-error);
@@ -3175,4 +3181,78 @@ h1 {
     font-size: var(--pp-font-size-h3);
     line-height: var(--pp-line-height-h3);
   }
+}
+
+/* Category dropdown (Figma "Owner / Category dropdown" 2985:15555). The field is the Input Field
+ * Default look (.pp-input) with the Arrow-down icon; open it shows the focus edge. The list sits 8
+ * below the field: surface-container fill, Neutral/300 edge, radius 12, padding 8, rows 4 apart. */
+.s09-cat__box {
+  position: relative;
+}
+.s09 .s09-cat__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-6);
+  cursor: pointer;
+  user-select: none;
+}
+.s09 .s09-cat__field[data-open] {
+  --pp-input-edge: var(--pp-role-input-border-focus);
+}
+.s09-cat__ph {
+  color: var(--pp-role-input-placeholder);
+}
+.s09-cat__menu {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + var(--pp-space-8));
+  z-index: 10;
+  padding: var(--pp-space-8);
+  border: 1px solid var(--pp-color-neutral-300);
+  border-radius: var(--pp-radius-12);
+  background: var(--s09-pending-surface);
+  box-shadow: var(--s09-pending-menu-shadow);
+}
+.s09-cat__menu [role="listbox"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-4);
+}
+/* Owner / Dropdown option: 44 tall, padding 8, radius 8; hover (also the keyboard highlight) is
+ * color/accent-hover with on-surface text. */
+.s09-cat__option {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+  min-block-size: 44px;
+  padding: var(--pp-space-8);
+  border-radius: var(--pp-radius-8);
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+  cursor: pointer;
+}
+.s09-cat__option[data-active] {
+  background: var(--s09-pending-option-hover);
+  color: var(--pp-role-on-surface);
+}
+/* "Add category": color/link (Orange/800), Medium weight, with the plus icon. */
+.s09-cat__add {
+  color: var(--pp-color-orange-800);
+  font-weight: var(--pp-font-weight-medium);
+}
+.s09-cat__divider {
+  block-size: 1px;
+  background: var(--pp-role-outline-variant);
+}
+/* Creating: the name input fills the row, then the Outlined Medium "Add" button, 8 apart. */
+.s09-cat__new {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-8);
+}
+.s09-cat__new .pp-input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
 }
