@@ -2746,3 +2746,12 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T20:39:34.442Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-DINER-RELEASE-IMPORTS", "status": "resolved", "area": "release-reconciliation", "cause": "Narrow contract export reconciliation needed the existing Biome import ordering.", "prevention": "Run the repository formatter after selective release reconciliation.", "sources": ["packages/contracts/src/index.ts"], "regression": "pnpm check passes after import ordering; prepared-menu portion regression preserves exact-byte checks."}
+```

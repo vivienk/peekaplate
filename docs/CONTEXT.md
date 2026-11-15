@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/public-menu, analytics, retrieval and nine-observation contracts with receipts, canonical JSON and microsecond time helpers. Public-menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse, then validates shared delivery identity; tamper vectors cover reformatted and wrong-revision data. Queue traffic_class is server-derived; normalized observation.v2 payloads reject client authority/private fields. Owner-report v1 enforces per-metric ten-session cohorts and complementary suppression, stripping internal counts. Review candidate/persistence and owner-AI evidence contracts remain bounded. DIN-03 uses the shared verifier; hosted release acceptance remains separately recorded. The read-only owner workspace contract lists only the verified actor and current owner/editor restaurant memberships. owner-analysis.v1 strictly carries dish/goal requests and bounded synthetic review/abstention responses without menu effects.",
+      "summary": "Strict staff/publication/menu, analytics, retrieval and observation contracts with receipts, canonical JSON and microsecond time helpers. Menu integrity hashes exact fetched UTF-8 bytes before fatal decode/parse and verifies delivery identity. Queue traffic_class is server-derived; observation.v2 rejects client authority/private fields. Owner reports enforce per-metric ten-session cohorts/complementary suppression and strip internal counts. Review/persistence and AI evidence remain bounded. Workspace lists the verified actor and current owner/editor memberships. owner-analysis.v1 carries bounded synthetic review/abstention without menu effects. Optional portions carry bounded hash-bound layers; ingredient-artwork supports a fallback-safe client.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -56,7 +56,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/owner-menu.test.ts",
         "packages/contracts/src/owner-workspace.ts",
         "packages/contracts/src/owner-workspace.test.ts",
-        "packages/contracts/src/owner-analysis.ts"
+        "packages/contracts/src/owner-analysis.ts",
+        "packages/contracts/src/portion.ts",
+        "packages/contracts/src/ingredient-artwork.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -64,7 +66,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c57c4cdef1292da51d02bfff2ef67cb02e08d1c1c1e19175f061ff7c131fc6e1"
+      "sourceFingerprint": "c11fcbf1b60e8c6da7368aba3fa9eb10a59113bd9afcdecff61827a933e9e154"
     },
     {
       "id": "tokens",
@@ -102,7 +104,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate.",
+      "summary": "Auth-free diner reads approved immutable menu bundles with exact-byte/revision verification and restaurant-link resolution. Authored Menu, Search, Detail, Save/Saved and Compare/Replace preserve navigation and accessibility. Consent gates independent PostHog/canonical dispatch. Optional portion layers are hash-bound and dish/revision-matched, loaded on demand with original-photo fallback and cleanup. Published synthetic demos use real HTTPS layer URLs and explicit provenance; no measured-size claim. Demo uploads/generation remain separate from normal builds. Hosted acceptance and physical-phone checks are recorded separately.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -199,7 +201,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/restaurant-urls.md",
         "tests/restaurant-links/restaurant-links.spec.ts",
         "playwright.restaurant-links.config.ts",
-        "scripts/serve-restaurant-routing-test.mjs"
+        "scripts/serve-restaurant-routing-test.mjs",
+        "frontend/diner/src/menu/portionPreview.ts",
+        "frontend/diner/src/menu/portionAssets.ts",
+        "frontend/diner/src/menu/portionAR.ts",
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/compare/resultScreen.ts",
+        "docs/merged-diner-staging.md"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -208,7 +216,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "0b2af6a1e7e361a39ed089c47744c8dcbb3ece67e650d71bf1742f529bc56523"
+      "sourceFingerprint": "e25cae47fe0d0e4098f50fd9bb84d8af430df1730d8448404f6fdb21b47c4553"
     },
     {
       "id": "console",
@@ -326,7 +334,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9884d8f67e9989c536bee3b209cf216c87094c95c784bf007fa90fbdc9b92081"
+      "sourceFingerprint": "45ce728d6de5ef4c1b6235e774f4be019f78db61ab4eaab934e3c4335e7fd411"
     },
     {
       "id": "backend",
@@ -478,7 +486,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "1cbe9630a0f306fd3f79598c2ae57605d4a2007c265eb689bdaad955056c010a"
+      "sourceFingerprint": "56acbfab9f0b66de9649919906a8f60c31d954e60b202c0fec4ed6c7fab8db58"
     },
     {
       "id": "database",
@@ -605,7 +613,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "261010ff91fde4b8939600bffbc55e277f64b9460d40f8406c358a3501e3ed2d"
+      "sourceFingerprint": "9eb41dc2864130a8c86878d6d243bd89748b7908a34b68ad22e941b5d3d84bf2"
     },
     {
       "id": "agents",
@@ -794,21 +802,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-12",
-      "modules": [
-        "diner",
-        "analytics"
-      ],
-      "summary": "PR158 is merged on main8c83f53 and deployed to existing staging diner Pages24dcd65c. Intercepted hosted smoke found the first menu_viewed missing only from PostHog because the screen consent listener ran first. A real-adapter regression reproduced the loss; syncing adapter consent immediately before capture fixes initial and renewed consent. No policy, SDK configuration, API, provider or Queue changes.",
-      "paths": [
-        "frontend/diner/src/tracking/index.ts",
-        "frontend/diner/src/tracking/dispatch.test.ts",
-        "tests/e2e/posthog-adapter.spec.ts",
-        "docs/diner-tracking-staging.md"
-      ],
-      "next": "Obtain final-commit approval, deploy the corrected exact main diner and rerun the intercepted hosted smoke. Jeffin/Uneeza then coordinate genuine PostHog readback, canonical durability and report reconciliation in an explicitly approved window; normal collection stays gated."
-    },
-    {
       "date": "2026-11-14",
       "modules": [
         "diner",
@@ -940,6 +933,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.workerd-harness.ts"
       ],
       "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "diner",
+        "contracts",
+        "backend"
+      ],
+      "summary": "Promote merged diner Compare, photos and portion viewer with strict optional portion preview support. Preserve owner screens, staging-only restaurant routing and existing publication authority. No migration, provider or Queue activation.",
+      "files": [
+        "docs/merged-diner-staging.md",
+        "backend/src/owner-publication.test.ts",
+        "frontend/diner/src/menu/portionPreview.ts"
+      ],
+      "next": "Approve exact release, deploy existing staging API/routing Pages and verify the labelled one-restaurant publication with page screenshots; S10/trusted draft preparation and physical scale remain separate."
     }
   ]
 }

@@ -19,13 +19,14 @@ available. Mobile retains the authored stacked layout.
 
 - #163 remains a separate S10 verification-only implementation; its title does
   not mean it implements S13 publication.
-- #162 remains the draft 2.5D camera/portion integration. The merged diner detail
-  still disables View Portion. Its preview is separate from this hosted flow.
-- #145/#147 are pending diner icon/photo updates; #196 is a Compare design update.
+- #162, #147 and #196 are merged: portion/camera behavior, sample dish photography
+  and Compare design changes. Their narrow staging promotion is documented in
+  [merged diner staging](merged-diner-staging.md); a merge alone is not hosted evidence.
+- Other icon/screen changes remain separate from this promotion.
 - #173 changes confirmed-404 withdrawal behavior. Until it is merged and deployed,
   REL-02 must distinguish fresh-load denial from the older retained-menu behavior.
 
-These pending branches are not silently included in the staging release.
+The pending S10/withdrawal branches are not included in this staging release.
 
 ## Owner journey
 
