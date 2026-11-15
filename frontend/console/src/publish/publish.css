@@ -1,0 +1,252 @@
+/* S13 Owner diner menu preview and publish (Figma 3123:12796). Values are @peekaplate/tokens
+ * variables from the frames; the phone size (390 × 680), its 32 radius and the dialog width (600)
+ * have no token category yet and stay as --pp-s13-pending-* values. The page, card, buttons and
+ * messages reuse the onboarding layout and the owner auth parts. */
+.pp-menu-preview,
+.pp-menu-preview__dialog {
+  --pp-s13-pending-phone-width: 390px;
+  --pp-s13-pending-phone-height: 680px;
+  --pp-s13-pending-phone-radius: 32px;
+  --pp-s13-pending-dialog-width: 600px;
+}
+.pp-menu-preview {
+  display: grid;
+  justify-items: stretch;
+  gap: calc(2 * var(--pp-space-32)); /* 64: no spacing token yet */
+  /* card: padding 80 × 48 */
+  padding-inline: var(--pp-space-48);
+}
+
+/* Title (H3 Bold 32/36) and the 18/28 Semi Bold lead in text/secondary, 2 apart. */
+.pp-menu-preview__head {
+  display: grid;
+  gap: var(--pp-space-2);
+}
+.pp-menu-preview__lead {
+  margin: 0;
+  color: var(--pp-color-gray-600);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+  text-align: center;
+}
+.pp-menu-preview .pp-onboard__title:focus {
+  outline: none;
+}
+
+/* Messages sit inside the 900-wide preview column. */
+.pp-menu-preview > .pp-auth-banner {
+  inline-size: 100%;
+  max-inline-size: 900px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+/* "Review dishes": Text link, Tone Neutral (Medium 16, text/secondary). */
+.pp-menu-preview__link {
+  justify-self: start;
+  padding: var(--pp-space-4) 0;
+  border: 0;
+  background: none;
+  color: var(--pp-color-gray-600);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-1);
+  font-weight: var(--pp-font-weight-medium);
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* error msg, State=Success ("Link copied."): success-container with on-success-container text. */
+.pp-auth-banner.pp-menu-preview__success {
+  background: var(--pp-color-success-50);
+  color: var(--pp-color-success-900);
+}
+
+/* The onboarding card keeps its children 800 wide; S13's preview body is 900 (390 + 48 + 462). */
+.pp-onboard__card.pp-menu-preview > * {
+  max-width: 900px;
+}
+.pp-onboard__card.pp-menu-preview > .pp-menu-preview__head {
+  max-width: none;
+}
+
+/* Preview body: the phone column and the publish panel, 48 apart, centred. */
+.pp-menu-preview__body {
+  inline-size: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--pp-space-48);
+}
+.pp-menu-preview__diner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pp-space-16);
+  inline-size: min(100%, var(--pp-s13-pending-phone-width));
+}
+
+/* Status Label (Warning before publishing, success once live): 24 high, padding 4 × 12. */
+.pp-menu-preview__label,
+.pp-menu-preview__badge {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--pp-space-24);
+  padding: var(--pp-space-4) var(--pp-space-12);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-warning-50);
+  color: var(--pp-color-warning-900);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
+  box-sizing: border-box;
+}
+.pp-menu-preview__badge {
+  padding-inline-start: var(--pp-space-8);
+}
+.pp-menu-preview__label.is-live,
+.pp-menu-preview__badge.is-live {
+  background: var(--pp-color-success-50);
+  color: var(--pp-color-success-900);
+}
+
+/* Phone / Diner menu: Neutral/800 fill, Neutral/500 edge, radius 32; the diner app scrolls inside. */
+.pp-menu-preview__phone {
+  inline-size: 100%;
+  block-size: var(--pp-s13-pending-phone-height);
+  overflow: hidden;
+  border: 1px solid var(--pp-color-neutral-500);
+  border-radius: var(--pp-s13-pending-phone-radius);
+  background: var(--pp-color-neutral-800);
+  box-sizing: border-box;
+}
+.pp-menu-preview__frame {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border: 0;
+}
+.pp-menu-preview__unavailable {
+  display: grid;
+  place-items: center;
+  block-size: 100%;
+  margin: 0;
+  padding: var(--pp-space-24);
+  color: var(--pp-color-neutral-200);
+  font-size: var(--pp-font-size-paragraph-2);
+  text-align: center;
+}
+
+/* Publish panel: radius 24, padding 24, items 24 apart, surface fill. */
+.pp-menu-preview__panel {
+  display: grid;
+  gap: var(--pp-space-24);
+  flex: 1 1 20rem;
+  max-inline-size: 462px;
+  padding: var(--pp-space-24);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface); /* Figma color/surface #FAF4EF */
+  box-sizing: border-box;
+}
+.pp-menu-preview__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pp-space-12);
+}
+.pp-menu-preview__panel h2 {
+  margin: 0;
+  color: var(--pp-color-gray-900);
+  font-size: var(--pp-font-size-h5);
+  line-height: var(--pp-line-height-h5);
+  font-weight: var(--pp-font-weight-semibold);
+}
+.pp-menu-preview__url-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pp-space-12);
+}
+/* URL field (read-only): 44 high, radius 12, surface-container fill, outline-solid edge, 14 text. */
+.pp-menu-preview__url {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: 0 var(--pp-space-16);
+  border: 1px solid var(--pp-color-neutral-500);
+  border-radius: var(--pp-radius-12);
+  background: var(--pp-auth-pending-surface-container);
+  color: var(--pp-color-gray-900);
+  font: inherit;
+  font-size: var(--pp-font-size-paragraph-2);
+  box-sizing: border-box;
+}
+.pp-menu-preview__url:focus-visible {
+  outline: 2px solid var(--pp-role-input-border-focus);
+  outline-offset: 1px;
+}
+.pp-menu-preview__url-row > .pp-auth-btn {
+  flex: none;
+  inline-size: auto;
+  margin: 0;
+}
+.pp-menu-preview__helper,
+.pp-menu-preview__summary {
+  margin: 0;
+  font-size: var(--pp-font-size-paragraph-2);
+}
+.pp-menu-preview__helper {
+  color: var(--pp-color-gray-600);
+}
+.pp-menu-preview__summary {
+  color: var(--pp-color-gray-900);
+  font-weight: var(--pp-font-weight-semibold);
+}
+
+/* Publish Confirmation: 600 wide, padding 80 × 48, radius 24, title then buttons 48 apart. */
+.pp-menu-preview__dialog {
+  inline-size: calc(100% - 2 * var(--pp-space-16));
+  max-inline-size: var(--pp-s13-pending-dialog-width);
+  padding: var(--pp-space-80) var(--pp-space-48);
+  border: 1px solid var(--pp-role-card-border);
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-auth-pending-surface-container);
+  box-shadow: var(--pp-auth-pending-card-shadow);
+  box-sizing: border-box;
+  text-align: center;
+}
+.pp-menu-preview__dialog::backdrop {
+  background: color-mix(in srgb, var(--pp-color-gray-900) 40%, transparent);
+}
+.pp-menu-preview__dialog h2 {
+  margin: 0 0 var(--pp-space-6);
+  color: var(--pp-color-gray-900);
+  font-size: var(--pp-auth-pending-title-size);
+  line-height: var(--pp-auth-pending-title-line);
+  font-weight: var(--pp-font-weight-bold);
+}
+.pp-menu-preview__dialog p {
+  margin: 0 0 var(--pp-space-48);
+  color: var(--pp-color-gray-600);
+  font-size: var(--pp-font-size-paragraph-1);
+  line-height: var(--pp-line-height-paragraph-1);
+}
+.pp-menu-preview__dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--pp-space-16);
+}
+.pp-menu-preview__dialog-actions > .pp-auth-btn {
+  flex: 1 1 13rem;
+  inline-size: auto;
+  max-inline-size: 17.5rem;
+  margin: 0;
+}
+
+@media (max-width: 599px) {
+  .pp-menu-preview {
+    padding-inline: var(--pp-space-16);
+  }
+  .pp-menu-preview__url-row {
+    flex-wrap: wrap;
+  }
+}
