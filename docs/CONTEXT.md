@@ -215,7 +215,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/serve-restaurant-routing-test.mjs",
         "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json",
         "frontend/diner/src/menu/liveArtwork.ts",
-        "tests/e2e/ingredient-artwork.spec.ts"
+        "tests/e2e/ingredient-artwork.spec.ts",
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/compare/pickerScreen.test.ts",
+        "tests/e2e/compare-picker.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -224,7 +227,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "34b222c113ec3061a4f89b8e76101c860246584ddee3cfc0412a96c275d3b1b8"
+      "sourceFingerprint": "7498a5b8e1fe631d0170ab6b16e6635ebb2b0bfc1b487a653351308019e1175e"
     },
     {
       "id": "console",
@@ -485,7 +488,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "0772d1d3ddcabd3ff701c4894ffc0ac989d4cf2608366a0e85d2f65f4a6bad75"
+      "sourceFingerprint": "c35e178f261ee8fdeb0e6c728bc5e078b7ac26cb3b636ab842ee8e31cf2c6f93"
     },
     {
       "id": "database",
@@ -628,7 +631,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "a539e02fecc9416887f1e4d916354044d35caf528f3cc3130f389fe8875835c2"
+      "sourceFingerprint": "a8551b0c4fb59f384808b400cdfe8fa82c837fb6e0a8604115fb86c10cc822e6"
     },
     {
       "id": "agents",
@@ -842,22 +845,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-13",
-      "modules": [
-        "diner",
-        "backend",
-        "delivery"
-      ],
-      "summary": "Prepare peekaplate.app/diner/<restaurant> with a validated public locator directory and create-only Pages artifact. Existing QR/publication/token/hash checks remain; .io marketing and live resources are unchanged. Root/owner are not implemented by the diner-only artifact. Real local Pages routing catches clean-URL redirects; hosted domain and owner integration remain pending.",
-      "sources": [
-        "docs/restaurant-urls.md",
-        "frontend/diner/src/menu/route.ts",
-        "scripts/prepare-app-site.mjs",
-        "tests/restaurant-links/restaurant-links.spec.ts"
-      ],
-      "next": "Complete pinned review and repository checks, then review the preparation PR. Enroll approved restaurant IDs and run an approved staging candidate before production DNS/Pages association. Align owner base/auth callbacks separately."
-    },
-    {
       "date": "2026-11-14",
       "modules": [
         "backend",
@@ -1000,6 +987,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/eval/qa02/EVIDENCE.md"
       ],
       "next": "Mohammad and Uneeza review the original menus/reference/scoring decisions, register untouched holdouts, then obtain approval before fresh scored provider runs. Merge preparation without declaring QA-02 accepted."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
+      "files": [],
+      "next": "Merge picker before PR127 result and Replace. Hosted analytics acceptance remains separate."
     }
   ]
 }
