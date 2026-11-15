@@ -223,6 +223,7 @@ export function OwnerWorkspace({
         restaurantName={selected.name}
         current={page}
         available={pages}
+        lockedHint="Some screens are not connected in this workspace yet."
         visible={
           new Set<OwnerPage>(['overview', 'report', 'performance', 'menu', 'actions', 'setup'])
         }

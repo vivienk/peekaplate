@@ -124,3 +124,10 @@ manual draft reload, extracted correction save/reload and restoration, partial
 upload retention and revoked-access cleanup against staging. It did not establish
 visual fidelity. This correction requires its own Pages rollout and screenshot
 readback; provider extraction is not rerun for a presentation-only change.
+
+Independent review also caught an inherited global menu-heading style and a
+sidebar hint promising unsupported publication unlocks. The live surface now
+uses the author's scoped 28px heading and describes unavailable connections
+without changing the demo. Browser-dropped files with no MIME use the existing
+extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
+server signature/hash verification remains authoritative.

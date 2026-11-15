@@ -1,4 +1,11 @@
 @import "./dish-presentation.css";
+.owner-menu-design .pagehead h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  font-weight: 600;
+}
 /* Authored dashboard controls/table, scoped away from auth and report pages. */
 .owner-menu-design {
   --bg: var(--pp-role-surface);

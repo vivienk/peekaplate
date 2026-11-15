@@ -405,6 +405,59 @@ async function addCategory(page: Page, category: string) {
   }
 }
 
+test('menu typography and locked-page copy keep the authored live boundary', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await expect(page.getByRole('heading', { name: 'Your dishes', exact: true })).toHaveCSS(
+    'font-size',
+    '28px',
+  );
+  await expect(page.locator('.owner-nav-hint')).toHaveText(
+    'Some screens are not connected in this workspace yet.',
+  );
+  state.venues = [{ ...venue, permission: 'editor' }];
+  await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dish performance', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(page.locator('.owner-nav-hint')).not.toContainText('after you publish');
+});
+
+test('a browser file with no MIME keeps original bytes and a declared PDF upload', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByText('Upload photos/PDF', { exact: true }).click();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const original = Buffer.from('%PDF-1.7 synthetic empty MIME fixture');
+  const sent: Array<{ type: string | undefined; body: Buffer | null }> = [];
+  page.on('request', (request) => {
+    if (/\/upload-groups\/[^/]+\/files\/0$/.test(new URL(request.url()).pathname))
+      sent.push({ type: request.headers()['content-type'], body: request.postDataBuffer() });
+  });
+  // Playwright infers a MIME for file payloads; emulate the browser's actual empty-type File.
+  await page
+    .locator('input[type=file]')
+    .first()
+    .evaluate((input) => {
+      const files = new DataTransfer();
+      files.items.add(
+        new File(['%PDF-1.7 synthetic empty MIME fixture'], 'synthetic.pdf', { type: '' }),
+      );
+      (input as HTMLInputElement).files = files.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  await expect.poll(() => state.jobs[venue.venueId]?.[0]?.source_uploaded).toBe(true);
+  expect(sent).toEqual([{ type: 'application/pdf', body: original }]);
+});
+
 test('the live dish approval describes the category validation error', async ({ page }) => {
   await page.route('**/src/onboarding/demo.tsx*', async (route) => {
     const response = await route.fetch();
