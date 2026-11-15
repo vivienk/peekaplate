@@ -3945,6 +3945,6 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T18:30:31.359Z","exitCode":2}
 ```
 
-`json
+```json
 {"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
-`
+```
