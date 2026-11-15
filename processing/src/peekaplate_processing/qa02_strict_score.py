@@ -46,6 +46,7 @@ PAGE_COUNT_KEYS = (
     "duplicate_assertions",
     "role_errors",
     "unassociated_candidates",
+    "unresolved_candidates",
     "name_correct",
     "dish_correct",
     "dish_wrong",
@@ -262,6 +263,10 @@ def _empty_page(page: int, exclusion_reason: str | None, entries) -> dict:
         "exclusion_reason": exclusion_reason,
         "segment_status": "unavailable",
         "segment_errors": [],
+        "segments": [],
+        "has_failed_segments": False,
+        "has_skipped_segments": False,
+        "partial_coverage": False,
         "expected_entry_ids": [entry.entry_id for entry in entries if entry.page == page],
         "actual_candidate_ids": [],
         "counts": _zero_page_counts(),
@@ -276,18 +281,31 @@ def _bounded_error(value: str | None) -> str | None:
 
 
 def _page_segments(page: dict, segments: list) -> None:
+    page["segments"] = [
+        {
+            "segment_id": segment.segment_id,
+            "method": segment.method,
+            "status": segment.status,
+            "error": segment.error,
+            "warnings": list(segment.warnings),
+        }
+        for segment in segments
+    ]
     if not segments:
         page["segment_status"] = "missing"
-        page["segment_errors"] = []
         return
-    if any(segment.status == "ready" and segment.error is None for segment in segments):
-        page["segment_status"] = "ready"
-    elif any(segment.status == "failed" for segment in segments):
+    has_ready = any(segment.status == "ready" and segment.error is None for segment in segments)
+    has_failed = any(segment.status == "failed" or segment.error is not None for segment in segments)
+    has_skipped = any(segment.status == "skipped" for segment in segments)
+    page["has_failed_segments"] = has_failed
+    page["has_skipped_segments"] = has_skipped
+    page["partial_coverage"] = has_ready and (has_failed or has_skipped)
+    if has_failed:
         page["segment_status"] = "failed"
-    elif any(segment.status == "skipped" for segment in segments):
+    elif has_skipped:
         page["segment_status"] = "skipped"
     else:
-        page["segment_status"] = "unknown"
+        page["segment_status"] = "ready" if has_ready else "unknown"
     errors = []
     for segment in segments:
         bounded = _bounded_error(segment.error)
@@ -415,7 +433,7 @@ def _score_case(case, run: CaseRun, reference: Reference, runs_base: Path) -> di
         pair = link_by_candidate.get(candidate_id)
         if pair is None:
             span_index = 0
-            disposition[candidate_id] = "unassociated"
+            disposition[candidate_id] = "unassociated" if candidate_id in link_by_candidate else "unresolved"
             disposition_entry[candidate_id] = None
         else:
             entry, span_index = pair
@@ -438,6 +456,7 @@ def _score_case(case, run: CaseRun, reference: Reference, runs_base: Path) -> di
             "duplicate": "duplicate_assertions",
             "role_error": "role_errors",
             "unassociated": "unassociated_candidates",
+            "unresolved": "unresolved_candidates",
         }[disposition[candidate_id]]
         page_stat["counts"][disposition_key] += 1
 
@@ -548,7 +567,7 @@ def _score_case(case, run: CaseRun, reference: Reference, runs_base: Path) -> di
             "assigned_page": page,
             "disposition": disposition[candidate_id],
             "associated_entry_id": disposition_entry[candidate_id],
-            "evidence_index": used_index[candidate_id] if disposition[candidate_id] != "unassociated" else None,
+            "evidence_index": used_index[candidate_id] if disposition[candidate_id] not in {"unassociated", "unresolved"} else None,
             "evidence_index_used": used_index[candidate_id],
             "original": {
                 "name": original.name,
@@ -672,8 +691,9 @@ def _coverage(cases: list[dict]) -> dict:
         ),
         "pages_total": len(pages),
         "pages_ready": sum(page["segment_status"] == "ready" for page in pages),
-        "pages_failed": sum(page["segment_status"] == "failed" for page in pages),
-        "pages_skipped": sum(page["segment_status"] == "skipped" for page in pages),
+        "pages_failed": sum(page["has_failed_segments"] for page in pages),
+        "pages_skipped": sum(page["has_skipped_segments"] for page in pages),
+        "pages_partial": sum(page["partial_coverage"] for page in pages),
         "pages_missing": sum(page["segment_status"] == "missing" for page in pages),
         "pages_unavailable": sum(page["segment_status"] == "unavailable" for page in pages),
         "pages_excluded": sum(page["excluded"] for page in pages),

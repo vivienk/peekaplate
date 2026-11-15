@@ -170,10 +170,21 @@ uv run --project processing --extra service --frozen --offline \
 ```
 
 The guarded runner rejects parent/child network attempts and zero discovered tests.
-On 2026-11-14 the initial combined reference/scorer run passed **38 tests in4.193s**,
-including actual module-CLI, create-only/private output, tampering, duplicates,
-missing/failed/unavailable pages, whole price fields and null/zero controls.
-An additional CLI-argument privacy regression exposed argument parsing outside the sanitized
-error handler. After correction, the focused actual-module CLI test passed in5.334s, including
-both invalid-argument cases. The exact current revision and CI evidence are recorded on PR181.
+On 2026-11-14 the final combined reference/scorer run passed **39 tests in5.569s**,
+including actual module-CLI/privacy, tampering, null/zero, duplicate/unresolved mapping,
+and mixed ready/failed/skipped/error-bearing segment controls. Earlier failing controls
+and CI observations are retained in the error ledger and PR181; no warning is suppressed.
 These synthetic/offline controls are not real-menu accuracy or hosted acceptance.
+
+### Reviewed extras and partial pages
+
+`unassociated_candidates` counts explicit reviewed null associations;
+`unresolved_candidates` counts actual predictions omitted from the mapping ledger.
+Both remain in precision, but the receipt does not mistake unfinished mapping for review.
+
+Page receipts retain every segment's identity, method, status, error and warnings.
+Failed/error-bearing segments take precedence over ready, then skipped, when deriving
+effective page status. `partial_coverage` and `pages_partial` flag readable partial pages.
+`pages_failed`/`pages_skipped` count the underlying flags and may overlap for a page;
+do not sum these flags as disjoint page totals. Valid ready-segment facts stay measurable,
+but mixed required pages cannot make input coverage complete.

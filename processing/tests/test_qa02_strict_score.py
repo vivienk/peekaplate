@@ -356,7 +356,7 @@ class StrictScoreTests(unittest.TestCase):
 
         for key in ("expected_dishes", "expected_qualifiers", "primary_assertions",
                     "wrong_page_assertions", "duplicate_assertions", "role_errors",
-                    "unassociated_candidates", "name_correct", "dish_correct",
+                    "unassociated_candidates", "unresolved_candidates", "name_correct", "dish_correct",
                     "dish_wrong", "dish_missing", "price_matched", "price_wrong",
                     "price_missing", "unknown_correct", "unknown_unsupported",
                     "unknown_missing"):
@@ -502,7 +502,11 @@ class StrictScoreTests(unittest.TestCase):
         capture = self.capture()
         omitted = [link for link in self.default_links() if link["candidate_id"] != "cand-coffee"]
         case = self.evaluate([self.captured("DEV-001", capture, omitted)])["cases"][0]
-        self.assertEqual(case["counts"]["unassociated_candidates"], 1)
+        self.assertEqual(case["counts"]["unassociated_candidates"], 0)
+        self.assertEqual(case["counts"]["unresolved_candidates"], 1)
+        unresolved = next(item for item in case["candidates"] if item["candidate_id"] == "cand-coffee")
+        self.assertEqual(unresolved["disposition"], "unresolved")
+        self.assertIsNone(unresolved["evidence_index"])
         self.assertEqual(case["counts"]["asserted_candidates"], 4)
         self.assertEqual(case["counts"]["name_correct"], 3)
         self.assertEqual(case["counts"]["unknown_missing"], 1)
@@ -513,6 +517,9 @@ class StrictScoreTests(unittest.TestCase):
         ]
         case = self.evaluate([self.captured("DEV-001", capture, explicit)])["cases"][0]
         self.assertEqual(case["counts"]["unassociated_candidates"], 1)
+        self.assertEqual(case["counts"]["unresolved_candidates"], 0)
+        reviewed = next(item for item in case["candidates"] if item["candidate_id"] == "cand-coffee")
+        self.assertEqual(reviewed["disposition"], "unassociated")
         self.assertEqual(case["counts"]["asserted_candidates"], 4)
         self.assertEqual(self.row(case, "p1-coffee")["price_outcome"], "missing")
 
@@ -554,7 +561,8 @@ class StrictScoreTests(unittest.TestCase):
 
         for case in (first, second):
             self.assertEqual(case["counts"]["asserted_candidates"], 6)
-            self.assertEqual(case["counts"]["unassociated_candidates"], 1)
+            self.assertEqual(case["counts"]["unassociated_candidates"], 0)
+            self.assertEqual(case["counts"]["unresolved_candidates"], 1)
             self.assertEqual(case["counts"]["duplicate_assertions"], 1)
             self.assertEqual(case["counts"]["name_correct"], 3,
                              "the later correct duplicate never becomes the scoreable assertion")
@@ -695,6 +703,43 @@ class StrictScoreTests(unittest.TestCase):
         self.assertEqual(case["counts"]["report_errors"], 1)
         self.assertEqual(result["coverage"]["reports_with_errors"], 1)
         self.assertEqual(result["coverage"]["input_status"], "incomplete")
+
+    def test_mixed_page_segments_preserve_partial_coverage_and_diagnostics(self):
+        for status, error in (
+            ("failed", "Synthetic additional segment failed."),
+            ("skipped", None),
+            ("ready", "Synthetic ready-labelled segment has an error."),
+        ):
+            with self.subTest(status=status):
+                capture = self.capture()
+                raw = json.loads(capture["report"].read_text(encoding="utf-8"))
+                additional = copy.deepcopy(raw["segments"][0])
+                additional.update(
+                    segment_id=additional["segment_id"] + "-additional",
+                    status=status, text="", native_text=None, error=error,
+                    warnings=["Synthetic additional segment warning."],
+                )
+                raw["segments"].append(additional)
+                capture["report"].write_text(json.dumps(raw), encoding="utf-8")
+                exported = prepare_review_candidates(MenuExtractionResult.model_validate(raw))
+                capture["candidates"].write_text(exported.model_dump_json(), encoding="utf-8")
+                capture["report_sha256"] = digest(capture["report"])
+                capture["candidates_sha256"] = digest(capture["candidates"])
+                result = self.evaluate([self.captured("DEV-001", capture, self.default_links())])
+                page = result["cases"][0]["pages"][0]
+                self.assertEqual(result["coverage"]["input_status"], "incomplete")
+                self.assertTrue(page["partial_coverage"])
+                self.assertEqual(result["coverage"]["pages_partial"], 1)
+                self.assertEqual(result["coverage"]["pages_ready"], 1)
+                self.assertEqual(result["coverage"]["pages_failed"], int(error is not None))
+                self.assertEqual(result["coverage"]["pages_skipped"], int(status == "skipped"))
+                preserved = next(item for item in page["segments"]
+                                 if item["segment_id"] == additional["segment_id"])
+                self.assertEqual(preserved["status"], status)
+                self.assertEqual(preserved["error"], error)
+                self.assertEqual(preserved["warnings"], ["Synthetic additional segment warning."])
+                self.assertEqual(result["cases"][0]["counts"]["reference_dishes"], 4)
+                self.assertEqual(result["cases"][0]["counts"]["asserted_candidates"], 4)
 
     def test_unavailable_capture_retains_all_denominators(self):
         result = self.evaluate([self.unavailable("DEV-001", reason="not_attempted")])
@@ -1039,7 +1084,7 @@ class StrictScoreTests(unittest.TestCase):
                     capture_output=True, text=True, cwd=str(self.root), env=env,
                 )
                 self.assertNotEqual(completed.returncode, 0)
-                self.assertEqual(completed.stderr, "")
+                self.assertNotIn(str(self.root), completed.stdout + completed.stderr)
                 self.assertNotIn(MARKER, completed.stdout + completed.stderr)
                 self.assertEqual(json.loads(completed.stdout)["status"], "FAIL")
 
