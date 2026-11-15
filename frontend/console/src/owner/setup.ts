@@ -14,7 +14,7 @@ export type OwnerPage = 'setup' | 'overview' | 'report' | 'performance' | 'menu'
  * - submitted: sent, waiting for the PeekaPlate team to check them;
  * - verified: checked by the team (this never makes anything visible to diners).
  */
-export type DetailsStatus = 'missing' | 'submitted' | 'verified';
+export type DetailsStatus = 'missing' | 'submitted' | 'verified' | 'unknown';
 
 /** Facts about one restaurant's onboarding, as persisted by the owner API. */
 export interface OwnerSetup {
@@ -23,14 +23,14 @@ export interface OwnerSetup {
   restaurantName: string;
   detailsStatus: DetailsStatus;
   /** At least one dish was saved through S06–S10. */
-  menuAdded: boolean;
+  menuAdded: boolean | null;
   /** Publication of the menu to diners was confirmed by the API (Step 3). */
-  published: boolean;
+  published: boolean | null;
   /** Label of the latest report period, only when a report exists (never a placeholder). */
   reportPeriod?: string | null;
 }
 
-export type StepState = 'done' | 'waiting' | 'current' | 'locked';
+export type StepState = 'done' | 'waiting' | 'current' | 'locked' | 'unknown';
 /** Tones of Rania's "Status Label" component (Figma 2721:12212) that onboarding uses. */
 export type Tone = 'success' | 'warning' | 'information' | 'neutral';
 
@@ -80,20 +80,24 @@ export function isVerified(setup: OwnerSetup): boolean {
 
 /** Publishing opens only when the team verified the details and at least one dish exists. */
 export function canPublish(setup: OwnerSetup): boolean {
-  return isVerified(setup) && setup.menuAdded && !setup.published;
+  return isVerified(setup) && setup.menuAdded === true && setup.published === false;
 }
 
 function stateOf(id: StepId, setup: OwnerSetup): StepState {
   if (id === 'details') {
+    if (setup.detailsStatus === 'unknown') return 'unknown';
     if (setup.detailsStatus === 'verified') return 'done';
     return setup.detailsStatus === 'submitted' ? 'waiting' : 'current';
   }
-  if (id === 'menu') return setup.menuAdded ? 'done' : 'current';
+  if (id === 'menu')
+    return setup.menuAdded === null ? 'unknown' : setup.menuAdded ? 'done' : 'current';
+  if (setup.published === null) return 'unknown';
   if (setup.published) return 'done';
   return canPublish(setup) ? 'current' : 'locked';
 }
 
 function statusOf(id: StepId, state: StepState): StepView['status'] {
+  if (state === 'unknown') return { text: 'Status unavailable', tone: 'neutral' };
   if (state === 'waiting') return { text: 'Waiting for verification', tone: 'information' };
   if (id === 'details' && state === 'done') return { text: 'Verified', tone: 'success' };
   if (id === 'menu' && state === 'done') return { text: 'Added', tone: 'success' };
@@ -110,7 +114,7 @@ function lockedReasonOf(setup: OwnerSetup): string {
 }
 
 function actionOf(id: StepId, state: StepState): StepView['action'] {
-  if (state === 'locked') return null;
+  if (state === 'locked' || state === 'unknown') return null;
   // Publishing cannot be edited from here; the published menu is changed through the Menu page.
   if (id === 'publish' && state === 'done') return null;
   if (state === 'done' || state === 'waiting') return { label: 'Edit', disabled: false };
@@ -151,7 +155,7 @@ export function setupProgress(setup: OwnerSetup): SetupProgress {
     total: steps.length,
     next: nextStep ? { id: nextStep.id, label: STEP_TEXT[nextStep.id].startLabel } : null,
     review:
-      setup.detailsStatus === 'missing'
+      setup.detailsStatus === 'missing' || setup.detailsStatus === 'unknown'
         ? null
         : { id: 'details', label: 'Review restaurant details' },
   };

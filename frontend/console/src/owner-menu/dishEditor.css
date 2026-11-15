@@ -1,31 +1,4 @@
-/* FE-06.2 Screen 9 layout on the console tokens. Visual sign-off stays with Rania/Amr; this keeps the
-   structure readable until the owner shell (#125) and Jeffin's Screen 9 styling are merged. */
-.pp-dish-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pp-space-16, 16px);
-  max-width: 60rem;
-}
-
-.pp-dish-editor__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: var(--pp-space-24, 24px);
-  align-items: start;
-}
-
-@media (max-width: 760px) {
-  .pp-dish-editor__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.pp-dish-editor__fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pp-space-16, 16px);
-}
-
+/* Live-only status/evidence extensions to the shared authored Screen 9. */
 .pp-dish-editor__group {
   display: flex;
   flex-direction: column;
@@ -114,4 +87,19 @@
 
 .pp-dish-editor__evidence figure {
   margin: 0;
+}
+
+.pp-dish-editor .pp-dish-editor__group {
+  border: 0;
+  padding: 0;
+}
+.pp-dish-editor .pp-dish-editor__group legend {
+  padding: 0;
+  font-weight: var(--pp-font-weight-semibold);
+}
+.pp-dish-editor .s09-photo {
+  margin-bottom: var(--pp-space-16);
+}
+.pp-dish-editor .s09-btns {
+  flex-wrap: wrap;
 }

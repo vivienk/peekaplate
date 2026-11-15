@@ -9,12 +9,14 @@ import './onboarding.css';
 export function OnboardingLayout({
   restaurantName,
   bare = false,
+  accountActions,
   children,
 }: {
   // Shown under "Owner Portal". Before S05 is saved there is no name yet.
   restaurantName?: string | undefined;
   // The screen draws its own card (S07 Upload puts the upload list below the card).
   bare?: boolean;
+  accountActions?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -30,9 +32,18 @@ export function OnboardingLayout({
               <span className="pp-onboard__portal-label">Owner Portal</span>
               {restaurantName && <span className="pp-onboard__venue">{restaurantName}</span>}
             </p>
-            <span className="pp-onboard__avatar" aria-hidden="true">
-              <img src={userIcon} alt="" width="32" height="32" />
-            </span>
+            {accountActions ? (
+              <details className="pp-onboard__account-menu">
+                <summary className="pp-onboard__avatar" aria-label="Owner account">
+                  <img src={userIcon} alt="" width="32" height="32" />
+                </summary>
+                <div className="pp-onboard__account-actions">{accountActions}</div>
+              </details>
+            ) : (
+              <span className="pp-onboard__avatar" aria-hidden="true">
+                <img src={userIcon} alt="" width="32" height="32" />
+              </span>
+            )}
           </div>
         </header>
         <main className={bare ? 'pp-onboard__main' : 'pp-onboard__card'}>{children}</main>

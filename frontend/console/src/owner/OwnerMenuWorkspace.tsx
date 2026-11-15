@@ -1,9 +1,13 @@
 import type { ExtractionReviewSessionResponse } from '@peekaplate/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { AddMenuLink } from '../onboarding/AddMenuLink';
-import { ChooseMenuSources, type MenuInput } from '../onboarding/ChooseMenuSource';
+import { ChooseMenuSource, type MenuSource } from '../onboarding/ChooseMenuSource';
 import { MenuProcessing } from '../onboarding/MenuProcessing';
+import { menuFileKind } from '../onboarding/menu-source';
+import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
+import { Btn, Icon } from '../owner-dashboard/controls';
+import { MenuTable } from '../owner-dashboard/menu-presentation';
 import {
   createOwnerMenuClient,
   type DishDraft,
@@ -26,6 +30,7 @@ import {
 import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage } from '../owner-menu/jobs';
 import { Button } from '../ui';
+import { FirstDashboardContent } from './FirstDashboard';
 import '../onboarding/onboarding.css';
 
 type Active = { client: OwnerMenuClient; controller: AbortController };
@@ -38,24 +43,40 @@ type Editing = {
 };
 type FileSelection = { files: File[]; groupKey: string; fileKeys: string[]; groupId?: string };
 
+// Dropped files may lack a MIME. Declare the UI-accepted kind without changing bytes;
+// the server still verifies the actual signature and manifest hash.
+function typedMenuFile(file: File): File {
+  const kind = menuFileKind(file);
+  if (file.type || !kind) return file;
+  const type =
+    kind === 'pdf' ? 'application/pdf' : /\.png$/i.test(file.name) ? 'image/png' : 'image/jpeg';
+  return new File([file], file.name, { type, lastModified: file.lastModified });
+}
+
 export function OwnerMenuWorkspace({
   apiBase,
   actorId,
   venueId,
   restaurantName,
   section,
+  navigation,
   getAccessToken,
   onAccessFailure,
   onDirtyChange,
+  renderShell,
+  accountActions,
 }: {
   apiBase: string;
   actorId: string;
   venueId: string;
   restaurantName: string;
   section: 'overview' | 'menu';
+  navigation: number;
   getAccessToken: () => Promise<string | null>;
   onAccessFailure: (kind: 'signed_out' | 'denied') => void;
   onDirtyChange: (dirty: boolean) => void;
+  renderShell: (content: ReactNode) => ReactNode;
+  accountActions: ReactNode;
 }) {
   const runtime = useRef<Active | null>(null);
   const running = useRef(false);
@@ -64,6 +85,7 @@ export function OwnerMenuWorkspace({
   const readGeneration = useRef(0);
   const urlAttempt = useRef<{ url: string; key: string } | null>(null);
   const photoAttempt = useRef<{ file: File; key: string } | null>(null);
+  const photoPicker = useRef<HTMLInputElement>(null);
   const [jobs, setJobs] = useState<MenuJob[]>([]);
   const [drafts, setDrafts] = useState<DishDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -79,7 +101,6 @@ export function OwnerMenuWorkspace({
     setRawView(next);
   }, []);
   const [processingIds, setProcessingIds] = useState<string[]>([]);
-  const [remaining, setRemaining] = useState<MenuInput[]>([]);
   const [uploads, setUploads] = useState<MenuUpload[]>([]);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
@@ -156,7 +177,7 @@ export function OwnerMenuWorkspace({
     setView(section === 'menu' ? 'list' : 'overview');
     setEditing(null);
     setPendingPhoto(null);
-  }, [section, setView]);
+  }, [section, navigation, setView]);
 
   // Private images use authenticated byte reads, never bearer tokens in image URLs.
   useEffect(() => {
@@ -261,13 +282,11 @@ export function OwnerMenuWorkspace({
     setPendingPhoto(null);
     setView('edit');
   };
-  const nextSource = (sources = remaining) => {
-    const [next, ...rest] = sources;
-    setRemaining(rest);
+  const nextSource = (next?: MenuSource) => {
     selection.current = null;
     setUploads([]);
     if (next === 'manual') editManual();
-    else setView(next ?? 'list');
+    else setView(next === 'upload' ? 'photo' : (next ?? 'list'));
   };
   const importUrl = (url: string) =>
     void run(async (active) => {
@@ -282,25 +301,17 @@ export function OwnerMenuWorkspace({
       if (current(active)) {
         urlAttempt.current = null;
         if (generation === viewGeneration.current) {
-          if (remaining.length) nextSource();
-          else setView('processing');
+          setView('processing');
         }
       }
     });
   const uploadFiles = (files: File[], retry = false) =>
     void run(async (active) => {
+      files = files.map(typedMenuFile);
       if (
-        files.some((file) =>
-          view === 'pdf'
-            ? file.type !== 'application/pdf'
-            : !['image/jpeg', 'image/png'].includes(file.type),
-        )
+        files.some((file) => !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type))
       ) {
-        setError(
-          view === 'pdf'
-            ? 'Choose a PDF for this source.'
-            : 'Choose JPEG or PNG menu photos for this source.',
-        );
+        setError('Choose a PDF, JPEG or PNG menu source.');
         return;
       }
       if (!retry)
@@ -471,12 +482,12 @@ export function OwnerMenuWorkspace({
     });
 
   if (!loaded)
-    return (
+    return renderShell(
       <section>
         <h1>Opening your menu workspace</h1>
         <p role={error ? 'alert' : 'status'}>{error ?? 'Loading saved sources and dishes…'}</p>
         {error && <Button onClick={reload}>Try again</Button>}
-      </section>
+      </section>,
     );
   const activeJobs = jobs.filter((job) => ['queued', 'running'].includes(job.status));
   const item = editing?.session?.items.find(
@@ -484,18 +495,11 @@ export function OwnerMenuWorkspace({
   );
   const content =
     view === 'sources' ? (
-      <ChooseMenuSources
-        onContinue={(sources) => nextSource(sources)}
-        onBack={() => setView('list')}
-      />
+      <ChooseMenuSource onContinue={nextSource} onBack={() => setView('list')} />
     ) : view === 'url' ? (
       <AddMenuLink importing={busy} onImport={importUrl} onBack={() => setView('sources')} />
     ) : view === 'photo' || view === 'pdf' ? (
       <>
-        <p>
-          {view === 'pdf' ? 'PDF source' : 'Photo source'} — each selection is stored together. Add
-          another source after this upload.
-        </p>
         <UploadMenu
           files={uploads}
           onAdd={(files) =>
@@ -518,7 +522,7 @@ export function OwnerMenuWorkspace({
           onRetry={() => {
             if (selection.current) uploadFiles(selection.current.files, true);
           }}
-          onContinue={() => (remaining.length ? nextSource() : setView('processing'))}
+          onContinue={() => setView('processing')}
           onBack={() => setView('sources')}
         />
       </>
@@ -551,32 +555,51 @@ export function OwnerMenuWorkspace({
       </>
     ) : view === 'edit' && editing ? (
       <>
-        {editing.form.origin === 'manual' && (
-          <div>
-            <label>
-              Dish photo
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                disabled={busy}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (
-                    file &&
-                    file.size > 0 &&
-                    file.size <= 12_000_000 &&
-                    ['image/jpeg', 'image/png'].includes(file.type)
-                  )
-                    setPendingPhoto(file);
-                  else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
-                }}
-              />
-            </label>
-            {photoUrl && <img src={photoUrl} alt="Private draft dish" width={200} />}
-          </div>
-        )}
         <DishEditor
           value={editing.form}
+          categories={drafts.map((draft) => draft.category ?? '').filter(Boolean)}
+          photo={
+            editing.form.origin === 'manual' ? (
+              <>
+                <div className={`s09-photo${photoUrl ? ' has' : ''}`}>
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Private draft dish" />
+                  ) : (
+                    <span>No photo yet</span>
+                  )}
+                </div>
+                <Btn
+                  kind="outlined"
+                  size="md"
+                  disabled={busy}
+                  onClick={() => photoPicker.current?.click()}
+                >
+                  {photoUrl ? 'Replace photo' : 'Upload photo'}
+                </Btn>
+                <input
+                  id="live-dish-photo"
+                  ref={photoPicker}
+                  aria-label="Dish photo"
+                  className="pp-onboard-hidden-input"
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  disabled={busy}
+                  onChange={(event) => {
+                    const selectedFile = event.target.files?.[0];
+                    const file = selectedFile ? typedMenuFile(selectedFile) : undefined;
+                    if (
+                      file &&
+                      file.size > 0 &&
+                      file.size <= 12_000_000 &&
+                      ['image/jpeg', 'image/png'].includes(file.type)
+                    )
+                      setPendingPhoto(file);
+                    else if (file) setError('Choose a JPEG or PNG up to 12 MB.');
+                  }}
+                />
+              </>
+            ) : undefined
+          }
           onChange={(form) => {
             if (!busy) setEditing({ ...editing, form });
           }}
@@ -595,127 +618,170 @@ export function OwnerMenuWorkspace({
             }
           }}
         />
-        <p>
-          Save keeps this dish private. Required owner confirmations and final review/publish are
-          separate; extracted allergens remain unknown.
-        </p>
       </>
+    ) : view === 'overview' ? (
+      <FirstDashboardContent
+        setup={{
+          venueId,
+          restaurantName,
+          detailsStatus: 'unknown',
+          menuAdded: loaded ? drafts.length > 0 : null,
+          published: null,
+        }}
+        onOpenStep={(step) => {
+          if (step === 'menu') setView('sources');
+        }}
+      />
     ) : (
-      <>
-        <h1>{view === 'overview' ? 'Restaurant workspace' : 'Your menu draft'}</h1>
-        <h2>{restaurantName}</h2>
-        <p>
-          Continue with saved menu work. Restaurant setup and final review/publish are not connected
-          here yet.
-        </p>
+      <div className="owner-menu-design stack">
+        <div className="pagehead">
+          <span className="eyebrow">Menu</span>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <h1>Your dishes</h1>
+            <Btn kind="primary" size="lg" icon="plus" disabled={busy} onClick={() => editManual()}>
+              Add dish
+            </Btn>
+          </div>
+          <p className="lede">
+            Edit a dish or add a new one. Your saved drafts stay private until review and
+            publication.
+          </p>
+        </div>
         <div className="owner-workspace-toolbar">
-          <Button disabled={busy} onClick={() => setView('sources')}>
+          <Btn kind="outlined" disabled={busy} onClick={() => setView('sources')}>
             Add menu sources
-          </Button>
-          <Button disabled={busy} onClick={() => editManual()}>
-            Add dish
-          </Button>
-          <Button disabled={busy} onClick={reload}>
+          </Btn>
+          <Btn kind="text" disabled={busy} onClick={reload}>
             Reload saved work
-          </Button>
+          </Btn>
         </div>
         <p>
           Saving these drafts does not change a live menu. Required confirmations and explicit
           publication stay separate.
         </p>
-        <h3>Saved sources</h3>
-        {jobs.length === 0 ? (
-          <p>No menu sources yet.</p>
-        ) : (
-          <ul>
-            {jobs.map((job) => (
-              <li key={job.id}>
-                {job.source_type.toUpperCase()} source — {job.status}; {job.draft_count} dishes.{' '}
-                {['queued', 'running'].includes(job.status) && (
-                  <Button
-                    disabled={busy}
-                    onClick={() => {
-                      setProcessingIds([job.id]);
-                      setView('processing');
-                    }}
+        <details className="card owner-saved-sources">
+          <summary>Saved sources ({jobs.length})</summary>
+          {jobs.length === 0 ? (
+            <p>No menu sources yet.</p>
+          ) : (
+            <ul>
+              {jobs.map((job) => (
+                <li key={job.id}>
+                  {job.source_type.toUpperCase()} source — {job.status}; {job.draft_count} dishes.{' '}
+                  {['queued', 'running'].includes(job.status) && (
+                    <Button
+                      disabled={busy}
+                      onClick={() => {
+                        setProcessingIds([job.id]);
+                        setView('processing');
+                      }}
+                    >
+                      View processing
+                    </Button>
+                  )}
+                  {['failed', 'incomplete'].includes(job.status) && (
+                    <Button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async (active) => {
+                          await active.client.retryJob(
+                            venueId,
+                            job.id,
+                            command('retry', [job.id, job.attempt_count]),
+                          );
+                          await load(active);
+                        })
+                      }
+                    >
+                      Retry source
+                    </Button>
+                  )}
+                  {['queued', 'running'].includes(job.status) && (
+                    <Button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async (active) => {
+                          await active.client.cancelJob(venueId, job.id, command('cancel', job.id));
+                          await load(active);
+                        })
+                      }
+                    >
+                      Cancel source
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {activeJobs.length > 0 && (
+            <p role="status">
+              {activeJobs.length} sources are waiting or processing. Reload to check their saved
+              status. Other saved dishes remain available.
+            </p>
+          )}
+          {jobs.length === 100 && (
+            <p>Showing the latest 100 sources. Earlier saved dish drafts remain listed below.</p>
+          )}
+        </details>
+        <MenuTable>
+          {drafts.length === 0 ? (
+            <p>No saved dishes yet.</p>
+          ) : (
+            <>
+              {drafts.map((draft) => (
+                <div key={draft.id} className="mrow">
+                  <span className="thumb">
+                    <Icon n="menu" s={24} />
+                  </span>
+                  <span className="dn">
+                    {draft.name ?? 'Untitled dish'}
+                    <small>{draft.origin === 'manual' ? 'Manual draft' : 'Extracted draft'}</small>
+                  </span>
+                  <span className="hidem">{draft.category ?? 'Not set'}</span>
+                  <span className="hidem num">
+                    {draft.price_amount ?? '—'} {draft.price_currency ?? ''}
+                  </span>
+                  <span className="lab st">{draft.review_status}</span>
+                  <span className="hidem">
+                    <span className="lab st">Not connected</span>
+                  </span>
+                  <Btn
+                    kind="outlined"
+                    size="md"
+                    disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
+                    onClick={() => openDraft(draft)}
+                    aria-label={`Edit ${draft.name ?? 'untitled dish'}`}
                   >
-                    View processing
-                  </Button>
-                )}
-                {['failed', 'incomplete'].includes(job.status) && (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async (active) => {
-                        await active.client.retryJob(
-                          venueId,
-                          job.id,
-                          command('retry', [job.id, job.attempt_count]),
-                        );
-                        await load(active);
-                      })
-                    }
-                  >
-                    Retry source
-                  </Button>
-                )}
-                {['queued', 'running'].includes(job.status) && (
-                  <Button
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async (active) => {
-                        await active.client.cancelJob(venueId, job.id, command('cancel', job.id));
-                        await load(active);
-                      })
-                    }
-                  >
-                    Cancel source
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {activeJobs.length > 0 && (
-          <p role="status">
-            {activeJobs.length} sources are waiting or processing. Reload to check their saved
-            status. Other saved dishes remain available.
-          </p>
-        )}
-        {jobs.length === 100 && (
-          <p>Showing the latest 100 sources. Earlier saved dish drafts remain listed below.</p>
-        )}
-        <h3>Saved dishes ({drafts.length})</h3>
-        <p>
-          Keep successful source results while correcting partial or failed imports. Similar dishes
-          remain separate until reviewed; no automatic deduplication or approval is claimed.
-        </p>
-        {drafts.length === 0 ? (
-          <p>No saved dishes yet.</p>
-        ) : (
-          <ul>
-            {drafts.map((draft) => (
-              <li key={draft.id}>
-                {draft.name ?? 'Untitled dish'} —{' '}
-                {draft.origin === 'manual' ? 'Manual draft' : 'Extracted draft'};{' '}
-                {draft.review_status}.{' '}
-                <Button
-                  disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
-                  onClick={() => openDraft(draft)}
-                >
-                  Edit {draft.name ?? 'untitled dish'}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </>
+                    Edit
+                  </Btn>
+                </div>
+              ))}
+            </>
+          )}
+        </MenuTable>
+      </div>
     );
-  return (
-    <section className="owner-menu-workspace" aria-busy={busy}>
+  const body = (
+    <section
+      className={`owner-menu-workspace${view === 'overview' ? ' owner-dashboard-content' : ''}`}
+      aria-busy={busy}
+    >
       {error && view !== 'edit' && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {content}
     </section>
+  );
+  return ['sources', 'url', 'photo', 'pdf', 'processing', 'edit'].includes(view) ? (
+    <OnboardingLayout
+      restaurantName={restaurantName}
+      bare={['photo', 'pdf', 'edit'].includes(view)}
+      accountActions={accountActions}
+    >
+      {error && view !== 'edit' && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
+      {content}
+    </OnboardingLayout>
+  ) : (
+    renderShell(body)
   );
 }

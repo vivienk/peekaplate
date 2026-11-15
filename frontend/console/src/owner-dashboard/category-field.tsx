@@ -6,7 +6,7 @@
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import chevron from './assets/icons/angle-small-down.svg';
 import plus from './assets/icons/plus-small.svg';
-import { Btn } from './ui';
+import { Btn } from './controls';
 
 const ADD = Symbol('add-category');
 type CategoryKey = string | typeof ADD;
