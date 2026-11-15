@@ -2549,6 +2549,7 @@ export async function verifyVenueOrderDeletion(
   // 1. Full cursor pagination over order-imports/<venueId>/ (never read CSV bodies)
   const venuePrefix = `order-imports/${venueId}/`;
   let r2RemainingObjectCount = 0;
+  const observedArchiveKeys: string[] = [];
   let cursor: string | undefined;
   const seenCursors = new Set<string>();
   do {
@@ -2556,6 +2557,7 @@ export async function verifyVenueOrderDeletion(
     for (const obj of page.objects) {
       if (obj.key.startsWith(venuePrefix)) {
         r2RemainingObjectCount++;
+        observedArchiveKeys.push(obj.key);
       }
     }
     if (page.truncated) {
@@ -2656,14 +2658,27 @@ export async function verifyVenueOrderDeletion(
       auditRow!.db_quarantine_deleted === completedJson.dbQuarantineDeleted &&
       auditRow!.db_conflicts_deleted === completedJson.dbConflictsDeleted;
 
+    const cutoff = ledgerValid ? (completedJson!.completedAt as string) : null;
+    if (cutoff) {
+      const newer = await client.query<{ storage_key: string }>(
+        'SELECT storage_key FROM app_private.order_outcome_import_batches WHERE tenant_id=$1 AND created_at > $2',
+        [venueId, cutoff],
+      );
+      const protectedKeys = new Set(newer.rows.map((row) => row.storage_key));
+      r2RemainingObjectCount = observedArchiveKeys.filter((key) => !protectedKeys.has(key)).length;
+    }
+
     const dbRemainingRes = await client.query<{ total_remaining: number }>(
-      `SELECT (
-         (SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id = $1) +
-         (SELECT count(*)::int FROM app_private.order_outcome_lines WHERE tenant_id = $1) +
-         (SELECT count(*)::int FROM app_private.order_outcome_quarantine WHERE tenant_id = $1) +
-         (SELECT count(*)::int FROM app_private.order_outcome_conflicts WHERE tenant_id = $1)
+      `WITH affected_batches AS (
+         SELECT id FROM app_private.order_outcome_import_batches
+         WHERE tenant_id=$1 AND ($2::timestamptz IS NULL OR created_at <= $2)
+       ) SELECT (
+         (SELECT count(*)::int FROM affected_batches) +
+         (SELECT count(*)::int FROM app_private.order_outcome_lines WHERE tenant_id=$1 AND batch_id IN (SELECT id FROM affected_batches)) +
+         (SELECT count(*)::int FROM app_private.order_outcome_quarantine WHERE tenant_id=$1 AND batch_id IN (SELECT id FROM affected_batches)) +
+         (SELECT count(*)::int FROM app_private.order_outcome_conflicts WHERE tenant_id=$1 AND batch_id IN (SELECT id FROM affected_batches))
        ) AS total_remaining`,
-      [venueId],
+      [venueId, cutoff],
     );
     const dbRemainingRowCount = Number(dbRemainingRes.rows[0]?.total_remaining ?? 0);
 

@@ -384,6 +384,7 @@ export async function reconcileOrderDeletionsAfterRestore(
         completedAt: completedParsed.completedAt,
         receiptWrittenAt: completedParsed.completedAt,
         ledgerStatus: 'completed',
+        originalReceipt: completedParsed,
         r2ObjectsDeleted: r2Purged,
         evidenceRef: `r2://order-deletion-ledger/${venueId}/${requestId}/reconciled.json`,
       });
@@ -535,6 +536,7 @@ async function recordReconcileInDb(
     ledgerStatus: 'completed' | 'intent_only' | 'completed_without_intent' | 'missing_in_r2';
     r2ObjectsDeleted: number;
     evidenceRef: string;
+    originalReceipt?: z.infer<typeof CompletedLedgerSchema>;
   },
 ): Promise<{
   batchesDeleted: number;
@@ -559,7 +561,7 @@ async function recordReconcileInDb(
       conflicts_deleted: number;
     }>(
       `SELECT batches_deleted, lines_deleted, quarantine_deleted, conflicts_deleted
-       FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)`,
       [
         params.reconciliationRunId,
         params.venueId,
@@ -570,6 +572,7 @@ async function recordReconcileInDb(
         params.ledgerStatus,
         params.r2ObjectsDeleted,
         params.evidenceRef,
+        params.originalReceipt ? JSON.stringify(params.originalReceipt) : null,
       ],
     );
     await client.query('COMMIT');

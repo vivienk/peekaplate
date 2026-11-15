@@ -3627,7 +3627,21 @@ the scheduled retry and artwork-isolation tests pass. The bounded context summar
 was shortened before fingerprint refresh. No behavior was accepted from a merge
 without type and regression checks.
 
+The final restore/checker regression exposed original receipt counts being
+replaced by counts from a partial restored snapshot. Reconciliation now requires
+and validates the original completed receipt in SQL, preserving its executor and
+counts; restore-run counters remain separate. Checker remaining-data checks use
+the same cutoff and exact newer batch keys. The real PostgreSQL partial-snapshot
+restore followed by independent verification now passes without deleting the
+newer import. The new required receipt also needed an existing direct-SQL test
+fixture updated; its earlier failure was an obsolete fixture, then rerun passed.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T00:20:30.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T00:32:08.133Z","exitCode":1}
 ```

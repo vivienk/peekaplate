@@ -3,6 +3,7 @@ import { PILOT_ORDER_AGREEMENT_VERSION } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../index';
+import { reconcileOrderDeletionsAfterRestore } from './restore-reconciliation';
 import {
   acceptPilotOrderAgreement,
   deleteVenueOrderData,
@@ -69,6 +70,129 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
   }
 
   // Probe 1: Runtime tracking activation lookup via real HTTP adapter and restricted runtime connection (Finding A)
+  it('reconciles a partial snapshot, preserves later uploads and permits independent verification with original counts', async () => {
+    const venue = randomUUID(),
+      request = randomUUID(),
+      originalOperator = randomUUID(),
+      reconciler = randomUUID(),
+      checker = randomUUID();
+    const oldBatch = randomUUID(),
+      newBatch = randomUUID();
+    const cutoff = '2026-11-13T00:00:00.000Z';
+    await adminClient.query(
+      "INSERT INTO app_private.venues(id,name) VALUES($1,'Synthetic restore verification')",
+      [venue],
+    );
+    const oldKey = `order-imports/${venue}/${oldBatch}/source.csv`,
+      newKey = `order-imports/${venue}/${newBatch}/source.csv`;
+    await adminClient.query(
+      `INSERT INTO app_private.order_outcome_import_batches(id,tenant_id,schema_version,source_filename,file_sha256,storage_key,created_by,created_at)
+      VALUES($1,$3,'pilot_order_outcome.v1','old.csv',$4,$6,$8,$9::timestamptz),($2,$3,'pilot_order_outcome.v1','new.csv',$5,$7,$8,$9::timestamptz + interval '1 millisecond')`,
+      [
+        oldBatch,
+        newBatch,
+        venue,
+        'a'.repeat(64),
+        'b'.repeat(64),
+        oldKey,
+        newKey,
+        originalOperator,
+        cutoff,
+      ],
+    );
+    const prefix = `order-deletion-ledger/${venue}/${request}`;
+    const originalReceipt = {
+      requestId: request,
+      venueId: venue,
+      operatorId: originalOperator,
+      status: 'completed',
+      completedAt: cutoff,
+      r2ObjectsDeleted: 5,
+      dbBatchesDeleted: 5,
+      dbLinesDeleted: 7,
+      dbQuarantineDeleted: 2,
+      dbConflictsDeleted: 1,
+    };
+    const objects = new Map<string, string>([
+      [oldKey, 'synthetic old CSV'],
+      [newKey, 'synthetic new CSV'],
+      [
+        `${prefix}/intent.json`,
+        JSON.stringify({
+          requestId: request,
+          venueId: venue,
+          operatorId: originalOperator,
+          status: 'in_progress',
+          intentRecordedAt: '2026-11-12T23:59:00.000Z',
+        }),
+      ],
+      [`${prefix}/completed.json`, JSON.stringify(originalReceipt)],
+    ]);
+    const storage = {
+      list: async (opts?: { prefix?: string }) => ({
+        objects: [...objects.keys()]
+          .filter((key) => key.startsWith(opts?.prefix ?? ''))
+          .map((key) => ({ key, uploaded: new Date(0) })),
+        truncated: false,
+      }),
+      get: async (key: string) =>
+        objects.has(key)
+          ? { text: async () => objects.get(key)!, json: async () => JSON.parse(objects.get(key)!) }
+          : null,
+      put: async (key: string, value: string | ArrayBuffer | ReadableStream) => {
+        if (typeof value !== 'string') throw Error('JSON fixture only');
+        objects.set(key, value);
+      },
+      delete: async (key: string) => {
+        objects.delete(key);
+      },
+    };
+    const op = new Client({ connectionString: operatorUrl }),
+      check = new Client({ connectionString: checkerUrl });
+    await op.connect();
+    await check.connect();
+    try {
+      const result = await reconcileOrderDeletionsAfterRestore({
+        client: op,
+        operatorId: reconciler,
+        authorizedOperatorIds: new Set([reconciler]),
+        verificationStorage: storage,
+        storage,
+      });
+      expect(result.status).toBe('completed');
+      expect(objects.has(oldKey)).toBe(false);
+      expect(objects.has(newKey)).toBe(true);
+      const audit = await adminClient.query(
+        'SELECT executed_by,db_batches_deleted FROM app_private.order_data_deletion_requests WHERE tenant_id=$1 AND id=$2',
+        [venue, request],
+      );
+      expect(audit.rows[0]).toMatchObject({ executed_by: originalOperator, db_batches_deleted: 5 });
+      const verified = await verifyVenueOrderDeletion({
+        client: check,
+        checkerId: checker,
+        authorizedCheckerIds: new Set([checker]),
+        venueId: venue,
+        requestId: request,
+        outcome: 'PASS',
+        evidenceRef: 'synthetic restored snapshot',
+        verificationStorage: storage,
+      });
+      expect(verified.status).toBe('verified');
+      expect(verified.dbRemainingRowCount).toBe(0);
+      expect(verified.r2RemainingObjectCount).toBe(0);
+      expect(
+        (
+          await adminClient.query(
+            'SELECT count(*)::int AS n FROM app_private.order_outcome_import_batches WHERE tenant_id=$1',
+            [venue],
+          )
+        ).rows[0].n,
+      ).toBe(1);
+    } finally {
+      await op.end();
+      await check.end();
+    }
+  });
   it('exercises real HTTP adapter with restricted runtime role: reads activation inside authorized tenant context', async () => {
     const { venueId, ownerId } = await createTestVenue();
 
@@ -1573,8 +1697,26 @@ describe.skipIf(!hasDb)('Order Ingestion Real PostgreSQL Integration Tests (S5-D
         await operatorClient.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
         await operatorClient.query("SELECT set_config('app.actor_id', $1, true)", [operatorId]);
         const opReconcile = await operatorClient.query<{ outcome: string }>(
-          `SELECT outcome FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, now(), now(), 'completed', 0, 'order-deletion-ledger/test/completed.json')`,
-          [randomUUID(), venueId, forgedReqId, operatorId],
+          `SELECT outcome FROM app_private.reconcile_venue_order_deletion($1, $2, $3, $4, $5::timestamptz, now(), 'completed', 0, 'order-deletion-ledger/test/completed.json', $6::jsonb)`,
+          [
+            randomUUID(),
+            venueId,
+            forgedReqId,
+            operatorId,
+            '2026-11-14T00:00:00.000Z',
+            JSON.stringify({
+              requestId: forgedReqId,
+              venueId,
+              operatorId,
+              status: 'completed',
+              completedAt: '2026-11-14T00:00:00.000Z',
+              r2ObjectsDeleted: 0,
+              dbBatchesDeleted: 0,
+              dbLinesDeleted: 0,
+              dbQuarantineDeleted: 0,
+              dbConflictsDeleted: 0,
+            }),
+          ],
         );
         await operatorClient.query('COMMIT');
         expect(opReconcile.rows[0]?.outcome).toBe('reconciled');

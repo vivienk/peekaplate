@@ -11,6 +11,14 @@ tests, plus actual Node entrypoint/default-loader checks. Current final commands
 counts and durations are recorded on PR #166. Hosted deletion and restore drills
 remain NOT RUN; real pilot uploads and draft agreement approval stay gated.
 
+Final recovery correction keeps original receipt provenance/counts distinct from
+snapshot purge counts. SQL validates the required original receipt before any
+completed purge; the obsolete nine-argument overload is removed. A real
+PostgreSQL restore-to-checker regression uses a snapshot containing fewer old
+rows than the original receipt plus a newer authorized upload, then verifies
+independent PASS while preserving that newer upload. The checker has only the
+additional tenant-scoped storage_key read needed to identify those exact keys.
+
 - **Date:** 2026-11-14
 - **Branch:** `feat/s6-data-14-pilot-agreement-and-deletion`
 - **Base HEAD:** `58cccf312dd1bf3db0a5af8e0fc5bf61f57001a7` (+ PR #166 review reconciliation & regression tests)

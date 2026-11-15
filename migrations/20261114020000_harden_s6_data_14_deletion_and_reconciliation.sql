@@ -230,7 +230,7 @@ GRANT SELECT (
   verified_by, verified_at, verification_outcome, verification_evidence_ref,
   reconciled_from_r2
 ) ON app_private.order_data_deletion_requests TO peekaplate_deletion_checker;
-GRANT SELECT (id, tenant_id, status, created_at, finished_at) ON app_private.order_outcome_import_batches TO peekaplate_deletion_checker;
+GRANT SELECT (id, tenant_id, status, created_at, finished_at, storage_key) ON app_private.order_outcome_import_batches TO peekaplate_deletion_checker;
 GRANT SELECT (tenant_id, order_id, order_line_id, outcome_type, batch_id) ON app_private.order_outcome_lines TO peekaplate_deletion_checker;
 GRANT SELECT (id, tenant_id, batch_id) ON app_private.order_outcome_quarantine TO peekaplate_deletion_checker;
 GRANT SELECT (tenant_id, order_id, order_line_id, outcome_type, batch_id) ON app_private.order_outcome_conflicts TO peekaplate_deletion_checker;
@@ -311,8 +311,8 @@ BEGIN
     IF NOT app_private.has_privileged_deletion_tx_grant('reconciliation') THEN
       RAISE EXCEPTION 'reconciled_from_r2 inserts are permitted only inside reconcile_venue_order_deletion';
     END IF;
-    IF session_actor IS NULL OR session_actor <> NEW.executed_by::text THEN
-      RAISE EXCEPTION 'Trusted actor context (app.actor_id) must match executed_by during reconciliation';
+    IF session_actor IS NULL THEN
+      RAISE EXCEPTION 'Trusted reconciler actor context is required';
     END IF;
     RETURN NEW;
   END IF;
@@ -525,6 +525,7 @@ REVOKE ALL ON FUNCTION app_private.record_deletion_verification(uuid, uuid, uuid
 GRANT EXECUTE ON FUNCTION app_private.record_deletion_verification(uuid, uuid, uuid, text, text) TO peekaplate_deletion_checker;
 
 -- Privileged post-restore reconciliation function (operator-only)
+DROP FUNCTION IF EXISTS app_private.reconcile_venue_order_deletion(uuid, uuid, uuid, uuid, timestamptz, timestamptz, text, integer, text);
 CREATE OR REPLACE FUNCTION app_private.reconcile_venue_order_deletion(
   p_reconciliation_run_id uuid,
   p_tenant_id uuid,
@@ -534,7 +535,8 @@ CREATE OR REPLACE FUNCTION app_private.reconcile_venue_order_deletion(
   p_receipt_written_at timestamptz,
   p_ledger_status text,
   p_r2_objects_deleted integer,
-  p_evidence_ref text
+  p_evidence_ref text,
+  p_original_receipt jsonb DEFAULT NULL
 )
 RETURNS TABLE (
   batches_deleted integer,
@@ -555,6 +557,8 @@ DECLARE
   v_quarantine integer := 0;
   v_conflicts integer := 0;
   v_outcome text;
+  receipt_field text;
+  original_operator uuid;
 BEGIN
   IF app_private.is_runtime_role(session_user) THEN
     RAISE EXCEPTION 'Runtime role % cannot execute reconcile_venue_order_deletion', session_user;
@@ -581,6 +585,28 @@ BEGIN
     RAISE EXCEPTION 'Unsupported ledger_status for reconciliation: %', p_ledger_status;
   END IF;
 
+  IF p_ledger_status = 'completed' THEN
+    IF p_original_receipt IS NULL OR jsonb_typeof(p_original_receipt) IS DISTINCT FROM 'object'
+       OR p_original_receipt->>'requestId' IS DISTINCT FROM p_request_id::text
+       OR p_original_receipt->>'venueId' IS DISTINCT FROM p_tenant_id::text
+       OR p_original_receipt->>'status' IS DISTINCT FROM 'completed'
+       OR COALESCE(p_original_receipt->>'operatorId','') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+       OR p_completed_at IS NULL OR p_original_receipt->>'completedAt' IS NULL THEN
+      RAISE EXCEPTION 'Valid original completed receipt is required';
+    END IF;
+    IF (p_original_receipt->>'completedAt')::timestamptz IS DISTINCT FROM p_completed_at THEN
+      RAISE EXCEPTION 'Original receipt cutoff mismatch';
+    END IF;
+    FOREACH receipt_field IN ARRAY ARRAY['r2ObjectsDeleted','dbBatchesDeleted','dbLinesDeleted','dbQuarantineDeleted','dbConflictsDeleted'] LOOP
+      IF jsonb_typeof(p_original_receipt->receipt_field) IS DISTINCT FROM 'number'
+         OR COALESCE(p_original_receipt->>receipt_field,'') !~ '^(0|[1-9][0-9]*)$'
+         OR (p_original_receipt->>receipt_field)::numeric > 2147483647 THEN
+        RAISE EXCEPTION 'Invalid original receipt counts';
+      END IF;
+    END LOOP;
+    original_operator := (p_original_receipt->>'operatorId')::uuid;
+  END IF;
+
   BEGIN
     INSERT INTO app_private.deletion_privileged_tx_grants (txid, pid, operation, session_role)
     VALUES (pg_current_xact_id(), pg_backend_pid(), 'reconciliation', session_user::text)
@@ -588,13 +614,16 @@ BEGIN
       SET pid = EXCLUDED.pid, operation = EXCLUDED.operation, session_role = EXCLUDED.session_role;
     PERFORM set_config('app.order_data_deletion_active', 'on', true);
 
-    SELECT id, status, requested_by
+    SELECT id, status, requested_by, executed_by
     INTO existing_row
     FROM app_private.order_data_deletion_requests
     WHERE tenant_id = p_tenant_id AND id = p_request_id
     FOR UPDATE;
 
     IF p_ledger_status = 'completed' THEN
+      IF existing_row.executed_by IS NOT NULL AND existing_row.executed_by <> original_operator THEN
+        RAISE EXCEPTION 'Original receipt executor mismatch';
+      END IF;
       IF p_completed_at IS NULL THEN
         RAISE EXCEPTION 'Completed reconciliation requires its trusted deletion cutoff';
       END IF;
@@ -620,21 +649,23 @@ BEGIN
           db_quarantine_deleted, db_conflicts_deleted,
           requested_at, completed_at, receipt_written_at, reconciled_from_r2
         ) VALUES (
-          p_tenant_id, p_request_id, p_operator_id, p_operator_id, NULL, 'awaiting_verification',
-          GREATEST(0, p_r2_objects_deleted), v_batches, v_lines, v_quarantine, v_conflicts,
+          p_tenant_id, p_request_id, original_operator, original_operator, NULL, 'awaiting_verification',
+          (p_original_receipt->>'r2ObjectsDeleted')::integer, (p_original_receipt->>'dbBatchesDeleted')::integer,
+          (p_original_receipt->>'dbLinesDeleted')::integer, (p_original_receipt->>'dbQuarantineDeleted')::integer,
+          (p_original_receipt->>'dbConflictsDeleted')::integer,
           COALESCE(p_completed_at, now()), COALESCE(p_completed_at, now()), COALESCE(p_receipt_written_at, now()), true
         );
       ELSIF existing_row.status <> 'verified' THEN
         UPDATE app_private.order_data_deletion_requests
         SET status = 'awaiting_verification',
-            executed_by = COALESCE(executed_by, p_operator_id),
+            executed_by = COALESCE(executed_by, original_operator),
             completed_at = COALESCE(completed_at, p_completed_at, now()),
             receipt_written_at = COALESCE(receipt_written_at, p_receipt_written_at, now()),
-            r2_objects_deleted = GREATEST(r2_objects_deleted, p_r2_objects_deleted),
-            db_batches_deleted = db_batches_deleted + v_batches,
-            db_lines_deleted = db_lines_deleted + v_lines,
-            db_quarantine_deleted = db_quarantine_deleted + v_quarantine,
-            db_conflicts_deleted = db_conflicts_deleted + v_conflicts,
+            r2_objects_deleted = (p_original_receipt->>'r2ObjectsDeleted')::integer,
+            db_batches_deleted = (p_original_receipt->>'dbBatchesDeleted')::integer,
+            db_lines_deleted = (p_original_receipt->>'dbLinesDeleted')::integer,
+            db_quarantine_deleted = (p_original_receipt->>'dbQuarantineDeleted')::integer,
+            db_conflicts_deleted = (p_original_receipt->>'dbConflictsDeleted')::integer,
             execution_token = NULL,
             execution_lease_expires_at = NULL,
             error_code = NULL
@@ -697,8 +728,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-REVOKE ALL ON FUNCTION app_private.reconcile_venue_order_deletion(uuid, uuid, uuid, uuid, timestamptz, timestamptz, text, integer, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION app_private.reconcile_venue_order_deletion(uuid, uuid, uuid, uuid, timestamptz, timestamptz, text, integer, text) TO peekaplate_deletion_operator;
+REVOKE ALL ON FUNCTION app_private.reconcile_venue_order_deletion(uuid, uuid, uuid, uuid, timestamptz, timestamptz, text, integer, text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION app_private.reconcile_venue_order_deletion(uuid, uuid, uuid, uuid, timestamptz, timestamptz, text, integer, text, jsonb) TO peekaplate_deletion_operator;
 
 -- H1: Replace delete_venue_order_data so obsolete 'completed' check rejects db_deleted, awaiting_verification, and verified
 CREATE OR REPLACE FUNCTION app_private.delete_venue_order_data(

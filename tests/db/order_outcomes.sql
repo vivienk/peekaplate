@@ -1,6 +1,12 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(118);
+SELECT plan(120);
+CREATE FUNCTION pg_temp.completed_deletion_receipt(venue uuid, request uuid, operator_id uuid, cutoff timestamptz)
+RETURNS jsonb LANGUAGE sql AS $$
+  SELECT jsonb_build_object('venueId',venue,'requestId',request,'operatorId',operator_id,
+    'status','completed','completedAt',cutoff,'r2ObjectsDeleted',5,'dbBatchesDeleted',5,
+    'dbLinesDeleted',5,'dbQuarantineDeleted',5,'dbConflictsDeleted',5)
+$$;
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -703,7 +709,8 @@ SELECT lives_ok(
       now(),
       'completed',
       0,
-      'order-deletion-ledger/test/completed.json'
+      'order-deletion-ledger/test/completed.json',
+      pg_temp.completed_deletion_receipt('00000000-0000-0000-0000-000000000801','00000000-0000-4000-8000-000000000996','00000000-0000-0000-0000-000000000099',now())
     )$$,
   'operator can reconcile venue order deletion from R2 ledger'
 );
@@ -715,7 +722,8 @@ SELECT lives_ok(
       '00000000-0000-4000-8000-000000000996',
       '00000000-0000-0000-0000-000000000099',
       now(), now(), 'completed', 0,
-      'order-deletion-ledger/test/completed.json'
+      'order-deletion-ledger/test/completed.json',
+      pg_temp.completed_deletion_receipt('00000000-0000-0000-0000-000000000801','00000000-0000-4000-8000-000000000996','00000000-0000-0000-0000-000000000099',now())
     )$$,
   'repeated reconciliation with an existing request and no restored batches is harmless'
 );
@@ -731,15 +739,19 @@ VALUES
 SET ROLE peekaplate_deletion_operator;
 SELECT set_config('app.tenant_id','00000000-0000-4000-8000-000000000803',true);
 SELECT lives_ok(
-  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000703','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff')$$,
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000703','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff',pg_temp.completed_deletion_receipt('00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z'))$$,
   'restore handles missing request with resurrected batches');
 SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000951'),0,'batch exactly at deletion cutoff is removed');
 SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000952'),1,'batch one millisecond after cutoff is preserved');
 SELECT is((SELECT count(*)::int FROM app_private.order_data_deletion_requests WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000993'),1,'missing deletion audit is created even when batch deletion found rows');
 SELECT lives_ok(
-  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000704','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff')$$,
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000704','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff',pg_temp.completed_deletion_receipt('00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z'))$$,
   'cutoff reconciliation can repeat without destroying newer data');
 SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803'),1,'newer batch survives repeated restore reconciliation');
+SELECT is((SELECT db_batches_deleted FROM app_private.order_data_deletion_requests WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000993'),5,'audit preserves original receipt counts rather than restored purge counts');
+SELECT throws_like(
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000705','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'missing-receipt')$$,
+  '%Valid original completed receipt is required%','completed reconciliation fails closed without original receipt');
 RESET ROLE;
 SELECT set_config('app.tenant_id','00000000-0000-0000-0000-000000000801',true);
 CREATE OR REPLACE FUNCTION app_private.test_arbitrary_postgres_definer_insert()

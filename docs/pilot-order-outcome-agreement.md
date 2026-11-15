@@ -40,6 +40,14 @@ changed uploaded timestamps. Global import freeze remains active through the
 entire reconciliation. Existing historical receipts must never erase legitimate
 uploads accepted after independent verification.
 
+The validated original completion receipt supplies deletion executor, counts and
+cutoff to SQL; a completed reconciliation without it fails closed. Actual rows or
+objects removed from a restored snapshot are separate restore-run evidence, not
+replacement original-deletion counts. The checker uses that same cutoff and
+excludes only exact keys/rows owned by newer committed batches. A reconstructed
+audit is marked reconciled_from_r2; its operator placeholder does not recover an
+original owner/requester identity absent from the external ledger.
+
 Run the operator CLI from the repository root with the supported Node loader:
 
 `node --experimental-transform-types --import ./scripts/node-ts-hooks.mjs ./scripts/reconcile-order-deletions-after-restore.mjs`
