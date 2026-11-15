@@ -52,7 +52,7 @@ part of this narrowed slice.
 - Harshita's pending PR163 owns verification-only S10 integration.
   Required owner confirmations, optional verification badges, approval and
   publication must remain separate. Use the returned diner URL after an explicit
-  successful publish. The separately authorized [temporary S13 handoff](owner-publish-handoff.md)
+  successful publish. The [S13 handoff](owner-publish-handoff.md)
   publishes already prepared snapshots through the existing owner commands.
 - Pending AI, portion/2.5D and other team PRs remain separate. No unfinished
   screen is used as a live fallback.

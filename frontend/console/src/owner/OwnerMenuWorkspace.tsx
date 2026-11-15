@@ -631,6 +631,7 @@ export function OwnerMenuWorkspace({
         getAccessToken={getAccessToken}
         onAccessFailure={onAccessFailure}
         onBack={() => setView('list')}
+        onDone={() => setView('overview')}
       />
     ) : view === 'overview' ? (
       <FirstDashboardContent
@@ -792,7 +793,8 @@ export function OwnerMenuWorkspace({
   return ['sources', 'url', 'photo', 'pdf', 'processing', 'edit', 'publish'].includes(view) ? (
     <OnboardingLayout
       restaurantName={restaurantName}
-      bare={['photo', 'pdf', 'edit'].includes(view)}
+      // S13 (publish) draws its own Figma card, like Screen 9 (edit).
+      bare={['photo', 'pdf', 'edit', 'publish'].includes(view)}
       accountActions={accountActions}
     >
       {error && view !== 'edit' && <p role="alert">{error}</p>}

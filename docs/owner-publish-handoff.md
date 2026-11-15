@@ -1,11 +1,13 @@
 # Prepared menu → owner publication → diner
 
-This is the temporary S13 handoff authorized by Sai until the team's official
-screen replaces it. It follows Figma `3123:12796` in the existing PeekaPlate
-Design file and reuses the merged onboarding layout and buttons. S10 remains
-verification-only; no pending S10 implementation is merged by this change.
-The page visibly labels S13 as temporary. The reused account disclosure also
-labels its dashboard placement as awaiting design review.
+The S13 handoff. Sai's #197 added the data and publication flow below with a temporary
+screen; the official S13 presentation (S6-FE-14, `frontend/console/src/publish/MenuPreview.tsx`)
+now replaces that screen and keeps this flow unchanged. It follows Figma `3123:12796` /
+`3123:12319` (preview), `3123:12795` (Publish Confirmation) and `3123:12742` (live, with Copy
+Link), and reuses the merged onboarding layout and buttons. Before publishing, the phone shows the
+prepared snapshot in the diner's menu look (the diner app only serves published menus); after
+publishing it frames the real diner page at the returned URL. S10 remains verification-only. The
+reused account disclosure still labels its dashboard placement as awaiting design review.
 
 ## Authored screens and remaining PRs
 

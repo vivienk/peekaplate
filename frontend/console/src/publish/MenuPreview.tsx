@@ -10,7 +10,7 @@
 // builds a URL itself. Figma shows a draft link before publishing; that difference is flagged.
 //
 // A presentational screen: the caller publishes and passes back what happened.
-import { useEffect, useId, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { ActionButton, ErrorBanner } from '../auth/parts';
 import checkIcon from '../onboarding/assets/check.svg';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
@@ -20,16 +20,29 @@ export type MenuPreviewProps = {
   restaurantName: string;
   dishCount: number;
   categoryCount: number;
-  /** The diner menu to show in the phone; null shows a short "not available" note instead. */
+  /** "page": the full onboarding page (navbar + card). "inline": only the card, for a page that
+   * already has its own frame (the owner workspace). */
+  layout?: 'page' | 'inline';
+  /** The diner app to frame in the phone (the published link, or a preview build). */
   dinerUrl: string | null;
+  /** Shown in the phone instead of a frame: the draft menu before it is published. */
+  phoneContent?: ReactNode;
   /** Dishes still missing a price or category; more than 0 blocks publishing (Not Ready). */
   dishesMissingDetails?: number;
+  /** Replaces the Not Ready body when the caller knows the exact reason. */
+  notReadyBody?: string | undefined;
   /** True while the publish request runs. */
   publishing?: boolean;
-  /** The last publish attempt failed; the menu is still a draft. */
-  publishFailed?: boolean;
+  /** The last publish attempt failed; the menu is still a draft. A string replaces the body. */
+  publishFailed?: boolean | string;
+  /** The menu is published (the link may still be loading or need a retry). */
+  published?: boolean;
   /** The full diner URL returned by the API once the menu is published. */
   publishedUrl?: string | null;
+  /** Published, but reading the link failed: offered as "Get diner link" (never republishes). */
+  onRetryLink?: (() => void) | undefined;
+  /** An extra line under the menu summary in the link panel. */
+  panelNote?: string | undefined;
   onBackToEdit: () => void;
   onReviewDishes: () => void;
   /** Called after the owner confirms in the Publish Confirmation dialog. */
@@ -43,18 +56,24 @@ export function MenuPreview({
   restaurantName,
   dishCount,
   categoryCount,
+  layout = 'page',
   dinerUrl,
+  phoneContent,
   dishesMissingDetails = 0,
+  notReadyBody,
   publishing = false,
   publishFailed = false,
+  published: publishedProp,
   publishedUrl = null,
+  onRetryLink,
+  panelNote,
   onBackToEdit,
   onReviewDishes,
   onPublish,
   onGoToDashboard,
 }: MenuPreviewProps) {
   const ids = useId();
-  const published = Boolean(publishedUrl);
+  const published = publishedProp ?? Boolean(publishedUrl);
   const notReady = !published && dishesMissingDetails > 0;
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState<'copied' | 'failed' | null>(null);
@@ -80,8 +99,8 @@ export function MenuPreview({
 
   const summary = `${plural(dishCount, 'dish', 'dishes')} · ${plural(categoryCount, 'category', 'categories')}`;
 
-  return (
-    <OnboardingLayout restaurantName={restaurantName} bare>
+  const card = (
+    <>
       <section className="pp-onboard__card pp-menu-preview" aria-labelledby={`${ids}-title`}>
         <header className="pp-menu-preview__head">
           <h1 className="pp-onboard__title" id={`${ids}-title`} ref={headingRef} tabIndex={-1}>
@@ -98,7 +117,9 @@ export function MenuPreview({
           <ErrorBanner
             copy={{
               title: 'Your menu isn’t ready to publish',
-              body: `${plural(dishesMissingDetails, 'dish is', 'dishes are')} missing a price or category. Add the missing details, then publish.`,
+              body:
+                notReadyBody ??
+                `${plural(dishesMissingDetails, 'dish is', 'dishes are')} missing a price or category. Add the missing details, then publish.`,
             }}
             action={
               <button type="button" className="pp-menu-preview__link" onClick={onReviewDishes}>
@@ -111,7 +132,10 @@ export function MenuPreview({
           <ErrorBanner
             copy={{
               title: 'We couldn’t publish your menu',
-              body: 'Your menu is still a draft and nothing is public. Please try again.',
+              body:
+                typeof publishFailed === 'string'
+                  ? publishFailed
+                  : 'Your menu is still a draft and nothing is public. Please try again.',
             }}
           />
         )}
@@ -140,7 +164,9 @@ export function MenuPreview({
               {published ? 'Live — Published' : 'Preview — Not Published'}
             </span>
             <div className="pp-menu-preview__phone">
-              {dinerUrl ? (
+              {phoneContent && !(published && dinerUrl) ? (
+                <div className="pp-menu-preview__screen">{phoneContent}</div>
+              ) : dinerUrl ? (
                 <iframe
                   className="pp-menu-preview__frame"
                   title={`${restaurantName} diner menu preview`}
@@ -185,6 +211,23 @@ export function MenuPreview({
                   Your menu is public. Anyone with this link can open it.
                 </p>
               </>
+            ) : published ? (
+              <>
+                <p className="pp-menu-preview__helper">
+                  Your menu is published. We couldn’t load its link yet.
+                </p>
+                {onRetryLink && (
+                  <ActionButton
+                    variant="outlined"
+                    size="medium"
+                    busy={publishing}
+                    busyLabel="Loading"
+                    onClick={onRetryLink}
+                  >
+                    Get diner link
+                  </ActionButton>
+                )}
+              </>
             ) : (
               <p className="pp-menu-preview__helper">
                 Your menu link appears here after you publish. Until then diners can’t open your
@@ -192,6 +235,7 @@ export function MenuPreview({
               </p>
             )}
             <p className="pp-menu-preview__summary">{summary}</p>
+            {panelNote && <p className="pp-menu-preview__helper">{panelNote}</p>}
           </section>
         </div>
 
@@ -227,7 +271,14 @@ export function MenuPreview({
           }}
         />
       )}
+    </>
+  );
+  return layout === 'page' ? (
+    <OnboardingLayout restaurantName={restaurantName} bare>
+      {card}
     </OnboardingLayout>
+  ) : (
+    <div className="pp-onboard pp-menu-preview-inline">{card}</div>
   );
 }
 
