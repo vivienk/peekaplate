@@ -30,7 +30,8 @@ export const WK_ORDERS = [47, 50, 52, 58];
 
 // open = dish opens, again = opened again, cmp = in a comparison, p25 = 2.5D previews shown,
 // fb = tapped 2.5D and saw the photo, time = avg seconds interacting per open,
-// ord = verified orders on record (null = no record), weekly = opens over 4 weeks.
+// ord = verified orders on record (null = no record), weekly = opens over 4 weeks,
+// seen = menu visits that showed the dish (of SESSIONS.now). Fictional sample values.
 export type Dish = {
   id: string;
   name: string;
@@ -44,6 +45,7 @@ export type Dish = {
   time: number;
   ord: number | null;
   weekly: number[];
+  seen: number;
   has25: boolean;
   desc: string;
   ing: string[];
@@ -57,6 +59,7 @@ export const DISH: Dish[] = [
     price: 14,
     open: 148,
     again: 41,
+    seen: 360,
     cmp: 33,
     p25: 62,
     fb: 0,
@@ -74,6 +77,7 @@ export const DISH: Dish[] = [
     price: 16,
     open: 96,
     again: 19,
+    seen: 210,
     cmp: 24,
     p25: 0,
     fb: 22,
@@ -91,6 +95,7 @@ export const DISH: Dish[] = [
     price: 15,
     open: 71,
     again: 12,
+    seen: 280,
     cmp: 18,
     p25: 0,
     fb: 14,
@@ -108,6 +113,7 @@ export const DISH: Dish[] = [
     price: 16,
     open: 64,
     again: 9,
+    seen: 140,
     cmp: 15,
     p25: 0,
     fb: 11,
@@ -125,6 +131,7 @@ export const DISH: Dish[] = [
     price: 18,
     open: 119,
     again: 38,
+    seen: 300,
     cmp: 29,
     p25: 57,
     fb: 0,
@@ -153,6 +160,7 @@ export const DISH: Dish[] = [
     price: 19,
     open: 132,
     again: 29,
+    seen: 330,
     cmp: 40,
     p25: 0,
     fb: 31,
@@ -180,6 +188,7 @@ export const DISH: Dish[] = [
     price: 15,
     open: 58,
     again: 8,
+    seen: 250,
     cmp: 11,
     p25: 24,
     fb: 0,
@@ -364,6 +373,23 @@ export const SEC: Record<SectionKind, string> = {
 export const EVT =
   'Events used: menu_opened, dish_detail_opened, dish_revisited, compare_started, compare_dish_replaced, preview_failed, fallback_shown. Not used: ready_to_order_tapped.';
 const topN = (k: SortKey, n = 3) => bySort(k).slice(0, n);
+
+// "Opened after being seen": visits that opened the dish ÷ visits that showed it, the same idea as
+// the owner report's open_rate. A visit counts once however often it reopened the dish, so opened
+// visits are opens minus re-opens. Dishes seen in fewer than PRIVACY_FLOOR visits are left out,
+// as the owner report does.
+const PRIVACY_FLOOR = 10;
+export type Attention = { dish: Dish; opened: number; seen: number; rate: number };
+export function attentionRanking(dishes: Dish[] = DISH): Attention[] {
+  return dishes
+    .filter((d) => d.seen >= PRIVACY_FLOOR)
+    .map((d) => {
+      const opened = Math.max(0, Math.min(d.seen, d.open - d.again));
+      return { dish: d, opened, seen: d.seen, rate: opened / d.seen };
+    })
+    .sort((a, b) => b.rate - a.rate || b.seen - a.seen || a.dish.name.localeCompare(b.dish.name));
+}
+const pct = (rate: number) => `${Math.round(rate * 100)}%`;
 const first = <T>(a: T[]): T => {
   const item = a[0];
   if (item === undefined) throw new Error('Empty list');
@@ -378,31 +404,34 @@ export const QUICK = ['top', 'orders', 'interact', 'improve', 'week'];
 
 export const ANSWERS: Record<string, () => Answer> = {
   top: () => {
-    const t = topN('open');
+    const ranked = attentionRanking();
+    const [a, b] = [first(ranked), second(ranked)];
+    const mostOpens = first(bySort('open'));
     return {
-      short: `${first(t).name} (${first(t).open} opens) and ${second(t).name} (${second(t).open}) drew the most attention this week.`,
+      short: `${a.dish.name} (${pct(a.rate)}) and ${b.dish.name} (${pct(b.rate)}) were opened most often after diners saw them this week.`,
       secs: [
         {
           k: 'obs',
           items: [
-            `Most opens: ${t.map((d) => `${d.name} ${d.open}`).join(' · ')}`,
-            `Longest average interaction: ${bySort('time')
-              .slice(0, 2)
-              .map((d) => `${d.name} ${d.time} s`)
-              .join(' · ')}`,
-            `Opened again most often: ${bySort('again')
-              .slice(0, 2)
-              .map((d) => `${d.name} ${d.again}`)
-              .join(' · ')}`,
+            ...ranked
+              .slice(0, 3)
+              .map(
+                (r) =>
+                  `${r.dish.name}: opened in ${r.opened} of ${r.seen} visits that showed it (${pct(r.rate)})`,
+              ),
+            `Most opens in total: ${mostOpens.name} (${mostOpens.open}), shown in ${mostOpens.seen} visits.`,
           ],
         },
         {
           k: 'unk',
-          items: ['Attention is not a preference. Opens do not show whether a diner ordered.'],
+          items: [
+            'Attention is not a preference. Opening a dish does not show whether a diner ordered it.',
+          ],
         },
       ],
       ev: [
-        `Period ${REST.period}, ${SESSIONS.now} menu sessions, ${T.open} dish opens in total.`,
+        'Open rate = visits that opened the dish ÷ visits that showed it. Reopening in the same visit counts once.',
+        `Period ${REST.period}, ${SESSIONS.now} menu sessions. Dishes shown in fewer than ${PRIVACY_FLOOR} visits are left out.`,
         EVT,
       ],
       follow: ['orders', 'interact'],

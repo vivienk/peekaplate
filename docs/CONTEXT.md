@@ -349,7 +349,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/dish-presentation.css",
         "frontend/console/src/owner/OwnerPublish.tsx",
         "frontend/console/src/owner/owner-publish.css",
-        "docs/owner-publish-handoff.md"
+        "docs/owner-publish-handoff.md",
+        "frontend/console/src/owner-dashboard/data.ts",
+        "frontend/console/src/owner-dashboard/attention.test.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -359,7 +361,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9919cfe7ee74a2f22a6a4a53b66773c70cd9eec4d94fd0c034ae421bfaa42b03"
+      "sourceFingerprint": "1435a19a632e44503c6c95af77a1367ae67f9206d3ba96a068efe735ad5e831e"
     },
     {
       "id": "backend",
@@ -917,20 +919,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "console"
-      ],
-      "summary": "PR172 adds S09 Add/Edit dish and category selection to the synthetic dashboard demo. Category command identity is separate from user category names, including add; the AI-review test now supplies the required photo so it isolates that guard. Reconciles owner onboarding and current develop without claiming real save/reload or publication.",
-      "files": [
-        "frontend/console/src/owner-dashboard/menu.tsx",
-        "frontend/console/src/owner-dashboard/category-field.tsx",
-        "frontend/console/src/owner-dashboard/menu.test.tsx",
-        "tests/e2e/owner-category-dropdown.spec.ts"
-      ],
-      "next": "Wire the screen through the owner-menu client separately; keep food evidence, verification and publishing authority on the server."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "backend"
       ],
       "summary": "PR188 adds a required hosted tenant/job provider-attempt gate backed by transactional DO SQLite. Queue redeliveries share the two-attempt counter; Python vision/OCR/model retries reserve before transport and fail closed. Real local workerd concurrency, replay/scope, process-restart and SQL rollback checks pass; 576 offline Python tests pass. Hosted Worker+image rollout and provider acceptance remain NOT RUN.",
@@ -1054,6 +1042,18 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/qa02-strict-scorer-spec.md"
       ],
       "next": "Review source-only answers and scoring with Sai/Uneeza before new predictions; Vivien thresholds and call/retry authorization stay separate. PR169 merged at0946d21 with unchanged reference/helper bytes, removing its code-landing dependency. Reuse FE-06.4's job verifier and existing backend acceptance in the operator-coordinated156/171/172 run; do not claim routed-UI or release acceptance."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR189 ranks the synthetic preview most-attention answer by first opens divided by seen visits, with a ten-visit floor. The illustrative answer does not use live owner reports.",
+      "files": [
+        "frontend/console/src/owner-dashboard/data.ts",
+        "frontend/console/src/owner-dashboard/attention.test.ts"
+      ],
+      "next": "Retain the synthetic label; connect real owner AI only through validated server report semantics."
     }
   ]
 }
