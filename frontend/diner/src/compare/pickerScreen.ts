@@ -60,6 +60,8 @@ export type ComparePickerOptions = {
   onConfirm?: (pickedDishId: string) => void;
   // "Compare" when starting a comparison, "Replace Dish" when replacing one side (DIN-02.4).
   confirmLabel?: string;
+  // Screen title: "Compare Dish", or "Replace Dish" after Replace (Rania, Nov 15; Azoz review #14).
+  title?: string;
 };
 
 function escapeHtml(value: string): string {
@@ -122,7 +124,7 @@ export function renderComparePicker(container: HTMLElement, options: ComparePick
     <div class="pp-picker">
       <header class="pp-detail__topbar pp-picker__topbar">
         <button class="pp-detail__back pp-picker__close" type="button" aria-label="Close compare">×</button>
-        <h1 class="pp-detail__title" tabindex="-1">Compare Dish</h1>
+        <h1 class="pp-detail__title" tabindex="-1">${escapeHtml(options.title ?? 'Compare Dish')}</h1>
         <span class="pp-picker__spacer" aria-hidden="true"></span>
       </header>
 
