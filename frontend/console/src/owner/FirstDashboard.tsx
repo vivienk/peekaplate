@@ -54,9 +54,9 @@ export interface FirstDashboardProps {
   /** Today's date for the top bar until a report period exists. Defaults to now. */
   today?: Date;
   /** True right after the API confirmed publication: shows the success pop-up. */
-  showPublishSuccess?: boolean;
+  showPublishSuccess?: boolean | undefined;
   /** Closes the success pop-up and returns to the dashboard. */
-  onClosePublishSuccess?: () => void;
+  onClosePublishSuccess?: (() => void) | undefined;
 }
 
 export function FirstDashboard({
@@ -67,12 +67,35 @@ export function FirstDashboard({
   showPublishSuccess,
   onClosePublishSuccess,
 }: FirstDashboardProps) {
-  const steps = setupSteps(setup);
-  const progress = setupProgress(setup);
-  const percent = Math.round((progress.done / progress.total) * 100);
-  const onboarding = !setup.published;
+  return (
+    <OwnerShell
+      venueId={setup.venueId}
+      restaurantName={setup.restaurantName}
+      current="setup"
+      onNavigate={onNavigate}
+      available={availablePages(setup)}
+      visible={visiblePages(setup)}
+      topbar={<FirstDashboardTopbar setup={setup} today={today} />}
+      aside={<FirstDashboardAside setup={setup} today={today} />}
+    >
+      <FirstDashboardContent
+        setup={setup}
+        onOpenStep={onOpenStep}
+        showPublishSuccess={showPublishSuccess}
+        onClosePublishSuccess={onClosePublishSuccess}
+      />
+    </OwnerShell>
+  );
+}
 
-  const topbar = (
+export function FirstDashboardTopbar({
+  setup,
+  today = new Date(),
+}: {
+  setup: OwnerSetup;
+  today?: Date;
+}) {
+  return (
     <>
       <div className="owner-chips">
         {/* The report week once there is one; until then, today's date (never an invented period). */}
@@ -84,18 +107,31 @@ export function FirstDashboard({
           </time>
         )}
       </div>
-      {setup.published ? (
+      {setup.published === null ? (
+        <StatusLabel text="Status unavailable" tone="neutral" />
+      ) : setup.published ? (
         <StatusLabel text="Published" tone="success" />
       ) : (
         <StatusLabel text="Not published" tone="warning" />
       )}
     </>
   );
+}
 
-  const aside = (
+export function FirstDashboardAside({
+  setup,
+  today = new Date(),
+  ariaLabel = 'PeekaPlate AI',
+}: {
+  setup: OwnerSetup;
+  today?: Date;
+  ariaLabel?: string;
+}) {
+  const onboarding = !setup.published;
+  return (
     <aside
       className="owner-ai"
-      aria-label="PeekaPlate AI"
+      aria-label={ariaLabel}
       data-variant={onboarding ? 'disabled' : 'default'}
     >
       <div className="owner-ai__head">
@@ -122,10 +158,17 @@ export function FirstDashboard({
           Ask about dish activity or your reports. Answers use only the records shown on these
           pages.
         </p>
-        <h3>{onboarding ? 'AI turns on after you publish' : 'No questions yet'}</h3>
+        <h3>
+          {setup.published === null
+            ? 'Analysis is not active'
+            : onboarding
+              ? 'AI turns on after you publish'
+              : 'No questions yet'}
+        </h3>
         <p className="owner-muted" id="owner-ai-empty">
-          There are no reports or dish activity to ask about yet. Once your menu is published and
-          diners start using PeekaPlate, you can ask questions here.
+          {setup.published === null
+            ? 'Verified reporting and analysis status are not available here yet. No sample answers are shown.'
+            : 'There are no reports or dish activity to ask about yet. Once your menu is published and diners start using PeekaPlate, you can ask questions here.'}
         </p>
       </div>
       <form className="owner-ai__composer" onSubmit={(event) => event.preventDefault()}>
@@ -145,21 +188,29 @@ export function FirstDashboard({
       </form>
     </aside>
   );
+}
 
+export function FirstDashboardContent({
+  setup,
+  onOpenStep,
+  showPublishSuccess,
+  onClosePublishSuccess,
+}: Pick<
+  FirstDashboardProps,
+  'setup' | 'onOpenStep' | 'showPublishSuccess' | 'onClosePublishSuccess'
+>) {
+  const steps = setupSteps(setup);
+  const progress = setupProgress(setup);
+  const progressKnown = steps.every((step) => step.state !== 'unknown');
+  const percent = Math.round((progress.done / progress.total) * 100);
+  const onboarding = !setup.published;
   return (
-    <OwnerShell
-      venueId={setup.venueId}
-      restaurantName={setup.restaurantName}
-      current="setup"
-      onNavigate={onNavigate}
-      available={availablePages(setup)}
-      visible={visiblePages(setup)}
-      topbar={topbar}
-      aside={aside}
-    >
+    <>
       <div className="owner-welcome">
         <h1>Welcome to PeekaPlate</h1>
-        {onboarding ? (
+        {setup.published === null ? (
+          <p>Continue setting up {setup.restaurantName} and review your saved menu work.</p>
+        ) : onboarding ? (
           <p>
             Finish setting up {setup.restaurantName}. Nothing is shown to diners until you review it
             and choose to publish.
@@ -173,7 +224,9 @@ export function FirstDashboard({
         <div className="owner-progress__head">
           <h2 id="owner-progress-title">Setup progress</h2>
           <p>
-            {progress.done} of {progress.total} steps complete
+            {progressKnown
+              ? `${progress.done} of ${progress.total} steps complete`
+              : 'Setup status partly unavailable'}
           </p>
         </div>
         <div
@@ -182,10 +235,17 @@ export function FirstDashboard({
           aria-labelledby="owner-progress-title"
           aria-valuemin={0}
           aria-valuemax={progress.total}
-          aria-valuenow={progress.done}
-          aria-valuetext={`${progress.done} of ${progress.total} steps complete`}
+          aria-valuenow={progressKnown ? progress.done : undefined}
+          aria-valuetext={
+            progressKnown
+              ? `${progress.done} of ${progress.total} steps complete`
+              : 'Setup status partly unavailable'
+          }
         >
-          <div className="owner-progress__fill" style={{ width: `${percent}%` }} />
+          <div
+            className="owner-progress__fill"
+            style={{ width: progressKnown ? `${percent}%` : '0%' }}
+          />
         </div>
         {(progress.next || progress.review) && (
           <div className="owner-progress__actions">
@@ -251,7 +311,9 @@ export function FirstDashboard({
           <h2 id="owner-verify-title">Verified is not the same as published</h2>
           <div className="owner-verify__rows">
             <div className="owner-verify__row">
-              {setup.detailsStatus === 'verified' ? (
+              {setup.detailsStatus === 'unknown' ? (
+                <StatusLabel text="Status unavailable" tone="neutral" />
+              ) : setup.detailsStatus === 'verified' ? (
                 <StatusLabel text="Verified" tone="success" />
               ) : (
                 <StatusLabel
@@ -260,23 +322,29 @@ export function FirstDashboard({
                 />
               )}
               <p>
-                {setup.detailsStatus === 'verified'
-                  ? "We've checked your restaurant details. This does not make anything visible to diners."
-                  : setup.detailsStatus === 'submitted'
-                    ? "We've received your restaurant details and are checking them."
-                    : 'We check your restaurant details before anything is shown to diners.'}
+                {setup.detailsStatus === 'unknown'
+                  ? 'Restaurant-detail status is not connected here yet.'
+                  : setup.detailsStatus === 'verified'
+                    ? "We've checked your restaurant details. This does not make anything visible to diners."
+                    : setup.detailsStatus === 'submitted'
+                      ? "We've received your restaurant details and are checking them."
+                      : 'We check your restaurant details before anything is shown to diners.'}
               </p>
             </div>
             <div className="owner-verify__row">
-              {setup.published ? (
+              {setup.published === null ? (
+                <StatusLabel text="Status unavailable" tone="neutral" />
+              ) : setup.published ? (
                 <StatusLabel text="Published" tone="success" />
               ) : (
                 <StatusLabel text="Not published" tone="warning" />
               )}
               <p>
-                {setup.published
-                  ? 'Your menu is visible to diners.'
-                  : 'Your menu is not visible to diners yet. You decide when to publish.'}
+                {setup.published === null
+                  ? 'Publication status has not been verified here.'
+                  : setup.published
+                    ? 'Your menu is visible to diners.'
+                    : 'Your menu is not visible to diners yet. You decide when to publish.'}
               </p>
             </div>
           </div>
@@ -285,10 +353,13 @@ export function FirstDashboard({
           <span className="owner-empty__tile">
             <Icon name="activity" size={24} />
           </span>
-          <h2 id="owner-empty-title">No dish activity yet</h2>
+          <h2 id="owner-empty-title">
+            {setup.published === null ? 'Dish activity' : 'No dish activity yet'}
+          </h2>
           <p>
-            Diner activity for your dishes will appear here once your menu is published and diners
-            start using PeekaPlate. We never show placeholder numbers.
+            {setup.published === null
+              ? 'Open Dish performance for available reports. Missing reporting status does not mean zero activity.'
+              : 'Diner activity for your dishes will appear here once your menu is published and diners start using PeekaPlate. We never show placeholder numbers.'}
           </p>
         </section>
       </div>
@@ -298,6 +369,6 @@ export function FirstDashboard({
           onClose={onClosePublishSuccess}
         />
       )}
-    </OwnerShell>
+    </>
   );
 }

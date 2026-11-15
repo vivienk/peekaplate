@@ -17,7 +17,8 @@ No other pending team PR is merged by this wiring task.
 
 1. Sign in, then select a restaurant returned by GET /staff/venues. Accounts
    without membership receive no restaurant authority or sample restaurant.
-2. Open Menu and choose a combination of URL, photos, PDF and manual entry.
+2. Open Menu and use the merged S06 picker: paste a URL, upload photos/PDF,
+   or add a dish manually. Add further sources from Menu as needed.
    Each intake group remains one PDF or up to five photos. Further sources and
    saved dishes stay together in that restaurant's workspace. Supported URL
    intake is a direct public menu PDF/image, not general HTML crawling.
@@ -72,3 +73,31 @@ normal delivery paused outside an authorized synthetic test window.
 Hosted rollout and authenticated screen acceptance for this slice: NOT RUN.
 Deploy PR188's paired host/container before claiming hosted provider-budget
 enforcement. A zero-provider reserve probe uses its own disposable job identity.
+
+## Screen composition correction — November 15
+
+The first wiring release used a plain workspace list instead of the authors'
+dashboard and Screen 9 composition. Functional save/upload checks did not prove
+visual alignment. The correction uses the merged `FirstDashboard` content in
+`OwnerShell`, the original three-option `ChooseMenuSource` in `OnboardingLayout`,
+and shared `DishFormFrame` / `MenuTable` markup extracted from the owner demo.
+The demo retains its existing actions and data; live presentation imports no
+sample menu, thumbnails or AI suggestion generators.
+
+The existing Figma Design file was inspected for cross-checking, not recreated:
+dashboard `1669:3682`, source choice `2292:9846`, upload `1936:5274`, and dish
+form `2470:19843`. The older dashboard pointer `2346:6206` no longer resolves.
+Authored source remains the implementation reference. Responsive desktop/mobile
+screenshots cover every connected page and are retained with the review evidence.
+
+Known differences follow the persisted API rather than sample design data:
+details/publication status can be unavailable; no fabricated progress or activity
+is shown. Currency, unknown/proposed/confirmed food fields and extraction evidence
+remain explicit. Serving size and 2.5D controls are marked unconnected. Save keeps
+a private draft; final review/publication is still a separate integration.
+
+The previous authenticated November 15 run verified original-photo persistence,
+manual draft reload, extracted correction save/reload and restoration, partial
+upload retention and revoked-access cleanup against staging. It did not establish
+visual fidelity. This correction requires its own Pages rollout and screenshot
+readback; provider extraction is not rerun for a presentation-only change.

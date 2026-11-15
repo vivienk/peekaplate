@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established. Opt-in owner analysis mounts beside the signed-in report with typed access cleanup and separate displayed-report/analysis periods; mobile report cards contain table overflow. No model activation is implied.",
+      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -342,7 +342,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "playwright.owner-ai.config.ts",
         "tests/owner-ai-browser/connection.spec.ts",
         "frontend/console/src/owner/api-origin.ts",
-        "playwright.workspace.config.ts"
+        "playwright.workspace.config.ts",
+        "frontend/console/src/owner-dashboard/controls.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.css",
+        "frontend/console/src/owner-dashboard/dish-presentation.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -352,7 +356,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ed87032decd187d29859fc1837a8829596c44e49642b14eb7cbc9be1647260ce"
+      "sourceFingerprint": "cbad6470aef48aed6ef7b22513a21ad084ed2712accc9b0c9d517292107d3121"
     },
     {
       "id": "backend",
@@ -899,20 +903,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "processing"
-      ],
-      "summary": "PR169 prepares offline QA-02 reference freezing and integrity evidence. Original-byte hashes, page coverage and declared source-family splits are checked; source/reference review declarations are not authenticated approvals. The three-entry fictional development source is reviewed as a development case, with two blank-page exclusions. Independent reference sign-off remains pending; registered holdouts are zero and model evaluation is NOT RUN.",
-      "files": [
-        "processing/src/peekaplate_processing/qa02_reference.py",
-        "processing/tests/test_qa02_reference.py",
-        "processing/eval/qa02/README.md",
-        "processing/eval/qa02/EVIDENCE.md"
-      ],
-      "next": "Mohammad and Uneeza review the original menus/reference/scoring decisions, register untouched holdouts, then obtain approval before fresh scored provider runs. Merge preparation without declaring QA-02 accepted."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "diner"
       ],
       "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
@@ -1031,6 +1021,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
       "files": [],
       "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress.",
+      "files": [
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
     }
   ]
 }
