@@ -186,6 +186,8 @@ export function DishForm({
       er['f-price'] = 'Enter a valid price';
     if (!d.size.trim()) er['f-size'] = 'Enter a serving size';
     if (d.ing.length < 1) er['f-ing'] = 'Add at least one ingredient';
+    // A photo is required (Jeffin, 14 Nov): an uploaded one or the dish's existing photo.
+    if (!imgOf(d)) er['f-photo'] = 'Add a photo of the dish';
     if (d.upload && !d.rights) er['f-rights'] = 'Confirm you have the right to use this photo';
     if (d.aiUsed && !d.aiReviewed)
       er['f-ai'] = 'Confirm you reviewed the AI-drafted text and ingredients';
@@ -474,7 +476,9 @@ export function DishForm({
         </section>
         <div className="s09-side">
           <section className="card s09-sidecard" aria-labelledby="s09-photo">
-            <h2 id="s09-photo">Photo</h2>
+            <h2 id="s09-photo" className="s09-req">
+              Photo<span className="pp-visually-hidden"> (required)</span>
+            </h2>
             <div className={`s09-photo${imgOf(dr) ? ' has' : ''}`}>
               {imgOf(dr) ? (
                 <img src={imgOf(dr)} alt={dr.name ? `${dr.name} photo` : 'Dish photo'} />
@@ -484,7 +488,7 @@ export function DishForm({
             </div>
             <input
               ref={fileRef}
-              id="f-photo"
+              id="f-photo-file"
               type="file"
               accept="image/*"
               className="sr"
@@ -496,9 +500,17 @@ export function DishForm({
                   });
               }}
             />
-            <Btn kind="outlined" size="md" type="button" onClick={() => fileRef.current?.click()}>
+            <Btn
+              id="f-photo"
+              kind="outlined"
+              size="md"
+              type="button"
+              aria-describedby={err('f-photo') ? 'f-photo-error' : undefined}
+              onClick={() => fileRef.current?.click()}
+            >
               {imgOf(dr) ? 'Replace photo' : 'Upload photo'}
             </Btn>
+            {fieldErr('f-photo')}
             {dr.upload && (
               <div className="pp-field">
                 <label className="s09-check" htmlFor="f-rights">

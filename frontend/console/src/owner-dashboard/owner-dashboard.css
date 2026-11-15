@@ -3124,6 +3124,16 @@ h1 {
   line-height: var(--pp-line-height-small);
   font-weight: var(--pp-font-weight-semibold);
 }
+/* The photo card's text style must not grey out its error line (Input Field Default error colour). */
+.s09-sidecard p.pp-field__error {
+  color: var(--pp-role-input-text-error);
+}
+/* Required section heading (Photo): the same red * as the Input Field Default "star". */
+.s09-sidecard h2.s09-req::after {
+  content: "*" / "";
+  margin-inline-start: var(--pp-space-2);
+  color: var(--pp-role-error);
+}
 .s09-sidecard p {
   margin: 0;
   color: var(--pp-role-on-surface-variant);
