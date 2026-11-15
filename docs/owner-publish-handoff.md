@@ -86,6 +86,12 @@ link allocation, withdrawal and current-access denial. Chromium checks cover
 desktop/mobile preview, confirmation, returned links, same-command retry,
 link-only recovery and stale-version refresh; screenshots accompany each state.
 
+The prepared fetch also runs in local workerd. Hosted testing exposed that
+`redirect: 'error'` works in Node but is rejected by Workers; `manual` preserves
+the no-follow boundary, and every non-success response (including redirects)
+is rejected before its body is consumed. The runtime regression uses no network.
+The corrected feature passes `pnpm check` (1,851 unit and 106 script tests).
+
 These local checks do not establish hosted acceptance. Record the exact release,
 genuine staff-session publication, diner rendering and cleanup/retained test link
 on the release PR before describing the hosted flow as verified. Normal Queues

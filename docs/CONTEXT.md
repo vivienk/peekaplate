@@ -231,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "2a3f6d1969394b25c194c16d36f19e2fe3b7670c5085ca1aaeddd71bbfc0d44a"
+      "sourceFingerprint": "86572a06895d815f93cf6efb4de38e77780669e45f7422e7ae057df3e0b5f749"
     },
     {
       "id": "console",
@@ -359,7 +359,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7bffdd85b6d83442c4025357ece325d31eaa82c297c2e3123755e5fbf3a3651a"
+      "sourceFingerprint": "9919cfe7ee74a2f22a6a4a53b66773c70cd9eec4d94fd0c034ae421bfaa42b03"
     },
     {
       "id": "backend",
@@ -537,7 +537,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.ts",
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication-http.test.ts",
-        "backend/src/owner-publication.integration.ts"
+        "backend/src/owner-publication.integration.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -550,7 +551,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6f99d6c55db5f8a89ec9e3778939cdba36d1196ae1ff266861ac767f87fe807e"
+      "sourceFingerprint": "2521b9d6baf9ce8671a2ecbe165457269a423e21be154f6862251be6de25e6bf"
     },
     {
       "id": "database",
@@ -910,33 +911,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
-      "files": [
-        "frontend/diner/src/compare/resultScreen.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/compare-result.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
-      ],
-      "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR171 adds props-controlled owner onboarding S05 details, S06 source choice, S07 URL/files and S08 processing states. Actual saved baseline changes reset form/photo state, while equivalent props preserve edits; demo request callbacks cancel on navigation. Reconciled current develop and Compare changes. Real upload/persistence integration is not claimed.",
-      "files": [
-        "frontend/console/src/onboarding/RestaurantDetails.tsx",
-        "frontend/console/src/onboarding/demo.tsx",
-        "tests/e2e/owner-onboarding-screens.spec.ts"
-      ],
-      "next": "Wire these screen callbacks through the separately reviewed owner-menu clients; S08 Ready-to-review belongs to the next screen work."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "console"
       ],
       "summary": "PR172 adds S09 Add/Edit dish and category selection to the synthetic dashboard demo. Category command identity is separate from user category names, including add; the AI-review test now supplies the required photo so it isolates that guard. Reconciles owner onboarding and current develop without claiming real save/reload or publication.",
@@ -1045,6 +1019,30 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-publish-handoff.md"
       ],
       "next": "Verify the pinned staging rollout with a genuine owner session and retained labelled synthetic diner link; official S13 and automatic trusted preparation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "backend"
+      ],
+      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
+      "files": [
+        "backend/src/owner-publication.ts",
+        "backend/src/owner-publication.test.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
+      ],
+      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR196 preserves the authored Compare/navigation/search design changes and fixes focused placeholder contrast with a token colour. A browser regression reproduces 2.36:1 before correction and passes afterward; 66 related Chromium checks pass.",
+      "files": [
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "Review physical-device design separately; no hosted release follows from this merge."
     }
   ]
 }

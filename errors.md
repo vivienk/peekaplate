@@ -3941,3 +3941,20 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T18:06:14.398Z","exitCode":1}
 ```
+
+```json
+{"id": "ERR-20261115-PREPARED-WORKER-REDIRECT", "status": "resolved", "area": "prepared-menu-fetch", "cause": "Node accepted redirect error, but workerd rejects that fetch option, making valid hosted previews return 503.", "prevention": "Exercise request options in the deployed runtime; use manual redirect handling and reject non-success responses without following.", "sources": ["backend/src/owner-publication.ts", "backend/src/owner-publication.test.ts", "backend/src/owner-publication.workerd-harness.ts"], "regression": "New network-free workerd test failed before the fix (502 instead of 200), then all 11 prepared publication tests passed; real public fixture also passed in local workerd after correction."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T18:30:31.359Z","exitCode":2}
+```
+
+```json
+{"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
+```
+
+## PR196 focused search placeholder contrast — November 15, 2026
+
+The empty focused search kept its dark-surface placeholder colour on a light surface. A browser-computed WCAG contrast check reproduced 2.3557:1 (required 4.5:1); the generic axe scan alone did not catch this pseudo-element. The focused placeholder now uses the existing neutral-600 token. `tests/e2e/search.spec.ts` covers the actual focused placeholder; 66 related Chromium checks pass in 1.1 minutes.

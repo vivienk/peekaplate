@@ -544,6 +544,10 @@ main:has(> .pp-compare) {
   color: var(--pp-color-neutral-800);
 }
 
+.pp-search-panel .pp-search-input:focus::placeholder {
+  color: var(--pp-color-neutral-600);
+}
+
 .pp-search-panel .pp-search-input:focus-visible {
   outline: 2px solid var(--pp-role-input-border-focus);
   outline-offset: 2px;
