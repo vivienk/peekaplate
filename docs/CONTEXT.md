@@ -116,7 +116,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and remaining Compare/ingredient controls remain separate. Live details refresh approved decorative art; revocation/error restores fallback.",
+      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. Scroll/navigation manage listeners. Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and ingredient controls remain separate. Compare Start/Replace uses displayed pairs and route-safe Menu/Saved exits. Live details refresh approved decorative art; revocation/error restores fallback.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -218,7 +218,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/ingredient-artwork.spec.ts",
         "frontend/diner/src/compare/pickerScreen.ts",
         "frontend/diner/src/compare/pickerScreen.test.ts",
-        "tests/e2e/compare-picker.spec.ts"
+        "tests/e2e/compare-picker.spec.ts",
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/compare/resultScreen.test.ts",
+        "tests/e2e/compare-result.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -227,7 +230,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7498a5b8e1fe631d0170ab6b16e6635ebb2b0bfc1b487a653351308019e1175e"
+      "sourceFingerprint": "a07fe1f13eec7164119064530a4c3153ea961b2e93b1d1caf78c547f05d4d43f"
     },
     {
       "id": "console",
@@ -845,21 +848,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-14",
-      "modules": [
-        "backend",
-        "database",
-        "diner"
-      ],
-      "summary": "Automatic restaurant links allocate with owner publication; public resolution reuses existing publication/token/bundle verification. V1 events and receipts are unchanged; .io remains untouched.",
-      "sources": [
-        "backend/src/restaurant-link.ts",
-        "migrations/20261114010000_restaurant_menu_links.sql",
-        "docs/restaurant-urls.md"
-      ],
-      "next": "Complete pinned reviews, staging migration/deployment and genuine owner publish-to-diner verification. PR163 must display the returned URL; production DNS/hosting remains separate."
-    },
-    {
       "date": "2026-11-13",
       "modules": [
         "console"
@@ -996,6 +984,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
       "files": [],
       "next": "Merge picker before PR127 result and Replace. Hosted analytics acceptance remains separate."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
+      "files": [],
+      "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
     }
   ]
 }

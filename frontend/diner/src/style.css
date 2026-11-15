@@ -1255,3 +1255,249 @@ main:has(> .pp-compare) {
 .pp-picker__footer .pp-notice {
   margin: 8px 0 0;
 }
+
+/* Compare result (S3-DIN-02.4, Figma "Compare result allergens"): a dish header, then bordered
+   sections with the two dishes side by side and a divider, so every row lines up. */
+.pp-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 390px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 0 16px;
+  background: #2a2d36;
+  color: #fafafa;
+  font-family: var(--pp-font-family-base);
+}
+
+.pp-compare button {
+  font-family: inherit;
+}
+
+.pp-compare__close {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.pp-compare__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.pp-compare__divider {
+  background: rgba(113, 115, 122, 0.3);
+}
+
+.pp-compare__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pp-compare__image {
+  display: block;
+  width: 100%;
+  max-width: 128px;
+  height: auto;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Figma dish header: centered, Paragraph 1/Bold 16/24 name and Paragraph 1/Semi Bold 16/24
+   price in color/primary, 24px above the first section. */
+/* Figma: 16px bottom padding in the header, then a 24px gap: 40px from the prices to the first
+   section (Azoz review #9). The column gap already gives 16px. */
+.pp-compare__header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.pp-compare__name {
+  margin: 4px 0 0;
+  color: var(--pp-role-on-surface);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__price {
+  margin: 0;
+  color: var(--pp-role-primary);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+/* Figma comparison section: 16px padding and gap, 16px radius, surface-container with an
+   outline. */
+.pp-compare__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--pp-role-outline);
+  border-radius: 16px;
+  background: var(--pp-role-surface-container);
+}
+
+/* Section headings: Figma Paragraph 2/Bold 14/24, uppercase, color/on-surface-variant. */
+.pp-compare__label {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Figma Paragraph 2/Regular 14/24, color/text/secondary. */
+.pp-compare__description,
+.pp-compare__ingredient-names {
+  margin: 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+.pp-compare__actions {
+  align-items: center;
+  gap: 8px;
+}
+
+/* Figma Dietary & Allergen Info: icons with room around them, wrapping inside each column; the
+   column divider spans the whole row. */
+.pp-compare__icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.pp-compare__icon {
+  display: flex;
+}
+
+.pp-compare__icon img {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.pp-compare__none {
+  margin: 0;
+  padding: 8px 0;
+  color: var(--pp-role-text-secondary);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.pp-compare__pair {
+  align-items: stretch;
+}
+
+/* Hover and pressed states (Azoz review #17) from the design-system button roles. */
+.pp-compare__view:hover {
+  border-color: var(--pp-role-outline-solid);
+}
+
+.pp-compare__view:active {
+  background: var(--pp-role-button-outline-pressed-bg);
+}
+
+.pp-compare__replace:hover {
+  background: var(--pp-role-button-text-hover-bg);
+  border-radius: 999px;
+}
+
+.pp-compare__replace:active {
+  background: var(--pp-role-button-text-pressed-bg);
+  border-radius: 999px;
+}
+
+/* Figma Buttons (Medium, Outlined, trailing icon): a 40px pill, 20px side padding, 4px gap; and
+   a text-style color/primary "Replace" under it. */
+.pp-compare__view {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 14px;
+}
+
+.pp-compare__replace {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--pp-role-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-compare__staff {
+  margin: 0;
+  padding: 0;
+}
+
+/* Figma: Back to Menu follows the sections (24px after them) and the frame ends with 32px. */
+.pp-compare__footer {
+  margin-top: 8px;
+  padding-bottom: 32px;
+}
+
+.pp-compare__back {
+  width: 100%;
+  min-height: 48px;
+}
+
+.pp-compare__close:focus-visible,
+.pp-compare__back:focus-visible,
+.pp-compare__view:focus-visible,
+.pp-compare__replace:focus-visible {
+  outline: 2px solid #f89537;
+  outline-offset: 2px;
+}
+
+/* Chips keep their own height when the other dish's side of the row is taller. */
+.pp-compare__cell .pp-chip-group {
+  flex: none;
+  align-items: flex-start;
+}
+
+/* The header shares its rows (photo, name, price) across both dishes, so a name that wraps on
+   one side keeps the two prices level. */
+.pp-compare__header {
+  grid-template-rows: repeat(3, auto);
+}
+
+.pp-compare__header > .pp-compare__cell {
+  display: grid;
+  grid-row: 1 / span 3;
+  grid-template-rows: subgrid;
+  row-gap: 8px;
+  align-content: start;
+}
+
+.pp-compare__header > .pp-compare__divider {
+  grid-row: 1 / span 3;
+}

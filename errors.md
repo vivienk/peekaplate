@@ -2535,6 +2535,15 @@ success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
 
+## November 10 local outbox-capacity browser timing
+
+During DIN-02.4 verification, the local Chromium case "a full outbox drops the
+oldest events" stored 146 and then 477 of 505 events before its default 5 s poll
+expired, failing both with and without the Compare result changes (stashed run on
+the same machine). No tracking code changed; the cause is local write throughput
+under this Windows machine's load, not a behaviour regression. The test was left
+unchanged; CI remains the authority for that case. All Compare, picker, search,
+menu, save and other tracking browser cases passed locally.
 ## November 10 Draft report-input compatibility synchronization
 
 PR112 synchronizes develop085ecfd after PR107 and PR82 merged. The merge has
@@ -2999,6 +3008,16 @@ The first complete Chromium run passed 136/137 cases: the withdrawal fixture inj
 
 Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.
 
+## November 11 local Save-screen browser timing (Compare sync)
+
+While syncing #126/#127 with develop, the develop Chromium case "when storage is
+blocked, Save works for the visit and sends no Save events" failed twice in full
+local runs: a dish_viewed exposure (1 s timer) landed inside its no-events window.
+It passed 3/3 when repeated alone, and no Save or exposure code changed in the
+Compare work. "removing a dish on the detail shows Undo" also failed once with
+"jsHandle.jsonValue: Test ended" from its console listener racing test teardown,
+then passed 3/3. Both tests were left unchanged; CI remains the authority.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T11:51:00.081Z","exitCode":1}
@@ -3240,6 +3259,12 @@ Transient observations during Phase 3 verification:
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
 
+## 2026-11-13 compare-result first cold run
+
+- Check: `pnpm exec playwright test tests/e2e/compare-result.spec.ts tests/e2e/compare-picker.spec.ts --project=chromium` on feat/s3-din-02-4-compare-result after adding Compare allergen icons.
+- Result: one `toEqual` deep-equality failure on the first run after the change; the next two full runs and a `--repeat-each 4` run (36/36) passed.
+- Cause: not confirmed. Most likely the first cold Vite dev-server load of the new icon modules.
+- Prevention: rerun once before treating a single cold-start failure as a regression; keep the network test's allowance limited to bundled `/assets/icons/*.svg`.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
@@ -3676,3 +3701,21 @@ Detail and picker navigation now resolve the dish from the current validated men
 falling back to Menu or Saved when it no longer exists. All three regressions and
 the picker, live-trigger, Save and artwork suite pass (26 browser cases, 28.9s).
 These synthetic browser sinks do not establish hosted analytics acceptance.
+
+## Compare result exits - November 14, 2026
+
+Real-browser regressions reproduced a stale result after Replace's kept dish was
+removed by publication refresh, and a Saved-origin result returning to Menu while
+leaving the Saved hash in the URL. Compare exits now use the existing Saved-route
+cleanup when needed; missing kept dishes return safely to the current menu.
+Three regressions cover Back to Menu, removed Replace targets and removed detail
+navigation from Saved-origin comparisons. All 38 targeted browser cases pass
+in 39.4s. The added Saved-return test asserts the visible heading rather than an
+incidental CSS class. No hosted acceptance is inferred from synthetic sinks.
+The context-check observation below came from editing the final regression during
+the check; reviewed fingerprints were refreshed afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T06:35:36.517Z","exitCode":1}
+```

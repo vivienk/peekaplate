@@ -265,3 +265,57 @@ test('Compare from an old detail resolves the kept dish from the refreshed menu'
   await page.locator('.pp-detail__compare').click();
   await expect(page.locator('.pp-picker__kept-name')).toHaveText('Refreshed synthetic dish');
 });
+
+test('Replace leaves a comparison whose kept dish was removed by a publication refresh', async ({
+  page,
+}) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
+  await page.locator('.pp-detail__compare').click();
+  await page.locator('.pp-picker__choose').first().click();
+  await page.locator('.pp-picker__confirm').click();
+  await expect(page.locator('.pp-compare')).toBeVisible();
+  expect(await captured(page, 'dish_compared')).toHaveLength(1);
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes.shift();
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('[data-side="other"] .pp-compare__replace').click();
+  await expect(page.locator('.pp-compare')).toHaveCount(0);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  expect(await captured(page, 'dish_compared')).toHaveLength(1);
+});
+
+test('a removed comparison detail also leaves its original Saved route', async ({ page }) => {
+  const state = await open(page);
+  await consent(page, true);
+  await page.locator('.pp-category:not([hidden]) .pp-card__save').first().click();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await page.locator('.pp-saved__open').first().click();
+  await page.locator('.pp-detail__compare').click();
+  await page.locator('.pp-picker__choose').first().click();
+  await page.locator('.pp-picker__confirm').click();
+  await expect(page.locator('.pp-compare')).toBeVisible();
+  state.publication = publicationB;
+  state.bundle.menu_revision_id = '00000000-0000-4000-8000-000000000203';
+  state.bundle.categories[0].dishes.shift();
+  await page.clock.fastForward(25 * 60_000);
+  await page.waitForFunction(
+    (publication) =>
+      (window as unknown as { refreshedPublication: string }).refreshedPublication === publication,
+    publicationB,
+    { polling: 100 },
+  );
+  await page.locator('[data-side="first"] .pp-compare__view').click();
+  await expect(page).not.toHaveURL(/#saved$/);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
+});
