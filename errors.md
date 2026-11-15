@@ -3733,3 +3733,18 @@ edits; demo request timers cancel on navigation and unmount. All 54 onboarding
 and auth browser cases pass in 1.5m. The lint observation after reconciliation was
 fixture formatting under the current Biome configuration; formatting and repository
 checks pass. These are caller-driven screens, not hosted upload acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T06:48:55.095Z","exitCode":2}
+```
+
+## S09 category command collision - November 14, 2026
+
+Pointer and keyboard regressions reproduced duplicate option IDs for the valid
+category name add. A Symbol now identifies the Add-category command, separate
+from every user label. The key array is explicitly typed to retain that unique
+symbol through keyboard navigation. The unreviewed-AI unit case now includes a
+valid photo/rights fixture so only the AI-review guard controls its result.
+All 19 category/photo/dashboard browser cases pass in 24.3s; repository checks
+pass with 1,733 unit and 103 script tests. Persistence remains outside the demo.

@@ -235,7 +235,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. S05-S08 details, source, upload and processing screens use caller-owned callbacks and preview-only demo outcomes. Persisted setup, menu intake/edit/publish wiring and hosted full-journey acceptance remain separate.",
+      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. S05-S08 details/source/upload/processing screens use caller callbacks; S09 Add/Edit remains a synthetic dashboard demo. Persisted setup, menu intake/edit/publish wiring and hosted full-journey acceptance remain separate.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -327,7 +327,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "27a3616d0dbbb888115234fa4d55dfdec34b898a00bbbecf2d088cb8d45a39d9"
+      "sourceFingerprint": "be3a9d54957f25e58b79991ec8741136c1e2efccd82cd03799720f7dda3ccdeb"
     },
     {
       "id": "backend",
@@ -862,21 +862,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR146 reconciled with current owner/report/AI/DATA06 work. Apply Rania’s editable email downloads without changing text, links, placeholders or colours. Preserve current auth screens, session guards and preview/provider build separation.",
-      "sources": [
-        "frontend/console/email-templates/confirm-signup.html",
-        "frontend/console/email-templates/reset-password.html",
-        "frontend/console/email-templates/README.md",
-        "docs/owner-auth.md",
-        "frontend/console/vite.config.ts"
-      ],
-      "next": "Finish exact-head checks and design review. Keep auth PRs unmerged until the owner/dashboard handoff is accepted; provider installation and real-client rendering are separate from source updates."
-    },
-    {
       "date": "2026-11-14",
       "modules": [
         "contracts",
@@ -981,7 +966,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
-      "files": [],
+      "files": [
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/menu-triggers-live.spec.ts"
+      ],
       "next": "Merge picker before PR127 result and Replace. Hosted analytics acceptance remains separate."
     },
     {
@@ -990,7 +979,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "diner"
       ],
       "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
-      "files": [],
+      "files": [
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/compare-result.spec.ts",
+        "tests/e2e/menu-triggers-live.spec.ts"
+      ],
       "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
     },
     {
@@ -999,8 +993,26 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console"
       ],
       "summary": "PR171 adds props-controlled owner onboarding S05 details, S06 source choice, S07 URL/files and S08 processing states. Actual saved baseline changes reset form/photo state, while equivalent props preserve edits; demo request callbacks cancel on navigation. Reconciled current develop and Compare changes. Real upload/persistence integration is not claimed.",
-      "files": [],
+      "files": [
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/demo.tsx",
+        "tests/e2e/owner-onboarding-screens.spec.ts"
+      ],
       "next": "Wire these screen callbacks through the separately reviewed owner-menu clients; S08 Ready-to-review belongs to the next screen work."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR172 adds S09 Add/Edit dish and category selection to the synthetic dashboard demo. Category command identity is separate from user category names, including add; the AI-review test now supplies the required photo so it isolates that guard. Reconciles owner onboarding and current develop without claiming real save/reload or publication.",
+      "files": [
+        "frontend/console/src/owner-dashboard/menu.tsx",
+        "frontend/console/src/owner-dashboard/category-field.tsx",
+        "frontend/console/src/owner-dashboard/menu.test.tsx",
+        "tests/e2e/owner-category-dropdown.spec.ts"
+      ],
+      "next": "Wire the screen through the owner-menu client separately; keep food evidence, verification and publishing authority on the server."
     }
   ]
 }
