@@ -71,7 +71,7 @@ describe('ingredient artwork approval', () => {
     const input = artworkInput();
     const result = await reviewArtwork(db as never, actor, venue, input, { put });
     expect(result).toMatchObject({ label: 'grilled chicken', status: 'approved', version: 1 });
-    expect(put).toHaveBeenCalledOnce();
+    expect(put).toHaveBeenCalledTimes(2);
     const sql = db.query.mock.calls.map((c) => c[0]);
     for (const table of ['es_event', 'ingredient_artwork_current', 'es_command', 'outbox'])
       expect(sql.some((q) => q.startsWith(`INSERT INTO app_private.${table}`))).toBe(true);
@@ -137,9 +137,9 @@ describe('ingredient artwork approval', () => {
     expect(db.query).toHaveBeenCalledWith("SELECT set_config('app.tenant_id', $1, true)", [venue]);
     expect(db.query.mock.calls.at(-1)?.[0]).toBe('COMMIT');
   });
-  it('performs R2 upload outside any open PostgreSQL transaction', async () => {
+  it('uploads before the write transaction and repairs under its blob lock before commit', async () => {
     let inTx = false;
-    let putInTx: boolean | null = null;
+    const putInTx: boolean[] = [];
     const db = {
       query: vi.fn(async (sql: string) => {
         if (sql === 'BEGIN' || sql === 'BEGIN READ ONLY') inTx = true;
@@ -151,12 +151,28 @@ describe('ingredient artwork approval', () => {
       }),
     };
     const put = vi.fn(async () => {
-      putInTx = inTx;
+      putInTx.push(inTx);
     });
     await reviewArtwork(db as never, actor, venue, artworkInput(), { put });
-    expect(put).toHaveBeenCalledOnce();
-    expect(putInTx).toBe(false);
+    expect(put).toHaveBeenCalledTimes(2);
+    expect(putInTx).toEqual([false, true]);
     expect(inTx).toBe(false);
+  });
+  it('rolls back without an approved pointer when the locked storage repair fails', async () => {
+    const db = client();
+    const put = vi
+      .fn()
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error('repair unavailable'));
+    await expect(reviewArtwork(db as never, actor, venue, artworkInput(), { put })).rejects.toThrow(
+      'repair unavailable',
+    );
+    expect(db.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+    expect(
+      db.query.mock.calls.some(([sql]) =>
+        sql.startsWith('INSERT INTO app_private.ingredient_artwork_current'),
+      ),
+    ).toBe(false);
   });
   it('revalidates authorization and expectedVersion in Phase C after R2 upload', async () => {
     // 1. Authorization revoked between Phase A preflight and Phase C commit.
@@ -209,7 +225,7 @@ describe('ingredient artwork approval', () => {
       get: matchingGet,
     });
     expect(result.status).toBe('approved');
-    expect(matchingGet).toHaveBeenCalledOnce();
+    expect(matchingGet).toHaveBeenCalledTimes(2);
 
     const tampered = Buffer.from('corrupt-bytes');
     const mismatchGet = vi.fn(async () => ({

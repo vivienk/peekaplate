@@ -443,7 +443,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "0eb6b08351225c0cc1edecc17571eeceeb1a051ee19baa14b58221a0f0a265db"
+      "sourceFingerprint": "2fce2bb28e493bb6fbdac696de3987099ae876de96a83ba669042429385b6b55"
     },
     {
       "id": "database",
@@ -746,7 +746,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "9eed52a615354bcba568a547858ba94e9dd444ca710594e4a884d378147455aa"
+      "sourceFingerprint": "c3ade975a0b9b6268394189fc64eb44f2d1b3ce45695abc6ae423ea9b687797d"
     },
     {
       "id": "assets",
@@ -790,7 +790,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "database",
         "diner"
       ],
-      "summary": "PR165 adds automatic approved artwork delivery: configured local review uploads exact PNG through authorized venue API; event/projection/receipt/outbox commit atomically. Live dish details refresh approved art without rebuild; revocation and failures restore fallback. Local unit/Python/type/build and synthetic browser refresh checks pass. Real DB integration is wired to CI; Docker absent locally. No deployment, hosted migration or real-candidate approval.",
+      "summary": "PR165/178 adds reviewed decorative artwork delivery and diner refresh/fallback. Review preflights authority, uploads outside the write transaction, then repairs exact bytes under the cleanup blob lock before committing event/projection/receipt/outbox. This final R2 operation deliberately stays inside the transaction; pooled session locks are unsuitable. A real PostgreSQL interleaving reproduced and fixed cleanup deleting an approval's upload. Hosted migration, real provider generation and visual approval remain separate gates.",
       "sources": [
         "docs/ingredient-icon-pipeline.md",
         "backend/src/ingredient-artwork.ts",

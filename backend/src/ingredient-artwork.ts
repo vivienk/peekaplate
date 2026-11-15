@@ -213,6 +213,11 @@ export async function reviewArtwork(
     );
     if ((current.rows[0]?.version ?? 0) !== input.expectedVersion)
       throw new CommandError('version_conflict', 409);
+    if (bytes && input.status === 'approved') {
+      // GC may have deleted Phase B's object while we waited for this blob lock.
+      // Repair under the transaction lock; pooled connections cannot use session locks.
+      await uploadImmutableArtwork(storage, venue, input.sha256, bytes);
+    }
     const stream = current.rows[0]?.stream_id ?? randomUUID();
     const state: ArtworkState = {
       label: input.label,

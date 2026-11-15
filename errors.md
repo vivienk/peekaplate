@@ -3430,3 +3430,20 @@ Follow-up: full JavaScript tests initially failed when authentication fixtures c
 The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
 
 Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T23:55:57.240Z","exitCode":1}
+```
+## 2026-11-14 — Ingredient artwork cleanup/approval race
+
+A real PostgreSQL regression paused cleanup after its old-object HEAD, completed
+the approval's initial upload, then let cleanup delete before the approval took
+its blob lock. Approval committed a missing object. Phase C now verifies/repairs
+exact bytes under that same transaction lock, after authorization, replay and
+version checks. The interleaving and repair-failure rollback tests cover the fix.
+This final R2 operation intentionally stays inside the transaction; session-level
+locks are unsafe to assume across pooled Hyperdrive transactions. A Windows
+Python fixture also used the default code page for Unicode JSON; it now writes
+UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
+the passing Python rerun. No hosted objects or provider calls were used.

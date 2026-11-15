@@ -140,7 +140,7 @@ class IngredientGenerationTests(unittest.TestCase):
         source = report(["coconut"])
         run = self.root / "run"
         run.mkdir()
-        (run / "extraction.json").write_text(source.model_dump_json())
+        (run / "extraction.json").write_text(source.model_dump_json(), encoding="utf-8")
         with patch("peekaplate_processing.run_pipeline.run_pipeline", return_value=source), patch(
                 "peekaplate_processing.ingredient_icon_generation.GeminiImageProvider", return_value=self.provider):
             code = pipeline_main(["--input", "synthetic.pdf", "--run-dir", str(run),
