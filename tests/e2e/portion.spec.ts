@@ -705,6 +705,23 @@ test('camera portal positions the exact cutout, rotates, resets and releases cam
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
   await page.screenshot({ path: 'test-results/ar-camera-mobile.png' });
+  await page.getByRole('dialog').getByText('Adjust view', { exact: true }).click();
+  const canvas = page.locator('.pp-ar__canvas');
+  const beforeDrag = await canvas.screenshot();
+  const area = (await canvas.boundingBox())!;
+  await page.mouse.move(area.x + area.width / 2, area.y + area.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(area.x + area.width * 0.8, area.y + area.height * 0.6, { steps: 6 });
+  await page.mouse.up();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect((await canvas.screenshot()).equals(beforeDrag)).toBe(false);
+  await page.getByRole('dialog').getByText('Adjust view', { exact: true }).click();
+
   await page.getByRole('slider', { name: 'Tilt dish', exact: true }).fill('3');
   await expect(page.getByRole('slider', { name: 'Tilt dish', exact: true })).toHaveValue('3');
   await page.getByRole('button', { name: 'Reposition', exact: true }).click();
@@ -990,6 +1007,7 @@ for (const name of [
   'Garden Avocado Salad',
 ]) {
   test(`actual PR145 menu opens automatic camera from ${name}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await cameraFixture(page);
     await page.goto(
       `http://127.0.0.1:5173/${name === 'Berry Pancake Stack' ? '?scenario=edge-cases' : ''}`,

@@ -2868,3 +2868,10 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T08:46:58.839Z","exitCode":1}
 ```
+
+- 2026-11-15 broader browser run:67/76 passed. Landscape portrait test lacked touch emulation; six menu-camera cases expected390px without setting that viewport. Corrected explicit device setup. Observer count(2 vs1) and withdrawal event count(4 vs1) also fail with original50c3b99 application files restored; these pre-existing tracking expectations remain outside this camera correction. Context summary exceeded its limit; shortened and refreshed successfully. Independent review caught pointer grab snapping and local3D vertical offset; added grab-offset/rotated-bounds regressions and centered manual models.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T08:55:19.271Z","exitCode":1}
+```

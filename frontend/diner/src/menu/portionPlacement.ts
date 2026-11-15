@@ -20,3 +20,26 @@ export function cameraPlacement(
   const y = top + height / 2 + Math.max(0, Math.min(1, position.y)) * (availableHeight - height);
   return { width, height, x, y, initialWidth, left, right, top, bottom };
 }
+
+// A rotated box must fit as a whole; the local model is not a measured food volume.
+export function rotatedCameraBounds(dimensions: { x: number; y: number; z: number }, yaw: number) {
+  const angle = (yaw * Math.PI) / 180;
+  return {
+    width: Math.max(
+      0.001,
+      Math.abs(dimensions.x * Math.cos(angle)) + Math.abs(dimensions.z * Math.sin(angle)),
+    ),
+    height: Math.max(0.001, dimensions.y),
+  };
+}
+
+export function cameraGrabOffset(
+  rect: { x: number; y: number; width: number; height: number },
+  pointer: { x: number; y: number },
+) {
+  const x = pointer.x - rect.x;
+  const y = pointer.y - rect.y;
+  return Math.abs(x) <= rect.width / 2 && Math.abs(y) <= rect.height / 2
+    ? { x, y }
+    : { x: 0, y: 0 };
+}

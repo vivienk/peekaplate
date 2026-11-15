@@ -1,7 +1,7 @@
 import type { PublicPortion } from '@peekaplate/contracts';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { cameraPlacement } from './portionPlacement';
+import { cameraGrabOffset, cameraPlacement, rotatedCameraBounds } from './portionPlacement';
 
 export function portionWorldWidth(size?: PublicPortion['physical_size']) {
   return size ? size.plate.width_mm / 1000 / size.plate.boundary.width : 0.3;
@@ -57,6 +57,8 @@ export function bindPortionAR(
     }
     const button = (name: string) =>
       dialog.querySelector<HTMLButtonElement>(`[data-action="${name}"]`)!;
+    button('landscape').hidden =
+      typeof (screen.orientation as ScreenOrientation & { lock?: unknown })?.lock !== 'function';
     const original = document.createElement('img');
     original.className = 'pp-ar__original';
     original.hidden = true;
@@ -104,6 +106,7 @@ export function bindPortionAR(
     let stream: MediaStream | undefined;
     let renderer: THREE.WebGLRenderer | undefined;
     let model: THREE.Object3D | undefined;
+    let modelDimensions: THREE.Vector3 | undefined;
     let use3d = false;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
@@ -123,21 +126,28 @@ export function bindPortionAR(
     let cameraScale = 0.3 / width;
     let preferredWidth: number | undefined;
     const position = { x: 0.5, y: 0.5 };
+    let currentLayout: ReturnType<typeof cameraPlacement> | undefined;
+    const activeDimensions = () =>
+      use3d && modelDimensions
+        ? rotatedCameraBounds(modelDimensions, Number(rotation.value))
+        : { width, height };
     const layoutCameraDish = () => {
       if (tracked) return;
       const bounds = canvasHost.getBoundingClientRect();
       const header = dialog.querySelector('.pp-ar__header')!.getBoundingClientRect();
+      const dimensions = activeDimensions();
       const layout = cameraPlacement(
         { width: bounds.width, height: bounds.height, top: header.bottom - bounds.top, bottom: 64 },
-        height / width,
+        dimensions.height / dimensions.width,
         preferredWidth,
         Number(size.value) / 100,
         position,
       );
+      currentLayout = layout;
       preferredWidth ??= layout.initialWidth;
       const pixelsPerUnit =
         bounds.height / (2 * 0.85 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-      cameraScale = layout.width / width / pixelsPerUnit;
+      cameraScale = layout.width / dimensions.width / pixelsPerUnit;
       content.scale.setScalar(cameraScale);
       anchor.position.set(
         (layout.x - bounds.width / 2) / pixelsPerUnit,
@@ -266,6 +276,7 @@ export function bindPortionAR(
     const changed = () => {
       const tilt = Math.max(-3, Math.min(3, Number(rotation.value)));
       content.rotation.y = THREE.MathUtils.degToRad(use3d ? Number(rotation.value) : tilt);
+      if (model && modelDimensions) model.position.y = tracked ? modelDimensions.y / 2 : 0;
       if (!tracked) layoutCameraDish();
       else content.scale.setScalar(physicalSize ? 1 : Number(size.value) / 100);
     };
@@ -340,13 +351,15 @@ export function bindPortionAR(
         ? 'Move your phone slowly over a table. Wait for the placement ring.'
         : 'Manual camera preview — no surface tracking. Tap Place dish to position it.';
     });
+    let grabOffset = { x: 0, y: 0 };
     const moveDish = (event: PointerEvent) => {
       if (!running || tracked || !placed || !live) return;
       const bounds = canvasHost.getBoundingClientRect();
       const header = dialog.querySelector('.pp-ar__header')!.getBoundingClientRect();
+      const dimensions = activeDimensions();
       const layout = cameraPlacement(
         { width: bounds.width, height: bounds.height, top: header.bottom - bounds.top, bottom: 64 },
-        height / width,
+        dimensions.height / dimensions.width,
         preferredWidth,
         Number(size.value) / 100,
         position,
@@ -355,7 +368,7 @@ export function bindPortionAR(
         0,
         Math.min(
           1,
-          (event.clientX - bounds.left - layout.left - layout.width / 2) /
+          (event.clientX - bounds.left - grabOffset.x - layout.left - layout.width / 2) /
             Math.max(1, layout.right - layout.left - layout.width),
         ),
       );
@@ -363,7 +376,7 @@ export function bindPortionAR(
         0,
         Math.min(
           1,
-          (event.clientY - bounds.top - layout.top - layout.height / 2) /
+          (event.clientY - bounds.top - grabOffset.y - layout.top - layout.height / 2) /
             Math.max(1, layout.bottom - layout.top - layout.height),
         ),
       );
@@ -373,6 +386,13 @@ export function bindPortionAR(
     canvasHost.addEventListener('pointerdown', (event) => {
       if (!event.isPrimary || tracked || !placed) return;
       pointerId = event.pointerId;
+      const bounds = canvasHost.getBoundingClientRect();
+      grabOffset = currentLayout
+        ? cameraGrabOffset(currentLayout, {
+            x: event.clientX - bounds.left,
+            y: event.clientY - bounds.top,
+          })
+        : { x: 0, y: 0 };
       canvasHost.setPointerCapture(event.pointerId);
       moveDish(event);
     });
@@ -557,11 +577,12 @@ export function bindPortionAR(
             throw new Error('Invalid model size');
           }
           gltf.scene.position.sub(bounds.getCenter(new THREE.Vector3()));
-          gltf.scene.position.y += dimensions.y / 2;
+          modelDimensions = dimensions.clone().multiplyScalar(0.3 / extent);
           model = new THREE.Group();
           model.add(gltf.scene);
           // Generated mesh bounds are not a calibrated plate boundary. Keep appearance approximate.
           model.scale.setScalar(0.3 / extent);
+          model.position.y = tracked ? modelDimensions.y / 2 : 0;
           model.visible = false;
           content.add(model);
           mode.disabled = false;
