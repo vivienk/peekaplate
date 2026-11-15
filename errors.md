@@ -3719,3 +3719,17 @@ the check; reviewed fingerprints were refreshed afterward.
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T06:35:36.517Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T06:45:07.336Z","exitCode":1}
+```
+
+## Owner onboarding baseline and callbacks - November 14, 2026
+
+Three browser regressions reproduced stale saved fields/photo state and an import
+callback navigating after Back. Value-based form reset preserves equivalent-prop
+edits; demo request timers cancel on navigation and unmount. All 54 onboarding
+and auth browser cases pass in 1.5m. The lint observation after reconciliation was
+fixture formatting under the current Biome configuration; formatting and repository
+checks pass. These are caller-driven screens, not hosted upload acceptance.
