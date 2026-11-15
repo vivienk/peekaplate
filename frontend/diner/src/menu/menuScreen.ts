@@ -28,7 +28,7 @@ import { createFixtureMenuSource, demoBundle } from './fixtures';
 import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
-import { menuRouteFromPath } from './route';
+import { resolveMenuRoute } from './route';
 import {
   bindMenuSearch,
   SEARCH_ALL_CATEGORY_ID,
@@ -816,10 +816,14 @@ export function mountMenuScreen(container: HTMLElement): void {
             import('./published'),
             import('../tracking'),
             import('../tracking/delivery'),
-          ]).then(([published, tracking, delivery]): Promise<MenuLoadResult> | MenuLoadResult => {
+          ]).then(async ([published, tracking, delivery]): Promise<MenuLoadResult> => {
             const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
             if (!apiBase) return { status: 'error' };
-            const route = menuRouteFromPath(window.location.pathname);
+            const route = await resolveMenuRoute(window.location.pathname, {
+              apiBase,
+              signal: controller.signal,
+            });
+            controller.signal.throwIfAborted();
             if (!route) return { status: 'unavailable' };
             const source = published.createPublishedMenuSource({
               apiBase,
