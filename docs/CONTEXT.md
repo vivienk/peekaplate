@@ -332,7 +332,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Actor-bound owner workspaces expose owner/editor restaurants and versioned private draft/photo/upload/verification flows. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are versioned/idempotent. Owner-AI trust/issuance and live evaluation remain gated. Decorative artwork uses exact-byte blob-locked repair before approval and approved-only public reads. Order imports require agreement; owner requests, bound operator execution, independent checker and frozen restore use tenant/fence/cutoff guards. Hosted activation and acceptance are recorded separately.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Actor-bound owner workspaces expose owner/editor restaurants and versioned private draft/photo/upload/verification flows. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are versioned/idempotent. Owner-AI trust/issuance and live evaluation remain gated. Decorative artwork uses exact-byte blob-locked repair before approval and approved-only public reads. Order imports require agreement; owner requests, bound operator execution, independent checker and frozen restore use tenant/fence/cutoff guards. Required hosted provider gating reserves at most two attempts per tenant/job in transactional DO SQLite, including redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -505,7 +505,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "c35e178f261ee8fdeb0e6c728bc5e078b7ac26cb3b636ab842ee8e31cf2c6f93"
+      "sourceFingerprint": "f89363f05f6f86f932601bd981d3fd637a382a1f08f5438e652d7b46e8bd1699"
     },
     {
       "id": "database",
@@ -715,7 +715,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. FE-06.4 has a read-only job/draft verifier with tenant and attempt identity checks, strict report version pairing and explicit unknown upstream provider usage; it cannot enforce provider budgets or replace hosted UI/accuracy acceptance. Reviewed ingredient PNGs retain exact-byte provenance and deliver through the staff API. QA-02 freezes references; human/AI acceptance stays pending.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. FE-06.4 has a read-only job/draft verifier with tenant and attempt identity checks, strict report version pairing and explicit unknown upstream provider usage; the separate required hosted gate enforces attempts; UI/accuracy acceptance remains separate. Reviewed ingredient PNGs retain exact-byte provenance and deliver through the staff API. QA-02 freezes references; human/AI acceptance stays pending.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -826,7 +826,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "ccd0f0f72c62c3c045090a506eec0d648e66516b69b72ac6407b102d42918c21"
+      "sourceFingerprint": "75cdfcc32230b8f8fb05a511d8335240b7b8da594af17de4995335d7af8af0e5"
     },
     {
       "id": "assets",
@@ -861,24 +861,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "contracts",
-        "backend",
-        "console",
-        "delivery"
-      ],
-      "summary": "Connect merged Auth143/146, shell125/139 and report128 with read-only staff restaurant discovery and actor-bound tokens. No migration, automatic membership, fictional setup state, fixture report fallback or deployment. Restricted-role database/workerd and synthetic-provider browser checks exercise access, revocation and identity switches.",
-      "sources": [
-        "backend/src/owner-workspace.ts",
-        "frontend/console/src/owner/OwnerWorkspace.tsx",
-        "frontend/console/src/auth/supabase-auth.ts",
-        "docs/owner-session-workspace.md",
-        "tests/e2e/owner-workspace.spec.ts"
-      ],
-      "next": "Finish pinned reviews/checks and merge. Release API/console separately for genuine hosted staff acceptance; then integrate reviewed156/171/172 and163. Preserve diner publication/token flow; PostHog/canonical/report reconciliation remains a release gate."
-    },
     {
       "date": "2026-11-14",
       "modules": [
@@ -1013,6 +995,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/owner-category-dropdown.spec.ts"
       ],
       "next": "Wire the screen through the owner-menu client separately; keep food evidence, verification and publishing authority on the server."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR188 adds a required hosted tenant/job provider-attempt gate backed by transactional DO SQLite. Queue redeliveries share the two-attempt counter; Python vision/OCR/model retries reserve before transport and fail closed. Real local workerd concurrency, replay/scope, process-restart and SQL rollback checks pass; 576 offline Python tests pass. Hosted Worker+image rollout and provider acceptance remain NOT RUN.",
+      "files": [
+        "backend/src/extraction-host.ts",
+        "backend/src/extraction-budget.workerd.test.ts",
+        "backend/tests/provider-budget-worker.ts",
+        "processing/src/peekaplate_processing/provider_budget.py",
+        "docs/provider-call-budget.md"
+      ],
+      "next": "Deploy matching Worker and container image before any controlled provider test; keep the existing allowance and Queue controls. This is not an account-wide spending limit."
     }
   ]
 }

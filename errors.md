@@ -3748,3 +3748,24 @@ symbol through keyboard navigation. The unreviewed-AI unit case now includes a
 valid photo/rights fixture so only the AI-review guard controls its result.
 All 19 category/photo/dashboard browser cases pass in 24.3s; repository checks
 pass with 1,733 unit and 103 script tests. Persistence remains outside the demo.
+
+## Provider-budget independent verification - November 14, 2026
+
+The actual local workerd/SQLite test verifies two grants under 12 concurrent
+requests, same-key replay, cross-job denial, restart persistence and rollback of
+a counter increment when a reservation insert fails. It passes without starting
+a Container or contacting a provider. Ordinary unit checks skip this optional
+TEST_WORKERD case; the explicit runtime invocation passed in 2.98s.
+The first Python invocations lacked the service extra and then used Windows
+legacy text encoding for Unicode fixtures. Installing the declared service extra
+and running Python with -X utf8 passed all 576 offline tests in 72.731s; no
+unrelated fixture or extraction behavior was changed. A test-harness typecheck
+observation used the Worker URL type where Node fileURLToPath requires Node URL;
+importing URL from node:url matches the existing workerd tests. Final repository
+checks pass, and the explicit SQLite regression passes again in 2.70s. Hosted
+rollout is NOT RUN.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T06:54:16.642Z","exitCode":2}
+```
