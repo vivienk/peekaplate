@@ -3542,3 +3542,65 @@ and producer identities, rejects redirects and reports upstream calls as unknown
 The real Worker/PostgreSQL regression covers the owner, viewer and cross-venue
 routes. Its initial typed fixture omitted required nullable fields; those fields
 were restored to match the production contract. Final typecheck and checks passed.
+
+## Ingredient icon preparation — November 12, 2026
+
+Initial environment discovery found no system Python pydantic; tests use the existing isolated Python 3.12 environment (pydantic 2.14.3, Pillow 13.0.0), not the frozen deployment environment. The first eight-case icon run exposed trailing whitespace in the new empty-ingredient synthetic fixture: DishDraft stripped it while source offsets retained it. The fixture now supplies explicit nonblank unknown-ingredient text; source validation remains strict. Ingredient tests (23), review-candidate tests (17) and full Python suite (526) pass. Initial branch setup could not fast-forward main to develop; a new clean task branch was based directly on the fetched develop SHA before edits. No existing work was discarded.
+
+Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise RecursionError rather than fall back to text. Catalogue reads now normalize this to ValueError; the new regression and all 24 ingredient tests pass. Initial pnpm checks were blocked by system Node 24.14 and automatic dependency installation without network access. Using installed Node 24.16 and disabling only automatic dependency installation allowed the dependency-free repository context/docs verification commands to pass; no check itself was disabled.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T07:35:35.800Z","exitCode":1}
+```
+
+## Ingredient illustration generation — November 12, 2026
+
+The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.
+
+Generation review found valid JSON with non-object provider fields could raise AttributeError and stop the batch. Explicit envelope/candidate/content/part/image type validation now returns a sanitized failed job; malformed-shape regression verifies remaining ingredients still run. Focused ingredient suite passes 34 tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:18:46.464Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T08:20:15.323Z","exitCode":1}
+```
+
+## Diner ingredient integration verification — November 13, 2026
+
+The first typecheck caught unchecked indexed access in the generated catalogue resolver and an optional test error handler. Both now have explicit guards. Focused menu tests exercise missing mappings and failed-image handling. The first local browser run could not bind port 5173 under restricted execution (EPERM); rerun with local server permission. No food-review command was changed.
+
+Follow-up: full JavaScript tests initially failed when authentication fixtures could not bind local ports; the permitted rerun passes all 1,423 unit and 74 script tests. The normal browser runner found port 5173 occupied. A temporary copy of the two targeted browser cases used only port 5283 and the diner server; both pass. The first temporary config was mistakenly placed under Playwright's cleaned output directory and found no tests; moving it outside that directory fixed the runner setup. Temporary runner files were removed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T06:21:04.472Z","exitCode":2}
+```
+
+## Automatic ingredient artwork delivery verification — November 13, 2026
+
+The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
+
+Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T23:55:57.240Z","exitCode":1}
+```
+
+## 2026-11-14 — Ingredient artwork cleanup/approval race
+
+A real PostgreSQL regression paused cleanup after its old-object HEAD, completed
+the approval's initial upload, then let cleanup delete before the approval took
+its blob lock. Approval committed a missing object. Phase C now verifies/repairs
+exact bytes under that same transaction lock, after authorization, replay and
+version checks. The interleaving and repair-failure rollback tests cover the fix.
+This final R2 operation intentionally stays inside the transaction; session-level
+locks are unsafe to assume across pooled Hyperdrive transactions. A Windows
+Python fixture also used the default code page for Unicode JSON; it now writes
+UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
+the passing Python rerun. No hosted objects or provider calls were used.
