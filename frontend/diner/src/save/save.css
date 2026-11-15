@@ -50,7 +50,9 @@
   width: 14px;
   height: 14px;
   font-size: 10px;
-  line-height: 1;
+  /* Figma 10/14 Medium (Azoz QA report 03, M7). */
+  font-weight: 500;
+  line-height: 14px;
 }
 
 /* The menu styles the badge as inline-flex, which would otherwise override [hidden] at zero. */
@@ -199,10 +201,16 @@ main:has(> .pp-saved-screen) {
   gap: 12px;
 }
 
-/* Saved dish card (DishCard_Saved, 691:7715). */
+/* Saved dish card (DishCard_Saved, 691:7715; Azoz QA report 03, V1/V2): 120px tall, #2D3038,
+   radius 16, 1px #71737A 30% border, and the 120px plate image filling its height. */
 .pp-saved__item {
-  padding: 8px 4px 8px 8px;
+  box-sizing: border-box;
+  min-height: 120px;
+  padding: 0 4px 0 0;
+  overflow: hidden;
   border-radius: var(--pp-radius-16);
+  /* Inside stroke, as in Figma, so the card stays 120px with the 120px image. */
+  box-shadow: inset 0 0 0 1px var(--pp-role-outline);
   background: var(--pp-color-neutral-700);
 }
 
@@ -210,6 +218,19 @@ main:has(> .pp-saved-screen) {
   flex: none;
   display: block;
   border-radius: var(--pp-radius-full);
+}
+
+.pp-saved-screen .pp-saved__open {
+  padding: 0;
+}
+
+.pp-saved-screen .pp-saved__image {
+  inline-size: 120px;
+  block-size: 120px;
+}
+
+.pp-saved__heart {
+  display: block;
 }
 
 .pp-saved__text {
@@ -220,28 +241,34 @@ main:has(> .pp-saved-screen) {
   gap: 2px;
 }
 
+/* Figma: category 12/16 #A8A59E, name 18/28 Bold, price 18/28 Semi Bold (V2). */
 .pp-saved__category {
-  color: var(--pp-color-neutral-400);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  color: #a8a59e;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
 }
 
 .pp-saved__name {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 28px;
   overflow-wrap: break-word;
 }
 
 .pp-saved__price {
   color: var(--pp-color-orange-500);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
+  line-height: 28px;
 }
 
 .pp-saved__save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--pp-color-orange-500);
-  font-size: 20px;
 }
 
 /* Empty state (Saved_Empty, 722:8589): centred in the space below the header. */

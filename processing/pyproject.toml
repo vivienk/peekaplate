@@ -17,6 +17,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cutout = [
+    "rembg==2.0.67",
+    "onnxruntime==1.19.2",
+    "numba==0.60.0",
+    "numpy==2.0.2",
+    "opencv-python-headless==4.11.0.86",
+]
 service = [
     "fastapi==0.162.0",
     "httpx==0.28.1",

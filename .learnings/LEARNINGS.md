@@ -152,3 +152,12 @@ progress. Keep sample design content confined to labelled demos.
 
 Related: docs/owner-onboarding-wiring.md, tests/e2e/owner-workspace.spec.ts.
 Pattern: frontend.composition-before-wiring; first occurrence, no policy promotion.
+
+## LRN-20261115-CONFLICT-001 · Bound conflict repair to marker lines
+
+**Logged**: November 15, 2026 · **Status**: resolved · **Area**: tooling
+
+An external reconciliation script combined DOTALL with a greedy closing-marker pattern and consumed a module after the conflict. Independent review and TypeScript caught the missing exports before push. Prefer exact conflict-block replacement or line-based parsing; verify the retained exports and diff against both parents before recording readiness. Restore from a pinned parent and reapply the small behavioral delta when the result is uncertain.
+
+Related: frontend/diner/src/menu/dishDetail.ts, tests/e2e/portion.spec.ts.
+Pattern: tooling.bounded-conflict-repair; first occurrence, no policy promotion.
