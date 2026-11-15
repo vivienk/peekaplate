@@ -19,6 +19,13 @@ must still confirm it; no human-review decision has been fabricated.
 
 ## Executed controls
 
+November 14 re-review: 18 focused Python tests passed in 0.900 s. The actual
+manifest CLI again returned one development case, three entries, zero holdouts
+and pending independent review. Adding --require-reviewed returned exit 1 with
+the expected pending-review reason. PDF/source-reference comparison was checked;
+the independent human decision in the reference remains pending. Current develop
+context/history was reconciled; no model request or acceptance status changed.
+
 | Check | Expected | Actual | Result / boundary |
 | --- | --- | --- | --- |
 | Verify committed manifest | One development case, 3 entries, all source/reference bytes unchanged | Matched; 3 source pages accounted for, 0 holdouts, review pending | Integrity PASS only. |
