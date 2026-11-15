@@ -1,0 +1,49 @@
+S5-DATA-05 focused validation - 2026-11-09
+
+Command:
+pnpm exec vitest run backend/src/comparison-report.test.ts packages/contracts/src/comparison-report.test.ts backend/src/comparison-report.data05.test.ts
+
+Current result: PASS, 3 files, 17 tests, 0 failures.
+Existing backend: 4; existing contract: 4; independent privacy fixtures: 9.
+Final focused wall time: 1.719 seconds.
+
+Controlled regression check (temporary source mutation, restored afterward):
+Denominator OR changed to AND; original tests: 11 PASS, 1.796 seconds.
+Same mutation with expanded fixtures: 4 FAIL / 13 PASS, 1.719 seconds.
+Failures: current/baseline exposure and current/baseline opening denominator cases.
+Original production implementation restored byte-for-byte: 17 PASS, 1.719 seconds.
+
+Historical submitted evidence: 11 PASS (4 backend + 4 contract + 3 privacy).
+Superseded by the current 17-test run above.
+
+NOT RUN: database integration, cross-revision SQL deduplication, hosted privacy.
+All independent privacy tests use synthetic mocked database rows.
+
+Repository check: pnpm check PASS, 1023 unit + 67 script tests, 26.991 seconds.
+Lint, strict types, context freshness and local documentation links also PASS.
+
+Current-base reconciliation - 2026-11-11
+Implementation base: c344b7e000bc8d01eeb0ab4e7a3ed80197af7c5c (PR134).
+Same focused command: PASS, 3 files, 17 tests, 550 ms Vitest duration.
+pnpm check: PASS, 1081 unit tests (4 optional skips), 67 script tests,
+lint, strict types, context freshness and local documentation links.
+Unit phase: 5.41 s; script phase: 1.31 s.
+Reporting source and shared comparison contract are unchanged relative to this base.
+Merge target remains s5-data-05-periodic-comparison, not develop.
+Historical mutation check above was NOT RERUN.
+Local comparison SQL/cross-revision integration and hosted privacy remain NOT RUN.
+
+PR134 combined implementation/validation review - 2026-11-11
+Restored PR123 source: a8cd00b5be105b52b38a51b2b4a254b2a291a6de.
+Fixture profile: data05.validation.v3 (complementary open-rate suppression added).
+Focused unit/contract/JSON command above: 17 PASS, 744 ms.
+Focused real PostgreSQL comparison-report.integration.ts: 11 PASS, 2.42 s.
+pnpm verify test:db: PASS, 281 pgTAP assertions + 107 integration tests.
+Integration phase: 25.36 s; disposable DB/local smoke cleanup passed.
+Two new DB regressions: 2 FAIL / 1 PASS before correction; 3 PASS after correction.
+Cross-publication 17-session fixture now executes against restricted PostgreSQL.
+Previous NOT RUN SQL entries describe historical runs, not this current verification.
+NOT RUN: hosted comparison endpoint/dashboard, privacy/freshness and product acceptance.
+Current repository check: pnpm check PASS, 1374 unit tests (4 optional skips),
+74 script tests, lint, strict types, context and docs. Unit phase 7.49 s; scripts 1.71 s.
+pnpm verify build PASS: both frontends and staging Worker dry-run; no deployment.

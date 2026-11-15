@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { chipKey, completeDishes, FIXTURE_NOTICE, toMenu } from './adapter';
 import {
   CATEGORY,
@@ -121,11 +121,33 @@ describe('fixture menu source', () => {
     expect(complete(menu, DISH.longName).name.length).toBeGreaterThan(80);
   });
 
-  it('labels every placeholder image as synthetic', async () => {
+  it('labels every image as synthetic: Figma sample photos or placeholders', async () => {
     for (const dish of completeDishes(await loadMenu('edge-cases'))) {
       if (!dish.images) continue;
       expect(dish.images.card.alt).toMatch(/synthetic fixture/);
-      expect(dish.images.card.url).toMatch(/^(data:image\/svg\+xml,|.*\.webp)/);
+      expect(dish.images.card.url).toMatch(/^data:image\/svg\+xml,|\.webp($|\?)/);
+    }
+  });
+
+  it('uses the Figma sample photo for the six dishes drawn in the design', async () => {
+    const dishes = new Map(
+      [
+        ...completeDishes(await loadMenu('demo')),
+        ...completeDishes(await loadMenu('edge-cases')),
+      ].map((d) => [d.dishId, d]),
+    );
+    for (const id of [
+      DISH.avocadoToast,
+      DISH.harvestPowerBowl,
+      DISH.eggsBenedict,
+      DISH.gardenAvocadoSalad,
+      DISH.berryPancakeStack,
+      DISH.salmonPokeBowl,
+    ]) {
+      const images = dishes.get(id)?.images;
+      expect(images, id).toBeTruthy();
+      expect(images?.card.url).toMatch(/\.webp($|\?)/);
+      expect(images?.card.alt).toMatch(/sample photo/);
     }
   });
 
@@ -286,33 +308,4 @@ describe('menu adapter', () => {
     expect(complete(result.menu, DISH.gardenAvocadoSalad).dietary).toEqual(['Vegan']);
     expect(complete(result.menu, DISH.gardenAvocadoSalad).allergens).toEqual([]);
   });
-});
-
-it('camera preview preserves every PR145 dish and stays out of ordinary builds', async () => {
-  try {
-    vi.stubEnv('DEV', false);
-    vi.stubEnv('VITE_PORTION_DEMO', 'true');
-    const preview = completeDishes(await loadMenu('demo'));
-    expect(preview).toHaveLength(5);
-    const legacyLink = completeDishes(await loadMenu('portion-demo'));
-    expect(
-      legacyLink.every(
-        (dish) => dish.cameraSample === undefined && dish.previewPortion?.dish_id === dish.dishId,
-      ),
-    ).toBe(true);
-    expect(
-      preview.every(
-        (dish) =>
-          dish.previewPortion?.dish_id === dish.dishId &&
-          dish.previewPortion?.dish_revision_id === dish.dishRevisionId,
-      ),
-    ).toBe(true);
-    vi.stubEnv('VITE_PORTION_DEMO', undefined);
-    const ordinary = completeDishes(await loadMenu('demo'));
-    expect(ordinary.every((dish) => dish.previewPortion === undefined)).toBe(true);
-    expect(preview.map(({ previewPortion, ...dish }) => dish)).toEqual(ordinary);
-    expect(await createFixtureMenuSource('portion-demo').load()).toEqual({ status: 'unavailable' });
-  } finally {
-    vi.unstubAllEnvs();
-  }
 });

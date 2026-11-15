@@ -3,6 +3,7 @@ import type { Envelope } from '../../frontend/diner/src/tracking/envelope';
 import type { Outbox } from '../../frontend/diner/src/tracking/outbox';
 
 const DINER = 'http://127.0.0.1:5173/';
+const PAGE = `${DINER}?scenario=empty`; // the screen emits no events of its own
 function event(): Envelope {
   return {
     schema_version: 'observation.v2',
@@ -17,7 +18,7 @@ function event(): Envelope {
   };
 }
 async function openBox(page: Page, kind: 'indexedDB' | 'localStorage') {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await page.evaluate(async (kind) => {
     const source = await import(/* @vite-ignore */ '/src/tracking/outbox.ts');
     const store =
@@ -73,7 +74,7 @@ for (const kind of ['indexedDB', 'localStorage'] as const) {
 test('an IndexedDB request success followed by abort is not reported as a committed update', async ({
   page,
 }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   const aborted = await page.evaluate(async (value) => {
     const { indexedDbOutboxStore } = await import(/* @vite-ignore */ '/src/tracking/outbox.ts');
     const store = await indexedDbOutboxStore(indexedDB);
@@ -96,7 +97,7 @@ test('an IndexedDB request success followed by abort is not reported as a commit
 });
 
 test('without Web Locks the localStorage fallback stays in visit memory', async ({ page }) => {
-  await page.goto(DINER);
+  await page.goto(PAGE);
   const state = await page.evaluate(async (value) => {
     Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
     const { localStorageOutboxStore, createOutbox } = await import(
@@ -116,7 +117,7 @@ test('failed withdrawal survives reload and clears both recovered storage backen
   page,
 }) => {
   await page.clock.install();
-  await page.goto(DINER);
+  await page.goto(PAGE);
   await page.evaluate(async (value) => {
     const source = await import(/* @vite-ignore */ '/src/tracking/outbox.ts');
     await (await source.indexedDbOutboxStore(indexedDB)).update(() => [value]);

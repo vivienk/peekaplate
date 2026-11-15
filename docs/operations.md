@@ -423,7 +423,7 @@ pnpm --filter @peekaplate/backend dev
 
 `pnpm verify test:db` builds a PostgreSQL 16 test image with pgTAP and creates a temporary Docker network/database. It installs the previous schema, preserves a synthetic venue through the forward migration, confirms a second `up` has no pending migration, runs SQL policies, then exercises the real local Worker with signed JWTs and restricted database credentials. Tests include concurrent writers, duplicate/conflicting commands, revoked membership, rollback, replay and physical connection reuse. Cleanup removes the harness container, its volumes and network. The random database host port binds only to `127.0.0.1`; credentials are disposable fixtures. Never point this harness at a shared database. A Docker daemon and image downloads are required. Image tags are pinned to versions, not immutable digests.
 
-`pnpm dev:backend` uses that disposable database setup with a loopback JWKS service and the actual Worker. It writes a synthetic owner session to ignored `work/local-session.json`; the private signing key stays in memory. Run `pnpm local:demo` in another terminal to create a dish revision. Stop with Ctrl+C; local data is intentionally discarded. Do not run it alongside the plain backend dev process on port 8787. A forcibly terminated process can leave its uniquely named `peekaplate-db-*` container/network and session file; inspect ownership before removing those exact resources. Restart after the one-hour fixture token expires.
+`pnpm dev:backend` uses that disposable database setup with a loopback JWKS service and the actual Worker. It writes a synthetic owner session to ignored `work/local-session.json`; the private signing key stays in memory. Run `pnpm local:demo` in another terminal to create a dish revision. Stop with Ctrl+C; local data is intentionally discarded. The authenticated fixture Worker listens on port 8790; the plain backend dev process uses port 8787. A forcibly terminated process can leave its uniquely named `peekaplate-db-*` container/network and session file; inspect ownership before removing those exact resources. Restart after the one-hour fixture token expires.
 
 ### Windows Docker startup recovery
 
@@ -577,6 +577,30 @@ Dependabot checks routine versions on the first day of each month, with one open
 Document and demonstrate: Queue retry and poison-message DLQ handling; create-only archive conflict quarantine; replay with network side effects disabled; independent backup of Postgres, approved assets/manifests and R2 evidence; restore reconciliation by ID and checksum; deletion requests reapplied after restoration. Measure the plan's content RPO ≤24 hours and restore RTO ≤4 hours. Until the drill exists, those are targets only.
 
 For a failing release, stop promotion and preserve logs without secrets or raw diner data. Prefer restoring the prior application deployment and forward-fixing schema. Do not delete an event stream or silently acknowledge unarchived observations to clear an alert.
+
+## Staging rollback and recovery (S4-REL-01)
+
+Procedure agreed with Sai on November 5 for the first staging journey release. It covers staging only; production needs its own release decision. **The drill below is NOT RUN yet**; record its results here when it is.
+
+**Before each release, record the known-good state:** Worker version ID and release SHA, diner and console Pages deployment IDs (the `main`/default deployment of each staging project, never a PR preview), the migration list, the `DINER_CORS_ALLOWED_ORIGINS` value and whether Queues are paused. On November 5 these were Worker version `60ac184a-a348-4e2c-843d-e380861771cc` (main `c6a47bd`), Pages deployments `013f89a7-d20a-42ef-b3f9-0a3612301e60` and `9ebf0f78-b3f4-47b1-857d-d04abf76ab55` (frontend `2a135fa`), eight migrations ending `20261026120000_observation_facts`, and paused Queues. Recheck the live values right before deploying; if they differ, stop and ask the infrastructure contact.
+
+**Roll back when** `/health` is not 200; missing or invalid staff tokens are not 401; another restaurant or a revoked account is not denied; a published bundle fails its hash check or shows private or another restaurant's content; a withdrawn menu or dish is still served on a fresh fetch; owner views include another tenant or `test` traffic; or Queue/DLQ or archive errors grow. First stop promotion, keep logs without secrets or raw diner data, and tell the infrastructure contact.
+
+**Undo only the affected parts, in this order:**
+
+1. **Unsafe content first:** contain unsafe dish content by withdrawing its whole menu through the staff API, `POST /venues/:venueId/menus/:menuId/withdrawals` with a fresh `commandId` and the current `expectedVersion`, and confirm a fresh public read returns 404. This endpoint does not withdraw individual dishes.
+2. **Pages:** in `peekaplate-diner-staging` or `peekaplate-console-staging`, open Deployments, choose the previous successful `main` deployment and use **Rollback to this deployment** ([Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/)).
+3. **Worker:** from `backend`, `pnpm exec wrangler rollback <known-good-version-id> --env staging`, or the Worker's Deployments → Rollback ([Worker rollbacks](https://developers.cloudflare.com/workers/configuration/versions-and-deployments/rollbacks/)). First check that version is compatible with the current database, bindings and secrets. A Worker rollback does not restore database or storage data.
+4. **Database:** fix forward with a new reviewed migration (see [Database change procedure](#database-change-procedure)); applied migrations are never reversed.
+5. **Queues:** pause the source Queue if delivery misbehaves; never purge or acknowledge unarchived messages.
+
+**Confirm the rollback:** the active Worker version and Pages deployments match the recorded known-good IDs; `/health` returns 200, an unknown route 404 and a missing token 401; both Pages roots and their assets return 200; the withdrawn menu returns 404; cross-tenant and revoked requests are denied; Queues are paused and not growing. Record expected and actual results with times.
+
+**Drill:** run one controlled staging drill with synthetic data: roll the affected component back to the recorded previous version, run the smoke checks, then restore the approved release. Capture before and after versions, timings and smoke-test results here.
+
+**Cleanup:** withdraw synthetic test menus, remove or downgrade the test memberships added for the release, end staff sessions, re-pause Queues and stop temporary helpers. Keep append-only events, archives and audit rows; they are `test` traffic, excluded from owner reports. Record their IDs. Touch nothing else.
+
+**Contacts:** infrastructure and rollback coordination: Sai. Release go/no-go and backup: Vivien (proposed; confirm her availability and the relevant feature owners before finalizing the roster).
 
 ## PostHog hosted release — October 19, 2026
 

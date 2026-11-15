@@ -21,16 +21,18 @@ from peekaplate_processing.errors import ExtractionError
 from peekaplate_processing.extract_menus import extract_source
 from peekaplate_processing.schemas import DishDraft, DraftEvidence, SourceSpan, MenuExtractionResult, validate_box_evidence
 from peekaplate_processing.storage import save_json
-from peekaplate_processing.workflow import INPUT_MODES, page_batches, run_menu_graph
+from peekaplate_processing.ingredient_intelligence import build_review_handoff
+from peekaplate_processing.workflow import INPUT_MODES, page_batches, request_failure, run_menu_graph
 from peekaplate_processing.sources import read_file, detect_kind
 from peekaplate_processing.timing import measure
 from peekaplate_processing.vision import image_source, normalize_page_selection, page_images
 from peekaplate_processing.preflight import assess_image
 from peekaplate_processing.review_suggestions import private_result
 
-from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result
+from peekaplate_processing.vision_extraction import extract_vision_v4, build_v4_result, VisionCaptureLimitError
 
 from peekaplate_processing.model_providers import create_model_client, create_cascading_clients, PROVIDER_REGISTRY
+from peekaplate_processing.provider_budget import ProviderBudgetError, ProviderBudgetGate
 
 
 def configured_llm(timeout=120, provider=None):
@@ -101,19 +103,19 @@ def saved_page_text(source, pages_json, *, recovery=False):
     )
 
 
-def _vision_with_retry(client, images, timeout, *, wait_seconds=2.0):
+def _vision_with_retry(client, images, timeout, *, wait_seconds=2.0, attempts=None, provider="default", budget_gate=None):
     """One short retry for transient 429s (shared upstream pools); daily quotas move straight on."""
     try:
-        return extract_vision_v4(client, images, timeout=timeout)
+        return extract_vision_v4(client, images, timeout=timeout, attempts=attempts, provider=provider, budget_gate=budget_gate)
     except openai.RateLimitError as error:
         if "per day" in str(error).lower() or "perday" in str(error).lower():
             raise
         print(f"Rate limited; retrying once in {wait_seconds:g}s...", file=sys.stderr, flush=True)
         time.sleep(wait_seconds)
-        return extract_vision_v4(client, images, timeout=timeout)
+        return extract_vision_v4(client, images, timeout=timeout, attempts=attempts, provider=provider, budget_gate=budget_gate)
 
 
-def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None):
+def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work/ocr-cache", pages_json=None, llm_timeout=90, batch_pages=10, llm_concurrency=1, llm_cache_dir="work/llm-cache", input_mode="ocr_image", is_table=True, target_pages=None, max_model_requests=None, provider=None, budget_gate=None, require_budget_gate=False):
     if target_pages is not None:
         target_pages=normalize_page_selection(target_pages,limit=4)
         if pages_json is None or input_mode=="image" or type(max_model_requests) is not int or not 1 <= max_model_requests <= 4:
@@ -132,6 +134,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         raise ExtractionError("LLM batch pages must be an integer between 1 and 10.")
     if not math.isfinite(llm_timeout) or not 0 < llm_timeout <= 300:
         raise ExtractionError("LLM deadline must be greater than zero and at most 300 seconds.")
+    if budget_gate is None:
+        budget_gate = ProviderBudgetGate.from_env(required=bool(require_budget_gate))
     directory = Path(run_dir)
     if directory.exists() or directory.is_symlink(): raise ExtractionError("Choose a new run directory.")
     # Defer default LLM configuration so V4 can run with only provider-specific keys (e.g. GEMINI_API_KEY only)
@@ -143,9 +147,12 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
     timings={}
     report=None
     completed=False
+    vision_requested = input_mode == "vision_v4"
+    vision_attempts = []
     try:
         fallback_warnings = []
         prepared_images = []
+        prepared_image_errors = []
         if pages_json is None:
             try:
                 source_bytes = read_file(source)
@@ -157,6 +164,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 if check.rejected:
                     print("Preflight rejected the image; no OCR or model request was made.", file=sys.stderr, flush=True)
                     report = image_source(source)
+                    report.configuration["input_mode"] = input_mode
                     report.errors.extend(check.errors)
                     report.configuration["preflight"] = check.metadata()
                     report.status = "failed"
@@ -172,6 +180,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
             with measure(timings, "source_images"):
                 images, image_errors = page_images(report.source, directory)
                 prepared_images = images
+                prepared_image_errors = image_errors
             report.errors.extend(image_errors)
 
             # Explicit provider, else cascade google_studio -> qwen -> glm -> openrouter
@@ -184,8 +193,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 if llm is None:
                     try:
                         llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=None)
-                    except ExtractionError as config_err:
-                        fallback_warnings.append(f"No vision provider configured: {config_err}")
+                    except ExtractionError:
+                        fallback_warnings.append("No vision provider configured.")
                 if llm is not None:
                     client_candidates = [("default", llm)]
 
@@ -194,9 +203,14 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                 try:
                     print(f"Trying V4 vision extraction with provider '{p_name}' ({getattr(p_client, 'model_name', 'unknown')})...", file=sys.stderr, flush=True)
                     with measure(timings, "llm_wall"):
-                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout)
+                        v4_dishes, v4_errors = _vision_with_retry(p_client, images, llm_timeout, attempts=vision_attempts, provider=p_name, budget_gate=budget_gate)
                     if not v4_dishes:
-                        raise ExtractionError("Vision extraction produced 0 dishes.")
+                        failure = "Vision extraction produced 0 dishes."
+                        print(f"Provider '{p_name}' failed: {failure} Trying next provider in cascade...", file=sys.stderr, flush=True)
+                        fallback_warnings.append(f"Provider '{p_name}' failed: {failure}")
+                        continue
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        v4_errors.append("Private vision response capture was truncated.")
                     v4_report = build_v4_result(report.source, images, v4_dishes, started_dt, errors=image_errors + v4_errors)
                     v4_report.warnings.extend(fallback_warnings)
                     v4_report.extraction_model = getattr(p_client, "model_name", None)
@@ -206,11 +220,29 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     completed = True
                     v4_success = True
                     return report
-                except TimeoutError as deadline_err:
+                except TimeoutError:
                     # The budget is spent: no further provider or OCR request may start.
-                    print(f"Provider '{p_name}' exceeded the deadline; stopping without fallback.", file=sys.stderr, flush=True)
+                    print(f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline; stopping without fallback.", file=sys.stderr, flush=True)
+                    report.configuration["input_mode"] = input_mode
                     report.warnings.extend(fallback_warnings)
-                    report.errors.append(f"Provider '{p_name}': {deadline_err} No fallback request was started.")
+                    report.errors.append(f"Provider '{p_name}' exceeded the {llm_timeout:g}s deadline. No fallback request was started.")
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        report.errors.append("Private vision response capture was truncated.")
+                    report.status = "failed"
+                    report.finished_at = datetime.now(timezone.utc)
+                    with measure(timings, "extraction_write"):
+                        save_json(report.model_dump(mode="json"), directory / "extraction.json")
+                    completed = True
+                    return report
+                except VisionCaptureLimitError:
+                    raise
+                except ProviderBudgetError as budget_err:
+                    print(f"Provider call budget blocked further requests: {budget_err}", file=sys.stderr, flush=True)
+                    report.configuration["input_mode"] = input_mode
+                    report.warnings.extend(fallback_warnings)
+                    report.errors.append(str(budget_err))
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        report.errors.append("Private vision response capture was truncated.")
                     report.status = "failed"
                     report.finished_at = datetime.now(timezone.utc)
                     with measure(timings, "extraction_write"):
@@ -218,19 +250,37 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                     completed = True
                     return report
                 except Exception as prov_err:
-                    print(f"Provider '{p_name}' failed ({prov_err}); trying next provider in cascade...", file=sys.stderr, flush=True)
-                    fallback_warnings.append(f"Provider '{p_name}' failed: {prov_err}")
+                    failure = request_failure(prov_err)
+                    print(f"Provider '{p_name}' failed: {failure} Trying next provider in cascade...", file=sys.stderr, flush=True)
+                    fallback_warnings.append(f"Provider '{p_name}' failed: {failure}")
 
             if not v4_success:
-                print("All vision providers failed; cleanly falling back to OCR mode...", file=sys.stderr, flush=True)
+                print("All vision providers failed; preparing OCR fallback...", file=sys.stderr, flush=True)
+                # Instantiate a fresh client so its async transport is not bound to a closed loop.
+                try:
+                    llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
+                    if llm is None:
+                        raise ExtractionError("OCR fallback client unavailable.")
+                except Exception:
+                    report.configuration["input_mode"] = "vision_v4"
+                    report.warnings.extend(fallback_warnings)
+                    report.errors.append("OCR fallback could not be initialized; no OCR request was started.")
+                    if any(attempt["truncated"] for attempt in vision_attempts):
+                        report.errors.append("Private vision response capture was truncated.")
+                    report.status = "failed"
+                    report.finished_at = datetime.now(timezone.utc)
+                    with measure(timings, "extraction_write"):
+                        save_json(report.model_dump(mode="json"), directory / "extraction.json")
+                    completed = True
+                    return report
                 input_mode = "ocr_image"
-                # Instantiate a fresh client for the OCR graph so its async transport is not bound to a closed loop
-                llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         if llm is None:
             llm = configured_llm(timeout=max(120, int(llm_timeout)), provider=provider)
         print("Preparing image-only source (no OCR or native text)..." if input_mode=="image" else "Acquiring page text (reusing cached OCR where available)...", file=sys.stderr, flush=True)
         with measure(timings, "acquisition"):
-            report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table)
+            report = image_source(source) if input_mode=="image" else saved_page_text(source, pages_json, recovery=True) if target_pages is not None else saved_page_text(source, pages_json) if pages_json is not None else extract_source(source, ocr_api_key=ocr_api_key, cache_dir=cache_dir, is_table=is_table, budget_gate=budget_gate)
+        if prepared_images:
+            report.errors.extend(prepared_image_errors)
         report.warnings.extend(fallback_warnings)
         if target_pages is not None:
             by_number={segment.page_number:segment for segment in report.segments}
@@ -272,7 +322,7 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         output={"suggestions":[],"batches":[],"raw_sections":[]}
         if report.source and (any(page.get("text", "").strip() for page in pages) or input_mode!="ocr" and pages) and sum(len(segment.text) for segment in report.segments) <= 100_000:
             with measure(timings, "llm_wall"):
-                output=run_menu_graph(llm, pages, request_timeout=llm_timeout, batch_pages=batch_pages, concurrency=llm_concurrency, cache_dir=llm_cache_dir, source_sha256=report.source.sha256,input_mode=input_mode)
+                output=run_menu_graph(llm, pages, request_timeout=llm_timeout, batch_pages=batch_pages, concurrency=llm_concurrency, cache_dir=llm_cache_dir, source_sha256=report.source.sha256,input_mode=input_mode, budget_gate=budget_gate, budget_provider=provider or "llm")
             report.errors.extend(output["errors"])
             report.warnings.extend(output["warnings"])
             report.configuration["llm_batches"]=output["batches"]
@@ -301,6 +351,8 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
                         continue
                     report.drafts.append(draft)
                     report.evidence.append(evidence)
+        if any(attempt["truncated"] for attempt in vision_attempts):
+            report.errors.append("Private vision response capture was truncated.")
         validate_box_evidence(report)
         if input_mode=="image":
             report.warnings.append("Image-only suggestions are private and unvalidated; no OCR-grounded candidates or text spans were created.")
@@ -324,8 +376,22 @@ def run_pipeline(source, run_dir, *, llm=None, ocr_api_key=None, cache_dir="work
         completed=True
         return report
     finally:
+        ingredient_review = {"status": "not_run"}
+        if completed and report is not None:
+            try:
+                handoff = build_review_handoff(report)
+            except (ExtractionError, ValueError):
+                ingredient_review = {"status": "unavailable", "reason": "unsupported_input"}
+                print("Ingredient review unavailable for this input; extraction retained.", file=sys.stderr, flush=True)
+            else:
+                save_json(handoff.model_dump(mode="json"), directory / "ingredient-review.json")
+                ingredient_review = {"status": "written", "file": "ingredient-review.json"}
+        if vision_requested and report is not None and report.source is not None:
+            save_json({"schema_version": 1, "source_id": report.source.source_id,
+                       "attempts": vision_attempts}, directory / "vision-attempts.json")
         timings["total"]=round(time.perf_counter()-started, 6)
         summary={"schema_version":1, "status":report.status if completed else "failed", "input_mode":input_mode, "acquisition_mode":"images_without_ocr" if input_mode=="image" else "saved_pages" if pages_json is not None else "source", "timings_seconds":timings, "pages":[], "batches":[]}
+        summary["ingredient_review"] = ingredient_review
         if report is not None:
             summary["batches"]=report.configuration.get("llm_batches", [])
             summary["pages"]=[{"page_number":segment.page_number, "method":segment.method, "status":segment.status, "reused":pages_json is not None, "cache_hit":segment.metadata.get("cache_hit") if pages_json is None else None, "timings_seconds":segment.metadata.get("timings_seconds") if pages_json is None else None} for segment in report.segments]
@@ -340,6 +406,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
+    parser.add_argument("--ingredient-icons", action="store_true", help="Write private text-fallback icon proposals after extraction; no generation or approval.")
+    parser.add_argument("--generate-ingredient-icons", action="store_true", help="Generate missing ingredient illustrations with Gemini after extraction; requires GEMINI_API_KEY.")
+    parser.add_argument("--icon-catalogue", type=Path, default=Path("work/ingredient-icons"))
+    parser.add_argument("--max-icon-requests", type=int, default=0, help="Maximum new image requests for this run, 0 to 20.")
+    parser.add_argument("--icon-rights-confirmed", action="store_true")
     parser.add_argument("--input-mode",choices=INPUT_MODES,default="ocr_image",help="Model input: ocr text, ocr_image (default), image (no OCR; private suggestions only), or vision_v4 (vision-model transcription with approximate boxes; falls back to ocr_image).")
     parser.add_argument("--pages-json", type=Path, help="Reuse a saved page report matching --input; no OCR calls.")
     parser.add_argument("--target-pages",type=int,nargs="+",help="Explicitly recover only 1 to 4 saved ready pages; no merging with old drafts or automatic retry.")
@@ -351,15 +422,44 @@ def main(argv=None):
     parser.add_argument("--no-ocr-cache", action="store_true", help="Skip OCR cache reads and writes for fresh OCR requests.")
     parser.add_argument("--no-ocr-table", action="store_true", help="Disable OCR.space table recognition (isTable); enabled by default.")
     parser.add_argument("--provider", choices=list(sorted(PROVIDER_REGISTRY.keys())), default=None, help="Explicit model provider (e.g. google_studio, qwen, glm, openrouter, openai, nara).")
+    parser.add_argument("--require-budget-gate", action="store_true", help="Fail closed unless PEEK_BUDGET_URL and PEEK_BUDGET_TOKEN are configured.")
     args = parser.parse_args(argv)
     load_dotenv(override=False, interpolate=False)
+    if args.generate_ingredient_icons:
+        from .ingredient_icon_generation import GeminiImageProvider
+        try:
+            icon_provider = GeminiImageProvider(os.environ.get("GEMINI_API_KEY"))
+            if not args.icon_rights_confirmed or not 0 <= args.max_icon_requests <= 20:
+                raise ValueError("Confirm image rights and request budget")
+        except ValueError:
+            parser.exit(1, "Configure GEMINI_API_KEY, --icon-rights-confirmed and --max-icon-requests (0..20) before extraction.\n")
     recovery={} if args.target_pages is None and args.max_model_requests is None else {
         "target_pages":args.target_pages,"max_model_requests":args.max_model_requests}
     try:
-        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table,provider=args.provider,**recovery)
+        report = run_pipeline(args.input, args.run_dir, ocr_api_key=os.environ.get("OCR_SPACE_API_KEY"), cache_dir=None if args.no_ocr_cache else "work/ocr-cache", pages_json=args.pages_json, llm_timeout=args.llm_timeout, batch_pages=args.batch_pages, llm_concurrency=args.llm_concurrency, llm_cache_dir=None if args.no_llm_cache else "work/llm-cache",input_mode=args.input_mode,is_table=not args.no_ocr_table,provider=args.provider,require_budget_gate=args.require_budget_gate,**recovery)
     except (ExtractionError, OSError) as error:
         parser.exit(1, f"Pipeline failed: {error if isinstance(error, ExtractionError) else 'Unable to write run files.'}\n")
     print(f"Saved {len(report.drafts)} drafts ({report.status}) to {args.run_dir / 'extraction.json'}.")
+    if args.ingredient_icons or args.generate_ingredient_icons:
+        from .ingredient_icons import export_icons
+        try:
+            export_icons(args.run_dir / "extraction.json", args.run_dir / "ingredient-icons.json")
+        except (ValueError, OSError, ExtractionError):
+            parser.exit(1, "Ingredient icons unavailable; original extraction retained.\n")
+    if args.generate_ingredient_icons:
+        from .ingredient_icons import IconStore
+        from .ingredient_icon_generation import generate_missing, export_preview
+        try:
+            store = IconStore(args.icon_catalogue)
+            generation = generate_missing(report, store=store, provider=icon_provider,
+                                          max_requests=args.max_icon_requests,
+                                          rights_confirmed=args.icon_rights_confirmed)
+            export_preview(store, generation, args.run_dir / "ingredient-artwork")
+        except (ValueError, OSError, ExtractionError):
+            parser.exit(1, "Ingredient artwork unavailable; original extraction retained.\n")
+        if any(job["state"] in {"failed", "budget_exhausted"} for job in generation["jobs"]):
+            print("Some illustrations are unavailable; inspect ingredient-artwork/generation-results.json.")
+            return 2
     if args.input_mode=="image":
         print("Image-only results are private unvalidated suggestions in review-suggestions.json; no OCR-grounded candidates were created.")
     for error in report.errors: print(error)

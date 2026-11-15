@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from fixture_factory import make_pdf
+from peekaplate_processing.model_providers import create_cascading_clients, create_model_client
 from peekaplate_processing.run_pipeline import configured_llm, run_pipeline
 from peekaplate_processing.workflow import DishBatch, ExtractedDish
 from peekaplate_processing.errors import ExtractionError
@@ -49,6 +50,26 @@ class FakeLLM:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_valid_long_ingredient_preserves_extraction_when_sidecar_is_out_of_bounds(self):
+        phrase = 'x' * 257
+        class LongIngredient(FakeLLM):
+            def invoke(self, messages):
+                answer = super().invoke(messages)
+                answer['parsed'].dishes[0].ingredients = [phrase]
+                answer['raw'].content = answer['parsed'].model_dump_json()
+                return answer
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'menu.pdf'
+            # Fit the complete phrase inside the page, rather than testing clipped text.
+            path.write_bytes(make_pdf([{'text': 'Dish 1 8.50 CAD Ingredients: ' + phrase}]).replace(b'/F1 12 Tf', b'/F1  2 Tf'))
+            folder = Path(directory) / 'run'
+            report = run_pipeline(path, folder, llm=LongIngredient(), input_mode='ocr')
+            self.assertEqual(report.status, 'complete', report.errors)
+            self.assertEqual(report.drafts[0].ingredients, [phrase])
+            self.assertEqual(json.loads((folder/'extraction.json').read_text())['status'], 'complete')
+            self.assertFalse((folder/'ingredient-review.json').exists())
+            self.assertEqual(json.loads((folder/'timings.json').read_text())['ingredient_review']['status'], 'unavailable')
+
     def run_case(self, directory, count, llm):
         path = Path(directory)/"menu.pdf"
         path.write_bytes(make_pdf([{"text":f"Menu prices\nDish {i} 8.50 CAD"} for i in range(1, count+1)]))
@@ -63,6 +84,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(len(report.drafts), 35)
             self.assertTrue((Path(directory)/"run/pages.json").exists())
             self.assertFalse((Path(directory)/"run/review.json").exists())
+            from peekaplate_processing.ingredient_intelligence import IngredientReviewHandoff
+            handoff = IngredientReviewHandoff.model_validate_json((Path(directory)/"run/ingredient-review.json").read_text())
+            self.assertEqual(len(handoff.assessments), 35)
+            self.assertTrue(all(a.status == "unknown" and not a.publishable for a in handoff.assessments))
+            self.assertEqual([a.draft_id for a in handoff.assessments], [e.draft_id for e in report.evidence])
             for index, evidence in enumerate(report.evidence):
                 span = evidence.spans[0]; segment = report.segments[index]
                 self.assertEqual(segment.segment_id, span.segment_id)
@@ -76,6 +102,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(report.drafts), 11)
         self.assertTrue(any("Batch 2" in e for e in report.errors))
         self.assertNotIn("secret", str(report.errors))
+
+    def test_provider_extraction_error_is_sanitized(self):
+        class Broken(FakeLLM):
+            async def ainvoke(self, messages):
+                raise ExtractionError("synthetic-provider-secret")
+        with tempfile.TemporaryDirectory() as directory:
+            report = self.run_case(directory, 1, Broken())
+            saved = (Path(directory)/"run/extraction.json").read_text()
+        self.assertEqual(report.status, "failed")
+        for output in (str(report.errors), saved):
+            self.assertNotIn("synthetic-provider-secret", output)
+            self.assertIn("ExtractionError", output)
 
     def test_existing_output_directory_refuses_before_any_llm_call(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -126,6 +164,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(str(model.openai_api_base), "https://openrouter.ai/api/v1")
         self.assertEqual(model.max_retries, 0)
         self.assertEqual(model.extra_body["reasoning"], {"enabled": False})
+
+    def test_cascade_keeps_openrouter_key_separate_from_generic_endpoint_and_model(self):
+        settings = {
+            "OPENROUTER_API_KEY": "synthetic-openrouter-key",
+            "MENU_AI_API_KEY": "synthetic-generic-key",
+            "MENU_AI_API_URL": "https://generic.example.test/v1/chat/completions",
+            "MENU_AI_MODEL": "generic-model",
+        }
+        with patch.dict(os.environ, settings, clear=True):
+            clients = create_cascading_clients()
+            generic = configured_llm()
+            explicit = create_model_client("openrouter")
+        self.assertEqual([name for name, _ in clients], ["qwen", "glm", "openrouter"])
+        self.assertEqual(
+            [client.model_name for _, client in clients],
+            ["qwen/qwen3.8-flash", "z-ai/glm-5.3-flash", "google/gemini-3-flash-preview"],
+        )
+        for _, client in clients:
+            self.assertEqual(str(client.openai_api_base), "https://openrouter.ai/api/v1")
+            self.assertEqual(client.openai_api_key.get_secret_value(), "synthetic-openrouter-key")
+        self.assertEqual(str(generic.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(generic.openai_api_key.get_secret_value(), "synthetic-generic-key")
+        self.assertEqual(generic.model_name, "generic-model")
+        self.assertEqual(str(explicit.openai_api_base), "https://generic.example.test/v1")
+        self.assertEqual(explicit.model_name, "generic-model")
 
     def test_nara_settings_take_precedence_without_openrouter_parameters(self):
         settings = {"MENU_AI_API_KEY":"old-synthetic", "MENU_AI_API_URL":"https://openrouter.ai/api/v1/chat/completions", "MENU_AI_MODEL":"old-model", "NARA_ROUTER_KEY":"synthetic", "NARA_ROUTER_URL":"https://router.bynara.id/v1", "NARA_ROUTER_MODEL":"minimax-m3.1-flash:free"}

@@ -197,6 +197,8 @@ export function connectPostHogFromEnv(
 // reaches the canonical path or the screens.
 function captureToPostHog(envelope: Envelope) {
   try {
+    // A screen's consent listener can emit before the adapter's listener runs.
+    postHog?.setConsent(isTrackingAllowed() && !liveSuspended);
     postHog?.capturePostHog(envelope.type, envelope.payload, { eventId: envelope.event_id });
   } catch {}
 }

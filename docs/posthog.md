@@ -52,7 +52,9 @@ The October setup emitted `app_shell_viewed` with `surface=diner` or `surface=co
 
 The legacy `captureDishIntent(input)` adapter validates the strict v1 `DishIntentEventSchema` and preserves `dish_open` and `portion_compare`. It is not the current diner's v2 path. New diner controls call the shared `track()` boundary after the actual approved display/interaction; do not add a second direct analytics call. Console callers cannot submit diner events.
 
-The [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record) proposes broader v2 events. Menu/card exposures, ingredients, saves, comparison replacement, viewer lifecycle and owner report actions remain unwired until their controls, strict schemas and triggers are reviewed. Historical portion events cannot be renamed into generic comparison events. No two names for one action.
+The diner menu/detail and Save/Saved screens call the shared tracking boundary. DIN-01 records a readable menu once per publication, qualifying card exposures (at least 50% visible for one continuous second), and completed detail openings. It uses the shared opening clock, including final checkpoints and window-scroll activity. In live mode, consent starts a fresh opening and clock; disallowed time and exposure references are discarded. A replacement publication records its own readable menu and cannot reuse an older exposure link. Fixture mode logs locally and sends nothing.
+
+These trigger checks use real Chromium with synthetic menu responses and destination sinks; they do not establish hosted PostHog/Queue acceptance. Remaining ingredient, comparison and viewer controls need their own agreed triggers and integration evidence from the [implementation plan](implementation_plan.md#5-proposed-event-contract-exactly-what-to-record). Historical portion events cannot be renamed into generic comparison events. No two names for one action.
 
 ## Legacy adapter privacy and failure behavior
 
@@ -135,3 +137,8 @@ Once real dish callers exist, exploratory counts of `dish_open` and `portion_com
 A production owner dashboard still requires server-verified venue access, validated evidence, agreed metric denominators and minimum-ten-eligible-session suppression from [ADR 0006](adr/0006-orders-and-measurement.md). No owner report/query endpoint or dashboard is claimed here. Ingredient rates, saves, order linkage, revenue and causal lift cannot be calculated from this slice.
 
 References: [PostHog capture API](https://posthog.com/docs/api/capture), [anonymous events](https://posthog.com/docs/data/anonymous-vs-identified-events), [IP storage controls](https://posthog.com/docs/privacy/data-storage).
+
+
+## Consent-listener ordering
+
+The shared dispatch synchronizes the adapter from the current consent gate immediately before capture. A screen may emit its initial menu view from an earlier-registered consent listener; that event must reach both destinations. The real-adapter unit regression checks initial consent and re-consent with matching event IDs, and the SDK browser test uses the same screen-before-adapter order. Privacy signals, fixture mode and publication suspension keep their existing gates. Hosted destination persistence remains a separate acceptance check.

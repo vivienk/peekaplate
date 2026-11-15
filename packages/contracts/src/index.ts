@@ -1,6 +1,8 @@
 import { PublicPortionSchema } from './portion';
 
+export * from './owner-actions';
 export * from './owner-ai';
+export * from './owner-workspace';
 export {
   type PlateCalibration,
   PlateCalibrationSchema,
@@ -9,6 +11,15 @@ export {
 } from './portion';
 
 import { z } from 'zod';
+import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
+
+export {
+  type ComparisonReport,
+  ComparisonReportSchema,
+  ComparisonStatus,
+  type ComparisonStatus as ComparisonStatusValue,
+} from './comparison-report';
+export * from './owner-menu';
 
 export {
   type ReviewCandidate,
@@ -90,6 +101,7 @@ export const CreateDishRevisionSchema = z.strictObject({
   expectedVersion: z.number().int().nonnegative().max(2_147_483_646),
   name: postgresText.trim().min(1).max(160),
   description: postgresText.trim().max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export const DishRevisionSchema = z.strictObject({
@@ -98,6 +110,7 @@ export const DishRevisionSchema = z.strictObject({
   version: z.number().int().positive().max(2_147_483_647),
   name: postgresText.min(1).max(160),
   description: postgresText.max(4000),
+  facts: ApprovedDishFactsSchema.optional(),
 });
 
 export type CreateDishRevision = z.infer<typeof CreateDishRevisionSchema>;
@@ -136,6 +149,16 @@ export const PublishMenuSchema = z.strictObject({
 export const WithdrawMenuSchema = z.strictObject({
   commandId: uuid,
   expectedVersion: commandVersion,
+});
+
+export const RestaurantSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/)
+  .refine(
+    (slug) => !['diner', 'owner', 'venues', 'assets', 'api', 'auth', 'constructor'].includes(slug),
+  );
+export const DinerLinkSchema = z.strictObject({
+  path: z.string().regex(/^\/diner\/[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/),
 });
 
 export const MenuPublicationSchema = z.strictObject({
@@ -187,18 +210,6 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
   ...publicMenuDishIdentity,
   complete: z.literal(false),
 });
-
-export const PublicMenuAllergenCodeSchema = z.enum([
-  'milk',
-  'egg',
-  'fish',
-  'crustacean shellfish',
-  'nuts',
-  'peanut',
-  'wheat',
-  'soy',
-  'sesame',
-]);
 
 export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
 
@@ -366,6 +377,34 @@ export type PublicMenuDish = z.infer<typeof PublicMenuDishSchema>;
 export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
 export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
 export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
+
+export const PreparedMenuSchema = z.strictObject({
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+  contentHash: hash,
+  assetManifestHash: hash,
+  bundleUrl: z.url(),
+  reviewVersion: commandVersion,
+  publicationVersion: commandVersion,
+  publishedRevisionId: uuid.nullable(),
+});
+export const PreparedMenusSchema = z.strictObject({ menus: z.array(PreparedMenuSchema).max(100) });
+export const PreparedMenuPreviewSchema = z
+  .strictObject({
+    menu: PreparedMenuSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .refine(
+    ({ menu, content }) =>
+      menu.venueId === content.venue_id &&
+      menu.menuId === content.menu_id &&
+      menu.menuRevisionId === content.menu_revision_id,
+  );
+export type PreparedMenu = z.infer<typeof PreparedMenuSchema>;
+export type PreparedMenuPreview = z.infer<typeof PreparedMenuPreviewSchema>;
 
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
@@ -1426,6 +1465,10 @@ export type SubmitMenuIngestionRequest = z.infer<typeof SubmitMenuIngestionReque
 export const ApproveDishDraftRequestSchema = z.strictObject({
   commandId: uuid,
   expectedVersion: z.number().int().nonnegative().default(0),
+  expectedDraftVersion: z.number().int().positive().optional(),
+  expectedReviewVersion: z.number().int().nonnegative().optional(),
+  extractionId: postgresText.trim().min(1).max(128).optional(),
+  confirmed: z.literal(true).optional(),
 });
 export type ApproveDishDraftRequest = z.infer<typeof ApproveDishDraftRequestSchema>;
 
@@ -1436,3 +1479,63 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
   queuedAt: z.string().datetime(),
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
+
+export * from './ingredient-artwork';
+export {
+  type IngredientAssessment,
+  IngredientAssessmentSchema,
+  IngredientReviewHandoffSchema,
+  ingredientAssessmentForReview,
+} from './ingredient-intelligence.js';
+export {
+  type AcceptPilotOrderAgreementRequest,
+  AcceptPilotOrderAgreementRequestSchema,
+  type AcceptPilotOrderAgreementResponse,
+  AcceptPilotOrderAgreementResponseSchema,
+  ALL_ALLOWED_CSV_HEADERS,
+  BASE_REQUIRED_CSV_HEADERS,
+  CANONICAL_REVISION_HEADERS,
+  type ClassifyTimestampOptions,
+  type CsvParseResult,
+  classifyOrderTimestampWindow,
+  computeOrderLineChecksum,
+  DEFAULT_HISTORICAL_IMPORT_WINDOW_DAYS,
+  DEFAULT_RAW_CSV_RETENTION_DAYS,
+  type DeleteOrderDataRequest,
+  DeleteOrderDataRequestSchema,
+  type DeleteOrderDataResponse,
+  DeleteOrderDataResponseSchema,
+  ISO_EXPLICIT_TIMEZONE_PATTERN,
+  MAX_ORDER_OUTCOME_FILE_BYTES,
+  MAX_ORDER_OUTCOME_ROWS,
+  NINETY_DAYS_MICROS,
+  OPTIONAL_CSV_HEADERS,
+  OPTIONAL_PRICING_HEADERS,
+  type OrderDataDeletionReason,
+  OrderDataDeletionReasonSchema,
+  type OrderDataDeletionStatus,
+  OrderDataDeletionStatusSchema,
+  type OrderOutcomeImportResponse,
+  OrderOutcomeImportResponseSchema,
+  type OrderOutcomeLine,
+  OrderOutcomeLineSchema,
+  type OrderOutcomeQuarantineReason,
+  OrderOutcomeQuarantineReasonSchema,
+  type OrderOutcomeType,
+  OrderOutcomeTypeSchema,
+  OrderTokenIdentifierSchema,
+  type ParsedCsvRow,
+  PILOT_ORDER_AGREEMENT_VERSION,
+  PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
+  POS_ITEM_HEADERS,
+  parseOrderOutcomeCsv,
+  REQUIRED_CSV_HEADERS,
+  type SanitizedRowDiagnostic,
+  SanitizedRowDiagnosticSchema,
+  type SubmitOrderDeletionResponse,
+  SubmitOrderDeletionResponseSchema,
+  type VerifyOrderDeletionRequest,
+  VerifyOrderDeletionRequestSchema,
+  type VerifyOrderDeletionResponse,
+  VerifyOrderDeletionResponseSchema,
+} from './order-outcome';

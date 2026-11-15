@@ -263,9 +263,15 @@ def create_cascading_clients(*, timeout: int | float = DEFAULT_TIMEOUT) -> list[
     cascade_order = ("google_studio", "qwen", "glm", "openrouter")
     available: list[tuple[str, ChatOpenAI]] = []
     seen: set[tuple[str, str]] = set()
+    # MENU_AI_* belongs to the generic client. In the automatic cascade, pairing
+    # its endpoint with OPENROUTER_API_KEY could send that key to another provider,
+    # and its model override would collapse the distinct OpenRouter candidates.
+    cascade_env = dict(os.environ)
+    cascade_env.pop("MENU_AI_API_URL", None)
+    cascade_env.pop("MENU_AI_MODEL", None)
     for prov_name in cascade_order:
         try:
-            client = create_model_client(provider_name=prov_name, timeout=timeout)
+            client = create_model_client(provider_name=prov_name, timeout=timeout, env=cascade_env)
         except ExtractionError:
             continue
         identity = (str(client.openai_api_base), client.model_name)

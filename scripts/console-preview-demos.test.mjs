@@ -6,8 +6,23 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-// The synthetic console foundations demo is built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS),
-// never for staging or production. Agreed with Sai and Jeffin.
+// The synthetic console demos are built only for PR previews (PEEKAPLATE_PREVIEW_DEMOS), never for
+// staging or production. Agreed with Sai and Jeffin.
+const DEMOS = [
+  {
+    page: 'first-dashboard.html',
+    asset: /firstDashboard/,
+    label: /Synthetic demo/,
+  },
+  { page: 'foundations.html', asset: /foundations/, label: /Synthetic demo/ },
+  { page: 'owner-dashboard.html', asset: /ownerDashboard/, label: /Sample restaurant/ },
+  // S4-FE-04: the owner sign-in demo answers with a synthetic service, so it never reaches staging.
+  { page: 'owner-sign-in.html', asset: /ownerSignIn/, label: /Synthetic demo/ },
+  // FE-05/FE-06: the owner onboarding demo answers saves itself, so it never reaches staging.
+  { page: 'owner-onboarding.html', asset: /ownerOnboarding/, label: /Synthetic demo/ },
+];
+// Normal builds carry the provider-backed sign-in pages instead; preview builds do not.
+const LIVE_AUTH = ['owner-auth.html', 'auth-confirm.html', 'auth-reset.html'];
 const consoleDir = fileURLToPath(new URL('../frontend/console/', import.meta.url));
 const vite = join(consoleDir, 'node_modules/vite/bin/vite.js');
 
@@ -41,21 +56,29 @@ async function pageScripts(dir, page) {
 test('a normal console build contains no demo page', async (t) => {
   const dir = await build(t, false);
   const files = await readdir(dir);
+  const assets = await readdir(join(dir, 'assets'));
   assert.ok(files.includes('index.html'));
-  assert.ok(!files.includes('foundations.html'));
-  for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /foundations/);
+  for (const page of LIVE_AUTH) assert.ok(files.includes(page), page);
+  for (const demo of DEMOS) {
+    assert.ok(!files.includes(demo.page), demo.page);
+    for (const asset of assets) assert.doesNotMatch(asset, demo.asset);
+  }
 });
 
-test('a preview build adds the demo page, labelled synthetic, noindex and without analytics', async (t) => {
+test('a preview build adds the demo pages, labelled synthetic, noindex and without analytics', async (t) => {
   const dir = await build(t, true);
   const files = await readdir(dir);
   assert.ok(files.includes('index.html'));
-  assert.ok(files.includes('foundations.html'));
-  const html = await readFile(join(dir, 'foundations.html'), 'utf8');
-  assert.match(html, /<meta name="robots" content="noindex"/);
-  const scripts = (await pageScripts(dir, 'foundations.html')).join('\n');
-  assert.match(scripts, /Synthetic demo/);
-  assert.doesNotMatch(scripts, /posthog/i);
+  for (const page of LIVE_AUTH) assert.ok(!files.includes(page), page);
+  for (const demo of DEMOS) {
+    assert.ok(files.includes(demo.page), demo.page);
+    const html = await readFile(join(dir, demo.page), 'utf8');
+    assert.match(html, /<meta name="robots" content="noindex"/);
+    const scripts = (await pageScripts(dir, demo.page)).join('\n');
+    assert.match(scripts, demo.label);
+    if (demo.page === 'first-dashboard.html') assert.match(scripts, /Illustrative sample data/);
+    assert.doesNotMatch(scripts, /posthog/i);
+  }
 });
 
 test('only the preview workflow turns the demo flag on', async () => {
@@ -66,5 +89,18 @@ test('only the preview workflow turns the demo flag on', async () => {
   assert.equal(preview.match(/PEEKAPLATE_PREVIEW_DEMOS/g)?.length, 1);
   for (const other of ['deploy-staging.yml', 'ci.yml']) {
     assert.doesNotMatch(await read(other), /PEEKAPLATE_PREVIEW_DEMOS/);
+  }
+});
+
+// The FE-06.1 owner menu integration harness calls the real staging API with a pasted token. It is
+// for the local dev server only (the API allows that origin), so no build ever contains it.
+test('no console build contains the owner menu integration harness', async (t) => {
+  for (const previewDemos of [false, true]) {
+    const dir = await build(t, previewDemos);
+    const files = await readdir(dir);
+    assert.ok(!files.includes('owner-menu-harness.html'));
+    for (const asset of await readdir(join(dir, 'assets'))) assert.doesNotMatch(asset, /harness/);
+    const scripts = (await pageScripts(dir, 'index.html')).join('\n');
+    assert.doesNotMatch(scripts, /Integration harness/);
   }
 });

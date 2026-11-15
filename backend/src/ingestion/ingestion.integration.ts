@@ -1,8 +1,10 @@
 import type { StructuredDishDraft } from '@peekaplate/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { approveDishDraftAtomic, createApp } from '../index';
+import { approveDishDraftAtomic, createApp, submitAuthorizedMenuIngestion } from '../index';
+import { changeMenuJob } from './intake';
 import { processIngestionQueueBatch, type QueueMessage, submitMenuIngestion } from './orchestrator';
+import { menuPdfFixture } from './pdf-fixture';
 import {
   approveDishDraft,
   claimIngestionJob,
@@ -54,6 +56,196 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
   afterAll(async () => {
     await runtimeClient?.end().catch(() => {});
     await adminClient?.end().catch(() => {});
+  });
+
+  it('runs the read-only verifier against real job/draft rows and identity-first authorization', async () => {
+    const { verifyIngestionE2E } = await import(
+      new URL('../../../scripts/verify-ingestion-e2e.mjs', import.meta.url).href
+    );
+    const viewer = crypto.randomUUID();
+    await adminClient.query(
+      "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'viewer')",
+      [venueId, viewer],
+    );
+    const jobId = crypto.randomUUID();
+    const sourceHash = 'a'.repeat(64);
+    await createIngestionJob(runtimeClient, {
+      id: jobId,
+      tenantId: venueId,
+      sourceType: 'pdf',
+      sourceHash,
+      idempotencyKey: `verifier-${jobId}`,
+    });
+    const claim = await claimIngestionJob(runtimeClient, {
+      tenantId: venueId,
+      jobId,
+      workerId: 'verifier-test',
+    });
+    expect(claim).not.toBeNull();
+    await persistExtractedDrafts(runtimeClient, {
+      tenantId: venueId,
+      jobId,
+      claimToken: claim!.claimToken,
+      resultStorageKey: `reports/${venueId}/${jobId}/attempts/${claim!.claimToken}/extraction.json`,
+      drafts: [
+        {
+          draft_id: 'synthetic-verifier-soup',
+          draft_index: 0,
+          name: 'Synthetic verifier soup',
+          description: null,
+          category: null,
+          price_amount: null,
+          price_currency: null,
+          ingredients: null,
+          image_id: null,
+          source_id: 'synthetic-verifier-source',
+          source_text: 'Synthetic verifier soup',
+          code_point_spans: [],
+          utf16_spans: [],
+          review_warnings: [],
+          status: 'needs_review',
+        },
+      ],
+    });
+    const app = createApp({
+      verify: async (authorization) => (authorization === 'Bearer viewer-test' ? viewer : actorId),
+      execute: vi.fn(),
+    });
+    const request = (url: string, init: RequestInit) => {
+      const parsed = new URL(url);
+      return app.request(parsed.pathname + parsed.search, init, {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: runtimeUrl!,
+      });
+    };
+    const options = {
+      jobId,
+      venueId,
+      token: 'owner-test',
+      viewerToken: 'viewer-test',
+      crossTenantVenueId: otherVenueId,
+      requirePr161: true,
+      request,
+      progress: () => {},
+    };
+    const result = await verifyIngestionE2E(options);
+    expect(result.checks.filter((check: { passed: boolean }) => !check.passed)).toEqual([]);
+    expect(result.passed).toBe(true);
+    expect(result.providerCallsConsumed).toBeNull();
+    await adminClient.query(
+      "UPDATE app_private.menu_ingestion_jobs SET status='failed' WHERE id=$1",
+      [jobId],
+    );
+    expect((await verifyIngestionE2E(options)).passed).toBe(false);
+  });
+
+  it('uploads authorized source bytes through HTTP before queue dispatch', async () => {
+    const stored = new Map<string, unknown>();
+    const send = vi.fn(async () => {
+      expect(stored.size).toBe(1);
+    });
+    const app = createApp({ verify: async () => actorId, execute: vi.fn() });
+    const response = await app.request(
+      `https://test/venues/${venueId}/menus/uploads`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer synthetic',
+          'Content-Type': 'application/pdf',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
+        body: menuPdfFixture(1) as BodyInit,
+      },
+      {
+        APP_ENV: 'local',
+        LOCAL_DATABASE_URL: runtimeUrl!,
+        INGESTION_REPORTS_BUCKET: {
+          put: async (key, bytes) => {
+            stored.set(key, bytes);
+          },
+        },
+        INGESTION_QUEUE: { send },
+      },
+    );
+    expect(response.status).toBe(202);
+    const { job } = (await response.json()) as {
+      job: { id: string; source_storage_key: string; tenant_id: string };
+    };
+    expect(job.tenant_id).toBe(venueId);
+    expect(stored.has(`menu-ingestion/sources/${venueId}/${job.id}/source`)).toBe(true);
+    expect(send).toHaveBeenCalledOnce();
+    expect(
+      (
+        await adminClient.query('SELECT id FROM app_private.menu_ingestion_jobs WHERE id = $1', [
+          job.id,
+        ])
+      ).rows,
+    ).toHaveLength(1);
+  });
+
+  it('holds the membership lock through job creation and rejects a later revoked actor', async () => {
+    const raceActor = crypto.randomUUID();
+    await adminClient.query(
+      'INSERT INTO app_private.staff_membership (tenant_id, actor_id, permission) VALUES ($1,$2,$3)',
+      [venueId, raceActor, 'owner'],
+    );
+    const writer = new Client({ connectionString: runtimeUrl });
+    await writer.connect();
+    const original = writer.query.bind(writer);
+    let release!: () => void;
+    let locked!: () => void;
+    const held = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const querySpy = vi.spyOn(writer, 'query').mockImplementation((async (...args: unknown[]) => {
+      const result = await (original as (...args: unknown[]) => Promise<unknown>)(...args);
+      if (String(args[0]).includes('FOR SHARE')) {
+        locked();
+        await gate;
+      }
+      return result;
+    }) as typeof writer.query);
+    const request = {
+      venueId,
+      sourceType: 'pdf' as const,
+      sourceHash: 'a'.repeat(64),
+      idempotencyKey: crypto.randomUUID(),
+    };
+    const creation = submitAuthorizedMenuIngestion(writer, raceActor, venueId, request);
+    try {
+      await held;
+      await adminClient.query('BEGIN');
+      await adminClient.query("SET LOCAL lock_timeout = '100ms'");
+      await expect(
+        adminClient.query(
+          'DELETE FROM app_private.staff_membership WHERE tenant_id = $1 AND actor_id = $2',
+          [venueId, raceActor],
+        ),
+      ).rejects.toMatchObject({ code: '55P03' });
+      await adminClient.query('ROLLBACK');
+      release();
+      await creation;
+      querySpy.mockRestore();
+      await adminClient.query(
+        'DELETE FROM app_private.staff_membership WHERE tenant_id = $1 AND actor_id = $2',
+        [venueId, raceActor],
+      );
+      await expect(
+        submitAuthorizedMenuIngestion(writer, raceActor, venueId, {
+          ...request,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      ).rejects.toMatchObject({ code: 'forbidden' });
+    } finally {
+      release();
+      await creation.catch(() => {});
+      querySpy.mockRestore();
+      await adminClient.query('ROLLBACK');
+      await writer.end();
+    }
   });
 
   it('claims job and issues a unique fencing claim_token and incremented lease_generation', async () => {
@@ -242,6 +434,10 @@ describe.skipIf(!isDbAvailable)('Menu Ingestion Database Integration', () => {
       [jobId],
     );
 
+    expect(
+      await claimIngestionJob(adminClient, { tenantId: venueId, jobId, workerId: 'duplicate' }),
+    ).toBeNull();
+    await changeMenuJob(runtimeClient, actorId, venueId, jobId, crypto.randomUUID(), 'retry');
     const claimRetry = (await claimIngestionJob(adminClient, {
       tenantId: venueId,
       jobId,

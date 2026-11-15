@@ -132,6 +132,22 @@ test('closing a portion preview preserves the Saved return label and destination
   await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
 });
 
+test('closing a portion preview preserves the Compare return label and destination', async ({
+  page,
+}) => {
+  await openMenu(page);
+  await page.getByRole('button', { name: 'Open Charred Leeks', exact: true }).click();
+  await page.locator('.pp-detail__compare').click();
+  await page.getByRole('button', { name: 'Compare with Roast Chicken', exact: true }).click();
+  await page.locator('.pp-picker__confirm').click();
+  await page.getByRole('button', { name: 'View details of Charred Leeks', exact: true }).click();
+  await page.getByRole('button', { name: 'View Portion', exact: true }).click();
+  await expect(page.locator('.pp-portion__css')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Back to dish details', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to compare', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Compare', exact: true })).toBeVisible();
+});
+
 test('menu → dish-specific 2.5D → detail → another dish, with focus and browser navigation', async ({
   page,
 }) => {

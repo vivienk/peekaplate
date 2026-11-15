@@ -1,5 +1,9 @@
 # Menu extraction
 
+For QA-02 source-based reference preparation, development/holdout separation and
+the offline freeze/verify commands, see the [reference handoff](eval/qa02/README.md).
+Its integrity checks are separate from menu accuracy and independent acceptance.
+
 The optional staging HTTP service wraps this same pipeline; it does not replace
 the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
 for the request contract, Docker commands, secrets, limits and activation gates.
@@ -145,6 +149,13 @@ Provider selection: `--provider` (or `MENU_AI_PROVIDER`) picks a registry entry:
 `qwen`, `glm`, `deepseek` and `openrouter` (`OPENROUTER_API_KEY`; OpenRouter models
 `qwen/qwen3.8-flash`, `z-ai/glm-5.3-flash`, `deepseek/deepseek-v4.1-flash`),
 `nara` and `openai`. MiniMax/A2Agent is not supported.
+
+The automatic vision cascade uses the Google settings above and the
+OpenRouter key with its default endpoint and distinct default models. It does
+not apply `MENU_AI_API_URL` or `MENU_AI_MODEL` to those candidates, so a generic
+endpoint cannot receive the OpenRouter key. Explicitly selected OpenRouter
+providers retain the existing `MENU_AI_*` overrides; only configure an endpoint
+trusted with the selected provider's key.
 
 Without an explicit provider, the graph uses `NARA_ROUTER_KEY`, `NARA_ROUTER_URL` and `NARA_ROUTER_MODEL`
 when any Nara setting is present; all three must then be supplied. Use
@@ -300,6 +311,21 @@ The inherited schema remains a Python draft contract; final TypeScript/backend
 integration and the ClickUp ground-truth evaluation are still separate work.
 Menu imagery is text evidence, not approved photographs of plated dishes.
 
+### Merchandise and minimum prices
+
+Text-grounded and vision extraction reject explicit wrapping-cloth product
+titles (`Furoshiki`, `Furoshiki Wrapping`, `Furoshiki Wrapping Cloth`, and
+`Wrapping Cloth`, ignoring case and whitespace). Rejections remain visible in
+the report and make the result incomplete when food drafts remain. This narrow
+check is not a general merchandise classifier; food wraps and mentions of
+cloth in descriptions are not excluded.
+
+A printed plus-qualified price such as `$25.00+` remains in `price_text`, with
+`price_amount` null and a minimum/qualified-price review warning. The text path
+also checks the dish's own source entry when a model omits the plus; it does not
+borrow another dish's price or resolve an ambiguous association. Vision output
+remains unverified transcription and cannot recover a qualifier omitted by the
+model. Review exports preserve the printed price and `needs_review` status.
 ## T0 asset preparation and delivery
 
 `peekaplate_processing.assets` prepares one captured dish photo into approved
@@ -533,3 +559,24 @@ Pass `--serving-width-mm` to photo ingestion or preparation, or `serving_width_m
 The approved portion contract can carry optional `physical_size` with owner width and foreground fraction. Tracked table AR uses metres and fixes the measured scale; the plain camera overlay cannot establish table distance and explicitly remains approximate. Dimensions and segmentation must be checked against the real dish; physical-phone accuracy has not been accepted. The future owner menu-upload UI must provide these dimensions through its authorized backend; this PR only adds the ingestion/service/preview contract.
 
 View Portion and Compare retain their original detail row. The camera portal uses the full viewport, the existing preview back arrow, and collapsed adjustment controls. A mobile View Portion tap requests landscape/fullscreen where supported; unsupported browsers show a rotate-phone hint. Closing releases only this viewer's orientation/fullscreen request.
+
+
+## Ingredient intelligence (AI-02)
+
+Runs attempt a separate review-only `ingredient-review.json` sidecar without new model calls.
+Inputs outside its bounds retain the original extraction and record explicit sidecar
+unavailability in `timings.json`. Vision transcriptions never become independent
+ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
+the offline CLI, limits and remaining authenticated owner-review integration.
+
+## Strict menu field scoring (QA-02 / VIS-04)
+
+Reuse the [source-reference workflow](eval/qa02/README.md) and the
+[versioned source/page proposal](../docs/qa02-real-menu-source-plan-v1.md).
+The [strict scorer guide](eval/qa02/STRICT_SCORER.md) defines the offline CLI,
+hash-bound original outputs and human occurrence associations, complete emitted
+price-text/scalar/currency comparisons, duplicates, null/zero and failed-page counts.
+It is not the historical fuzzy scorer. It does not infer structured option arrays,
+ingredient/geometry truth, reviewer identity, quality approval or publication.
+Fresh evaluated predictions require the independently reviewed reference/scoring
+freeze, Vivien's threshold sign-off and explicit bounded execution authorization.

@@ -313,6 +313,20 @@ class InputModeTests(unittest.TestCase):
 
 
 class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
+    def test_direct_vision_early_return_writes_review_only_unknown_sidecar(self):
+        from peekaplate_processing.vision_extraction import V4Dish
+        with tempfile.TemporaryDirectory() as folder, \
+             patch('peekaplate_processing.run_pipeline.create_cascading_clients', return_value=[('synthetic', object())]), \
+             patch('peekaplate_processing.run_pipeline._vision_with_retry', return_value=([V4Dish(page_number=1, name='Soup', box=[10,10,100,100])], [])):
+            path=Path(folder)/'menu.pdf'
+            path.write_bytes(make_pdf([{'text':'Soup 8.50 Seasonal vegetables and herbs'}]))
+            report=run_pipeline(path,Path(folder)/'run',input_mode='vision_v4')
+            sidecar=json.loads((Path(folder)/'run/ingredient-review.json').read_text(encoding='utf-8'))
+            self.assertEqual(report.status,'complete',report.errors)
+            self.assertEqual(len(sidecar['assessments']),1)
+            self.assertEqual(sidecar['assessments'][0]['status'],'unknown')
+            self.assertFalse(sidecar['publishable'])
+
     def _image(self, folder):
         path=Path(folder)/"menu.png"
         photo(path,(200,120))
@@ -360,6 +374,45 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertEqual(report.segments[0].metadata["vision_boxes"],{})
         self.assertTrue(any("inverted" in warning for warning in report.warnings))
 
+    def test_vision_boxes_survive_candidate_export_with_candidate_identity(self):
+        from datetime import datetime, timezone
+        from peekaplate_processing.review_candidates import ReviewCandidateResult, export_review_candidates
+        from peekaplate_processing.schemas import SourceRecord
+        from peekaplate_processing.storage import save_json
+        from peekaplate_processing.vision_extraction import V4Dish, build_v4_result
+
+        now=datetime(2025,1,1,tzinfo=timezone.utc)
+        data=b"synthetic image"; digest=hashlib.sha256(data).hexdigest()
+        source=SourceRecord(source_id=f"sha256:{digest}",sha256=digest,kind="image",location="menu.png",
+                            retrieved_at=now,size_bytes=len(data),snapshot_base64=base64.b64encode(data).decode())
+        pages=[{"page_number":1,"image_reference":{"width":200,"height":100}},
+               {"page_number":2,"image_reference":{"width":300,"height":200}}]
+        dishes=[V4Dish.model_validate({"page_number":1,"name":"Soup","price_text":"8.50",
+                                      "price_amount":"8.50","box":[100,200,300,600],
+                                      "price_box":[400,700,500,900]}),
+                V4Dish.model_validate({"page_number":2,"name":"Salad","box":[50,100,250,400]})]
+        report=build_v4_result(source,pages,dishes,now)
+        ids=[e.draft_id for e in report.evidence]
+        expected=[{ids[0]:[
+            {"page_number":1,"type":"title","text":"Soup","box":{"left":40,"top":10,"width":80,"height":20}},
+            {"page_number":1,"type":"price","text":"8.50","box":{"left":140,"top":40,"width":40,"height":10}},
+        ]},{ids[1]:[
+            {"page_number":2,"type":"title","text":"Salad","box":{"left":30,"top":10,"width":90,"height":40}},
+        ]}]
+        self.assertEqual(len(set(ids)),2)
+        self.assertEqual([s.metadata["vision_boxes"] for s in report.segments],expected)
+        with tempfile.TemporaryDirectory() as folder:
+            extraction=Path(folder)/"extraction.json"
+            output=Path(folder)/"review.json"
+            save_json(report.model_dump(mode="json"),extraction)
+            exported=export_review_candidates(extraction,output)
+            saved=json.loads(output.read_text())
+            reloaded=ReviewCandidateResult.model_validate_json(output.read_text())
+        self.assertEqual([c.candidate_id for c in exported.candidates],ids)
+        self.assertEqual([s["metadata"]["vision_boxes"] for s in saved["segments"]],expected)
+        self.assertEqual([s.metadata["vision_boxes"] for s in reloaded.segments],expected)
+        self.assertTrue(all("candidate_box_evidence" not in s.metadata for s in reloaded.segments))
+
 
     def test_multi_page_vision_extraction_reuses_client_without_event_loop_closed(self):
         from peekaplate_processing.vision_extraction import extract_vision_v4
@@ -375,13 +428,58 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertEqual([d.page_number for d in dishes], [1, 2])
         self.assertEqual(errors, [])
 
+    def test_private_attempts_capture_raw_before_parse_and_failures_without_secrets(self):
+        from peekaplate_processing.vision_extraction import extract_vision_v4
+        class Client:
+            def __init__(self, values): self.values=iter(values)
+            def bind(self, **kwargs): return self
+            async def ainvoke(self, messages):
+                value=next(self.values)
+                if isinstance(value, Exception): raise value
+                return SimpleNamespace(content=value)
+        attempts=[]
+        raw='{"dishes":[{"name":"Soup","box":[1,2,3,4]},{"name":"Soup","box":[1,2,3,4]}]}'
+        dishes, _=extract_vision_v4(Client([raw]), [{"page_number":2,"image_url":"data:,"}], attempts=attempts, provider="first")
+        self.assertEqual(len(dishes),2)
+        self.assertEqual(attempts[0]["response"],raw)
+        with self.assertRaises(ValueError):
+            extract_vision_v4(Client(['not-json']), [{"page_number":3,"image_url":"data:,"}], attempts=attempts, provider="second")
+        with self.assertRaises(RuntimeError):
+            extract_vision_v4(Client([RuntimeError("private-secret")]), [{"page_number":4,"image_url":"data:,"}], attempts=attempts, provider="second")
+        self.assertEqual([r["attempt"] for r in attempts],[1,2,3])
+        self.assertEqual([r["page_number"] for r in attempts],[2,3,4])
+        self.assertEqual(attempts[1]["response"],"not-json")
+        self.assertEqual(attempts[1]["failure_class"],"parse_error")
+        self.assertEqual(attempts[2]["failure_class"],"provider_error")
+        self.assertNotIn("private-secret",json.dumps(attempts))
+        blocks=[{"type":"text","text":"synthetic structured response"}]
+        dishes, errors=extract_vision_v4(Client([blocks]), [{"page_number":1,"image_url":"data:,"}], attempts=attempts)
+        self.assertEqual(dishes,[])
+        self.assertTrue(errors)
+        self.assertEqual(attempts[-1]["failure_class"],"invalid_response")
+        self.assertEqual(json.loads(attempts[-1]["response"]),blocks)
+
+    def test_vision_capture_bounds_preserve_utf8_prefix_with_explicit_diagnostic(self):
+        from peekaplate_processing.vision_extraction import extract_vision_v4
+        raw='{"dishes":[]}' + "é" * 600_000
+        class Client:
+            def bind(self, **kwargs): return self
+            async def ainvoke(self, messages): return SimpleNamespace(content=raw)
+        attempts=[]
+        with self.assertRaises(ValueError):
+            extract_vision_v4(Client(), [{"page_number":1,"image_url":"data:,"}], attempts=attempts)
+        self.assertTrue(attempts[0]["truncated"])
+        self.assertGreaterEqual(len(attempts[0]["response"].encode("utf-8")),999_999)
+        self.assertLessEqual(len(attempts[0]["response"].encode("utf-8")),1_000_000)
+        self.assertEqual(attempts[0]["failure_class"],"parse_error")
+
     def _dish(self):
         from peekaplate_processing.vision_extraction import V4Dish
         return V4Dish.model_validate({"page_number":1,"name":"Soup","price_text":"8.50","price_amount":"8.50","box":[10,10,20,40]})
 
     def _run(self, *, cascade, generic):
         used=[]
-        def fake_extract(client, images, timeout=None):
+        def fake_extract(client, images, timeout=None, **kwargs):
             used.append(client)
             return [self._dish()], []
         with tempfile.TemporaryDirectory() as folder, \
@@ -405,6 +503,160 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
         self.assertEqual(used,[named])
         self.assertEqual(report.extraction_model,"models/gemini")
 
+    def test_provider_failure_is_sanitized_in_logs_and_saved_report(self):
+        from contextlib import redirect_stderr
+        first=SimpleNamespace(model_name="first")
+        second=SimpleNamespace(model_name="second")
+        used=[]
+        def extract(client, images, timeout=None, **kwargs):
+            used.append(client)
+            if client is first:
+                raise RuntimeError("synthetic-provider-secret")
+            return [self._dish()], []
+        log=io.StringIO()
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=[("first",first),("second",second)]), \
+             patch("peekaplate_processing.run_pipeline.extract_vision_v4", side_effect=extract), \
+             patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")), \
+             redirect_stderr(log):
+            report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_cache_dir=None)
+            saved=(Path(folder)/"run/extraction.json").read_text()
+        self.assertEqual(used,[first,second])
+        self.assertEqual(report.extraction_model,"second")
+        for output in (str(report.warnings), saved, log.getvalue()):
+            self.assertNotIn("synthetic-provider-secret",output)
+            self.assertIn("first",output)
+            self.assertIn("RuntimeError",output)
+
+    def test_zero_dishes_reports_reason_and_tries_next_provider(self):
+        first=SimpleNamespace(model_name="first")
+        second=SimpleNamespace(model_name="second")
+        def extract(client, images, timeout=None, **kwargs):
+            return ([], []) if client is first else ([self._dish()], [])
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=[("first",first),("second",second)]), \
+             patch("peekaplate_processing.run_pipeline.extract_vision_v4", side_effect=extract) as invoke, \
+             patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")):
+            report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_cache_dir=None)
+            saved=(Path(folder)/"run/extraction.json").read_text()
+        self.assertEqual(invoke.call_count,2)
+        self.assertEqual(report.extraction_model,"second")
+        self.assertTrue(any("first" in warning and "0 dishes" in warning for warning in report.warnings))
+        self.assertIn("0 dishes",saved)
+
+    def test_vision_parse_failure_is_retained_when_ocr_fallback_succeeds(self):
+        from contextlib import redirect_stderr
+        raw="synthetic malformed private vision response"
+        class Vision:
+            model_name="synthetic"
+            def bind(self, **kwargs): return self
+            async def ainvoke(self, messages): return SimpleNamespace(content=raw)
+        log=io.StringIO()
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/"menu.pdf"
+            source.write_bytes(make_pdf([{"text":"Soup 8.50\nSeasonal vegetables and herbs"}]))
+            with patch("peekaplate_processing.run_pipeline.create_cascading_clients",
+                       return_value=[("first",Vision())]), \
+                 patch("peekaplate_processing.run_pipeline.configured_llm", return_value=RecordingLLM()), \
+                 redirect_stderr(log):
+                report=run_pipeline(source,root/"run",input_mode="vision_v4",llm_cache_dir=None)
+            attempts=json.loads((root/"run/vision-attempts.json").read_text())
+            private=json.loads((root/"run/review-suggestions.json").read_text())
+            public=(root/"run/extraction.json").read_text()
+        self.assertEqual(report.configuration["input_mode"],"ocr_image")
+        self.assertEqual(attempts["source_id"],report.source.source_id)
+        self.assertEqual(attempts["attempts"][0]["response"],raw)
+        self.assertEqual(attempts["attempts"][0]["failure_class"],"parse_error")
+        self.assertEqual(attempts["attempts"][0]["page_number"],1)
+        self.assertEqual(private["input_mode"],"ocr_image")
+        self.assertNotIn(raw,public)
+        self.assertNotIn(raw,log.getvalue())
+
+    def test_failed_ocr_client_setup_retains_failed_vision_report_and_attempts(self):
+        from contextlib import redirect_stderr
+        raw="synthetic malformed vision response"
+        class Vision:
+            model_name="synthetic"
+            def bind(self, **kwargs): return self
+            async def ainvoke(self, messages): return SimpleNamespace(content=raw)
+        log=io.StringIO()
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/"menu.pdf"
+            source.write_bytes(make_pdf([{"text":"Soup 8.50\nSeasonal vegetables and herbs"}]))
+            with patch("peekaplate_processing.run_pipeline.create_cascading_clients",
+                       return_value=[("first",Vision())]), \
+                 patch("peekaplate_processing.run_pipeline.configured_llm",
+                       side_effect=ExtractionError("synthetic credential secret")), \
+                 patch("peekaplate_processing.run_pipeline.extract_source",
+                       side_effect=AssertionError("OCR must not start")) as ocr, \
+                 redirect_stderr(log):
+                report=run_pipeline(source,root/"run",input_mode="vision_v4",llm_cache_dir=None)
+            saved=(root/"run/extraction.json").read_text()
+            attempts=json.loads((root/"run/vision-attempts.json").read_text())
+            timings=json.loads((root/"run/timings.json").read_text())
+            self.assertFalse((root/"run/review-suggestions.json").exists())
+        ocr.assert_not_called()
+        self.assertEqual(report.status,"failed")
+        self.assertEqual(report.configuration["input_mode"],"vision_v4")
+        self.assertEqual(timings["status"],"failed")
+        self.assertEqual(timings["input_mode"],"vision_v4")
+        self.assertEqual(attempts["source_id"],report.source.source_id)
+        self.assertEqual(attempts["attempts"][0]["response"],raw)
+        self.assertEqual(attempts["attempts"][0]["failure_class"],"parse_error")
+        self.assertIn("OCR fallback could not be initialized",str(report.errors))
+        for output in (saved,str(report.errors),str(report.warnings),log.getvalue()):
+            self.assertNotIn("synthetic credential secret",output)
+            self.assertNotIn(raw,output)
+
+    def test_partial_page_image_failure_survives_vision_fallback(self):
+        from peekaplate_processing.vision import page_images
+        failure="Page 2: source image could not be prepared within the rendering limits."
+        def partial_images(source, directory):
+            images, errors=page_images(source,directory,page_numbers=[1])
+            return images, [*errors,failure]
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/"menu.pdf"
+            source.write_bytes(make_pdf([{"text":"Soup 8.50\nSeasonal vegetables and herbs"},
+                                         {"text":"Salad 9.50\nFresh vegetables and herbs"}]))
+            ocr_llm=RecordingLLM()
+            with patch("peekaplate_processing.run_pipeline.page_images", side_effect=partial_images) as prepare, \
+                 patch("peekaplate_processing.run_pipeline.create_cascading_clients",
+                       return_value=[("first",SimpleNamespace(model_name="first"))]), \
+                 patch("peekaplate_processing.run_pipeline.extract_vision_v4", return_value=([],[])), \
+                 patch("peekaplate_processing.run_pipeline.configured_llm", return_value=ocr_llm):
+                report=run_pipeline(source,root/"run",input_mode="vision_v4",llm_cache_dir=None)
+            saved=json.loads((root/"run/extraction.json").read_text())
+            private=json.loads((root/"run/review-suggestions.json").read_text())
+            self.assertEqual(prepare.call_count,1)
+            self.assertEqual(len(ocr_llm.messages),1)
+            self.assertEqual(len(report.drafts),1)
+            self.assertEqual(report.status,"incomplete")
+            self.assertEqual(report.errors.count(failure),1)
+            self.assertEqual(saved["status"],"incomplete")
+            self.assertEqual(saved["errors"].count(failure),1)
+            self.assertEqual(private["errors"].count(failure),1)
+
+    def test_provider_timeout_is_sanitized_and_starts_no_fallback(self):
+        from contextlib import redirect_stderr
+        first=SimpleNamespace(model_name="first")
+        second=SimpleNamespace(model_name="second")
+        log=io.StringIO()
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=[("first",first),("second",second)]), \
+             patch("peekaplate_processing.run_pipeline.extract_vision_v4", side_effect=TimeoutError("synthetic-timeout-secret")) as extract, \
+             patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")), \
+             redirect_stderr(log):
+            report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_cache_dir=None)
+            saved=(Path(folder)/"run/extraction.json").read_text()
+        self.assertEqual(extract.call_count,1)
+        self.assertEqual(report.status,"failed")
+        self.assertIn("No fallback request was started",report.errors[-1])
+        self.assertIn("90s",report.errors[-1])
+        self.assertIn("90s",saved)
+        for output in (str(report.errors), saved, log.getvalue()):
+            self.assertNotIn("synthetic-timeout-secret",output)
+            self.assertIn("first",output)
+
     def test_deadline_cancels_request_and_starts_no_fallback(self):
         import asyncio
         cancelled=[]
@@ -421,9 +673,14 @@ class VisionV4ProviderAndDeadlineTests(unittest.TestCase):
              patch("peekaplate_processing.run_pipeline.create_cascading_clients", return_value=[("slow",Blocking()),("second",second)]), \
              patch("peekaplate_processing.run_pipeline.extract_source", side_effect=AssertionError("OCR must not run")):
             report=run_pipeline(self._image(folder), Path(folder)/"run", input_mode="vision_v4", llm_timeout=0.05, llm_cache_dir=None)
+            attempts=json.loads((Path(folder)/"run/vision-attempts.json").read_text())
         self.assertEqual(cancelled,[True])
         self.assertEqual(report.status,"failed")
         self.assertIn("No fallback request was started", report.errors[-1])
+        self.assertIn("0.05s",report.errors[-1])
+        self.assertEqual(attempts["attempts"][0]["failure_class"],"timeout")
+        self.assertEqual(attempts["attempts"][0]["page_number"],1)
+        self.assertIsNone(attempts["attempts"][0]["response"])
 
 
 if __name__ == "__main__": unittest.main()

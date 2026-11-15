@@ -12,18 +12,24 @@ import {
   toCanonicalObservation,
 } from '@peekaplate/contracts';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { createStaffVerifier } from './auth';
+import { CommandError } from './dish-command';
 import app, {
   CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   consumeJtiRateLimit,
   createApp,
   createWorker,
   handleQueueBatch,
+  handleScheduled,
+  OrderImportError,
   queue,
   SYNTHETIC_REPORT_VENUE_ALLOWLIST,
+  scheduled,
 } from './index';
 import { ingestObservations } from './observation-ingest';
+import { OwnerInsightActionError } from './owner-insight-actions';
 import { ReviewCommandError } from './review-command';
 
 const fixtureV2 = JSON.parse(
@@ -107,6 +113,98 @@ describe('worker queue consumer wiring', () => {
     expect(processBatchCalled).toBe(true);
     expect(cleanupCalled).toBe(true);
   });
+
+  it('exports scheduled cron handler on default app and as named export', () => {
+    expect(typeof scheduled).toBe('function');
+    expect(typeof (app as any).scheduled).toBe('function');
+    expect((app as any).scheduled).toBe(scheduled);
+  });
+
+  it('safely completes scheduled invocation when bucket or database binding is missing', async () => {
+    // Missing storage
+    await expect(handleScheduled({}, {})).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_IMPORT_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_IMPORT_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
+
+    // Missing DB connection string with ORDER_OUTCOME_ARCHIVE_BUCKET
+    await expect(
+      handleScheduled({}, { ORDER_OUTCOME_ARCHIVE_BUCKET: { list: vi.fn(), delete: vi.fn() } }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('invokes durable orphan cleanup retries during scheduled execution', async () => {
+    const venueId = '00000000-0000-4000-8000-000000000801';
+    const batchId = '00000000-0000-4000-8000-000000000901';
+    const orphanKey = `order-imports/${venueId}/${batchId}/source.csv`;
+    let orphanStatus = 'pending';
+
+    const connectSpy = vi.spyOn(Client.prototype, 'connect').mockResolvedValue(undefined);
+    const endSpy = vi.spyOn(Client.prototype, 'end').mockResolvedValue(undefined);
+    const querySpy = vi.spyOn(Client.prototype, 'query').mockImplementation((async (
+      sql: string,
+      params?: unknown[],
+    ) => {
+      const s = typeof sql === 'string' ? sql : '';
+      if (s.includes('list_pending_orphan_cleanup_tenants')) {
+        return { rows: [{ tenant_id: venueId }], rowCount: 1 };
+      }
+      if (s.includes('FROM app_private.order_import_orphan_cleanups')) {
+        return {
+          rows:
+            orphanStatus === 'pending'
+              ? [
+                  {
+                    id: '00000000-0000-4000-8000-000000000777',
+                    batch_id: batchId,
+                    storage_key: orphanKey,
+                    deletion_epoch: 0,
+                    retry_count: 1,
+                  },
+                ]
+              : [],
+          rowCount: orphanStatus === 'pending' ? 1 : 0,
+        };
+      }
+      if (s.includes('SELECT deletion_epoch')) {
+        return { rows: [{ deletion_epoch: 0 }], rowCount: 1 };
+      }
+      if (s.includes('UPDATE app_private.order_import_orphan_cleanups')) {
+        if (s.includes("SET status = 'cleaned'") && params?.[0] === venueId) {
+          orphanStatus = 'cleaned';
+        }
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }) as any);
+
+    const deleteMock = vi.fn().mockResolvedValue(undefined);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await handleScheduled(
+        {},
+        {
+          APP_ENV: 'local',
+          LOCAL_DATABASE_URL: 'postgres://localhost/test',
+          ORDER_OUTCOME_ARCHIVE_BUCKET: {
+            list: vi.fn().mockResolvedValue({ objects: [], truncated: false }),
+            delete: deleteMock,
+          },
+        },
+      );
+
+      expect(deleteMock).toHaveBeenCalledTimes(1);
+      expect(deleteMock).toHaveBeenCalledWith(orphanKey);
+      expect(orphanStatus).toBe('cleaned');
+    } finally {
+      connectSpy.mockRestore();
+      endSpy.mockRestore();
+      querySpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
 });
 
 describe('foundation API', () => {
@@ -134,7 +232,39 @@ describe('foundation API', () => {
   });
 });
 
-describe('owner report HTTP boundary', () => {
+describe.each(['', '/export'])('owner report HTTP boundary %s', (suffix) => {
+  const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+  const reportFixture = {
+    schema_version: 'owner_report.v1',
+    venue_id: venueId,
+    source: 'synthetic',
+    report_metadata: {
+      calculation_version: 'synthetic.v1',
+      generated_at: '2026-11-06T12:00:00.000Z',
+      date_window: {
+        duration_hours: 24,
+        start_time: '2026-11-05T12:00:00.000Z',
+        end_time: '2026-11-06T12:00:00.000Z',
+      },
+      coverage: { total_dishes_monitored: 0, measurable_dishes_count: 0 },
+      freshness: { is_stale: null, last_event_ingested_at: null },
+      report_status: 'EMPTY',
+    },
+    dishes: [],
+  };
+  const expectReport = async (response: Response) => {
+    expect(response.status).toBe(200);
+    if (suffix === '/export') {
+      expect(response.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get('Content-Disposition')).toBe(
+        `attachment; filename="owner-report-${venueId}-2026-11-06.csv"`,
+      );
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(await response.text()).toMatch(/^schema_version,venue_id,source,/);
+    } else {
+      expect(await response.json()).toEqual(reportFixture);
+    }
+  };
   it('fails closed without one explicit synthetic source using a signed staff JWT', async () => {
     const actorId = '00000000-0000-4000-8000-000000000003';
     const venueId = '00000000-0000-4000-8000-000000000001';
@@ -166,7 +296,7 @@ describe('owner report HTTP boundary', () => {
         .setExpirationTime('5 minutes')
         .sign(keys.privateKey);
       const syntheticVenueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
-      const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: syntheticVenueId, dishes: [] });
+      const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
       const app = createApp({
         verify: createStaffVerifier({ issuer, allowLocalIssuer: true }),
         execute: vi.fn(),
@@ -181,7 +311,7 @@ describe('owner report HTTP boundary', () => {
         ['?source=synthetic', {}],
       ]) {
         const response = await app.request(
-          `/api/v1/venues/${venueId}/analytics/dishes${query}`,
+          `/api/v1/venues/${venueId}/analytics/dishes${suffix}${query}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -193,15 +323,11 @@ describe('owner report HTTP boundary', () => {
       expect(readOwnerReport).not.toHaveBeenCalled();
 
       const syntheticResponse = await app.request(
-        `/api/v1/venues/${syntheticVenueId}/analytics/dishes?source=synthetic`,
+        `/api/v1/venues/${syntheticVenueId}/analytics/dishes${suffix}?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
         { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: syntheticVenueId },
       );
-      expect(syntheticResponse.status).toBe(200);
-      expect(await syntheticResponse.json()).toEqual({
-        venue_id: syntheticVenueId,
-        dishes: [],
-      });
+      await expectReport(syntheticResponse);
       expect(readOwnerReport).toHaveBeenCalledTimes(1);
       expect(readOwnerReport).toHaveBeenCalledWith(
         actorId,
@@ -212,7 +338,7 @@ describe('owner report HTTP boundary', () => {
       );
 
       const canonicalVenueResponse = await app.request(
-        `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+        `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
         { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId },
       );
@@ -231,7 +357,7 @@ describe('owner report HTTP boundary', () => {
     const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
     const now = new Date('2026-11-06T12:00:00.000Z');
     const verify = vi.fn().mockResolvedValue(actorId);
-    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
     const app = createApp({
       verify,
       execute: vi.fn(),
@@ -240,15 +366,14 @@ describe('owner report HTTP boundary', () => {
     });
 
     const response = await app.request(
-      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
       {
         headers: { Authorization: 'Bearer test-token' },
       },
       { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
+    await expectReport(response);
     expect(verify).toHaveBeenCalledWith('Bearer test-token', {
       APP_ENV: 'local',
       SYNTHETIC_REPORT_VENUE_ID: venueId,
@@ -274,7 +399,7 @@ describe('owner report HTTP boundary', () => {
     });
 
     const response = await app.request(
-      `/api/v1/venues/${requestedVenueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${requestedVenueId}/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Authorization: ['Bearer', 'test-token'].join(' ') } },
       { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: approvedSyntheticVenueId },
     );
@@ -288,10 +413,10 @@ describe('owner report HTTP boundary', () => {
     const actorId = '00000000-0000-4000-8000-000000000003';
     const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
     const verify = vi.fn().mockResolvedValue(actorId);
-    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
     const reportApp = createApp({ verify, execute: vi.fn(), readOwnerReport });
     const env = { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId };
-    const path = `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`;
+    const path = `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`;
     const preflight = (origin: string) =>
       reportApp.request(
         path,
@@ -330,7 +455,7 @@ describe('owner report HTTP boundary', () => {
       const report = await get(origin, 'Bearer test-token');
       expect(report.status).toBe(200);
       expect(report.headers.get('Access-Control-Allow-Origin')).toBe(origin);
-      expect(await report.json()).toEqual({ venue_id: venueId, dishes: [] });
+      await expectReport(report);
     }
     // A preflight never reaches authentication or the report reader.
     expect(verify).toHaveBeenCalledTimes(CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.length);
@@ -363,7 +488,7 @@ describe('owner report HTTP boundary', () => {
     const env = { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId };
 
     const noToken = await reportApp.request(
-      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Origin: origin } },
       env,
     );
@@ -371,20 +496,39 @@ describe('owner report HTTP boundary', () => {
     expect(noToken.headers.get('Access-Control-Allow-Origin')).toBe(origin);
 
     const otherVenue = await reportApp.request(
-      '/api/v1/venues/00000000-0000-4000-8000-000000000001/analytics/dishes?source=synthetic',
+      `/api/v1/venues/00000000-0000-4000-8000-000000000001/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
       env,
     );
     expect(otherVenue.status).toBe(503);
 
     const noSyntheticSource = await reportApp.request(
-      `/api/v1/venues/${venueId}/analytics/dishes`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}`,
       { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
       env,
     );
     expect(noSyntheticSource.status).toBe(503);
     expect(readOwnerReport).not.toHaveBeenCalled();
   });
+
+  it.each(['other-owner', 'revoked-owner'])(
+    'preserves the current membership denial for %s',
+    async (actor) => {
+      const readOwnerReport = vi.fn().mockRejectedValue(new CommandError('forbidden', 403));
+      const reportApp = createApp({
+        verify: vi.fn().mockResolvedValue(actor),
+        execute: vi.fn(),
+        readOwnerReport,
+      });
+      const response = await reportApp.request(
+        `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
+        { headers: { Authorization: 'Bearer test-token' } },
+        { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId },
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: 'forbidden' });
+    },
+  );
 
   it('does not add the console origins to the diner routes', async () => {
     const consoleOrigin = 'https://peekaplate-console-staging.pages.dev';
@@ -1637,6 +1781,345 @@ describe('menu ingestion HTTP boundary', () => {
     expect(approveDraft).not.toHaveBeenCalled();
   });
 
+  describe('order outcome import route', () => {
+    const venueId = '00000000-0000-4000-8000-000000000001';
+    const actorId = '00000000-0000-4000-8000-000000000002';
+    const validCsv =
+      'schema_version,order_id,order_line_id,ordered_at,menu_revision_id,dish_id,dish_revision_id,outcome_type,quantity\npilot_order_outcome.v1,ORD-1,L-1,2026-11-01T12:00:00Z,00000000-0000-4000-8000-000000000010,00000000-0000-4000-8000-000000000020,00000000-0000-4000-8000-000000000030,ordered,1';
+
+    const mockSuccessResult = {
+      batchId: '00000000-0000-4000-8000-000000000099',
+      venueId,
+      status: 'completed',
+      totalRows: 1,
+      acceptedRows: 1,
+      duplicateRows: 0,
+      quarantinedRows: 0,
+      conflictRows: 0,
+      isDuplicateFile: false,
+      fileSha256: 'abc123hash',
+      diagnostics: [],
+      createdAt: '2026-11-07T12:00:00.000Z',
+      finishedAt: '2026-11-07T12:00:01.000Z',
+    };
+
+    it('rejects unauthenticated requests with 401', async () => {
+      const response = await app.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'unauthorized' });
+    });
+
+    it('fails closed before connecting when import archive storage is missing', async () => {
+      const connect = vi
+        .spyOn(Client.prototype, 'connect')
+        .mockRejectedValue(new Error('must not connect'));
+      try {
+        const testApp = createApp({ verify: async () => actorId, execute: vi.fn() });
+        const response = await testApp.request(
+          `/venues/${venueId}/orders/import`,
+          {
+            method: 'POST',
+            headers: { Authorization: 'Bearer synthetic-token', 'Content-Type': 'text/csv' },
+            body: validCsv,
+          },
+          { APP_ENV: 'local', LOCAL_DATABASE_URL: 'postgres://unused.test/synthetic' },
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({ error: 'service_unavailable' });
+        expect(connect).not.toHaveBeenCalled();
+      } finally {
+        connect.mockRestore();
+      }
+    });
+
+    it('rejects invalid venueId UUID with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request('/venues/invalid-uuid/orders/import', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'invalid_request' });
+    });
+
+    it('rejects unsupported Content-Type with 415', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(415);
+      expect(await response.json()).toEqual({ error: 'unsupported_media_type' });
+    });
+
+    it('successfully processes text/csv upload and sets security headers', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('X-Request-ID')).toMatch(/^[0-9a-f-]{36}$/);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'orders.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('successfully processes multipart/form-data upload', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi.fn().mockResolvedValue(mockSuccessResult);
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const formData = new FormData();
+      const fileBlob = new Blob([validCsv], { type: 'text/csv' });
+      formData.append('file', fileBlob, 'pos_export_2026.csv');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(mockSuccessResult);
+      expect(importOrderOutcomes).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        validCsv,
+        'pos_export_2026.csv',
+        expect.any(Object),
+      );
+    });
+
+    it('rejects multipart/form-data with missing file field with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const formData = new FormData();
+      formData.append('unrelated', 'hello');
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token' },
+        body: formData,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'missing_file' });
+    });
+
+    it('returns 403 when user is not owner', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError('forbidden', 403, 'Order outcome import requires owner permission'),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'forbidden',
+        message: 'Order outcome import requires owner permission',
+      });
+    });
+
+    it('returns 413 when import fails with payload_too_large', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError(
+            'payload_too_large',
+            413,
+            'File exceeds maximum allowed rows (1000)',
+          ),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({
+        error: 'payload_too_large',
+        message: 'File exceeds maximum allowed rows (1000)',
+      });
+    });
+
+    it('returns 403 agreement_not_accepted when pilot agreement has not been accepted', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const importOrderOutcomes = vi
+        .fn()
+        .mockRejectedValue(
+          new OrderImportError(
+            'agreement_not_accepted',
+            403,
+            'Pilot order-outcome agreement (v0.1) must be accepted for this venue before importing',
+          ),
+        );
+      const testApp = createApp({ verify, execute: vi.fn(), importOrderOutcomes });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'agreement_not_accepted',
+        message:
+          'Pilot order-outcome agreement (v0.1) must be accepted for this venue before importing',
+      });
+    });
+
+    it('accepts pilot order agreement via POST /venues/:venueId/orders/agreement-acceptance', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const acceptPilotOrderAgreement = vi.fn().mockResolvedValue({
+        venueId,
+        agreementVersion: 'v0.1',
+        acceptedBy: actorId,
+        acceptedAt: '2026-11-13T00:00:00.000Z',
+        alreadyAccepted: false,
+      });
+      const testApp = createApp({ verify, execute: vi.fn(), acceptPilotOrderAgreement });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/agreement-acceptance`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementVersion: 'v0.1', accepted: true }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(acceptPilotOrderAgreement).toHaveBeenCalledWith(actorId, venueId, 'v0.1', {});
+      expect(await response.json()).toMatchObject({
+        venueId,
+        agreementVersion: 'v0.1',
+        alreadyAccepted: false,
+      });
+    });
+
+    it('rejects invalid agreement acceptance payload with 400', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/agreement-acceptance`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agreementVersion: 'v0.1', accepted: false }),
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('submits owner order-data deletion request via POST /venues/:venueId/orders/deletion-requests', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const requestId = '33333333-3333-4000-8000-000000000001';
+      const submitOrderDataDeletionRequest = vi.fn().mockResolvedValue({
+        requestId,
+        venueId,
+        status: 'requested',
+        reason: 'pilot_withdrawal',
+        requestedAt: '2026-11-13T00:00:00.000Z',
+        alreadyExists: false,
+      });
+      const testApp = createApp({ verify, execute: vi.fn(), submitOrderDataDeletionRequest });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/deletion-requests`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reason: 'pilot_withdrawal' }),
+      });
+
+      expect(response.status).toBe(202);
+      expect(submitOrderDataDeletionRequest).toHaveBeenCalledWith(
+        actorId,
+        venueId,
+        requestId,
+        'pilot_withdrawal',
+        {},
+      );
+      expect(await response.json()).toMatchObject({
+        requestId,
+        venueId,
+        status: 'requested',
+        reason: 'pilot_withdrawal',
+        alreadyExists: false,
+      });
+
+      // Free-text reason outside the bounded enum is rejected
+      const invalidReasonResponse = await testApp.request(
+        `/venues/${venueId}/orders/deletion-requests`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, reason: 'custom free text' }),
+        },
+      );
+      expect(invalidReasonResponse.status).toBe(400);
+
+      // Caller-supplied operatorId cannot be injected via HTTP body
+      const spoofOperatorResponse = await testApp.request(
+        `/venues/${venueId}/orders/deletion-requests`,
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            reason: 'pilot_withdrawal',
+            operatorId: '00000000-0000-4000-8000-000000000099',
+          }),
+        },
+      );
+      expect(spoofOperatorResponse.status).toBe(400);
+    });
+
+    it('returns 503 when database connection is unavailable in default importFn', async () => {
+      const verify = vi.fn().mockResolvedValue(actorId);
+      const testApp = createApp({ verify, execute: vi.fn() });
+
+      const response = await testApp.request(`/venues/${venueId}/orders/import`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer valid_token', 'Content-Type': 'text/csv' },
+        body: validCsv,
+      });
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'service_unavailable' });
+    });
+  });
+
   describe('Cloudflare Queue Worker Handler', () => {
     it('retries all messages when database connection string is unavailable', async () => {
       const msg1 = { ack: vi.fn(), retry: vi.fn() };
@@ -2064,5 +2547,236 @@ describe('review candidate HTTP boundaries', () => {
         expect(await response.json()).toEqual({ error: code });
       }
     });
+  });
+});
+
+describe('owner insight action HTTP boundary', () => {
+  const venueId = '00000000-0000-4000-8000-000000000101';
+  const actorId = '00000000-0000-4000-8000-000000000102';
+  const actionId = '00000000-0000-4000-8000-000000000103';
+  const menuId = '00000000-0000-4000-8000-000000000104';
+  const menuRevisionId = '00000000-0000-4000-8000-000000000105';
+  const commandId = '00000000-0000-4000-8000-000000000106';
+  const basePath = `/venues/${venueId}/owner-insight-actions`;
+
+  const action = {
+    actionId,
+    venueId,
+    insightKey: 'dish.low_conversion',
+    menuId,
+    menuRevisionId,
+    category: 'description_update',
+    status: 'planned' as const,
+    note: null,
+    version: 1,
+    createdBy: actorId,
+    updatedBy: actorId,
+    createdAt: '2026-11-10T00:00:00.000Z',
+    updatedAt: '2026-11-10T00:00:00.000Z',
+  };
+
+  it('lists actions using the verified actor, route venue and validated query', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [action],
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      listOwnerActions,
+    }).request(`${basePath}?insightKey=dish.low_conversion&limit=10`, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ schemaVersion: 1, actions: [action] });
+    expect(listOwnerActions).toHaveBeenCalledWith(
+      actorId,
+      venueId,
+      {
+        insightKey: 'dish.low_conversion',
+        limit: 10,
+      },
+      {},
+    );
+  });
+
+  it('uses the default list limit and rejects invalid or unknown query parameters', async () => {
+    const listOwnerActions = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      actions: [],
+    });
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions,
+    });
+
+    const valid = await testApp.request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+    expect(valid.status).toBe(200);
+    expect(listOwnerActions).toHaveBeenCalledWith(actorId, venueId, { limit: 50 }, {});
+
+    for (const query of [
+      '?limit=101',
+      '?unknown=value',
+      '?menuRevisionId=invalid',
+      '?limit=10&limit=20',
+    ]) {
+      const response = await testApp.request(`${basePath}${query}`, {
+        headers: { Authorization: 'Bearer signed' },
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(listOwnerActions).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an action without accepting a browser-supplied venue', async () => {
+    const createOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action,
+    });
+    const verify = vi.fn().mockResolvedValue(actorId);
+    const request = {
+      commandId,
+      insightKey: 'dish.low_conversion',
+      menuId,
+      menuRevisionId,
+      category: 'description_update',
+      note: 'Check the current description',
+    };
+
+    const response = await createApp({
+      verify,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ schemaVersion: 1, action });
+    expect(createOwnerAction).toHaveBeenCalledWith(actorId, venueId, request, {});
+
+    const forged = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    }).request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...request, venueId }),
+    });
+
+    expect(forged.status).toBe(400);
+    expect(createOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates only the action in the route venue with a validated patch', async () => {
+    const updateOwnerAction = vi.fn().mockResolvedValue({
+      schemaVersion: 1,
+      action: { ...action, status: 'active', version: 2 },
+    });
+    const patch = {
+      commandId,
+      expectedVersion: 1,
+      status: 'active',
+    };
+
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/${actionId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateOwnerAction).toHaveBeenCalledWith(actorId, venueId, actionId, patch, {});
+
+    const invalidPath = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      updateOwnerAction,
+    }).request(`${basePath}/not-a-uuid`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    });
+
+    expect(invalidPath.status).toBe(400);
+    expect(updateOwnerAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unauthenticated, malformed JSON and wrong content types before service calls', async () => {
+    const createOwnerAction = vi.fn();
+    const testApp = createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      createOwnerAction,
+    });
+
+    const unauthenticated = await testApp.request(basePath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(unauthenticated.status).toBe(401);
+
+    const malformed = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'application/json',
+      },
+      body: '{',
+    });
+    expect(malformed.status).toBe(400);
+
+    const wrongType = await testApp.request(basePath, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer signed',
+        'Content-Type': 'text/plain',
+      },
+      body: '{}',
+    });
+    expect(wrongType.status).toBe(415);
+
+    expect(createOwnerAction).not.toHaveBeenCalled();
+  });
+
+  it('maps owner authorization errors to their intended HTTP status', async () => {
+    const response = await createApp({
+      verify: async () => actorId,
+      execute: vi.fn(),
+      listOwnerActions: async () => {
+        throw new OwnerInsightActionError('forbidden', 403);
+      },
+    }).request(basePath, {
+      headers: { Authorization: 'Bearer signed' },
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'forbidden' });
   });
 });

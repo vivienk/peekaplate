@@ -2,7 +2,10 @@ import { expect, type Page, test } from '@playwright/test';
 
 // S3-TRK-01.1 per-tab identity in a real browser: real sessionStorage, reloads and a second tab.
 // window.open copies sessionStorage into the new tab, the same way duplicating a tab does.
-const DINER = 'http://127.0.0.1:5173/';
+// The empty scenario renders no menu, so the screen emits no events of its own and these tests
+// control every sequence number.
+const ORIGIN = 'http://127.0.0.1:5173/';
+const DINER = `${ORIGIN}?scenario=empty`;
 
 type Ids = { sessionId: string; producerId: string; localSequence: number };
 
@@ -88,6 +91,6 @@ test('track() builds an envelope in a real page and sends nothing over the netwo
     payload: { entry_source: 'qr' },
   });
   // Only the dev server's own module files were fetched; no tracking request left the page.
-  expect(requests.filter((url) => !url.startsWith(DINER))).toEqual([]);
+  expect(requests.filter((url) => !url.startsWith(ORIGIN))).toEqual([]);
   expect(requests.filter((url) => /observations|posthog/i.test(url))).toEqual([]);
 });

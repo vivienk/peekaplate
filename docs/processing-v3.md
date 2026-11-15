@@ -29,13 +29,24 @@ transient 429 (daily quotas move on), a deadline timeout cancels the request and
 ends the run without fallback, and repeated entries of one printed title are merged
 into a single item with all price options.
 
-All modes save private `review-suggestions.json` beside `extraction.json` and final
-`timings.json`. It retains schema-validated raw dish fields, changed/rejected field
-values and reasons, original page references and model section suggestions. Hidden
-reasoning/provider messages are not stored. Cleared prices and rejected composed
-names remain unvalidated, separate from `candidates[].original`. Base-heading and
-printed-option inspection uses the retained original page; no variant relationship
-or new review field is invented.
+The OCR and image graph saves private `review-suggestions.json` beside
+`extraction.json` and final `timings.json`. It retains schema-validated raw dish
+fields, changed/rejected field values and reasons, original page references and
+model section suggestions. Cleared prices and rejected composed names remain
+unvalidated, separate from `candidates[].original`. Base-heading and printed-option
+inspection uses the retained original page; no variant relationship is invented.
+
+Local vision runs save private `vision-attempts.json`: each actual page request
+has its provider label, page, sequential attempt number and raw text response or
+non-secret failure class, captured before parsing or option merging. Non-string
+JSON content and text with non-UTF-8 code points are retained as JSON serialization
+with an `invalid_response` class, not as verbatim provider text; non-serializable
+content is recorded as a failure without its value. The vision sidecar remains alongside the OCR sidecar on
+fallback. Capture is bounded at 1 MB per response, 4 MB total UTF-8, and 6 MB
+serialized strings, with explicit truncation and an incomplete/failed report if
+exceeded. It may include provider-supplied reasoning; never put its content in
+public reports or logs. This local sidecar is not included in the hosted V1 bundle;
+see [private bundle retention](menu-ingestion-infrastructure.md#follow-up-private-review-artifact-retention-not-deployed).
 
 Vision references contain actual image hashes, dimensions and whole-page regions,
 not inferred dish rectangles. Their `path` is local-run-only; source hash and page
