@@ -68,6 +68,7 @@ import {
 } from './ingestion/repository';
 import { createHttpPythonExtractor } from './ingestion/transport';
 import { readMenuUpload, storeAndDispatchUpload } from './ingestion/upload';
+import { registerArtworkRoutes } from './ingredient-artwork-routes';
 import {
   createMenuTokenVerifier,
   type MenuAuthority,
@@ -114,6 +115,10 @@ export const SYNTHETIC_REPORT_VENUE_ALLOWLIST: readonly [string, ...string[]] = 
 ];
 
 export type Bindings = {
+  INGREDIENT_ARTWORK_ENABLED?: string;
+  INGREDIENT_ARTWORK_ORPHAN_GRACE_MS?: string;
+  INGREDIENT_ARTWORK_CLEANUP_DRY_RUN?: string;
+  INGREDIENT_ARTWORK_BUCKET?: Bindings['INGESTION_REPORTS_BUCKET'];
   OWNER_AI_RESPONSES_ENABLED?: string;
   OWNER_AI_OPENAI_API_KEY?: string;
   OWNER_AI_OPENAI_PROJECT_ID?: string;
@@ -143,8 +148,18 @@ export type Bindings = {
    * tests bind put() alone; without it, review sessions outside local fail as artifact_unavailable.
    */
   INGESTION_REPORTS_BUCKET?: {
-    put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
+    ): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    head?(key: string): Promise<{ uploaded?: Date | string } | null>;
+    list?(options: { prefix: string; cursor?: string | undefined }): Promise<{
+      objects: { key: string; uploaded?: Date | string }[];
+      truncated?: boolean;
+      cursor?: string;
+    }>;
     delete?(key: string): Promise<unknown>;
   };
   EXTRACTION_SERVICE_URL?: string;
@@ -595,21 +610,8 @@ export async function approveDishDraftAtomic(
   try {
     await client.query('BEGIN');
     started = true;
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    await client.query("SET LOCAL lock_timeout = '3s'");
-    await client.query("SELECT set_config('app.actor_id', $1, true)", [actorId]);
+    await authorizeStaffVenue(client, actorId, venueId, true);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
-
-    const membership = await client.query<{ permission: string }>(
-      `SELECT permission
-       FROM app_private.staff_membership
-       WHERE tenant_id = $1 AND actor_id = $2
-       FOR SHARE`,
-      [venueId, actorId],
-    );
-    if (!['owner', 'editor'].includes(membership.rows[0]?.permission ?? '')) {
-      throw new CommandError('forbidden', 403);
-    }
 
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `command:${venueId}:${actorId}:${options.commandId}`,
@@ -911,7 +913,13 @@ export function createApp(services: Dependencies = dependencies) {
     maxSize: 16_384,
     onError: (c) => c.json({ error: 'body_too_large' }, 413),
   });
+  const artworkLimit = bodyLimit({
+    maxSize: 1_350_000,
+    onError: (c) => c.json({ error: 'body_too_large' }, 413),
+  });
   app.use('/venues/*', async (c, next) => {
+    if (c.req.method === 'POST' && /^\/venues\/[^/]+\/ingredient-icons\/review$/.test(c.req.path))
+      return artworkLimit(c, next);
     if (
       c.req.method === 'PUT' &&
       /^\/venues\/[^/]+\/menus\/upload-groups\/[^/]+\/files\/[0-4]$/.test(c.req.path)
@@ -932,7 +940,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|ingredient-icons(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -965,6 +973,11 @@ export function createApp(services: Dependencies = dependencies) {
       maxAge: 86400,
     }),
   );
+  registerArtworkRoutes(app, {
+    verify: services.verify,
+    authorizeVenue: services.authorizeVenue ?? dependencies.authorizeVenue!,
+    database: withDatabase,
+  });
   app.get('/public/restaurants/:slug', async (c) => {
     const slug = RestaurantSlugSchema.safeParse(c.req.param('slug'));
     if (!slug.success) return c.json({ error: 'invalid_request' }, 400);
@@ -1704,7 +1717,7 @@ export function createWorker(
       await observationQueue(batch, env);
     }
   };
-  return Object.assign(app, { queue });
+  return Object.assign(app, { queue, scheduled });
 }
 
 export {
@@ -1729,4 +1742,53 @@ export const queue = async (batch: any, env: any) => {
     await defaultObservationQueue(batch, env);
   }
 };
-export default Object.assign(defaultApp, { queue });
+export function parseNonNegativeIntEnv(
+  raw: string | undefined,
+  errorCode: string,
+): number | undefined {
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/.test(raw)) throw new Error(errorCode);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) throw new Error(errorCode);
+  return value;
+}
+
+// Promote only #165's existing cleanup; order-import retention is a separate release.
+export async function handleScheduled(
+  _event: unknown,
+  env: Bindings,
+  createClient: (connectionString: string) => Client = (connectionString) =>
+    new Client({ connectionString, connectionTimeoutMillis: 5000 }),
+) {
+  const storage = env.INGREDIENT_ARTWORK_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+  if (env.INGREDIENT_ARTWORK_ENABLED !== 'true' || !storage?.list || !storage.delete) return;
+  const connectionString =
+    env.APP_ENV === 'local' ? env.LOCAL_DATABASE_URL : env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+  const client = createClient(connectionString);
+  try {
+    await client.connect();
+    const { cleanupOrphanedIngredientArtwork } = await import('./ingredient-artwork-retention');
+    await cleanupOrphanedIngredientArtwork({
+      storage: {
+        list: storage.list.bind(storage),
+        delete: storage.delete.bind(storage),
+        ...(storage.head ? { head: storage.head.bind(storage) } : {}),
+      },
+      client,
+      gracePeriodMs: parseNonNegativeIntEnv(
+        env.INGREDIENT_ARTWORK_ORPHAN_GRACE_MS,
+        'invalid_artwork_grace_period',
+      ),
+      dryRun: env.INGREDIENT_ARTWORK_CLEANUP_DRY_RUN === 'true',
+    });
+  } catch {
+    console.error(JSON.stringify({ event: 'ingredient_artwork_cleanup_error' }));
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+export const scheduled = (event: unknown, env: Bindings) => handleScheduled(event, env);
+
+export default Object.assign(defaultApp, { queue, scheduled });

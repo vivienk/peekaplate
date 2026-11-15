@@ -61,6 +61,12 @@ function claims(authorization: string | undefined): { sub?: string; version?: nu
 }
 
 async function fixture(context: BrowserContext) {
+  // Keep the provider's allowed browser origin while an isolated test server uses another port.
+  if (process.env.PEEKAPLATE_OWNER_TEST_SERVER)
+    await context.route(`${origin}/**`, async (route) => {
+      const url = route.request().url().replace(origin, process.env.PEEKAPLATE_OWNER_TEST_SERVER!);
+      await route.fulfill({ response: await route.fetch({ url }) });
+    });
   const state = {
     venues: [venue],
     reportStatus: 200,
@@ -76,6 +82,8 @@ async function fixture(context: BrowserContext) {
     photos: new Map<string, Buffer>(),
     receipts: new Map<string, unknown>(),
     conflictSave: false,
+    verificationStatus: 200,
+    verificationCommands: [] as string[],
     menuStatus: 200,
     review: { ...reviewSession(), venueId: venue.venueId },
     correctionIds: [] as string[],
@@ -288,6 +296,38 @@ async function fixture(context: BrowserContext) {
       }
       if (path === 'drafts')
         return route.fulfill({ json: { drafts: state.drafts[id] ?? [] }, headers });
+      if (/^drafts\/[^/]+\/verify$/.test(path)) {
+        const input = request.postDataJSON();
+        state.verificationCommands.push(input.commandId);
+        const draft = state.drafts[id]?.find((draft) => draft.id === path.split('/')[1]);
+        if (state.verificationStatus !== 200)
+          return route.fulfill({
+            status: state.verificationStatus,
+            json: { error: 'version_conflict' },
+            headers,
+          });
+        if (!draft || draft.draft_version !== input.expectedVersion)
+          return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
+        draft.verification_status = 'verified';
+        return route.fulfill({ json: { draft }, headers });
+      }
+      if (/^drafts\/[^/]+\/photos\/[^/]+\/approve$/.test(path)) {
+        const photoId = path.split('/')[3]!;
+        return route.fulfill({
+          json: {
+            photo: {
+              id: photoId,
+              draftId: path.split('/')[1],
+              contentType: 'image/png',
+              sizeBytes: 4,
+              sha256: 'a'.repeat(64),
+              verificationStatus: 'verified',
+              storageKey: 'synthetic/approved.png',
+            },
+          },
+          headers,
+        });
+      }
       if (/^drafts\/[^/]+$/.test(path) && request.method() === 'PUT') {
         const draftId = path.split('/')[1]!;
         const input = request.postDataJSON();
@@ -657,6 +697,43 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await expect(page.getByRole('link', { name: /routing-staging/ })).toHaveCount(0);
 });
 
+test('live dish performance reuses authored cards with API evidence on desktop and mobile', async ({
+  context,
+  page,
+}, testInfo) => {
+  await fixture(context);
+  await page.setViewportSize({ width: 1440, height: 650 });
+  await signIn(page, undefined, false);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'What diners did with each dish' })).toBeVisible();
+  await expect(
+    page.getByText('Synthetic test data from the report API. Not real diners.'),
+  ).toBeVisible();
+  await expect(page.getByRole('row', { name: /Bowl/ }).first()).toContainText('Not measurable');
+  await expect(page.getByRole('heading', { name: 'Open rate', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('performance-desktop.png'), fullPage: true });
+  const left = await page.locator('.owner-sidebar').boundingBox();
+  const right = await page.locator('.owner-ai').boundingBox();
+  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 500));
+  expect(await page.locator('.owner-sidebar').boundingBox()).toEqual(left);
+  expect(await page.locator('.owner-ai').boundingBox()).toEqual(right);
+  await page.getByRole('button', { name: 'Verified orders', exact: true }).click();
+  await expect(
+    page.getByText('These measurements are not available in this report. No values are inferred.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Interaction time', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Average time interacting' })).toBeVisible();
+  await page.getByLabel('Search dishes', { exact: true }).fill('Soup');
+  await expect(page.locator('.dtable tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(page.locator('.dtable tbody tr')).toHaveCount(3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 0));
+  await expect(page.getByRole('heading', { name: 'What diners did with each dish' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: testInfo.outputPath('performance-mobile.png'), fullPage: true });
+});
+
 test('desktop panels stay in place while the middle scrolls, with account actions tucked away', async ({
   context,
   page,
@@ -713,7 +790,7 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
   await signIn(page);
   await expect(page.getByRole('heading', { name: 'Your dishes', exact: true })).toHaveCSS(
     'font-size',
-    '28px',
+    '32px',
   );
   await expect(page.locator('.owner-nav-hint')).toHaveText(
     'Some screens are not connected in this workspace yet.',
@@ -948,6 +1025,79 @@ test('keeps the authored onboarding frame and Screen 9 cards when connected', as
   await page.screenshot({ path: testInfo.outputPath('authored-mobile.png'), fullPage: true });
 });
 
+test('authored S10 verifies actual saved drafts without publication and preserves command identity after conflict', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const id = crypto.randomUUID();
+  const photoId = crypto.randomUUID();
+  state.drafts[venue.venueId] = [
+    {
+      id,
+      draft_id: id,
+      job_id: null,
+      origin: 'manual',
+      draft_version: 1,
+      name: 'Fictional Lentil Soup',
+      category: 'Soup',
+      description: 'Slow cooked lentil soup with herbs.',
+      price_amount: '9.50',
+      price_currency: 'CAD',
+      ingredients: ['lentils'],
+      source_text: null,
+      review_warnings: [],
+      review_status: 'pending',
+      verification_status: 'not_verified',
+      manual_fields: {
+        name: 'Fictional Lentil Soup',
+        category: 'Soup',
+        description: 'Slow cooked lentil soup with herbs.',
+        priceAmount: '9.50',
+        priceCurrency: 'CAD',
+        ingredients: { status: 'confirmed', items: ['lentils'] },
+        allergens: { status: 'confirmed', items: [] },
+        photoId,
+      },
+    },
+  ];
+  state.verificationStatus = 409;
+  await signIn(page);
+  await expect(page.locator('.review-table')).toBeVisible();
+  await expect(page.getByRole('main')).toHaveCount(1);
+  await expect(page.getByText('9.50 CAD', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Remove Fictional Lentil Soup', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Saved data changed');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  state.verificationStatus = 200;
+  await page.getByRole('button', { name: 'Complete verification', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Menu verified' })).toBeVisible();
+  expect(state.verificationCommands).toHaveLength(2);
+  expect(new Set(state.verificationCommands).size).toBe(1);
+  expect(state.drafts[venue.venueId]?.[0]?.verification_status).toBe('verified');
+  expect(state.apiCalls.some((call) => /\/photos\/[^/]+\/approve$/.test(call.path))).toBe(true);
+  expect(
+    state.apiCalls.some((call) =>
+      /publications|\/approvals$|\/drafts\/[^/]+\/approve$/.test(call.path),
+    ),
+  ).toBe(false);
+  await page.getByRole('button', { name: 'Go to dashboard', exact: true }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.screenshot({
+    path: 'outputs/duplication-wiring-evidence/owner-s10-desktop.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('html')).toHaveJSProperty('scrollWidth', 390);
+  await page.screenshot({
+    path: 'outputs/duplication-wiring-evidence/owner-s10-mobile.png',
+    fullPage: true,
+  });
+});
+
 test('manual dish and original private photo survive save and reload', async ({
   context,
   page,
@@ -976,7 +1126,7 @@ test('manual dish and original private photo survive save and reload', async ({
   });
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await page.getByRole('button', { name: 'Review Fictional Lentil Soup', exact: true }).click();
   await expect(page.getByLabel('Price', { exact: true })).toHaveValue('9.50');
   await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
   expect(state.apiCalls.some((call) => /approve|publications/.test(call.path))).toBe(false);
@@ -1007,12 +1157,12 @@ test('URL and manual sources share saved work and queued status is not a fake su
   await page.getByText('Saved sources (1)', { exact: true }).click();
   await expect(page.getByText('URL source — queued; 0 dishes.')).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Edit Fictional side salad', exact: true }),
+    page.getByRole('button', { name: 'Review Fictional side salad', exact: true }),
   ).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Edit Fictional side salad', exact: true }),
+    page.getByRole('button', { name: 'Review Fictional side salad', exact: true }),
   ).toBeVisible();
   expect(state.jobs[venue.venueId]).toHaveLength(1);
 });
@@ -1179,7 +1329,7 @@ test('identical corrections on separate extracted candidates get separate comman
   }));
   await signIn(page);
   for (const item of candidates) {
-    await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
+    await page.getByRole('button', { name: `Review ${item.effective.name}`, exact: true }).click();
     await addCategory(page, 'Sides');
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(
@@ -1218,7 +1368,7 @@ test('a delayed review session cannot reopen an editor after shell navigation', 
   ];
   state.delayReview = true;
   await signIn(page);
-  await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
+  await page.getByRole('button', { name: `Review ${item.effective.name}`, exact: true }).click();
   await expect.poll(() => state.reviewStarted).toBe(true);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   state.releaseReview();

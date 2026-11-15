@@ -1,4 +1,5 @@
 // Owner Dashboard screens: welcome, overview, report, dish performance, dish detail, actions.
+import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
 import { type ReactNode, useState } from 'react';
 import type { Chat } from './chat';
 import {
@@ -847,27 +848,17 @@ export function Perf({
     </th>
   );
   return (
-    <div className="stack">
-      <div className="pagehead">
-        <span className="eyebrow">Dish performance · {REST.period}</span>
-        <h1>What diners did with each dish</h1>
-        <p className="lede">
-          Views, time interacting and orders, labelled by how much we know. A dish that was viewed
-          but not ordered is not assumed to be rejected.
-        </p>
-      </div>
-      <section className="card" aria-labelledby="ad-h">
-        <div className="card-h">
-          <div>
-            <h3 id="ad-h">All dishes</h3>
-            <div className="sub" aria-live="polite">
-              {needle
-                ? `${sorted.length} of ${DISH.length} dishes`
-                : `${DISH.length} dishes · select a dish for details`}
-            </div>
-          </div>
-        </div>
-        <div className="scrollx dtable">
+    <PerfFrame
+      period={REST.period}
+      description="Views, time interacting and orders, labelled by how much we know. A dish that was viewed but not ordered is not assumed to be rejected."
+      summary={
+        needle
+          ? `${sorted.length} of ${DISH.length} dishes`
+          : `${DISH.length} dishes · select a dish for details`
+      }
+      table={
+        <>
+          {' '}
           <table className="tbl">
             <thead>
               <tr>
@@ -918,7 +909,77 @@ export function Perf({
             </tbody>
           </table>
           {sorted.length === 0 && <div className="empty">No dishes match “{q.trim()}”.</div>}
+        </>
+      }
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      action={
+        <Btn
+          kind="primary"
+          size="md"
+          icon="spark"
+          disabled={!selDish}
+          title={selDish ? '' : 'Search for one dish, or open a dish, to ask about it'}
+          onClick={() => {
+            if (selDish) {
+              chat.ask(`dish:${selDish.id}`, true);
+              openChat();
+            }
+          }}
+        >
+          Ask AI about this dish
+        </Btn>
+      }
+      body={body}
+    />
+  );
+}
+
+function PerfFrame({
+  period,
+  description,
+  summary,
+  table,
+  notice,
+  q,
+  setQ,
+  tab,
+  setTab,
+  action,
+  body,
+}: {
+  period: string;
+  description: ReactNode;
+  summary: ReactNode;
+  table: ReactNode;
+  notice?: ReactNode;
+  q: string;
+  setQ: (value: string) => void;
+  tab: string;
+  setTab: (value: string) => void;
+  action?: ReactNode;
+  body: ReactNode;
+}) {
+  return (
+    <div className="performance-page stack">
+      <div className="pagehead">
+        <span className="eyebrow">Dish performance · {period}</span>
+        <h1>What diners did with each dish</h1>
+        <p className="lede">{description}</p>
+      </div>
+      {notice}
+      <section className="card" aria-labelledby="ad-h">
+        <div className="card-h">
+          <div>
+            <h3 id="ad-h">All dishes</h3>
+            <div className="sub" aria-live="polite">
+              {summary}
+            </div>
+          </div>
         </div>
+        <div className="scrollx dtable">{table}</div>
       </section>
       <div className="tabs" role="group" aria-label="Metric" style={{ margin: 0 }}>
         {TABS.map(([k, l]) => (
@@ -958,24 +1019,137 @@ export function Perf({
             </button>
           )}
         </div>
-        <Btn
-          kind="primary"
-          size="md"
-          icon="spark"
-          disabled={!selDish}
-          title={selDish ? '' : 'Search for one dish, or open a dish, to ask about it'}
-          onClick={() => {
-            if (selDish) {
-              chat.ask(`dish:${selDish.id}`, true);
-              openChat();
-            }
-          }}
-        >
-          Ask AI about this dish
-        </Btn>
+        {action}
       </div>
       {body}
     </div>
+  );
+}
+
+// The live API supplies rates and averages, not the demo's opening/event counts.
+export function LivePerf({
+  report,
+  period,
+  summary,
+  notice,
+  columns,
+  display,
+}: {
+  report: OwnerDishReport;
+  period: string;
+  summary: ReactNode;
+  notice: ReactNode;
+  columns: [
+    keyof OwnerDishReport['dishes'][number]['metrics'],
+    string,
+    'count' | 'seconds' | 'rate',
+  ][];
+  display: (
+    cell: OwnerDishReport['dishes'][number]['metrics']['open_rate'],
+    kind: 'count' | 'seconds' | 'rate',
+  ) => ReactNode;
+}) {
+  const [q, setQ] = useState('');
+  const [tab, setTab] = useState('views');
+  const dishes = report.dishes.filter((d) => d.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const column = columns.find(
+    ([key]) => key === (tab === 'views' ? 'open_rate' : 'avg_interaction_time_seconds'),
+  );
+  const supported = tab === 'views' || tab === 'time';
+  const body =
+    supported && column ? (
+      <ChartCard
+        title={tab === 'views' ? 'Open rate' : 'Average time interacting'}
+        sub={
+          tab === 'views'
+            ? 'Share of visits that opened each dish; opening counts are unavailable.'
+            : 'Average active seconds from completed timed openings.'
+        }
+        head={['Dish', column[1]]}
+        rows={dishes.map((d) => [d.name, display(d.metrics[column[0]], column[2])])}
+      >
+        <HBars
+          legend={false}
+          max={
+            tab === 'views' ? 1 : Math.max(1, ...dishes.map((d) => d.metrics[column[0]].value ?? 0))
+          }
+          segs={[{ name: column[1], color: 'var(--pp-color-orange-600)' }]}
+          rows={dishes.map((d) => {
+            const cell = d.metrics[column[0]];
+            const visible = cell.status === 'NORMAL' || cell.status === 'VALID_ZERO';
+            return {
+              id: d.dish_id,
+              label: d.name,
+              vals: visible && cell.value !== null ? [cell.value] : [],
+              text: display(cell, column[2]),
+              ...(!visible ? { none: display(cell, column[2]) as string } : {}),
+            };
+          })}
+        />
+      </ChartCard>
+    ) : (
+      <section className="card">
+        <div className="card-h">
+          <h3>{TABS.find(([key]) => key === tab)?.[1]}</h3>
+        </div>
+        <div className="empty">
+          These measurements are not available in this report. No values are inferred.
+        </div>
+      </section>
+    );
+  return (
+    <PerfFrame
+      period={period}
+      description="Views and time interacting, labelled by how much we know. Orders and other measurements appear only when supported by the report."
+      summary={
+        <>
+          {dishes.length} of {report.dishes.length} dishes · {summary}
+        </>
+      }
+      notice={notice}
+      q={q}
+      setQ={setQ}
+      tab={tab}
+      setTab={setTab}
+      body={body}
+      table={
+        <>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Dish</th>
+                {columns.map(([key, label]) => (
+                  <th key={key} className="r">
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dishes.map((d) => (
+                <tr key={d.dish_id}>
+                  <td>
+                    <b>{d.name}</b>
+                  </td>
+                  {columns.map(([key, , kind]) => (
+                    <td key={key} className="r num">
+                      {display(d.metrics[key], kind)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {dishes.length === 0 && (
+            <div className="empty">
+              {report.dishes.length
+                ? 'No dishes match your search.'
+                : 'Numbers will appear here once measurable report data is available.'}
+            </div>
+          )}
+        </>
+      }
+    />
   );
 }
 

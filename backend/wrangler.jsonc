@@ -15,7 +15,10 @@
       "account_id": "51eda1917fd22a9478808a82d2980741",
       "workers_dev": true,
       "preview_urls": false,
+      "triggers": { "crons": ["0 */6 * * *"] },
       "vars": {
+        "INGREDIENT_ARTWORK_ENABLED": "true",
+        "INGREDIENT_ARTWORK_CLEANUP_DRY_RUN": "true",
         "APP_ENV": "staging",
         "DINER_PUBLIC_ORIGIN": "https://routing-staging.peekaplate-diner-staging.pages.dev",
         "SYNTHETIC_REPORT_VENUE_ID": "00000000-0000-4000-8000-000000000123",

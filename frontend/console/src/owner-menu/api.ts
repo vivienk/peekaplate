@@ -6,6 +6,8 @@
 import {
   type ApproveDishDraftRequest,
   ApproveDishDraftRequestSchema,
+  type ApproveDraftPhoto,
+  ApproveDraftPhotoSchema,
   type ApproveMenuRevision,
   ApproveMenuRevisionSchema,
   CreateMenuUploadGroupSchema,
@@ -27,6 +29,8 @@ import {
   ReviewCandidateItemResponseSchema,
   type SaveOwnerDishDraft,
   SaveOwnerDishDraftSchema,
+  type VerifyDishDraft,
+  VerifyDishDraftSchema,
 } from '@peekaplate/contracts';
 import { readWorkspaceApiBase } from '../owner/workspace-api';
 
@@ -72,6 +76,7 @@ export type DishDraft = {
   origin?: 'extracted' | 'manual';
   draft_version?: number;
   manual_fields?: unknown;
+  verification_status?: 'not_verified' | 'verified';
 };
 
 export type DraftPhoto = {
@@ -307,6 +312,49 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    async verifyDraft(
+      venueId: string,
+      draftId: string,
+      input: VerifyDishDraft,
+    ): Promise<DishDraft> {
+      return request(
+        venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/verify`),
+        json('POST', VerifyDishDraftSchema.parse(input)),
+        (body) => {
+          const row = draft(field(body, 'draft'));
+          if (
+            row.id !== draftId ||
+            row.verification_status !== (input.verified ? 'verified' : 'not_verified')
+          )
+            throw new Error('verification scope');
+          return row;
+        },
+      );
+    },
+    async approveDraftPhoto(
+      venueId: string,
+      draftId: string,
+      photoId: string,
+      input: ApproveDraftPhoto,
+    ): Promise<DraftPhoto> {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}/approve`,
+        ),
+        json('POST', ApproveDraftPhotoSchema.parse(input)),
+        (body) => {
+          const photo = parsePhoto(field(body, 'photo'));
+          if (
+            photo.id !== photoId ||
+            photo.draftId !== draftId ||
+            photo.verificationStatus !== 'verified'
+          )
+            throw new Error('photo scope');
+          return photo;
+        },
+      );
+    },
     async listPreparedMenus(venueId: string) {
       return request(
         venuePath(venueId, '/prepared-menus'),

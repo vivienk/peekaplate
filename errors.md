@@ -2772,3 +2772,16 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id":"ERR-20261115-NESTED-SHELL-EXPANSION","status":"resolved","area":"local-verification","cause":"A read-only process inspection embedded in a double-quoted nested PowerShell command expanded its pipeline variable in the outer shell.","prevention":"Use a literal single-quoted command or a script file when passing pipeline variables to nested PowerShell.","sources":["AGENTS.md"],"regression":"The corrected read-only inspection completed successfully; pnpm verify build then passed. No project source or hosted state was affected."}
 ```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-VERIFICATION","status":"resolved","area":"local-verification","cause":"The initial processing command used pytest instead of the repository's unittest runner; the next Windows run omitted UTF-8 and failed Unicode subprocess assertions. The artwork retention test also needed formatting.","prevention":"Use the frozen service environment with python -m unittest and PYTHONUTF8=1 on Windows; format changed tests before the combined gate.","sources":["processing/tests/test_source_entry_recovery.py","backend/src/ingredient-artwork-retention.test.ts"],"regression":"Frozen Python suite passes 573 tests in 46.998s; focused Biome passes. No runtime workaround or dependency change was needed."}
+```
+
+```json
+{"id":"ERR-20261115-AUTHORED-SCREEN-TESTS","status":"resolved","area":"browser-verification","cause":"Concurrent Playwright runs shared the default artifact directory; a retained menu-heading assertion also described the replaced fallback screen rather than authored S10.","prevention":"Use isolated output directories while iterating, run final browser configs sequentially, and check expectations against the imported authored screen.","sources":["tests/e2e/owner-workspace.spec.ts","playwright.portion-published.config.ts"],"regression":"Authored S10 32px title passes; isolated portion and performance browser regressions pass with screenshots. Final combined run is recorded in the correction PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T23:34:35.987Z","exitCode":1}
+```

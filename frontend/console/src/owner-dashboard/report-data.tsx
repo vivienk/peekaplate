@@ -4,6 +4,7 @@
 // from Uneeza's synthetic P0 v2 data, labelled as such.
 import { type OwnerDishReport, OwnerDishReportSchema } from '@peekaplate/contracts/owner-report';
 import { useEffect, useState } from 'react';
+import { LivePerf } from './pages';
 import { fetchOwnerReport, type ReportState } from './report-api';
 import { Note } from './ui';
 import { UNEEZA_REPORT } from './uneeza-report';
@@ -157,17 +158,26 @@ export function ReportView({
   state,
   saved = false,
   onRetry,
+  presentation = 'data',
 }: {
   state: ReportState;
   saved?: boolean;
   onRetry?: () => void;
+  presentation?: 'data' | 'performance';
 }) {
-  if (state.kind === 'ready') return <ReportTable report={state.report} saved={saved} />;
+  if (state.kind === 'ready')
+    return <ReportTable report={state.report} saved={saved} presentation={presentation} />;
   return (
     <div className="stack">
       <div className="pagehead">
-        <span className="eyebrow">Report data</span>
-        <h1>Dish report from the report API</h1>
+        <span className="eyebrow">
+          {presentation === 'performance' ? 'Dish performance' : 'Report data'}
+        </span>
+        <h1>
+          {presentation === 'performance'
+            ? 'What diners did with each dish'
+            : 'Dish report from the report API'}
+        </h1>
       </div>
       {state.kind === 'loading' ? (
         <div className="card" role="status">
@@ -194,11 +204,13 @@ export function ReportData({
   }),
   onAccessFailure,
   onReport,
+  presentation = 'data',
 }: {
   source?: ReportSource;
   onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
   /** The report on screen, or null while none is (loading, failed or denied). */
   onReport?: (report: OwnerDishReport | null) => void;
+  presentation?: 'data' | 'performance';
 }) {
   const { state, retry } = useOwnerReport(source);
   useEffect(() => {
@@ -209,11 +221,47 @@ export function ReportData({
     onReport?.(report);
   }, [report, onReport]);
   useEffect(() => () => onReport?.(null), [onReport]);
-  return <ReportView state={state} saved={source.mode === 'saved'} onRetry={retry} />;
+  return (
+    <ReportView
+      state={state}
+      saved={source.mode === 'saved'}
+      onRetry={retry}
+      presentation={presentation}
+    />
+  );
 }
 
-function ReportTable({ report: r, saved }: { report: OwnerDishReport; saved: boolean }) {
+function ReportTable({
+  report: r,
+  saved,
+  presentation,
+}: {
+  report: OwnerDishReport;
+  saved: boolean;
+  presentation: 'data' | 'performance';
+}) {
   const m = r.report_metadata;
+  if (presentation === 'performance')
+    return (
+      <LivePerf
+        report={r}
+        period={`${fmt(m.date_window.start_time)} – ${fmt(m.date_window.end_time)} (end exclusive)`}
+        summary={`${m.coverage.measurable_dishes_count} measurable · report ${m.report_status.toLowerCase()} · ${freshnessLabel(m.freshness.is_stale)}`}
+        notice={
+          saved ? (
+            <Note kind="warn">Saved copy of a report: synthetic test data. Not real diners.</Note>
+          ) : r.source === 'synthetic' ? (
+            <Note kind="warn">Synthetic test data from the report API. Not real diners.</Note>
+          ) : null
+        }
+        columns={COLUMNS}
+        display={(cell, kind) =>
+          cell.status === 'NORMAL' || cell.status === 'VALID_ZERO'
+            ? show(cell, kind)
+            : STATUS_TEXT[cell.status]
+        }
+      />
+    );
   return (
     <div className="stack">
       <div className="pagehead">

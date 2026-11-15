@@ -6,8 +6,7 @@ import { MenuProcessing } from '../onboarding/MenuProcessing';
 import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
-import { Btn, Icon } from '../owner-dashboard/controls';
-import { MenuTable } from '../owner-dashboard/menu-presentation';
+import { Btn } from '../owner-dashboard/controls';
 import {
   createOwnerMenuClient,
   type DishDraft,
@@ -32,6 +31,9 @@ import { errorMessage } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
 import { OwnerPublish } from './OwnerPublish';
+import { ReviewDishes } from './review/MenuReview';
+import { initialReview, isMenuReady, type ReviewDish } from './review/reviewDishes';
+import './review/review.css';
 import '../onboarding/onboarding.css';
 
 type Active = { client: OwnerMenuClient; controller: AbortController };
@@ -95,6 +97,7 @@ export function OwnerMenuWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
+  const [verified, setVerified] = useState(false);
   const [view, setRawView] = useState<
     'overview' | 'sources' | 'url' | 'photo' | 'pdf' | 'list' | 'edit' | 'processing' | 'publish'
   >('overview');
@@ -153,6 +156,7 @@ export function OwnerMenuWorkspace({
       setJobs(nextJobs);
       setDrafts(nextDrafts);
       setLoaded(true);
+      return nextDrafts;
     },
     [venueId, current],
   );
@@ -243,7 +247,10 @@ export function OwnerMenuWorkspace({
       if (current(active)) setBusy(false);
     }
   };
-  const reload = () => void run((active) => load(active));
+  const reload = () =>
+    void run(async (active) => {
+      await load(active);
+    });
   useEffect(() => {
     if (view !== 'processing') return;
     const active = runtime.current;
@@ -275,6 +282,7 @@ export function OwnerMenuWorkspace({
     }
   }, [view, jobs, processingIds, setView]);
   const editManual = (draft?: DishDraft) => {
+    setVerified(false);
     const form = draft ? dishFromManualDraft(draft) : emptyManualDish();
     setEditing({
       id: draft?.id ?? crypto.randomUUID(),
@@ -366,6 +374,7 @@ export function OwnerMenuWorkspace({
       }
     });
   const openDraft = (draft: DishDraft) => {
+    setVerified(false);
     if (draft.origin === 'manual') {
       editManual(draft);
       return;
@@ -482,6 +491,63 @@ export function OwnerMenuWorkspace({
       }
       await load(active);
       if (current(active)) setNotice('Draft saved. This has not approved or published your menu.');
+    });
+
+  const reviewDishes: ReviewDish[] = drafts.map((draft) => {
+    if (draft.origin === 'manual') return { id: draft.id, ...dishFromManualDraft(draft) };
+    return {
+      id: draft.id,
+      name: draft.name,
+      category: draft.category,
+      description: draft.description,
+      priceAmount: draft.price_amount,
+      priceCurrency: draft.price_currency,
+      photoId: null,
+      ingredients: {
+        status: 'proposed',
+        items: (draft.ingredients ?? []).filter((item): item is string => typeof item === 'string'),
+      },
+      allergens: { status: 'unknown', items: [] },
+    };
+  });
+  const completeVerification = () =>
+    void run(async (active) => {
+      if (!isMenuReady(reviewDishes) || drafts.some((draft) => draft.review_status !== 'pending'))
+        return;
+      const generation = viewGeneration.current;
+      setVerified(false);
+      for (const draft of drafts) {
+        const photoId = reviewDishes.find((dish) => dish.id === draft.id)?.photoId;
+        if (photoId)
+          await active.client.approveDraftPhoto(venueId, draft.id, photoId, {
+            commandId: command('verify-photo', [draft.id, photoId, draft.draft_version]),
+          });
+        if (!current(active)) return;
+        const saved = await active.client.verifyDraft(venueId, draft.id, {
+          commandId: command('verify-dish', [draft.id, draft.draft_version]),
+          expectedVersion: draft.draft_version!,
+          verified: true,
+        });
+        if (!current(active)) return;
+        setDrafts((previous) => previous.map((item) => (item.id === saved.id ? saved : item)));
+      }
+      const confirmed = await load(active);
+      if (!current(active) || generation !== viewGeneration.current) return;
+      if (
+        !confirmed ||
+        confirmed.length !== drafts.length ||
+        drafts.some(
+          (draft) =>
+            !confirmed.some(
+              (saved) =>
+                saved.id === draft.id &&
+                saved.draft_version === draft.draft_version &&
+                saved.verification_status === 'verified',
+            ),
+        )
+      )
+        throw new OwnerMenuApiError(409, 'version_conflict');
+      setVerified(true);
     });
 
   if (!loaded)
@@ -647,19 +713,6 @@ export function OwnerMenuWorkspace({
       />
     ) : (
       <div className="owner-menu-design stack">
-        <div className="pagehead">
-          <span className="eyebrow">Menu</span>
-          <div className="row" style={{ justifyContent: 'space-between' }}>
-            <h1>Your dishes</h1>
-            <Btn kind="primary" size="lg" icon="plus" disabled={busy} onClick={() => editManual()}>
-              Add dish
-            </Btn>
-          </div>
-          <p className="lede">
-            Edit a dish or add a new one. Your saved drafts stay private until review and
-            publication.
-          </p>
-        </div>
         <div className="owner-workspace-toolbar">
           <Btn kind="outlined" disabled={busy} onClick={() => setView('sources')}>
             Add menu sources
@@ -741,42 +794,39 @@ export function OwnerMenuWorkspace({
             <p>Showing the latest 100 sources. Earlier saved dish drafts remain listed below.</p>
           )}
         </details>
-        <MenuTable>
-          {drafts.length === 0 ? (
-            <p>No saved dishes yet.</p>
-          ) : (
-            <>
-              {drafts.map((draft) => (
-                <div key={draft.id} className="mrow">
-                  <span className="thumb">
-                    <Icon n="menu" s={24} />
-                  </span>
-                  <span className="dn">
-                    {draft.name ?? 'Untitled dish'}
-                    <small>{draft.origin === 'manual' ? 'Manual draft' : 'Extracted draft'}</small>
-                  </span>
-                  <span className="hidem">{draft.category ?? 'Not set'}</span>
-                  <span className="hidem num">
-                    {draft.price_amount ?? '—'} {draft.price_currency ?? ''}
-                  </span>
-                  <span className="lab st">{draft.review_status}</span>
-                  <span className="hidem">
-                    <span className="lab st">Not connected</span>
-                  </span>
-                  <Btn
-                    kind="outlined"
-                    size="md"
-                    disabled={busy || !['pending', 'edited'].includes(draft.review_status)}
-                    onClick={() => openDraft(draft)}
-                    aria-label={`Edit ${draft.name ?? 'untitled dish'}`}
-                  >
-                    Edit
-                  </Btn>
-                </div>
-              ))}
-            </>
-          )}
-        </MenuTable>
+        <ReviewDishes
+          embedded
+          restaurantName={restaurantName}
+          state={initialReview(reviewDishes)}
+          busy={busy}
+          completing={busy}
+          verified={verified}
+          removalUnavailable="Removing saved dishes is not available yet."
+          verificationUnavailable={
+            drafts.some((draft) => draft.review_status !== 'pending')
+              ? 'Only pending drafts can be verified. Reload saved work to check current status.'
+              : undefined
+          }
+          canEditDish={(id) =>
+            drafts.some(
+              (draft) => draft.id === id && ['pending', 'edited'].includes(draft.review_status),
+            )
+          }
+          onAddDish={() => editManual()}
+          onEditDish={(id) => {
+            const draft = drafts.find((draft) => draft.id === id);
+            if (draft) openDraft(draft);
+          }}
+          onRemoveDish={() => {}}
+          onUndoRemove={() => {}}
+          onCancel={() => setView('sources')}
+          onSaveAndExit={() => setView('overview')}
+          onCompleteVerification={completeVerification}
+          onGoToDashboard={() => {
+            setVerified(false);
+            setView('overview');
+          }}
+        />
       </div>
     );
   const body = (
