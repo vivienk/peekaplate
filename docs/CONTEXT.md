@@ -78,7 +78,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "305f9df8c73aae2e49af835058a47e58cb8320f06e125b8b46a47e671ed5f751"
+      "sourceFingerprint": "fe6c335a2ed38bda763f9c9aa081ab5e2d8ee46f47f19860e2b740fa980c1ac1"
     },
     {
       "id": "tokens",
@@ -312,7 +312,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, atomic commands/publication, signed menus and canonical observations. Owner workspace supports versioned private drafts/photos, uploads, fenced recovery and content-checked promotion; retention needs configuration. Synthetic-gated reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression; CSV preserves guards/VALID_ZERO. Owner actions are idempotent. Owner-AI validates privacy/IDs; trusted issuance and live AI remain unwired. Publishing reserves permanent name-seeded diner links atomically; scoped public resolution and owner URL retrieval preserve v1 receipts. Read-only staff restaurant discovery uses actor membership locks and tenant-scoped names under existing runtime RLS. Hosted bridge release, upload/publish UI and production domain acceptance remain separate. Artwork approval repairs exact R2 bytes under the cleanup transaction lock before commit.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Actor-bound owner workspaces expose owner/editor restaurants and versioned private draft/photo/upload/verification flows. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are versioned/idempotent. Owner-AI trust/issuance and live evaluation remain gated. Decorative artwork uses exact-byte blob-locked repair before approval and approved-only public reads. Order imports require agreement; owner requests, bound operator execution, independent checker and frozen restore use tenant/fence/cutoff guards. Hosted activation and acceptance are recorded separately.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -485,7 +485,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "d7e070fa6d5ab9d70065ecd9c6411593b14ee35874f22cc89316f718e4b36d8d"
+      "sourceFingerprint": "0772d1d3ddcabd3ff701c4894ffc0ac989d4cf2608366a0e85d2f65f4a6bad75"
     },
     {
       "id": "database",
@@ -535,7 +535,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "30bae869b010b9c5f28d3c45b3d5812637d3ea14a2e55be2bd6fec88ca787783"
+      "sourceFingerprint": "c7907c2e1fff93ac7a9139ed8c04850c7c51fab0884cb069158cb2eb351719f9"
     },
     {
       "id": "measurement",
@@ -548,7 +548,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/order-outcome.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/tracking-activation.ts",
-        "migrations/20261107120000_order_outcomes.sql"
+        "migrations/20261107120000_order_outcomes.sql",
+        "docs/pilot-order-outcome-agreement.md",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
@@ -557,7 +559,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "61a94c827e8f542dd5f446af1da530956eb6add77d7acf3e6858d822cadf6ba1"
+      "sourceFingerprint": "f7d3271c08362f59fea15fc9b529aab38f6531c3b1c826de480a1763727ca96e"
     },
     {
       "id": "delivery",
@@ -626,7 +628,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c7edb94a7be54408916e6b62c2daf05bb72c8d63a7d7b5413df6fcf1e44ad267"
+      "sourceFingerprint": "a539e02fecc9416887f1e4d916354044d35caf528f3cc3130f389fe8875835c2"
     },
     {
       "id": "agents",
@@ -842,22 +844,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-13",
       "modules": [
-        "contracts",
-        "delivery"
-      ],
-      "summary": "PR144 retargeted to develop after PR112 merged. DATA06 fixtures remain in default Vitest discovery and workspace typechecking. Prepared descriptive-ID counts, 9/10/11 distinct-session boundaries and null below-floor expectations remain preparation evidence, not production classification, scoring or hosted acceptance.",
-      "sources": [
-        "tests/data06/VALIDATION_REPORT.md",
-        "tests/data06/descriptive_signals.test.ts",
-        "tests/data06/privacy_boundaries.test.ts",
-        "vitest.config.ts",
-        "tests/data06/tsconfig.json"
-      ],
-      "next": "Complete exact-head checks/review and merge fixture preparation. Connect approved DATA06 producer/policy and execute raw-event/hosted evidence separately."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
         "diner",
         "backend",
         "delivery"
@@ -981,6 +967,25 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/ingredient_icon_delivery.py"
       ],
       "next": "Complete independent review and database CI; deploy migration/API/diner and configure trusted review delivery once. Then each explicit approval delivers without export/rebuild."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "measurement",
+        "contracts",
+        "backend",
+        "database"
+      ],
+      "summary": "PR166 adds agreement-gated order imports and separate owner-request/operator/checker deletion. Re-review fixed overwritten SQL FOUND, later-import destruction during restore, cross-operator receipt mismatch and Windows/TypeScript CLI loading. Historical reconciliation deletes through a trusted completedAt cutoff and preserves later batch CSV keys. A request stays bound to its first executor. Disposable database and CLI regressions cover these failures; hosted activation and agreement approval remain separate.",
+      "sources": [
+        "docs/pilot-order-outcome-agreement.md",
+        "packages/contracts/src/order-outcome.ts",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql",
+        "migrations/20261114020000_harden_s6_data_14_deletion_and_reconciliation.sql",
+        "backend/src/order-ingestion/service.ts",
+        "backend/src/index.ts"
+      ],
+      "next": "Finish final CI and independent review before merge. Provision restricted operator/checker bindings and run a synthetic hosted deletion/restore drill before any real pilot uploads; obtain product/agreement sign-off."
     },
     {
       "date": "2026-11-14",

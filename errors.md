@@ -3605,6 +3605,47 @@ Python fixture also used the default code page for Unicode JSON; it now writes
 UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
 the passing Python rerun. No hosted objects or provider calls were used.
 
+## 2026-11-14 — Order restore reconciliation review
+
+The actual Windows CLI exited zero without validation because its manually built
+file URL did not match import.meta.url. pathToFileURL fixes that entrypoint; the
+documented transform-types flag plus the existing Node resolution hook now loads
+the real restore function, including source-only .js-to-.ts contract imports.
+The child-process loader regression verifies the real freeze check is reached.
+
+A PostgreSQL regression reproduced duplicate audit insertion on repeated restore:
+FOUND referred to the last DELETE rather than the request lookup. Explicit row
+identity fixes both existing/missing request cases. Cutoff and exact-key protection
+preserve later authorized imports during historical deletion replay. An execution
+is bound to its first operator to preserve immutable intent/completion identity.
+Tests use disposable PostgreSQL and synthetic storage; no hosted purge occurred.
+
+Reconciliation with the artwork scheduler exposed an obsolete storage variable
+and a cleanup guard requiring an unnecessary put method. The scheduler now passes
+the order bucket explicitly and permits its existing list/delete retry contract;
+the scheduled retry and artwork-isolation tests pass. The bounded context summary
+was shortened before fingerprint refresh. No behavior was accepted from a merge
+without type and regression checks.
+
+The final restore/checker regression exposed original receipt counts being
+replaced by counts from a partial restored snapshot. Reconciliation now requires
+and validates the original completed receipt in SQL, preserving its executor and
+counts; restore-run counters remain separate. Checker remaining-data checks use
+the same cutoff and exact newer batch keys. The real PostgreSQL partial-snapshot
+restore followed by independent verification now passes without deleting the
+newer import. The new required receipt also needed an existing direct-SQL test
+fixture updated; its earlier failure was an obsolete fixture, then rerun passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T00:20:30.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T00:32:08.133Z","exitCode":1}
+```
+
 ## QA-02 reference integrity preparation - November 13, 2026
 
 The initial lint observation was JSON formatting in the new draft synthetic
