@@ -3926,3 +3926,12 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T17:46:45.853Z","exitCode":1}
 ```
+
+```json
+{"id":"ERR-20261115-PUBLISH-CONTEXT","status":"resolved","area":"context-handoff","cause":"The initial publication handoff exceeded the bounded summary; later UI/test edits invalidated its refreshed fingerprint.","prevention":"Keep the bounded summary and refresh after the final source and test edits.","sources":["docs/CONTEXT.md","scripts/context.mjs"],"regression":"Final pnpm check passes all functional, context and documentation checks; publication browser regressions pass separately."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T18:06:14.398Z","exitCode":1}
+```

@@ -16,6 +16,7 @@ import {
   useState,
 } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
+import { OwnerAccountMenu } from '../onboarding/OnboardingLayout';
 import {
   createOwnerAnalysisClient,
   OwnerAnalysisAccessError,
@@ -245,16 +246,21 @@ export function OwnerWorkspace({
                 published: null,
               }}
             />
-            {picker}
-            <Button
-              variant="text"
-              onClick={() => {
-                if (canLeave()) refresh();
-              }}
-            >
-              Refresh access
-            </Button>
-            {signOut}
+            <OwnerAccountMenu>
+              {picker}
+              <Button
+                variant="text"
+                onClick={() => {
+                  if (canLeave()) refresh();
+                }}
+              >
+                Refresh access
+              </Button>
+              {signOut}
+              <small className="owner-workspace-design-note">
+                (Account placement awaiting design review)
+              </small>
+            </OwnerAccountMenu>
           </div>
         }
       >
@@ -278,6 +284,7 @@ export function OwnerWorkspace({
       actorId={owner.id}
       venueId={selected.venueId}
       restaurantName={selected.name}
+      canPublish={selected.permission === 'owner'}
       section={page === 'menu' ? 'menu' : 'overview'}
       navigation={navigation}
       getAccessToken={getAccessToken}
