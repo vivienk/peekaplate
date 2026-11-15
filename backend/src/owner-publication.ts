@@ -63,7 +63,7 @@ export async function fetchPreparedMenu(menu: PreparedMenu, send: typeof fetch =
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
     const response = await send(url, {
-      redirect: 'error',
+      redirect: 'manual',
       cache: 'no-store',
       signal: controller.signal,
     });
