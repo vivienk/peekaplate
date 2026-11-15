@@ -70,7 +70,8 @@ host60b99488-78f3-4d6a-a497-2ff1597f1ab7 predates merged PR188. All four Queues
 were empty and paused. Recheck exact release versions before rollout; keep
 normal delivery paused outside an authorized synthetic test window.
 
-Hosted rollout and authenticated screen acceptance for this slice: NOT RUN.
+Record each rollout's exact commit and authenticated screen evidence on its
+release PR. Local fixture checks alone are not hosted screen acceptance.
 Deploy PR188's paired host/container before claiming hosted provider-budget
 enforcement. A zero-provider reserve probe uses its own disposable job identity.
 
@@ -101,3 +102,10 @@ manual draft reload, extracted correction save/reload and restoration, partial
 upload retention and revoked-access cleanup against staging. It did not establish
 visual fidelity. This correction requires its own Pages rollout and screenshot
 readback; provider extraction is not rerun for a presentation-only change.
+
+Independent review also caught an inherited global menu-heading style and a
+sidebar hint promising unsupported publication unlocks. The live surface now
+uses the author's scoped 28px heading and describes unavailable connections
+without changing the demo. Browser-dropped files with no MIME use the existing
+extension policy to declare PDF/JPEG/PNG while retaining the original bytes;
+server signature/hash verification remains authoritative.

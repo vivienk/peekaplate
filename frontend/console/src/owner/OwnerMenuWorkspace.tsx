@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { AddMenuLink } from '../onboarding/AddMenuLink';
 import { ChooseMenuSource, type MenuSource } from '../onboarding/ChooseMenuSource';
 import { MenuProcessing } from '../onboarding/MenuProcessing';
+import { menuFileKind } from '../onboarding/menu-source';
 import { OnboardingLayout } from '../onboarding/OnboardingLayout';
 import { type MenuUpload, UploadMenu } from '../onboarding/UploadMenu';
 import { Btn, Icon } from '../owner-dashboard/controls';
@@ -41,6 +42,16 @@ type Editing = {
   session?: ExtractionReviewSessionResponse;
 };
 type FileSelection = { files: File[]; groupKey: string; fileKeys: string[]; groupId?: string };
+
+// Dropped files may lack a MIME. Declare the UI-accepted kind without changing bytes;
+// the server still verifies the actual signature and manifest hash.
+function typedMenuFile(file: File): File {
+  const kind = menuFileKind(file);
+  if (file.type || !kind) return file;
+  const type =
+    kind === 'pdf' ? 'application/pdf' : /\.png$/i.test(file.name) ? 'image/png' : 'image/jpeg';
+  return new File([file], file.name, { type, lastModified: file.lastModified });
+}
 
 export function OwnerMenuWorkspace({
   apiBase,
@@ -296,6 +307,7 @@ export function OwnerMenuWorkspace({
     });
   const uploadFiles = (files: File[], retry = false) =>
     void run(async (active) => {
+      files = files.map(typedMenuFile);
       if (
         files.some((file) => !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type))
       ) {
@@ -573,7 +585,8 @@ export function OwnerMenuWorkspace({
                   accept="image/jpeg,image/png"
                   disabled={busy}
                   onChange={(event) => {
-                    const file = event.target.files?.[0];
+                    const selectedFile = event.target.files?.[0];
+                    const file = selectedFile ? typedMenuFile(selectedFile) : undefined;
                     if (
                       file &&
                       file.size > 0 &&
