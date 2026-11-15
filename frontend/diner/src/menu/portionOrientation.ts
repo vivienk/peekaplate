@@ -23,22 +23,16 @@ export function createPortionOrientation() {
   };
   return {
     request() {
-      if (
-        run ||
-        !matchMedia('(pointer: coarse)').matches ||
-        !orientation?.lock ||
-        !root.requestFullscreen ||
-        document.fullscreenElement
-      )
-        return;
+      if (run || !matchMedia('(pointer: coarse)').matches || !orientation?.lock) return;
       const current = { cancelled: false, settled: false, fullscreen: false, locked: false };
       run = current;
       // Do not defer this call: transient user activation expires during image decoding.
       try {
-        void root
-          .requestFullscreen()
+        const needsFullscreen = !document.fullscreenElement && !!root.requestFullscreen;
+        const enter = needsFullscreen ? root.requestFullscreen() : Promise.resolve();
+        void enter
           .then(async () => {
-            current.fullscreen = true;
+            current.fullscreen = needsFullscreen;
             if (current.cancelled) return;
             await orientation.lock!('landscape');
             current.locked = true;

@@ -1471,3 +1471,25 @@ main:has(> .pp-detail) {
 .pp-ar--original .pp-ar__rotate-hint {
   visibility: hidden;
 }
+
+.pp-ar__canvas {
+  touch-action: none;
+  cursor: grab;
+}
+.pp-ar__canvas:active {
+  cursor: grabbing;
+}
+
+.pp-ar__header [data-action="landscape"] {
+  display: none;
+  pointer-events: auto;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  .pp-ar__header [data-action="landscape"] {
+    display: block;
+    margin-left: auto;
+  }
+  .pp-ar__header [data-action="original"] {
+    margin-left: 8px;
+  }
+}

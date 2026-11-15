@@ -705,10 +705,10 @@ test('camera portal positions the exact cutout, rotates, resets and releases cam
   await expect(page.locator('.pp-ar__message')).toContainText('Manual camera placement');
   await expect(page.locator('.pp-ar__canvas canvas')).toBeVisible();
   await page.screenshot({ path: 'test-results/ar-camera-mobile.png' });
-  await page.getByRole('slider', { name: 'Rotate dish', exact: true }).fill('45');
-  await expect(page.getByRole('slider', { name: 'Rotate dish', exact: true })).toHaveValue('45');
+  await page.getByRole('slider', { name: 'Tilt dish', exact: true }).fill('3');
+  await expect(page.getByRole('slider', { name: 'Tilt dish', exact: true })).toHaveValue('3');
   await page.getByRole('button', { name: 'Reposition', exact: true }).click();
-  await expect(page.getByRole('slider', { name: 'Rotate dish', exact: true })).toHaveValue('0');
+  await expect(page.getByRole('slider', { name: 'Tilt dish', exact: true })).toHaveValue('0');
   await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
   await expect(page.locator('.pp-ar')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).cameraTest.stopped)).toBe(1);

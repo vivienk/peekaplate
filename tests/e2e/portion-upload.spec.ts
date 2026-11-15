@@ -75,9 +75,9 @@ for (const variant of [
     await expect(page.locator('.pp-ar__original')).toHaveAttribute('src', /^blob:/);
     await page.getByRole('button', { name: 'Return to AR', exact: true }).click();
     await expect(page.locator('.pp-ar__original')).toBeHidden();
-    const rotation = page.getByRole('slider', { name: 'Rotate dish' });
-    await rotation.fill('30');
-    await expect(rotation).toHaveValue('30');
+    const rotation = page.getByRole('slider', { name: 'Tilt dish' });
+    await rotation.fill('3');
+    await expect(rotation).toHaveValue('3');
     await page.screenshot({ path: '/private/tmp/automatic-cutout-camera-test.png' });
     await page.getByRole('button', { name: 'Back to preview', exact: true }).click();
     await page.getByText('Preview controls', { exact: true }).click();

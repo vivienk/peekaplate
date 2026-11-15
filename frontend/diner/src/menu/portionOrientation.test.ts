@@ -53,7 +53,7 @@ it('releases a lock which completes after the preview closed', async () => {
   await settle();
   expect(unlock).toHaveBeenCalledOnce();
 });
-it('cleans up unsupported lock and does not take over existing fullscreen', async () => {
+it('cleans up unsupported lock and does not exit existing fullscreen', async () => {
   const { document, root } = setup(
     vi.fn(async () => {
       throw new Error('unsupported');
@@ -75,4 +75,17 @@ it('does not request fullscreen on desktop or without orientation support', () =
   vi.stubGlobal('screen', { orientation: {} });
   createPortionOrientation().request();
   expect(root.requestFullscreen).not.toHaveBeenCalled();
+});
+
+it('locks landscape inside existing fullscreen without exiting its owner', async () => {
+  const { document, root, lock, unlock } = setup();
+  document.fullscreenElement = root;
+  const controller = createPortionOrientation();
+  controller.request();
+  await settle();
+  expect(lock).toHaveBeenCalledWith('landscape');
+  expect(root.requestFullscreen).not.toHaveBeenCalled();
+  controller.release();
+  expect(unlock).toHaveBeenCalledOnce();
+  expect(document.exitFullscreen).not.toHaveBeenCalled();
 });

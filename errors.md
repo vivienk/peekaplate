@@ -2859,3 +2859,12 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 - 2026-11-13 context check rejected eleven handoffs after adding plate calibration. Kept the required ten most recent handoffs; older entries remain in Git history.
 
 - 2026-11-13 interaction revert: browser checks initially failed with ERR_CONNECTION_REFUSED because the isolated local preview on5175 was stopped. Restarted the diner development server before rerunning; no application change required.
+
+- 2026-11-15 portion interaction regression setup: browser runner could not bind local5173 (EPERM). Retrying with authorized local networking; no application failure inferred.
+
+- 2026-11-15 portal regression RED: original portionAR at50c3b99 fails the new landscape assertion because it offers unrestricted Rotate dish instead of bounded Tilt dish. New placement geometry regressions cover retained size/position and image containment across orientation and zoom.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T08:46:58.839Z","exitCode":1}
+```

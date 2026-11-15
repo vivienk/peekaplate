@@ -98,7 +98,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner menu/detail/search and Save/Saved use PR145 screens and shared contracts/tokens. Live mode validates bundle identity before rendering; consent gates independent tracking outboxes. View Portion validates revision-bound layers and retains photo fallback, back navigation and camera cleanup. PR147 supplies six unchanged transparent design photos; generated bounded manifests bind each photo to its fixture dish/revision. Explicit preview builds open matching 2.5D camera previews from normal menu dishes. Published menus cannot set the internal fixture marker. Local development alone retains the legacy shared-image/3D harness; hosted legacy links use dish photos. Real-device and restaurant publication acceptance remain separate. Photo preparation invokes reusable portion ingestion; PR147 fixtures are exports of this processor, with build-time freshness checks.",
+      "summary": "Diner menu/detail/search and Saved use shared contracts/tokens. Live mode verifies bundle identity; consent gates tracking. View Portion validates revision-bound layers and retains photo fallback, navigation and camera cleanup. PR147 design photos bind to fixture dish/revision; published menus cannot set preview markers. Preview camera images retain proportions, preferred pixel size and relative placement across viewport changes, with bounded drag and ±3° tilt. Opening requests landscape; unsupported browsers retain a manual rotation prompt. Optional local upload/3D stays DEV-only. Real-device and approved restaurant publication acceptance remain separate.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -217,7 +217,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/src/peekaplate_processing/portion_ingestion.py",
         "processing/src/peekaplate_processing/plate_calibration.py",
         "processing/src/peekaplate_processing/prepare_assets.py",
-        "processing/tests/test_portion_ingestion.py"
+        "processing/tests/test_portion_ingestion.py",
+        "frontend/diner/src/menu/portionPlacement.ts",
+        "frontend/diner/src/menu/portionPlacement.test.ts",
+        "frontend/diner/src/menu/portionOrientation.ts",
+        "frontend/diner/src/menu/portionOrientation.test.ts",
+        "tests/e2e/portion-landscape.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -226,7 +231,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "9ac3dc587c667b12a7774e9c135fbe8b43271ddb3d1dccb763bf67c159f3449f"
+      "sourceFingerprint": "f948fbb8f1f536f579db9718ffe16b6d1110c8d684ec665a22e7b51c84f0f391"
     },
     {
       "id": "console",

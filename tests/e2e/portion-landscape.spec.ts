@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.use({ hasTouch: true });
+
 for (const { supported, landscape } of [
   { supported: true, landscape: true },
   { supported: false, landscape: true },
@@ -54,7 +56,7 @@ for (const { supported, landscape } of [
         },
       });
     }, supported);
-    await page.goto(process.env.PEEKAPLATE_UPLOAD_URL || 'http://127.0.0.1:5175/');
+    await page.goto(process.env.PEEKAPLATE_UPLOAD_URL || 'http://127.0.0.1:5173/');
     await page.getByRole('button', { name: 'Open Avocado Toast', exact: true }).click();
     const actions = page.locator('.pp-detail__actions');
     await expect(actions.locator(':scope > *')).toHaveCount(2);
@@ -78,7 +80,9 @@ for (const { supported, landscape } of [
       )
       .toBe(supported ? 'landscape' : '');
     if (!supported && !landscape)
-      await expect(portal.getByText('Rotate your phone sideways to view the dish.')).toBeVisible();
+      await expect(
+        portal.getByText('Turn your phone sideways for the landscape view.'),
+      ).toBeVisible();
     const box = await portal.boundingBox();
     expect(box!.width).toBe(landscape ? 844 : 390);
     expect(box!.height).toBe(landscape ? 390 : 844);
@@ -101,7 +105,7 @@ for (const { supported, landscape } of [
     await portal.getByRole('button', { name: 'Return to AR', exact: true }).click();
     await expect(portal.locator('.pp-ar__original')).toBeHidden();
     await portal.getByText('Adjust view', { exact: true }).click();
-    await expect(portal.getByRole('slider', { name: 'Rotate dish' })).toBeEnabled();
+    await expect(portal.getByRole('slider', { name: 'Tilt dish' })).toHaveAttribute('max', '3');
     await page.screenshot({ path: `/private/tmp/portion-landscape-${supported}-${landscape}.png` });
     await portal.getByRole('button', { name: 'Back to preview', exact: true }).click();
     if (supported)

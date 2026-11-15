@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: [
     'portion.spec.ts',
+    'portion-landscape.spec.ts',
     'menu-states.spec.ts',
     'published-integrity.spec.ts',
     'published-refresh.spec.ts',
