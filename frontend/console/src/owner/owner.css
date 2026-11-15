@@ -588,6 +588,13 @@ body:has(.owner-root) {
   line-height: var(--pp-line-height-paragraph-1);
   font-weight: var(--pp-font-weight-semibold);
 }
+.owner-ai__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-8);
+  font-size: var(--pp-font-size-paragraph-2);
+  font-weight: var(--pp-font-weight-semibold);
+}
 .owner-ai__composer {
   display: flex;
   align-items: center;

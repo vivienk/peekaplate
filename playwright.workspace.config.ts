@@ -19,6 +19,8 @@ export default defineConfig({
       VITE_SUPABASE_URL: 'https://auth-fixture.supabase.co',
       VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_synthetic_fixture_only',
       VITE_PUBLIC_API_URL: 'https://peekaplate-api-staging.vxkong.workers.dev',
+      // Shows the #164 AI panel beside the live report; analysis HTTP is synthetic too.
+      VITE_OWNER_AI_ENABLED: 'true',
     },
   },
 });

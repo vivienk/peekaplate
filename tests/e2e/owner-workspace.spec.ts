@@ -64,6 +64,7 @@ async function fixture(context: BrowserContext) {
     delayReport: false,
     releaseReport: () => {},
     apiCalls: [] as Array<{ path: string; actor: string; version: number }>,
+    analyses: [] as Array<{ venueId: string; actor: string; body: unknown }>,
   };
   await context.route('https://auth-fixture.supabase.co/auth/v1/**', async (route) => {
     const request = route.request();
@@ -112,6 +113,29 @@ async function fixture(context: BrowserContext) {
       actor,
       version: claims(request.headers().authorization).version ?? 0,
     });
+    const analysis = url.pathname.match(/^\/api\/v1\/venues\/([0-9a-f-]{36})\/ai\/analysis$/);
+    if (analysis && request.method() === 'POST') {
+      const body = request.postDataJSON();
+      state.analyses.push({ venueId: analysis[1] ?? '', actor, body });
+      return route.fulfill({
+        json: {
+          schemaVersion: 'owner-analysis.v1',
+          venueId: analysis[1],
+          dishId: body.dishId,
+          goal: body.goal,
+          source: 'synthetic',
+          reportSnapshot: 'a'.repeat(64),
+          timeWindow: { start: '2026-11-11T12:00:00Z', end: '2026-11-12T12:00:00Z' },
+          status: 'review',
+          metric: 'open_rate',
+          value: 0.5,
+          reason: 'review_evidence',
+          approvalRequired: true,
+          allowedEffects: [],
+        },
+        headers: { 'Access-Control-Allow-Origin': origin },
+      });
+    }
     if (url.pathname === '/staff/venues') {
       const body = {
         actorId: state.invalidActor ? otherId : actor,
@@ -369,4 +393,61 @@ test('workspace supports keyboard, narrow screens and accessible labels', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test('the AI panel opens beside the live report and uses only the signed-in owner and restaurant', async ({
+  context,
+  page,
+}, testInfo) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
+  await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await expect(panel).toBeVisible();
+  const dish = panel.getByLabel('Dish', { exact: true });
+  await expect(dish.locator('option')).toHaveText(UNEEZA_REPORT.dishes.map((d) => d.name));
+  await dish.selectOption({ label: 'Soup' });
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  const soup = UNEEZA_REPORT.dishes.find((d) => d.name === 'Soup');
+  expect(state.analyses).toEqual([
+    { venueId: venue.venueId, actor: ownerId, body: { dishId: soup?.dish_id, goal: 'menu' } },
+  ]);
+  const axe = await new AxeBuilder({ page }).analyze();
+  expect(axe.violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('owner-workspace-ai.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
+});
+
+test('switching restaurant clears the AI result and asks only for the new restaurant', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.venues = [venue, otherVenue];
+  await signIn(page);
+  await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
+  await expect(page.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  await expect(panel.getByText(otherVenue.name)).toBeVisible();
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  expect(state.analyses.map((call) => call.venueId)).toEqual([venue.venueId, otherVenue.venueId]);
+});
+
+test('editor access shows no AI panel', async ({ context, page }) => {
+  const state = await fixture(context);
+  state.venues = [{ ...venue, permission: 'editor' }];
+  await signIn(page);
+  await expect(page.getByRole('heading', { name: 'Restaurant workspace' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
+  expect(state.analyses).toEqual([]);
 });

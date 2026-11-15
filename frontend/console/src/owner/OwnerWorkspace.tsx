@@ -1,7 +1,11 @@
+import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
+import { createOwnerAnalysisClient } from '../owner-dashboard/ai-preview/analysis-client';
+import { OwnerAnalysisPanel } from '../owner-dashboard/ai-preview/OwnerAnalysisPanel';
 import { ReportData } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
+import { Icon } from './icons';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
 import './owner.css';
@@ -11,6 +15,7 @@ export function OwnerWorkspace({
   auth,
   owner,
   apiBase,
+  aiEnabled = false,
   onSessionExpired,
   onSignOut,
   signingOut,
@@ -18,6 +23,8 @@ export function OwnerWorkspace({
   auth: OwnerAuthRuntime;
   owner: SignedInOwner;
   apiBase: string | null;
+  /** Shows the #164 AI panel beside the live report. Off unless the build turns it on. */
+  aiEnabled?: boolean;
   onSessionExpired: () => void;
   onSignOut: () => void;
   signingOut: boolean;
@@ -27,6 +34,9 @@ export function OwnerWorkspace({
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('overview');
   const pickerId = useId();
+  // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
+  // one restaurant's dishes under another.
+  const [shown, setShown] = useState<{ scope: string; report: OwnerDishReport } | null>(null);
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
   useEffect(() => {
@@ -68,6 +78,11 @@ export function OwnerWorkspace({
         selected?.permission === 'owner' ? ['overview', 'performance'] : ['overview'],
       ),
     [selected?.permission],
+  );
+  const scope = selected ? `${owner.id}:${selected.venueId}` : '';
+  const showReport = useCallback(
+    (report: OwnerDishReport | null) => setShown(report ? { scope, report } : null),
+    [scope],
   );
   const signOut = (
     <Button variant="text" disabled={signingOut} onClick={onSignOut}>
@@ -146,6 +161,19 @@ export function OwnerWorkspace({
       </main>
     );
 
+  const reportShown = page === 'performance' && shown?.scope === scope ? shown.report : null;
+  const aside =
+    aiEnabled && selected.permission === 'owner' && reportShown ? (
+      <LiveAiPanel
+        key={scope}
+        apiBase={apiBase}
+        venueId={selected.venueId}
+        restaurantName={selected.name}
+        getAccessToken={getAccessToken}
+        dishes={reportShown.dishes}
+      />
+    ) : undefined;
+
   return (
     <div className="owner-root owner-workspace">
       <OwnerShell
@@ -157,6 +185,7 @@ export function OwnerWorkspace({
         onNavigate={(next) => {
           if (pages.has(next)) setPage(next);
         }}
+        aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
             {picker}
@@ -172,6 +201,7 @@ export function OwnerWorkspace({
             key={`${owner.id}:${selected.venueId}`}
             source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
             onAccessFailure={accessFailure}
+            onReport={showReport}
           />
         ) : (
           <section>
@@ -183,5 +213,75 @@ export function OwnerWorkspace({
         )}
       </OwnerShell>
     </div>
+  );
+}
+
+// The #164 analysis panel inside the live shell. Identity and restaurant come only from the signed-in
+// workspace: the token getter is bound to this owner and the venue is the authorised selection.
+// Dishes come from the report on screen; the panel sends only a dish ID and a review goal.
+function LiveAiPanel({
+  apiBase,
+  venueId,
+  restaurantName,
+  getAccessToken,
+  dishes,
+}: {
+  apiBase: string;
+  venueId: string;
+  restaurantName: string;
+  getAccessToken: () => Promise<string | null>;
+  dishes: OwnerDishReport['dishes'];
+}) {
+  const dishFieldId = useId();
+  const [picked, setPicked] = useState('');
+  const dishId = dishes.some((dish) => dish.dish_id === picked)
+    ? picked
+    : (dishes[0]?.dish_id ?? '');
+  const analyze = useMemo(
+    () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
+    [apiBase, venueId, getAccessToken],
+  );
+  const connection = useMemo(
+    () => (dishId ? { analyze, venueId, dishId } : null),
+    [analyze, venueId, dishId],
+  );
+  return (
+    <aside className="owner-ai" aria-label="PeekaPlate AI">
+      <div className="owner-ai__head">
+        <div className="owner-ai__title">
+          <span className="owner-ai__icon">
+            <Icon name="spark" size={16} />
+          </span>
+          <h2>PeekaPlate AI</h2>
+        </div>
+        <div className="owner-chips">
+          <span className="owner-chip owner-chip--surface">{restaurantName}</span>
+        </div>
+      </div>
+      <div className="owner-ai__body">
+        {connection ? (
+          <>
+            <div className="owner-ai__field">
+              <label htmlFor={dishFieldId}>Dish</label>
+              <select
+                id={dishFieldId}
+                className="pp-input"
+                value={dishId}
+                onChange={(event) => setPicked(event.target.value)}
+              >
+                {dishes.map((dish) => (
+                  <option key={dish.dish_id} value={dish.dish_id}>
+                    {dish.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <OwnerAnalysisPanel connection={connection} />
+          </>
+        ) : (
+          <p className="owner-muted">There are no dishes in this report to review yet.</p>
+        )}
+      </div>
+    </aside>
   );
 }
