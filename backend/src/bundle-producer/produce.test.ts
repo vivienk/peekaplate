@@ -143,6 +143,32 @@ async function produceDefault() {
   return produceMenuBundle(parseRequest(requestInput()), sources(), assets());
 }
 
+it('uses the reviewed allergen/category snapshot and refuses a different category', async () => {
+  const result = await produceMenuBundle(
+    parseRequest(requestInput()),
+    sources({ [LEEKS]: { approvedAllergens: ['milk'], approvedCategory: 'Starters' } }),
+    assets(),
+  );
+  const leek = dishes(result).find((dish) => dish.dish_id === LEEKS);
+  expect(leek?.complete && leek.allergens).toEqual(['milk']);
+  const unknown = await produceMenuBundle(
+    parseRequest(requestInput()),
+    sources({ [LEEKS]: { approvedAllergens: null, approvedCategory: 'Starters' } }),
+    assets(),
+  );
+  expect(dishes(unknown).find((dish) => dish.dish_id === LEEKS)).toMatchObject({
+    complete: true,
+    allergens: null,
+  });
+  await expect(
+    produceMenuBundle(
+      parseRequest(requestInput()),
+      sources({ [LEEKS]: { approvedAllergens: [], approvedCategory: 'Unapproved category' } }),
+      assets(),
+    ),
+  ).rejects.toMatchObject({ code: 'invalid_request' });
+});
+
 async function producerError(promise: Promise<unknown>) {
   const error = await promise.catch((caught: unknown) => caught);
   if (!(error instanceof BundleProducerError)) throw error;

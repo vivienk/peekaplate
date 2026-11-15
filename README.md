@@ -12,6 +12,12 @@ Staging links: [diner](https://peekaplate-diner-staging.pages.dev/) · [owner/st
 
 ## Implementation status
 
+The [owner menu workspace handoff](docs/owner-menu-workspace.md) defines grouped
+uploads, private dish photos, manual draft save/resume, cancel/retry and reviewed
+revision facts. The November 12 authenticated staging acceptance passed 53 hosted
+HTTP checks and 29 browser assertions, plus independent Supabase/R2 checks. The
+real S06–S09 screen connection remains Ehab’s next slice.
+
 Team analytics inspection is deployed in staging at release `afe45db`. Both read APIs returned 200 using an accepted repository collaborator's own GitHub token; missing/invalid tokens returned 401. On October 23, a valid non-collaborator received 403 from both endpoints in two reported checker runs. See [team data access](docs/team-data-access.md) for the URL, authentication, safe fields and dated evidence. All accepted repository collaborators are eligible; nobody receives a shared database or deployment credential. These delayed diagnostic counts are separate from owner business reports. The controlled collaborator-removal check remains pending; production is not configured.
 
 The repository includes diner menu/detail/search and Save/Compare foundations, staff review/publication commands, canonical observations and gated owner-report APIs. These pieces have separate integration and release boundaries. Genuine Supabase sessions have verified bounded synthetic staff/publication behavior and tenant denial; they do not certify the complete pilot. Owner-screen integration, remaining diner triggers, POS work and end-to-end evidence still require their ticket acceptance. See the [verification map](docs/verification.md) and dated deployment records rather than assuming every merged feature is deployed.
@@ -24,9 +30,9 @@ The staging observation producer and real Queue consumer are deployed. Genuine s
 | --- | --- | --- |
 | Diner frontend | TypeScript, Vite | Static shell with content available without JavaScript |
 | Staff console | React, TypeScript, Vite | Application shell |
-| Backend | Hono, TypeScript, Cloudflare Workers | Health and authenticated dish-revision commands; staging issuer and Hyperdrive configured |
-| Shared contracts | Zod, TypeScript | Health, dish revision and initial dish-intent schemas |
-| Database | PostgreSQL, SQL, dbmate | Private venues, staff memberships, dish projections, events, receipts and outbox; restricted runtime role |
+| Backend | Hono, TypeScript, Cloudflare Workers | Staff/tenant commands, private menu uploads and drafts, extraction review/publication, signed menus, observations and gated owner reports; release records define hosted scope |
+| Shared contracts | Zod, TypeScript | Strict upload, draft, review, menu publication, observation and owner-report contracts |
+| Database | PostgreSQL, SQL, dbmate | Private venues, staff permissions, jobs/upload groups, drafts/photo metadata, approved facts, events, receipts and outbox; restricted tenant runtime role |
 | Processing and analysis | Python, uv, Pydantic; optional FastAPI/Uvicorn service | [PDF/image extraction](processing/README.md), deployed staging Python service and [T0/2.5D/presentation asset preparation](docs/asset-delivery.md); hosted authorization/private R2 checks passed. [Provider extraction and VIS-01 integration](docs/menu-ingestion-infrastructure.md) remain separate |
 | Product analytics | PostHog, shared TypeScript capture module | Opt-in shell views and tested v1 dish adapter; hosted staging ingestion verified. Private Supabase export and duplicate-safe retry verified; hourly staging schedule enabled. |
 
@@ -47,7 +53,7 @@ The backend can include both TypeScript and Python. The existing TypeScript/Hono
 
 The existing Python component uses an isolated `uv` environment, a frozen lockfile and `unittest` regression tests. Install and test its HTTP service with `uv run --project processing --extra service --frozen python -m unittest discover -s processing/tests`; CI runs that suite and builds the package. Python and TypeScript communicate through validated JSON contracts. Job requests must carry backend-authorized restaurant and input references; returned results must be checked against that job before any application change. Use the established command path for business changes rather than writing around permissions, event history or approval rules.
 
-VIS-01 has a deployed Cloudflare Containers host and bounded HTTP wrapper for the native PyMuPDF pipeline. Workers Paid is active; internal credentials and the API service URL are configured. Hosted health, authorization and signed private R2 source checks passed. On October 28, the OCR.space key was stored in GitHub's protected staging environment and the extraction Worker; a fresh OCR-only provider call read three synthetic dish names and prices in 4.654 seconds. The [service handoff](docs/menu-ingestion-infrastructure.md#ocr-credential-and-provider-check--october-28-2026) distinguishes this check from full extraction: AI provider configuration, the reviewed migration/consumer and complete staging acceptance remain pending. No key belongs in frontend configuration or source control.
+VIS-01 has a deployed Cloudflare Containers host and bounded HTTP wrapper for the native PyMuPDF pipeline. Workers Paid is active; internal credentials and the API service URL are configured. Hosted health, authorization and signed private R2 source checks passed. On October 28, the OCR.space key was stored in GitHub's protected staging environment and the extraction Worker; a fresh OCR-only provider call read three synthetic dish names and prices in 4.654 seconds. The [service handoff](docs/menu-ingestion-infrastructure.md#ocr-credential-and-provider-check--october-28-2026) records that OCR-only checkpoint. The current [workspace acceptance](docs/owner-menu-workspace.md#acceptance-record) verifies authenticated upload/review persistence using retained genuine extraction output; no new model call or complete owner-screen acceptance is claimed. No key belongs in frontend configuration or source control.
 
 Choose its runtime after checking the task's packages and resource needs:
 

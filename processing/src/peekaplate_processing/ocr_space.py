@@ -32,7 +32,7 @@ class OCRSpaceClient(OCRProvider):
     transport_attempts counter excludes cache hits and local input/key failures.
     """
 
-    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90, is_table:bool=True, max_attempts:int=2):
+    def __init__(self, api_key:str|None, *, cache_dir:str|Path|None=None, timeout:float=90, is_table:bool=True, max_attempts:int=2, budget_gate=None):
         if not math.isfinite(timeout) or not 0<timeout<=120:
             raise ExtractionError("OCR timeout must be greater than zero and at most 120 seconds.")
         if type(max_attempts) is not int or max_attempts not in (1, 2):
@@ -43,6 +43,7 @@ class OCRSpaceClient(OCRProvider):
         self.cache_dir=Path(cache_dir) if cache_dir is not None else None
         self.timeout=timeout
         self.is_table=bool(is_table)
+        self.budget_gate=budget_gate
 
     def extract(self, image:bytes)->dict:
         if not image or len(image)>MAX_OCR_BYTES:
@@ -71,6 +72,8 @@ class OCRSpaceClient(OCRProvider):
         data=urlencode({key:str(value).lower() if isinstance(value, bool) else value for key,value in payload.items()}).encode()
         request=Request(OCR_ENDPOINT, data=data, headers={"apikey":self.api_key, "Content-Type":"application/x-www-form-urlencoded"}, method="POST")
         for attempt in range(self.max_attempts):
+            if self.budget_gate is not None:
+                self.budget_gate.reserve("ocr_space")
             try:
                 self.transport_attempts += 1
                 with build_opener(NoRedirects()).open(request, timeout=self.timeout) as response:

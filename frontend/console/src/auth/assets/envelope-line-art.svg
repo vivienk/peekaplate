@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="320" height="150" viewBox="0 0 320 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Envelope line art">
+<path id="Vector" opacity="0.9" d="M0 150C0 128 14 114 36 114C40 98 58 90 74 96C84 82 106 84 112 100C124 100 134 110 134 124V150H0Z" fill="#FEEED6"/>
+<path id="Vector_2" opacity="0.9" d="M186 150V134C186 122 196 114 208 116C214 102 236 100 244 112C262 108 276 120 274 134C292 134 304 142 306 150H186Z" fill="#FEEED6"/>
+<path id="Vector_3" d="M143 20L150 28M169 8V20M195 20L188 28" stroke-width="2.5" stroke-linecap="round" stroke="#FBBF76"/>
+<path id="Vector_4" d="M107 56H213C217.971 56 222 60.0294 222 65V135C222 139.971 217.971 144 213 144H107C102.029 144 98 139.971 98 135V65C98 60.0294 102.029 56 107 56Z" stroke-width="2.8" stroke="#3A3A3C"/>
+<path id="Vector_5" d="M103 63L160 108L217 63" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" stroke="#3A3A3C"/>
+<path id="Vector_6" d="M103 138L141 99M217 138L179 99" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" stroke="#3A3A3C"/>
+</g>
+</svg>

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { CreateDishRevision, DishRevision } from '@peekaplate/contracts';
-import { DishRevisionSchema } from '@peekaplate/contracts';
+import { ApprovedDishFactsSchema, DishRevisionSchema } from '@peekaplate/contracts';
 import type { Client } from 'pg';
 
 export type CreateDishRevisionInput = CreateDishRevision & Pick<DishRevision, 'dishId'>;
@@ -38,6 +38,7 @@ function requestHash(input: CreateDishRevisionInput) {
         expectedVersion: input.expectedVersion,
         name: input.name,
         description: input.description,
+        ...(input.facts === undefined ? {} : { factsVersion: 1, facts: input.facts }),
       }),
     )
     .digest('hex');
@@ -55,19 +56,22 @@ export class ReplayError extends Error {
 }
 
 function eventResult(event: DishEvent): DishRevisionResult {
-  if (event.schemaVersion !== 1 || event.eventType !== 'dish.revision.created') {
+  if (![1, 2].includes(event.schemaVersion) || event.eventType !== 'dish.revision.created') {
     throw new ReplayError('unsupported dish event');
   }
   if (!event.payload || typeof event.payload !== 'object') {
     throw new ReplayError('dish event payload is invalid');
   }
   const payload = event.payload as Record<string, unknown>;
+  if (event.schemaVersion === 2 && !ApprovedDishFactsSchema.safeParse(payload.facts).success)
+    throw new ReplayError('dish event facts are invalid');
   const parsed = DishRevisionSchema.safeParse({
     dishId: payload.dishId,
     revisionId: payload.revisionId,
     version: payload.version,
     name: payload.name,
     description: payload.description,
+    ...(event.schemaVersion === 2 ? { facts: payload.facts } : {}),
   });
   if (
     !parsed.success ||
@@ -157,8 +161,8 @@ export async function createDishRevision(
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
       `dish:${venueId}:${input.dishId}`,
     ]);
-    const current = await client.query<{ version: number }>(
-      `SELECT version
+    const current = await client.query<{ version: number; approved_facts?: unknown }>(
+      `SELECT version, approved_facts
        FROM app_private.dish_current
        WHERE tenant_id = $1 AND dish_id = $2`,
       [venueId, input.dishId],
@@ -171,12 +175,19 @@ export async function createDishRevision(
     const version = currentVersion + 1;
     const revisionId = randomUUID();
     const eventId = randomUUID();
+    const storedFacts = current.rows[0]?.approved_facts;
+    const facts =
+      input.facts ??
+      (storedFacts === undefined || storedFacts === null
+        ? undefined
+        : ApprovedDishFactsSchema.parse(storedFacts));
     const commandResult: DishRevisionResult = {
       dishId: input.dishId,
       revisionId,
       version,
       name: input.name,
       description: input.description,
+      ...(facts === undefined ? {} : { facts }),
     };
     const eventPayload = JSON.stringify({ ...commandResult, commandId: input.commandId });
     const commandPayload = JSON.stringify({
@@ -184,27 +195,52 @@ export async function createDishRevision(
       expectedVersion: input.expectedVersion,
       name: input.name,
       description: input.description,
+      ...(input.facts === undefined ? {} : { facts: input.facts }),
     });
 
     await client.query(
       `INSERT INTO app_private.es_event
         (id, tenant_id, stream_type, stream_id, version, schema_version, event_type, payload, metadata)
-       VALUES ($1, $2, 'dish', $3, $4, 1, 'dish.revision.created', $5::jsonb, $6::jsonb)`,
-      [eventId, venueId, input.dishId, version, eventPayload, JSON.stringify({ actorId })],
+       VALUES ($1, $2, 'dish', $3, $4, $7, 'dish.revision.created', $5::jsonb, $6::jsonb)`,
+      [
+        eventId,
+        venueId,
+        input.dishId,
+        version,
+        eventPayload,
+        JSON.stringify({ actorId }),
+        facts === undefined ? 1 : 2,
+      ],
     );
     if (current.rows[0]) {
       await client.query(
         `UPDATE app_private.dish_current
-         SET version = $3, revision_id = $4, name = $5, description = $6, updated_at = now()
+         SET version = $3, revision_id = $4, name = $5, description = $6, updated_at = now(), approved_facts = $7::jsonb
          WHERE tenant_id = $1 AND dish_id = $2`,
-        [venueId, input.dishId, version, revisionId, input.name, input.description],
+        [
+          venueId,
+          input.dishId,
+          version,
+          revisionId,
+          input.name,
+          input.description,
+          facts === undefined ? null : JSON.stringify(facts),
+        ],
       );
     } else {
       await client.query(
         `INSERT INTO app_private.dish_current
-          (tenant_id, dish_id, version, revision_id, name, description)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [venueId, input.dishId, version, revisionId, input.name, input.description],
+          (tenant_id, dish_id, version, revision_id, name, description, approved_facts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+        [
+          venueId,
+          input.dishId,
+          version,
+          revisionId,
+          input.name,
+          input.description,
+          facts === undefined ? null : JSON.stringify(facts),
+        ],
       );
     }
     await client.query(

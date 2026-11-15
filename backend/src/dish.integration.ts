@@ -325,10 +325,14 @@ beforeAll(async () => {
   config.main = fileURLToPath(new URL('./index.ts', import.meta.url));
   config.r2_buckets = [
     { binding: 'OBSERVATION_ARCHIVE_BUCKET', bucket_name: 'local-observation-fixtures' },
+    { binding: 'INGESTION_REPORTS_BUCKET', bucket_name: 'local-menu-workspace' },
   ];
   config.ratelimits = config.env.staging.ratelimits;
   config.queues = {
-    producers: [{ binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' }],
+    producers: [
+      { binding: 'OBSERVATION_QUEUE', queue: 'local-observation-fixtures' },
+      { binding: 'INGESTION_QUEUE', queue: 'local-menu-workspace' },
+    ],
     consumers: [
       {
         queue: 'local-observation-fixtures',
@@ -375,6 +379,108 @@ afterAll(async () => {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
+});
+
+describe('owner menu browser transport', () => {
+  it('saves and resumes a private draft/photo through Chromium and the actual Worker/database', async () => {
+    const browser = await chromium.launch();
+    const consoleServer = createServer((_, res) =>
+      res
+        .writeHead(200, { 'Content-Type': 'text/html' })
+        .end('<!doctype html><title>Synthetic owner workspace transport</title>'),
+    );
+    let ownsServer = false;
+    await new Promise<void>((resolve, reject) => {
+      consoleServer.once('error', (error: NodeJS.ErrnoException) =>
+        error.code === 'EADDRINUSE' ? resolve() : reject(error),
+      );
+      consoleServer.listen(5174, '127.0.0.1', () => {
+        ownsServer = true;
+        resolve();
+      });
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto('http://127.0.0.1:5174/workspace-check.html');
+      const id = crypto.randomUUID();
+      const bearer = await token({ sub: actor });
+      const api = `http://127.0.0.1:${worker.port}`;
+      const first = await page.evaluate(
+        async ({ api, id, venue, bearer }) => {
+          const response = await fetch(`${api}/venues/${venue}/drafts/${id}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              commandId: crypto.randomUUID(),
+              expectedVersion: 0,
+              fields: { name: 'Browser fictional soup' },
+            }),
+          });
+          return {
+            status: response.status,
+            body: await response.json(),
+          };
+        },
+        { api, id, venue, bearer },
+      );
+      expect(first.status).toBe(200);
+      await page.reload();
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5WQAAAAASUVORK5CYII=',
+        'base64',
+      );
+      const result = await page.evaluate(
+        async ({ api, id, venue, otherVenue, bearer, png }) => {
+          const headers = { Authorization: `Bearer ${bearer}` };
+          const resumed = await fetch(`${api}/venues/${venue}/drafts/${id}`, { headers });
+          const draft = (await resumed.json()) as {
+            draft: { name: string; draft_version: number };
+          };
+          const uploaded = await fetch(`${api}/venues/${venue}/drafts/${id}/photos`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'image/png',
+              'Idempotency-Key': crypto.randomUUID(),
+            },
+            body: new Uint8Array(png),
+          });
+          const photo = (await uploaded.json()) as { photo: { id: string } };
+          const read = await fetch(`${api}/venues/${venue}/drafts/${id}/photos/${photo.photo.id}`, {
+            headers,
+          });
+          const denied = await fetch(`${api}/venues/${otherVenue}/drafts/${id}`, { headers });
+          const anonymous = await fetch(`${api}/venues/${venue}/drafts/${id}`);
+          return {
+            resumed: resumed.status,
+            name: draft.draft.name,
+            version: draft.draft.draft_version,
+            upload: uploaded.status,
+            photo: read.status,
+            type: read.headers.get('content-type'),
+            size: (await read.arrayBuffer()).byteLength,
+            denied: denied.status,
+            anonymous: anonymous.status,
+          };
+        },
+        { api, id, venue, otherVenue, bearer, png: [...png] },
+      );
+      expect(result).toEqual({
+        resumed: 200,
+        name: 'Browser fictional soup',
+        version: 1,
+        upload: 201,
+        photo: 200,
+        type: 'image/png',
+        size: png.length,
+        denied: 403,
+        anonymous: 401,
+      });
+    } finally {
+      await browser.close();
+      if (ownsServer) await new Promise<void>((resolve) => consoleServer.close(() => resolve()));
+    }
+  });
 });
 
 describe('real team analytics API', () => {
@@ -1306,6 +1412,123 @@ describe('real PostgreSQL staff command', () => {
 });
 
 describe('real PostgreSQL menu publication commands', () => {
+  it('rolls back publication, receipt and outbox if link allocation fails, then permits retry', async () => {
+    const menuId = crypto.randomUUID();
+    const input = approvalCommand();
+    await registerReviewSubject(menuId, input);
+    const approval = MenuApprovalSchema.parse(
+      await (await requestPublication(menuId, 'approvals', input)).json(),
+    );
+    const command = {
+      commandId: crypto.randomUUID(),
+      expectedVersion: 0,
+      approvalId: approval.approvalId,
+    };
+    const before = await publicationCounts(menuId);
+    await admin.query(
+      `ALTER TABLE app_private.restaurant_menu_link ADD CONSTRAINT link_test_fault CHECK (menu_id <> '${menuId}'::uuid)`,
+    );
+    try {
+      expect((await requestPublication(menuId, 'publications', command)).status).toBe(503);
+      expect(await publicationCounts(menuId)).toEqual(before);
+      expect(
+        (
+          await admin.query(
+            'SELECT count(*)::int AS count FROM app_private.restaurant_menu_link WHERE menu_id=$1',
+            [menuId],
+          )
+        ).rows[0].count,
+      ).toBe(0);
+    } finally {
+      await admin.query(
+        'ALTER TABLE app_private.restaurant_menu_link DROP CONSTRAINT link_test_fault',
+      );
+    }
+    expect((await requestPublication(menuId, 'publications', command)).status).toBe(200);
+  });
+  it('allocates distinct restaurant links atomically, preserving retries and closing withdrawn links', async () => {
+    const restaurantName = `URL fixture ${crypto.randomUUID().slice(0, 8)}`;
+    const tenants = [crypto.randomUUID(), crypto.randomUUID()];
+    const menus = [crypto.randomUUID(), crypto.randomUUID()];
+    const commands: Array<{ commandId: string; expectedVersion: number; approvalId: string }> = [];
+    for (const [index, tenant] of tenants.entries()) {
+      const menu = menus[index]!;
+      await admin.query('INSERT INTO app_private.venues(id,name) VALUES ($1,$2)', [
+        tenant,
+        restaurantName,
+      ]);
+      await admin.query(
+        "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES ($1,$2,'owner')",
+        [tenant, actor],
+      );
+      const input = approvalCommand();
+      await registerReviewSubject(menu, input, tenant);
+      await registerPublicBundle(menu, input.menuRevisionId, tenant);
+      const approval = await requestPublication(menu, 'approvals', input, tenant);
+      const approved = MenuApprovalSchema.parse(await approval.json());
+      commands.push({
+        commandId: crypto.randomUUID(),
+        expectedVersion: 0,
+        approvalId: approved.approvalId,
+      });
+    }
+    const responses = await Promise.all(
+      tenants.map((tenant, index) =>
+        requestPublication(menus[index]!, 'publications', commands[index], tenant),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    const paths = responses.map((response) => response.headers.get('Location'));
+    expect(new Set(paths).size).toBe(2);
+    for (const path of paths)
+      expect(path).toMatch(/^http:\/\/127\.0\.0\.1:5186\/diner\/url_fixture_[a-z0-9_]+$/);
+    const expected = await responses[0]!.json();
+    const again = await requestPublication(menus[0]!, 'publications', commands[0], tenants[0]);
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual(expected);
+    expect(again.headers.get('Location')).toBe(paths[0]);
+    const slug = paths[0]!.split('/').at(-1)!;
+    const resolve = () => fetch(`http://127.0.0.1:${worker.port}/public/restaurants/${slug}`);
+    expect(await (await resolve()).json()).toEqual({ venueId: tenants[0], menuId: menus[0] });
+    const ownerLink = `/venues/${tenants[0]}/menus/${menus[0]}/diner-link`;
+    expect((await fetch(`http://127.0.0.1:${worker.port}${ownerLink}`)).status).toBe(401);
+    const denied = await fetch(`http://127.0.0.1:${worker.port}${ownerLink}`, {
+      headers: { Authorization: `Bearer ${await token({ sub: otherVenueOwner })}` },
+    });
+    expect(denied.status).toBe(403);
+    await admin.query('UPDATE app_private.venues SET name=$2 WHERE id=$1', [
+      tenants[0],
+      'Renamed restaurant',
+    ]);
+    expect(
+      (
+        await requestPublication(
+          menus[0]!,
+          'withdrawals',
+          { commandId: crypto.randomUUID(), expectedVersion: 1 },
+          tenants[0],
+        )
+      ).status,
+    ).toBe(200);
+    expect((await resolve()).status).toBe(404);
+    const republish = await requestPublication(
+      menus[0]!,
+      'publications',
+      { ...commands[0]!, commandId: crypto.randomUUID(), expectedVersion: 2 },
+      tenants[0],
+    );
+    expect(republish.status).toBe(200);
+    expect(republish.headers.get('Location')).toBe(paths[0]);
+    expect((await resolve()).status).toBe(200);
+    expect(
+      (
+        await admin.query(
+          'SELECT count(*)::int AS count FROM app_private.restaurant_menu_link WHERE tenant_id=$1',
+          [tenants[0]],
+        )
+      ).rows[0].count,
+    ).toBe(1);
+  });
   it('serves only an active approved bundle and binds its menu token to the publication', async () => {
     const menuId = crypto.randomUUID();
     const approvalInput = approvalCommand();
@@ -1328,6 +1551,7 @@ describe('real PostgreSQL menu publication commands', () => {
 
     const response = await requestPublicMenu(menuId);
     expect(response.status).toBe(200);
+    expect((await requestPublicMenu(menuId, otherVenue)).status).toBe(404);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     const body = PublicMenuResponseSchema.parse(await response.json());
     expect(body).toMatchObject({
@@ -2641,5 +2865,39 @@ describe('Multi-tenant owner report isolation', () => {
     const revokedResponse = await requestReport(venue, revokedActor);
     expect(revokedResponse.status).toBe(403);
     expect(await revokedResponse.json()).toEqual({ error: 'forbidden' });
+  });
+});
+
+it('discovers only current owner/editor restaurants through real workerd and signed staff JWTs', async () => {
+  const workspaceActor = crypto.randomUUID();
+  const workspaceViewer = crypto.randomUUID();
+  const ownedVenue = crypto.randomUUID();
+  const secretVenue = crypto.randomUUID();
+  await admin.query(
+    `INSERT INTO app_private.venues(id,name) VALUES($1,'Synthetic bridge restaurant'),($2,'Unrelated private restaurant')`,
+    [ownedVenue, secretVenue],
+  );
+  await admin.query(
+    `INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'owner'),($1,$3,'viewer')`,
+    [ownedVenue, workspaceActor, workspaceViewer],
+  );
+  const url = `http://127.0.0.1:${worker.port}/staff/venues`;
+  expect((await fetch(url)).status).toBe(401);
+  const headers = { Authorization: `Bearer ${await token({ sub: workspaceActor })}` };
+  const response = await fetch(url, { headers });
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({
+    actorId: workspaceActor,
+    venues: [{ venueId: ownedVenue, name: 'Synthetic bridge restaurant', permission: 'owner' }],
+  });
+  const viewerResponse = await fetch(url, {
+    headers: { Authorization: `Bearer ${await token({ sub: workspaceViewer })}` },
+  });
+  expect(await viewerResponse.json()).toEqual({ actorId: workspaceViewer, venues: [] });
+  expect((await fetch(`${url}?venueId=${secretVenue}`, { headers })).status).toBe(400);
+  await admin.query('DELETE FROM app_private.staff_membership WHERE actor_id=$1', [workspaceActor]);
+  expect(await (await fetch(url, { headers })).json()).toEqual({
+    actorId: workspaceActor,
+    venues: [],
   });
 });

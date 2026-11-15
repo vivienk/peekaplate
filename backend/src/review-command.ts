@@ -250,6 +250,7 @@ export async function upsertExtractionReviewSession(
   actorId: string,
   venueId: string,
   input: UpsertExtractionReviewSessionRequest,
+  options?: { jobReportKey: string },
 ): Promise<ExtractionReviewSessionResponse> {
   let started = false;
   try {
@@ -278,6 +279,25 @@ export async function upsertExtractionReviewSession(
     }
 
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+
+    if (options) {
+      const current = await client.query(
+        `SELECT id FROM app_private.menu_ingestion_jobs WHERE tenant_id=$1 AND id=$2
+         AND status IN ('complete','incomplete') AND result_storage_key=$3 AND source_hash=$4 FOR UPDATE`,
+        [venueId, input.jobId, options.jobReportKey, input.extractionResult.source.sha256],
+      );
+      if (current.rowCount !== 1) throw new ReviewCommandError('extraction_conflict', 409);
+    }
+    const commit = async () => {
+      if (options)
+        await client.query(
+          `UPDATE app_private.menu_ingestion_jobs SET active_review_extraction_id=$3,
+           review_result_storage_key=$4 WHERE tenant_id=$1 AND id=$2`,
+          [venueId, input.jobId, input.extractionResult.extraction_id, options.jobReportKey],
+        );
+      await client.query('COMMIT');
+      started = false;
+    };
 
     const inputPayloadString = JSON.stringify(input.extractionResult);
     const inputPayloadHash = createHash('sha256')
@@ -320,8 +340,7 @@ export async function upsertExtractionReviewSession(
         input.extractionResult.extraction_id,
       );
       if (!replayed) throw new ReviewCommandError('not_found', 404);
-      await client.query('COMMIT');
-      started = false;
+      await commit();
       return buildReviewSessionResponse(venueId, replayed.session, replayed.reviews);
     }
 
@@ -376,8 +395,7 @@ export async function upsertExtractionReviewSession(
         ],
       );
 
-      await client.query('COMMIT');
-      started = false;
+      await commit();
       return response;
     }
 
@@ -430,8 +448,7 @@ export async function upsertExtractionReviewSession(
       ],
     );
 
-    await client.query('COMMIT');
-    started = false;
+    await commit();
     return response;
   } catch (error) {
     if (started) await client.query('ROLLBACK');
