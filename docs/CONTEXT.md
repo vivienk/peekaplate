@@ -235,7 +235,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite owner shell, fields and synthetic preview demos; setup rules require supplied persisted facts, and preview AI cannot apply changes. Auth143/146 use pinned Supabase SDK/public config, confirmed users and isolated purpose-bound recovery; previews force provider Auth off. Live Auth now discovers actor-scoped owner/editor restaurants, opens the merged shell and supplies actor-bound SDK tokens to the report reader. No access is an empty state; identity changes and denial clear old state. Reports validate venue/privacy/status; live workspace never falls back to saved samples. Editable email sources preserve provider placeholders. S05-S08 details/source/upload/processing screens use caller callbacks; S09 Add/Edit remains a synthetic dashboard demo. Persisted setup, menu intake/edit/publish wiring and hosted full-journey acceptance remain separate.",
+      "summary": "Owner console includes design foundations, staged auth/callbacks, actor-bound restaurant discovery and tenant-isolated report clients. The merged menu client connects source selection, immutable upload groups, persisted job status, manual drafts/photos and evidence-backed extracted corrections in the signed-in shell. Save remains separate from optional verification, approval and publication. New accounts receive no restaurant authority. Restaurant-details persistence and final review/publish remain unconnected pending their own backend/screen work; no synthetic workspace or progress substitutes for saved data.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -332,7 +332,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "scripts/console-preview-demos.test.mjs",
         "frontend/console/src/owner-menu/DishEditor.tsx",
         "frontend/console/src/owner-menu/DishEditor.test.tsx",
-        "frontend/console/src/owner-menu/dishEditor.css"
+        "frontend/console/src/owner-menu/dishEditor.css",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "docs/owner-onboarding-wiring.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -342,7 +344,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "76f7f1859fbd6d916fc9ee191a40a0f9ff3a15b76eac30914bdc3dfd499cf477"
+      "sourceFingerprint": "d84d0a10ee47fe04c2ec0566f3df6b90853a073d8acaa7fa0553d27529aec33a"
     },
     {
       "id": "backend",
@@ -520,7 +522,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "4a6e5db8560aeb86abba58193b0ed7fcbf20aba0d9b9b4fa83ce12287a5b52c7"
+      "sourceFingerprint": "f0ca1dc0165e37c99ab405204e71ede111f13595dc868034cd686b21d97a49dc"
     },
     {
       "id": "database",
@@ -877,22 +879,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-14",
-      "modules": [
-        "processing",
-        "backend"
-      ],
-      "summary": "PR184 verifier fails closed on missing/failed/foreign records, uses the identity-first viewer probe, checks source/producer identities and redacts evidence. Provider usage stays unknown; no fake hard cap. Real local Worker/DB coverage exercises owner/viewer/cross-venue routes.",
-      "sources": [
-        "scripts/verify-ingestion-e2e.mjs",
-        "scripts/verify-ingestion-e2e.test.mjs",
-        "scripts/verify-ingestion-e2e.regression.test.mjs",
-        "docs/staging-e2e-acceptance-2026-11-14.md",
-        "backend/src/ingestion/ingestion.integration.ts"
-      ],
-      "next": "Use the current PR185 staging deployment and own sessions for the controlled fictional-menu run; verify actual provider budget before intake, then record UI/save/reload and cleanup separately."
-    },
-    {
       "date": "2026-11-13",
       "modules": [
         "processing",
@@ -1025,6 +1011,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-menu-workspace.md"
       ],
       "next": "Connect actor-bound tokens and server-backed owner workspace; keep review approval separate from publication."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Connect merged owner controls through PR156 client to existing authenticated menu/draft APIs; no new backend or pending-team-PR merge.",
+      "files": [
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Verify narrow staging release; keep S05 persistence and PR163 final review/publication separate."
     }
   ]
 }

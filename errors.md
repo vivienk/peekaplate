@@ -3785,3 +3785,23 @@ These observations contain synthetic inputs only. Hosted integration is separate
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T07:50:44.272Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T08:03:22.349Z","exitCode":1}
+```
+
+## 2026-11-15 — Merged owner-screen wiring checks
+
+The browser regressions cover correction-key collisions between separate
+candidates, late intake responses overriding navigation and overlapping status
+polls invalidating slow responses. Keys include target identity; navigation is
+generation-fenced; polls are serialized. The fixture initially used the wrong
+review status and venue identity; it was corrected to the shared contract rather
+than weakening response validation. Node's direct JSON fixture import requires
+the explicit JSON import attribute.
+
+An exploratory profile migration failed in a disposable database because hosted
+browser roles do not exist locally. That expansion was parked when scope was
+narrowed to merged APIs; no profile migration or permission grant was applied to
+hosted Supabase. Earlier local profile results are not evidence for this slice.

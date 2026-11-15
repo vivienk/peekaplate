@@ -4,7 +4,9 @@ import type {
   ExtractionReviewSessionResponse,
   ReviewCandidateItemResponse,
 } from '@peekaplate/contracts';
-import extraction from '../../../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json';
+import extraction from '../../../../processing/tests/fixtures/review-candidates/representative-candidates-v2.json' with {
+  type: 'json',
+};
 
 export const VENUE = '0f0e0d0c-0b0a-4908-8706-050403020100';
 export const JOB = '11111111-2222-4333-8444-555555555555';
