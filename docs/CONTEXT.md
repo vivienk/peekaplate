@@ -326,7 +326,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ac8773b910d59b023a30a50c9016d79aba3c86b31d6652718519078494fb7ce8"
+      "sourceFingerprint": "9884d8f67e9989c536bee3b209cf216c87094c95c784bf007fa90fbdc9b92081"
     },
     {
       "id": "backend",
@@ -464,7 +464,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.ts",
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication-http.test.ts",
-        "backend/src/owner-publication.integration.ts"
+        "backend/src/owner-publication.integration.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -477,7 +478,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "0b118d163e533d49ba5dfdbfedfed9fc0c265be2de2303f5b6359732def6505b"
+      "sourceFingerprint": "1cbe9630a0f306fd3f79598c2ae57605d4a2007c265eb689bdaad955056c010a"
     },
     {
       "id": "database",
@@ -796,22 +797,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "date": "2026-11-12",
       "modules": [
         "diner",
-        "analytics",
-        "delivery"
-      ],
-      "summary": "Narrow main release promotes the already reviewed PR78 diner triggers and compatible browser regressions from develop. Existing live-menu/PostHog configuration and staging Pages hosting are reused. API, extraction, database, console and Queue configuration are unchanged. The release PR records exact deployment identity and observed smoke checks.",
-      "sources": [
-        "frontend/diner/src/menu/menuScreen.ts",
-        "frontend/diner/src/menu/events.ts",
-        "tests/e2e/menu-triggers-live.spec.ts",
-        "docs/diner-tracking-staging.md"
-      ],
-      "next": "Release the reviewed main commit to the existing diner staging Pages project, verify release metadata and bounded synthetic browser dispatch. Jeffin/Uneeza then coordinate approved real PostHog/canonical persistence and numeric report reconciliation; no normal collection activation is implied."
-    },
-    {
-      "date": "2026-11-12",
-      "modules": [
-        "diner",
         "analytics"
       ],
       "summary": "PR158 is merged on main8c83f53 and deployed to existing staging diner Pages24dcd65c. Intercepted hosted smoke found the first menu_viewed missing only from PostHog because the screen consent listener ran first. A real-adapter regression reproduced the loss; syncing adapter consent immediately before capture fixes initial and renewed consent. No policy, SDK configuration, API, provider or Queue changes.",
@@ -942,6 +927,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-publish-handoff.md"
       ],
       "next": "Verify the pinned staging rollout with a genuine owner session and retained labelled synthetic diner link; official S13 and automatic trusted preparation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "backend"
+      ],
+      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
+      "files": [
+        "backend/src/owner-publication.ts",
+        "backend/src/owner-publication.test.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
+      ],
+      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
     }
   ]
 }

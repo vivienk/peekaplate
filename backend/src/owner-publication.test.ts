@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
+import { fileURLToPath, URL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { unstable_dev } from 'wrangler';
 import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -33,6 +35,39 @@ const menu = {
 };
 
 describe('prepared owner publication', () => {
+  it('uses Worker-compatible manual redirects without following a hostile Location', async () => {
+    const worker = await unstable_dev(
+      fileURLToPath(new URL('./owner-publication.workerd-harness.ts', import.meta.url)),
+      {
+        config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+        local: true,
+        ip: '127.0.0.1',
+        port: 0,
+        inspectorPort: 0,
+        logLevel: 'error',
+        experimental: {
+          disableExperimentalWarning: true,
+          forceLocal: true,
+          watch: false,
+          disableDevRegistry: true,
+        },
+      },
+    );
+    try {
+      for (const redirect of [false, true]) {
+        const response = await worker.fetch('http://fixture.test', {
+          method: 'POST',
+          body: JSON.stringify({ menu, bytes, redirect }),
+        });
+        expect(response.status).toBe(redirect ? 502 : 200);
+        expect(response.headers.get('X-Fixture-Requests')).toBe('1');
+        if (!redirect) expect(await response.json()).toEqual(content);
+      }
+    } finally {
+      await worker.stop();
+    }
+  }, 30_000);
+
   it.each(['editor', 'viewer', null])(
     'denies %s before reading admitted menus',
     async (permission) => {
@@ -67,7 +102,7 @@ describe('prepared owner publication', () => {
     expect(await fetchPreparedMenu(menu, send as typeof fetch)).toEqual(content);
     expect(send.mock.calls[0]).toEqual([
       menu.bundleUrl,
-      expect.objectContaining({ redirect: 'error' }),
+      expect.objectContaining({ redirect: 'manual' }),
     ]);
   });
 
