@@ -13,7 +13,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "contracts",
       "status": "foundation",
-      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque.",
+      "summary": "Strict staff/publication/menu and observation.v2 contracts include byte-verified bundle identity, normalized authority-free payloads, receipts/canonical JSON and time helpers. Owner-report v1 enforces per-metric cohorts and complementary suppression with internal-count stripping. comparison_report.v1 is a separate internal period/rate contract, without an HTTP endpoint. Review-candidate/persistence/owner-AI evidence and review-only ingredient/source/digest contracts retain bounded authority. Pilot order-outcome contracts validate civil calendar/time fields and row-level quarantine. Hosted release acceptance remains separately recorded. Owner-action v1 adds strict create/update/list shapes; insight keys remain opaque. Strict owner workspace lists only actor-bound owner/editor restaurant identity, never setup status. Artwork contracts separate decoration from food approval.",
       "paths": [
         "packages/contracts/src/index.ts",
         "packages/contracts/src/index.test.ts",
@@ -67,7 +67,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-insight-actions.md",
         "packages/contracts/src/owner-menu.ts",
         "packages/contracts/src/owner-menu.test.ts",
-        "packages/contracts/package.json"
+        "packages/contracts/package.json",
+        "packages/contracts/src/owner-workspace.ts",
+        "packages/contracts/src/owner-workspace.test.ts",
+        "packages/contracts/src/ingredient-artwork.ts",
+        "packages/contracts/src/owner-analysis.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -75,7 +79,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "2a2537123c75a557c01c39d1c8020ce24ae008adc511a1a0e70cc64f64e1cdda"
+      "sourceFingerprint": "f6e9b0c334cc251100d306a13f754f94b0370bdcb6f5f994d5563c3684b5c2f4"
     },
     {
       "id": "tokens",
@@ -91,7 +95,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0004-visual-tiers.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "62b6629cc0f9e8d2c9e20abf8a4600001e0a2a3f2ecd45f1276647d167136390"
+      "sourceFingerprint": "718ef1f80715da06acefcd2e2c14e99fb432e015b592a3882d9c4de9a47bb4ac"
     },
     {
       "id": "ui",
@@ -113,7 +117,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "diner",
       "status": "foundation",
-      "summary": "Diner fixture/live menu, detail, search and Save/Saved screens use verified menu bytes and shared tracking. DIN-01 records readable publications, visible-card exposures and menu-card openings with shared IDs/clock. Consent starts fresh timing; withdrawal clears pending exposure references and stops the clock. Publication swaps record the replacement once and clear older exposure links. A confirmed 404 clears the menu on every screen with Check again; a replacement from detail or Saved returns to the new list. Window scroll drives activity and navigation removes listeners. Fixtures never send; both live destinations share the existing consent/privacy gate. Hosted trigger acceptance and remaining Compare/ingredient controls are separate. Shared dispatch synchronizes the PostHog adapter from the current consent gate before capture, so a screen listener registered earlier cannot drop the first consent-triggered menu view.",
+      "summary": "Fixture/live menu, detail, Search and Save/Saved screens use verified bundles and shared tracking. DIN-01 records readable publications, visible cards and openings with shared IDs/activity timing. Consent starts fresh timing; withdrawal stops clocks and clears exposure links. Publication swaps clear old links and record the replacement once. A confirmed 404 clears the menu (Check again). Fixtures never send; both live destinations share consent/privacy and synchronize PostHog before the first capture. Automatic /diner aliases resolve published server locators before the existing public reader; legacy QR paths remain; custom hosting, owner-link wiring, hosted trigger acceptance and ingredient controls remain separate. Compare Start/Replace uses displayed pairs and route-safe Menu/Saved exits. Live details refresh approved decorative art; revocation/error restores fallback.",
       "paths": [
         "frontend/diner/index.html",
         "frontend/diner/src/main.ts",
@@ -206,7 +210,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/save/save.css",
         "tests/e2e/save-screens.spec.ts",
         "tests/e2e/menu-triggers.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
+        "tests/e2e/menu-triggers-live.spec.ts",
+        "docs/restaurant-urls.md",
+        "tests/restaurant-links/restaurant-links.spec.ts",
+        "playwright.restaurant-links.config.ts",
+        "scripts/serve-restaurant-routing-test.mjs",
+        "frontend/diner/src/assets/icons/generated-ingredients/catalogue.json",
+        "frontend/diner/src/menu/liveArtwork.ts",
+        "tests/e2e/ingredient-artwork.spec.ts",
+        "frontend/diner/src/compare/pickerScreen.ts",
+        "frontend/diner/src/compare/pickerScreen.test.ts",
+        "tests/e2e/compare-picker.spec.ts",
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/compare/resultScreen.test.ts",
+        "tests/e2e/compare-result.spec.ts"
       ],
       "adrs": [
         "docs/adr/0004-visual-tiers.md"
@@ -215,12 +232,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "3380f6f62fe0a6ed5607951ff33e1692bcf58546ac2e39e0e8d7721b23b5e797"
+      "sourceFingerprint": "8bccd2caed28b01ab72d4433d4b7e847e96f221fcd78aa88a8550b8c59e4e05b"
     },
     {
       "id": "console",
       "status": "foundation",
-      "summary": "React/Vite console fields and preview-only synthetic owner/onboarding/dashboard demos. Supplied owner setup facts distinguish missing/submitted/verified details; publishing requires verification and a menu. Navigation stays locked until confirmed publication. Success dismissal closes the native dialog then restores stable dashboard focus for button and Escape. AI composer stays disabled. Connected auth, persisted setup and real publication/reporting integration remain separate. Normal builds exclude all demos. Report data validates public owner reports, venue and failure states; source changes reset retained data. Saved samples stay labelled. The live token getter remains an auth-integration seam. Typed AI result view validates venue/window and optional known report ID; the preview-only fictional wrapper retains desktop/mobile drawer mounts and cannot apply changes.",
+      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -258,7 +275,79 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/drawer.tsx",
         "frontend/console/src/owner-dashboard/owner-dashboard.css",
         "tests/e2e/owner-dashboard-drawer.spec.ts",
-        "frontend/console/src/owner-dashboard/chat.tsx"
+        "frontend/console/src/owner-dashboard/chat.tsx",
+        "docs/owner-auth.md",
+        "frontend/console/auth-confirm.html",
+        "frontend/console/email-templates/README.md",
+        "frontend/console/email-templates/confirm-signup.html",
+        "frontend/console/email-templates/reset-password.html",
+        "frontend/console/owner-auth.html",
+        "frontend/console/owner-sign-in.html",
+        "frontend/console/src/auth/OwnerAuth.tsx",
+        "frontend/console/src/auth/auth-service.ts",
+        "frontend/console/src/auth/auth.css",
+        "frontend/console/src/auth/callback.test.tsx",
+        "frontend/console/src/auth/callback.ts",
+        "frontend/console/src/auth/copy.ts",
+        "frontend/console/src/auth/demo.tsx",
+        "frontend/console/src/auth/live.tsx",
+        "frontend/console/src/auth/parts.tsx",
+        "frontend/console/src/auth/supabase-auth.test.tsx",
+        "frontend/console/src/auth/supabase-auth.ts",
+        "playwright.auth.config.ts",
+        "tests/e2e/owner-auth-provider.spec.ts",
+        "tests/e2e/owner-auth.spec.ts",
+        "frontend/console/auth-reset.html",
+        "frontend/console/src/auth/recovery-provider.test.tsx",
+        "tests/e2e/owner-recovery.spec.ts",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/owner/workspace-api.ts",
+        "frontend/console/src/owner/workspace-api.test.tsx",
+        "frontend/console/src/owner/workspace.css",
+        "docs/owner-session-workspace.md",
+        "tests/e2e/owner-workspace.spec.ts",
+        "frontend/console/owner-onboarding.html",
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/OnboardingLayout.tsx",
+        "frontend/console/src/onboarding/details.ts",
+        "frontend/console/src/onboarding/onboarding.css",
+        "frontend/console/src/onboarding/demo.tsx",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
+        "frontend/console/src/onboarding/AddMenuLink.tsx",
+        "frontend/console/src/onboarding/UploadMenu.tsx",
+        "frontend/console/src/onboarding/menu-source.ts",
+        "frontend/console/src/onboarding/menu-source.test.tsx",
+        "tests/e2e/owner-onboarding-screens.spec.ts",
+        "frontend/console/src/onboarding/MenuProcessing.tsx",
+        "frontend/console/src/onboarding/FileButton.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/api.test.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/jobs.test.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/dishForm.test.ts",
+        "frontend/console/src/owner-menu/fixtures.test-helpers.ts",
+        "frontend/console/src/owner-menu/evidence.ts",
+        "frontend/console/src/owner-menu/evidence.test.ts",
+        "frontend/console/src/owner-menu/harness.tsx",
+        "frontend/console/owner-menu-harness.html",
+        "scripts/console-preview-demos.test.mjs",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/DishEditor.test.tsx",
+        "frontend/console/src/owner-menu/dishEditor.css",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "docs/owner-onboarding-wiring.md",
+        "frontend/console/src/owner-dashboard/ai-preview/OwnerAnalysisPanel.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
+        "playwright.owner-ai.config.ts",
+        "tests/owner-ai-browser/connection.spec.ts",
+        "frontend/console/src/owner/api-origin.ts",
+        "playwright.workspace.config.ts",
+        "frontend/console/src/owner-dashboard/controls.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.css",
+        "frontend/console/src/owner-dashboard/dish-presentation.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -268,12 +357,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "f43744603fa0d071df7ff8932b6a653c61fb52f235565326fb57a5b4a1c770c5"
+      "sourceFingerprint": "8ea6a96a455d0be1e3d41f51761f26d45800e6108801b101ed5aa57d31fcd021"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands/publication, signed menus and canonical observations. Owner workspace supports versioned private drafts/photos, grouped uploads, PDF limits, URL materialization, fenced cancel/retry, revision-bound verification and content-checked photo promotion; retention stays disabled until configured. Public bundles still require approval. Synthetic-gated owner reports use half-open windows, unknown freshness, ordered comparisons and complementary suppression. CSV export reuses owner/source/venue guards, preserving VALID_ZERO while withholding unavailable cells. Owner insight writes remain versioned/idempotent. Connected owner UI and hosted DATA-12 provenance/reconciliation remain separate from local fixtures. Owner-AI validates privacy/IDs; trusted issuance, freshness and live AI remain unwired.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Actor-bound owner workspaces expose owner/editor restaurants and versioned private draft/photo/upload/verification flows. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are versioned/idempotent. Owner-AI trust/issuance and live evaluation remain gated. Decorative artwork uses exact-byte blob-locked repair before approval and approved-only public reads. Order imports require agreement; owner requests, bound operator execution, independent checker and frozen restore use tenant/fence/cutoff guards. Required hosted provider gating reserves at most two attempts per tenant/job in transactional DO SQLite, including redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -421,7 +510,28 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/data06/descriptive_signals.test.ts",
         "tests/data06/privacy_boundaries.json",
         "tests/data06/privacy_boundaries.test.ts",
-        "tests/data06/tsconfig.json"
+        "tests/data06/tsconfig.json",
+        "backend/src/restaurant-link.ts",
+        "backend/src/restaurant-link.test.ts",
+        "backend/src/restaurant-link-http.test.ts",
+        "backend/src/owner-workspace.ts",
+        "backend/src/owner-workspace-http.test.ts",
+        "backend/src/owner-workspace.integration.ts",
+        "backend/src/ingredient-artwork.ts",
+        "backend/src/ingredient-artwork-routes.ts",
+        "backend/src/ingredient-artwork-retention.ts",
+        "backend/src/ingredient-artwork.test.ts",
+        "backend/src/ingredient-artwork-retention.test.ts",
+        "backend/src/ingredient-artwork.integration.ts",
+        "backend/src/owner-ai/responses.ts",
+        "backend/src/owner-ai/responses.test.ts",
+        "backend/src/owner-ai/routes.ts",
+        "backend/src/owner-ai/routes.test.ts",
+        "backend/scripts/owner-ai-local.ts",
+        "backend/scripts/owner-ai-local-fixture.ts",
+        "scripts/start-owner-ai-private.py",
+        "docs/owner-ai-responses.md",
+        "backend/owner-ai-handoff.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -434,12 +544,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "50f6fb005ea74b7c5ecdcac71b42815286b50fcf168d38ed7962b849bcbefd2a"
+      "sourceFingerprint": "10087ab67767b018d3b1fef3adababcac75c6b4a2836f999b6eda8c5043f1d96"
     },
     {
       "id": "database",
       "status": "foundation",
-      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate.",
+      "summary": "Private commands/events/outbox, memberships and projections use tenant RLS. Canonical observations and typed live-only facts retain replay/conflict/backfill safeguards; local and bounded hosted evidence remain distinct. PostHog raw exports stay isolated from browser/runtime application access. Publication bundles and approvals use immutable tenant/menu/hash identities; order imports retain owner authority, reviewed mappings and activation gates. Owner insight actions add a forced-RLS table with an exact tenant/menu/revision FK, runtime SELECT/INSERT/UPDATE and no DELETE. This new migration has only local verification; hosted migration/deployment and production acceptance remain separate. Immutable tenant-scoped URL settings use unique slugs and a narrowly owned public resolver. Ingredient artwork projection uses forced tenant RLS and restricted runtime grants.",
       "paths": [
         "migrations/202610130001_foundation.sql",
         "migrations/20261014210000_staff_commands.sql",
@@ -470,7 +580,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/db/owner_insight_actions.sql",
         "migrations/20261112010000_owner_menu_workspace.sql",
         "tests/db/owner_menu_workspace.sql",
-        "migrations/20261113010000_menu_verification_lifecycle.sql"
+        "migrations/20261113010000_menu_verification_lifecycle.sql",
+        "migrations/20261114010000_restaurant_menu_links.sql",
+        "tests/db/restaurant_links.sql",
+        "migrations/20261113020000_ingredient_artwork.sql"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -481,7 +594,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "c01d6598aa99b14d8b78adeb20c4ff9a967a3050f63e4febc73e6c02e25ecae8"
+      "sourceFingerprint": "c7907c2e1fff93ac7a9139ed8c04850c7c51fab0884cb069158cb2eb351719f9"
     },
     {
       "id": "measurement",
@@ -494,7 +607,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/src/order-outcome.ts",
         "backend/src/order-ingestion/service.ts",
         "backend/src/order-ingestion/tracking-activation.ts",
-        "migrations/20261107120000_order_outcomes.sql"
+        "migrations/20261107120000_order_outcomes.sql",
+        "docs/pilot-order-outcome-agreement.md",
+        "migrations/20261113120000_pilot_order_agreement_and_deletion.sql"
       ],
       "adrs": [
         "docs/adr/0006-orders-and-measurement.md",
@@ -503,7 +618,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "backend"
       ],
-      "sourceFingerprint": "61a94c827e8f542dd5f446af1da530956eb6add77d7acf3e6858d822cadf6ba1"
+      "sourceFingerprint": "f7d3271c08362f59fea15fc9b529aab38f6531c3b1c826de480a1763727ca96e"
     },
     {
       "id": "delivery",
@@ -558,7 +673,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         ".github/workflows/deploy-extraction-staging.yml",
         "docs/staging-ingestion-release.md",
         "vitest.config.ts",
-        "vitest.data06.config.ts"
+        "vitest.data06.config.ts",
+        "scripts/prepare-app-site.mjs",
+        "scripts/prepare-app-site.test.mjs",
+        "playwright.workspace.config.ts",
+        "scripts/owner-ai-launcher.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -569,7 +688,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "26a8d27ffa63d06cf9ef0e86888b765b3b60aad1a213bbea875a04018ff9be5c"
+      "sourceFingerprint": "fda2d9d1a36ed450bf9498df6c7fd51960806d03c23d1ce744566ee74bd6ce40"
     },
     {
       "id": "agents",
@@ -636,7 +755,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. FE-06.4 has a read-only job/draft verifier with tenant and attempt identity checks, strict report version pairing and explicit unknown upstream provider usage; the separate required hosted gate enforces attempts; UI/accuracy acceptance remains separate. Reviewed ingredient PNGs retain exact-byte provenance and deliver through the staff API. QA-02 freezes references; human/AI acceptance stays pending.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -718,7 +837,27 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/test_ingredient_intelligence.py",
         "processing/tests/fixtures/ingredient-review.json",
         "docs/ingredient-intelligence.md",
-        "processing/tests/fixtures/ingredient-review-unicode.json"
+        "processing/tests/fixtures/ingredient-review-unicode.json",
+        "scripts/verify-ingestion-e2e.mjs",
+        "scripts/verify-ingestion-e2e.test.mjs",
+        "scripts/verify-ingestion-e2e.regression.test.mjs",
+        "docs/staging-e2e-acceptance-2026-11-14.md",
+        "processing/src/peekaplate_processing/ingredient_icons.py",
+        "processing/tests/test_ingredient_icons.py",
+        "docs/ingredient-icon-pipeline.md",
+        "processing/src/peekaplate_processing/ingredient_icon_generation.py",
+        "processing/tests/test_ingredient_icon_generation.py",
+        "processing/src/peekaplate_processing/ingredient_icon_export.py",
+        "processing/tests/test_ingredient_icon_export.py",
+        "processing/src/peekaplate_processing/ingredient_icon_delivery.py",
+        "processing/tests/test_ingredient_icon_delivery.py",
+        "processing/src/peekaplate_processing/qa02_reference.py",
+        "processing/tests/test_qa02_reference.py",
+        "processing/eval/qa02/README.md",
+        "processing/eval/qa02/EVIDENCE.md",
+        "processing/eval/qa02/development.manifest.json",
+        "processing/eval/qa02/development-inventory.json",
+        "processing/eval/qa02/synthetic-menu.reference.json"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -727,7 +866,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "60216b87932a13fdf733bb4982bceac50ac1e4b689034bcb0f6ec5adaf92d160"
+      "sourceFingerprint": "75cdfcc32230b8f8fb05a511d8335240b7b8da594af17de4995335d7af8af0e5"
     },
     {
       "id": "assets",
@@ -763,151 +902,143 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-13",
-      "modules": [
-        "backend",
-        "contracts",
-        "database"
-      ],
-      "summary": "PR161 verification correction: expected draft version required; separate verification event sequence supports manual and extracted drafts without changing content versions or published projections. Manual edits/extraction retries invalidate verification. Photo transitions serialize successive event versions; identical retries are storage-effect-free. Retention establishes tenant RLS scope and row locks, validates promoted bytes and exact keys, paginates R2 and retains on lookup failures. Review/Saved pages remain synthetic preview state, not connected persistence.",
-      "sources": [
-        "migrations/20261113010000_menu_verification_lifecycle.sql",
-        "packages/contracts/src/owner-menu.ts",
-        "backend/src/owner-menu.ts",
-        "backend/src/owner-menu-routes.ts",
-        "backend/src/owner-menu-retention.ts",
-        "backend/src/owner-menu.integration.ts",
-        "frontend/console/src/owner-dashboard/menu.tsx"
-      ],
-      "next": "Complete final pinned review and CI before merge. Migration 20261113010000, exact-main staging release and authenticated hosted photo/verification acceptance remain NOT RUN; retention stays off until explicitly configured. Preserve #105 drawer regression and preview build input while reconciling develop."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console",
-        "delivery"
-      ],
-      "summary": "PR125 reconciles owner first-dashboard setup shell with current develop, retaining the existing owner-dashboard/foundations previews, owner-menu adapters and shared context. All three synthetic demo pages remain preview-only and excluded from normal output. No auth/API/publication wiring is introduced.",
-      "sources": [
-        "frontend/console/src/owner/setup.ts",
-        "frontend/console/src/owner/OwnerShell.tsx",
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "frontend/console/vite.config.ts",
-        "scripts/console-preview-demos.test.mjs"
-      ],
-      "next": "Run final checks and merge reviewed PR125 before reconciling PR139 onboarding states/dialog. Connected owner dashboard/auth acceptance remains separate."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR139 corrects native publish-success dialog dismissal: close the modal before restoring focus to the stable dashboard, because publication removes the opener. Button and Escape browser regressions failed before correction and passed afterward. Submitted/missing setup keeps publication locked; synthetic previews still make no real publish/auth/AI request.",
-      "sources": [
-        "frontend/console/src/owner/PublishSuccessDialog.tsx",
-        "frontend/console/src/owner/FirstDashboard.tsx",
-        "tests/e2e/owner-onboarding.spec.ts"
-      ],
-      "next": "Reconcile/merge after PR125 and recheck develop. Connected restaurant setup/auth/publication and full owner journey remain separate acceptance work."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR167 fixes impossible mocked opening cohorts, explicitly checks EMPTY and all suppressed comparison metrics, and separates mocked serialization from actual SQL/staging evidence. Two PostgreSQL regressions reproduced inclusive-end exposure/checkpoint errors and pass with half-open owner SQL. Existing synthetic starter fixtures use test traffic and cannot prove the fixed allowlisted hosted venue is synthetic. is_stale remains null without a trusted completion signal.",
-      "sources": [
-        "backend/src/owner-report.ts",
-        "backend/src/owner-report.test.ts",
-        "backend/src/owner-report.data12-reconciliation.test.ts",
-        "backend/src/comparison-report.integration.ts",
-        "tests/data12/reconciliation_findings.md"
-      ],
-      "next": "Review final PR167 commit and CI; no merge or deployment in this task. Before DATA-12 approval, audit hosted input/archive provenance, reconcile approved fixtures, agree freshness authority and validate panel/AI semantics with Jeffin/Zhiliang. PR170 frontend changes remain separately reviewed."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR131 CSV export reconciled after owner UI and reporting/test merges. Preserve current routes, tenant/source guards, VALID_ZERO serialization, half-open owner report SQL and unknown freshness. No new export behavior beyond the previously approved CSV slice.",
-      "sources": [
-        "backend/src/owner-report-export.ts",
-        "backend/src/owner-report-export.test.ts",
-        "backend/src/index.ts",
-        "docs/owner-report-staging.md"
-      ],
-      "next": "Finish final review/CI and merge approved CSV slice into develop. Hosted export/download and full owner journey acceptance remain separate; no deployment."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR128 reconciled with current develop, preserving prior owner/report/CSV updates. Report source changes must never reuse another source’s data.",
-      "sources": [
-        "frontend/console/src/owner-dashboard/report-api.ts",
-        "frontend/console/src/owner-dashboard/report-data.tsx",
-        "tests/e2e/owner-report-api.spec.ts"
-      ],
-      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR124 reconciled with current develop, preserving prior owner/report/CSV updates. Reusable result display remains separate from its fictional preview wrapper.",
-      "sources": [
-        "frontend/console/src/owner-dashboard/ai-preview/AiRecommendationPreview.tsx",
-        "docs/owner-ai-preview.md",
-        "tests/e2e/owner-ai-preview.spec.ts"
-      ],
-      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "backend"
-      ],
-      "summary": "PR112 reconciled with current develop, preserving prior owner/report/CSV updates. Internal validation stays separate from trusted issuance and paid model execution.",
-      "sources": [
-        "backend/src/owner-ai/report-adapter.ts",
-        "backend/src/owner-ai/report-input.ts",
-        "docs/owner-ai.md"
-      ],
-      "next": "Complete exact-head review and checks before merging. No deployment or live AI acceptance is included."
-    },
-    {
-      "date": "2026-11-13",
-      "modules": [
-        "contracts",
-        "delivery"
-      ],
-      "summary": "PR144 retargeted to develop after PR112 merged. DATA06 fixtures remain in default Vitest discovery and workspace typechecking. Prepared descriptive-ID counts, 9/10/11 distinct-session boundaries and null below-floor expectations remain preparation evidence, not production classification, scoring or hosted acceptance.",
-      "sources": [
-        "tests/data06/VALIDATION_REPORT.md",
-        "tests/data06/descriptive_signals.test.ts",
-        "tests/data06/privacy_boundaries.test.ts",
-        "vitest.config.ts",
-        "tests/data06/tsconfig.json"
-      ],
-      "next": "Complete exact-head checks/review and merge fixture preparation. Connect approved DATA06 producer/policy and execute raw-event/hosted evidence separately."
-    },
-    {
       "date": "2026-11-14",
       "modules": [
         "diner"
       ],
-      "summary": "S5-FE-10 deliberately reverses the earlier keep-the-menu-after-404 behavior. A confirmed 404 on the scheduled re-read stops collection, clears the menu on every diner surface and shows an unavailable state with Check again; network and 5xx errors keep the menu. A replacement while a dish detail or Saved is open returns to the new list with \"This menu was updated.\" The withdrawn and refresh-failed copy is interim. A failed re-read keeps the menu and shows a Retry notice that clears when a re-read succeeds. Saved IDs are kept in local storage and hidden, never deleted, while a published menu lacks the dish; they return if it is published again.",
-      "sources": [
+      "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
+      "files": [
+        "frontend/diner/src/compare/resultScreen.ts",
+        "frontend/diner/src/menu/menuScreen.ts",
+        "tests/e2e/compare-result.spec.ts",
+        "tests/e2e/menu-triggers-live.spec.ts"
+      ],
+      "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR171 adds props-controlled owner onboarding S05 details, S06 source choice, S07 URL/files and S08 processing states. Actual saved baseline changes reset form/photo state, while equivalent props preserve edits; demo request callbacks cancel on navigation. Reconciled current develop and Compare changes. Real upload/persistence integration is not claimed.",
+      "files": [
+        "frontend/console/src/onboarding/RestaurantDetails.tsx",
+        "frontend/console/src/onboarding/demo.tsx",
+        "tests/e2e/owner-onboarding-screens.spec.ts"
+      ],
+      "next": "Wire these screen callbacks through the separately reviewed owner-menu clients; S08 Ready-to-review belongs to the next screen work."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "console"
+      ],
+      "summary": "PR172 adds S09 Add/Edit dish and category selection to the synthetic dashboard demo. Category command identity is separate from user category names, including add; the AI-review test now supplies the required photo so it isolates that guard. Reconciles owner onboarding and current develop without claiming real save/reload or publication.",
+      "files": [
+        "frontend/console/src/owner-dashboard/menu.tsx",
+        "frontend/console/src/owner-dashboard/category-field.tsx",
+        "frontend/console/src/owner-dashboard/menu.test.tsx",
+        "tests/e2e/owner-category-dropdown.spec.ts"
+      ],
+      "next": "Wire the screen through the owner-menu client separately; keep food evidence, verification and publishing authority on the server."
+    },
+    {
+      "date": "2026-11-14",
+      "modules": [
+        "backend"
+      ],
+      "summary": "PR188 adds a required hosted tenant/job provider-attempt gate backed by transactional DO SQLite. Queue redeliveries share the two-attempt counter; Python vision/OCR/model retries reserve before transport and fail closed. Real local workerd concurrency, replay/scope, process-restart and SQL rollback checks pass; 576 offline Python tests pass. Hosted Worker+image rollout and provider acceptance remain NOT RUN.",
+      "files": [
+        "backend/src/extraction-host.ts",
+        "backend/src/extraction-budget.workerd.test.ts",
+        "backend/tests/provider-budget-worker.ts",
+        "processing/src/peekaplate_processing/provider_budget.py",
+        "docs/provider-call-budget.md"
+      ],
+      "next": "Deploy matching Worker and container image before any controlled provider test; keep the existing allowance and Queue controls. This is not an account-wide spending limit."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Owner menu client dependency reconciled with current authenticated workspace and screens; live composition remains in progress.",
+      "files": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/harness.tsx",
+        "docs/owner-menu-workspace.md"
+      ],
+      "next": "Connect actor-bound tokens and server-backed owner workspace; keep review approval separate from publication."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Connect merged owner controls through PR156 client to existing authenticated menu/draft APIs; no new backend or pending-team-PR merge.",
+      "files": [
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner/OwnerWorkspace.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/onboarding/ChooseMenuSource.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Verify narrow staging release; keep S05 persistence and PR163 final review/publication separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
+      "files": [
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "backend/owner-ai-handoff.test.mjs",
+        "docs/owner-ai-responses.md"
+      ],
+      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "The signed-in owner shell includes the opt-in AI panel with typed access cleanup and distinct displayed-report/analysis evidence periods, preserving merged menu workspace wiring.",
+      "files": [],
+      "next": "Retarget after #164; test pending sign-out, mobile, flag-off and hosted configuration gates before activation."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
+      "files": [
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "diner"
+      ],
+      "summary": "S5-FE-10 deliberately reverses keep-the-menu-after-404. A confirmed 404 clears the menu on every screen with Check again; network and 5xx errors keep it and show a Retry notice. A replacement from detail or Saved returns to the new list with a notice. Saved IDs stay in storage and are hidden when missing from the menu. Copy is interim.",
+      "files": [
         "frontend/diner/src/menu/menuScreen.ts",
         "frontend/diner/src/menu/refresh.ts",
         "frontend/diner/src/save/save-state.ts",
         "tests/e2e/published-withdrawal.spec.ts",
         "docs/diner-connection.md"
       ],
-      "next": "Final copy and return path, hosted check 6 and the token-expiry state need decisions."
+      "next": "Design approves copy and return path; Sai updates hosted check 6; confirm release scope, a cap on hidden saved IDs and the token-expiry state."
     }
   ]
 }

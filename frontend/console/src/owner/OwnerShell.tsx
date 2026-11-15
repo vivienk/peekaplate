@@ -29,6 +29,7 @@ export interface OwnerShellProps {
   available?: ReadonlySet<OwnerPage>;
   /** Pages listed in the sidebar at all. Defaults to all pages. */
   visible?: ReadonlySet<OwnerPage>;
+  lockedHint?: string;
   topbar: ReactNode;
   aside?: ReactNode;
   children: ReactNode;
@@ -41,6 +42,7 @@ export function OwnerShell({
   onNavigate,
   available,
   visible,
+  lockedHint = 'These pages open after you publish your menu.',
   topbar,
   aside,
   children,
@@ -53,7 +55,7 @@ export function OwnerShell({
       <a className="owner-skip" href="#owner-content">
         Skip to content
       </a>
-      <div className="owner-sidebar">
+      <aside className="owner-sidebar" aria-label="Restaurant navigation">
         <div className="owner-brand">
           <div className="owner-brand__row">
             <img src={ICONS.logo} alt="" width={28} height={28} />
@@ -96,11 +98,11 @@ export function OwnerShell({
           </ul>
           {anyLocked && (
             <p className="owner-nav-hint" id={LOCKED_HINT_ID}>
-              These pages open after you publish your menu.
+              {lockedHint}
             </p>
           )}
         </nav>
-      </div>
+      </aside>
       <div className="owner-main">
         <header className="owner-topbar">{topbar}</header>
         <main id="owner-content" className="owner-content" tabIndex={-1}>

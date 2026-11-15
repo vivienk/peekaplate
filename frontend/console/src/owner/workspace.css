@@ -1,0 +1,78 @@
+.owner-workspace-state {
+  max-width: 48rem;
+  margin: var(--pp-space-32) auto;
+  padding: var(--pp-space-24);
+  font-family: var(--pp-font-family-base);
+}
+.owner-dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pp-space-32);
+}
+.pp-onboard .s09 .s09-textarea {
+  height: auto;
+  min-height: var(--s09-pending-textarea);
+  padding: var(--pp-space-16);
+  border-radius: var(--pp-radius-16);
+}
+.owner-workspace-state label,
+.owner-workspace-toolbar label {
+  display: grid;
+  gap: var(--pp-space-4);
+}
+.owner-workspace-picker {
+  display: grid;
+  gap: var(--pp-space-4);
+  min-width: 0;
+  max-width: 100%;
+}
+.owner-workspace-picker select {
+  min-width: 0;
+  max-width: 100%;
+}
+.owner-workspace-state select,
+.owner-workspace-toolbar select {
+  max-width: 100%;
+  padding: var(--pp-space-8);
+  border: 1px solid var(--pp-role-outline);
+  border-radius: var(--pp-radius-8);
+  background: var(--pp-role-surface);
+  color: var(--pp-role-on-surface);
+}
+.owner-workspace-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pp-space-16);
+}
+.owner-workspace .stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--pp-space-16);
+}
+.owner-workspace .card,
+.owner-workspace .note {
+  padding: var(--pp-space-16);
+  border: 1px solid var(--pp-role-outline);
+  border-radius: var(--pp-radius-12);
+}
+.owner-workspace .scrollx {
+  overflow-x: auto;
+}
+.owner-workspace .tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+.owner-workspace .tbl th,
+.owner-workspace .tbl td {
+  padding: var(--pp-space-8);
+  border-bottom: 1px solid var(--pp-role-outline);
+  text-align: left;
+}
+.owner-workspace .muted,
+.owner-workspace .sub {
+  color: var(--pp-role-text-secondary);
+}
+.owner-workspace .eyebrow {
+  font-size: var(--pp-font-size-small);
+}

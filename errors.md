@@ -2030,6 +2030,9 @@ Tooling corrections: a Windows rg path containing a wildcard was treated literal
 The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
 
 The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"build","timestamp":"2026-11-08T14:11:49.421Z","exitCode":1}
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -2087,6 +2090,8 @@ The new Chromium regression failed because the invalid input had identical focus
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"build","timestamp":"2026-11-08T14:12:02.169Z","exitCode":1}
+```
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-09T18:53:26.478Z","exitCode":1}
 ```
 
@@ -2530,6 +2535,15 @@ success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
 
+## November 10 local outbox-capacity browser timing
+
+During DIN-02.4 verification, the local Chromium case "a full outbox drops the
+oldest events" stored 146 and then 477 of 505 events before its default 5 s poll
+expired, failing both with and without the Compare result changes (stashed run on
+the same machine). No tracking code changed; the cause is local write throughput
+under this Windows machine's load, not a behaviour regression. The test was left
+unchanged; CI remains the authority for that case. All Compare, picker, search,
+menu, save and other tracking browser cases passed locally.
 ## November 10 Draft report-input compatibility synchronization
 
 PR112 synchronizes develop085ecfd after PR107 and PR82 merged. The merge has
@@ -2994,6 +3008,16 @@ The first complete Chromium run passed 136/137 cases: the withdrawal fixture inj
 
 Linux CI run 42990078738 passed quality and 136/137 browser cases; the withdrawal fixture saw zero canonical deliveries after a fixed fake-time advance on both attempts. The fixture waited in real time without advancing a batch timer that may be armed after asynchronous outbox initialization. It now first requires the synchronous PostHog menu capture, then advances fake time during the bounded canonical-delivery poll. Exact one-event counts and all post-withdrawal denial assertions remain unchanged. Local repeated publication/withdrawal checks and final CI establish the fix; no product runtime changed in this follow-up.
 
+## November 11 local Save-screen browser timing (Compare sync)
+
+While syncing #126/#127 with develop, the develop Chromium case "when storage is
+blocked, Save works for the visit and sends no Save events" failed twice in full
+local runs: a dish_viewed exposure (1 s timer) landed inside its no-events window.
+It passed 3/3 when repeated alone, and no Save or exposure code changed in the
+Compare work. "removing a dish on the detail shows Undo" also failed once with
+"jsHandle.jsonValue: Test ended" from its console listener racing test teardown,
+then passed 3/3. Both tests were left unchanged; CI remains the authority.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-11T11:51:00.081Z","exitCode":1}
@@ -3039,6 +3063,41 @@ The shared context/error-ledger conflict was reconciled by preserving both branc
 ```
 
 The comparison SQL scope change also required updating both test clients that detect the aggregate query prefix. The independent DATA05 mock initially returned no rows for all nine scenarios; its dispatch marker was updated without changing expected values or assertions. The focused thirteen comparison/fixture tests and the full 1397-unit/74-script check now pass. Browser verification passes 137 Chromium and nine SDK/privacy cases; builds pass.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
+
+
+## Owner auth integration - November 11, 2026
+
+Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.
+
+
+## Auth email editor - November 11, 2026
+
+An editor replacement retained part of the previous HTML. A complete-source
+comparison exposed the mismatch; the complete document was selected and pasted,
+then compared before the corrected save and on reopening. No email was sent
+from the intermediate source. Source equality, persisted preview and the actual
+branded Gmail recovery email now pass. Use whole-document selection/paste and
+verify copied source rather than assuming a generic editor set-value replaces
+all Monaco content. No provider credentials, accounts or mail links are recorded.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
+```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -3138,6 +3197,14 @@ The first full check also caught strict indexed-access typing in the added test 
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
 
+
+## Owner auth resend and reconciliation — November 12, 2026
+
+The provider adapter lacked the optional resendConfirmation method, so the live confirmation screen correctly hid Resend. The actual-SDK regression failed before the method existed; the adapter now calls signup resend with the exact confirmation callback and SDK-managed PKCE. Unit/provider browser checks cover the resent-link exchange, cooldown, throttling and sanitized errors. These use synthetic HTTP, not newly delivered real mail. Three document conflicts were reconciled by retaining both additive guide/error histories and current develop modules plus auth context; fingerprints are refreshed separately.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T20:07:34.810Z","exitCode":1}
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T23:13:45.676Z","exitCode":1}
@@ -3192,6 +3259,12 @@ Transient observations during Phase 3 verification:
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T07:01:38.677Z","exitCode":1}
 ```
 
+## 2026-11-13 compare-result first cold run
+
+- Check: `pnpm exec playwright test tests/e2e/compare-result.spec.ts tests/e2e/compare-picker.spec.ts --project=chromium` on feat/s3-din-02-4-compare-result after adding Compare allergen icons.
+- Result: one `toEqual` deep-equality failure on the first run after the change; the next two full runs and a `--repeat-each 4` run (36/36) passed.
+- Cause: not confirmed. Most likely the first cold Vite dev-server load of the new icon modules.
+- Prevention: rerun once before treating a single cold-start failure as a regression; keep the network test's allowance limited to bundled `/assets/icons/*.svg`.
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
@@ -3385,3 +3458,457 @@ contains the dashboard demo, and the normal build excludes it.
 ## PR144 fixture preparation review - November 11, 2026
 
 The standalone DATA06 suite passed thirteen tests, but the default Vitest discovery returned an empty array and normal CI would not execute these cases. Four new files also failed Biome formatting, and the PR verification section lacked the required exact-command status entries. DATA06 paths are now included in normal test/typecheck commands; formatting and PR evidence are corrected. The expanded fourteen fixture tests pass; deliberate empty descriptive and missing suppression-status mutations fail at their assertions. One selected real local Worker/PostgreSQL owner-report journey passes; this is supporting report evidence, not an absent DATA06 producer. No provider request, hosted migration or deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T06:15:42.376Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-AUTH-CHECK-CACHE","status":"resolved","area":"local-auth-verification","cause":"The restricted execution environment redirected browser/Corepack caches, preventing a standalone renderer and a build command from starting normally.","prevention":"Use the existing installed Chromium executable for isolated HTML rendering and the authorized normal runtime for existing auth/build checks; do not install new dependencies or weaken tests.","regression":"Four local email render checks and the same provider/build checks pass. A stopped readiness attempt executed no provider assertions; it is not counted as a passed run."}
+```
+
+## Restaurant URL preparation: local Pages routing
+
+Initial new browser checks used non-existent failure headings, then a status
+locator matching both the menu and analytics notice. Assertions now use the
+existing state text; these were test-authoring failures, not product defects.
+The first local Pages readiness URL returned 404, so readiness now checks
+/diner/. The pinned workerd binary supports compatibility dates through
+2026-10-13; the local harness uses that supported date rather than today's date.
+
+Actual Pages testing rejected trailing-slash rewrites back to /diner/index.html
+as loops. An outside .html shell initially produced a 308 clean-URL redirect,
+which lost the restaurant pathname and displayed unavailable. Rewriting to the
+outside shell's extensionless URL fixes the cause. The browser checks assert
+the unchanged address, real built CSS/JS, reload, canonical/alias reads and
+unknown/tampered/withdrawn states. Six local Pages/Chromium checks pass; hosted
+domain, owner flow and real tracking remain NOT RUN. No DNS or deployment changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T07:23:24.731Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
+```
+
+
+Restaurant URL follow-up: bounded context summaries were shortened to satisfy
+the graph validator. Corepack's initial fetch was blocked by sandbox networking;
+the approved recheck completed using the pinned runtime. After adding the final
+regressions, a check observed stale context before its refresh; fingerprints were
+refreshed after all source edits. These are preparation/tooling observations, not
+hosted application failures. Eight actual local Pages browser cases now pass,
+including directory JSON serving and trailing-slash URLs. A delayed-directory
+cancellation regression and the existing menu checks also pass. No cloud state changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:35:16.211Z","exitCode":2}
+```
+
+Automatic diner-link preparation: the new pgTAP table assertion initially used
+the two-argument overload, which interpreted the schema as a table name. The
+schema-qualified three-argument assertion now passes with all 320 SQL checks.
+The concurrent-publish test's evolving command array needed an explicit element
+type under strict TypeScript. Context summaries were shortened to the graph's
+bound. After these test/documentation corrections, pnpm check and the real
+139-test Worker/database run pass. Seven local Pages and eleven existing diner
+browser cases pass. Hosted publication and custom-domain acceptance are pending;
+no provider calls or production changes were performed by these local checks.
+The dedicated URL-allocation fault injection now verifies rollback of every
+publication/event/receipt/outbox write and a successful identical retry: all
+140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
+push/PR creation because the operator email was unverified; after verification,
+the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T23:34:03.526Z","exitCode":2}
+```
+
+## 2026-11-14 — Read-only ingestion verifier false acceptance
+
+Nine focused regressions reproduced missing/failed/foreign-record acceptance,
+unpaired report versions, wrong viewer probe, unsupported provider accounting,
+and unsafe evidence/origin handling. The verifier now fails closed, binds source
+and producer identities, rejects redirects and reports upstream calls as unknown.
+The real Worker/PostgreSQL regression covers the owner, viewer and cross-venue
+routes. Its initial typed fixture omitted required nullable fields; those fields
+were restored to match the production contract. Final typecheck and checks passed.
+
+## Ingredient icon preparation — November 12, 2026
+
+Initial environment discovery found no system Python pydantic; tests use the existing isolated Python 3.12 environment (pydantic 2.14.3, Pillow 13.0.0), not the frozen deployment environment. The first eight-case icon run exposed trailing whitespace in the new empty-ingredient synthetic fixture: DishDraft stripped it while source offsets retained it. The fixture now supplies explicit nonblank unknown-ingredient text; source validation remains strict. Ingredient tests (23), review-candidate tests (17) and full Python suite (526) pass. Initial branch setup could not fast-forward main to develop; a new clean task branch was based directly on the fetched develop SHA before edits. No existing work was discarded.
+
+Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise RecursionError rather than fall back to text. Catalogue reads now normalize this to ValueError; the new regression and all 24 ingredient tests pass. Initial pnpm checks were blocked by system Node 24.14 and automatic dependency installation without network access. Using installed Node 24.16 and disabling only automatic dependency installation allowed the dependency-free repository context/docs verification commands to pass; no check itself was disabled.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T07:35:35.800Z","exitCode":1}
+```
+
+## Ingredient illustration generation — November 12, 2026
+
+The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.
+
+Generation review found valid JSON with non-object provider fields could raise AttributeError and stop the batch. Explicit envelope/candidate/content/part/image type validation now returns a sanitized failed job; malformed-shape regression verifies remaining ingredients still run. Focused ingredient suite passes 34 tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:18:46.464Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T08:20:15.323Z","exitCode":1}
+```
+
+## Diner ingredient integration verification — November 13, 2026
+
+The first typecheck caught unchecked indexed access in the generated catalogue resolver and an optional test error handler. Both now have explicit guards. Focused menu tests exercise missing mappings and failed-image handling. The first local browser run could not bind port 5173 under restricted execution (EPERM); rerun with local server permission. No food-review command was changed.
+
+Follow-up: full JavaScript tests initially failed when authentication fixtures could not bind local ports; the permitted rerun passes all 1,423 unit and 74 script tests. The normal browser runner found port 5173 occupied. A temporary copy of the two targeted browser cases used only port 5283 and the diner server; both pass. The first temporary config was mistakenly placed under Playwright's cleaned output directory and found no tests; moving it outside that directory fixed the runner setup. Temporary runner files were removed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T06:21:04.472Z","exitCode":2}
+```
+
+## Automatic ingredient artwork delivery verification — November 13, 2026
+
+The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
+
+Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T23:55:57.240Z","exitCode":1}
+```
+
+## 2026-11-14 — Ingredient artwork cleanup/approval race
+
+A real PostgreSQL regression paused cleanup after its old-object HEAD, completed
+the approval's initial upload, then let cleanup delete before the approval took
+its blob lock. Approval committed a missing object. Phase C now verifies/repairs
+exact bytes under that same transaction lock, after authorization, replay and
+version checks. The interleaving and repair-failure rollback tests cover the fix.
+This final R2 operation intentionally stays inside the transaction; session-level
+locks are unsafe to assume across pooled Hyperdrive transactions. A Windows
+Python fixture also used the default code page for Unicode JSON; it now writes
+UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
+the passing Python rerun. No hosted objects or provider calls were used.
+
+## 2026-11-14 — Order restore reconciliation review
+
+The actual Windows CLI exited zero without validation because its manually built
+file URL did not match import.meta.url. pathToFileURL fixes that entrypoint; the
+documented transform-types flag plus the existing Node resolution hook now loads
+the real restore function, including source-only .js-to-.ts contract imports.
+The child-process loader regression verifies the real freeze check is reached.
+
+A PostgreSQL regression reproduced duplicate audit insertion on repeated restore:
+FOUND referred to the last DELETE rather than the request lookup. Explicit row
+identity fixes both existing/missing request cases. Cutoff and exact-key protection
+preserve later authorized imports during historical deletion replay. An execution
+is bound to its first operator to preserve immutable intent/completion identity.
+Tests use disposable PostgreSQL and synthetic storage; no hosted purge occurred.
+
+Reconciliation with the artwork scheduler exposed an obsolete storage variable
+and a cleanup guard requiring an unnecessary put method. The scheduler now passes
+the order bucket explicitly and permits its existing list/delete retry contract;
+the scheduled retry and artwork-isolation tests pass. The bounded context summary
+was shortened before fingerprint refresh. No behavior was accepted from a merge
+without type and regression checks.
+
+The final restore/checker regression exposed original receipt counts being
+replaced by counts from a partial restored snapshot. Reconciliation now requires
+and validates the original completed receipt in SQL, preserving its executor and
+counts; restore-run counters remain separate. Checker remaining-data checks use
+the same cutoff and exact newer batch keys. The real PostgreSQL partial-snapshot
+restore followed by independent verification now passes without deleting the
+newer import. The new required receipt also needed an existing direct-SQL test
+fixture updated; its earlier failure was an obsolete fixture, then rerun passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T00:20:30.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T00:32:08.133Z","exitCode":1}
+```
+
+## QA-02 reference integrity preparation - November 13, 2026
+
+The initial lint observation was JSON formatting in the new draft synthetic
+reference. Formatting was applied and the manifest hash refreshed before any
+prediction run; pnpm check subsequently passed. Historical menu keys were unchanged.
+
+Independent review reproduced source/reference check-then-read replacement and
+rejection of an explicitly qualified single-price null. The validator now hashes
+and parses the same bounded byte snapshots, and supports qualified null scalars
+with an explicit reason. A CLI regression also replaced an unhelpful generic
+pending-review failure with a controlled reason, without exposing private input.
+The 18 focused tests and 536-test offline Python suite pass. See
+processing/tests/test_qa02_reference.py and processing/eval/qa02/EVIDENCE.md.
+Integrity checks do not certify source truth, reviewer identity, model quality
+or hosted acceptance; the example's independent review remains pending.
+
+## Compare picker publication refresh - November 14, 2026
+
+Three browser regressions reproduced an old kept dish surviving a publication
+refresh: closing the picker could pair its old dish revision with the current
+publication or reopen a removed dish; Compare from an old detail kept stale data.
+Detail and picker navigation now resolve the dish from the current validated menu,
+falling back to Menu or Saved when it no longer exists. All three regressions and
+the picker, live-trigger, Save and artwork suite pass (26 browser cases, 28.9s).
+These synthetic browser sinks do not establish hosted analytics acceptance.
+
+## Compare result exits - November 14, 2026
+
+Real-browser regressions reproduced a stale result after Replace's kept dish was
+removed by publication refresh, and a Saved-origin result returning to Menu while
+leaving the Saved hash in the URL. Compare exits now use the existing Saved-route
+cleanup when needed; missing kept dishes return safely to the current menu.
+Three regressions cover Back to Menu, removed Replace targets and removed detail
+navigation from Saved-origin comparisons. All 38 targeted browser cases pass
+in 39.4s. The added Saved-return test asserts the visible heading rather than an
+incidental CSS class. No hosted acceptance is inferred from synthetic sinks.
+The context-check observation below came from editing the final regression during
+the check; reviewed fingerprints were refreshed afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T06:35:36.517Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T06:45:07.336Z","exitCode":1}
+```
+
+## Owner onboarding baseline and callbacks - November 14, 2026
+
+Three browser regressions reproduced stale saved fields/photo state and an import
+callback navigating after Back. Value-based form reset preserves equivalent-prop
+edits; demo request timers cancel on navigation and unmount. All 54 onboarding
+and auth browser cases pass in 1.5m. The lint observation after reconciliation was
+fixture formatting under the current Biome configuration; formatting and repository
+checks pass. These are caller-driven screens, not hosted upload acceptance.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T06:48:55.095Z","exitCode":2}
+```
+
+## S09 category command collision - November 14, 2026
+
+Pointer and keyboard regressions reproduced duplicate option IDs for the valid
+category name add. A Symbol now identifies the Add-category command, separate
+from every user label. The key array is explicitly typed to retain that unique
+symbol through keyboard navigation. The unreviewed-AI unit case now includes a
+valid photo/rights fixture so only the AI-review guard controls its result.
+All 19 category/photo/dashboard browser cases pass in 24.3s; repository checks
+pass with 1,733 unit and 103 script tests. Persistence remains outside the demo.
+
+## Provider-budget independent verification - November 14, 2026
+
+The actual local workerd/SQLite test verifies two grants under 12 concurrent
+requests, same-key replay, cross-job denial, restart persistence and rollback of
+a counter increment when a reservation insert fails. It passes without starting
+a Container or contacting a provider. Ordinary unit checks skip this optional
+TEST_WORKERD case; the explicit runtime invocation passed in 2.98s.
+The first Python invocations lacked the service extra and then used Windows
+legacy text encoding for Unicode fixtures. Installing the declared service extra
+and running Python with -X utf8 passed all 576 offline tests in 72.731s; no
+unrelated fixture or extraction behavior was changed. A test-harness typecheck
+observation used the Worker URL type where Node fileURLToPath requires Node URL;
+importing URL from node:url matches the existing workerd tests. Final repository
+checks pass, and the explicit SQLite regression passes again in 2.70s. Hosted
+rollout is NOT RUN.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T06:54:16.642Z","exitCode":2}
+```
+
+## 2026-11-15 — Owner menu client integration boundaries
+
+The client regression reproduced acceptance of an arbitrary API origin, a request
+sent after cancellation during token refresh, and incomplete job data reaching
+the caller. The fixed client validates the existing exact origin allowlist,
+checks cancellation before sending, rejects absent sessions and malformed consumed
+fields, and refuses redirects. The local approval regression rejects an edited
+price until its correction is saved. A temporary typecheck failure was a parser
+name shadowed by the upload Blob parameter; the distinct parser name fixes it.
+These observations contain synthetic inputs only. Hosted integration is separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T07:50:44.272Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T08:03:22.349Z","exitCode":1}
+```
+
+## 2026-11-15 — Merged owner-screen wiring checks
+
+The browser regressions cover correction-key collisions between separate
+candidates, late intake responses overriding navigation and overlapping status
+polls invalidating slow responses. Keys include target identity; navigation is
+generation-fenced; polls are serialized. The fixture initially used the wrong
+review status and venue identity; it was corrected to the shared contract rather
+than weakening response validation. Node's direct JSON fixture import requires
+the explicit JSON import attribute.
+
+An exploratory profile migration failed in a disposable database because hosted
+browser roles do not exist locally. That expansion was parked when scope was
+narrowed to merged APIs; no profile migration or permission grant was applied to
+hosted Supabase. Earlier local profile results are not evidence for this slice.
+
+## 2026-11-15 — Analysis-client access handoff
+
+Regressions reproduced unsupported destinations reaching credential lookup,
+cancellation during token retrieval still dispatching and 401/403 responses
+losing their status. Exact workspace API origins and the existing loopback proxy
+are now the only destinations. Cancellation is checked around token lookup;
+typed denials retain a generic message for workspace cleanup. The local Worker
+handoff fixture uses the approved loopback API origin. No provider request,
+hosted configuration or trusted-freshness flag changed during these fixes.
+
+The two error histories also contained edits in place, so an append-only-prefix
+merge assumption failed locally. The develop ledger and added/revised branch
+evidence are retained below without conflict markers or dropped source changes.
+
+### Retained PR164 branch evidence
+
+The new shared origin check initially imported the workspace HTTP module,
+bringing unrelated contracts into the synthetic demo's dependency path and
+failing its no-analytics bundle check. Extracting the unchanged allowlist into a
+dependency-free module preserves the origin boundary and passes all four normal/
+preview/harness-exclusion script checks. No test assertion or tracker policy was
+relaxed.
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:15:53.963Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:18:40.227Z","exitCode":2}
+```
+
+## Owner Responses local integration — November 12, 2026
+
+Initial checks identified exact-optional-property construction errors and Node versus Worker URL type overlap in the local launcher; explicit optional spreads and a file-path cwd resolve them. The local plain-Node harness also exposed an unrelated contracts-barrel .js import that exists only as TypeScript source. Narrow public owner-report/owner-analysis exports avoid loading unrelated modules; the shared resolver and provider policy are unchanged. The default Node 24.14 could not install this repository, and offline package metadata was incomplete; the existing Node 24.16 runtime and normal frozen installation succeeded without changing engine or lockfile requirements. No live provider request or credential was involved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T00:21:54.000Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T00:25:10.668Z","exitCode":1}
+```
+
+- Owner Responses integration verification: full test suite passed with local ports permitted (1515 tests, 4 skipped; 79 script checks). The context check detected the newly changed E2E script fingerprint; refreshed after reviewing the delivery summary. Build dry-run succeeded, but Wrangler could not write its default external log directory; retry uses a temporary log path. No deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-13T00:29:15.673Z","exitCode":1}
+```
+
+- Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
+
+## PR164 develop reconciliation — November 15, 2026
+
+The locked dependency install first stopped because the noninteractive runner could not confirm refreshing node_modules. Re-running with CI=true installed the unchanged lockfile and passed all 222 supply-chain policy entries. The dashboard conflict combines S09's showAi visibility guard with the connected analysis component; a browser regression covers hide-on-edit and restore-on-menu behavior. No provider requests or hosted changes are part of this reconciliation.
+
+The combined context summary initially exceeded its 1,000-character bound; it was condensed while retaining both integrations. The first full check passed unit tests but hit the known macOS /var versus /private/var temporary-path assertion in prepare-app-site.test.mjs. The repeat uses the canonical temporary-directory path rather than changing unrelated routing behavior.
+
+Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,831 unit tests (five existing skips), 106 script checks, lint/types/context/docs. pnpm verify build passed. The mock-provider owner-AI browser suite passed three cases, including S09 visibility; desktop/mobile synthetic screenshots were retained for review. Database/full-browser CI remains separate evidence on the pushed commit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:52:42.006Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:57:00.409Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-OWNER-AI-SHELL", "status": "resolved", "area": "owner-ai-shell", "cause": "Generic analysis failures retained private report output after authorization denial; panel wording implied an exact displayed snapshot despite an independent server read. Mobile grid intrinsic width also widened the report workspace.", "prevention": "Propagate typed access denials, cancel stale actor/report work, label both evidence periods explicitly and constrain report grid tracks.", "sources": ["frontend/console/src/owner/OwnerWorkspace.tsx", "frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "Two browser reproducers failed before fixes. Access denial, separate periods, pending sign-out/account change and mobile accessibility/overflow now pass; full verification follows."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T10:15:22.721Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T10:19:56.289Z","exitCode":2}
+```
+
+```json
+{"id":"ERR-20261115-OWNER-COMPOSITION","status":"resolved","area":"owner-console-presentation","cause":"The authenticated wiring wrapper bypassed merged dashboard/onboarding composition; broad workspace styles also hid icons and changed authored form spacing.","prevention":"Reuse the original dashboard, source picker and shared form/table presentation; scope demo styles and record every connected page at desktop/mobile widths.","sources":["frontend/console/src/owner/FirstDashboard.tsx","frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/owner-dashboard/menu-presentation.tsx","tests/e2e/owner-workspace.spec.ts"],"regression":"Two missing-composition checks failed before correction. Workspace suite 36/36 and authored-screen suite 48/48 passed; optional approval category error also has a browser regression. Final hosted screenshot acceptance is separate."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T10:39:51.356Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T10:40:53.588Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
+```
