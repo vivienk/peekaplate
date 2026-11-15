@@ -80,7 +80,7 @@ function publicationHash(
     .digest('hex');
 }
 
-async function beginAuthorizedOwner(
+export async function beginAuthorizedOwner(
   client: Client,
   actorId: string,
   venueId: string,

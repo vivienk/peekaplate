@@ -3919,3 +3919,25 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 - Result: `search.spec.ts:154` (two `dish_viewed` fixture logs during search) and `tracking-outbox.spec.ts:218` failed only in the full parallel run; both pass alone, and `search.spec.ts --repeat-each 4 --workers 4` passed 28/28 both with and without this branch's diner changes.
 - Cause: not confirmed; timing-sensitive under full-suite load (1 s visibility timer and outbox fill), not the search styling.
 - Prevention: rerun a single full-suite failure in isolation and with `--repeat-each` before treating it as a regression.
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-TEST-SLUG","status":"resolved","area":"publication-tests","cause":"The new database test expected hyphens, but the existing automatic restaurant link allocator uses underscores. Runtime behavior was correct.","prevention":"Assert the existing allocator's contract, not the Figma sample spelling.","sources":["backend/src/owner-publication.integration.ts","backend/src/restaurant-link.ts"],"regression":"The publication/link integration assertion now expects synthetic_preview_cafe; rerun evidence is recorded on the PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T17:46:45.853Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-CONTEXT","status":"resolved","area":"context-handoff","cause":"The initial publication handoff exceeded the bounded summary; later UI/test edits invalidated its refreshed fingerprint.","prevention":"Keep the bounded summary and refresh after the final source and test edits.","sources":["docs/CONTEXT.md","scripts/context.mjs"],"regression":"Final pnpm check passes all functional, context and documentation checks; publication browser regressions pass separately."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T18:06:14.398Z","exitCode":1}
+```
