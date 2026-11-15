@@ -359,7 +359,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "7bffdd85b6d83442c4025357ece325d31eaa82c297c2e3123755e5fbf3a3651a"
+      "sourceFingerprint": "9919cfe7ee74a2f22a6a4a53b66773c70cd9eec4d94fd0c034ae421bfaa42b03"
     },
     {
       "id": "backend",
@@ -537,7 +537,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.ts",
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication-http.test.ts",
-        "backend/src/owner-publication.integration.ts"
+        "backend/src/owner-publication.integration.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -550,7 +551,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "6f99d6c55db5f8a89ec9e3778939cdba36d1196ae1ff266861ac767f87fe807e"
+      "sourceFingerprint": "2521b9d6baf9ce8671a2ecbe165457269a423e21be154f6862251be6de25e6bf"
     },
     {
       "id": "database",
@@ -910,20 +911,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "diner"
-      ],
-      "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
-      "files": [
-        "frontend/diner/src/compare/resultScreen.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/compare-result.spec.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
-      ],
-      "next": "Hosted tracking acceptance remains separate. Continue owner onboarding after Compare merges."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "console"
       ],
       "summary": "PR171 adds props-controlled owner onboarding S05 details, S06 source choice, S07 URL/files and S08 processing states. Actual saved baseline changes reset form/photo state, while equivalent props preserve edits; demo request callbacks cancel on navigation. Reconciled current develop and Compare changes. Real upload/persistence integration is not claimed.",
@@ -1045,6 +1032,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-publish-handoff.md"
       ],
       "next": "Verify the pinned staging rollout with a genuine owner session and retained labelled synthetic diner link; official S13 and automatic trusted preparation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "backend"
+      ],
+      "summary": "Hosted prepared preview exposed Worker rejection of redirect error. Manual redirect handling rejects every 3xx without following; the network-free workerd regression reproduces the failure and verifies valid bytes plus hostile Location rejection.",
+      "files": [
+        "backend/src/owner-publication.ts",
+        "backend/src/owner-publication.test.ts",
+        "backend/src/owner-publication.workerd-harness.ts"
+      ],
+      "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
     }
   ]
 }
