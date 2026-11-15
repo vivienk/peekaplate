@@ -15,8 +15,10 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
   name: 'Avocado Toast',
   category: 'Breakfast',
   priceAmount: '14',
+  description: 'Toasted sourdough with smashed avocado.',
   ingredients: { status: 'confirmed', items: ['a', 'b', 'c', 'd', 'e', 'f'] },
   allergens: { status: 'confirmed', items: ['egg'] },
+  photoId: 'photo-1',
   ...over,
 });
 
@@ -25,7 +27,7 @@ const noPrice = dish({
   name: 'Berry Pancake Stack',
   priceAmount: null,
   ingredients: { status: 'confirmed', items: ['a', 'b', 'c', 'd', 'e'] },
-  allergens: { status: 'unknown', items: [] },
+  allergens: { status: 'confirmed', items: [] },
 });
 const noCategory = dish({ id: 'd3', name: 'Brioche French Toast', category: null });
 
@@ -40,7 +42,8 @@ const render = (state: ReviewState, props: Partial<ReviewDishesProps> = {}) =>
       onUndoRemove={noop}
       onCancel={noop}
       onSaveAndExit={noop}
-      onPublish={noop}
+      onCompleteVerification={noop}
+      onGoToDashboard={noop}
       {...props}
     />,
   );
@@ -51,10 +54,10 @@ const text = (html: string) =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
-const publishButton = (html: string) =>
-  html.match(/<button[^>]*>Publish Menu<\/button>/)?.[0] ?? '';
+const completeButton = (html: string) =>
+  html.match(/<button[^>]*>Complete verification<\/button>/)?.[0] ?? '';
 
-describe('ReviewDishes (S10 Menu Review and Publish)', () => {
+describe('ReviewDishes (S10 Menu Review)', () => {
   it('shows each dish with the status and text from the design', () => {
     const words = text(render(initialReview([dish(), noPrice, noCategory])));
     expect(words).toContain('Your dishes');
@@ -69,40 +72,45 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(words).toContain('Ready');
   });
 
-  it('while any dish is not Ready, the footer is Cancel and Save and Exit (no Publish Menu)', () => {
+  it('while any dish is not Ready, the footer is Cancel and Save and Exit', () => {
     const html = render(initialReview([dish(), noPrice]));
     const words = text(html);
     expect(words).toContain('Cancel');
     expect(words).toContain('Save and Exit');
-    expect(publishButton(html)).toBe('');
+    expect(completeButton(html)).toBe('');
     expect(words).not.toContain('Back');
+    expect(words).not.toContain('Publish');
   });
 
-  it('when every dish is Ready, Publish Menu replaces Save and Exit', () => {
+  it('when every dish is Ready, Complete verification takes the place of Cancel', () => {
     const html = render(initialReview([dish(), dish({ id: 'd9', name: 'Eggs' })]));
     const words = text(html);
-    expect(words).toContain('Cancel');
-    expect(publishButton(html)).not.toBe('');
-    expect(publishButton(html)).not.toContain('disabled');
-    expect(words).not.toContain('Save and Exit');
+    expect(words).toContain('Save and Exit');
+    expect(completeButton(html)).not.toBe('');
+    expect(completeButton(html)).not.toContain('disabled');
+    expect(words).not.toContain('Cancel');
+    // Publishing happens later, from the dashboard's Review and publish step.
+    expect(words).not.toContain('Publish');
   });
 
-  it('cannot publish an empty menu and says so', () => {
+  it('an empty menu cannot be completed and says so', () => {
     const html = render(initialReview([]));
-    expect(publishButton(html)).toBe('');
+    expect(completeButton(html)).toBe('');
     expect(text(html)).toContain('Save and Exit');
     expect(text(html)).toContain('No dishes yet.');
   });
 
-  it('disables Publish Menu and marks it busy while publishing, and shows a failure', () => {
+  it('disables Complete verification and marks it busy while completing, and shows a failure', () => {
     const state = initialReview([dish()]);
-    const busy = render(state, { publishing: true });
-    expect(publishButton(busy)).toContain('disabled=""');
-    expect(publishButton(busy)).toContain('aria-busy="true"');
-    const failed = render(state, { publishError: 'We could not publish. Try again.' });
+    const busy = render(state, { completing: true });
+    expect(completeButton(busy)).toContain('disabled=""');
+    expect(completeButton(busy)).toContain('aria-busy="true"');
+    const failed = render(state, {
+      completeError: 'We could not complete verification. Try again.',
+    });
     expect(failed).toContain('role="alert"');
-    expect(text(failed)).toContain('We could not publish. Try again.');
-    expect(publishButton(failed)).not.toContain('disabled');
+    expect(text(failed)).toContain('We could not complete verification. Try again.');
+    expect(completeButton(failed)).not.toContain('disabled');
   });
 
   it('offers Undo after a removal, with the notice announced politely', () => {
@@ -113,8 +121,8 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(text(html)).toContain('Dish removed.');
     expect(html).toContain('>Undo</button>');
     expect(text(html)).not.toContain('Berry Pancake Stack');
-    // The only bad dish is gone, so Publish Menu takes the place of Save and Exit.
-    expect(publishButton(html)).not.toBe('');
+    // The only bad dish is gone, so Complete verification takes the place of Cancel.
+    expect(completeButton(html)).not.toBe('');
   });
 
   it('shows Dish restored with no further Undo', () => {
@@ -123,7 +131,8 @@ describe('ReviewDishes (S10 Menu Review and Publish)', () => {
     expect(text(html)).toContain('Dish restored.');
     expect(html).not.toContain('>Undo</button>');
     expect(text(html)).toContain('Berry Pancake Stack');
-    expect(publishButton(html)).toBe('');
+    expect(completeButton(html)).toBe('');
+    expect(text(html)).toContain('Cancel');
     expect(text(html)).toContain('Save and Exit');
   });
 

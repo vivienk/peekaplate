@@ -21,8 +21,10 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
   name: 'Avocado Toast',
   category: 'Breakfast',
   priceAmount: '14',
+  description: 'Toasted sourdough with smashed avocado.',
   ingredients: { status: 'confirmed', items: ['avocado', 'bread'] },
   allergens: { status: 'confirmed', items: ['wheat'] },
+  photoId: 'photo-1',
   ...over,
 });
 
@@ -54,7 +56,13 @@ describe('dishStatus', () => {
   it('is never Ready when both are missing', () => {
     const status = dishStatus(dish({ priceAmount: null, category: null }));
     expect(status.ready).toBe(false);
-    expect(status.label).toBe('Price and Category Missing');
+    expect(status.label).toBe('2 fields missing');
+  });
+
+  it('is Serving Size Missing when only the serving size is missing', () => {
+    const status = dishStatus(dish({ servingSize: null }));
+    expect(status.ready).toBe(false);
+    expect(status.label).toBe('Serving Size Missing');
   });
 });
 

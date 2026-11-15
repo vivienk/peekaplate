@@ -13,6 +13,14 @@ export interface DashboardMenuItem {
   ing: readonly string[];
   aiIng: readonly string[];
   aiReviewed: boolean;
+  /** Dish description, when the source has one. */
+  desc?: string;
+  /** Id of the dish photo, when the source has one. */
+  photoId?: string | null;
+  /** True when the owner confirmed the allergens, including confirming that there are none. */
+  allergensConfirmed?: boolean;
+  /** Serving size, when the source has one (not in the draft contract yet). */
+  servingSize?: string | null;
   /** Recorded allergens. Added to the dashboard data by the Screen 9 PR (#172). */
   alg?: readonly string[];
   /** Allergens suggested by AI and not yet reviewed (#172). */
@@ -36,8 +44,14 @@ export function menuItemToReviewDish(item: DashboardMenuItem): ReviewDish {
     id: item.id ?? `new-${item.name.trim() || 'dish'}`,
     name: item.name.trim() === '' ? null : item.name,
     category: item.cat.trim() === '' ? null : item.cat,
+    description: item.desc?.trim() ? item.desc : null,
+    photoId: item.photoId ?? null,
+    ...(item.servingSize !== undefined && { servingSize: item.servingSize }),
     priceAmount: price === '' ? null : price,
     ingredients: factsOf(item.ing, item.aiIng, item.aiReviewed),
-    allergens: factsOf(item.alg ?? [], item.aiAlg ?? [], item.aiReviewed),
+    allergens:
+      item.allergensConfirmed === true && (item.alg ?? []).length === 0
+        ? { status: 'confirmed', items: [] }
+        : factsOf(item.alg ?? [], item.aiAlg ?? [], item.aiReviewed),
   };
 }

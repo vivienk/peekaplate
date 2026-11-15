@@ -1,7 +1,8 @@
-/* S5-FE-10 S10 "Menu Review and Publish" (Figma frames S10_Review, S10_Ready to publish).
+/* S5-FE-10 S10 "Menu Review" (Figma frames S10_Review and S10_Ready to publish).
  * Every value comes from @peekaplate/tokens. Shared owner values (--owner-pending-*, buttons, focus
- * ring, visually-hidden) come from owner.css through the .owner-root wrapper. Styling of the trash
- * action and the Edit button height (32px) are still pending from design. */
+ * ring, visually-hidden) come from owner.css through the .owner-root wrapper. Sizes follow the Figma
+ * frame "S10_Review — Default" (1200px card, 80px padding, 32px Edit button and trash, 48px footer
+ * buttons). Styling of the trash action is still to be confirmed by design. */
 
 .review-root {
   display: flex;
@@ -48,12 +49,13 @@
 }
 
 .review-card {
-  width: min(100% - var(--pp-space-32), 64rem);
+  box-sizing: border-box; /* the 1200px Figma card includes its 80px padding */
+  width: min(100% - var(--pp-space-32), 75rem); /* Figma card width 1200px: no size token */
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--pp-space-24);
-  padding: var(--pp-space-40);
+  gap: calc(var(--pp-space-32) * 2); /* Figma gap 64px */
+  padding: var(--pp-space-80);
   border-radius: var(--pp-radius-24);
   background: var(--pp-color-white);
   box-shadow: var(--owner-pending-shadow-menu);
@@ -122,8 +124,28 @@
 }
 .review-table {
   width: 100%;
+  min-width: 40rem;
+  table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
+}
+/* Figma column widths on the 1038px table: Dish 573, Category 106, Price 83, Status 161, Edit 115. */
+.review-table thead th:nth-child(1) {
+  width: 55%;
+  border-top-left-radius: var(--pp-radius-12);
+}
+.review-table thead th:nth-child(2) {
+  width: 10%;
+}
+.review-table thead th:nth-child(3) {
+  width: 8%;
+}
+.review-table thead th:nth-child(4) {
+  width: 15.5%;
+}
+.review-table thead th:nth-child(5) {
+  width: 7.25rem; /* Figma 115px: no size token */
+  border-top-right-radius: var(--pp-radius-12);
 }
 .review-table thead th {
   padding: var(--pp-space-8);
@@ -138,7 +160,7 @@
 }
 .review-table td,
 .review-table tbody th {
-  padding: var(--pp-space-12) var(--pp-space-8);
+  padding: var(--pp-space-8);
   color: var(--pp-role-on-surface-variant);
   font-size: var(--pp-font-size-paragraph-2);
   line-height: var(--pp-line-height-button-label);
@@ -188,11 +210,17 @@
 .review-actions {
   display: inline-flex;
   align-items: center;
-  gap: var(--pp-space-12);
+  gap: var(--pp-space-8);
 }
-.review-edit.pp-button {
+/* Figma "Owner dashboard_Button" in the table: 32px high pill, 8px 16px padding, 12px Semi Bold label. */
+.review-actions .review-edit.pp-button {
+  box-sizing: border-box;
+  height: var(--pp-space-32);
   min-height: var(--pp-space-32);
-  padding-block: var(--pp-space-4);
+  padding: var(--pp-space-8) var(--pp-space-16);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+  font-weight: var(--pp-font-weight-semibold);
 }
 .review-trash {
   display: inline-flex;
@@ -257,7 +285,59 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+  gap: var(--pp-space-24);
+}
+
+/* "Menu verified" pop-up (Figma): centred card, orange check, title, one line, one full-width pill.
+ * Sizes are read from the Figma screenshot, not the frame; confirm with design. */
+.review-verified {
+  width: min(100% - var(--pp-space-32), 25.5rem);
+  margin: auto;
+  padding: var(--pp-space-32);
+  border: 0;
+  border-radius: var(--pp-radius-24);
+  background: var(--pp-color-white);
+  color: var(--pp-role-on-surface);
+  box-shadow: var(--owner-pending-shadow-card);
+  text-align: center;
+}
+.review-verified[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--pp-space-16);
+}
+.review-verified::backdrop {
+  background: color-mix(in srgb, var(--pp-color-neutral-950) 55%, transparent);
+}
+.review-verified__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pp-space-64, 4rem);
+  height: var(--pp-space-64, 4rem);
+  border-radius: var(--pp-radius-full);
+  background: var(--pp-color-orange-500);
+  color: var(--pp-color-white);
+}
+.review-verified h2 {
+  margin: 0;
+  font-size: var(--pp-font-size-h3);
+  line-height: var(--pp-line-height-h3);
+  font-weight: var(--pp-font-weight-bold);
+}
+.review-verified p {
+  margin: 0;
+  color: var(--pp-role-on-surface-variant);
+  font-size: var(--pp-font-size-small);
+  line-height: var(--pp-line-height-small);
+}
+.review-verified .review-verified__button.owner-button.pp-button {
+  width: 100%;
+  min-height: var(--pp-space-48);
+  margin-top: var(--pp-space-8);
+  font-size: var(--pp-font-size-paragraph-1);
+  font-weight: var(--pp-font-weight-semibold);
 }
 
 .review-root :focus-visible {
@@ -268,6 +348,7 @@
 @media (max-width: 899px) {
   .review-card {
     padding: var(--pp-space-24) var(--pp-space-16);
+    gap: var(--pp-space-24);
   }
   .review-topbar {
     padding: var(--pp-space-16) var(--pp-space-16) 0;

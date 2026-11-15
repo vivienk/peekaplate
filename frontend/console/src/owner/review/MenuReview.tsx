@@ -1,7 +1,9 @@
-// S5-FE-10 / S10 "Menu Review and Publish" screen (Figma frames S10_Review and S10_Ready to publish,
-// developer handoff node 2793:15371). Presentational: the parent owns the draft data, the S09 form
-// and the publish call, and passes them in, so the owner draft API can be connected without
-// changing this UI. Publishing is never started here unless the owner presses Publish Menu.
+// S5-FE-10 / S10 "Menu Review" screen (Figma frames S10_Review — Default and S10_Ready to publish).
+// Presentational: the parent owns the draft data, the S09 form and navigation, and passes them in, so
+// the owner draft API can be connected without changing this UI. This screen never publishes:
+// "Complete verification" shows the "Menu verified" pop-up (verification does not publish), and its
+// "Go to dashboard" button hands over to the parent, which opens S12 (first dashboard), where step 3
+// (Review and publish) comes next.
 import { useEffect, useRef } from 'react';
 import { Button } from '../../ui';
 import { ICONS } from '../icons';
@@ -24,16 +26,68 @@ export interface ReviewDishesProps {
   onEditDish: (id: string) => void;
   onRemoveDish: (id: string) => void;
   onUndoRemove: () => void;
-  /** Left footer button. Figma frame S10_Review — Default labels it Cancel; its behavior is not specified. */
+  /** Left button while a dish is not Ready. Confirmed: goes back to Screen 8. */
   onCancel: () => void;
-  /** Saves progress and returns to S12. */
+  /** Saves progress and opens the first-time dashboard. */
   onSaveAndExit: () => void;
-  /** Starts publication. The parent confirms success with the API before showing the pop-up. */
-  onPublish: () => void;
-  /** True while the publish request is running, so it cannot be sent twice. */
-  publishing?: boolean;
-  /** Plain-language reason when publishing failed; the owner can try again. */
-  publishError?: string | null;
+  /**
+   * Shown only when every dish is Ready. Confirmed: opens the first-time dashboard with step 2
+   * complete and step 3 (Review and publish) next. Nothing is published here.
+   */
+  onCompleteVerification: () => void;
+  /** True while the parent is completing verification, so it cannot be sent twice. */
+  completing?: boolean;
+  /** Plain-language reason when completing failed; the owner can try again. */
+  completeError?: string | null;
+  /** True once verification succeeded: shows the "Menu verified" pop-up. Nothing is published. */
+  verified?: boolean;
+  /** "Go to dashboard" in the pop-up: the parent opens S12 (first dashboard). */
+  onGoToDashboard: () => void;
+}
+
+/**
+ * Figma "Menu verified" pop-up. It has one button and no close control, so Escape does not close it:
+ * the owner continues with Go to dashboard. A native modal dialog keeps focus and the page behind it
+ * inert; the one button takes focus when it opens.
+ */
+function MenuVerifiedDialog({ onGoToDashboard }: { onGoToDashboard: () => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialogRef}
+      className="review-verified"
+      aria-labelledby="review-verified-title"
+      aria-describedby="review-verified-text"
+      onCancel={(event) => event.preventDefault()}
+    >
+      <span className="review-verified__icon" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" focusable="false">
+          <path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+      <h2 id="review-verified-title">Menu verified</h2>
+      <p id="review-verified-text">
+        Your menu details are confirmed. Verification does not publish your menu.
+      </p>
+      <Button
+        variant="action"
+        className="owner-button review-verified__button"
+        onClick={onGoToDashboard}
+      >
+        Go to dashboard
+      </Button>
+    </dialog>
+  );
 }
 
 function TrashIcon() {
@@ -68,9 +122,11 @@ export function ReviewDishes({
   onUndoRemove,
   onCancel,
   onSaveAndExit,
-  onPublish,
-  publishing = false,
-  publishError = null,
+  onCompleteVerification,
+  completing = false,
+  completeError = null,
+  verified = false,
+  onGoToDashboard,
 }: ReviewDishesProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
@@ -113,7 +169,7 @@ export function ReviewDishes({
           <div>
             <h1>Your dishes</h1>
             <p className="review-sub">
-              {count} dish{count === 1 ? '' : 'es'}
+              {count} dish{count === 1 ? '' : 'es'} extracted
             </p>
           </div>
           <Button variant="text" className="owner-button review-add" onClick={onAddDish}>
@@ -151,7 +207,7 @@ export function ReviewDishes({
                   <th scope="col">Category</th>
                   <th scope="col">Price</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Edit / Remove</th>
+                  <th scope="col">Review / Remove</th>
                 </tr>
               </thead>
               <tbody>
@@ -200,33 +256,41 @@ export function ReviewDishes({
           </div>
         )}
 
-        {publishError && (
+        {completeError && (
           <p className="review-error" role="alert">
-            {publishError}
+            {completeError}
           </p>
         )}
 
         <div className="review-footer">
-          <Button variant="outline" className="owner-button" onClick={onCancel}>
-            Cancel
-          </Button>
           {ready ? (
-            <Button
-              variant="action"
-              className="owner-button"
-              disabled={publishing}
-              aria-busy={publishing}
-              onClick={onPublish}
-            >
-              Publish Menu
-            </Button>
+            <>
+              <Button variant="outline" className="owner-button" onClick={onSaveAndExit}>
+                Save and Exit
+              </Button>
+              <Button
+                variant="action"
+                className="owner-button"
+                disabled={completing}
+                aria-busy={completing}
+                onClick={onCompleteVerification}
+              >
+                Complete verification
+              </Button>
+            </>
           ) : (
-            <Button variant="action" className="owner-button" onClick={onSaveAndExit}>
-              Save and Exit
-            </Button>
+            <>
+              <Button variant="outline" className="owner-button" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button variant="action" className="owner-button" onClick={onSaveAndExit}>
+                Save and Exit
+              </Button>
+            </>
           )}
         </div>
       </main>
+      {verified && <MenuVerifiedDialog onGoToDashboard={onGoToDashboard} />}
     </div>
   );
 }

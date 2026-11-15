@@ -10,6 +10,8 @@ const item = (over: Partial<DashboardMenuItem> = {}): DashboardMenuItem => ({
   ing: ['Seeded bread', 'Avocado', 'Poached egg'],
   aiIng: [],
   aiReviewed: false,
+  desc: 'Toasted seeded bread with smashed avocado and a poached egg.',
+  photoId: 'avotoast',
   ...over,
 });
 
@@ -24,13 +26,16 @@ describe('dashboard menu item to S10 review row', () => {
   });
 
   it('turns an empty price or category into a missing value, so the row is not Ready', () => {
-    const noPrice = menuItemToReviewDish(item({ price: '' }));
+    const confirmed = { allergensConfirmed: true };
+    const noPrice = menuItemToReviewDish(item({ price: '', ...confirmed }));
     expect(noPrice.priceAmount).toBeNull();
     expect(dishStatus(noPrice).label).toBe('Price Missing');
-    const noCategory = menuItemToReviewDish(item({ cat: ' ' }));
+    const noCategory = menuItemToReviewDish(item({ cat: ' ', ...confirmed }));
     expect(noCategory.category).toBeNull();
     expect(dishStatus(noCategory).label).toBe('Category Missing');
-    expect(dishStatus(menuItemToReviewDish(item())).ready).toBe(true);
+    expect(dishStatus(menuItemToReviewDish(item(confirmed))).ready).toBe(true);
+    // Allergens the owner has not confirmed keep a dish from being Ready.
+    expect(dishStatus(menuItemToReviewDish(item())).label).toBe('1 field missing');
   });
 
   it('never invents allergens: none listed is unknown, listed is confirmed', () => {
