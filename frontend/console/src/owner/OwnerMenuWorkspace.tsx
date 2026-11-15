@@ -31,6 +31,7 @@ import { evidenceExcerpts } from '../owner-menu/evidence';
 import { errorMessage } from '../owner-menu/jobs';
 import { Button } from '../ui';
 import { FirstDashboardContent } from './FirstDashboard';
+import { OwnerPublish } from './OwnerPublish';
 import '../onboarding/onboarding.css';
 
 type Active = { client: OwnerMenuClient; controller: AbortController };
@@ -93,7 +94,7 @@ export function OwnerMenuWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const [view, setRawView] = useState<
-    'overview' | 'sources' | 'url' | 'photo' | 'pdf' | 'list' | 'edit' | 'processing'
+    'overview' | 'sources' | 'url' | 'photo' | 'pdf' | 'list' | 'edit' | 'processing' | 'publish'
   >('overview');
   const viewGeneration = useRef(0);
   const setView = useCallback((next: typeof view) => {
@@ -619,6 +620,16 @@ export function OwnerMenuWorkspace({
           }}
         />
       </>
+    ) : view === 'publish' ? (
+      <OwnerPublish
+        key={`${actorId}:${venueId}`}
+        apiBase={apiBase}
+        actorId={actorId}
+        venueId={venueId}
+        getAccessToken={getAccessToken}
+        onAccessFailure={onAccessFailure}
+        onBack={() => setView('list')}
+      />
     ) : view === 'overview' ? (
       <FirstDashboardContent
         setup={{
@@ -653,6 +664,9 @@ export function OwnerMenuWorkspace({
           </Btn>
           <Btn kind="text" disabled={busy} onClick={reload}>
             Reload saved work
+          </Btn>
+          <Btn kind="outlined" disabled={busy} onClick={() => setView('publish')}>
+            Review and publish
           </Btn>
         </div>
         <p>
@@ -771,7 +785,7 @@ export function OwnerMenuWorkspace({
       {content}
     </section>
   );
-  return ['sources', 'url', 'photo', 'pdf', 'processing', 'edit'].includes(view) ? (
+  return ['sources', 'url', 'photo', 'pdf', 'processing', 'edit', 'publish'].includes(view) ? (
     <OnboardingLayout
       restaurantName={restaurantName}
       bare={['photo', 'pdf', 'edit'].includes(view)}

@@ -79,7 +79,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "f6e9b0c334cc251100d306a13f754f94b0370bdcb6f5f994d5563c3684b5c2f4"
+      "sourceFingerprint": "ef21889258626c10fe842e6cac5b30065162df19da8f602cebc1f78510728663"
     },
     {
       "id": "tokens",
@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
+      "summary": "Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and private menu/draft/photo persistence. Signed-in setup reuses merged FirstDashboard, source picker and authored Screen 9; live presentation imports no demo data. Unknown setup/food facts, evidence, cancellation and access cleanup remain explicit. Temporary S13 previews admitted snapshots, explicitly approves/publishes and reads the returned diner URL with stable retries. Automatic draft-to-bundle preparation remains operator-owned. Opt-in analysis retains typed denials and distinct evidence periods. Profile persistence and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -346,7 +346,10 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/controls.tsx",
         "frontend/console/src/owner-dashboard/menu-presentation.tsx",
         "frontend/console/src/owner-dashboard/menu-presentation.css",
-        "frontend/console/src/owner-dashboard/dish-presentation.css"
+        "frontend/console/src/owner-dashboard/dish-presentation.css",
+        "frontend/console/src/owner/OwnerPublish.tsx",
+        "frontend/console/src/owner/owner-publish.css",
+        "docs/owner-publish-handoff.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -356,12 +359,12 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "8ea6a96a455d0be1e3d41f51761f26d45800e6108801b101ed5aa57d31fcd021"
+      "sourceFingerprint": "cbd69e27c1f8bfc27bd3d10894d631481e800d2640fca38f37d6e23e0949928b"
     },
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Actor-bound owner workspaces expose owner/editor restaurants and versioned private draft/photo/upload/verification flows. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are versioned/idempotent. Owner-AI trust/issuance and live evaluation remain gated. Decorative artwork uses exact-byte blob-locked repair before approval and approved-only public reads. Order imports require agreement; owner requests, bound operator execution, independent checker and frozen restore use tenant/fence/cutoff guards. Required hosted provider gating reserves at most two attempts per tenant/job in transactional DO SQLite, including redelivery. Hosted rollout/acceptance stays separate.",
+      "summary": "Worker enforces staff JWT/current tenant authority, transactional commands, signed publication and automatic diner links. Owner/editor workspaces have versioned private draft/photo/upload flows; owner-only staging prepared-menu reads preserve operator admission and verify bounded bundle bytes/assets. Canonical observations remain separate from PostHog. Synthetic-gated reports/CSV use half-open windows, unknown freshness, cohorts and complementary suppression; owner actions are idempotent. AI trust/issuance remains gated. Artwork uses blob-locked repair before approval. Order imports require agreement and bound operator/checker execution. Hosted provider gating reserves at most two attempts per tenant/job including redelivery. Hosted rollout/acceptance stays separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -530,7 +533,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/scripts/owner-ai-local-fixture.ts",
         "scripts/start-owner-ai-private.py",
         "docs/owner-ai-responses.md",
-        "backend/owner-ai-handoff.test.mjs"
+        "backend/owner-ai-handoff.test.mjs",
+        "backend/src/owner-publication.ts",
+        "backend/src/owner-publication.test.ts",
+        "backend/src/owner-publication-http.test.ts",
+        "backend/src/owner-publication.integration.ts"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -543,7 +550,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "08679cc0f2665b05c272f7d921ef309212d771d7160f575feed3b30039f7a7cf"
+      "sourceFingerprint": "6f99d6c55db5f8a89ec9e3778939cdba36d1196ae1ff266861ac767f87fe807e"
     },
     {
       "id": "database",
@@ -905,19 +912,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "diner"
       ],
-      "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
-      "files": [
-        "frontend/diner/src/compare/pickerScreen.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
-      ],
-      "next": "Merge picker before PR127 result and Replace. Hosted analytics acceptance remains separate."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "diner"
-      ],
       "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
       "files": [
         "frontend/diner/src/compare/resultScreen.ts",
@@ -1036,6 +1030,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-onboarding-wiring.md"
       ],
       "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console",
+        "backend",
+        "contracts"
+      ],
+      "summary": "Temporary S13 uses existing onboarding composition and owner-only prepared snapshots. Preview integrity, explicit menu approval/publication, same-command retry and authoritative URL retrieval preserve existing admission and tenant boundaries.",
+      "files": [
+        "backend/src/owner-publication.ts",
+        "frontend/console/src/owner/OwnerPublish.tsx",
+        "docs/owner-publish-handoff.md"
+      ],
+      "next": "Verify the pinned staging rollout with a genuine owner session and retained labelled synthetic diner link; official S13 and automatic trusted preparation remain separate."
     }
   ]
 }
