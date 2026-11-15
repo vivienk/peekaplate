@@ -410,6 +410,12 @@ async function addCategory(page: Page, category: string) {
   }
 }
 
+async function openAccount(page: Page) {
+  const menu = page.locator('details.pp-onboard__account-menu');
+  if ((await menu.count()) && (await menu.getAttribute('open')) === null)
+    await menu.locator('summary').click();
+}
+
 async function preparedPublication(context: BrowserContext) {
   const id = (n: number) => `55555555-5555-4555-8555-${String(n).padStart(12, '0')}`;
   const menu = {
@@ -647,6 +653,35 @@ test('prepared publication conflict requires a fresh preview and denied access c
   await expect(page.getByRole('link', { name: /routing-staging/ })).toHaveCount(0);
 });
 
+test('desktop panels stay in place while the middle scrolls, with account actions tucked away', async ({
+  context,
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 650 });
+  await fixture(context);
+  await signIn(page, undefined, false);
+  await expect(page.locator('.owner-progress')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refresh access', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeHidden();
+  const left = await page.locator('.owner-sidebar').boundingBox();
+  const right = await page.locator('.owner-ai').boundingBox();
+  const heading = page.getByRole('heading', { name: 'Welcome to PeekaPlate' });
+  const before = await heading.boundingBox();
+  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 500));
+  await expect.poll(async () => (await heading.boundingBox())!.y).toBeLessThan(before!.y);
+  expect(await page.locator('.owner-sidebar').boundingBox()).toEqual(left);
+  expect(await page.locator('.owner-ai').boundingBox()).toEqual(right);
+  await page.screenshot({
+    path: testInfo.outputPath('desktop-middle-scrolled.png'),
+    fullPage: true,
+  });
+  await page.locator('.owner-main').evaluate((element) => element.scrollTo(0, 0));
+  await openAccount(page);
+  await expect(page.getByRole('button', { name: 'Refresh access', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('desktop-account-menu.png'), fullPage: true });
+});
+
 test('long restaurant names fit the dashboard and onboarding account menu', async ({
   context,
   page,
@@ -680,6 +715,7 @@ test('menu typography and locked-page copy keep the authored live boundary', asy
     'Some screens are not connected in this workspace yet.',
   );
   state.venues = [{ ...venue, permission: 'editor' }];
+  await openAccount(page);
   await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Dish performance', exact: true })).toHaveAttribute(
     'aria-disabled',
@@ -1214,6 +1250,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
   await page.reload();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
+  await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await expect(page.locator('.owner-shell')).toHaveCount(0);
@@ -1239,15 +1276,20 @@ test('multiple restaurants require selection and a switch removes the old report
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
   await expect(page.getByRole('heading', { name: 'Choose a restaurant' })).toBeVisible();
+  await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(page.getByRole('table')).toBeVisible();
+  await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
   await expect(page.locator('.owner-identity__name')).toHaveText(otherVenue.name);
   await expect(page.getByRole('table')).toHaveCount(0);
 });
 
-test('editor access does not enable owner-only reports', async ({ context, page }) => {
+test('editor access does not enable owner-only reports or publication', async ({
+  context,
+  page,
+}) => {
   const state = await fixture(context);
   state.venues = [{ ...venue, permission: 'editor' }];
   await signIn(page, undefined, false);
@@ -1256,6 +1298,12 @@ test('editor access does not enable owner-only reports', async ({ context, page 
     'aria-disabled',
     'true',
   );
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your dishes' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review and publish' })).toHaveCount(0);
+  expect(
+    state.apiCalls.filter((call) => /prepared-menus|approvals|publications/.test(call.path)),
+  ).toEqual([]);
 });
 
 test('a response for another actor never opens its restaurant', async ({ context, page }) => {
@@ -1306,6 +1354,7 @@ test('sign-out while membership is pending cannot restore a late restaurant resp
   state.delayMembership = true;
   await signIn(page, undefined, false);
   await expect.poll(() => state.apiCalls.length).toBeGreaterThan(0);
+  await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   state.releaseMembership();
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
@@ -1361,6 +1410,7 @@ test('SDK refresh supplies the new actor-bound token without keeping expired acc
     stored.expires_at = Math.floor(Date.now() / 1000) - 120;
     localStorage.setItem(key, JSON.stringify(stored));
   });
+  await openAccount(page);
   await page.getByRole('button', { name: 'Refresh access', exact: true }).click();
   await expect.poll(() => state.tokenVersion).toBeGreaterThan(before);
   await expect(page.locator('.owner-identity__name')).toHaveText(venue.name);
@@ -1409,6 +1459,7 @@ test('workspace supports keyboard, narrow screens and accessible labels', async 
   // WCAG 1.4.3 exempts logotypes; retain the authored orange wordmark.
   const axe = await new AxeBuilder({ page }).exclude('.owner-brand__name').analyze();
   expect(axe.violations).toEqual([]);
+  await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).focus();
   await expect(page.getByLabel('Restaurant', { exact: true })).toBeFocused();
   await page.screenshot({
@@ -1460,11 +1511,13 @@ test('switching restaurant clears the AI result and asks only for the new restau
   const state = await fixture(context);
   state.venues = [venue, otherVenue];
   await signIn(page, undefined, false);
+  await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).selectOption(venue.venueId);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  await openAccount(page);
   await page.getByLabel('Restaurant', { exact: true }).selectOption(otherVenue.venueId);
   await expect(page.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
@@ -1554,6 +1607,7 @@ test('a pending analysis cannot restore private output after sign-out and anothe
   await panel.getByRole('button', { name: 'Review report' }).click();
   await expect(panel.getByRole('status')).toHaveText('Reviewing the report…');
   await expect.poll(() => state.analyses.length).toBe(1);
+  await openAccount(page);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await signIn(page, 'other@example.test');

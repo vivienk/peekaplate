@@ -4,6 +4,28 @@ This is the temporary S13 handoff authorized by Sai until the team's official
 screen replaces it. It follows Figma `3123:12796` in the existing PeekaPlate
 Design file and reuses the merged onboarding layout and buttons. S10 remains
 verification-only; no pending S10 implementation is merged by this change.
+The page visibly labels S13 as temporary. The reused account disclosure also
+labels its dashboard placement as awaiting design review.
+
+## Authored screens and remaining PRs
+
+The live composition reuses the merged `OwnerShell` / `FirstDashboard` from
+#125/#139, `OnboardingLayout` and source screens from #171, and Screen 9 from
+#172. #156 supplies the API client/mapping, #179 supplies the signed-in restaurant
+scope, and #192 restored those authored components around the live data. This
+change retains their title/body tokens. Account controls reuse the onboarding
+disclosure; at desktop widths the middle scrolls while both side panels remain
+available. Mobile retains the authored stacked layout.
+
+- #163 remains a separate S10 verification-only implementation; its title does
+  not mean it implements S13 publication.
+- #162 remains the draft 2.5D camera/portion integration. The merged diner detail
+  still disables View Portion. Its preview is separate from this hosted flow.
+- #145/#147 are pending diner icon/photo updates; #196 is a Compare design update.
+- #173 changes confirmed-404 withdrawal behavior. Until it is merged and deployed,
+  REL-02 must distinguish fresh-load denial from the older retained-menu behavior.
+
+These pending branches are not silently included in the staging release.
 
 ## Owner journey
 

@@ -167,6 +167,9 @@ export function OwnerPublish({
     <div className="owner-publish">
       <header>
         <h1>{published ? 'Your menu is published' : 'Preview your menu'}</h1>
+        <small className="owner-workspace-design-note">
+          (Temporary S13 — awaiting the official screen)
+        </small>
         <p>
           {published
             ? 'Use your restaurant’s link to open and share the diner menu.'

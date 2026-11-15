@@ -59,6 +59,7 @@ export function OwnerMenuWorkspace({
   actorId,
   venueId,
   restaurantName,
+  canPublish,
   section,
   navigation,
   getAccessToken,
@@ -71,6 +72,7 @@ export function OwnerMenuWorkspace({
   actorId: string;
   venueId: string;
   restaurantName: string;
+  canPublish: boolean;
   section: 'overview' | 'menu';
   navigation: number;
   getAccessToken: () => Promise<string | null>;
@@ -620,7 +622,7 @@ export function OwnerMenuWorkspace({
           }}
         />
       </>
-    ) : view === 'publish' ? (
+    ) : view === 'publish' && canPublish ? (
       <OwnerPublish
         key={`${actorId}:${venueId}`}
         apiBase={apiBase}
@@ -665,9 +667,11 @@ export function OwnerMenuWorkspace({
           <Btn kind="text" disabled={busy} onClick={reload}>
             Reload saved work
           </Btn>
-          <Btn kind="outlined" disabled={busy} onClick={() => setView('publish')}>
-            Review and publish
-          </Btn>
+          {canPublish && (
+            <Btn kind="outlined" disabled={busy} onClick={() => setView('publish')}>
+              Review and publish
+            </Btn>
+          )}
         </div>
         <p>
           Saving these drafts does not change a live menu. Required confirmations and explicit
