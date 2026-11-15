@@ -39,6 +39,11 @@ Ingredient icons fall back to bundled assets if the optional artwork API is abse
 
 ## Release and checks
 
+The release also retains #162's `prepare_assets` entrypoint integration, so
+the existing processing regression exercises the same optional portion path as
+develop. The publication retry browser test waits for the failed link response
+before releasing its mock failure; this changes test synchronization only.
+
 Deploy the approved exact main commit to the existing staging API (for the strict
 optional portion contract) and to the `routing-staging` branch of the existing
 diner Pages project. Leave the console deployment, production domains and `.io`

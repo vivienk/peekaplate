@@ -620,8 +620,12 @@ test('prepared publication retries the same command and a failed link read never
   await page.getByRole('button', { name: 'Confirm and publish' }).click();
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
   state.linkFailure = true;
+  const failedLinkRead = page.waitForResponse(
+    (response) => response.url().endsWith('/diner-link') && response.status() === 503,
+  );
   await page.getByRole('button', { name: 'Confirm and publish' }).click();
-  await expect(page.getByRole('button', { name: 'Get diner link' })).toBeVisible();
+  await failedLinkRead;
+  await expect(page.getByRole('button', { name: 'Get diner link' })).toBeEnabled();
   expect(state.approvals[1]).toEqual(state.approvals[0]);
   state.linkFailure = false;
   await page.getByRole('button', { name: 'Get diner link' }).click();

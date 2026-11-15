@@ -2755,3 +2755,7 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id": "ERR-20261115-DINER-RELEASE-IMPORTS", "status": "resolved", "area": "release-reconciliation", "cause": "Narrow contract export reconciliation needed the existing Biome import ordering.", "prevention": "Run the repository formatter after selective release reconciliation.", "sources": ["packages/contracts/src/index.ts"], "regression": "pnpm check passes after import ordering; prepared-menu portion regression preserves exact-byte checks."}
 ```
+
+```json
+{"id":"ERR-20261115-DINER-RELEASE-CI","status":"resolved","area":"release-reconciliation","cause":"The selective release omitted the merged prepare_assets portion entrypoint; the publication retry browser mock also cleared its failure before the request completed.","prevention":"Promote entrypoints with their caller tests; synchronize failure recovery against the observed response.","sources":["processing/src/peekaplate_processing/prepare_assets.py","processing/tests/test_portion_ingestion.py","tests/e2e/owner-workspace.spec.ts"],"regression":"Full Python suite: 516 tests PASS in 44.823s with UTF-8; publication retry case: 8 repeated passes in 24.4s. Hosted CI rerun required before merge."}
+```
