@@ -106,6 +106,78 @@ describe('prepared owner publication', () => {
     ]);
   });
 
+  it('preserves reviewed portion layers in an exact prepared snapshot', async () => {
+    const assetUrl = new URL('dish.webp', menu.bundleUrl).href;
+    const dish = {
+      dish_id: id(5),
+      dish_revision_id: id(6),
+      complete: true,
+      name: 'Synthetic dish',
+      description: 'Synthetic release fixture, not restaurant content.',
+      price: { amount: '12.50', currency: 'USD' },
+      allergens: null,
+      dietary: [],
+      ingredients: [],
+      images: {
+        card: { url: assetUrl, width: 640, height: 640, alt: 'Synthetic sample' },
+        detail: { url: assetUrl, width: 640, height: 640, alt: 'Synthetic sample' },
+      },
+      portion: {
+        schema_version: 1,
+        dish_id: id(5),
+        dish_revision_id: id(6),
+        width: 640,
+        height: 640,
+        layers: [
+          { url: assetUrl, sha256: 'a'.repeat(64), size_bytes: 100, depth: 0 },
+          { url: assetUrl, sha256: 'b'.repeat(64), size_bytes: 1000, depth: 1 },
+        ],
+      },
+    };
+    const snapshot = {
+      ...content,
+      categories: [{ ...content.categories[0], dishes: [dish] }],
+    };
+    const portionBytes = JSON.stringify(snapshot);
+    const prepared = {
+      ...menu,
+      contentHash: createHash('sha256').update(portionBytes).digest('hex'),
+    };
+    expect(await fetchPreparedMenu(prepared, async () => new Response(portionBytes))).toEqual(
+      snapshot,
+    );
+    await expect(
+      fetchPreparedMenu(prepared, async () => new Response(`${portionBytes} `)),
+    ).rejects.toBeDefined();
+    const worker = await unstable_dev(
+      fileURLToPath(new URL('./owner-publication.workerd-harness.ts', import.meta.url)),
+      {
+        config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url)),
+        local: true,
+        ip: '127.0.0.1',
+        port: 0,
+        inspectorPort: 0,
+        logLevel: 'error',
+        experimental: {
+          disableExperimentalWarning: true,
+          forceLocal: true,
+          watch: false,
+          disableDevRegistry: true,
+        },
+      },
+    );
+    try {
+      const response = await worker.fetch('http://fixture.test', {
+        method: 'POST',
+        body: JSON.stringify({ menu: prepared, bytes: portionBytes, redirect: false }),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(snapshot);
+    } finally {
+      await worker.stop();
+    }
+  }, 30_000);
+
   it.each([
     'https://example.test/menu.json',
     'https://68d424e7.peekaplate-diner-staging.pages.dev.evil.test/menu.json',

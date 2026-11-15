@@ -27,7 +27,8 @@
     "verify": "node scripts/verify.mjs",
     "produce:bundle": "node --import ./scripts/node-ts-hooks.mjs backend/scripts/produce-menu-bundle.ts",
     "check": "node scripts/verify.mjs lint typecheck test context:check docs:check",
-    "prepare:app-site": "node scripts/prepare-app-site.mjs"
+    "prepare:app-site": "node scripts/prepare-app-site.mjs",
+    "ingest:portion-fixtures": "node scripts/generate-fixture-portions.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

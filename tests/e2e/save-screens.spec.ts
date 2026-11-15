@@ -69,7 +69,7 @@ test('a card heart saves the dish, and the badge, detail heart and header agree'
     'aria-pressed',
     'true',
   );
-  await expect(page.getByText('View Portion and Compare are not available yet.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeEnabled();
 
   await expect
     .poll(() => events.filter((e) => e.type === 'dish_saved').map((e) => e.payload.save_surface))
