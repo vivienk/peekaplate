@@ -97,10 +97,26 @@ describe('Screen 9 (Add dish) form', () => {
       aiIng: ['Maple syrup'],
       aiUsed: true,
       aiReviewed: true,
+      // The photo is required; an uploaded one also needs the rights confirmation.
+      upload: 'data:image/png;base64,iVBORw0KGgo=',
+      rights: true,
     });
     expect(html).toMatch(/aria-disabled="false"[^>]*>Continue to review/);
     expect(html).toContain('class="tag ai"');
     expect(html).toContain('>AI<');
+  });
+
+  it('keeps Continue inactive while the photo is missing', () => {
+    const html = render({
+      ...newDraft(),
+      name: 'Avocado Toast',
+      cat: 'Breakfast',
+      price: '14.00',
+      size: '1 slice',
+      ing: ['Avocado'],
+    });
+    expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
+    expect(html).toContain('Photo<span class="pp-visually-hidden"> (required)</span>');
   });
 
   it('keeps Continue inactive while AI suggestions are unreviewed', () => {
@@ -113,6 +129,8 @@ describe('Screen 9 (Add dish) form', () => {
       ing: ['Avocado'],
       aiUsed: true,
       aiReviewed: false,
+      upload: 'data:image/png;base64,iVBORw0KGgo=',
+      rights: true,
     });
     expect(html).toMatch(/aria-disabled="true"[^>]*>Continue to review/);
   });

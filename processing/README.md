@@ -1,5 +1,9 @@
 # Menu extraction
 
+For QA-02 source-based reference preparation, development/holdout separation and
+the offline freeze/verify commands, see the [reference handoff](eval/qa02/README.md).
+Its integrity checks are separate from menu accuracy and independent acceptance.
+
 The optional staging HTTP service wraps this same pipeline; it does not replace
 the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
 for the request contract, Docker commands, secrets, limits and activation gates.
@@ -482,3 +486,15 @@ Inputs outside its bounds retain the original extraction and record explicit sid
 unavailability in `timings.json`. Vision transcriptions never become independent
 ingredient grounding. The [AI-02 guide](../docs/ingredient-intelligence.md) explains
 the offline CLI, limits and remaining authenticated owner-review integration.
+
+## Strict menu field scoring (QA-02 / VIS-04)
+
+Reuse the [source-reference workflow](eval/qa02/README.md) and the
+[versioned source/page proposal](../docs/qa02-real-menu-source-plan-v1.md).
+The [strict scorer guide](eval/qa02/STRICT_SCORER.md) defines the offline CLI,
+hash-bound original outputs and human occurrence associations, complete emitted
+price-text/scalar/currency comparisons, duplicates, null/zero and failed-page counts.
+It is not the historical fuzzy scorer. It does not infer structured option arrays,
+ingredient/geometry truth, reviewer identity, quality approval or publication.
+Fresh evaluated predictions require the independently reviewed reference/scoring
+freeze, Vivien's threshold sign-off and explicit bounded execution authorization.

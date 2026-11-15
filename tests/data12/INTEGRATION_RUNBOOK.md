@@ -26,6 +26,10 @@ Do not execute dependent staging acceptance until:
 
 - Vivien and Adam confirm TRK scope/adapter ownership and consent
   implementation alignment.
+  Adam proposed the ownership on S6-TRK-03 (2026-11-14): Jeffin owns the
+  TRK adapter evidence, Sai reviews, Ehab runs the phone journey. This
+  hold lifts once Vivien replies "confirmed" and Sai confirms (Adam:
+  otherwise assumed). Consent for the run uses what is on develop.
 - Compatible frontend, Worker and schema deployments are available.
 - The approved PostHog project, host and environment are confirmed.
 - The staging venue and test classification are approved.

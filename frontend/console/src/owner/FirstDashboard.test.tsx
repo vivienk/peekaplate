@@ -34,6 +34,23 @@ const figmaState: OwnerSetup = {
 const published: OwnerSetup = { ...figmaState, menuAdded: true, published: true };
 
 describe('FirstDashboard (S12 first dashboard arrival, S6-FE-14 onboarding)', () => {
+  it('keeps unavailable API facts distinct from missing or unpublished setup', () => {
+    const html = render({
+      ...figmaState,
+      detailsStatus: 'unknown',
+      menuAdded: true,
+      published: null,
+    });
+    const words = text(html);
+    expect(words).toContain('Setup status partly unavailable');
+    expect(words).toContain('Status unavailable');
+    expect(words).toContain('Added');
+    expect(words).not.toContain('Not verified');
+    expect(words).not.toContain('Not published');
+    expect(words).not.toContain('No dish activity yet');
+    expect(html).not.toContain('aria-valuenow=');
+    expect(html).not.toContain('owner-dialog');
+  });
   it('uses one restaurant name everywhere and shows progress from the setup facts', () => {
     const html = render(figmaState);
     const words = text(html);
