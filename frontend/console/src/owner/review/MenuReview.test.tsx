@@ -67,28 +67,31 @@ describe('ReviewDishes (S10 Menu Review)', () => {
     expect(words).toContain('5 ingredients · no allergen recorded');
     expect(words).toContain('$14.00');
     expect(words).toContain('Not found');
-    expect(words).toContain('1 field missing');
-    expect(words).not.toMatch(/Price Missing|Category Missing|Serving Size Missing/);
+    // One missing detail is named (the price of Berry Pancake Stack, the category of Brioche French Toast).
+    expect(words).toContain('Price Missing');
+    expect(words).toContain('Category Missing');
+    expect(words).not.toMatch(/\d+ fields? missing/);
     expect(words).toContain('Ready');
   });
 
-  it('while any dish is not Ready, the footer is Cancel and Save and Exit', () => {
+  it('while any dish is not Ready, the footer is Import more dishes and Save and Exit', () => {
     const html = render(initialReview([dish(), noPrice]));
     const words = text(html);
-    expect(words).toContain('Cancel');
+    expect(words).toContain('Import more dishes');
     expect(words).toContain('Save and Exit');
+    expect(words).not.toContain('Cancel');
     expect(completeButton(html)).toBe('');
     expect(words).not.toContain('Back');
     expect(words).not.toContain('Publish');
   });
 
-  it('when every dish is Ready, Complete verification takes the place of Cancel', () => {
+  it('when every dish is Ready, Complete verification takes the place of Import more dishes', () => {
     const html = render(initialReview([dish(), dish({ id: 'd9', name: 'Eggs' })]));
     const words = text(html);
     expect(words).toContain('Save and Exit');
     expect(completeButton(html)).not.toBe('');
     expect(completeButton(html)).not.toContain('disabled');
-    expect(words).not.toContain('Cancel');
+    expect(words).not.toContain('Import more dishes');
     // Publishing happens later, from the dashboard's Review and publish step.
     expect(words).not.toContain('Publish');
   });
@@ -121,7 +124,7 @@ describe('ReviewDishes (S10 Menu Review)', () => {
     expect(text(html)).toContain('Dish removed.');
     expect(html).toContain('>Undo</button>');
     expect(text(html)).not.toContain('Berry Pancake Stack');
-    // The only bad dish is gone, so Complete verification takes the place of Cancel.
+    // The only bad dish is gone, so Complete verification takes the place of Import more dishes.
     expect(completeButton(html)).not.toBe('');
   });
 
@@ -132,26 +135,34 @@ describe('ReviewDishes (S10 Menu Review)', () => {
     expect(html).not.toContain('>Undo</button>');
     expect(text(html)).toContain('Berry Pancake Stack');
     expect(completeButton(html)).toBe('');
-    expect(text(html)).toContain('Cancel');
+    expect(text(html)).toContain('Import more dishes');
     expect(text(html)).toContain('Save and Exit');
   });
 
-  it('gives every row Review and Remove buttons a name that includes the dish', () => {
+  it('gives Ready rows Edit and rows that need attention Review, both with Remove', () => {
     const html = render(initialReview([dish(), noCategory]));
-    expect(html).toContain('aria-label="Review Avocado Toast"');
+    expect(html).toContain('aria-label="Edit Avocado Toast"');
+    expect(html).toContain('aria-label="Review Brioche French Toast"');
     expect(html).toContain('aria-label="Remove Avocado Toast"');
     expect(html).toContain('aria-label="Remove Brioche French Toast"');
-    expect(html).not.toContain('aria-label="Edit ');
-    expect(html).toMatch(/<th[^>]*>Review \/ Remove<\/th>/);
+    expect(html).toMatch(/<th[^>]*>Actions<\/th>/);
   });
 
-  it('shows only a count of missing fields, never the name of the field', () => {
+  it('shows Pending Review with a Review button for an unreviewed dish with nothing missing', () => {
+    const html = render(initialReview([dish({ reviewed: false })]));
+    expect(text(html)).toContain('Pending Review');
+    expect(html).toContain('aria-label="Review Avocado Toast"');
+    expect(text(html)).not.toContain('Complete verification');
+  });
+
+  it('names a single missing field and counts when more than one is missing', () => {
     const twoMissing = dish({ id: 'd4', name: 'Cold Brew', priceAmount: null, category: null });
     const oneOther = dish({ id: 'd5', name: 'Granola', photoId: null });
     const words = text(render(initialReview([twoMissing, oneOther])));
     expect(words).toContain('2 fields missing');
-    expect(words).toContain('1 field missing');
-    expect(words).not.toMatch(/(Price|Category|Photo|Serving Size)( and \w+)? Missing/);
+    expect(words).toContain('Photo Missing');
+    expect(words).not.toContain('1 field missing');
+    expect(words).not.toMatch(/(Price|Category)( and \w+)? Missing/);
   });
 
   it('uses a real table with column headers and a row header for the dish', () => {

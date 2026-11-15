@@ -30,6 +30,12 @@ export interface ReviewDish {
   servingSize?: string | null;
   /** Currency of priceAmount (three letters), when the source provides it. */
   priceCurrency?: string | null;
+  /**
+   * True once the owner has reviewed the dish in S09 (checked "I have reviewed the AI-drafted text and
+   * ingredients" and saved). false: an extracted dish nobody has reviewed yet, so it is "Pending
+   * Review" even when nothing is missing. undefined counts as reviewed (dishes the owner typed in).
+   */
+  reviewed?: boolean;
 }
 
 /** What the table shows in the Category and Price cells when the value is missing (Figma). */
@@ -49,7 +55,7 @@ export type MissingField =
   | 'allergens'
   | 'photo';
 
-export type DishStatusTone = 'success' | 'warning' | 'error';
+export type DishStatusTone = 'success' | 'warning' | 'error' | 'information';
 
 export interface DishStatus {
   ready: boolean;
@@ -66,10 +72,9 @@ function priceValid(priceAmount: string | null): boolean {
 }
 
 /**
- * Every detail a dish needs before it can be ready. A dish is ready only when all of them are
- * complete and proper: a name, a category, a price above zero, a real description, at least one
- * ingredient the owner confirmed (unknown or only-proposed ingredients do not count), owner-confirmed
- * allergens (a confirmed "none" counts; they are never inferred) and a photo.
+ * The mandatory details (red * in S09): name, category, price, serving size (when the source provides
+ * it), at least one ingredient and a photo. Description and allergens are optional and never block a
+ * dish or appear in "N fields missing".
  */
 export function missingFields(dish: ReviewDish): MissingField[] {
   const missing: MissingField[] = [];
@@ -77,32 +82,43 @@ export function missingFields(dish: ReviewDish): MissingField[] {
   if (isBlank(dish.category)) missing.push('category');
   if (!priceValid(dish.priceAmount)) missing.push('price');
   if (dish.servingSize !== undefined && isBlank(dish.servingSize)) missing.push('servingSize');
-  if ((dish.description?.trim().length ?? 0) < MIN_DESCRIPTION_LENGTH) missing.push('description');
-  if (dish.ingredients.status !== 'confirmed' || dish.ingredients.items.length === 0) {
-    missing.push('ingredients');
-  }
-  // Flowchart step 4: allergen information is required and the owner must confirm it. Unknown or
-  // only-proposed allergens do not count; a confirmed "none" does.
-  if (dish.allergens.status !== 'confirmed') missing.push('allergens');
+  if (dish.ingredients.items.length === 0) missing.push('ingredients');
   if (isBlank(dish.photoId)) missing.push('photo');
   return missing;
 }
 
+const FIELD_LABEL: Record<MissingField, string> = {
+  name: 'Name',
+  price: 'Price',
+  category: 'Category',
+  servingSize: 'Serving Size',
+  description: 'Description',
+  ingredients: 'Ingredients',
+  allergens: 'Allergens',
+  photo: 'Photo',
+};
+
 /**
- * Status pill of one row (Figma): "Ready", or a count of what is still missing, such as "1 field
- * missing" or "3 fields missing". The pill never names the missing details; the owner opens the dish
- * with Review to see and fix them.
+ * Status pill of one row (Figma S08/S10): "2 fields missing" or "Price Missing" (red/yellow) while a
+ * required detail is missing; "Pending Review" when nothing is missing but the owner has not reviewed
+ * the dish yet; "Ready" once it is reviewed. Only required fields count (see missingFields).
  */
 export function dishStatus(dish: ReviewDish): DishStatus {
   const missing = missingFields(dish);
-  if (missing.length === 0) return { ready: true, label: 'Ready', tone: 'success' };
-  // A missing price (or several missing details) is shown in red; one other detail in yellow.
-  const tone: DishStatusTone =
-    missing.includes('price') || missing.length > 1 ? 'error' : 'warning';
+  const [first] = missing;
+  if (first === undefined) {
+    return dish.reviewed === false
+      ? { ready: false, label: 'Pending Review', tone: 'information' }
+      : { ready: true, label: 'Ready', tone: 'success' };
+  }
+  if (missing.length > 1) {
+    return { ready: false, label: `${missing.length} fields missing`, tone: 'error' };
+  }
+  // A missing price is shown in red; one other missing detail in yellow.
   return {
     ready: false,
-    label: `${missing.length} field${missing.length === 1 ? '' : 's'} missing`,
-    tone,
+    label: `${FIELD_LABEL[first]} Missing`,
+    tone: first === 'price' ? 'error' : 'warning',
   };
 }
 

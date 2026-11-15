@@ -24,9 +24,19 @@ export interface ReviewDishesProps {
   onAddDish: () => void;
   /** Opens the selected dish in S09. */
   onEditDish: (id: string) => void;
-  onRemoveDish: (id: string) => void;
-  onUndoRemove: () => void;
-  /** Left button while a dish is not Ready. Confirmed: goes back to Screen 8. */
+  /** When omitted, the trash button is not shown (the owner API has no draft removal yet). */
+  onRemoveDish?: (id: string) => void;
+  onUndoRemove?: () => void;
+  /**
+   * S8 (Review menu, before verification): a dish with every detail shows "Pending Review" until the
+   * whole menu is Ready; then every dish shows "Ready" and the footer offers Complete verification.
+   * S10 leaves this off and shows "Ready" per dish.
+   */
+  /** Ignored: the row button is "Review" until the dish is Ready, then "Edit" (Figma S08/S10). */
+  pendingReview?: boolean;
+  /** Ignored, see pendingReview. */
+  editLabel?: 'Edit' | 'Review';
+  /** Left footer button while a dish is not Ready: "Import more dishes". The parent opens S06 (drafts are already saved). */
   onCancel: () => void;
   /** Saves progress and opens the first-time dashboard. */
   onSaveAndExit: () => void;
@@ -181,7 +191,12 @@ export function ReviewDishes({
           {state.notice === 'removed' && (
             <div className="review-notice review-notice--removed">
               <strong>Dish removed.</strong>
-              <button type="button" className="review-undo" ref={undoRef} onClick={onUndoRemove}>
+              <button
+                type="button"
+                className="review-undo"
+                ref={undoRef}
+                onClick={() => onUndoRemove?.()}
+              >
                 Undo
               </button>
             </div>
@@ -207,12 +222,13 @@ export function ReviewDishes({
                   <th scope="col">Category</th>
                   <th scope="col">Price</th>
                   <th scope="col">Status</th>
-                  <th scope="col">Review / Remove</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {state.dishes.map((dish) => {
                   const status = dishStatus(dish);
+                  const editLabel = status.ready ? 'Edit' : 'Review';
                   const name = dishName(dish);
                   return (
                     <tr key={dish.id} data-dish-id={dish.id}>
@@ -233,19 +249,21 @@ export function ReviewDishes({
                             variant="outline"
                             className="owner-button review-edit"
                             data-edit-dish-id={dish.id}
-                            aria-label={`Review ${name}`}
+                            aria-label={`${editLabel} ${name}`}
                             onClick={() => onEditDish(dish.id)}
                           >
-                            Review
+                            {editLabel}
                           </Button>
-                          <button
-                            type="button"
-                            className="review-trash"
-                            aria-label={`Remove ${name}`}
-                            onClick={() => onRemoveDish(dish.id)}
-                          >
-                            <TrashIcon />
-                          </button>
+                          {onRemoveDish && (
+                            <button
+                              type="button"
+                              className="review-trash"
+                              aria-label={`Remove ${name}`}
+                              onClick={() => onRemoveDish(dish.id)}
+                            >
+                              <TrashIcon />
+                            </button>
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -281,7 +299,7 @@ export function ReviewDishes({
           ) : (
             <>
               <Button variant="outline" className="owner-button" onClick={onCancel}>
-                Cancel
+                Import more dishes
               </Button>
               <Button variant="action" className="owner-button" onClick={onSaveAndExit}>
                 Save and Exit

@@ -89,4 +89,28 @@ describe('DishEditor (Screen 9)', () => {
     expect(html).not.toContain('Approve dish');
     expect(html).toContain('Save draft');
   });
+
+  it('keeps Continue disabled until the license and review boxes are both ticked', () => {
+    const props = {
+      value: emptyManualDish(),
+      onChange: noop,
+      onSave: noop,
+      onCancel: noop,
+      saveLabel: 'Continue to review',
+      onReviewConfirmedChange: noop,
+      onLicenseConfirmedChange: noop,
+    };
+    const continueButton = (html: string) =>
+      html.match(/<button[^>]*>Continue to review<\/button>/)?.[0] ?? '';
+    const none = renderToStaticMarkup(<DishEditor {...props} />);
+    expect(none).toContain('I have the legal license to use this image');
+    expect(none).toContain('I have reviewed the AI-drafted text and ingredients');
+    expect(continueButton(none)).toContain('disabled=""');
+    const onlyLicense = renderToStaticMarkup(<DishEditor {...props} licenseConfirmed />);
+    expect(continueButton(onlyLicense)).toContain('disabled=""');
+    const onlyReview = renderToStaticMarkup(<DishEditor {...props} reviewConfirmed />);
+    expect(continueButton(onlyReview)).toContain('disabled=""');
+    const both = renderToStaticMarkup(<DishEditor {...props} licenseConfirmed reviewConfirmed />);
+    expect(continueButton(both)).not.toContain('disabled');
+  });
 });

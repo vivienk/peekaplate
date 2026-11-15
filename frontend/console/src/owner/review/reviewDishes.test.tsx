@@ -33,65 +33,86 @@ describe('dishStatus', () => {
     expect(dishStatus(dish())).toEqual({ ready: true, label: 'Ready', tone: 'success' });
   });
 
-  it('shows 1 field missing, in red, when only the price is missing', () => {
+  it('names the field, in red, when only the price is missing', () => {
     for (const priceAmount of [null, '', '  ', 'Free', '0']) {
       expect(dishStatus(dish({ priceAmount }))).toEqual({
         ready: false,
-        label: '1 field missing',
+        label: 'Price Missing',
         tone: 'error',
       });
     }
   });
 
-  it('shows 1 field missing, in yellow, when only the category is missing', () => {
+  it('names the field, in yellow, when only the category is missing', () => {
     for (const category of [null, '', '   ']) {
       expect(dishStatus(dish({ category }))).toEqual({
         ready: false,
-        label: '1 field missing',
+        label: 'Category Missing',
         tone: 'warning',
       });
     }
   });
 
-  it('shows 1 field missing, in yellow, when only the serving size is missing', () => {
+  it('names the field, in yellow, when only the serving size is missing', () => {
     expect(dishStatus(dish({ servingSize: null }))).toEqual({
       ready: false,
-      label: '1 field missing',
+      label: 'Serving Size Missing',
       tone: 'warning',
     });
   });
 
-  it('shows 1 field missing for any other single detail', () => {
-    const cases: Partial<ReviewDish>[] = [
-      { photoId: null },
-      { description: 'Too short' },
-      { name: null },
-      { ingredients: { status: 'proposed', items: ['egg'] } },
-      { allergens: { status: 'unknown', items: [] } },
+  it('names any other single missing mandatory detail', () => {
+    const cases: [Partial<ReviewDish>, string][] = [
+      [{ photoId: null }, 'Photo Missing'],
+      [{ name: null }, 'Name Missing'],
+      [{ ingredients: { status: 'unknown', items: [] } }, 'Ingredients Missing'],
     ];
-    for (const over of cases) {
-      expect(dishStatus(dish(over))).toEqual({
-        ready: false,
-        label: '1 field missing',
-        tone: 'warning',
-      });
+    for (const [over, label] of cases) {
+      expect(dishStatus(dish(over))).toEqual({ ready: false, label, tone: 'warning' });
     }
   });
 
-  it('shows N fields missing, in red, when several details are missing', () => {
+  it('does not count the optional description or allergens', () => {
+    expect(dishStatus(dish({ description: null })).ready).toBe(true);
+    expect(dishStatus(dish({ description: 'Too short' })).ready).toBe(true);
+    expect(dishStatus(dish({ allergens: { status: 'unknown', items: [] } })).ready).toBe(true);
+    // An AI-drafted (proposed) ingredient list still counts as present.
+    expect(dishStatus(dish({ ingredients: { status: 'proposed', items: ['egg'] } })).ready).toBe(
+      true,
+    );
+    // Missing optional details never add to the count.
+    expect(
+      dishStatus(
+        dish({ priceAmount: null, description: null, allergens: { status: 'unknown', items: [] } }),
+      ).label,
+    ).toBe('Price Missing');
+  });
+
+  it('is Pending Review when nothing is missing but the dish was not reviewed yet', () => {
+    expect(dishStatus(dish({ reviewed: false }))).toEqual({
+      ready: false,
+      label: 'Pending Review',
+      tone: 'information',
+    });
+    expect(dishStatus(dish({ reviewed: true })).label).toBe('Ready');
+    // Missing details come first.
+    expect(dishStatus(dish({ reviewed: false, priceAmount: null })).label).toBe('Price Missing');
+  });
+
+  it('shows N fields missing, in red, when several mandatory details are missing', () => {
     expect(dishStatus(dish({ priceAmount: null, category: null }))).toEqual({
       ready: false,
       label: '2 fields missing',
       tone: 'error',
     });
-    expect(dishStatus(dish({ photoId: null, description: null })).label).toBe('2 fields missing');
+    expect(dishStatus(dish({ photoId: null, name: null })).label).toBe('2 fields missing');
     expect(
       dishStatus(dish({ priceAmount: null, category: null, servingSize: null, photoId: null }))
         .label,
     ).toBe('4 fields missing');
   });
 
-  it('never names a missing detail in the label', () => {
+  it('counts only the six mandatory details, never the optional ones', () => {
     const worst = dishStatus(
       dish({
         name: null,
@@ -104,7 +125,7 @@ describe('dishStatus', () => {
         photoId: null,
       }),
     );
-    expect(worst.label).toBe('8 fields missing');
+    expect(worst.label).toBe('6 fields missing');
     expect(worst.label).not.toMatch(/price|category|serving|photo|name|allergen|ingredient/i);
   });
 });

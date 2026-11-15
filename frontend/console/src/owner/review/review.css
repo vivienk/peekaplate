@@ -361,6 +361,12 @@
   }
 }
 
+/* S8 "Pending Review" pill (Figma: blue label). */
+.review-status--information {
+  background: var(--pp-color-info-100);
+  color: var(--pp-role-on-surface);
+}
+
 .review-root :focus-visible {
   outline: 2px solid var(--pp-role-focus-ring);
   outline-offset: 2px;
