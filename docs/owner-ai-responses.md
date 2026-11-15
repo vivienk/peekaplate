@@ -1,7 +1,7 @@
 # Owner dashboard Responses connection
 
 This development integration connects the owner dashboard panel to a server-side
-Responses adapter. It is not deployed and does not enable production reports.
+Responses adapter. It is off by default and does not enable production reports.
 It builds on the AI report validation and dashboard preview branches (#112/#124).
 
 ## Behavior and authority
@@ -56,6 +56,11 @@ forecast, business threshold, causal claim, or automatic menu/CRM action.
 
 ## Private local trial
 
+These private launcher and mock-provider harness instructions apply to `develop`,
+where #164's complete local trial tooling is maintained. The narrow staging
+release intentionally omits that launcher/proxy and its separate test config;
+use `develop` for this trial, not the release checkout.
+
 Requirements: Node 24.16 or later in the 24.x line, pnpm 11.25, and the frozen
 workspace dependencies. From the repository root:
 
@@ -84,7 +89,8 @@ changed by the launcher. Existing OpenAI budget alerts remain soft thresholds.
 
 ## Hosted activation remains separate
 
-The backend code is wired into createApp but not deployed. Hosting requires the
+The backend code is wired into createApp but remains disabled unless explicitly
+activated. Activation requires the
 restricted key in a Worker secret named `OWNER_AI_OPENAI_API_KEY` and a server-only
 `OWNER_AI_OPENAI_PROJECT_ID`. Staging additionally requires `OWNER_AI_RATE_LIMITER`
 (a Cloudflare rate limiter binding); missing configuration fails closed. These
@@ -106,7 +112,7 @@ wrong tenant, denied membership, configuration gates, no retries, rate reservati
 refusals/malformed outputs and frontend result matching.
 
 `pnpm exec playwright test --config playwright.owner-ai.config.ts` runs the actual
-local dashboard/backend route with a mock provider. It does not consume credits
+local dashboard/backend route on `develop` with a mock provider. It does not consume credits
 or establish real model quality. It covers desktop and mobile requests, CRM
 abstention and failure clearing. The prior single-request live key probe is
 separate from this integrated browser test.
