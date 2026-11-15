@@ -28,6 +28,8 @@ export interface ReviewDish {
    * undefined means the source does not provide it, so it is not checked; null or blank is missing.
    */
   servingSize?: string | null;
+  /** Currency of priceAmount (three letters), when the source provides it. */
+  priceCurrency?: string | null;
 }
 
 /** What the table shows in the Category and Price cells when the value is missing (Figma). */

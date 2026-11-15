@@ -340,6 +340,14 @@
   font-weight: var(--pp-font-weight-semibold);
 }
 
+/* The owner shell resets `main` margins (.owner-root main { margin: 0 }), which beat a plain class and
+ * pushed the card to the left. This keeps the S10 card and the S09 form view centred, with the card
+ * padding inside the 1200px width. */
+.owner-root .review-card {
+  box-sizing: border-box;
+  margin-inline: auto;
+}
+
 .review-root :focus-visible {
   outline: 2px solid var(--pp-role-focus-ring);
   outline-offset: 2px;

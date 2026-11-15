@@ -1,45 +1,56 @@
 // Preview-only demo of S10 "Menu Review" (S5-FE-10) with fictional dishes (PR previews only). The
-// dishes come from the owner dashboard's menu data (the data behind its Menu screen), so S10 and
-// that screen show the same menu. The owner draft API, the S09 form and the real navigation replace
-// these stand-ins; nothing here is real restaurant data. The buttons only describe where the real
-// flow goes. Nothing is published or linked from here: publishing happens in the dashboard's
-// "Review and publish" step, and only a real publish request may show a published state or a link.
-import { StrictMode, useState } from 'react';
+// dishes are the owner dashboard's own menu data, and Add dish / Edit open the dashboard's Screen 9
+// form, so S10, that form and the Menu screen all work on the same dishes. The owner draft API
+// replaces these stand-ins; nothing here is real restaurant data. The navigation is the confirmed
+// onboarding flow:
+//   Cancel -> Screen 8 (its S08 "Ready to review" frame is a separate task, so a note stands in)
+//   Add dish / Edit -> Screen 9; Back or Continue to review returns to S10
+//   Save and Exit -> first-time dashboard (menu step still open)
+//   Complete verification -> "Menu verified" pop-up -> Go to dashboard (step 3 next)
+// Nothing is published or linked from here: publishing happens in the dashboard's "Review and
+// publish" step, and only a real publish request may show a published state or a link.
+import { StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@peekaplate/tokens/tokens.css';
 import '@peekaplate/ui/components.css';
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';
+import '../../owner-dashboard/owner-dashboard.css';
 import '../owner.css';
 import './review.css';
-import { DISH, initialMenu, THUMBS } from '../../owner-dashboard/data';
+import { imgOf, initialMenu, type MenuItem, newDraft } from '../../owner-dashboard/data';
+import { DishForm, type EditState } from '../../owner-dashboard/menu';
 import { FirstDashboard } from '../FirstDashboard';
-import type { OwnerSetup } from '../setup';
-import { type DashboardMenuItem, menuItemToReviewDish } from './fromMenuItem';
+import type { OwnerSetup, StepId } from '../setup';
+import { menuItemToReviewDish } from './fromMenuItem';
 import { ReviewDishes } from './MenuReview';
 import {
+  addDish,
   initialReview,
   type ReviewDish,
   type ReviewState,
   removeDish,
+  saveEdit,
   undoRemove,
 } from './reviewDishes';
 
 const RESTAURANT = 'Ember & Stone';
 
-// What S12 shows right after verification: step 2 done, step 3 "Review and publish" next. Synthetic;
-// nothing is published and no link exists.
-const AFTER_VERIFICATION: OwnerSetup = {
+// S12 after Save and Exit: details verified, the menu step still open so the owner can come back.
+const SAVED_AND_EXITED: OwnerSetup = {
   venueId: 'demo-venue',
   restaurantName: RESTAURANT,
   detailsStatus: 'verified',
-  menuAdded: true,
+  menuAdded: false,
   published: false,
 };
 
+// S12 right after verification: step 2 done, step 3 "Review and publish" next. Synthetic; nothing is
+// published and no link exists.
+const AFTER_VERIFICATION: OwnerSetup = { ...SAVED_AND_EXITED, menuAdded: true };
+
 // Illustrative allergens for the sample dishes, so most rows show them as recorded (as in Figma).
-// Berry Pancake Stack and Brioche French Toast have none recorded.
 const ALLERGENS: Record<string, string[]> = {
   avotoast: ['egg', 'wheat'],
   benedict: ['egg', 'milk', 'wheat'],
@@ -47,71 +58,118 @@ const ALLERGENS: Record<string, string[]> = {
   poke: ['fish', 'soy', 'sesame'],
   greek: ['milk'],
 };
+// Demo: the owner has confirmed that these two dishes contain none of the listed allergens.
+const CONFIRMED_NONE: ReadonlySet<string> = new Set(['berrypancakes', 'frenchtoast']);
 
-const dashboardDishes = (): DashboardMenuItem[] =>
-  initialMenu().map((item) => ({
-    ...item,
-    alg: ALLERGENS[item.id ?? ''] ?? [],
-    // Demo: the owner has confirmed the allergens of every sample dish (some have none).
-    allergensConfirmed: true,
-    // Description and photo come from the same dashboard sample data (nothing is invented here).
-    desc: DISH.find((dish) => dish.id === item.id)?.desc ?? '',
-    photoId: item.id !== null && THUMBS[item.id] ? item.id : null,
-    // Figma S10 shows Classic Eggs Benedict as "Serving Size Missing"; the others have one.
-    servingSize: item.id === 'benedict' ? null : '1 serving',
-  }));
+// A dashboard dish as S10 shows it. Everything comes from the dish itself; nothing is invented.
+const toReviewDish = (item: MenuItem): ReviewDish =>
+  menuItemToReviewDish({
+    id: item.id,
+    name: item.name,
+    cat: item.cat,
+    desc: item.desc,
+    price: item.price,
+    ing: item.ing,
+    aiIng: item.aiIng,
+    aiReviewed: item.aiReviewed,
+    alg: item.alg,
+    aiAlg: item.aiAlg,
+    servingSize: item.size,
+    photoId: imgOf(item) ? (item.id ?? 'uploaded-photo') : null,
+    allergensConfirmed: item.id !== null && CONFIRMED_NONE.has(item.id),
+  });
 
-// The Figma example: the dashboard's seven dishes, one without a price and one without a category.
-const NEEDS_FIXES: ReviewDish[] = dashboardDishes().map((item) => {
-  if (item.id === 'berrypancakes') return menuItemToReviewDish({ ...item, price: '' });
-  if (item.id === 'frenchtoast') return menuItemToReviewDish({ ...item, cat: '' });
-  return menuItemToReviewDish(item);
-});
+// The Figma example: the dashboard's seven dishes, one without a price, one without a category and
+// one without a serving size ("ready" fills all three in).
+function sampleItems(kind: 'fixes' | 'ready'): MenuItem[] {
+  return initialMenu().map((item) => {
+    const dish: MenuItem = { ...item, alg: ALLERGENS[item.id ?? ''] ?? [], size: '1 serving' };
+    if (kind === 'ready') return dish;
+    if (item.id === 'berrypancakes') return { ...dish, price: '' };
+    if (item.id === 'frenchtoast') return { ...dish, cat: '' };
+    if (item.id === 'benedict') return { ...dish, size: '' };
+    return dish;
+  });
+}
 
-// The same menu after the missing price and category are filled in (Figma "Ready to publish").
-const ALL_READY: ReviewDish[] = NEEDS_FIXES.map((dish) => ({
-  ...dish,
-  category: dish.category ?? 'Breakfast',
-  priceAmount: dish.priceAmount ?? '17',
-  servingSize: dish.servingSize ?? '1 serving',
-}));
-
-const SAMPLES: Record<string, { label: string; dishes: ReviewDish[]; fails?: boolean }> = {
-  fixes: { label: 'Two dishes need fixes (Figma)', dishes: NEEDS_FIXES },
-  ready: { label: 'Every dish is Ready (Figma)', dishes: ALL_READY },
-  fails: { label: 'Every dish is Ready, completing fails', dishes: ALL_READY, fails: true },
-  empty: { label: 'No dishes', dishes: [] },
+const SAMPLES: Record<string, { label: string; items: MenuItem[]; fails?: boolean }> = {
+  fixes: { label: 'Three dishes need fixes (Figma)', items: sampleItems('fixes') },
+  ready: { label: 'Every dish is Ready (Figma)', items: sampleItems('ready') },
+  fails: {
+    label: 'Every dish is Ready, completing fails',
+    items: sampleItems('ready'),
+    fails: true,
+  },
+  empty: { label: 'No dishes', items: [] },
 };
+
+type View = 'review' | 'form' | 'saved' | 'verified';
+type Editing = { ed: Extract<EditState, { step: 'form' | 'review' }>; orig: MenuItem | null };
+
+function startState(id: string): { items: MenuItem[]; state: ReviewState } {
+  const items = SAMPLES[id]?.items ?? [];
+  return { items, state: initialReview(items.map(toReviewDish)) };
+}
 
 function Demo() {
   const [sample, setSample] = useState('fixes');
-  const [state, setState] = useState<ReviewState>(() => initialReview(NEEDS_FIXES));
+  const [items, setItems] = useState<MenuItem[]>(() => startState('fixes').items);
+  const [state, setState] = useState<ReviewState>(() => startState('fixes').state);
+  const [view, setView] = useState<View>('review');
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [completeError, setCompleteError] = useState<string | null>(null);
-  const [note, setNote] = useState('');
   const [verified, setVerified] = useState(false);
-  const [onDashboard, setOnDashboard] = useState(false);
+  const [note, setNote] = useState('');
+  const added = useRef(0);
   const current = SAMPLES[sample] ?? SAMPLES.fixes;
 
   const reset = (id: string) => {
+    const next = startState(id);
     setSample(id);
-    setState(initialReview(SAMPLES[id]?.dishes ?? []));
+    setItems(next.items);
+    setState(next.state);
+    setView('review');
+    setEditing(null);
     setCompleteError(null);
-    setNote('');
     setVerified(false);
-    setOnDashboard(false);
+    setNote('');
   };
 
-  // Edit and Add dish change nothing here. They will open the Screen 9 form once Screen 9 is merged
-  // into develop (PR #172); until then they only say so.
-  const onEditDish = (id: string) => {
-    const dish = state.dishes.find((item) => item.id === id);
-    setNote(
-      `Demo only: Screen 9 (the dish form) opens here for ${dish?.name ?? 'this dish'} once it is merged.`,
-    );
-  };
-
+  // Screen 9: Add dish opens it empty, Edit opens that dish. Back and Continue return to S10.
   const onAddDish = () => {
-    setNote('Demo only: Screen 9 (the dish form) opens here, empty, once it is merged.');
+    setEditing({ ed: { step: 'form', draft: newDraft(), origId: null }, orig: null });
+    setView('form');
+    setNote('');
+  };
+
+  const onEditDish = (id: string) => {
+    const item = items.find((entry) => entry.id === id);
+    if (!item) return;
+    setEditing({ ed: { step: 'form', draft: { ...item }, origId: id }, orig: item });
+    setView('form');
+    setNote('');
+  };
+
+  const onContinue = () => {
+    if (!editing) return;
+    const draft = editing.ed.draft;
+    const isNew = editing.orig === null;
+    if (isNew) added.current += 1;
+    const saved: MenuItem = { ...draft, id: draft.id ?? `new-${added.current}` };
+    if (isNew) {
+      setItems([...items, saved]);
+      setState(addDish(state, toReviewDish(saved)));
+    } else {
+      setItems(items.map((entry) => (entry.id === saved.id ? saved : entry)));
+      setState(saveEdit(state, toReviewDish(saved)));
+    }
+    setEditing(null);
+    setView('review');
+  };
+
+  const onBackToReview = () => {
+    setEditing(null);
+    setView('review');
   };
 
   const onCompleteVerification = () => {
@@ -121,15 +179,27 @@ function Demo() {
       return;
     }
     setCompleteError(null);
-    setNote('');
     // Shows the "Menu verified" pop-up. Nothing is published.
     setVerified(true);
   };
 
   const onGoToDashboard = () => {
     setVerified(false);
-    setOnDashboard(true);
+    setView('verified');
     setNote('Demo only: this is S12 after verification. Nothing was published.');
+  };
+
+  const onOpenStep = (step: StepId) => {
+    if (step === 'menu') {
+      setView('review');
+      setNote('');
+      return;
+    }
+    setNote(
+      step === 'publish'
+        ? 'Demo only: Review and publish is the next screen (S13), not built here.'
+        : 'Demo only: would open that step.',
+    );
   };
 
   return (
@@ -146,20 +216,39 @@ function Demo() {
             ))}
           </select>
         </label>
-        {onDashboard && (
-          <button type="button" onClick={() => setOnDashboard(false)}>
+        {(view === 'saved' || view === 'verified') && (
+          <button type="button" onClick={() => setView('review')}>
             Back to menu review (demo)
           </button>
         )}
         <span role="status">{note}</span>
       </aside>
-      {onDashboard ? (
+      {view === 'form' && editing && (
+        <main
+          className="review-card review-form-view"
+          style={{ marginBlock: 'var(--pp-space-32)' }}
+        >
+          <DishForm
+            ed={editing.ed}
+            setEd={(next) => {
+              if (next.step === 'form' || next.step === 'review') {
+                setEditing({ ...editing, ed: next });
+              }
+            }}
+            orig={editing.orig}
+            cancel={onBackToReview}
+            toReview={onContinue}
+          />
+        </main>
+      )}
+      {(view === 'saved' || view === 'verified') && (
         <FirstDashboard
-          setup={AFTER_VERIFICATION}
-          onOpenStep={() => setNote('Demo only: would open that step.')}
+          setup={view === 'saved' ? SAVED_AND_EXITED : AFTER_VERIFICATION}
+          onOpenStep={onOpenStep}
           onNavigate={() => setNote('Demo only: would open that page.')}
         />
-      ) : (
+      )}
+      {view === 'review' && (
         <ReviewDishes
           restaurantName={RESTAURANT}
           state={state}
@@ -168,10 +257,15 @@ function Demo() {
           onEditDish={onEditDish}
           onRemoveDish={(id) => setState(removeDish(state, id))}
           onUndoRemove={() => setState(undoRemove(state))}
-          onCancel={() => setNote('Demo only: would go back to Screen 8.')}
-          onSaveAndExit={() =>
-            setNote('Demo only: would save progress and open the first-time dashboard.')
+          onCancel={() =>
+            setNote(
+              'Demo only: goes back to Screen 8 (Ready to review), which is a separate screen.',
+            )
           }
+          onSaveAndExit={() => {
+            setView('saved');
+            setNote('Demo only: progress saved; this is the first-time dashboard.');
+          }}
           onCompleteVerification={onCompleteVerification}
           verified={verified}
           onGoToDashboard={onGoToDashboard}

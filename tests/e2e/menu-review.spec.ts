@@ -18,10 +18,13 @@ test('the demo is labelled as synthetic and Complete verification waits for ever
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save and Exit' })).toBeVisible();
 
-  // Edit and + Add dish do not change any dish: they will open Screen 9 once it is merged.
+  // Edit and + Add dish open the Screen 9 form (the dish form), not a stand-in.
   await page.getByRole('button', { name: 'Edit Berry Pancake Stack' }).click();
-  await expect(page.getByText('Screen 9', { exact: false })).toBeVisible();
+  await expect(page.getByLabel('Dish name')).toHaveValue('Berry Pancake Stack');
+  await page.goto(demo);
   await page.getByRole('button', { name: '+ Add dish' }).click();
+  await expect(page.getByLabel('Dish name')).toHaveValue('');
+  await page.goto(demo);
   await expect(page.getByText('7 dishes extracted')).toBeVisible();
   await expect(page.getByText('Price Missing')).toBeVisible();
   await expect(complete).toHaveCount(0);
