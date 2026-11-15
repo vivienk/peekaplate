@@ -1,6 +1,14 @@
+import { PublicPortionSchema } from './portion';
+
 export * from './owner-actions';
 export * from './owner-ai';
 export * from './owner-workspace';
+export {
+  type PlateCalibration,
+  PlateCalibrationSchema,
+  type PublicPortion,
+  PublicPortionSchema,
+} from './portion';
 
 import { z } from 'zod';
 import { ApprovedDishFactsSchema, PublicMenuAllergenCodeSchema } from './owner-menu';
@@ -206,6 +214,7 @@ export const PublicMenuIncompleteDishSchema = z.strictObject({
 export const PublicMenuDietaryCodeSchema = z.enum(['vegan', 'vegetarian', 'gluten-free']);
 
 export const PublicMenuCompleteDishSchema = z.strictObject({
+  portion: PublicPortionSchema.optional(),
   ...publicMenuDishIdentity,
   complete: z.literal(true),
   name: publicMenuText.min(1).max(160),

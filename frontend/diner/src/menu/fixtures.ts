@@ -4,6 +4,7 @@
 // stays the missing-image case and every other dish keeps a labelled placeholder. Allergens use the approved P0 code values; the adapter turns them into labels.
 // Ingredient names match the Figma icon set (./icons), except NO_ICON_INGREDIENT and dishes the
 // icon set does not cover, so screens can test both layouts.
+import { PublicPortionSchema } from '@peekaplate/contracts';
 import { toMenu } from './adapter';
 import avocadoToastPhoto from './fixture-assets/avocado-toast.webp';
 import berryPancakeStackPhoto from './fixture-assets/berry-pancake-stack.webp';
@@ -11,6 +12,7 @@ import classicEggsBenedictPhoto from './fixture-assets/classic-eggs-benedict.web
 import logo from './fixture-assets/ember-and-stone-logo.png';
 import gardenAvocadoSaladPhoto from './fixture-assets/garden-avocado-salad.webp';
 import harvestPowerBowlPhoto from './fixture-assets/harvest-power-bowl.webp';
+import portionMetadata from './fixture-assets/portion-fixtures.json';
 import salmonPokeBowlPhoto from './fixture-assets/salmon-poke-bowl.webp';
 import type { MenuLoadResult, MenuSource } from './types';
 import type { WireCompleteDish, WireDish, WireImage, WireMenuBundle } from './wire';
@@ -284,6 +286,7 @@ export const layoutBundle = bundle(4, layoutCategories);
 export const emptyBundle = bundle(5, { breakfast: [], brunchBowls: [], salads: [] });
 
 export type FixtureScenario =
+  | 'portion-demo'
   | 'demo'
   | 'edge-cases'
   | 'withdrawal'
@@ -319,11 +322,57 @@ export function createFixtureMenuSource(
     async load(signal) {
       await wait(options.delayMs ?? 0, signal);
       loads++;
-      const ready = (b: WireMenuBundle): MenuLoadResult =>
-        toMenu(b, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
+      const ready = (b: WireMenuBundle): MenuLoadResult => {
+        const result = toMenu(b, 'fixture', FIXTURE_PUBLICATION_REVISION_ID);
+        if (
+          (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+          result.status === 'ready' &&
+          (scenario !== 'portion-demo' || !import.meta.env.DEV)
+        ) {
+          for (const category of result.menu.categories)
+            for (const dish of category.dishes) {
+              if (dish.kind !== 'complete') continue;
+              const portion = portionMetadata.entries.find(
+                (entry) =>
+                  entry.dish_id === dish.dishId && entry.dish_revision_id === dish.dishRevisionId,
+              );
+              if (portion) dish.previewPortion = PublicPortionSchema.parse(portion);
+            }
+        }
+        return result;
+      };
+      if (
+        scenario === 'portion-demo' &&
+        !(import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO)
+      ) {
+        return { status: 'unavailable' };
+      }
       switch (scenario) {
-        case 'demo':
-          return ready(demoBundle);
+        case 'portion-demo':
+        case 'demo': {
+          const result = ready(demoBundle);
+          if (
+            (import.meta.env.DEV || import.meta.env.VITE_PORTION_DEMO) &&
+            result.status === 'ready'
+          ) {
+            for (const category of result.menu.categories) {
+              for (const dish of category.dishes) {
+                if (dish.kind === 'complete') {
+                  if (scenario === 'portion-demo' && import.meta.env.DEV) dish.cameraSample = true;
+
+                  if (
+                    scenario === 'portion-demo' &&
+                    typeof location !== 'undefined' &&
+                    new URLSearchParams(location.search).get('previewState') === 'failed'
+                  ) {
+                    dish.images = null;
+                  }
+                }
+              }
+            }
+          }
+          return result;
+        }
         case 'edge-cases':
           return ready(edgeCaseBundle);
         case 'withdrawal':
