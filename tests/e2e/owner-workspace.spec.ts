@@ -451,3 +451,27 @@ test('editor access shows no AI panel', async ({ context, page }) => {
   await expect(page.getByRole('complementary', { name: 'PeekaPlate AI' })).toHaveCount(0);
   expect(state.analyses).toEqual([]);
 });
+
+test('the AI panel shows the report period and an honest error when the review fails', async ({
+  context,
+  page,
+}) => {
+  await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'PeekaPlate AI' });
+  await expect(panel.getByText('No questions yet')).toBeVisible();
+  await expect(panel.getByText(/Oct 19\s*–\s*20, 2026/)).toBeVisible();
+  await context.route(`${api}/api/v1/venues/*/ai/analysis`, (route) =>
+    route.fulfill({
+      status: 503,
+      json: { error: 'unavailable' },
+      headers: { 'Access-Control-Allow-Origin': origin },
+    }),
+  );
+  await panel.getByRole('button', { name: 'Review report' }).click();
+  await expect(panel.getByRole('alert')).toHaveText(
+    'The report could not be reviewed. Check your session or try again later.',
+  );
+  await expect(panel.getByRole('heading', { name: /Suggested review/ })).toHaveCount(0);
+});

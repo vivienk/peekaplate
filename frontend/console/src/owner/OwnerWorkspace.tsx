@@ -1,8 +1,13 @@
+import {
+  OWNER_ANALYSIS_ACTIONS,
+  OWNER_ANALYSIS_LIMITATION,
+  type OwnerAnalysisRequest,
+  type OwnerAnalysisResult,
+} from '@peekaplate/contracts/owner-analysis';
 import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
 import { createOwnerAnalysisClient } from '../owner-dashboard/ai-preview/analysis-client';
-import { OwnerAnalysisPanel } from '../owner-dashboard/ai-preview/OwnerAnalysisPanel';
 import { ReportData } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
 import { Icon } from './icons';
@@ -170,7 +175,7 @@ export function OwnerWorkspace({
         venueId={selected.venueId}
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
-        dishes={reportShown.dishes}
+        report={reportShown}
       />
     ) : undefined;
 
@@ -216,35 +221,92 @@ export function OwnerWorkspace({
   );
 }
 
-// The #164 analysis panel inside the live shell. Identity and restaurant come only from the signed-in
-// workspace: the token getter is bound to this owner and the venue is the authorised selection.
-// Dishes come from the report on screen; the panel sends only a dish ID and a review goal.
+// PeekaPlate AI panel in the live shell, built on Rania's "AI panel" component (Figma 2462:15103):
+// header with restaurant and report-period chips, intro text, messages, composer. Identity and
+// restaurant come only from the signed-in workspace: the token getter is bound to this owner and the
+// venue is the authorised selection. The analysis API (#164) takes a dish and a review focus rather
+// than free text, so the composer offers those two pickers in place of Figma's text box (design gap
+// flagged for Rania). Only `{ dishId, goal }` is sent; nothing is published or changed.
+const FOCUS_OPTIONS: { value: OwnerAnalysisRequest['goal']; label: string }[] = [
+  { value: 'menu', label: 'Menu presentation' },
+  { value: 'engagement', label: 'Dish engagement' },
+  { value: 'crm', label: 'Customer retention (CRM)' },
+];
+const PERIOD_FORMAT = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+// Report windows are end-exclusive, so the last day shown is the millisecond before the end.
+function reportPeriod(window: { start_time: string; end_time: string }): string {
+  const start = new Date(window.start_time);
+  const end = new Date(Math.max(start.getTime(), new Date(window.end_time).getTime() - 1));
+  return PERIOD_FORMAT.formatRange(start, end);
+}
+const percent = (value: number | null) => `${((value ?? 0) * 100).toFixed(1)}%`;
+
+type Reply =
+  | { kind: 'loading'; scope: string }
+  | { kind: 'error'; scope: string }
+  | { kind: 'result'; scope: string; result: OwnerAnalysisResult; dishName: string };
+
 function LiveAiPanel({
   apiBase,
   venueId,
   restaurantName,
   getAccessToken,
-  dishes,
+  report,
 }: {
   apiBase: string;
   venueId: string;
   restaurantName: string;
   getAccessToken: () => Promise<string | null>;
-  dishes: OwnerDishReport['dishes'];
+  report: OwnerDishReport;
 }) {
-  const dishFieldId = useId();
+  const ids = useId();
+  const dishes = report.dishes;
   const [picked, setPicked] = useState('');
+  const [goal, setGoal] = useState<OwnerAnalysisRequest['goal']>('menu');
+  const [reply, setReply] = useState<Reply | null>(null);
+  const pending = useRef<AbortController | null>(null);
   const dishId = dishes.some((dish) => dish.dish_id === picked)
     ? picked
     : (dishes[0]?.dish_id ?? '');
+  const scope = `${venueId}:${dishId}:${goal}`;
   const analyze = useMemo(
     () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
   );
-  const connection = useMemo(
-    () => (dishId ? { analyze, venueId, dishId } : null),
-    [analyze, venueId, dishId],
+  // A reply belongs to one restaurant, dish and focus; changing any of them hides it and stops a
+  // request still on its way.
+  useEffect(
+    () => () => {
+      pending.current?.abort();
+      pending.current = null;
+    },
+    [analyze, scope],
   );
+  const shown = reply?.scope === scope ? reply : null;
+
+  async function ask(event: FormEvent) {
+    event.preventDefault();
+    if (!dishId || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    const dishName = dishes.find((dish) => dish.dish_id === dishId)?.name ?? '';
+    setReply({ kind: 'loading', scope });
+    try {
+      const result = await analyze({ dishId, goal }, controller.signal);
+      if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
+    } catch {
+      if (!controller.signal.aborted) setReply({ kind: 'error', scope });
+    } finally {
+      if (pending.current === controller) pending.current = null;
+    }
+  }
+
+  const busy = shown?.kind === 'loading';
   return (
     <aside className="owner-ai" aria-label="PeekaPlate AI">
       <div className="owner-ai__head">
@@ -256,32 +318,116 @@ function LiveAiPanel({
         </div>
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{restaurantName}</span>
+          <span className="owner-chip owner-chip--surface">
+            {reportPeriod(report.report_metadata.date_window)}
+          </span>
         </div>
       </div>
-      <div className="owner-ai__body">
-        {connection ? (
+      <div className="owner-ai__body" data-ai-state={shown?.kind ?? 'empty'} aria-live="polite">
+        <p className="owner-muted">
+          Ask about dish activity or your reports. Answers use only the records shown on these
+          pages.
+        </p>
+        {dishes.length === 0 && (
           <>
-            <div className="owner-ai__field">
-              <label htmlFor={dishFieldId}>Dish</label>
-              <select
-                id={dishFieldId}
-                className="pp-input"
-                value={dishId}
-                onChange={(event) => setPicked(event.target.value)}
-              >
-                {dishes.map((dish) => (
-                  <option key={dish.dish_id} value={dish.dish_id}>
-                    {dish.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <OwnerAnalysisPanel connection={connection} />
+            <h3>No questions yet</h3>
+            <p className="owner-muted">There are no dishes in this report to ask about yet.</p>
           </>
-        ) : (
-          <p className="owner-muted">There are no dishes in this report to review yet.</p>
+        )}
+        {dishes.length > 0 && !shown && (
+          <>
+            <h3>No questions yet</h3>
+            <p className="owner-muted">
+              Choose a dish and a focus below. Suggestions are for review only; nothing is changed
+              or sent to diners.
+            </p>
+          </>
+        )}
+        {shown?.kind === 'loading' && (
+          <p className="owner-muted" role="status">
+            Reviewing the report…
+          </p>
+        )}
+        {shown?.kind === 'error' && (
+          <p className="owner-ai__error" role="alert">
+            The report could not be reviewed. Check your session or try again later.
+          </p>
+        )}
+        {shown?.kind === 'result' && (
+          <div className="owner-ai__answer">
+            {shown.result.status === 'review' && shown.result.metric !== null ? (
+              <>
+                <h3>Suggested review: {shown.dishName}</h3>
+                <p>{OWNER_ANALYSIS_ACTIONS[shown.result.metric]}</p>
+                <p className="owner-muted">
+                  {shown.result.metric.replaceAll('_', ' ')}: {percent(shown.result.value)}
+                </p>
+              </>
+            ) : (
+              <>
+                <h3>No recommendation for {shown.dishName}</h3>
+                <p>
+                  {shown.result.reason === 'unsupported_goal'
+                    ? 'This report has no customer-retention or CRM evidence.'
+                    : 'There is not enough verified evidence to suggest a next step.'}
+                </p>
+              </>
+            )}
+            <p className="owner-muted">
+              Report window:{' '}
+              {reportPeriod({
+                start_time: shown.result.timeWindow.start,
+                end_time: shown.result.timeWindow.end,
+              })}
+            </p>
+            <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
+            <p className="owner-muted">No menu changes or customer messages are sent.</p>
+          </div>
         )}
       </div>
+      <form className="owner-ai__composer owner-ai__composer--pickers" onSubmit={ask}>
+        <label className="owner-visually-hidden" htmlFor={`${ids}-dish`}>
+          Dish
+        </label>
+        <select
+          id={`${ids}-dish`}
+          className="owner-ai__input"
+          value={dishId}
+          disabled={dishes.length === 0}
+          onChange={(event) => setPicked(event.target.value)}
+        >
+          {dishes.map((dish) => (
+            <option key={dish.dish_id} value={dish.dish_id}>
+              {dish.name}
+            </option>
+          ))}
+        </select>
+        <div className="owner-ai__row">
+          <label className="owner-visually-hidden" htmlFor={`${ids}-focus`}>
+            Review focus
+          </label>
+          <select
+            id={`${ids}-focus`}
+            className="owner-ai__input"
+            value={goal}
+            onChange={(event) => setGoal(event.target.value as OwnerAnalysisRequest['goal'])}
+          >
+            {FOCUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="owner-ai__send"
+            disabled={busy || dishes.length === 0}
+            aria-label="Review report"
+          >
+            <Icon name="send" size={18} />
+          </button>
+        </div>
+      </form>
     </aside>
   );
 }
