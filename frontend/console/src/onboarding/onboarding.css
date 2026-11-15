@@ -971,3 +971,28 @@
     white-space: nowrap;
   }
 }
+.pp-onboard__account-menu {
+  position: relative;
+}
+.pp-onboard__account-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+.pp-onboard__account-menu summary::-webkit-details-marker {
+  display: none;
+}
+.pp-onboard__account-actions {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  min-width: 16rem;
+  max-width: min(28rem, calc(100vw - 32px));
+  padding: var(--pp-space-16);
+  display: grid;
+  gap: var(--pp-space-12);
+  background: var(--pp-role-surface);
+  border: 1px solid var(--pp-role-outline);
+  border-radius: var(--pp-radius-16);
+  box-shadow: var(--pp-shadow-medium);
+}

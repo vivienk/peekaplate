@@ -3884,3 +3884,31 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"id": "ERR-20261115-OWNER-AI-SHELL", "status": "resolved", "area": "owner-ai-shell", "cause": "Generic analysis failures retained private report output after authorization denial; panel wording implied an exact displayed snapshot despite an independent server read. Mobile grid intrinsic width also widened the report workspace.", "prevention": "Propagate typed access denials, cancel stale actor/report work, label both evidence periods explicitly and constrain report grid tracks.", "sources": ["frontend/console/src/owner/OwnerWorkspace.tsx", "frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "Two browser reproducers failed before fixes. Access denial, separate periods, pending sign-out/account change and mobile accessibility/overflow now pass; full verification follows."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T10:15:22.721Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T10:19:56.289Z","exitCode":2}
+```
+
+```json
+{"id":"ERR-20261115-OWNER-COMPOSITION","status":"resolved","area":"owner-console-presentation","cause":"The authenticated wiring wrapper bypassed merged dashboard/onboarding composition; broad workspace styles also hid icons and changed authored form spacing.","prevention":"Reuse the original dashboard, source picker and shared form/table presentation; scope demo styles and record every connected page at desktop/mobile widths.","sources":["frontend/console/src/owner/FirstDashboard.tsx","frontend/console/src/owner/OwnerMenuWorkspace.tsx","frontend/console/src/owner-dashboard/menu-presentation.tsx","tests/e2e/owner-workspace.spec.ts"],"regression":"Two missing-composition checks failed before correction. Workspace suite 36/36 and authored-screen suite 48/48 passed; optional approval category error also has a browser regression. Final hosted screenshot acceptance is separate."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T10:39:51.356Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T10:40:53.588Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
+```

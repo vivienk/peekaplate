@@ -5,7 +5,16 @@ import {
   type OwnerAnalysisResult,
 } from '@peekaplate/contracts/owner-analysis';
 import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
-import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
 import {
   createOwnerAnalysisClient,
@@ -13,6 +22,7 @@ import {
 } from '../owner-dashboard/ai-preview/analysis-client';
 import { ReportData } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
+import { FirstDashboardAside, FirstDashboardTopbar } from './FirstDashboard';
 import { Icon } from './icons';
 import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
@@ -41,7 +51,8 @@ export function OwnerWorkspace({
   const [state, setState] = useState<WorkspaceState>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
-  const [page, setPage] = useState<OwnerPage>('overview');
+  const [page, setPage] = useState<OwnerPage>('setup');
+  const [navigation, setNavigation] = useState(0);
   const [dirty, setDirty] = useState(false);
   const canLeave = () =>
     !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
@@ -70,7 +81,7 @@ export function OwnerWorkspace({
 
   const refresh = useCallback(() => {
     setState({ kind: 'loading' });
-    setPage('overview');
+    setPage('setup');
     setAttempt((value) => value + 1);
   }, []);
   const accessFailure = useCallback(
@@ -87,9 +98,7 @@ export function OwnerWorkspace({
   const pages = useMemo(
     () =>
       new Set<OwnerPage>(
-        selected?.permission === 'owner'
-          ? ['overview', 'performance', 'menu']
-          : ['overview', 'menu'],
+        selected?.permission === 'owner' ? ['setup', 'performance', 'menu'] : ['setup', 'menu'],
       ),
     [selected?.permission],
   );
@@ -161,7 +170,7 @@ export function OwnerWorkspace({
         onChange={(event) => {
           if (!canLeave()) return;
           setSelectedId(event.target.value);
-          setPage('overview');
+          setPage('setup');
         }}
       >
         {!selected && <option value="">Choose a restaurant</option>}
@@ -194,22 +203,48 @@ export function OwnerWorkspace({
         report={reportShown}
         onAccessFailure={accessFailure}
       />
-    ) : undefined;
+    ) : (
+      <FirstDashboardAside
+        setup={{
+          venueId: selected.venueId,
+          restaurantName: selected.name,
+          detailsStatus: 'unknown',
+          menuAdded: null,
+          published: null,
+        }}
+        ariaLabel="Analysis availability"
+      />
+    );
 
-  return (
+  const renderShell = (content: ReactNode) => (
     <div className="owner-root owner-workspace">
       <OwnerShell
         venueId={selected.venueId}
         restaurantName={selected.name}
         current={page}
         available={pages}
-        visible={pages}
+        lockedHint="Some screens are not connected in this workspace yet."
+        visible={
+          new Set<OwnerPage>(['overview', 'report', 'performance', 'menu', 'actions', 'setup'])
+        }
         onNavigate={(next) => {
-          if (pages.has(next) && canLeave()) setPage(next);
+          if (pages.has(next) && canLeave()) {
+            setPage(next);
+            setNavigation((value) => value + 1);
+          }
         }}
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
+            <FirstDashboardTopbar
+              setup={{
+                venueId: selected.venueId,
+                restaurantName: selected.name,
+                detailsStatus: 'unknown',
+                menuAdded: null,
+                published: null,
+              }}
+            />
             {picker}
             <Button
               variant="text"
@@ -223,31 +258,39 @@ export function OwnerWorkspace({
           </div>
         }
       >
-        {page === 'performance' && selected.permission === 'owner' ? (
-          <ReportData
-            key={`${owner.id}:${selected.venueId}`}
-            source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
-            onAccessFailure={accessFailure}
-            onReport={showReport}
-          />
-        ) : (
-          <>
-            <p>Access: {selected.permission === 'owner' ? 'Owner' : 'Editor'}</p>
-            <OwnerMenuWorkspace
-              key={`${owner.id}:${selected.venueId}`}
-              apiBase={apiBase}
-              actorId={owner.id}
-              venueId={selected.venueId}
-              restaurantName={selected.name}
-              section={page === 'menu' ? 'menu' : 'overview'}
-              getAccessToken={getAccessToken}
-              onAccessFailure={accessFailure}
-              onDirtyChange={setDirty}
-            />
-          </>
-        )}
+        {content}
       </OwnerShell>
     </div>
+  );
+  return page === 'performance' && selected.permission === 'owner' ? (
+    renderShell(
+      <ReportData
+        key={`${owner.id}:${selected.venueId}`}
+        source={{ mode: 'live', apiBase, venueId: selected.venueId, getAccessToken }}
+        onAccessFailure={accessFailure}
+        onReport={showReport}
+      />,
+    )
+  ) : (
+    <OwnerMenuWorkspace
+      key={`${owner.id}:${selected.venueId}`}
+      apiBase={apiBase}
+      actorId={owner.id}
+      venueId={selected.venueId}
+      restaurantName={selected.name}
+      section={page === 'menu' ? 'menu' : 'overview'}
+      navigation={navigation}
+      getAccessToken={getAccessToken}
+      onAccessFailure={accessFailure}
+      onDirtyChange={setDirty}
+      renderShell={renderShell}
+      accountActions={
+        <>
+          {picker}
+          {signOut}
+        </>
+      }
+    />
   );
 }
 

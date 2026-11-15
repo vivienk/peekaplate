@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established. Opt-in owner analysis mounts beside the signed-in report with typed access cleanup and separate displayed-report/analysis periods; mobile report cards contain table overflow. No model activation is implied. S10 owner review only verifies dishes: Complete verification opens a Menu verified pop-up and never publishes.",
+      "summary": "S10 owner review only verifies dishes: Complete verification opens a Menu verified pop-up and never publishes. Owner console includes auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and menu/draft/photo persistence. Signed-in setup reuses the merged FirstDashboard, original three-choice source picker and authored Screen 9 frame; live presentation imports no demo data. Missing setup/publication facts remain unavailable. Original files, versioned corrections, unknown allergens, cancellation and access cleanup are preserved. Opt-in analysis uses separate report/analysis periods and typed denials. Save, verification, approval and publication stay separate. Profile persistence, final publish UI and hosted AI activation remain unconnected.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -352,7 +352,11 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "playwright.owner-ai.config.ts",
         "tests/owner-ai-browser/connection.spec.ts",
         "frontend/console/src/owner/api-origin.ts",
-        "playwright.workspace.config.ts"
+        "playwright.workspace.config.ts",
+        "frontend/console/src/owner-dashboard/controls.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.css",
+        "frontend/console/src/owner-dashboard/dish-presentation.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -362,7 +366,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "55162d495e2382ada4b9b5be058469d3e63b523201e181c4929d2b25edcbe6d9"
+      "sourceFingerprint": "7ffedcef9b936b39a22534f909fb3d31a2605e58ed88aca5ab3a9f329b5182b2"
     },
     {
       "id": "backend",
@@ -911,19 +915,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "diner"
       ],
-      "summary": "PR126 adds the Compare picker with shared search and excludes the kept dish. Reconciled current develop artwork, Save cleanup and tracking. Three browser regressions reproduce and fix stale dish revisions or removed dishes after publication refresh. Picker, live-trigger, Save and artwork browser checks: 26 passed.",
-      "files": [
-        "frontend/diner/src/compare/pickerScreen.ts",
-        "frontend/diner/src/menu/menuScreen.ts",
-        "tests/e2e/menu-triggers-live.spec.ts"
-      ],
-      "next": "Merge picker before PR127 result and Replace. Hosted analytics acceptance remains separate."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "diner"
-      ],
       "summary": "PR127 adds displayed Compare pairs, Start/Replace observations, linked detail openings and Save controls. Preserves PR126 publication-safe navigation. Three regressions fix withdrawn Replace/detail targets and Saved-origin route exits. Repository checks and 38 targeted browser cases pass.",
       "files": [
         "frontend/diner/src/compare/resultScreen.ts",
@@ -1033,6 +1024,21 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
+      "summary": "Restore authored dashboard, onboarding and Screen 9 composition while preserving the existing authenticated menu controller. Reproduced missing dashboard/form frames before correction; explicit unavailable setup facts avoid fake progress. Hosted mobile readback exposed an intrinsic-width restaurant selector; constrain the shared picker/select and verify long names in dashboard and onboarding account menu.",
+      "files": [
+        "frontend/console/src/owner/FirstDashboard.tsx",
+        "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
+        "frontend/console/src/owner-dashboard/menu-presentation.tsx",
+        "tests/e2e/owner-workspace.spec.ts",
+        "docs/owner-onboarding-wiring.md"
+      ],
+      "next": "Local workspace/browser screenshots pass; finish authored-demo checks, pinned reviews and Pages-only staging readback. Final publication, profile persistence and provider activation remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
       "summary": "S5-FE-10 owner S10 is verification only: Complete verification opens a Menu verified pop-up whose Go to dashboard opens the first dashboard; nothing publishes and no diner link is shown. Statuses are Ready, Price/Category/Serving Size Missing and N fields missing. Ready needs name, category, price, description, a confirmed ingredient, owner-confirmed allergens and a photo. The preview demo's Edit and Add dish change nothing until the S09 form is wired.",
       "files": [
         "frontend/console/src/owner/review/reviewDishes.ts",
@@ -1040,7 +1046,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner/review/menuReviewDemo.tsx",
         "tests/e2e/menu-review.spec.ts"
       ],
-      "next": "Wire Edit and Add dish to the S09 form (DishEditor, PR156). Publishing and the diner link belong to S13: submit the menu approval, publish, then show the returned URL. Confirm serving-size contract field and wording for a single missing detail."
+      "next": "Wire Edit and Add dish to the S09 form (DishEditor, PR156) and add S8 on the same list. Publishing and the diner link belong to S13. Confirm serving-size contract field and wording for a single missing detail."
     }
   ]
 }
