@@ -101,6 +101,11 @@ export function DishEditor({
 
   const verify = (event: FormEvent) => {
     event.preventDefault();
+    if (busy) return;
+    if (!onVerify) {
+      onSave();
+      return;
+    }
     const found = approvalIssues(value);
     setIssues(found);
     if (found.length > 0) {

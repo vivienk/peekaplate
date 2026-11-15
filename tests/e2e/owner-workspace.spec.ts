@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
+import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/api';
+import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtures.test-helpers';
 
 const origin = 'http://127.0.0.1:5174';
 const api = 'https://peekaplate-api-staging.vxkong.workers.dev';
@@ -59,6 +62,24 @@ async function fixture(context: BrowserContext) {
     identityRequests: 0,
     tokenVersion: 0,
     invalidActor: false,
+    drafts: {} as Record<string, DishDraft[]>,
+    jobs: {} as Record<string, MenuJob[]>,
+    groups: new Map<string, { jobs: MenuJob[]; hashes: string[] }>(),
+    photos: new Map<string, Buffer>(),
+    receipts: new Map<string, unknown>(),
+    conflictSave: false,
+    menuStatus: 200,
+    review: { ...reviewSession(), venueId: venue.venueId },
+    correctionIds: [] as string[],
+    delayUrl: false,
+    urlStarted: false,
+    releaseUrl: () => {},
+    delayJobs: false,
+    jobsReads: 0,
+    releaseJobs: () => {},
+    delayReview: false,
+    reviewStarted: false,
+    releaseReview: () => {},
     delayMembership: false,
     releaseMembership: () => {},
     delayReport: false,
@@ -124,6 +145,185 @@ async function fixture(context: BrowserContext) {
       await route
         .fulfill({ json: body, headers: { 'Access-Control-Allow-Origin': origin } })
         .catch(() => {});
+    } else if (url.pathname.startsWith('/venues/')) {
+      const id = url.pathname.split('/')[2]!;
+      const path = url.pathname.split('/').slice(3).join('/');
+      const headers = { 'Access-Control-Allow-Origin': origin };
+      if (state.menuStatus !== 200)
+        return route.fulfill({ status: state.menuStatus, json: { error: 'forbidden' }, headers });
+      if (path === 'menus/jobs') {
+        state.jobsReads++;
+        if (state.delayJobs)
+          await new Promise<void>((resolve) => {
+            state.releaseJobs = resolve;
+          });
+        return route.fulfill({ json: { jobs: state.jobs[id] ?? [] }, headers });
+      }
+      if (path === 'menus/upload-groups') {
+        const input = request.postDataJSON();
+        const groupId = crypto.randomUUID();
+        const jobs: MenuJob[] = input.files.map(
+          (file: { sourceType: 'pdf' | 'photo' }, index: number) => ({
+            id: crypto.randomUUID(),
+            source_type: file.sourceType,
+            upload_group_id: groupId,
+            upload_index: index,
+            source_uploaded: false,
+            status: 'queued',
+            attempt_count: 0,
+            max_attempts: 3,
+            error_code: null,
+            draft_count: 0,
+            created_at: '2026-11-15T00:00:00Z',
+            started_at: null,
+            finished_at: null,
+          }),
+        );
+        state.groups.set(groupId, {
+          jobs,
+          hashes: input.files.map((file: { sourceHash: string }) => file.sourceHash),
+        });
+        state.jobs[id] = [...(state.jobs[id] ?? []), ...jobs];
+        return route.fulfill({ status: 202, json: { group: { id: groupId, jobs } }, headers });
+      }
+      if (/^menus\/upload-groups\/[^/]+\/files\/\d$/.test(path)) {
+        const groupId = path.split('/')[2]!;
+        const index = Number(path.split('/')[4]);
+        const group = state.groups.get(groupId)!;
+        expect(createHash('sha256').update(request.postDataBuffer()!).digest('hex')).toBe(
+          group.hashes[index],
+        );
+        group.jobs[index]!.source_uploaded = true;
+        return route.fulfill({
+          status: 202,
+          json: {
+            group: {
+              id: groupId,
+              jobs: group.jobs,
+              ready: group.jobs.every((job) => job.source_uploaded),
+            },
+          },
+          headers,
+        });
+      }
+      if (/^menus\/upload-groups\/[^/]+\/cancel$/.test(path)) {
+        const groupId = path.split('/')[2]!;
+        const group = state.groups.get(groupId)!;
+        for (const job of group.jobs) job.status = 'cancelled';
+        return route.fulfill({ json: { group: { id: groupId, jobs: group.jobs } }, headers });
+      }
+      if (/^menus\/jobs\/[^/]+\/review-session$/.test(path)) {
+        state.reviewStarted = true;
+        if (state.delayReview)
+          await new Promise<void>((resolve) => {
+            state.releaseReview = resolve;
+          });
+        return route.fulfill({ json: state.review, headers });
+      }
+      if (/^extractions\/[^/]+\/candidates\/[^/]+\/review$/.test(path)) {
+        const input = request.postDataJSON();
+        const candidateId = decodeURIComponent(path.split('/')[3]!);
+        const identity = `${path}:${JSON.stringify(input.corrected)}`;
+        if (state.receipts.has(input.commandId) && state.receipts.get(input.commandId) !== identity)
+          return route.fulfill({ status: 409, json: { error: 'command_conflict' }, headers });
+        state.receipts.set(input.commandId, identity);
+        state.correctionIds.push(input.commandId);
+        const item = state.review.items.find(
+          (value) => value.candidate.candidate_id === candidateId,
+        )!;
+        item.effective = { ...item.effective, ...input.corrected };
+        item.review = {
+          ...item.review,
+          version: item.review.version + 1,
+          corrected: input.corrected,
+          editedFields: Object.keys(input.corrected) as typeof item.review.editedFields,
+          reviewStatus: 'corrected',
+        };
+        return route.fulfill({ json: item, headers });
+      }
+      if (path === 'drafts')
+        return route.fulfill({ json: { drafts: state.drafts[id] ?? [] }, headers });
+      if (/^drafts\/[^/]+$/.test(path) && request.method() === 'PUT') {
+        const draftId = path.split('/')[1]!;
+        const input = request.postDataJSON();
+        const rows = state.drafts[id] ?? [];
+        const old = rows.find((draft) => draft.id === draftId);
+        if (state.conflictSave || (old?.draft_version ?? 0) !== input.expectedVersion)
+          return route.fulfill({ status: 409, json: { error: 'version_conflict' }, headers });
+        const fields = input.fields;
+        const draft: DishDraft = {
+          id: draftId,
+          draft_id: draftId,
+          job_id: null,
+          origin: 'manual',
+          draft_version: input.expectedVersion + 1,
+          name: fields.name,
+          category: fields.category,
+          description: fields.description,
+          price_amount: fields.priceAmount,
+          price_currency: fields.priceCurrency,
+          source_text: null,
+          ingredients: fields.ingredients.items,
+          review_warnings: [],
+          review_status: 'pending',
+          manual_fields: fields,
+        };
+        state.drafts[id] = [...rows.filter((row) => row.id !== draftId), draft];
+        return route.fulfill({ json: { draft }, headers });
+      }
+      if (/^drafts\/[^/]+\/photos$/.test(path)) {
+        const bytes = request.postDataBuffer()!;
+        const photoId = crypto.randomUUID();
+        state.photos.set(photoId, bytes);
+        return route.fulfill({
+          status: 201,
+          json: {
+            photo: {
+              id: photoId,
+              draftId: path.split('/')[1],
+              contentType: 'image/png',
+              sizeBytes: bytes.length,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+              verificationStatus: 'not_verified',
+              storageKey: 'synthetic/private.png',
+            },
+          },
+          headers,
+        });
+      }
+      if (/^drafts\/[^/]+\/photos\/[^/]+$/.test(path))
+        return route.fulfill({
+          body: state.photos.get(path.split('/')[3]!)!,
+          contentType: 'image/png',
+          headers,
+        });
+      if (path === 'menus/url') {
+        state.urlStarted = true;
+        if (state.delayUrl)
+          await new Promise<void>((resolve) => {
+            state.releaseUrl = resolve;
+          });
+        const job: MenuJob = {
+          id: crypto.randomUUID(),
+          source_type: 'url',
+          status: 'queued',
+          attempt_count: 0,
+          max_attempts: 3,
+          error_code: null,
+          draft_count: 0,
+          source_uploaded: true,
+          created_at: '2026-11-15T00:00:00Z',
+          started_at: null,
+          finished_at: null,
+        };
+        state.jobs[id] = [...(state.jobs[id] ?? []), job];
+        return route.fulfill({
+          status: 202,
+          json: { group: { id: crypto.randomUUID(), jobs: [job] } },
+          headers,
+        });
+      }
+      return route.fulfill({ status: 404, json: { error: 'synthetic_not_found' }, headers });
     } else {
       if (state.delayReport)
         await new Promise<void>((resolve) => {
@@ -150,6 +350,279 @@ async function signIn(page: Page, email = 'owner@example.test') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
+test('manual dish and original private photo survive save and reload', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByLabel('Dish name', { exact: true }).fill('Fictional Lentil Soup');
+  await page.getByLabel('Category', { exact: true }).fill('Soup');
+  await page.getByLabel('Price', { exact: true }).fill('9.50');
+  await page.getByLabel('Currency', { exact: true }).fill('USD');
+  const original = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  await page
+    .getByLabel('Dish photo', { exact: true })
+    .setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: original });
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  expect([...state.photos.values()][0]).toEqual(original);
+  expect(state.drafts[venue.venueId]?.[0]?.manual_fields).toMatchObject({
+    allergens: { status: 'unknown', items: [] },
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit Fictional Lentil Soup', exact: true }).click();
+  await expect(page.getByLabel('Price', { exact: true })).toHaveValue('9.50');
+  await expect(page.getByRole('img', { name: 'Private draft dish' })).toBeVisible();
+  expect(state.apiCalls.some((call) => /approve|publications/.test(call.path))).toBe(false);
+});
+
+test('URL and manual sources share saved work and queued status is not a fake success', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Paste URL' }).check();
+  await page.getByRole('checkbox', { name: 'Add manually' }).check();
+  await expect(page.getByRole('checkbox', { name: 'Paste URL' })).toBeChecked();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+  await page.getByRole('button', { name: 'Import menu', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'New dish', exact: true })).toBeVisible();
+  await page.getByLabel('Dish name', { exact: true }).fill('Fictional side salad');
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(
+    page.getByText('Draft saved. This has not approved or published your menu.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByText('URL source — queued; 0 dishes.')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Edit Fictional side salad', exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Edit Fictional side salad', exact: true }),
+  ).toBeVisible();
+  expect(state.jobs[venue.venueId]).toHaveLength(1);
+});
+
+test('a stale draft save leaves the current edit visible instead of reporting success', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await page.getByLabel('Dish name', { exact: true }).fill('Unsaved fictional soup');
+  state.conflictSave = true;
+  await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Saved data changed');
+  await expect(page.getByLabel('Dish name', { exact: true })).toHaveValue('Unsaved fictional soup');
+  expect(state.drafts[venue.venueId]).toBeUndefined();
+});
+
+test('photo replacement cancels its immutable group and PDF stays a separate source in the same workspace', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Upload menu photos' }).check();
+  await page.getByRole('checkbox', { name: 'Upload PDF' }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  await page
+    .locator('input[type=file]')
+    .first()
+    .setInputFiles({ name: 'first.png', mimeType: 'image/png', buffer: image });
+  await expect.poll(() => state.jobs[venue.venueId]?.[0]?.source_uploaded).toBe(true);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Replace first.png', exact: true }).click();
+  await (await chooser).setFiles({
+    name: 'replacement.png',
+    mimeType: 'image/png',
+    buffer: Buffer.concat([image, Buffer.from([0])]),
+  });
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(2);
+  expect(state.jobs[venue.venueId]?.[0]?.status).toBe('cancelled');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(
+    page.getByText(
+      'PDF source — each selection is stored together. Add another source after this upload.',
+    ),
+  ).toBeVisible();
+  await page
+    .locator('input[type=file]')
+    .first()
+    .setInputFiles({
+      name: 'synthetic.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.7 synthetic HTTP fixture only'),
+    });
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(3);
+  await expect.poll(() => state.jobs[venue.venueId]?.[2]?.source_uploaded).toBe(true);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.getByText('Queued for processing', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'View saved dishes', exact: true }).click();
+  await expect(page.getByText('PHOTO source — queued; 0 dishes.')).toBeVisible();
+  await expect(page.getByText('PDF source — queued; 0 dishes.')).toBeVisible();
+});
+
+test('revoked menu access removes saved private state and reloads memberships', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  await signIn(page);
+  await expect(page.getByRole('button', { name: 'Reload saved work', exact: true })).toBeVisible();
+  state.menuStatus = 403;
+  state.venues = [];
+  await page.getByRole('button', { name: 'Reload saved work', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'No restaurant access yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: venue.name })).toHaveCount(0);
+});
+
+test('a delayed URL import cannot reopen a screen the owner left', async ({ context, page }) => {
+  const state = await fixture(context);
+  state.delayUrl = true;
+  await signIn(page);
+  await page.getByRole('button', { name: 'Add menu sources', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Paste URL' }).check();
+  await page.getByRole('checkbox', { name: 'Add manually' }).check();
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByLabel('Menu URL').fill('https://restaurant.example/menu.pdf');
+  await page.getByRole('button', { name: 'Import menu', exact: true }).click();
+  await expect.poll(() => state.urlStarted).toBe(true);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  state.releaseUrl();
+  await expect.poll(() => state.jobs[venue.venueId]?.length).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Choose how to add your menu' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'New dish', exact: true })).toHaveCount(0);
+});
+
+test('processing waits for a slow status read instead of invalidating it with another poll', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  state.jobs[venue.venueId] = [
+    {
+      id: JOB,
+      source_type: 'pdf',
+      status: 'queued',
+      attempt_count: 0,
+      max_attempts: 3,
+      error_code: null,
+      draft_count: 0,
+      source_uploaded: true,
+      created_at: '2026-11-15T00:00:00Z',
+      started_at: null,
+      finished_at: null,
+    },
+  ];
+  await page.clock.install();
+  await signIn(page);
+  await page.getByRole('button', { name: 'View processing', exact: true }).click();
+  state.delayJobs = true;
+  state.jobsReads = 0;
+  await page.clock.runFor(5000);
+  await expect.poll(() => state.jobsReads).toBe(1);
+  await page.clock.runFor(5000);
+  expect(state.jobsReads).toBe(1);
+  state.jobs[venue.venueId]![0]!.status = 'complete';
+  state.releaseJobs();
+  await expect(
+    page.getByText(
+      'Processing status updated. Review the saved dishes and any failed sources below.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByText('PDF source — complete; 0 dishes.')).toBeVisible();
+});
+
+test('identical corrections on separate extracted candidates get separate command identities', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const candidates = state.review.items.slice(0, 2);
+  state.drafts[venue.venueId] = candidates.map((item) => ({
+    id: crypto.randomUUID(),
+    draft_id: crypto.randomUUID(),
+    job_id: JOB,
+    candidate_id: item.candidate.candidate_id,
+    origin: 'extracted',
+    draft_version: 1,
+    name: item.effective.name,
+    category: item.effective.category ?? null,
+    description: item.effective.description ?? null,
+    price_amount: item.effective.price_amount ?? null,
+    price_currency: item.effective.price_currency ?? null,
+    ingredients: item.effective.ingredients ?? null,
+    source_text: 'Synthetic source',
+    review_warnings: [],
+    review_status: 'pending',
+  }));
+  await signIn(page);
+  for (const item of candidates) {
+    await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
+    await page.getByLabel('Category', { exact: true }).fill('Sides');
+    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+    await expect(
+      page.getByText('Draft saved. This has not approved or published your menu.'),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  }
+  expect(state.correctionIds).toHaveLength(2);
+  expect(new Set(state.correctionIds).size).toBe(2);
+});
+
+test('a delayed review session cannot reopen an editor after shell navigation', async ({
+  context,
+  page,
+}) => {
+  const state = await fixture(context);
+  const item = state.review.items[0]!;
+  state.drafts[venue.venueId] = [
+    {
+      id: crypto.randomUUID(),
+      draft_id: crypto.randomUUID(),
+      job_id: JOB,
+      candidate_id: item.candidate.candidate_id,
+      origin: 'extracted',
+      draft_version: 1,
+      name: item.effective.name,
+      category: item.effective.category ?? null,
+      description: item.effective.description ?? null,
+      price_amount: item.effective.price_amount ?? null,
+      price_currency: item.effective.price_currency ?? null,
+      ingredients: item.effective.ingredients ?? null,
+      source_text: 'Synthetic source',
+      review_warnings: [],
+      review_status: 'pending',
+    },
+  ];
+  state.delayReview = true;
+  await signIn(page);
+  await page.getByRole('button', { name: `Edit ${item.effective.name}`, exact: true }).click();
+  await expect.poll(() => state.reviewStarted).toBe(true);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  state.releaseReview();
+  await expect(page.getByRole('heading', { name: 'Your menu draft', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Category', { exact: true })).toHaveCount(0);
+});
+
 test('real SDK sign-in opens the server restaurant shell and authenticated report', async ({
   context,
   page,
@@ -162,7 +635,7 @@ test('real SDK sign-in opens the server restaurant shell and authenticated repor
     path: testInfo.outputPath('owner-workspace-desktop.png'),
     fullPage: true,
   });
-  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Menu', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'AI Insight Report', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(
@@ -243,11 +716,13 @@ test('an expired identity removes the shell before an API request can use it', a
   const state = await fixture(context);
   await signIn(page);
   await expect(page.locator('.owner-shell')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reload saved work', exact: true })).toBeVisible();
+  const beforeExpiry = [...state.apiCalls];
   state.denyIdentity = true;
   await page.getByRole('button', { name: 'Dish performance', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to PeekaPlate' })).toBeVisible();
   await expect(page.locator('.owner-shell')).toHaveCount(0);
-  expect(state.apiCalls.map((call) => call.path)).toEqual(['/staff/venues']);
+  expect(state.apiCalls).toEqual(beforeExpiry);
 });
 
 test('sign-out while membership is pending cannot restore a late restaurant response', async ({
