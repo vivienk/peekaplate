@@ -3935,3 +3935,39 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"id": "ERR-20261115-OWNER-PICKER-WIDTH", "status": "resolved", "area": "owner-console-responsive", "cause": "A long server-returned restaurant name gave the selector a 440px intrinsic width and widened a 390px hosted viewport.", "prevention": "Constrain the shared picker and select minimum/maximum inline width, including the onboarding account disclosure.", "sources": ["frontend/console/src/owner/workspace.css", "tests/e2e/owner-workspace.spec.ts"], "regression": "The real hosted overflow was reproduced locally at 448px; the long-name dashboard/account-menu browser case now passes at390px. Final hosted retest follows release."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-TEST-SLUG","status":"resolved","area":"publication-tests","cause":"The new database test expected hyphens, but the existing automatic restaurant link allocator uses underscores. Runtime behavior was correct.","prevention":"Assert the existing allocator's contract, not the Figma sample spelling.","sources":["backend/src/owner-publication.integration.ts","backend/src/restaurant-link.ts"],"regression":"The publication/link integration assertion now expects synthetic_preview_cafe; rerun evidence is recorded on the PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T17:46:45.853Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-CONTEXT","status":"resolved","area":"context-handoff","cause":"The initial publication handoff exceeded the bounded summary; later UI/test edits invalidated its refreshed fingerprint.","prevention":"Keep the bounded summary and refresh after the final source and test edits.","sources":["docs/CONTEXT.md","scripts/context.mjs"],"regression":"Final pnpm check passes all functional, context and documentation checks; publication browser regressions pass separately."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T18:06:14.398Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-PREPARED-WORKER-REDIRECT", "status": "resolved", "area": "prepared-menu-fetch", "cause": "Node accepted redirect error, but workerd rejects that fetch option, making valid hosted previews return 503.", "prevention": "Exercise request options in the deployed runtime; use manual redirect handling and reject non-success responses without following.", "sources": ["backend/src/owner-publication.ts", "backend/src/owner-publication.test.ts", "backend/src/owner-publication.workerd-harness.ts"], "regression": "New network-free workerd test failed before the fix (502 instead of 200), then all 11 prepared publication tests passed; real public fixture also passed in local workerd after correction."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T18:30:31.359Z","exitCode":2}
+```
+
+```json
+{"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
+```
