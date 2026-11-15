@@ -3769,3 +3769,19 @@ rollout is NOT RUN.
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T06:54:16.642Z","exitCode":2}
 ```
+
+## 2026-11-15 — Owner menu client integration boundaries
+
+The client regression reproduced acceptance of an arbitrary API origin, a request
+sent after cancellation during token refresh, and incomplete job data reaching
+the caller. The fixed client validates the existing exact origin allowlist,
+checks cancellation before sending, rejects absent sessions and malformed consumed
+fields, and refuses redirects. The local approval regression rejects an edited
+price until its correction is saved. A temporary typecheck failure was a parser
+name shadowed by the upload Blob parameter; the distinct parser name fixes it.
+These observations contain synthetic inputs only. Hosted integration is separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T07:50:44.272Z","exitCode":1}
+```

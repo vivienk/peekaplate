@@ -230,7 +230,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "a07fe1f13eec7164119064530a4c3153ea961b2e93b1d1caf78c547f05d4d43f"
+      "sourceFingerprint": "e74d54e5bfab63c593828b4eec2ae1d516ce4c6d420531cddf736630426e9136"
     },
     {
       "id": "console",
@@ -317,7 +317,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/onboarding/menu-source.test.tsx",
         "tests/e2e/owner-onboarding-screens.spec.ts",
         "frontend/console/src/onboarding/MenuProcessing.tsx",
-        "frontend/console/src/onboarding/FileButton.tsx"
+        "frontend/console/src/onboarding/FileButton.tsx",
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/api.test.ts",
+        "frontend/console/src/owner-menu/jobs.ts",
+        "frontend/console/src/owner-menu/jobs.test.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/dishForm.test.ts",
+        "frontend/console/src/owner-menu/fixtures.test-helpers.ts",
+        "frontend/console/src/owner-menu/evidence.ts",
+        "frontend/console/src/owner-menu/evidence.test.ts",
+        "frontend/console/src/owner-menu/harness.tsx",
+        "frontend/console/owner-menu-harness.html",
+        "scripts/console-preview-demos.test.mjs",
+        "frontend/console/src/owner-menu/DishEditor.tsx",
+        "frontend/console/src/owner-menu/DishEditor.test.tsx",
+        "frontend/console/src/owner-menu/dishEditor.css"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -327,7 +342,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "be3a9d54957f25e58b79991ec8741136c1e2efccd82cd03799720f7dda3ccdeb"
+      "sourceFingerprint": "76f7f1859fbd6d916fc9ee191a40a0f9ff3a15b76eac30914bdc3dfd499cf477"
     },
     {
       "id": "backend",
@@ -505,7 +520,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f89363f05f6f86f932601bd981d3fd637a382a1f08f5438e652d7b46e8bd1699"
+      "sourceFingerprint": "4a6e5db8560aeb86abba58193b0ed7fcbf20aba0d9b9b4fa83ce12287a5b52c7"
     },
     {
       "id": "database",
@@ -648,7 +663,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "1e95c40510170bc882f5d3affc6a632e68fdccfe0a2dac71f7aff913bb648631"
+      "sourceFingerprint": "c2fb8d6cb07d71c1976a99924ee72354b83e1188377d8226dc8ee8bd43f747c2"
     },
     {
       "id": "agents",
@@ -864,20 +879,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "date": "2026-11-14",
       "modules": [
-        "console"
-      ],
-      "summary": "Correct the hosted Pages callback mismatch: exact /auth-confirm and /auth-reset aliases share the existing same-purpose parser and entry classification. Existing .html allowlist, origin validation, PKCE and URL scrubbing remain unchanged. Both clean-path browser regressions fail against previous code.",
-      "sources": [
-        "frontend/console/src/auth/callback.ts",
-        "frontend/console/src/auth/live.tsx",
-        "tests/e2e/owner-auth-provider.spec.ts",
-        "docs/owner-auth.md"
-      ],
-      "next": "Finish pinned review/checks, promote the narrow correction to main, then verify the actual hosted clean callback paths. Genuine staff-session/email acceptance remains separate."
-    },
-    {
-      "date": "2026-11-14",
-      "modules": [
         "processing",
         "backend"
       ],
@@ -1010,6 +1011,20 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/provider-call-budget.md"
       ],
       "next": "Deploy matching Worker and container image before any controlled provider test; keep the existing allowance and Queue controls. This is not an account-wide spending limit."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Owner menu client dependency reconciled with current authenticated workspace and screens; live composition remains in progress.",
+      "files": [
+        "frontend/console/src/owner-menu/api.ts",
+        "frontend/console/src/owner-menu/dishForm.ts",
+        "frontend/console/src/owner-menu/harness.tsx",
+        "docs/owner-menu-workspace.md"
+      ],
+      "next": "Connect actor-bound tokens and server-backed owner workspace; keep review approval separate from publication."
     }
   ]
 }

@@ -258,3 +258,20 @@ auth #143/#146 dashboard integration, new provider accuracy tests and production
 acceptance remain separate. This run reused retained genuine extraction output;
 it did not launch another OCR/model job. Keep normal delivery paused outside a
 controlled synthetic test window.
+
+## Owner client integration (November 15)
+
+The FE-06.2 client reuses the authenticated workspace's exact local/staging API
+origin allowlist, refuses redirects, retrieves a fresh nullable staff token for
+each request, and accepts a caller AbortSignal. An actor/venue change must abort
+and discard the previous workspace. Job/draft/photo/approval responses validate
+the fields consumed by the screens; private-photo responses use the server's
+camelCase names. Errors remain typed and command identities remain caller-owned
+for identical retries.
+
+The local harness blocks approval of unsaved extracted corrections and reads the
+current draft version before approval. Its approval creates an approved revision;
+it neither records the separate verification badge nor publishes a menu. The
+harness remains excluded from normal and preview builds. Real owner screen
+composition, persisted restaurant setup and multi-source resume are a separate
+wiring change; this client alone does not complete the DES-02 journey.
