@@ -62,16 +62,14 @@ test('S05 resets changed saved baselines but preserves edits across equivalent p
 
 test('S05 clears the chosen photo after its saved baseline changes', async ({ page }) => {
   await mountDetailsCaller(page);
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: 'logo.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-        'base64',
-      ),
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'logo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    ),
+  });
   await expect(save(page)).not.toHaveAttribute('aria-disabled');
   await page.evaluate(() =>
     (
