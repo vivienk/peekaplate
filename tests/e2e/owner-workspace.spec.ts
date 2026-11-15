@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { UNEEZA_REPORT } from '../../frontend/console/src/owner-dashboard/uneeza-report';
@@ -6,6 +7,10 @@ import type { DishDraft, MenuJob } from '../../frontend/console/src/owner-menu/a
 import { JOB, reviewSession } from '../../frontend/console/src/owner-menu/fixtures.test-helpers';
 
 const origin = 'http://127.0.0.1:5174';
+// Narrow main releases omit preview-only demo entries; runtime journeys still always run.
+const authoredDemoAvailable = existsSync(
+  new URL('../../frontend/console/owner-onboarding.html', import.meta.url),
+);
 test.afterEach(async ({ page }, testInfo) => {
   await page.screenshot({ path: testInfo.outputPath('tested-state.png'), fullPage: true });
 });
@@ -459,6 +464,7 @@ test('a browser file with no MIME keeps original bytes and a declared PDF upload
 });
 
 test('the live dish approval describes the category validation error', async ({ page }) => {
+  test.skip(!authoredDemoAvailable, 'Preview-only fixture entry is absent from this release.');
   await page.route('**/src/onboarding/demo.tsx*', async (route) => {
     const response = await route.fetch();
     const source = await response.text();
@@ -486,6 +492,7 @@ test('the live dish approval describes the category validation error', async ({ 
 
 for (const width of [1440, 390]) {
   test(`records original regression demo pages at ${width}px`, async ({ page }, testInfo) => {
+    test.skip(!authoredDemoAvailable, 'Preview-only demo entries are absent from this release.');
     await page.setViewportSize({ width, height: 1052 });
     await page.goto(`${origin}/owner-onboarding.html`);
     await expect(page.getByLabel('Restaurant name')).toBeVisible();
