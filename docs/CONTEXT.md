@@ -70,7 +70,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "packages/contracts/package.json",
         "packages/contracts/src/owner-workspace.ts",
         "packages/contracts/src/owner-workspace.test.ts",
-        "packages/contracts/src/ingredient-artwork.ts"
+        "packages/contracts/src/ingredient-artwork.ts",
+        "packages/contracts/src/owner-analysis.ts"
       ],
       "adrs": [
         "docs/adr/0003-intent-evidence.md",
@@ -78,7 +79,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/adr/0016-unified-menu-ingestion-orchestration.md"
       ],
       "dependsOn": [],
-      "sourceFingerprint": "fe6c335a2ed38bda763f9c9aa081ab5e2d8ee46f47f19860e2b740fa980c1ac1"
+      "sourceFingerprint": "f6e9b0c334cc251100d306a13f754f94b0370bdcb6f5f994d5563c3684b5c2f4"
     },
     {
       "id": "tokens",
@@ -235,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes design foundations, staged auth/callbacks, actor-bound restaurant discovery and tenant-isolated report clients. The merged menu client connects source selection, immutable upload groups, persisted job status, manual drafts/photos and evidence-backed extracted corrections in the signed-in shell. Save remains separate from optional verification, approval and publication. New accounts receive no restaurant authority. Restaurant-details persistence and final review/publish remain unconnected pending their own backend/screen work; no synthetic workspace or progress substitutes for saved data.",
+      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -334,7 +335,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-menu/DishEditor.test.tsx",
         "frontend/console/src/owner-menu/dishEditor.css",
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
-        "docs/owner-onboarding-wiring.md"
+        "docs/owner-onboarding-wiring.md",
+        "frontend/console/src/owner-dashboard/ai-preview/OwnerAnalysisPanel.tsx",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
+        "playwright.owner-ai.config.ts",
+        "tests/owner-ai-browser/connection.spec.ts",
+        "frontend/console/src/owner/api-origin.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -344,7 +351,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "d84d0a10ee47fe04c2ec0566f3df6b90853a073d8acaa7fa0553d27529aec33a"
+      "sourceFingerprint": "795332c0dd6a762eb61b14d97873ff879e5f6ae5c3980ffff3023166b783ea55"
     },
     {
       "id": "backend",
@@ -509,7 +516,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/ingredient-artwork-retention.ts",
         "backend/src/ingredient-artwork.test.ts",
         "backend/src/ingredient-artwork-retention.test.ts",
-        "backend/src/ingredient-artwork.integration.ts"
+        "backend/src/ingredient-artwork.integration.ts",
+        "backend/src/owner-ai/responses.ts",
+        "backend/src/owner-ai/responses.test.ts",
+        "backend/src/owner-ai/routes.ts",
+        "backend/src/owner-ai/routes.test.ts",
+        "backend/scripts/owner-ai-local.ts",
+        "backend/scripts/owner-ai-local-fixture.ts",
+        "scripts/start-owner-ai-private.py",
+        "docs/owner-ai-responses.md",
+        "backend/owner-ai-handoff.test.mjs"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -522,7 +538,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "f0ca1dc0165e37c99ab405204e71ede111f13595dc868034cd686b21d97a49dc"
+      "sourceFingerprint": "b65ff365478302755b44ec3a4c111f55ca6ffe0c6f63146444ce23c113840122"
     },
     {
       "id": "database",
@@ -654,7 +670,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "vitest.data06.config.ts",
         "scripts/prepare-app-site.mjs",
         "scripts/prepare-app-site.test.mjs",
-        "playwright.workspace.config.ts"
+        "playwright.workspace.config.ts",
+        "scripts/owner-ai-launcher.test.mjs"
       ],
       "adrs": [
         "docs/adr/0007-delivery-and-recovery.md",
@@ -665,7 +682,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "console",
         "backend"
       ],
-      "sourceFingerprint": "c2fb8d6cb07d71c1976a99924ee72354b83e1188377d8226dc8ee8bd43f747c2"
+      "sourceFingerprint": "365808f8e3ef7877e952f5c66c8fce2b7a25e51709fbcd4f812c9e6528f8c91e"
     },
     {
       "id": "agents",
@@ -879,24 +896,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
   ],
   "handoffs": [
     {
-      "date": "2026-11-13",
-      "modules": [
-        "processing",
-        "contracts",
-        "backend",
-        "database",
-        "diner"
-      ],
-      "summary": "PR165/178 adds reviewed decorative artwork delivery and diner refresh/fallback. Review preflights authority, uploads outside the write transaction, then repairs exact bytes under the cleanup blob lock before committing event/projection/receipt/outbox. This final R2 operation deliberately stays inside the transaction; pooled session locks are unsuitable. A real PostgreSQL interleaving reproduced and fixed cleanup deleting an approval's upload. Hosted migration, real provider generation and visual approval remain separate gates.",
-      "sources": [
-        "docs/ingredient-icon-pipeline.md",
-        "backend/src/ingredient-artwork.ts",
-        "frontend/diner/src/menu/liveArtwork.ts",
-        "processing/src/peekaplate_processing/ingredient_icon_delivery.py"
-      ],
-      "next": "Complete independent review and database CI; deploy migration/API/diner and configure trusted review delivery once. Then each explicit approval delivers without export/rebuild."
-    },
-    {
       "date": "2026-11-14",
       "modules": [
         "measurement",
@@ -1028,6 +1027,19 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "docs/owner-onboarding-wiring.md"
       ],
       "next": "Verify narrow staging release; keep S05 persistence and PR163 final review/publication separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "console"
+      ],
+      "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
+      "files": [
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "backend/owner-ai-handoff.test.mjs",
+        "docs/owner-ai-responses.md"
+      ],
+      "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
     }
   ]
 }
