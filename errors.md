@@ -3507,39 +3507,6 @@ cancellation regression and the existing menu checks also pass. No cloud state c
 
 <!-- automatic observation; not root cause -->
 ```json
-{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:15:53.963Z","exitCode":2}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:18:40.227Z","exitCode":2}
-```
-
-## Owner Responses local integration — November 12, 2026
-
-Initial checks identified exact-optional-property construction errors and Node versus Worker URL type overlap in the local launcher; explicit optional spreads and a file-path cwd resolve them. The local plain-Node harness also exposed an unrelated contracts-barrel .js import that exists only as TypeScript source. Narrow public owner-report/owner-analysis exports avoid loading unrelated modules; the shared resolver and provider policy are unchanged. The default Node 24.14 could not install this repository, and offline package metadata was incomplete; the existing Node 24.16 runtime and normal frozen installation succeeded without changing engine or lockfile requirements. No live provider request or credential was involved.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T00:21:54.000Z","exitCode":1}
-```
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T00:25:10.668Z","exitCode":1}
-```
-
-- Owner Responses integration verification: full test suite passed with local ports permitted (1515 tests, 4 skipped; 79 script checks). The context check detected the newly changed E2E script fingerprint; refreshed after reviewing the delivery summary. Build dry-run succeeded, but Wrangler could not write its default external log directory; retry uses a temporary log path. No deployment occurred.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-13T00:29:15.673Z","exitCode":1}
-```
-
-- Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.
-
-<!-- automatic observation; not root cause -->
-```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
 ```
 
@@ -3819,20 +3786,6 @@ These observations contain synthetic inputs only. Hosted integration is separate
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T07:50:44.272Z","exitCode":1}
 ```
 
-<<<<<<< HEAD
-## PR164 develop reconciliation — November 15, 2026
-
-The locked dependency install first stopped because the noninteractive runner could not confirm refreshing node_modules. Re-running with CI=true installed the unchanged lockfile and passed all 222 supply-chain policy entries. The dashboard conflict combines S09's showAi visibility guard with the connected analysis component; a browser regression covers hide-on-edit and restore-on-menu behavior. No provider requests or hosted changes are part of this reconciliation.
-
-The combined context summary initially exceeded its 1,000-character bound; it was condensed while retaining both integrations. The first full check passed unit tests but hit the known macOS /var versus /private/var temporary-path assertion in prepare-app-site.test.mjs. The repeat uses the canonical temporary-directory path rather than changing unrelated routing behavior.
-
-Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,831 unit tests (five existing skips), 106 script checks, lint/types/context/docs. pnpm verify build passed. The mock-provider owner-AI browser suite passed three cases, including S09 visibility; desktop/mobile synthetic screenshots were retained for review. Database/full-browser CI remains separate evidence on the pushed commit.
-
-<!-- automatic observation; not root cause -->
-```json
-{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:52:42.006Z","exitCode":1}
-```
-=======
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T08:03:22.349Z","exitCode":1}
@@ -3852,4 +3805,78 @@ An exploratory profile migration failed in a disposable database because hosted
 browser roles do not exist locally. That expansion was parked when scope was
 narrowed to merged APIs; no profile migration or permission grant was applied to
 hosted Supabase. Earlier local profile results are not evidence for this slice.
->>>>>>> origin/develop
+
+## 2026-11-15 — Analysis-client access handoff
+
+Regressions reproduced unsupported destinations reaching credential lookup,
+cancellation during token retrieval still dispatching and 401/403 responses
+losing their status. Exact workspace API origins and the existing loopback proxy
+are now the only destinations. Cancellation is checked around token lookup;
+typed denials retain a generic message for workspace cleanup. The local Worker
+handoff fixture uses the approved loopback API origin. No provider request,
+hosted configuration or trusted-freshness flag changed during these fixes.
+
+The two error histories also contained edits in place, so an append-only-prefix
+merge assumption failed locally. The develop ledger and added/revised branch
+evidence are retained below without conflict markers or dropped source changes.
+
+### Retained PR164 branch evidence
+
+The new shared origin check initially imported the workspace HTTP module,
+bringing unrelated contracts into the synthetic demo's dependency path and
+failing its no-analytics bundle check. Extracting the unchanged allowlist into a
+dependency-free module preserves the origin boundary and passes all four normal/
+preview/harness-exclusion script checks. No test assertion or tracker policy was
+relaxed.
+
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:15:53.963Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T00:18:40.227Z","exitCode":2}
+```
+
+## Owner Responses local integration — November 12, 2026
+
+Initial checks identified exact-optional-property construction errors and Node versus Worker URL type overlap in the local launcher; explicit optional spreads and a file-path cwd resolve them. The local plain-Node harness also exposed an unrelated contracts-barrel .js import that exists only as TypeScript source. Narrow public owner-report/owner-analysis exports avoid loading unrelated modules; the shared resolver and provider policy are unchanged. The default Node 24.14 could not install this repository, and offline package metadata was incomplete; the existing Node 24.16 runtime and normal frozen installation succeeded without changing engine or lockfile requirements. No live provider request or credential was involved.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T00:21:54.000Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T00:25:10.668Z","exitCode":1}
+```
+
+- Owner Responses integration verification: full test suite passed with local ports permitted (1515 tests, 4 skipped; 79 script checks). The context check detected the newly changed E2E script fingerprint; refreshed after reviewing the delivery summary. Build dry-run succeeded, but Wrangler could not write its default external log directory; retry uses a temporary log path. No deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-13T00:29:15.673Z","exitCode":1}
+```
+
+- Independent owner-AI review found startup errors were reported as successful exits by both launcher layers. Fixed Node child/bind/spawn failure propagation and Python return-code handling; scripts/owner-ai-launcher.test.mjs covers a failing frontend stub and the private wrapper. Initial concurrent browser load exceeded the regression startup deadline; increased the bounded child timeout to 30 seconds.
+
+<!-- automatic observation; not root cause -->
+```json
+
+## PR164 develop reconciliation — November 15, 2026
+
+The locked dependency install first stopped because the noninteractive runner could not confirm refreshing node_modules. Re-running with CI=true installed the unchanged lockfile and passed all 222 supply-chain policy entries. The dashboard conflict combines S09's showAi visibility guard with the connected analysis component; a browser regression covers hide-on-edit and restore-on-menu behavior. No provider requests or hosted changes are part of this reconciliation.
+
+The combined context summary initially exceeded its 1,000-character bound; it was condensed while retaining both integrations. The first full check passed unit tests but hit the known macOS /var versus /private/var temporary-path assertion in prepare-app-site.test.mjs. The repeat uses the canonical temporary-directory path rather than changing unrelated routing behavior.
+
+Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,831 unit tests (five existing skips), 106 script checks, lint/types/context/docs. pnpm verify build passed. The mock-provider owner-AI browser suite passed three cases, including S09 visibility; desktop/mobile synthetic screenshots were retained for review. Database/full-browser CI remains separate evidence on the pushed commit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:52:42.006Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:57:00.409Z","exitCode":1}
+```

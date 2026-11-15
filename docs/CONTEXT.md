@@ -236,7 +236,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "console",
       "status": "foundation",
-      "summary": "Owner console includes design foundations, staged auth/callbacks, actor-bound restaurant discovery and tenant-isolated report clients. The merged menu client connects source selection, immutable upload groups, persisted job status, manual drafts/photos and evidence-backed extracted corrections in the signed-in shell. Save remains separate from optional verification, approval and publication. New accounts receive no restaurant authority. Restaurant-details persistence and final review/publish remain unconnected pending their own backend/screen work; no synthetic workspace or progress substitutes for saved data.",
+      "summary": "Owner console includes design foundations, Auth/callbacks, actor-bound restaurant selection, tenant-isolated reports and merged menu/draft/photo wiring. The opt-in synthetic analysis client restricts API destinations, cancellation and response scope, with typed denials for the later owner-shell panel. Save, verification, approval and publication remain separate. Restaurant setup persistence and final publish UI are unconnected; no sample restaurant or invented progress replaces saved data. Hosted AI activation and model-quality acceptance are not established.",
       "paths": [
         "frontend/console/src/main.tsx",
         "frontend/console/src/style.css",
@@ -340,7 +340,8 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
         "frontend/console/src/owner-dashboard/ai-preview/analysis-client.test.tsx",
         "playwright.owner-ai.config.ts",
-        "tests/owner-ai-browser/connection.spec.ts"
+        "tests/owner-ai-browser/connection.spec.ts",
+        "frontend/console/src/owner/api-origin.ts"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -350,7 +351,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "ebbe9eda4eb88b510d0a4dd52eacd7468a3b36b998e23818d50de444dbb7207e"
+      "sourceFingerprint": "795332c0dd6a762eb61b14d97873ff879e5f6ae5c3980ffff3023166b783ea55"
     },
     {
       "id": "backend",
@@ -537,7 +538,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "8eb625284d2290db101d9aa3940e9d9ca8fd93994819ad989a881ce0b093d652"
+      "sourceFingerprint": "b65ff365478302755b44ec3a4c111f55ca6ffe0c6f63146444ce23c113840122"
     },
     {
       "id": "database",
@@ -1028,12 +1029,16 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "next": "Verify narrow staging release; keep S05 persistence and PR163 final review/publication separate."
     },
     {
-      "date": "2026-11-14",
+      "date": "2026-11-15",
       "modules": [
         "console"
       ],
       "summary": "Reconcile opt-in synthetic owner analysis with merged menu wiring; client retains exact destinations, cancellation and typed access denial.",
-      "files": [],
+      "files": [
+        "frontend/console/src/owner-dashboard/ai-preview/analysis-client.ts",
+        "backend/owner-ai-handoff.test.mjs",
+        "docs/owner-ai-responses.md"
+      ],
       "next": "Merge analysis before shell panel; preserve unknown-freshness abstention and hosted activation gates."
     }
   ]

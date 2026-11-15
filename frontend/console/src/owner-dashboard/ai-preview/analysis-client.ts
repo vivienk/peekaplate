@@ -3,7 +3,7 @@ import {
   OwnerAnalysisRequestSchema,
   OwnerAnalysisResultSchema,
 } from '@peekaplate/contracts/owner-analysis';
-import { readWorkspaceApiBase } from '../../owner/workspace-api';
+import { readWorkspaceApiBase } from '../../owner/api-origin';
 
 export class OwnerAnalysisAccessError extends Error {
   constructor(readonly status: 401 | 403) {
