@@ -46,6 +46,35 @@ const job = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('owner menu client', () => {
+  it('reads private image bytes with staff auth and rejects non-image responses', async () => {
+    let type = 'image/png';
+    const send = vi.fn<typeof fetch>(
+      async () =>
+        new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': type } }),
+    );
+    const getToken = vi.fn(() => 'fresh-staff-token');
+    const api = createOwnerMenuClient({ baseUrl: 'http://127.0.0.1:8787', getToken, fetch: send });
+    const bytes = await api.readDraftPhoto(VENUE, JOB, JOB);
+    expect(bytes.type).toBe('image/png');
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      credentials: 'omit',
+      redirect: 'error',
+      cache: 'no-store',
+      headers: { Authorization: 'Bearer fresh-staff-token' },
+    });
+    type = 'text/html';
+    await expect(api.readDraftPhoto(VENUE, JOB, JOB)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+    expect(getToken).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a review session from another restaurant', async () => {
+    const { api } = client([{ status: 200, body: { ...reviewSession(), venueId: JOB } }]);
+    await expect(api.openReviewSession(VENUE, JOB, crypto.randomUUID())).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
   it('rejects an untrusted origin before reading credentials', () => {
     const getToken = vi.fn(() => 'private');
     for (const baseUrl of [

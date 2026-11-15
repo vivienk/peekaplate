@@ -223,7 +223,13 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
 
   async function request<T>(
     url: string,
-    init: { method: string; body?: BodyInit; headers?: Record<string, string>; upload?: boolean },
+    init: {
+      method: string;
+      body?: BodyInit;
+      headers?: Record<string, string>;
+      upload?: boolean;
+      blob?: boolean;
+    },
     parse: (body: unknown) => T,
   ): Promise<T> {
     const token = await options.getToken();
@@ -261,7 +267,7 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
         );
       }
       try {
-        body = await response.json();
+        body = init.blob && response.ok ? await response.blob() : await response.json();
       } catch {
         if (timedOut) throw new OwnerMenuApiError(0, 'timeout');
         body = null;
@@ -293,6 +299,26 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
   });
 
   return {
+    // Existing private-photo endpoint; retrieve bytes with the same actor-bound request boundary.
+    async readDraftPhoto(venueId: string, draftId: string, photoId: string): Promise<Blob> {
+      return request(
+        venuePath(
+          venueId,
+          `/drafts/${encodeURIComponent(draftId)}/photos/${encodeURIComponent(photoId)}`,
+        ),
+        { method: 'GET', blob: true },
+        (body) => {
+          if (
+            !(body instanceof Blob) ||
+            !['image/jpeg', 'image/png'].includes(body.type) ||
+            body.size === 0 ||
+            body.size > MAX_FILE_BYTES
+          )
+            throw new Error('photo');
+          return body;
+        },
+      );
+    },
     // S06/S07: declare one PDF or one to five photos by type and hash before sending any bytes.
     async createUploadGroup(
       venueId: string,
@@ -338,9 +364,9 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     },
 
     // S08 processing and resume: the stored state of every job in the group (at most 100).
-    async listJobs(venueId: string, groupId: string): Promise<MenuJob[]> {
+    async listJobs(venueId: string, groupId?: string): Promise<MenuJob[]> {
       return request(
-        `${venuePath(venueId, '/menus/jobs')}?groupId=${encodeURIComponent(groupId)}`,
+        `${venuePath(venueId, '/menus/jobs')}${groupId ? `?groupId=${encodeURIComponent(groupId)}` : ''}`,
         { method: 'GET' },
         (body) => list(field(body, 'jobs'), job),
       );
@@ -388,7 +414,11 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
       return request(
         venuePath(venueId, `/menus/jobs/${encodeURIComponent(jobId)}/review-session`),
         json('POST', { commandId }),
-        (body) => ExtractionReviewSessionResponseSchema.parse(body),
+        (body) => {
+          const session = ExtractionReviewSessionResponseSchema.parse(body);
+          if (session.venueId !== venueId) throw new Error('review scope');
+          return session;
+        },
       );
     },
 
@@ -406,7 +436,15 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
           `/extractions/${encodeURIComponent(extractionId)}/candidates/${encodeURIComponent(candidateId)}/review`,
         ),
         json('POST', payload),
-        (body) => ReviewCandidateItemResponseSchema.parse(body),
+        (body) => {
+          const item = ReviewCandidateItemResponseSchema.parse(body);
+          if (
+            item.candidate.candidate_id !== candidateId ||
+            item.review.extractionId !== extractionId
+          )
+            throw new Error('candidate scope');
+          return item;
+        },
       );
     },
 
@@ -456,6 +494,8 @@ export function createOwnerMenuClient(options: OwnerMenuClientOptions) {
     ): Promise<DraftPhoto> {
       if (!['image/jpeg', 'image/png'].includes(photo.type))
         throw new OwnerMenuApiError(0, 'unsupported_media_type');
+      if (photo.size > MAX_FILE_BYTES) throw new OwnerMenuApiError(0, 'file_too_large');
+      if (photo.size === 0) throw new OwnerMenuApiError(0, 'invalid_request');
       if (!IDEMPOTENCY_KEY.test(idempotencyKey)) throw new OwnerMenuApiError(0, 'invalid_request');
       return request(
         venuePath(venueId, `/drafts/${encodeURIComponent(draftId)}/photos`),

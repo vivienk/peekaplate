@@ -275,3 +275,7 @@ it neither records the separate verification badge nor publishes a menu. The
 harness remains excluded from normal and preview builds. Real owner screen
 composition, persisted restaurant setup and multi-source resume are a separate
 wiring change; this client alone does not complete the DES-02 journey.
+
+The [owner onboarding wiring](owner-onboarding-wiring.md) connects the available
+screens to these existing APIs. Restaurant-settings persistence and final
+review/publication stay outside that slice; rollout evidence is separate.

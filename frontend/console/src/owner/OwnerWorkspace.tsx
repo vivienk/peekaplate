@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
 import { ReportData } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
+import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
 import './owner.css';
@@ -26,6 +27,9 @@ export function OwnerWorkspace({
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('overview');
+  const [dirty, setDirty] = useState(false);
+  const canLeave = () =>
+    !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
   const getAccessToken = useCallback(() => auth.accessTokenFor(owner.id), [auth, owner.id]);
 
@@ -65,12 +69,20 @@ export function OwnerWorkspace({
   const pages = useMemo(
     () =>
       new Set<OwnerPage>(
-        selected?.permission === 'owner' ? ['overview', 'performance'] : ['overview'],
+        selected?.permission === 'owner'
+          ? ['overview', 'performance', 'menu']
+          : ['overview', 'menu'],
       ),
     [selected?.permission],
   );
   const signOut = (
-    <Button variant="text" disabled={signingOut} onClick={onSignOut}>
+    <Button
+      variant="text"
+      disabled={signingOut}
+      onClick={() => {
+        if (canLeave()) onSignOut();
+      }}
+    >
       Sign out
     </Button>
   );
@@ -124,6 +136,7 @@ export function OwnerWorkspace({
         id={pickerId}
         value={selected?.venueId ?? ''}
         onChange={(event) => {
+          if (!canLeave()) return;
           setSelectedId(event.target.value);
           setPage('overview');
         }}
@@ -155,12 +168,17 @@ export function OwnerWorkspace({
         available={pages}
         visible={pages}
         onNavigate={(next) => {
-          if (pages.has(next)) setPage(next);
+          if (pages.has(next) && canLeave()) setPage(next);
         }}
         topbar={
           <div className="owner-workspace-toolbar">
             {picker}
-            <Button variant="text" onClick={refresh}>
+            <Button
+              variant="text"
+              onClick={() => {
+                if (canLeave()) refresh();
+              }}
+            >
               Refresh access
             </Button>
             {signOut}
@@ -174,12 +192,20 @@ export function OwnerWorkspace({
             onAccessFailure={accessFailure}
           />
         ) : (
-          <section>
-            <h1>Restaurant workspace</h1>
-            <h2>{selected.name}</h2>
+          <>
             <p>Access: {selected.permission === 'owner' ? 'Owner' : 'Editor'}</p>
-            <p>Menu setup is not available here yet.</p>
-          </section>
+            <OwnerMenuWorkspace
+              key={`${owner.id}:${selected.venueId}`}
+              apiBase={apiBase}
+              actorId={owner.id}
+              venueId={selected.venueId}
+              restaurantName={selected.name}
+              section={page === 'menu' ? 'menu' : 'overview'}
+              getAccessToken={getAccessToken}
+              onAccessFailure={accessFailure}
+              onDirtyChange={setDirty}
+            />
+          </>
         )}
       </OwnerShell>
     </div>

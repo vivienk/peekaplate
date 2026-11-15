@@ -7,11 +7,7 @@ import { readWorkspaceApiBase } from '../../owner/workspace-api';
 
 export class OwnerAnalysisAccessError extends Error {
   constructor(readonly status: 401 | 403) {
-    super(
-      status === 401
-        ? 'Sign in to request a recommendation.'
-        : 'Restaurant access is no longer available.',
-    );
+    super(status === 401 ? 'Sign in to request a recommendation.' : 'Analysis unavailable');
     this.name = 'OwnerAnalysisAccessError';
   }
 }

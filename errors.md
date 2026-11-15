@@ -3819,6 +3819,7 @@ These observations contain synthetic inputs only. Hosted integration is separate
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T07:50:44.272Z","exitCode":1}
 ```
 
+<<<<<<< HEAD
 ## PR164 develop reconciliation — November 15, 2026
 
 The locked dependency install first stopped because the noninteractive runner could not confirm refreshing node_modules. Re-running with CI=true installed the unchanged lockfile and passed all 222 supply-chain policy entries. The dashboard conflict combines S09's showAi visibility guard with the connected analysis component; a browser regression covers hide-on-edit and restore-on-menu behavior. No provider requests or hosted changes are part of this reconciliation.
@@ -3831,3 +3832,24 @@ Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:52:42.006Z","exitCode":1}
 ```
+=======
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T08:03:22.349Z","exitCode":1}
+```
+
+## 2026-11-15 — Merged owner-screen wiring checks
+
+The browser regressions cover correction-key collisions between separate
+candidates, late intake responses overriding navigation and overlapping status
+polls invalidating slow responses. Keys include target identity; navigation is
+generation-fenced; polls are serialized. The fixture initially used the wrong
+review status and venue identity; it was corrected to the shared contract rather
+than weakening response validation. Node's direct JSON fixture import requires
+the explicit JSON import attribute.
+
+An exploratory profile migration failed in a disposable database because hosted
+browser roles do not exist locally. That expansion was parked when scope was
+narrowed to merged APIs; no profile migration or permission grant was applied to
+hosted Supabase. Earlier local profile results are not evidence for this slice.
+>>>>>>> origin/develop
