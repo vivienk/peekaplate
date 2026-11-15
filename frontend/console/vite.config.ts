@@ -40,6 +40,7 @@ export default defineConfig(({ command }) => ({
           ? {
               foundations: page('foundations.html'),
               ownerSignIn: page('owner-sign-in.html'),
+              ownerOnboarding: page('owner-onboarding.html'),
               firstDashboard: page('first-dashboard.html'),
               ownerDashboard: page('owner-dashboard.html'),
             }
