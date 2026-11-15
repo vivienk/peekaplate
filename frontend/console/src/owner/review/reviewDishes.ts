@@ -89,24 +89,21 @@ export function missingFields(dish: ReviewDish): MissingField[] {
 }
 
 /**
- * Status pill of one row. Figma shows Ready, Price Missing and Category Missing. The labels for a
- * dish missing both, or missing any other detail, are not in the design yet (to confirm with Rania).
+ * Status pill of one row (Figma): "Ready", or a count of what is still missing, such as "1 field
+ * missing" or "3 fields missing". The pill never names the missing details; the owner opens the dish
+ * with Review to see and fix them.
  */
 export function dishStatus(dish: ReviewDish): DishStatus {
   const missing = missingFields(dish);
-  const noPrice = missing.includes('price');
-  const noCategory = missing.includes('category');
-  // Figma S10 shows "2 fields missing" (red) when more than one detail is missing.
-  if (missing.length > 1) {
-    return { ready: false, label: `${missing.length} fields missing`, tone: 'error' };
-  }
-  if (noPrice) return { ready: false, label: 'Price Missing', tone: 'error' };
-  if (noCategory) return { ready: false, label: 'Category Missing', tone: 'warning' };
-  if (missing.includes('servingSize')) {
-    return { ready: false, label: 'Serving Size Missing', tone: 'warning' };
-  }
-  if (missing.length > 0) return { ready: false, label: '1 field missing', tone: 'warning' };
-  return { ready: true, label: 'Ready', tone: 'success' };
+  if (missing.length === 0) return { ready: true, label: 'Ready', tone: 'success' };
+  // A missing price (or several missing details) is shown in red; one other detail in yellow.
+  const tone: DishStatusTone =
+    missing.includes('price') || missing.length > 1 ? 'error' : 'warning';
+  return {
+    ready: false,
+    label: `${missing.length} field${missing.length === 1 ? '' : 's'} missing`,
+    tone,
+  };
 }
 
 export function formatPrice(priceAmount: string | null): string {

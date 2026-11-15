@@ -18,15 +18,19 @@ test('the demo is labelled as synthetic and Complete verification waits for ever
   await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save and Exit' })).toBeVisible();
 
-  // Edit and + Add dish open the Screen 9 form (the dish form), not a stand-in.
-  await page.getByRole('button', { name: 'Edit Berry Pancake Stack' }).click();
+  // Review and + Add dish open the Screen 9 form (the dish form), not a stand-in.
+  await page.getByRole('button', { name: 'Review Berry Pancake Stack' }).click();
   await expect(page.getByLabel('Dish name')).toHaveValue('Berry Pancake Stack');
   await page.goto(demo);
   await page.getByRole('button', { name: '+ Add dish' }).click();
   await expect(page.getByLabel('Dish name')).toHaveValue('');
   await page.goto(demo);
   await expect(page.getByText('7 dishes extracted')).toBeVisible();
-  await expect(page.getByText('Price Missing')).toBeVisible();
+  // Three dishes need one fix each (price, category, serving size). The pill shows a count, never a name.
+  await expect(page.getByText('1 field missing')).toHaveCount(3);
+  await expect(page.getByText('Price Missing')).toHaveCount(0);
+  await expect(page.getByText('Category Missing')).toHaveCount(0);
+  await expect(page.getByText('Serving Size Missing')).toHaveCount(0);
   await expect(complete).toHaveCount(0);
 
   await page.getByLabel('Menu state').selectOption('ready');
@@ -34,7 +38,7 @@ test('the demo is labelled as synthetic and Complete verification waits for ever
   await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0);
 });
 
-test('Remove moves focus to Undo and Undo returns focus to that dish Edit button', async ({
+test('Remove moves focus to Undo and Undo returns focus to that dish Review button', async ({
   page,
 }) => {
   await page.goto(demo);
@@ -48,7 +52,7 @@ test('Remove moves focus to Undo and Undo returns focus to that dish Edit button
   await page.keyboard.press('Enter');
   await expect(page.getByText('Dish restored.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Edit Berry Pancake Stack' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Review Berry Pancake Stack' })).toBeFocused();
 });
 
 test('removing the only dishes that need fixes (price, category, serving size) shows Complete verification, and Undo hides it', async ({
@@ -69,10 +73,10 @@ test('removing the only dishes that need fixes (price, category, serving size) s
 test('the whole screen works from the keyboard in a sensible order', async ({ page }) => {
   await page.goto(demo);
   await page.getByLabel('Menu state').selectOption('ready');
-  // Walk the screen: Add dish, then each row (Edit, Remove), then the footer.
+  // Walk the screen: Add dish, then each row (Review, Remove), then the footer.
   await page.getByRole('button', { name: '+ Add dish' }).focus();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Edit Avocado Toast' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Review Avocado Toast' })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Remove Avocado Toast' })).toBeFocused();
 

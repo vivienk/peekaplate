@@ -29,40 +29,83 @@ const dish = (over: Partial<ReviewDish> = {}): ReviewDish => ({
 });
 
 describe('dishStatus', () => {
-  it('is Ready when price and category are present', () => {
+  it('is Ready when every detail is present', () => {
     expect(dishStatus(dish())).toEqual({ ready: true, label: 'Ready', tone: 'success' });
   });
 
-  it('is Price Missing when the price is null, blank or not a number', () => {
-    for (const priceAmount of [null, '', '  ', 'Free']) {
+  it('shows 1 field missing, in red, when only the price is missing', () => {
+    for (const priceAmount of [null, '', '  ', 'Free', '0']) {
       expect(dishStatus(dish({ priceAmount }))).toEqual({
         ready: false,
-        label: 'Price Missing',
+        label: '1 field missing',
         tone: 'error',
       });
     }
   });
 
-  it('is Category Missing when the category is null or blank', () => {
+  it('shows 1 field missing, in yellow, when only the category is missing', () => {
     for (const category of [null, '', '   ']) {
       expect(dishStatus(dish({ category }))).toEqual({
         ready: false,
-        label: 'Category Missing',
+        label: '1 field missing',
         tone: 'warning',
       });
     }
   });
 
-  it('is never Ready when both are missing', () => {
-    const status = dishStatus(dish({ priceAmount: null, category: null }));
-    expect(status.ready).toBe(false);
-    expect(status.label).toBe('2 fields missing');
+  it('shows 1 field missing, in yellow, when only the serving size is missing', () => {
+    expect(dishStatus(dish({ servingSize: null }))).toEqual({
+      ready: false,
+      label: '1 field missing',
+      tone: 'warning',
+    });
   });
 
-  it('is Serving Size Missing when only the serving size is missing', () => {
-    const status = dishStatus(dish({ servingSize: null }));
-    expect(status.ready).toBe(false);
-    expect(status.label).toBe('Serving Size Missing');
+  it('shows 1 field missing for any other single detail', () => {
+    const cases: Partial<ReviewDish>[] = [
+      { photoId: null },
+      { description: 'Too short' },
+      { name: null },
+      { ingredients: { status: 'proposed', items: ['egg'] } },
+      { allergens: { status: 'unknown', items: [] } },
+    ];
+    for (const over of cases) {
+      expect(dishStatus(dish(over))).toEqual({
+        ready: false,
+        label: '1 field missing',
+        tone: 'warning',
+      });
+    }
+  });
+
+  it('shows N fields missing, in red, when several details are missing', () => {
+    expect(dishStatus(dish({ priceAmount: null, category: null }))).toEqual({
+      ready: false,
+      label: '2 fields missing',
+      tone: 'error',
+    });
+    expect(dishStatus(dish({ photoId: null, description: null })).label).toBe('2 fields missing');
+    expect(
+      dishStatus(dish({ priceAmount: null, category: null, servingSize: null, photoId: null }))
+        .label,
+    ).toBe('4 fields missing');
+  });
+
+  it('never names a missing detail in the label', () => {
+    const worst = dishStatus(
+      dish({
+        name: null,
+        category: null,
+        priceAmount: null,
+        servingSize: null,
+        description: null,
+        ingredients: { status: 'unknown', items: [] },
+        allergens: { status: 'unknown', items: [] },
+        photoId: null,
+      }),
+    );
+    expect(worst.label).toBe('8 fields missing');
+    expect(worst.label).not.toMatch(/price|category|serving|photo|name|allergen|ingredient/i);
   });
 });
 

@@ -125,7 +125,6 @@
 .review-table {
   width: 100%;
   min-width: 40rem;
-  table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
 }
@@ -187,12 +186,14 @@
 .review-status {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: var(--pp-space-4) var(--pp-space-12);
-  border-radius: var(--pp-radius-full);
+  border-radius: var(--pp-radius-16);
   font-size: var(--pp-font-size-small);
   line-height: var(--pp-line-height-small);
   font-weight: var(--pp-font-weight-semibold);
-  white-space: nowrap;
+  /* A label that names several missing details wraps onto a second line instead of being cut off. */
+  white-space: normal;
 }
 .review-status--success {
   background: var(--pp-color-success-50);
@@ -346,6 +347,18 @@
 .owner-root .review-card {
   box-sizing: border-box;
   margin-inline: auto;
+}
+
+/* Narrow screens: columns size to their content, so a status label such as "Serving Size Missing"
+ * is always shown in full and never runs under the Edit button. The table scrolls sideways inside
+ * its own wrapper if it still does not fit. The fixed Figma column widths apply on wide screens. */
+.review-table tbody td {
+  white-space: nowrap;
+}
+@media (min-width: 70rem) {
+  .review-table {
+    table-layout: fixed;
+  }
 }
 
 .review-root :focus-visible {

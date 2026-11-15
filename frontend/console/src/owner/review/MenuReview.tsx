@@ -233,10 +233,10 @@ export function ReviewDishes({
                             variant="outline"
                             className="owner-button review-edit"
                             data-edit-dish-id={dish.id}
-                            aria-label={`Edit ${name}`}
+                            aria-label={`Review ${name}`}
                             onClick={() => onEditDish(dish.id)}
                           >
-                            Edit
+                            Review
                           </Button>
                           <button
                             type="button"

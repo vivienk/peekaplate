@@ -29,10 +29,10 @@ describe('dashboard menu item to S10 review row', () => {
     const confirmed = { allergensConfirmed: true };
     const noPrice = menuItemToReviewDish(item({ price: '', ...confirmed }));
     expect(noPrice.priceAmount).toBeNull();
-    expect(dishStatus(noPrice).label).toBe('Price Missing');
+    expect(dishStatus(noPrice)).toMatchObject({ ready: false, label: '1 field missing' });
     const noCategory = menuItemToReviewDish(item({ cat: ' ', ...confirmed }));
     expect(noCategory.category).toBeNull();
-    expect(dishStatus(noCategory).label).toBe('Category Missing');
+    expect(dishStatus(noCategory)).toMatchObject({ ready: false, label: '1 field missing' });
     expect(dishStatus(menuItemToReviewDish(item(confirmed))).ready).toBe(true);
     // Allergens the owner has not confirmed keep a dish from being Ready.
     expect(dishStatus(menuItemToReviewDish(item())).label).toBe('1 field missing');

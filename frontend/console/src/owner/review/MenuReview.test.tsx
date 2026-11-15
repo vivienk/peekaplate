@@ -67,8 +67,8 @@ describe('ReviewDishes (S10 Menu Review)', () => {
     expect(words).toContain('5 ingredients · no allergen recorded');
     expect(words).toContain('$14.00');
     expect(words).toContain('Not found');
-    expect(words).toContain('Price Missing');
-    expect(words).toContain('Category Missing');
+    expect(words).toContain('1 field missing');
+    expect(words).not.toMatch(/Price Missing|Category Missing|Serving Size Missing/);
     expect(words).toContain('Ready');
   });
 
@@ -136,11 +136,22 @@ describe('ReviewDishes (S10 Menu Review)', () => {
     expect(text(html)).toContain('Save and Exit');
   });
 
-  it('gives every row Edit and Remove buttons a name that includes the dish', () => {
+  it('gives every row Review and Remove buttons a name that includes the dish', () => {
     const html = render(initialReview([dish(), noCategory]));
-    expect(html).toContain('aria-label="Edit Avocado Toast"');
+    expect(html).toContain('aria-label="Review Avocado Toast"');
     expect(html).toContain('aria-label="Remove Avocado Toast"');
     expect(html).toContain('aria-label="Remove Brioche French Toast"');
+    expect(html).not.toContain('aria-label="Edit ');
+    expect(html).toMatch(/<th[^>]*>Review \/ Remove<\/th>/);
+  });
+
+  it('shows only a count of missing fields, never the name of the field', () => {
+    const twoMissing = dish({ id: 'd4', name: 'Cold Brew', priceAmount: null, category: null });
+    const oneOther = dish({ id: 'd5', name: 'Granola', photoId: null });
+    const words = text(render(initialReview([twoMissing, oneOther])));
+    expect(words).toContain('2 fields missing');
+    expect(words).toContain('1 field missing');
+    expect(words).not.toMatch(/(Price|Category|Photo|Serving Size)( and \w+)? Missing/);
   });
 
   it('uses a real table with column headers and a row header for the dish', () => {
