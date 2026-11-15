@@ -332,7 +332,7 @@ for (const state of ['loading', 'ready', 'fallback', 'failed'] as const) {
       expect(style.width).toBe(state === 'loading' ? '64px' : state === 'ready' ? '46px' : '150px');
       expect(style.height).toBe(style.width);
     }
-    await page.screenshot({ path: `test-results/figma-portion-${state}.png` });
+    await page.screenshot({ path: `test-results/figma-portion-${state}.png`, fullPage: true });
     if (state === 'failed') {
       const length = await page.evaluate(() => history.length);
       await page.getByRole('button', { name: 'Try again', exact: true }).click();

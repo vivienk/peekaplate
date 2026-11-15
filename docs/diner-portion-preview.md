@@ -187,3 +187,7 @@ The camera portal starts with a contained image and comfortable margins. Manual 
 Flat 2.5D images have a Tilt dish control limited to ±3°, rather than rotating edge-on or showing their reverse. Optional local 3D retains its rotation range; switching representation resets rotation. The opening gesture requests landscape on supported touch browsers. A portrait Landscape view button retries with a fresh gesture, including when already fullscreen. Unsupported browsers retain a manual sideways-rotation prompt; the app does not rotate the camera pixels to fake a physical orientation change. Closing releases only fullscreen acquired by this viewer.
 
 The landscape regression now targets the default test server and is included in the portion browser suite. Real-phone rotation, camera and physical AR acceptance remain separate from simulated browser evidence.
+
+## Current develop integration
+
+The preview reuses the merged detail, Compare/Replace, Search and Saved screens. Its disposer runs with the existing Save/artwork cleanup on navigation or refresh. Closing restores the original Back label and destination, including Saved and Compare. The local upload/editor remains DEV-only; reviewed photographs and generated review candidates are not interchangeable publication approvals. See the [independent integration results](../qa-reports/diner-portion-preview/README.md) for current evidence and real-device limits.

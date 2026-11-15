@@ -1,4 +1,21 @@
-# November 15 size and interaction correction
+# November 15 independent integration review
+
+Integrated runtime: `fa8398c`, reconciled with develop including #147, #189 and #196.
+This section supersedes the older merge/conflict and observer/withdrawal blockers below.
+
+- Preserved current Compare/Replace, Saved, automatic menu aliases, tracking and live artwork. Portion cleanup joins the existing detail-screen lifecycle.
+- Fixed the Saved-origin Back label and added Saved/Compare return regressions. A local conflict-resolution error was caught by typecheck/browser checks and the second review, restored before push, and retested.
+- PASS: `pnpm check`: 1,886 unit tests (27.90s), 115 script tests (5.71s), lint, types, context and documentation.
+- PASS: `pnpm exec playwright test --config playwright.portion.config.ts --workers=2`: 79/79 in 2.1 minutes, including the earlier observer/withdrawal cases. Camera/orientation are simulated.
+- PASS: four preview-state screenshot checks rerun with full-page captures in 7.4s. Review screenshots are local evidence; the historical captures below remain historical.
+- PASS: `pnpm exec playwright test tests/e2e/compare-picker.spec.ts tests/e2e/compare-result.spec.ts tests/e2e/save-screens.spec.ts tests/e2e/search.spec.ts tests/e2e/menu-triggers-live.spec.ts tests/e2e/ingredient-artwork.spec.ts --workers=2`: 46/46 in 32.9s. Replaced the obsolete "View Portion is not available" expectation with an enabled-button assertion; existing Save behavior is unchanged.
+- PASS: `pnpm verify build`. Initial diner JavaScript is below its 150 KB gzip gate; T1 is below its 400 KB gate. No deployment occurs in this check.
+- PASS: 64 focused portion/model/cutout/demo Python tests in the existing Linux service image with `--network none`, plus 12 proxy/bundle/generator script tests.
+- Full Python discovery in that image ran 655 tests in 55.408s: 651 passed; four spatial harness cases could not start because the image lacks Node. All 17 spatial tests, including those four, then passed using the host toolchain in 19.584s. This is split-environment evidence, not a passing full Linux run.
+- Two read-only review lanes checked UI lifecycle and private-service/contract boundaries. The original pinned security diff produced no supported security finding; reconciliation received separate delta review.
+- NOT RUN: paid Tripo calls, real cutout-model execution, physical-phone camera/orientation/scale acceptance, hosted publication or deployment. Generated/local assets stay review-only and publication-ineligible.
+
+## Historical size and interaction correction
 
 Latest source reviewed: `11a20aa` (delta from `50c3b99`). This section supersedes older interaction evidence below.
 

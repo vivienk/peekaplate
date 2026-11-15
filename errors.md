@@ -4428,3 +4428,8 @@ The empty focused search kept its dark-surface placeholder colour on a light sur
 ```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T20:15:41.960Z","exitCode":2}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T20:22:18.664Z","exitCode":1}
+```
