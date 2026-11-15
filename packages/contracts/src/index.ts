@@ -369,6 +369,34 @@ export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
 export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
 export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
 
+export const PreparedMenuSchema = z.strictObject({
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+  contentHash: hash,
+  assetManifestHash: hash,
+  bundleUrl: z.url(),
+  reviewVersion: commandVersion,
+  publicationVersion: commandVersion,
+  publishedRevisionId: uuid.nullable(),
+});
+export const PreparedMenusSchema = z.strictObject({ menus: z.array(PreparedMenuSchema).max(100) });
+export const PreparedMenuPreviewSchema = z
+  .strictObject({
+    menu: PreparedMenuSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .refine(
+    ({ menu, content }) =>
+      menu.venueId === content.venue_id &&
+      menu.menuId === content.menu_id &&
+      menu.menuRevisionId === content.menu_revision_id,
+  );
+export type PreparedMenu = z.infer<typeof PreparedMenuSchema>;
+export type PreparedMenuPreview = z.infer<typeof PreparedMenuPreviewSchema>;
+
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
 export const MAX_PASSAGES = 10;
@@ -1443,6 +1471,7 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
+export * from './ingredient-artwork';
 export {
   type IngredientAssessment,
   IngredientAssessmentSchema,
@@ -1450,6 +1479,10 @@ export {
   ingredientAssessmentForReview,
 } from './ingredient-intelligence.js';
 export {
+  type AcceptPilotOrderAgreementRequest,
+  AcceptPilotOrderAgreementRequestSchema,
+  type AcceptPilotOrderAgreementResponse,
+  AcceptPilotOrderAgreementResponseSchema,
   ALL_ALLOWED_CSV_HEADERS,
   BASE_REQUIRED_CSV_HEADERS,
   CANONICAL_REVISION_HEADERS,
@@ -1459,12 +1492,20 @@ export {
   computeOrderLineChecksum,
   DEFAULT_HISTORICAL_IMPORT_WINDOW_DAYS,
   DEFAULT_RAW_CSV_RETENTION_DAYS,
+  type DeleteOrderDataRequest,
+  DeleteOrderDataRequestSchema,
+  type DeleteOrderDataResponse,
+  DeleteOrderDataResponseSchema,
   ISO_EXPLICIT_TIMEZONE_PATTERN,
   MAX_ORDER_OUTCOME_FILE_BYTES,
   MAX_ORDER_OUTCOME_ROWS,
   NINETY_DAYS_MICROS,
   OPTIONAL_CSV_HEADERS,
   OPTIONAL_PRICING_HEADERS,
+  type OrderDataDeletionReason,
+  OrderDataDeletionReasonSchema,
+  type OrderDataDeletionStatus,
+  OrderDataDeletionStatusSchema,
   type OrderOutcomeImportResponse,
   OrderOutcomeImportResponseSchema,
   type OrderOutcomeLine,
@@ -1475,10 +1516,17 @@ export {
   OrderOutcomeTypeSchema,
   OrderTokenIdentifierSchema,
   type ParsedCsvRow,
+  PILOT_ORDER_AGREEMENT_VERSION,
   PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
   POS_ITEM_HEADERS,
   parseOrderOutcomeCsv,
   REQUIRED_CSV_HEADERS,
   type SanitizedRowDiagnostic,
   SanitizedRowDiagnosticSchema,
+  type SubmitOrderDeletionResponse,
+  SubmitOrderDeletionResponseSchema,
+  type VerifyOrderDeletionRequest,
+  VerifyOrderDeletionRequestSchema,
+  type VerifyOrderDeletionResponse,
+  VerifyOrderDeletionResponseSchema,
 } from './order-outcome';
