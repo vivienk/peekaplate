@@ -33,7 +33,8 @@ The fixture uses real immutable HTTPS asset URLs and exact SHA-256 values, not
 `portion-fixtures.invalid` or a demo-mode build flag. Omit `physical_size` because
 these photos have no independently measured plate calibration. The normal build
 excludes model generation, camera demo/upload controls and provider secrets.
-The viewer's ordinary camera permission/fallback behavior remains available.
+Normal staging exposes the CSS 2.5D viewer and original-photo fallback; camera
+controls remain restricted to local/demo builds.
 Ingredient icons fall back to bundled assets if the optional artwork API is absent.
 
 ## Release and checks
