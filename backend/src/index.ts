@@ -156,10 +156,54 @@ export type Bindings = {
    * tests bind put() alone; without it, review sessions outside local fail as artifact_unavailable.
    */
   INGESTION_REPORTS_BUCKET?: {
-    put(key: string, value: string | ArrayBuffer | ReadableStream): Promise<unknown>;
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: {
+        customMetadata?: Record<string, string>;
+        httpMetadata?: { contentType?: string };
+        onlyIf?: { etagDoesNotMatch?: string };
+        sha256?: string;
+      },
+    ): Promise<unknown>;
     get?(key: string): Promise<ReviewArtifactObject | null>;
+    head?(key: string): Promise<{ uploaded?: Date | string } | null>;
+    list?(options: {
+      prefix: string;
+      limit?: number | undefined;
+      cursor?: string | undefined;
+    }): Promise<{
+      objects: { key: string; size: number; uploaded: Date }[];
+      truncated: boolean;
+      cursor?: string;
+    }>;
     delete?(key: string): Promise<unknown>;
   };
+  INGREDIENT_ARTWORK_BUCKET?: {
+    put(
+      key: string,
+      value: string | ArrayBuffer | ReadableStream,
+      options?: { onlyIf?: { etagDoesNotMatch?: string }; sha256?: string },
+    ): Promise<unknown>;
+    get?(key: string): Promise<ReviewArtifactObject | null>;
+    head?(key: string): Promise<{ uploaded?: Date | string } | null>;
+    list?(options: {
+      prefix: string;
+      limit?: number | undefined;
+      cursor?: string | undefined;
+    }): Promise<{
+      objects: { key: string; size: number; uploaded: Date }[];
+      truncated: boolean;
+      cursor?: string;
+    }>;
+    delete?(key: string): Promise<unknown>;
+  };
+  INGREDIENT_ARTWORK_ORPHAN_GRACE_MS?: string;
+  INGREDIENT_ARTWORK_CLEANUP_DRY_RUN?: string;
+  MENU_STAGING_RETENTION_DAYS?: string;
+  MENU_STAGING_REJECTED_RETENTION_DAYS?: string;
+  MENU_STAGING_ORPHAN_GRACE_DAYS?: string;
+  MENU_STAGING_CLEANUP_DRY_RUN?: string;
 
   ORDER_OUTCOME_ARCHIVE_BUCKET?: OrderOutcomeStorage;
   ORDER_IMPORT_BUCKET?: OrderOutcomeStorage;
@@ -1887,10 +1931,76 @@ export {
   type QueueHandlerServices,
 };
 
-export const handleScheduled = async (event: any, env: any) => {
-  const storage =
+export function parseNonNegativeIntEnv(
+  raw: string | undefined,
+  errorCode: string,
+): number | undefined {
+  if (raw === undefined) return undefined;
+  if (!/^\d+$/.test(raw)) throw new Error(errorCode);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) throw new Error(errorCode);
+  return value;
+}
+
+type ScheduledEnv = Omit<
+  Bindings,
+  'ORDER_OUTCOME_ARCHIVE_BUCKET' | 'ORDER_IMPORT_BUCKET' | 'INGESTION_REPORTS_BUCKET'
+> & {
+  ORDER_OUTCOME_ARCHIVE_BUCKET?: Partial<OrderOutcomeStorage> | undefined;
+  ORDER_IMPORT_BUCKET?: Partial<OrderOutcomeStorage> | undefined;
+  INGESTION_REPORTS_BUCKET?: Bindings['INGESTION_REPORTS_BUCKET'];
+};
+
+function hasListAndDelete<T extends { list?: unknown; delete?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+} {
+  return (
+    storage !== undefined &&
+    typeof storage.list === 'function' &&
+    typeof storage.delete === 'function'
+  );
+}
+
+function hasOrderMethods<T extends { put?: unknown; list?: unknown; delete?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  put: NonNullable<T['put']>;
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+} {
+  return hasListAndDelete(storage) && typeof storage.put === 'function';
+}
+
+function hasStagingMethods<T extends { list?: unknown; delete?: unknown; get?: unknown }>(
+  storage: T | undefined,
+): storage is T & {
+  list: NonNullable<T['list']>;
+  delete: NonNullable<T['delete']>;
+  get: NonNullable<T['get']>;
+} {
+  return hasListAndDelete(storage) && typeof storage.get === 'function';
+}
+
+export const handleScheduled = async (
+  _event: unknown,
+  env: ScheduledEnv,
+  createClient: (connectionString: string) => Client = (connectionString) =>
+    new Client({ connectionString, connectionTimeoutMillis: 5000 }),
+) => {
+  const orderStorage =
     env.ORDER_OUTCOME_ARCHIVE_BUCKET ?? env.ORDER_IMPORT_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
-  if (!storage || typeof storage.list !== 'function' || typeof storage.delete !== 'function') {
+  const stagingStorage = env.INGESTION_REPORTS_BUCKET;
+  const artworkStorage = env.INGREDIENT_ARTWORK_BUCKET ?? env.INGESTION_REPORTS_BUCKET;
+
+  const hasOrderStorage = hasOrderMethods(orderStorage);
+  const hasStagingStorage = hasStagingMethods(stagingStorage);
+  const hasArtworkStorage =
+    env.INGREDIENT_ARTWORK_ENABLED === 'true' && hasListAndDelete(artworkStorage);
+
+  if (!hasOrderStorage && !hasStagingStorage && !hasArtworkStorage) {
     return;
   }
   const connectionString =
@@ -1899,36 +2009,42 @@ export const handleScheduled = async (event: any, env: any) => {
     return;
   }
 
-  const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
-    ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
-    : undefined;
-  const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
-    ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
-    : undefined;
-
-  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  const client = createClient(connectionString);
   try {
     await client.connect();
-    const result = await cleanupOrphanedOrderImports({
-      storage,
-      client,
-      retentionConfig: {
-        rawCsvRetentionDays,
-        orphanGracePeriodMs,
-      },
-    });
-    if (result.deleted > 0) {
-      console.log(
-        JSON.stringify({
-          event: 'order_import_orphan_cleanup',
-          scanned: result.scanned,
-          deleted: result.deleted,
-          deletedOrphans: result.deletedOrphans,
-          deletedAgedRawCsv: result.deletedAgedRawCsv,
-          skippedActive: result.skippedActive,
-          retained: result.retained,
-        }),
-      );
+
+    if (hasOrderMethods(orderStorage)) {
+      try {
+        const rawCsvRetentionDays = env.ORDER_IMPORT_RETENTION_DAYS
+          ? Number.parseInt(env.ORDER_IMPORT_RETENTION_DAYS, 10)
+          : undefined;
+        const orphanGracePeriodMs = env.ORDER_IMPORT_GRACE_PERIOD_MS
+          ? Number.parseInt(env.ORDER_IMPORT_GRACE_PERIOD_MS, 10)
+          : undefined;
+        const result = await cleanupOrphanedOrderImports({
+          storage: orderStorage,
+          client,
+          retentionConfig: {
+            rawCsvRetentionDays,
+            orphanGracePeriodMs,
+          },
+        });
+        if (result.deleted > 0) {
+          console.log(
+            JSON.stringify({
+              event: 'order_import_orphan_cleanup',
+              scanned: result.scanned,
+              deleted: result.deleted,
+              deletedOrphans: result.deletedOrphans,
+              deletedAgedRawCsv: result.deletedAgedRawCsv,
+              skippedActive: result.skippedActive,
+              retained: result.retained,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+      }
     }
 
     // Configurable staging menu photo cleanup (Category 1 promoted, Category 2 rejected, Category 3 orphan)
@@ -1943,11 +2059,8 @@ export const handleScheduled = async (event: any, env: any) => {
       : undefined;
     const stagingDryRun = env.MENU_STAGING_CLEANUP_DRY_RUN === 'true';
 
-    const stagingStorage = env.INGESTION_REPORTS_BUCKET;
     if (
-      stagingStorage &&
-      typeof stagingStorage.list === 'function' &&
-      typeof stagingStorage.delete === 'function' &&
+      hasStagingMethods(stagingStorage) &&
       (stagingRetentionDays !== undefined ||
         stagingRejectedDays !== undefined ||
         stagingOrphanDays !== undefined)
@@ -1980,8 +2093,34 @@ export const handleScheduled = async (event: any, env: any) => {
         console.error(JSON.stringify({ event: 'menu_staging_cleanup_error' }));
       }
     }
+
+    if (hasArtworkStorage) {
+      try {
+        const { cleanupOrphanedIngredientArtwork } = await import('./ingredient-artwork-retention');
+        const gracePeriodMs = parseNonNegativeIntEnv(
+          env.INGREDIENT_ARTWORK_ORPHAN_GRACE_MS,
+          'invalid_artwork_grace_period',
+        );
+        const artworkResult = await cleanupOrphanedIngredientArtwork({
+          storage: artworkStorage,
+          client,
+          gracePeriodMs,
+          dryRun: env.INGREDIENT_ARTWORK_CLEANUP_DRY_RUN === 'true',
+        });
+        if (artworkResult.deleted > 0 || artworkResult.errors > 0) {
+          console.log(
+            JSON.stringify({
+              event: 'ingredient_artwork_cleanup',
+              ...artworkResult,
+            }),
+          );
+        }
+      } catch {
+        console.error(JSON.stringify({ event: 'ingredient_artwork_cleanup_error' }));
+      }
+    }
   } catch {
-    console.error(JSON.stringify({ event: 'order_import_orphan_cleanup_error' }));
+    console.error(JSON.stringify({ event: 'scheduled_database_connect_error' }));
   } finally {
     await client.end().catch(() => {});
   }

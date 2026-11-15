@@ -111,6 +111,15 @@ transaction may leave an unreachable private content object; no route serves it.
 Pure event replay updates no storage and emits no work. Repeated commands return
 the saved result without restoring a later-revoked pointer or writing bytes again.
 
+The initial upload occurs outside the write transaction. After authorization,
+receipt and expected-version checks, Phase C ensures the exact object again while
+holding the same transaction-level blob lock as cleanup. Cleanup may have deleted
+the first upload while approval waited; this final storage operation repairs that
+race before an approved pointer commits. It deliberately holds the transaction
+during R2 verification/repair; SQL timeouts do not bound R2 latency. Session locks
+are unsuitable for the pooled Hyperdrive path. The real PostgreSQL interleaving
+regression reproduces the missing-object failure and verifies exact-byte recovery.
+
 The Python delivery hook persists a credential-free request before sending it.
 Network retries use the same command and expected version; a lost reply can be
 recovered by repeating the same review. Version conflicts never silently rebase

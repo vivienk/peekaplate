@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AuthenticationError } from './auth';
 import type { Bindings } from './index';
 import { readArtwork, replayArtwork, reviewArtwork } from './ingredient-artwork';
+import { cleanupOrphanedIngredientArtwork } from './ingredient-artwork-retention';
 import { registerArtworkRoutes } from './ingredient-artwork-routes';
 import { authorizeStaffVenue } from './staff-venue';
 
@@ -162,6 +163,72 @@ describe.skipIf(!runtimeUrl || !adminUrl)('Hosted ingredient artwork database', 
       ).rowCount,
     ).toBe(0);
     await db.query('ROLLBACK');
+  });
+  it('restores exact bytes when cleanup deletes the Phase B upload before approval commits', async () => {
+    const isolatedVenue = crypto.randomUUID();
+    await admin.query(
+      "INSERT INTO app_private.venues(id,name) VALUES($1,'Synthetic artwork race')",
+      [isolatedVenue],
+    );
+    await admin.query(
+      "INSERT INTO app_private.staff_membership(tenant_id,actor_id,permission) VALUES($1,$2,'owner')",
+      [isolatedVenue, actor],
+    );
+    const command = input('mango');
+    if (command.status !== 'approved') throw Error('Approval fixture required');
+    const key = `ingredient-artwork/${isolatedVenue}/${command.sha256}.png`;
+    const old = new Date(Date.now() - 7_200_000);
+    let object: ArrayBuffer | null = Uint8Array.from(png).buffer;
+    let headReached!: () => void;
+    let releaseDelete!: () => void;
+    let uploaded!: () => void;
+    const headReady = new Promise<void>((resolve) => {
+      headReached = resolve;
+    });
+    const deleteGate = new Promise<void>((resolve) => {
+      releaseDelete = resolve;
+    });
+    const uploadReady = new Promise<void>((resolve) => {
+      uploaded = resolve;
+    });
+    const raceStorage = {
+      list: async () => ({ objects: [{ key, uploaded: old }], truncated: false }),
+      head: async () => {
+        headReached();
+        return { uploaded: old };
+      },
+      delete: async () => {
+        await deleteGate;
+        object = null;
+      },
+      put: async (_key: string, bytes: ArrayBuffer) => {
+        object = bytes;
+        uploaded();
+        return {};
+      },
+      get: async () =>
+        object ? { size: object.byteLength, arrayBuffer: async () => object as ArrayBuffer } : null,
+    };
+    const gcClient = new Client({ connectionString: runtimeUrl });
+    await gcClient.connect();
+    try {
+      const gc = cleanupOrphanedIngredientArtwork({ client: gcClient, storage: raceStorage });
+      await headReady;
+      const review = reviewArtwork(db, actor, isolatedVenue, command, raceStorage);
+      await uploadReady;
+      releaseDelete();
+      expect((await gc).deleted).toBe(1);
+      expect((await review).status).toBe('approved');
+      expect(
+        object,
+        'Approved pointer must resolve after the GC/upload interleaving',
+      ).not.toBeNull();
+      expect(Buffer.from(object as unknown as ArrayBuffer)).toEqual(png);
+      expect((await readArtwork(db, isolatedVenue, ['mango']))[0]?.sha256).toBe(command.sha256);
+    } finally {
+      releaseDelete();
+      await gcClient.end();
+    }
   });
   it('failed upload leaves no approved state and concurrent first reviews conflict', async () => {
     const failed = input('apple');
