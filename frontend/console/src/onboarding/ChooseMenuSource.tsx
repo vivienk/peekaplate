@@ -11,66 +11,6 @@ import radioOn from './assets/radio-on.svg';
 import uploadIcon from './assets/upload.svg';
 
 export type MenuSource = 'url' | 'upload' | 'manual';
-export type MenuInput = 'url' | 'photo' | 'pdf' | 'manual';
-
-export function ChooseMenuSources({
-  onContinue,
-  onBack,
-}: {
-  onContinue: (sources: MenuInput[]) => void;
-  onBack: () => void;
-}) {
-  const [chosen, setChosen] = useState<MenuInput[]>([]);
-  const options: { value: MenuInput; label: string; icon: string }[] = [
-    { value: 'url', label: 'Paste URL', icon: linkIcon },
-    { value: 'photo', label: 'Upload menu photos', icon: uploadIcon },
-    { value: 'pdf', label: 'Upload PDF', icon: uploadIcon },
-    { value: 'manual', label: 'Add manually', icon: pencilIcon },
-  ];
-  return (
-    <form
-      className="pp-onboard-choose"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (chosen.length) onContinue(chosen);
-      }}
-    >
-      <h1>Choose how to add your menu</h1>
-      <p>
-        Choose any combination. All saved sources and dishes remain in this restaurant workspace.
-      </p>
-      <div className="pp-onboard-choose__options" role="group" aria-label="Menu sources">
-        {options.map((option) => (
-          <label
-            key={option.value}
-            className={`pp-onboard-option${chosen.includes(option.value) ? ' pp-onboard-option--selected' : ''}`}
-          >
-            <input
-              type="checkbox"
-              checked={chosen.includes(option.value)}
-              onChange={(event) =>
-                setChosen((current) =>
-                  event.target.checked
-                    ? [...current, option.value]
-                    : current.filter((value) => value !== option.value),
-                )
-              }
-            />
-            <img src={option.icon} alt="" width={24} height={24} />
-            <span>{option.label}</span>
-          </label>
-        ))}
-      </div>
-      <div className="pp-onboard__actions">
-        <ActionButton variant="outlined" onClick={onBack}>
-          Back
-        </ActionButton>
-        <SubmitButton busy={false} blocked={!chosen.length} label="Continue" busyLabel="Continue" />
-      </div>
-    </form>
-  );
-}
-
 const OPTIONS: { value: MenuSource; label: string; icon: string }[] = [
   { value: 'url', label: 'Paste URL', icon: linkIcon },
   { value: 'upload', label: 'Upload photos/PDF', icon: uploadIcon },
