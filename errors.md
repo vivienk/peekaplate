@@ -1327,6 +1327,35 @@ The shell could not locate the repository-requested RTK wrapper; native commands
 
 Focused verification then reused the existing pinned Vitest 4.1.11/Zod 4.6.7 installation with explicit aliases to this worktree's source. Its first attempt failed before collection because the sandbox temporary-directory rename was denied. Redirecting TEMP/TMP into a disposable workspace folder allowed both AI suites to run: 25 tests passed. Focused TypeScript checking and the pinned Biome check also passed. These explicit-source checks are not a frozen installation or a full workspace/hosted test run.
 
+## 2026-10-31 — Offline AI evaluation verification boundary
+
+The existing verification-runner test that invokes real pnpm failed before its
+check because automatic installation again hit the Windows store-symlink EPERM.
+The other seven runner tests passed. This is the previously recorded environment
+limit, not an AI case failure; do not disable the test. The source-pinned Vitest
+run passed all 46 AI tests, including 21 new synthetic development evaluation
+cases, and the focused strict TypeScript check passed. Full frozen installation,
+the standard evaluation command and workspace checks require a capable runner.
+
+PR #82 Linux CI then exposed a missing direct test dependency: the evaluation
+imports ZodError, but backend did not declare zod. The explicit-source local
+alias masked that package-resolution defect. Declare the existing pinned
+zod 4.6.7 as a backend development dependency and update its lockfile importer.
+The failed Linux typecheck is the reproducer; rerun frozen-install CI before
+claiming resolution. Focused alias-based checks do not verify dependency wiring.
+
+## 2026-11-03 — AI report input verification
+
+The new report-input suite initially failed collection because its implementation
+did not yet exist. After implementation, 20 report-input cases passed alongside
+46 existing AI cases using the source-pinned local configuration. Focused strict
+TypeScript also passed. A Biome invocation from the parent workspace encountered
+nested root configuration; running from this repository corrected the invocation.
+Frozen dependency installation still fails at pnpm store project symlink creation
+with EPERM, matching the earlier Windows limitation. Full workspace and hosted
+integration remain unverified in this environment; source aliases do not verify
+frozen dependency wiring.
+
 
 <!-- automatic observation; not root cause -->
 ```json
@@ -2282,6 +2311,39 @@ Complete the frozen installation and rerun workspace checks before treating
 them as green. Dedicated development evidence is synthetic, not independent
 rubric, live model, hosted reporting or production acceptance.
 
+## November 8 PR112 stack synchronization
+
+The report-input implementation and its 20 tests are unchanged from the prior
+Draft. Synchronization inherits the reviewed core privacy fix and the corrected
+21-case evaluation oracle. All 67 focused core/contracts/evaluation/input cases,
+backend/contracts strict types and context/docs checks pass with the existing
+installation. The frozen-install and broader workspace limitations above remain
+open until dependencies are repaired and those checks are rerun. No unmerged
+report schema, SQL producer, live model or hosted integration was adopted.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T18:59:18.059Z","exitCode":1}
+```
+
+## November 8 normal-install validation follow-up
+
+The contributor completed normal `pnpm install --frozen-lockfile` on this
+checkout: eight workspace projects, 213 policy-checked lock entries, exit 0.
+The missing diner workspace import is resolved. Without the dependency-status
+warning override, lint, all seven package typechecks and all 57 application test
+files pass (925 tests passed, four skipped) on the synchronized #112 source.
+Build, context and documentation checks also pass; the Worker build is dry-run.
+Wrangler's optional log-file write reports a local permission warning, without
+changing the successful build exit or performing a deployment.
+
+The remaining `pnpm check` failure is observation
+2026-11-08T18:59:18.059Z: `scripts/preview.test.mjs` cannot create the junction
+needed to test artifact-symlink rejection. The other 66 script tests pass. This
+is a test-setup permission failure before the rejection assertion; retain that
+security regression and verify it in a normal terminal or Linux CI. Do not
+claim the aggregate check passed in this agent environment.
+
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-08T19:03:06.421Z","exitCode":1}
@@ -2299,6 +2361,57 @@ inside the agent sandbox; the other 66 script tests pass. Do not skip or alter
 that rejection test. Normal-terminal/Linux verification remains necessary for
 the aggregate check. Initial installation/temporary-path failures above remain
 historical observations; they are not failures in the corrected AI oracle.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T19:06:08.980Z","exitCode":1}
+```
+
+## November 8 normal-terminal verification resolution
+
+The first contributor-terminal launch stopped before typechecking because the
+provided PATH omitted the pnpm executable required by nested package scripts
+(observation 2026-11-08T19:06:08.980Z). A task-local launcher now consistently
+selects existing Node 24.22.1 and project-pinned pnpm 11.25.0 for parent and child
+commands; no repository scripts, engine policy or dependency versions changed.
+
+The contributor reran normal `pnpm check` successfully: lint, all seven package
+typechecks, 925 application tests (four skipped), all 67 script tests including
+the artifact-symlink rejection regression, context and documentation links.
+This resolves the missing-workspace-link issue and supplies normal-terminal
+evidence for the test blocked by the agent's junction permission. Earlier agent
+failures remain recorded; none was bypassed by skipping or weakening a test.
+Only this ledger and documentation changed after that source validation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-08T19:06:55.022Z","exitCode":1}
+```
+
+
+## November 8 PR77 cached-page identity correction
+
+Three new core.test.ts cases reproduced cached-page sequence reuse, resurrection of an expired visit and reuse after stored state disappeared. identity.ts now reconciles the persisted identity before saving on pageshow, preserves the maximum sequence for the same producer, adopts a newer visit and starts fresh when persistent state cannot be recovered. All 44 tracking tests and four Chromium lifecycle/fixture tests pass. The first context handoff exceeded the 1000-character summary cap; its guard prevented any write. The summary was shortened and fingerprints refreshed without dropping either side of the append-only merge ledger.
+
+
+## November 8 PR80 withdrawal and atomic-store corrections
+
+Four RED storage/public-dispatch regressions reproduced cold-page withdrawal replay, 25 delayed additions crossing withdrawal/re-opt-in, interleaved event loss and stale snapshots after receipt/clear. Atomic IndexedDB transactions and Web-Locked localStorage now update the latest record; pending reads are authoritative. Retiring a pipeline synchronously invalidates its queued additions and stops its batcher. Reopening waits for durable clearing, retries an unconfirmed clear and uses visit memory if it still fails. A further RED fault test proved failed clearing could otherwise replay old work; it now passes. Browser checks cover two genuine tabs, transaction abort after request success, memory fallback without Web Locks and the actual banner with both destinations. Shared consent injection preserves console behavior and removes the separate legacy diner capture path.
+
+The first local merge helper stopped at the summary cap, but a missing exit guard allowed conflict markers into an unpublished merge commit. Recovery reconstructed both parent graphs and path sets, preserved both append-only ledger sides and amended only that unpublished merge. Legacy handoffs without date fields are retained without assuming a common date shape. Subsequent mutation steps stop at the first nonzero result; context:check and git diff --check verify the repaired result before push. A test-only LockGrantedCallback generic annotation was corrected after strict TypeScript rejected it.
+
+## November 8 PR80 failed-clear recovery follow-up
+
+Independent review identified two additional paths: failed clearing lost its pending state after a reload, and clearing a fallback memory store could incorrectly certify that a temporarily unavailable IndexedDB backend was empty. Both regressions replayed the old event before correction. Withdrawal now records deletion-work tokens in sessionStorage/localStorage and explicitly clears both durable backends; incomplete clearance keeps new work in memory and is retried on reopening. Completion records cannot erase a newer request. Eight withdrawal unit tests cover reload, fallback, overlap and unreadable markers; a real Chromium reload test seeds both backends, interrupts IndexedDB access and verifies that old records never reach delivery after recovery. All-storage-write failure remains an explicit documented limitation; no hosted acceptance is inferred.
+
+Tooling corrections: a Windows rg path containing a wildcard was treated literally; use directory paths with rg's glob filter instead. A revised PR description initially omitted the repository's three required context labels; the exact body now passes scripts/check-pr.mjs before publishing.
+
+
+## November 8 PR74 reconciliation and invalid-field focus
+
+The current develop merge conflicted only in docs/CONTEXT.md and errors.md. Context keeps both module intents and the bounded current handoff; the error ledger retains both append-only histories. An initial local resolver asserted an unrelated module was present and stopped before writing; the corrected guard compares actual base node IDs instead of assuming feature presence.
+
+The new Chromium regression failed because the invalid input had identical focused and blurred outlines. The shared input now adds a token-based 2px keyboard-focus outline only for invalid fields, retaining the red error edge, accessible error description and 44px box. All 14 input browser cases pass in 17.5s, including narrow-screen axe checks and self-hosted fonts. The 390px rendering was inspected. Final design approval and real-device/manual screen-reader checks remain separate.
 
 ## November 9 append-only history reconciliation
 
@@ -2332,6 +2445,17 @@ Inter font dependency before a normal installation, and the existing artifact
 symlink rejection test cannot create its junction in this sandbox. Keep all
 three tests and install the frozen dependencies before the next full check.
 This is not an aggregate-check pass or live AI/report acceptance.
+
+## November 9 Draft report-input synchronization
+
+The Draft stack now includes the synchronized evaluation and develop 93194f2.
+AI core, report-input, contracts and evaluation source are byte-identical to
+the previous Draft head; only the inherited foundations and reconciliation
+documentation change. All 67 focused AI/contract/input cases pass, together
+with lint, all seven package typechecks, context freshness and documentation
+links using the existing installation. The new Inter font installation and
+sandbox junction limitations recorded above remain unresolved for the full
+aggregate check. Keep #112 Draft; this is not live report/model/UI acceptance.
 
 ## November 9 normal-terminal stack verification
 
@@ -2376,6 +2500,20 @@ The security test is retained unchanged. Lint, seven package typechecks,
 context freshness and local documentation links passed separately; Linux CI
 or a normal contributor terminal must establish the complete check.
 
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:47:24.995Z","exitCode":1}
+```
+
+## November 9 evening Draft stack full-check boundary
+
+The synchronized Draft source 5d26fc8 passes lint, seven package typechecks and
+1084 application tests (four optional skips). Of 67 script tests, 66 pass;
+only the unchanged artifact-symlink regression cannot create its junction in
+this agent sandbox. The complete normal-terminal check remains to be supplied.
+The focused 67 AI/contract/input cases and clean 21-case standard evaluation
+already pass. This note does not claim live producer/report/model acceptance.
+
 ## November 9 final offline-evaluation environment
 
 The frozen offline installation could not load missing package metadata from the
@@ -2391,6 +2529,72 @@ fresh report, frozen dataset/counts and unique passing records before returning
 success. Three CLI regression groups failed before the fix; all five pass after.
 The same partial-discovery probe now exits 1. The frozen test source was restored
 byte-for-byte, and the complete 21-case evaluation passes.
+
+## November 10 Draft report-input compatibility synchronization
+
+PR112 synchronizes develop085ecfd after PR107 and PR82 merged. The merge has
+conflicts only in the shared context and append-only ledger. Both parent context
+path sets and complete historical ledger paragraphs are retained. The shell
+could not locate RTK, so native PowerShell commands use the existing pinned
+Node/pnpm launcher; no engine, lockfile or dependency policy is relaxed.
+
+The widened owner_report.v1 schema makes unknown pipeline freshness reachable
+as is_stale=null. A new synthetic NORMAL-report regression reproduces the old
+validator returning all three rates as available (20 existing cases passed,
+one new case failed). The minimal guard now returns value-free missing metrics
+for unknown freshness while preserving the original null metadata. Verified
+fresh numeric zero remains available. The combined AI/report/contract suites
+pass 122 cases, and all five inherited evaluation CLI completeness regressions
+pass. The frozen 21-case oracle, CLI runner, report gate and reporting behavior
+are not changed by this correction. Clean-source evaluation and aggregate CI
+remain separate evidence; this does not establish the internal producer
+identity/cohort/freshness handoff, live model/report integration or acceptance.
+
+The synchronized `pnpm check` passes lint, seven package typechecks and all 68
+application test files (1106 passed, four existing optional skips). Of 72 script
+tests, 71 pass; only the unchanged artifact-symlink security test fails because
+the Windows agent sandbox cannot create its junction. The full aggregate check
+is therefore FAIL, not PASS. Separate lint/type/context/docs checks pass with 13
+modules, ten handoffs and links in 56 Markdown files; frontend builds and Worker
+dry run also pass. Matching-head Linux CI must establish the complete quality,
+browser and database evidence without skipping or weakening any test.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T07:13:17.443Z","exitCode":1}
+```
+
+## November 10 AI report-to-core adapter development
+
+The new seam suite initially failed because the consumer mapping export did not
+exist (15 failing cases, one rejection case passing). After adding the pure
+adapter, all 16 cases pass against the unchanged deterministic core. The adapter
+binds explicit caller context and honors the shared complementary-suppression
+projection; it never generates producer identities or restores hidden values.
+An initial direct Biome check reported two test line-wrapping differences; the
+formatter corrected those without changing assertions. Backend typecheck passes.
+The frozen development oracle, shared contracts, producer SQL and model/API
+behavior are unchanged. Final aggregate checks and pinned review are recorded
+separately; this development result is not live producer or hosted acceptance.
+
+The first context refresh rejected the expanded backend summary because it
+exceeded the existing 1,000-character bound. The summary was compacted while
+retaining the parent responsibilities and source paths; the checker bound was
+not changed. Refresh and validation must pass before committing this candidate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T18:47:51.902Z","exitCode":1}
+```
+
+The corrected context refresh passes with all 13 modules and ten handoffs.
+`pnpm verify lint typecheck context:check docs:check` passes, including all seven
+package typechecks and links in 56 Markdown documents. `pnpm verify build`
+passes the frontend builds and Worker dry run, without deployment. `pnpm check`
+passes 1,122 application cases (four optional skips) and 71 of 72 script cases;
+its aggregate result is FAIL because the unchanged artifact-symlink security
+test cannot create a Windows junction in this sandbox (EPERM). The test remains
+intact. Linux CI must establish the complete aggregate result on the final head.
 
 ## November 10 published-menu refresh and browser verification
 
@@ -2451,6 +2655,48 @@ single-worker verification is recorded separately rather than hiding that run.
 All 111 browser checks then passed with one worker in 96.794 seconds, including
 the unchanged outbox-capacity case and the three refresh focus regressions.
 The high-concurrency failures are retained above; assertions/timeouts remain unchanged.
+
+## November 10 AI consumer forward synchronization after PR85
+
+Draft PR112 forward-merges develop e0eed262 without changing the AI adapter,
+frozen evaluation or upstream published-menu source. Shared context combines
+the separate backend and diner summaries, and both complete failure histories
+are preserved. Structural lint, seven workspace typechecks, context and local
+documentation checks pass.
+
+The first direct targeted run failed before collecting any tests because the
+sandbox denied a Vite SSR cache rename in the operating-system temporary
+directory. Using a task-owned temporary directory permits test collection. A
+parallel retry passes 171 cases but times out one unchanged upstream live-menu
+dynamic-import assertion. No implementation or assertion was altered. A
+single-worker rerun passes all 172 targeted AI/report/menu-state cases across
+11 files, and all five evaluation-CLI completeness regressions pass. These
+results do not erase the preceding failed runs or establish browser/hosted
+acceptance. The known junction-limited aggregate check is not repeated; exact
+head Linux CI remains required after pushing this synchronization.
+
+## November 10 internal producer-constructor consumer test seam
+
+Three added tests call the real owner report reader/private constructor with
+mock SQL aggregate rows and observe its internal input to the real disclosure
+projector. The first unchanged run passes all three. No production defect or
+RED-to-GREEN production fix is claimed: the existing constructor intentionally
+retains unknown freshness, so normal/zero/suppressed examples abstain in AI.
+
+A separate controlled test-side probe falsely labelled only the captured
+freshness copy as verified while the real projector still received the original
+input. All three tests failed their null-freshness assertions as expected. The
+test file was restored byte-for-byte and the production source was never
+altered. This is assertion sensitivity evidence, not a failed production run,
+SQL verification, authority proof or permission to enable live recommendations.
+
+After restoration, all 52 scoped reader/input/adapter/seam cases pass across
+four files. `pnpm verify lint typecheck context:check docs:check` passes, including
+seven workspace typechecks and the existing 13-module/10-handoff graph. The
+frozen standard evaluation is checked separately on the final clean commit.
+The full junction-dependent aggregate, database and hosted checks are not rerun
+for this test/documentation-only addition; final matching-head CI remains a
+separate check.
 
 
 ## PR117 reconciliation and capture-reference validation — 2026-11-10
@@ -2529,6 +2775,32 @@ the existing scoped OAuth access refreshed into the OS credential store. No
 credential was added to files or logs. Docker was started hidden for disposable
 database tests; all nine unrelated containers remained stopped.
 
+
+## November 10 evening AI consumer synchronization
+
+Fixed develop96b8de1 includes the reviewed bundle producer, report CORS/release
+records and exact-byte diner connection/publication-suspension work. This
+forward merge resolves only shared context and append-only error-history conflicts;
+both complete ledger tails and all parent source paths are retained. AI
+runtime, production policy and the frozen evaluation source are unchanged.
+New context records identify the exact synchronized source; refreshed hashes
+do not establish hosted readiness. Verification results belong to this new
+clean commit and are recorded in the handoff. No service, deployment, database
+or provider action is performed by this synchronization.
+
+The normal pnpm context-refresh entry attempted dependency synchronization
+after the upstream manifest/lock metadata changed. Windows sandbox project-link
+creation failed with EPERM before the context command ran. No dependency policy,
+engine, lockfile or security test is changed. Direct pinned-Node context/docs
+commands and the existing standard evaluation script provide bounded local
+evidence; the normal aggregate/frozen-install lane remains for exact-head Linux CI.
+
+Direct pinned-Node lint checks 351 files without fixes. Context validates all
+13 modules and ten bounded handoffs, and local links in 59 Markdown documents
+pass. Protected-source comparisons retain the previous AI runtime/oracle and
+the exact new upstream producer/diner implementation. Standard clean-source
+evaluation follows the merge commit; no full suite, database or browser run is
+implied by this documentation-conflict synchronization.
 
 ## Extraction release observations retained during reconciliation
 
@@ -2770,6 +3042,41 @@ The comparison SQL scope change also required updating both test clients that de
 
 <!-- automatic observation; not root cause -->
 ```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T02:46:47.511Z","exitCode":1}
+```
+
+
+## Owner auth integration - November 11, 2026
+
+Local Chromium reproduced callback URL fragment retention, an invalid-result render mismatch and an existing-session logout after an expired confirmation exchange. URL-change handling, explicit invalid-result mapping and immediate error return correct those cases; the real-SDK unit/browser regressions pass. A stale confirmation-copy assertion was updated to require neutral account-existence wording. The current SDK local-scope sign-out removes its local session before server revocation. No passwords, tokens or mail links are recorded.
+
+Independent review also identified stale recovery permission after cross-tab session replacement and a successful reset/sign-in remaining on the form. Both regressions failed before correction. Recovery now binds purpose to the exchange token, uses a separate in-memory SDK session, cancels on shared-session changes and rechecks that binding before update. A concurrent different-account switch test sends no password update. Successful sign-in clears callback rendering state. Eight SDK/browser journeys pass after correction. Initial fixture JWT/SDK-field assumptions and a formatting failure were corrected without relaxing expected user/password outcomes.
+
+
+## Auth email editor - November 11, 2026
+
+An editor replacement retained part of the previous HTML. A complete-source
+comparison exposed the mismatch; the complete document was selected and pasted,
+then compared before the corrected save and on reopening. No email was sent
+from the intermediate source. Source equality, persisted preview and the actual
+branded Gmail recovery email now pass. Use whole-document selection/paste and
+verify copied source rather than assuming a generic editor set-value replaces
+all Monaco content. No provider credentials, accounts or mail links are recorded.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-12T05:39:03.089Z","exitCode":1}
+```
+
+The auth documentation merge exceeded the context graph's 1,000-character node
+summary limit. The console summary was consolidated while preserving recovery
+purpose/session isolation, template sources and actual acceptance boundaries;
+both recovery and signup handoffs were retained. `pnpm context:refresh` and
+`pnpm verify context:check docs:check` now pass on the reconciled graph. This was
+a documentation validation failure, with no application or provider behavior change.
+
+<!-- automatic observation; not root cause -->
+```json
 {"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T07:18:39.671Z","exitCode":2}
 ```
 
@@ -2852,10 +3159,28 @@ The earlier otp_expired verifier blocker was resolved by selecting the newest Gm
 Live acceptance then passed 53 workspace HTTP checks, 29 Chromium assertions, independent remote R2 PDF hash verification and three read-only Supabase postconditions. Approved facts stayed at9.00 after the working review changed to9.50; current viewer access denied the existing JWT. Both test sessions ended, the temporary local test page was removed, and normal Queues/DLQs remain paused. The earlier dashboard SET ROLE failure did not require a new grant; deployed API calls exercised the existing restricted connection. This supersedes the initial NOT RUN record, while real owner-screen, fresh provider and production acceptance remain separate.
 
 
+## Owner CSV valid-zero correction — November 12, 2026
+
+The PR131 serializer treated every non-NORMAL status as unavailable, so valid zero rates were blanked. Five visible-zero regressions failed with the expected numeric cell missing before the fix; explicit NORMAL/VALID_ZERO visibility now preserves zero while SUPPRESSED, NOT_MEASURABLE and MISSING stay blank. Existing signed-identity, source/venue and CORS cases are parameterized over the JSON and CSV routes, including attachment headers and membership-error responses. This is a local correction and does not certify hosted CSV or spreadsheet behavior.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-12T16:44:35.153Z","exitCode":2}
+```
+
+The first full check also caught strict indexed-access typing in the added test fixtures; the fixture assertions were corrected, and the complete type/unit/script/context/docs checks pass afterward.
 ## Diner first-consent dispatch — November 12, 2026
 
 The compiled staging check after PR158 found the first menu_viewed in the canonical sender without a matching PostHog capture. The screen consent listener ran before the adapter listener, leaving the adapter on its old consent state during capture. Synchronizing from the current gate before capture fixes the ordering dependency. The actual-adapter unit regression failed before the correction; it and the SDK browser test now cover initial and renewed consent. Corrected hosted acceptance is pending approved release/retest.
 
+
+## Owner auth resend and reconciliation — November 12, 2026
+
+The provider adapter lacked the optional resendConfirmation method, so the live confirmation screen correctly hid Resend. The actual-SDK regression failed before the method existed; the adapter now calls signup resend with the exact confirmation callback and SDK-managed PKCE. Unit/provider browser checks cover the resent-link exchange, cooldown, throttling and sanitized errors. These use synthetic HTTP, not newly delivered real mail. Three document conflicts were reconciled by retaining both additive guide/error histories and current develop modules plus auth context; fingerprints are refreshed separately.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T20:07:34.810Z","exitCode":1}
 <!-- automatic observation; not root cause -->
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-12T23:13:45.676Z","exitCode":1}
@@ -2912,9 +3237,373 @@ Transient observations during Phase 3 verification:
 
 <!-- automatic observation; not root cause -->
 ```json
-{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T18:43:51.688Z","exitCode":1}
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-13T21:45:13.883Z","exitCode":1}
 ```
 
+## DATA-12 review corrections — November 13, 2026
+
+```json
+{"id":"ERR-20261113-DATA12","status":"resolved","area":"owner-report-window-and-evidence","cause":"Owner SQL included events at the report end despite end-exclusive panel semantics. Two mocked opening cohorts were impossible; evidence also inferred hosted synthetic provenance and fixture execution from unrelated local tests.","prevention":"Use half-open report SQL and real database boundary tests; keep opened-session counts consistent with openings. Distinguish aggregate-row serialization, canonical fixture integration and hosted provenance. Keep freshness unknown without a trusted pipeline signal.","sources":["backend/src/owner-report.ts","backend/src/comparison-report.integration.ts","backend/src/owner-report.data12-reconciliation.test.ts","tests/data12/reconciliation_findings.md"],"regression":"Exposure-at-end and checkpoint-at-end regressions failed before the two SQL corrections and passed afterward. Corrected zero-opening and timing assertions pass. Final commands/counts are recorded in PR167.","limit":"An initial combined run collided with browser port 5173; the new boundary dates also overlapped existing comparison fixtures. Separate those services and date windows before relying on the full integration result. Hosted provenance and DATA-12 acceptance remain pending."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-14T04:48:52.016Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-PREVIEW-MERGE","status":"resolved","area":"preview-build-verification","cause":"An initial conflict-resolution test assumed two React banner literals were contiguous in built JavaScript.","prevention":"Assert synthetic and illustrative labels separately while checking all existing/new demo entries are excluded from normal builds.","regression":"The three preview-build controls and pnpm check pass after preserving all three demo pages. Browser states fit 320/390/1440 pixels."}
+```
+
+```json
+{"id":"ERR-20261113-OWNER-DIALOG-FOCUS","status":"resolved","area":"owner-onboarding-accessibility","cause":"Publication removed the opener, so native dialog dismissal left keyboard focus on the page body.","prevention":"Close the native modal before explicitly focusing the stable owner-content target for both dismissal paths.","sources":["frontend/console/src/owner/PublishSuccessDialog.tsx","tests/e2e/owner-onboarding.spec.ts"],"regression":"Real Chromium button/Escape focus assertions failed before correction and passed afterward. A draft browser probe also used nonexistent sample keys; corrected to the actual fresh/submitted options before evaluating setup behavior."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T05:04:12.523Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T05:06:18.153Z","exitCode":1}
+```
+
+## Report source correction — November 13, 2026
+
+```json
+{"id":"ERR-20261113-REPORT-SOURCE","status":"resolved","area":"console-report-source","cause":"Hook state survived source changes, leaving fetched values labelled as the saved synthetic sample.","prevention":"Reset request identity during render; select the saved report explicitly and reject late responses after cleanup.","sources":["frontend/console/src/owner-dashboard/report-data.tsx","tests/e2e/owner-report-api.spec.ts"],"regression":"Chromium live-to-saved assertion failed before correction; all five report browser cases pass afterward (11.9s). The harness initially used named imports for Vite CommonJS interop; corrected to actual default exports before reproducing the defect.","limit":"Intercepted browser requests use a stand-in token; hosted auth and provenance remain separate."}
+```
+
+## November 9 AI preview dependency setup boundary
+
+The new synthetic preview worktree's normal frozen install stopped at pnpm's
+project-registration symlink with Windows EPERM before workspace dependencies
+could be linked. The one added contracts dependency is a local workspace link;
+no external package, engine, lock version or installation policy is changed.
+Formatting and lint can use the already installed toolchain; direct context
+refresh/check and documentation-link checks also run without installation.
+Typechecking, unit/browser tests and builds are NOT RUN for this candidate until
+normal installation is available. No test is removed, skipped or weakened to
+bypass the sandbox limitation.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:41:35.066Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:42:35.891Z","exitCode":1}
+```
+
+## November 9 AI preview review corrections
+
+Normal dependency installation was completed in the contributor terminal. The
+first child full check passed lint/typechecks but localhost JWKS reads failed
+with EACCES; the root's permitted recheck passed all 998 application tests
+(four skipped). Root script verification then exposed a genuine new regression:
+the broad contracts barrel brought unrelated PostHog schema strings into the
+standalone demo bundle. The existing no-analytics artifact regression is kept.
+A public owner-ai export now exposes only the existing AI schemas; the console
+uses that subpath without changing any wire contract or external version.
+
+Independent correctness review also found that slicing offset-bearing report
+bounds to a date under a UTC label displayed the wrong day and discarded
+intraday times. Three regressions fail against the old date-only display and
+pass after UTC normalization: both offset directions crossing midnight and a
+same-day intraday window. All 16 focused preview unit cases now pass. Original
+dateTime values remain intact; there are no new result statuses or effects.
+
+The context update guard rejected an overlong contracts summary before writing;
+the same narrow export handoff is now recorded within the existing cap. Final
+aggregate/script, actual browser and build results still need the root recheck.
+The sandbox junction regression remains unchanged and is not bypassed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T01:48:45.851Z","exitCode":1}
+```
+
+## November 9 preview final local verification boundary
+
+At implementation 69e2060, the 16 focused component cases pass, including three
+UTC offset/intraday regressions. Normal lint and seven package typechecks pass.
+The full application suite passes 1001 tests (four optional skips); 66 of 67
+script tests pass, including the unchanged no-analytics preview-build check.
+Only the existing artifact-symlink regression cannot create its junction in the
+agent sandbox. No test, engine or lockfile security policy is weakened.
+
+Browser setup initially lacked the pinned Chromium runtime and attempted to
+write Wrangler logs/registry outside the workspace. Installing the official
+Playwright Chromium runtime to ignored outputs and using Wrangler's supported
+local log/registry paths resolved startup. All three unchanged preview cases
+then report passing assertions (desktop six states/no API requests, narrow
+mobile drawer and keyboard/scoped axe). The Windows process teardown did not
+return, even in a console-only local harness; it was interrupted after the
+assertions and local servers stopped. This is not a normal browser-command
+completion. The first ignored focused config was inside the runner-cleaned
+output directory; moving it outside that directory resolved its launch cwd
+failure. Temporary harness files are not part of this change or CI.
+
+The final frontend/Worker dry-run build passes. A normal-terminal full check
+and standard three-server browser command are still required before pushing
+this candidate. Final visual inspection confirmed the component mounted in
+the existing desktop panel with its synthetic label and UTC time window;
+manual device/screen-reader and full shell design acceptance remain separate.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-10T03:25:04.862Z","exitCode":1}
+```
+
+## November 9 late parent-drawer integration
+
+The preview branch now includes parent #105 dcb6fd4. Its sole App.tsx conflict
+keeps the parent ModalDrawer wrapper and the existing synthetic aiPreview in
+both ChatBox ctxBar slots. The parent drawer implementation, CSS and two
+keyboard browser regressions are inherited unchanged; shared result schemas,
+fixtures, formatting and application behavior outside this mount are unchanged.
+
+The initial inline context helper stopped before writing because a shell quote
+split its source. Running the same guarded update from a standalone helper
+preserved the bounded context graph and refreshed its fingerprints.
+
+On the synchronized candidate, the 16 component cases, lint, seven package
+typechecks, context freshness, documentation links and frontend/Worker dry-run
+build pass. The full application suite passes; only the unchanged artifact
+junction security regression remains unable to create its test link in this
+agent sandbox. Its automatic observation is retained and the test is unchanged.
+A complete Linux CI or normal-terminal full check plus the three preview and
+two modal-drawer browser cases are required before requesting re-review.
+Earlier passing checks at ba0a19d do not verify this integration. Both PRs #112
+and #124 remain Draft; AI-01 remains In Progress with existing integration and
+visual-review ownership. No extra scope or delivery date is assigned.
+
+## November 10 AI preview screen-context handoff
+
+The reusable component formerly rendered every schema-valid result without
+checking the report selected on screen and always included fictional-demo copy.
+The expanded component suite reproduces these gaps before the implementation:
+20 cases fail and eight pass. The component now requires the expected venue and
+exact window before showing either wire status, with optional comparison of a
+report ID already known to the caller. Missing or malformed runtime context
+fails closed. The synthetic wrapper retains all fictional notices and passes
+its fixed context; no public report ID is invented or live source connected.
+
+All 28 component cases pass after the correction. The first strict typecheck
+also caught test-helper inference, an invalid never-spread test cast and an
+exact-optional-property mismatch in the private render props. Explicit context
+typing, a checked expected-error runtime regression and an undefined-aware
+private prop resolve those without weakening result-call requirements. Console
+strict TypeScript now passes. App.tsx, ModalDrawer, public result contracts,
+deterministic validation and both existing mounts are unchanged. Full browser,
+build and final-head evidence are recorded separately, not implied by unit tests.
+
+Lint, seven workspace typechecks, context/documentation checks and the normal
+frontend/Worker dry-run build pass on this correction. The standard five-case
+browser command did not reach test execution: local web-server startup stopped
+reporting progress before readiness, and the bounded attempt was interrupted.
+It is NOT RUN evidence for those cases, not a passing run or an established
+component defect. A task-local console-only harness may verify the unchanged
+preview/drawer assertions separately; the repository's three-server CI config
+and all test assertions remain intact. Final results belong to the exact-head
+handoff and do not establish live report, authorization or design acceptance.
+
+## November 11 AI preview synchronization with the compact owner panel
+
+The focused Playwright command waited for console-server readiness and was
+stopped before the five preview/drawer cases started. A separate Chromium
+smoke loaded the built preview assets through browser request interception.
+At 1440px it confirmed the 360px panel, the keyboard selector and all six
+synthetic states. At 390px it confirmed the preview in ModalDrawer, focus
+containment, Escape and opener restoration, and a result without horizontal
+overflow. The smoke observed zero fetch or XHR requests. The repository's
+Playwright cases, including the scoped axe check, await CI on the merge revision.
+
+Direct context/docs checks, Biome, console TypeScript, 33 component/contract
+tests, and both normal and preview console builds pass. The preview build
+contains the dashboard demo, and the normal build excludes it.
+
+## PR144 fixture preparation review - November 11, 2026
+
+The standalone DATA06 suite passed thirteen tests, but the default Vitest discovery returned an empty array and normal CI would not execute these cases. Four new files also failed Biome formatting, and the PR verification section lacked the required exact-command status entries. DATA06 paths are now included in normal test/typecheck commands; formatting and PR evidence are corrected. The expanded fourteen fixture tests pass; deliberate empty descriptive and missing suppression-status mutations fail at their assertions. One selected real local Worker/PostgreSQL owner-report journey passes; this is supporting report evidence, not an absent DATA06 producer. No provider request, hosted migration or deployment occurred.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T06:15:42.376Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261113-AUTH-CHECK-CACHE","status":"resolved","area":"local-auth-verification","cause":"The restricted execution environment redirected browser/Corepack caches, preventing a standalone renderer and a build command from starting normally.","prevention":"Use the existing installed Chromium executable for isolated HTML rendering and the authorized normal runtime for existing auth/build checks; do not install new dependencies or weaken tests.","regression":"Four local email render checks and the same provider/build checks pass. A stopped readiness attempt executed no provider assertions; it is not counted as a passed run."}
+```
+
+## Restaurant URL preparation: local Pages routing
+
+Initial new browser checks used non-existent failure headings, then a status
+locator matching both the menu and analytics notice. Assertions now use the
+existing state text; these were test-authoring failures, not product defects.
+The first local Pages readiness URL returned 404, so readiness now checks
+/diner/. The pinned workerd binary supports compatibility dates through
+2026-10-13; the local harness uses that supported date rather than today's date.
+
+Actual Pages testing rejected trailing-slash rewrites back to /diner/index.html
+as loops. An outside .html shell initially produced a 308 clean-URL redirect,
+which lost the restaurant pathname and displayed unavailable. Rewriting to the
+outside shell's extensionless URL fixes the cause. The browser checks assert
+the unchanged address, real built CSS/JS, reload, canonical/alias reads and
+unknown/tampered/withdrawn states. Six local Pages/Chromium checks pass; hosted
+domain, owner flow and real tracking remain NOT RUN. No DNS or deployment changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-14T07:23:24.731Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T07:29:43.921Z","exitCode":1}
+```
+
+
+Restaurant URL follow-up: bounded context summaries were shortened to satisfy
+the graph validator. Corepack's initial fetch was blocked by sandbox networking;
+the approved recheck completed using the pinned runtime. After adding the final
+regressions, a check observed stale context before its refresh; fingerprints were
+refreshed after all source edits. These are preparation/tooling observations, not
+hosted application failures. Eight actual local Pages browser cases now pass,
+including directory JSON serving and trailing-slash URLs. A delayed-directory
+cancellation regression and the existing menu checks also pass. No cloud state changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T08:34:00.540Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T08:35:16.211Z","exitCode":2}
+```
+
+Automatic diner-link preparation: the new pgTAP table assertion initially used
+the two-argument overload, which interpreted the schema as a table name. The
+schema-qualified three-argument assertion now passes with all 320 SQL checks.
+The concurrent-publish test's evolving command array needed an explicit element
+type under strict TypeScript. Context summaries were shortened to the graph's
+bound. After these test/documentation corrections, pnpm check and the real
+139-test Worker/database run pass. Seven local Pages and eleven existing diner
+browser cases pass. Hosted publication and custom-domain acceptance are pending;
+no provider calls or production changes were performed by these local checks.
+The dedicated URL-allocation fault injection now verifies rollback of every
+publication/event/receipt/outbox write and a successful identical retry: all
+140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
+push/PR creation because the operator email was unverified; after verification,
+the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T23:34:03.526Z","exitCode":2}
+```
+
+## 2026-11-14 — Read-only ingestion verifier false acceptance
+
+Nine focused regressions reproduced missing/failed/foreign-record acceptance,
+unpaired report versions, wrong viewer probe, unsupported provider accounting,
+and unsafe evidence/origin handling. The verifier now fails closed, binds source
+and producer identities, rejects redirects and reports upstream calls as unknown.
+The real Worker/PostgreSQL regression covers the owner, viewer and cross-venue
+routes. Its initial typed fixture omitted required nullable fields; those fields
+were restored to match the production contract. Final typecheck and checks passed.
+
+## Ingredient icon preparation — November 12, 2026
+
+Initial environment discovery found no system Python pydantic; tests use the existing isolated Python 3.12 environment (pydantic 2.14.3, Pillow 13.0.0), not the frozen deployment environment. The first eight-case icon run exposed trailing whitespace in the new empty-ingredient synthetic fixture: DishDraft stripped it while source offsets retained it. The fixture now supplies explicit nonblank unknown-ingredient text; source validation remains strict. Ingredient tests (23), review-candidate tests (17) and full Python suite (526) pass. Initial branch setup could not fast-forward main to develop; a new clean task branch was based directly on the fetched develop SHA before edits. No existing work was discarded.
+
+Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise RecursionError rather than fall back to text. Catalogue reads now normalize this to ValueError; the new regression and all 24 ingredient tests pass. Initial pnpm checks were blocked by system Node 24.14 and automatic dependency installation without network access. Using installed Node 24.16 and disabling only automatic dependency installation allowed the dependency-free repository context/docs verification commands to pass; no check itself was disabled.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T07:35:35.800Z","exitCode":1}
+```
+
+## Ingredient illustration generation — November 12, 2026
+
+The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.
+
+Generation review found valid JSON with non-object provider fields could raise AttributeError and stop the batch. Explicit envelope/candidate/content/part/image type validation now returns a sanitized failed job; malformed-shape regression verifies remaining ingredients still run. Focused ingredient suite passes 34 tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:18:46.464Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T08:20:15.323Z","exitCode":1}
+```
+
+## Diner ingredient integration verification — November 13, 2026
+
+The first typecheck caught unchecked indexed access in the generated catalogue resolver and an optional test error handler. Both now have explicit guards. Focused menu tests exercise missing mappings and failed-image handling. The first local browser run could not bind port 5173 under restricted execution (EPERM); rerun with local server permission. No food-review command was changed.
+
+Follow-up: full JavaScript tests initially failed when authentication fixtures could not bind local ports; the permitted rerun passes all 1,423 unit and 74 script tests. The normal browser runner found port 5173 occupied. A temporary copy of the two targeted browser cases used only port 5283 and the diner server; both pass. The first temporary config was mistakenly placed under Playwright's cleaned output directory and found no tests; moving it outside that directory fixed the runner setup. Temporary runner files were removed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T06:21:04.472Z","exitCode":2}
+```
+
+## Automatic ingredient artwork delivery verification — November 13, 2026
+
+The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
+
+Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T23:55:57.240Z","exitCode":1}
+```
+
+## 2026-11-14 — Ingredient artwork cleanup/approval race
+
+A real PostgreSQL regression paused cleanup after its old-object HEAD, completed
+the approval's initial upload, then let cleanup delete before the approval took
+its blob lock. Approval committed a missing object. Phase C now verifies/repairs
+exact bytes under that same transaction lock, after authorization, replay and
+version checks. The interleaving and repair-failure rollback tests cover the fix.
+This final R2 operation intentionally stays inside the transaction; session-level
+locks are unsafe to assume across pooled Hyperdrive transactions. A Windows
+Python fixture also used the default code page for Unicode JSON; it now writes
+UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
+the passing Python rerun. No hosted objects or provider calls were used.
 
 ## QA-02 reference integrity preparation - November 13, 2026
 

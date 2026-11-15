@@ -25,9 +25,10 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
-import { menuRouteFromPath } from './route';
+import { resolveMenuRoute } from './route';
 import {
   bindMenuSearch,
   SEARCH_ALL_CATEGORY_ID,
@@ -372,8 +373,21 @@ function attachSave(bind: () => () => void): () => void {
 
 // Removes the previous mount's Saved-route listener, so remounting never navigates twice.
 let stopRouting: () => void = () => {};
+// Detaches the active screen's Save and live-artwork lifecycle before the next screen or remount renders.
+let leaveScreen: () => void = () => {};
+
+function runLeaveScreen(): void {
+  const prev = leaveScreen;
+  leaveScreen = () => {};
+  prev();
+}
 
 export function mountMenuScreen(container: HTMLElement): void {
+  try {
+    runLeaveScreen();
+  } catch {
+    /* Ensure remaining mount teardown still runs if a screen cleanup callback throws. */
+  }
   teardownTracking?.();
   teardownTracking = null;
   activeLoad?.abort();
@@ -393,8 +407,6 @@ export function mountMenuScreen(container: HTMLElement): void {
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
   let view: 'menu' | 'detail' | 'saved' = 'menu';
-  // Detaches the current screen's Save behaviour before the next screen renders.
-  let leaveScreen: () => void = () => {};
   // True when this page added the Saved route to history, so leaving it can go back instead.
   let savedRouteAdded = false;
   let isLoading = false;
@@ -536,8 +548,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const switchScreen = (next: typeof view) => {
     if (view === 'menu') savedScroll = window.scrollY;
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     disposeObserver();
     // Leaving a screen ends its tracking: exposure timers and the detail clock's final checkpoint.
     cleanupExposure();
@@ -577,9 +588,20 @@ export function mountMenuScreen(container: HTMLElement): void {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
     }
     const state = saveState;
-    leaveScreen = attachSave(() =>
+    const stopArtwork =
+      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL
+        ? mountLiveArtwork(container, dish, {
+            apiBase: import.meta.env.VITE_PUBLIC_API_URL,
+            venueId: menu.venueId,
+          })
+        : () => {};
+    const stopSave = attachSave(() =>
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
+    leaveScreen = () => {
+      stopArtwork();
+      stopSave();
+    };
     window.scrollTo(0, 0);
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.
@@ -728,8 +750,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       }
     }
     cleanupExposure();
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     renderMenu(container, next, (dish) => showDetail(dish, 'menu_card'));
     const state = saveState;
     if (state) {
@@ -795,10 +816,14 @@ export function mountMenuScreen(container: HTMLElement): void {
             import('./published'),
             import('../tracking'),
             import('../tracking/delivery'),
-          ]).then(([published, tracking, delivery]): Promise<MenuLoadResult> | MenuLoadResult => {
+          ]).then(async ([published, tracking, delivery]): Promise<MenuLoadResult> => {
             const apiBase = import.meta.env.VITE_PUBLIC_API_URL;
             if (!apiBase) return { status: 'error' };
-            const route = menuRouteFromPath(window.location.pathname);
+            const route = await resolveMenuRoute(window.location.pathname, {
+              apiBase,
+              signal: controller.signal,
+            });
+            controller.signal.throwIfAborted();
             if (!route) return { status: 'unavailable' };
             const source = published.createPublishedMenuSource({
               apiBase,

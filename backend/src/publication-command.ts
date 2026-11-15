@@ -9,6 +9,7 @@ import {
   type WithdrawMenu,
 } from '@peekaplate/contracts';
 import type { Client } from 'pg';
+import { assignRestaurantLink } from './restaurant-link';
 
 export type ApproveMenuRevisionInput = ApproveMenuRevision & { menuId: string };
 export type PublishMenuInput = PublishMenu & { menuId: string };
@@ -426,11 +427,35 @@ export async function publishMenu(
       topic: 'menu.published',
       outboxPayload: { eventId, menuId: input.menuId, publicationId },
     });
+    await assignRestaurantLink(client, venueId, input.menuId);
     await client.query('COMMIT');
     started = false;
     return result;
   } catch (error) {
     if (started) await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+export async function readDinerLink(
+  client: Client,
+  actorId: string,
+  venueId: string,
+  menuId: string,
+) {
+  await beginAuthorizedOwner(client, actorId, venueId);
+  try {
+    const result = await client.query<{ slug: string }>(
+      `SELECT link.slug FROM app_private.restaurant_menu_link link
+       JOIN app_private.menu_publication_current publication
+         ON publication.tenant_id = link.tenant_id AND publication.menu_id = link.menu_id
+       WHERE link.tenant_id = $1 AND link.menu_id = $2 AND publication.status = 'published'`,
+      [venueId, menuId],
+    );
+    await client.query('COMMIT');
+    return result.rows[0] ? { path: `/diner/${result.rows[0].slug}` } : undefined;
+  } catch (error) {
+    await client.query('ROLLBACK');
     throw error;
   }
 }

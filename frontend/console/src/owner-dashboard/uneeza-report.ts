@@ -1,15 +1,15 @@
 // Demo data. An owner_report.v1 payload produced by #107's readOwnerReport (at 205214f) from
 // Uneeza's synthetic test-data/owner-synthetic-p0-v2 full_dataset.jsonl, through the S5-DATA-12
 // reconciliation harness, and validated with OwnerDishReportSchema. Synthetic, not captured data.
-// Only change from the generated payload: source is 'synthetic' (the harness calls the reader with
-// its default, 'production'). Replaced by the live
-// GET /api/v1/venues/:venueId/analytics/dishes call in S3-RES-03.
+// Metadata matches develop's readOwnerReport (385a19f): source 'synthetic', so calculation_version
+// is 'synthetic.v1', and freshness.is_stale is null (the reader abstains on freshness).
+// Replaced by the live GET /api/v1/venues/:venueId/analytics/dishes call in S3-RES-03.
 export const UNEEZA_REPORT = {
   schema_version: 'owner_report.v1',
   venue_id: 'e188609f-cebb-44ce-addc-2c583c5229d1',
   source: 'synthetic',
   report_metadata: {
-    calculation_version: 'production.v1',
+    calculation_version: 'synthetic.v1',
     generated_at: '2026-10-20T07:00:00.000Z',
     date_window: {
       start_time: '2026-10-19T07:00:00.000Z',
@@ -22,7 +22,7 @@ export const UNEEZA_REPORT = {
     },
     freshness: {
       last_event_ingested_at: '2026-10-20T06:00:07.000Z',
-      is_stale: false,
+      is_stale: null,
     },
     report_status: 'NORMAL',
   },

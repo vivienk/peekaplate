@@ -9,6 +9,7 @@ export default defineConfig({
       'frontend/diner/src/**/*.test.ts',
       'frontend/console/src/**/*.test.tsx',
       'frontend/diner/src/**/*.test.ts',
+      'tests/data06/**/*.test.ts',
     ],
   },
 });

@@ -15,6 +15,7 @@ import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { Client } from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { createStaffVerifier } from './auth';
+import { CommandError } from './dish-command';
 import app, {
   CONSOLE_REPORT_CORS_ALLOWED_ORIGINS,
   consumeJtiRateLimit,
@@ -160,7 +161,39 @@ describe('foundation API', () => {
   });
 });
 
-describe('owner report HTTP boundary', () => {
+describe.each(['', '/export'])('owner report HTTP boundary %s', (suffix) => {
+  const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
+  const reportFixture = {
+    schema_version: 'owner_report.v1',
+    venue_id: venueId,
+    source: 'synthetic',
+    report_metadata: {
+      calculation_version: 'synthetic.v1',
+      generated_at: '2026-11-06T12:00:00.000Z',
+      date_window: {
+        duration_hours: 24,
+        start_time: '2026-11-05T12:00:00.000Z',
+        end_time: '2026-11-06T12:00:00.000Z',
+      },
+      coverage: { total_dishes_monitored: 0, measurable_dishes_count: 0 },
+      freshness: { is_stale: null, last_event_ingested_at: null },
+      report_status: 'EMPTY',
+    },
+    dishes: [],
+  };
+  const expectReport = async (response: Response) => {
+    expect(response.status).toBe(200);
+    if (suffix === '/export') {
+      expect(response.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+      expect(response.headers.get('Content-Disposition')).toBe(
+        `attachment; filename="owner-report-${venueId}-2026-11-06.csv"`,
+      );
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(await response.text()).toMatch(/^schema_version,venue_id,source,/);
+    } else {
+      expect(await response.json()).toEqual(reportFixture);
+    }
+  };
   it('fails closed without one explicit synthetic source using a signed staff JWT', async () => {
     const actorId = '00000000-0000-4000-8000-000000000003';
     const venueId = '00000000-0000-4000-8000-000000000001';
@@ -192,7 +225,7 @@ describe('owner report HTTP boundary', () => {
         .setExpirationTime('5 minutes')
         .sign(keys.privateKey);
       const syntheticVenueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
-      const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: syntheticVenueId, dishes: [] });
+      const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
       const app = createApp({
         verify: createStaffVerifier({ issuer, allowLocalIssuer: true }),
         execute: vi.fn(),
@@ -207,7 +240,7 @@ describe('owner report HTTP boundary', () => {
         ['?source=synthetic', {}],
       ]) {
         const response = await app.request(
-          `/api/v1/venues/${venueId}/analytics/dishes${query}`,
+          `/api/v1/venues/${venueId}/analytics/dishes${suffix}${query}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -219,15 +252,11 @@ describe('owner report HTTP boundary', () => {
       expect(readOwnerReport).not.toHaveBeenCalled();
 
       const syntheticResponse = await app.request(
-        `/api/v1/venues/${syntheticVenueId}/analytics/dishes?source=synthetic`,
+        `/api/v1/venues/${syntheticVenueId}/analytics/dishes${suffix}?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
         { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: syntheticVenueId },
       );
-      expect(syntheticResponse.status).toBe(200);
-      expect(await syntheticResponse.json()).toEqual({
-        venue_id: syntheticVenueId,
-        dishes: [],
-      });
+      await expectReport(syntheticResponse);
       expect(readOwnerReport).toHaveBeenCalledTimes(1);
       expect(readOwnerReport).toHaveBeenCalledWith(
         actorId,
@@ -238,7 +267,7 @@ describe('owner report HTTP boundary', () => {
       );
 
       const canonicalVenueResponse = await app.request(
-        `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+        `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
         { headers: { Authorization: `Bearer ${token}` } },
         { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId },
       );
@@ -257,7 +286,7 @@ describe('owner report HTTP boundary', () => {
     const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
     const now = new Date('2026-11-06T12:00:00.000Z');
     const verify = vi.fn().mockResolvedValue(actorId);
-    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
     const app = createApp({
       verify,
       execute: vi.fn(),
@@ -266,15 +295,14 @@ describe('owner report HTTP boundary', () => {
     });
 
     const response = await app.request(
-      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
       {
         headers: { Authorization: 'Bearer test-token' },
       },
       { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId },
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ venue_id: venueId, dishes: [] });
+    await expectReport(response);
     expect(verify).toHaveBeenCalledWith('Bearer test-token', {
       APP_ENV: 'local',
       SYNTHETIC_REPORT_VENUE_ID: venueId,
@@ -300,7 +328,7 @@ describe('owner report HTTP boundary', () => {
     });
 
     const response = await app.request(
-      `/api/v1/venues/${requestedVenueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${requestedVenueId}/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Authorization: ['Bearer', 'test-token'].join(' ') } },
       { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: approvedSyntheticVenueId },
     );
@@ -314,10 +342,10 @@ describe('owner report HTTP boundary', () => {
     const actorId = '00000000-0000-4000-8000-000000000003';
     const venueId = SYNTHETIC_REPORT_VENUE_ALLOWLIST[0];
     const verify = vi.fn().mockResolvedValue(actorId);
-    const readOwnerReport = vi.fn().mockResolvedValue({ venue_id: venueId, dishes: [] });
+    const readOwnerReport = vi.fn().mockResolvedValue(reportFixture);
     const reportApp = createApp({ verify, execute: vi.fn(), readOwnerReport });
     const env = { APP_ENV: 'local', SYNTHETIC_REPORT_VENUE_ID: venueId };
-    const path = `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`;
+    const path = `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`;
     const preflight = (origin: string) =>
       reportApp.request(
         path,
@@ -356,7 +384,7 @@ describe('owner report HTTP boundary', () => {
       const report = await get(origin, 'Bearer test-token');
       expect(report.status).toBe(200);
       expect(report.headers.get('Access-Control-Allow-Origin')).toBe(origin);
-      expect(await report.json()).toEqual({ venue_id: venueId, dishes: [] });
+      await expectReport(report);
     }
     // A preflight never reaches authentication or the report reader.
     expect(verify).toHaveBeenCalledTimes(CONSOLE_REPORT_CORS_ALLOWED_ORIGINS.length);
@@ -389,7 +417,7 @@ describe('owner report HTTP boundary', () => {
     const env = { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId };
 
     const noToken = await reportApp.request(
-      `/api/v1/venues/${venueId}/analytics/dishes?source=synthetic`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Origin: origin } },
       env,
     );
@@ -397,20 +425,39 @@ describe('owner report HTTP boundary', () => {
     expect(noToken.headers.get('Access-Control-Allow-Origin')).toBe(origin);
 
     const otherVenue = await reportApp.request(
-      '/api/v1/venues/00000000-0000-4000-8000-000000000001/analytics/dishes?source=synthetic',
+      `/api/v1/venues/00000000-0000-4000-8000-000000000001/analytics/dishes${suffix}?source=synthetic`,
       { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
       env,
     );
     expect(otherVenue.status).toBe(503);
 
     const noSyntheticSource = await reportApp.request(
-      `/api/v1/venues/${venueId}/analytics/dishes`,
+      `/api/v1/venues/${venueId}/analytics/dishes${suffix}`,
       { headers: { Origin: origin, Authorization: 'Bearer test-token' } },
       env,
     );
     expect(noSyntheticSource.status).toBe(503);
     expect(readOwnerReport).not.toHaveBeenCalled();
   });
+
+  it.each(['other-owner', 'revoked-owner'])(
+    'preserves the current membership denial for %s',
+    async (actor) => {
+      const readOwnerReport = vi.fn().mockRejectedValue(new CommandError('forbidden', 403));
+      const reportApp = createApp({
+        verify: vi.fn().mockResolvedValue(actor),
+        execute: vi.fn(),
+        readOwnerReport,
+      });
+      const response = await reportApp.request(
+        `/api/v1/venues/${venueId}/analytics/dishes${suffix}?source=synthetic`,
+        { headers: { Authorization: 'Bearer test-token' } },
+        { APP_ENV: 'staging', SYNTHETIC_REPORT_VENUE_ID: venueId },
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: 'forbidden' });
+    },
+  );
 
   it('does not add the console origins to the diner routes', async () => {
     const consoleOrigin = 'https://peekaplate-console-staging.pages.dev';
