@@ -64,7 +64,7 @@ describe('DishEditor (Screen 9)', () => {
     expect(html).toContain('Diners will see: Contains: milk, wheat.');
   });
 
-  it('never offers AI drafting and says verifying does not publish', () => {
+  it('never offers AI drafting and says approval does not publish', () => {
     const { form, evidence } = scanned();
     const html = renderToStaticMarkup(
       <DishEditor
@@ -77,15 +77,15 @@ describe('DishEditor (Screen 9)', () => {
       />,
     );
     expect(html).not.toMatch(/AI/);
-    expect(html).toContain('Verifying a dish does not publish your menu.');
-    expect(html).toContain('Verify dish');
+    expect(html).toContain('Approving a dish does not publish your menu.');
+    expect(html).toContain('Approve dish');
   });
 
   it('hides Verify when the parent cannot approve this dish', () => {
     const html = renderToStaticMarkup(
       <DishEditor value={emptyManualDish()} onChange={noop} onSave={noop} onCancel={noop} />,
     );
-    expect(html).not.toContain('Verify dish');
+    expect(html).not.toContain('Approve dish');
     expect(html).toContain('Save draft');
   });
 });
