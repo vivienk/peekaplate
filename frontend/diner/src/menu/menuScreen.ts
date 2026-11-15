@@ -32,11 +32,13 @@ import {
   track,
 } from '../tracking';
 import type { MenuToken } from '../tracking/delivery';
+import { completeDishes } from './adapter';
 import { menuMode } from './config';
 import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
 import { resolveMenuRoute } from './route';
@@ -393,8 +395,21 @@ function attachSave(bind: () => () => void): () => void {
 
 // Removes the previous mount's Saved-route listener, so remounting never navigates twice.
 let stopRouting: () => void = () => {};
+// Detaches the active screen's Save and live-artwork lifecycle before the next screen or remount renders.
+let leaveScreen: () => void = () => {};
+
+function runLeaveScreen(): void {
+  const prev = leaveScreen;
+  leaveScreen = () => {};
+  prev();
+}
 
 export function mountMenuScreen(container: HTMLElement): void {
+  try {
+    runLeaveScreen();
+  } catch {
+    /* Ensure remaining mount teardown still runs if a screen cleanup callback throws. */
+  }
   teardownTracking?.();
   teardownTracking = null;
   activeLoad?.abort();
@@ -414,8 +429,6 @@ export function mountMenuScreen(container: HTMLElement): void {
   // Shared by every screen, so the hearts, badge and Saved screen agree (S3-DIN-02).
   let saveState: SaveState | null = null;
   let view: 'menu' | 'detail' | 'saved' | 'compare' = 'menu';
-  // Detaches the current screen's Save behaviour before the next screen renders.
-  let leaveScreen: () => void = () => {};
   // True when this page added the Saved route to history, so leaving it can go back instead.
   let savedRouteAdded = false;
   let isLoading = false;
@@ -557,8 +570,7 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   const switchScreen = (next: typeof view) => {
     if (view === 'menu') savedScroll = window.scrollY;
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     disposeObserver();
     // Leaving a screen ends its tracking: exposure timers and the detail clock's final checkpoint.
     cleanupExposure();
@@ -587,13 +599,20 @@ export function mountMenuScreen(container: HTMLElement): void {
   // compareBack: opened with View details on a Compare result (source compare_view); Back returns
   // to that result and the detail offers no Compare of its own.
   const showDetail = (
-    dish: CompleteDish,
+    requestedDish: CompleteDish,
     from: 'menu_card' | 'saved_screen',
     returning = false,
     compareBack?: () => void,
   ) => {
     if (!currentMenu || !saveState) return;
     const menu = currentMenu;
+    const dish = completeDishes(menu).find((dish) => dish.dishId === requestedDish.dishId);
+    if (!dish) {
+      if (compareBack) leaveCompare();
+      else if (from === 'saved_screen') showSaved();
+      else showMenu('opener');
+      return;
+    }
     switchScreen('detail');
     const fromSaved = from === 'saved_screen';
     renderDishDetail(
@@ -608,9 +627,20 @@ export function mountMenuScreen(container: HTMLElement): void {
       container.querySelector('.pp-detail__back')?.setAttribute('aria-label', 'Back to Saved');
     }
     const state = saveState;
-    leaveScreen = attachSave(() =>
+    const stopArtwork =
+      menu.source === 'published' && import.meta.env.VITE_PUBLIC_API_URL
+        ? mountLiveArtwork(container, dish, {
+            apiBase: import.meta.env.VITE_PUBLIC_API_URL,
+            venueId: menu.venueId,
+          })
+        : () => {};
+    const stopSave = attachSave(() =>
       bindDetailSave(container, { saveState: state, menu, send: track }),
     );
+    leaveScreen = () => {
+      stopArtwork();
+      stopSave();
+    };
     window.scrollTo(0, 0);
 
     // The Saved screen's own entry point (DIN-02.5), unchanged.
@@ -669,9 +699,15 @@ export function mountMenuScreen(container: HTMLElement): void {
 
   // Compare on a detail opens the picker (DIN-02.3); closing it returns to that detail's Compare
   // button. The picker itself sends nothing.
-  const showPicker = (dish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
+  const showPicker = (requestedDish: CompleteDish, from: 'menu_card' | 'saved_screen') => {
     if (!currentMenu) return;
     const menu = currentMenu;
+    const dish = completeDishes(menu).find((dish) => dish.dishId === requestedDish.dishId);
+    if (!dish) {
+      if (from === 'saved_screen') showSaved();
+      else showMenu('opener');
+      return;
+    }
     switchScreen('compare');
     renderComparePicker(container, {
       menu,
@@ -692,6 +728,10 @@ export function mountMenuScreen(container: HTMLElement): void {
   // after a start or a replacement; coming back from a detail or a cancelled Replace shows it again
   // silently. The same comparison_id is kept across Replace (matrix v0.1h D7).
   let compareScroll = 0;
+  const leaveCompare = () => {
+    if (isSavedRoute()) leaveSaved();
+    else showMenu();
+  };
   const showResult = (
     comparison: Comparison,
     action?: CompareAction,
@@ -705,7 +745,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       menu,
       comparison,
       focus,
-      onBackToMenu: () => showMenu(),
+      onBackToMenu: leaveCompare,
       onReplace: (side) => {
         compareScroll = window.scrollY;
         showReplacePicker(comparison, side);
@@ -718,7 +758,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       },
     });
     if (!shown) {
-      showMenu();
+      leaveCompare();
       return;
     }
     // Coming back to the result (focus set) restores where the diner was, so the focused View
@@ -737,7 +777,10 @@ export function mountMenuScreen(container: HTMLElement): void {
     const menu = currentMenu;
     const keptId = side === 'first' ? comparison.otherDishId : comparison.firstDishId;
     const keptDish = completeDishById(menu, keptId);
-    if (!keptDish) return;
+    if (!keptDish) {
+      leaveCompare();
+      return;
+    }
     const back = { side, control: 'replace' } as const;
     switchScreen('compare');
     renderComparePicker(container, {
@@ -852,8 +895,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       }
     }
     cleanupExposure();
-    leaveScreen();
-    leaveScreen = () => {};
+    runLeaveScreen();
     renderMenu(container, next, (dish) => showDetail(dish, 'menu_card'));
     const state = saveState;
     if (state) {

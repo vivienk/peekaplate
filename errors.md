@@ -3529,3 +3529,193 @@ publication/event/receipt/outbox write and a successful identical retry: all
 140 Worker/database tests and 320 SQL assertions pass. GitHub initially denied
 push/PR creation because the operator email was unverified; after verification,
 the branch and draft PR #176 were created. No GitHub protection was bypassed.
+
+
+## ERR-20261114-OWNER-WORKSPACE — resolved integration findings
+
+The new workspace browser check exposed the reused sidebar outside a landmark, low-contrast brand text and an ambiguous implicit restaurant-select label. The sidebar now uses a labelled aside, the live workspace uses the existing readable text token, and the select has an explicit unique label association. The same Chromium selection/accessibility regressions now pass (10/10 workspace cases, 11.0s). No design facts, restaurant status or permission were invented.
+
+The first browser run overlapped source formatting/HMR; a later provider run overlapped the database runner's local-server smoke on port 5174. Those harness launches were stopped; database and browser suites were then run sequentially. Restricted-role SQL/workerd checks passed 320 assertions and144 integration tests; the provider suite passed10/10 in23.8s. Use separate server windows and finish source mutations before browser verification. Two documentation patches also rejected a guessed empty heading before writing; use exact inspected anchors or a bounded append helper instead. No product failure is inferred from those harness/patch errors.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-14T19:49:03.988Z","exitCode":1}
+```
+
+
+## ERR-20261114-OWNER-REPORT-SEAM — resolved
+
+The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
+
+The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+
+## 2026-11-14 — Pages clean auth callbacks
+
+Hosted static verification found Pages returning 308 from both configured
+`.html` callback entries to their extensionless paths. The live entry and parser
+recognised only `.html`, so a real confirmation/recovery return lost its purpose
+and code. Added exact same-purpose aliases in one shared matcher. Unit and real
+SDK/browser regressions reproduce the old failure; wrong-purpose, query/fragment
+and path checks remain strict. No Supabase allowlist or credential policy changed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T23:34:03.526Z","exitCode":2}
+```
+
+## 2026-11-14 — Read-only ingestion verifier false acceptance
+
+Nine focused regressions reproduced missing/failed/foreign-record acceptance,
+unpaired report versions, wrong viewer probe, unsupported provider accounting,
+and unsafe evidence/origin handling. The verifier now fails closed, binds source
+and producer identities, rejects redirects and reports upstream calls as unknown.
+The real Worker/PostgreSQL regression covers the owner, viewer and cross-venue
+routes. Its initial typed fixture omitted required nullable fields; those fields
+were restored to match the production contract. Final typecheck and checks passed.
+
+## Ingredient icon preparation — November 12, 2026
+
+Initial environment discovery found no system Python pydantic; tests use the existing isolated Python 3.12 environment (pydantic 2.14.3, Pillow 13.0.0), not the frozen deployment environment. The first eight-case icon run exposed trailing whitespace in the new empty-ingredient synthetic fixture: DishDraft stripped it while source offsets retained it. The fixture now supplies explicit nonblank unknown-ingredient text; source validation remains strict. Ingredient tests (23), review-candidate tests (17) and full Python suite (526) pass. Initial branch setup could not fast-forward main to develop; a new clean task branch was based directly on the fetched develop SHA before edits. No existing work was discarded.
+
+Ingredient icon review found a corrupt, deeply nested catalogue JSON could raise RecursionError rather than fall back to text. Catalogue reads now normalize this to ValueError; the new regression and all 24 ingredient tests pass. Initial pnpm checks were blocked by system Node 24.14 and automatic dependency installation without network access. Using installed Node 24.16 and disabling only automatic dependency installation allowed the dependency-free repository context/docs verification commands to pass; no check itself was disabled.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-13T07:35:35.800Z","exitCode":1}
+```
+
+## Ingredient illustration generation — November 12, 2026
+
+The original fixed artwork vocabulary prevented coconut generation. Artwork identities now support bounded explicit new phrases without adding food-classification rules. Actual coconut generation used the built-in tool; the Gemini adapter has no configured key and is tested with a mocked HTTP response only. 536 Python tests pass in the existing non-frozen environment; 33 focused tests also pass after draft-binding changes. Context validation caught a summary exceeding its bound; concise wording fixes the documentation without changing behavior.
+
+Generation review found valid JSON with non-object provider fields could raise AttributeError and stop the batch. Explicit envelope/candidate/content/part/image type validation now returns a sanitized failed job; malformed-shape regression verifies remaining ingredients still run. Focused ingredient suite passes 34 tests.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-13T08:18:46.464Z","exitCode":2}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-13T08:20:15.323Z","exitCode":1}
+```
+
+## Diner ingredient integration verification — November 13, 2026
+
+The first typecheck caught unchecked indexed access in the generated catalogue resolver and an optional test error handler. Both now have explicit guards. Focused menu tests exercise missing mappings and failed-image handling. The first local browser run could not bind port 5173 under restricted execution (EPERM); rerun with local server permission. No food-review command was changed.
+
+Follow-up: full JavaScript tests initially failed when authentication fixtures could not bind local ports; the permitted rerun passes all 1,423 unit and 74 script tests. The normal browser runner found port 5173 occupied. A temporary copy of the two targeted browser cases used only port 5283 and the diner server; both pass. The first temporary config was mistakenly placed under Playwright's cleaned output directory and found no tests; moving it outside that directory fixed the runner setup. Temporary runner files were removed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-14T06:21:04.472Z","exitCode":2}
+```
+
+## Automatic ingredient artwork delivery verification — November 13, 2026
+
+The initial integration-test typecheck rejected direct access to unknown JSON responses. The test now validates responses with shared artwork schemas; typecheck, unit/script tests and builds pass. Docker is unavailable on this host, so real PostgreSQL assertions are wired into the existing CI database runner rather than claimed as local passes. The browser refresh test uses a temporary diner-only port-5283 configuration; it passed and temporary files were removed.
+
+Independent review found that hosted PNG validation rejected transparent indexed PNGs accepted by the importer. The backend now accepts alpha-channel or tRNS transparency and validates bounded chunk structure; Python and backend regressions preserve the exact reviewed indexed bytes. Both focused checks pass. Earlier PR CI failed only its description-label check; the updated description is validated with `checkPullRequest` before upload.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T23:55:57.240Z","exitCode":1}
+```
+
+## 2026-11-14 — Ingredient artwork cleanup/approval race
+
+A real PostgreSQL regression paused cleanup after its old-object HEAD, completed
+the approval's initial upload, then let cleanup delete before the approval took
+its blob lock. Approval committed a missing object. Phase C now verifies/repairs
+exact bytes under that same transaction lock, after authorization, replay and
+version checks. The interleaving and repair-failure rollback tests cover the fix.
+This final R2 operation intentionally stays inside the transaction; session-level
+locks are unsafe to assume across pooled Hyperdrive transactions. A Windows
+Python fixture also used the default code page for Unicode JSON; it now writes
+UTF-8 explicitly. An intermediate fixture indentation edit was corrected before
+the passing Python rerun. No hosted objects or provider calls were used.
+
+## 2026-11-14 — Order restore reconciliation review
+
+The actual Windows CLI exited zero without validation because its manually built
+file URL did not match import.meta.url. pathToFileURL fixes that entrypoint; the
+documented transform-types flag plus the existing Node resolution hook now loads
+the real restore function, including source-only .js-to-.ts contract imports.
+The child-process loader regression verifies the real freeze check is reached.
+
+A PostgreSQL regression reproduced duplicate audit insertion on repeated restore:
+FOUND referred to the last DELETE rather than the request lookup. Explicit row
+identity fixes both existing/missing request cases. Cutoff and exact-key protection
+preserve later authorized imports during historical deletion replay. An execution
+is bound to its first operator to preserve immutable intent/completion identity.
+Tests use disposable PostgreSQL and synthetic storage; no hosted purge occurred.
+
+Reconciliation with the artwork scheduler exposed an obsolete storage variable
+and a cleanup guard requiring an unnecessary put method. The scheduler now passes
+the order bucket explicitly and permits its existing list/delete retry contract;
+the scheduled retry and artwork-isolation tests pass. The bounded context summary
+was shortened before fingerprint refresh. No behavior was accepted from a merge
+without type and regression checks.
+
+The final restore/checker regression exposed original receipt counts being
+replaced by counts from a partial restored snapshot. Reconciliation now requires
+and validates the original completed receipt in SQL, preserving its executor and
+counts; restore-run counters remain separate. Checker remaining-data checks use
+the same cutoff and exact newer batch keys. The real PostgreSQL partial-snapshot
+restore followed by independent verification now passes without deleting the
+newer import. The new required receipt also needed an existing direct-SQL test
+fixture updated; its earlier failure was an obsolete fixture, then rerun passed.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T00:20:30.553Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T00:32:08.133Z","exitCode":1}
+```
+
+## QA-02 reference integrity preparation - November 13, 2026
+
+The initial lint observation was JSON formatting in the new draft synthetic
+reference. Formatting was applied and the manifest hash refreshed before any
+prediction run; pnpm check subsequently passed. Historical menu keys were unchanged.
+
+Independent review reproduced source/reference check-then-read replacement and
+rejection of an explicitly qualified single-price null. The validator now hashes
+and parses the same bounded byte snapshots, and supports qualified null scalars
+with an explicit reason. A CLI regression also replaced an unhelpful generic
+pending-review failure with a controlled reason, without exposing private input.
+The 18 focused tests and 536-test offline Python suite pass. See
+processing/tests/test_qa02_reference.py and processing/eval/qa02/EVIDENCE.md.
+Integrity checks do not certify source truth, reviewer identity, model quality
+or hosted acceptance; the example's independent review remains pending.
+
+## Compare picker publication refresh - November 14, 2026
+
+Three browser regressions reproduced an old kept dish surviving a publication
+refresh: closing the picker could pair its old dish revision with the current
+publication or reopen a removed dish; Compare from an old detail kept stale data.
+Detail and picker navigation now resolve the dish from the current validated menu,
+falling back to Menu or Saved when it no longer exists. All three regressions and
+the picker, live-trigger, Save and artwork suite pass (26 browser cases, 28.9s).
+These synthetic browser sinks do not establish hosted analytics acceptance.
+
+## Compare result exits - November 14, 2026
+
+Real-browser regressions reproduced a stale result after Replace's kept dish was
+removed by publication refresh, and a Saved-origin result returning to Menu while
+leaving the Saved hash in the URL. Compare exits now use the existing Saved-route
+cleanup when needed; missing kept dishes return safely to the current menu.
+Three regressions cover Back to Menu, removed Replace targets and removed detail
+navigation from Saved-origin comparisons. All 38 targeted browser cases pass
+in 39.4s. The added Saved-return test asserts the visible heading rather than an
+incidental CSS class. No hosted acceptance is inferred from synthetic sinks.
+The context-check observation below came from editing the final regression during
+the check; reviewed fingerprints were refreshed afterward.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T06:35:36.517Z","exitCode":1}
+```

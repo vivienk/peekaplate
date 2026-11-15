@@ -39,6 +39,20 @@ async function compare(page: Page, keptName: string, pickedName: string, scenari
 
 const sideNames = (page: Page) => page.locator('.pp-compare__name');
 
+test('Back to Menu from a Saved-origin comparison leaves the Saved route', async ({ page }) => {
+  await page.goto('http://127.0.0.1:5173/?scenario=demo');
+  await page.getByRole('button', { name: 'Save Avocado Toast', exact: true }).first().click();
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await page.locator('.pp-saved__open').first().click();
+  await page.locator('.pp-detail__compare').click();
+  await page.locator('.pp-picker__choose').first().click();
+  await page.locator('.pp-picker__confirm').click();
+  await page.getByRole('button', { name: 'Back to Menu', exact: true }).click();
+  await expect(page).not.toHaveURL(/#saved$/);
+  await page.getByRole('button', { name: /^Saved dishes/ }).click();
+  await expect(page.getByRole('heading', { name: 'Saved Dishes', exact: true })).toBeVisible();
+});
+
 async function expectNoAxeViolations(page: Page) {
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
