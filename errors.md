@@ -4373,6 +4373,9 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 
 Closing a preview opened from Saved reset the accessible back label to Menu while the callback still returned Saved. The real-browser regression failed before the fix. Capture the label when opening and restore it on close; the integrated Compare-origin case is covered too. Preview disposal now participates in the existing detail cleanup with artwork and Save, preserving current navigation and refresh behavior.
 
+- Reconciliation check: an over-broad external conflict-repair regex consumed the detail module after its import conflict. TypeScript, browser startup and independent review caught missing exports before any push. Restored the full module from #196 and reapplied only the portion lifecycle changes. Existing detail/Compare tests plus both portion-return regressions verify the restored module.
+- Full offline Python discovery in the existing Linux service image ran 655 tests in 55.408s; four spatial browser-harness tests could not start because that image has no Node binary. This is an environment failure, not a passing suite. Rerun those tests with the existing host Node environment; no provider networking was enabled.
+
 ## 2026-11-15 full Chromium run flakes on the Compare design follow-up
 
 - Check: `pnpm exec playwright test tests/e2e --project=chromium` on feat/s6-din-05-compare-design-followup.
@@ -4420,3 +4423,8 @@ Closing a preview opened from Saved reset the accessible back label to Menu whil
 The empty focused search kept its dark-surface placeholder colour on a light surface. A browser-computed WCAG contrast check reproduced 2.3557:1 (required 4.5:1); the generic axe scan alone did not catch this pseudo-element. The focused placeholder now uses the existing neutral-600 token. `tests/e2e/search.spec.ts` covers the actual focused placeholder; 66 related Chromium checks pass in 1.1 minutes.
 
 - PR162 merge validation: the first context check exceeded the 1,000-character summary limit. Shortened the three affected summaries while retaining current module behavior; context/docs/build pass. Integrated camera checks passed 78/79 before updating the old back-icon selector to the authored #196 SVG and restoring the #162 search image.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T20:15:41.960Z","exitCode":2}
+```
