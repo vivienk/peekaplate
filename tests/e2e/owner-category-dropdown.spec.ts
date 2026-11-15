@@ -93,8 +93,7 @@ for (const keyboard of [false, true]) {
       await field.focus();
       await page.keyboard.press('End');
       await page.keyboard.press('Enter');
-    }
-    else await page.getByRole('option', { name: 'add', exact: true }).click();
+    } else await page.getByRole('option', { name: 'add', exact: true }).click();
     await expect(field).toHaveText('add');
     await expect(field).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByLabel('New category name')).toHaveCount(0);

@@ -302,8 +302,10 @@ hashes or approved acquisition configuration, cache state and scorer version.
 
 **Unresolved:** representative held-out population, source rights/access,
 independent labels, scalar/name/role/whole-menu thresholds, runtime/error ceilings
-and Sai/Vivien sign-off. **No overall accuracy threshold is set.** Until agreed
-before scoring, a score cannot close this gate. Fresh provider evidence needs
+and Sai/Vivien sign-off. This record does not establish a reviewed whole-menu
+extraction population/threshold mapping; the rubric v0.4's accepted numerical
+criteria remain separate. Until the mapping is agreed before scoring, a score
+cannot close this gate. Fresh provider evidence needs
 separate authorization; frozen-response evaluation adds no new provider evidence.
 
 **Evidence/scope/preconditions:** references and raw inputs remain private/out of
@@ -352,6 +354,15 @@ Mohammad must supply the exact private evaluator command, versioned manifest,
 scorer tests and sanitized result ledger; Vivien must approve thresholds before
 execution. Inventing an executable command or declaring synthetic PASS would be
 false evidence.
+
+**November 13 reference-preparation handoff:** the [QA-02 reference pack](../processing/eval/qa02/README.md)
+now provides an offline source/reference byte-integrity CLI, explicit development
+inventory, three fictional source-based annotations and regression evidence.
+It rejects hash/page/split inconsistencies and can require a recorded independent
+review. This is not the strict quality scorer above, does not authenticate a
+reviewer's identity and does not approve reference truth. The legacy fuzzy scorer
+and unreviewed menu keys remain unchanged. Actual menu/holdout evaluation and
+final acceptance still require their frozen sources, reviewed labels and approved run.
 
 ## CONS-01 — Actual consumer save/reload and source authorization
 

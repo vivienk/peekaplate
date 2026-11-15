@@ -1,5 +1,9 @@
 # Menu extraction
 
+For QA-02 source-based reference preparation, development/holdout separation and
+the offline freeze/verify commands, see the [reference handoff](eval/qa02/README.md).
+Its integrity checks are separate from menu accuracy and independent acceptance.
+
 The optional staging HTTP service wraps this same pipeline; it does not replace
 the CLI. See [VIS-01 infrastructure and service handoff](../docs/menu-ingestion-infrastructure.md)
 for the request contract, Docker commands, secrets, limits and activation gates.

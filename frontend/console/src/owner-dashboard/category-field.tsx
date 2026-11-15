@@ -38,7 +38,7 @@ export function CategoryField({
   const [name, setName] = useState('');
   const fieldRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
-  const keys = [ADD, ...categories];
+  const keys: CategoryKey[] = [ADD, ...categories];
 
   const close = (refocus = true) => {
     setOpen(false);
