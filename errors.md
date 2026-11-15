@@ -2759,3 +2759,16 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"id":"ERR-20261115-DINER-RELEASE-CI","status":"resolved","area":"release-reconciliation","cause":"The selective release omitted the merged prepare_assets portion entrypoint; the publication retry browser mock also cleared its failure before the request completed.","prevention":"Promote entrypoints with their caller tests; synchronize failure recovery against the observed response.","sources":["processing/src/peekaplate_processing/prepare_assets.py","processing/tests/test_portion_ingestion.py","tests/e2e/owner-workspace.spec.ts"],"regression":"Full Python suite: 516 tests PASS in 44.823s with UTF-8; publication retry case: 8 repeated passes in 24.4s. Hosted CI rerun required before merge."}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T22:22:25.556Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-EXTRACTION-DRYRUN-OUTPUT", "status": "resolved", "area": "local-verification", "cause": "The extraction dry-run wrote generated JavaScript under an unignored .tmp directory, so Biome lint inspected build output. Runtime source was not faulty.", "prevention": "Keep dry-run output outside the source checkout or in an existing ignored build directory. Preserve the source lint policy.", "sources": ["docs/extraction-budget-release.md"], "regression": "Moved only the verified generated-output directory outside the checkout; full pnpm check rerun recorded on the release PR."}
+```
+
+```json
+{"id":"ERR-20261115-NESTED-SHELL-EXPANSION","status":"resolved","area":"local-verification","cause":"A read-only process inspection embedded in a double-quoted nested PowerShell command expanded its pipeline variable in the outer shell.","prevention":"Use a literal single-quoted command or a script file when passing pipeline variables to nested PowerShell.","sources":["AGENTS.md"],"regression":"The corrected read-only inspection completed successfully; pnpm verify build then passed. No project source or hosted state was affected."}
+```

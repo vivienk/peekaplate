@@ -339,7 +339,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "backend",
       "status": "foundation",
-      "summary": "Hono Worker verifies staff JWTs and current restaurant authority before transactional commands, uploads/review/publication and synthetic-gated reports. Public diner reads verify signed publication and content; owner publication allocates stable diner links. Owner-only staging prepared-menu reads keep operator admission and validate bounded bundle bytes and trusted asset origins. GET /staff/venues returns only current owner/editor memberships. Report windows are half-open. This narrow release retains main bindings/migrations and paused Queues; unrelated develop artwork, order/POS, comparison and provider-budget changes are excluded. Hosted acceptance is recorded separately; AI activation remains gated.",
+      "summary": "Hono Worker owns verified tenant commands, publication, observations, ingestion and owner reports. API/runtime contracts remain at ba70ce9 in this extraction-only release. The extraction host adds authenticated job-scoped budget reservations persisted atomically in its existing SQLite Durable Object. Matching Python calls reserve before provider transport; retries/redelivery share two attempts. The read-only FE-06.4 verifier binds job, source, report and draft identity and keeps upstream usage unknown. No API/Pages deployment, Supabase migration or Queue activation is included; paired extractor rollout and hosted acceptance remain separate.",
       "paths": [
         "backend/backfill-observations.mjs",
         "backend/local.mjs",
@@ -473,7 +473,15 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.test.ts",
         "backend/src/owner-publication-http.test.ts",
         "backend/src/owner-publication.integration.ts",
-        "backend/src/owner-publication.workerd-harness.ts"
+        "backend/src/owner-publication.workerd-harness.ts",
+        "backend/src/extraction-budget.workerd.test.ts",
+        "backend/tests/provider-budget-worker.ts",
+        "docs/provider-call-budget.md",
+        "docs/extraction-budget-release.md",
+        "scripts/verify-ingestion-e2e.mjs",
+        "scripts/verify-ingestion-e2e.test.mjs",
+        "scripts/verify-ingestion-e2e.regression.test.mjs",
+        "docs/staging-e2e-acceptance-2026-11-14.md"
       ],
       "adrs": [
         "docs/adr/0002-selective-event-sourcing.md",
@@ -486,7 +494,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "database"
       ],
-      "sourceFingerprint": "56acbfab9f0b66de9649919906a8f60c31d954e60b202c0fec4ed6c7fab8db58"
+      "sourceFingerprint": "3fec2fa607632c9d2ae0d605a2760ccbe511b7a4463d3eaf82dcecfb230a0c0f"
     },
     {
       "id": "database",
@@ -680,7 +688,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate.",
+      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. Hosted extraction requires a private loopback budget gate; the matching SQLite DO caps provider attempts at two per tenant/job across retries and redelivery. Standalone helpers remain optionally gated.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -757,7 +765,9 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/tests/fixtures/review-candidates/representative-extraction-v2.json",
         "processing/tests/fixtures/review-candidates/zero-price-candidate.json",
         "processing/src/peekaplate_processing/product_validation.py",
-        "processing/tests/test_product_validation.py"
+        "processing/tests/test_product_validation.py",
+        "processing/src/peekaplate_processing/provider_budget.py",
+        "processing/tests/test_provider_budget.py"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -766,7 +776,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "dd66a78aff466be74013297563e269fe188ace005694035aeffdc09a062fc38f"
+      "sourceFingerprint": "278df97e6e1df069bb01ba12b7bc95685893ec5254aaf1d358c1856f74e43dad"
     },
     {
       "id": "assets",
@@ -801,21 +811,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "diner",
-        "backend",
-        "delivery"
-      ],
-      "summary": "Narrow promotion of PR174 only: prepared .app/diner aliases, exact .app diner CORS and create-only Pages artifact with bounded clean-URL routing. Existing main APIs, publication/hash/token checks and unrelated release contents remain. No owner or production-domain activation.",
-      "sources": [
-        "docs/restaurant-urls.md",
-        "frontend/diner/src/menu/route.ts",
-        "scripts/prepare-app-site.mjs"
-      ],
-      "next": "Verify this exact main candidate on a branch-only deployment of the existing diner staging Pages project. Keep canonical staging root, .io and registrar nameservers unchanged; obtain actual Cloudflare nameservers from the pending Free .app zone."
-    },
     {
       "date": "2026-11-14",
       "modules": [
@@ -948,6 +943,23 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "frontend/diner/src/menu/portionPreview.ts"
       ],
       "next": "Approve exact release, deploy existing staging API/routing Pages and verify the labelled one-restaurant publication with page screenshots; S10/trusted draft preparation and physical scale remain separate."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "backend",
+        "processing",
+        "delivery"
+      ],
+      "summary": "Promote only #184 verifier and #188 hosted provider budget onto main. Exact merged source patches preserve API/Pages, contracts, secrets, config and migrations. Local host, Python, verifier, SQLite/workerd and PostgreSQL checks pass; extraction dry-run builds its matching container.",
+      "files": [
+        "docs/extraction-budget-release.md",
+        "docs/provider-call-budget.md",
+        "scripts/verify-ingestion-e2e.mjs",
+        "backend/src/extraction-host.ts",
+        "processing/src/peekaplate_processing/provider_budget.py"
+      ],
+      "next": "After green CI and final approval, hand the exact merge SHA to Teeyansh for extraction-only Worker/container rollout, authenticated non-billable budget probes, then the separately controlled two-attempt FE-06.4 run. Keep deployed API/Pages on ba70ce9."
     }
   ]
 }

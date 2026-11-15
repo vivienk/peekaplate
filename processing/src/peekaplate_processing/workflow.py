@@ -501,7 +501,7 @@ def model_images(pages, context_pages, input_mode):
     return blocks,identities
 
 
-def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=10, cache_dir=None, source_sha256=None, input_mode="ocr"):
+def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=10, cache_dir=None, source_sha256=None, input_mode="ocr", budget_gate=None, budget_provider="llm"):
     if type(batch_pages) is not int or not 1 <= batch_pages <= 10:
         raise ExtractionError("LLM batch pages must be an integer between 1 and 10.")
     if not math.isfinite(request_timeout) or not 0 < request_timeout <= 300:
@@ -569,6 +569,8 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
                 print(f"Batch {state['worker_id']}: requesting dishes from {len(state['pages'])} pages...", file=sys.stderr, flush=True)
                 with measure(timings, "model_request"):
                     try:
+                        if budget_gate is not None:
+                            await budget_gate.areserve(budget_provider)
                         answer = await asyncio.wait_for(
                             structured_llm.ainvoke([("system", prompt), ("human", human)]),
                             timeout=request_timeout,
@@ -685,11 +687,11 @@ def build_menu_graph(llm, *, request_timeout=90, on_response=None, batch_pages=1
     return builder.compile()
 
 
-def run_menu_graph(llm, pages, *, request_timeout=90, on_response=None, batch_pages=10, concurrency=1, cache_dir=None, source_sha256=None, input_mode="ocr"):
+def run_menu_graph(llm, pages, *, request_timeout=90, on_response=None, batch_pages=10, concurrency=1, cache_dir=None, source_sha256=None, input_mode="ocr", budget_gate=None, budget_provider="llm"):
     """Run all batches on one event loop so cancelled HTTP requests are awaited."""
     if type(concurrency) is not int or concurrency not in (1, 2):
         raise ExtractionError("LLM concurrency must be 1 or 2.")
-    return asyncio.run(build_menu_graph(llm, request_timeout=request_timeout, on_response=on_response, batch_pages=batch_pages, cache_dir=cache_dir, source_sha256=source_sha256, input_mode=input_mode).ainvoke(
+    return asyncio.run(build_menu_graph(llm, request_timeout=request_timeout, on_response=on_response, batch_pages=batch_pages, cache_dir=cache_dir, source_sha256=source_sha256, input_mode=input_mode, budget_gate=budget_gate, budget_provider=budget_provider).ainvoke(
         {"pages": pages, "batches": [], "worker_findings": []},
         config={"max_concurrency": concurrency},
     ))["final_report"]
