@@ -7,10 +7,14 @@ import {
 import type { OwnerDishReport } from '@peekaplate/contracts/owner-report';
 import { type FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { OwnerAuthRuntime, SignedInOwner } from '../auth/supabase-auth';
-import { createOwnerAnalysisClient } from '../owner-dashboard/ai-preview/analysis-client';
+import {
+  createOwnerAnalysisClient,
+  OwnerAnalysisAccessError,
+} from '../owner-dashboard/ai-preview/analysis-client';
 import { ReportData } from '../owner-dashboard/report-data';
 import { Button } from '../ui';
 import { Icon } from './icons';
+import { OwnerMenuWorkspace } from './OwnerMenuWorkspace';
 import { type OwnerPage, OwnerShell } from './OwnerShell';
 import { fetchOwnerWorkspace, type WorkspaceState } from './workspace-api';
 import './owner.css';
@@ -38,6 +42,9 @@ export function OwnerWorkspace({
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState('');
   const [page, setPage] = useState<OwnerPage>('overview');
+  const [dirty, setDirty] = useState(false);
+  const canLeave = () =>
+    !dirty || window.confirm('Leave these unsaved changes? Your saved draft stays available.');
   const pickerId = useId();
   // The report on screen, tagged with the restaurant it belongs to, so the AI panel never offers
   // one restaurant's dishes under another.
@@ -80,7 +87,9 @@ export function OwnerWorkspace({
   const pages = useMemo(
     () =>
       new Set<OwnerPage>(
-        selected?.permission === 'owner' ? ['overview', 'performance'] : ['overview'],
+        selected?.permission === 'owner'
+          ? ['overview', 'performance', 'menu']
+          : ['overview', 'menu'],
       ),
     [selected?.permission],
   );
@@ -90,7 +99,13 @@ export function OwnerWorkspace({
     [scope],
   );
   const signOut = (
-    <Button variant="text" disabled={signingOut} onClick={onSignOut}>
+    <Button
+      variant="text"
+      disabled={signingOut}
+      onClick={() => {
+        if (canLeave()) onSignOut();
+      }}
+    >
       Sign out
     </Button>
   );
@@ -144,6 +159,7 @@ export function OwnerWorkspace({
         id={pickerId}
         value={selected?.venueId ?? ''}
         onChange={(event) => {
+          if (!canLeave()) return;
           setSelectedId(event.target.value);
           setPage('overview');
         }}
@@ -176,6 +192,7 @@ export function OwnerWorkspace({
         restaurantName={selected.name}
         getAccessToken={getAccessToken}
         report={reportShown}
+        onAccessFailure={accessFailure}
       />
     ) : undefined;
 
@@ -188,13 +205,18 @@ export function OwnerWorkspace({
         available={pages}
         visible={pages}
         onNavigate={(next) => {
-          if (pages.has(next)) setPage(next);
+          if (pages.has(next) && canLeave()) setPage(next);
         }}
         aside={aside}
         topbar={
           <div className="owner-workspace-toolbar">
             {picker}
-            <Button variant="text" onClick={refresh}>
+            <Button
+              variant="text"
+              onClick={() => {
+                if (canLeave()) refresh();
+              }}
+            >
               Refresh access
             </Button>
             {signOut}
@@ -209,12 +231,20 @@ export function OwnerWorkspace({
             onReport={showReport}
           />
         ) : (
-          <section>
-            <h1>Restaurant workspace</h1>
-            <h2>{selected.name}</h2>
+          <>
             <p>Access: {selected.permission === 'owner' ? 'Owner' : 'Editor'}</p>
-            <p>Menu setup is not available here yet.</p>
-          </section>
+            <OwnerMenuWorkspace
+              key={`${owner.id}:${selected.venueId}`}
+              apiBase={apiBase}
+              actorId={owner.id}
+              venueId={selected.venueId}
+              restaurantName={selected.name}
+              section={page === 'menu' ? 'menu' : 'overview'}
+              getAccessToken={getAccessToken}
+              onAccessFailure={accessFailure}
+              onDirtyChange={setDirty}
+            />
+          </>
         )}
       </OwnerShell>
     </div>
@@ -257,12 +287,14 @@ function LiveAiPanel({
   restaurantName,
   getAccessToken,
   report,
+  onAccessFailure,
 }: {
   apiBase: string;
   venueId: string;
   restaurantName: string;
   getAccessToken: () => Promise<string | null>;
   report: OwnerDishReport;
+  onAccessFailure: (kind: 'signed_out' | 'denied') => void;
 }) {
   const ids = useId();
   const dishes = report.dishes;
@@ -273,7 +305,7 @@ function LiveAiPanel({
   const dishId = dishes.some((dish) => dish.dish_id === picked)
     ? picked
     : (dishes[0]?.dish_id ?? '');
-  const scope = `${venueId}:${dishId}:${goal}`;
+  const scope = `${venueId}:${dishId}:${goal}:${report.report_metadata.date_window.start_time}:${report.report_metadata.date_window.end_time}:${report.report_metadata.generated_at}`;
   const analyze = useMemo(
     () => createOwnerAnalysisClient({ baseUrl: apiBase, venueId, getAccessToken }),
     [apiBase, venueId, getAccessToken],
@@ -299,8 +331,13 @@ function LiveAiPanel({
     try {
       const result = await analyze({ dishId, goal }, controller.signal);
       if (!controller.signal.aborted) setReply({ kind: 'result', scope, result, dishName });
-    } catch {
-      if (!controller.signal.aborted) setReply({ kind: 'error', scope });
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        if (error instanceof OwnerAnalysisAccessError) {
+          setReply(null);
+          onAccessFailure(error.status === 401 ? 'signed_out' : 'denied');
+        } else setReply({ kind: 'error', scope });
+      }
     } finally {
       if (pending.current === controller) pending.current = null;
     }
@@ -319,14 +356,14 @@ function LiveAiPanel({
         <div className="owner-chips">
           <span className="owner-chip owner-chip--surface">{restaurantName}</span>
           <span className="owner-chip owner-chip--surface">
-            {reportPeriod(report.report_metadata.date_window)}
+            Displayed report period: {reportPeriod(report.report_metadata.date_window)}
           </span>
         </div>
       </div>
       <div className="owner-ai__body" data-ai-state={shown?.kind ?? 'empty'} aria-live="polite">
         <p className="owner-muted">
-          Ask about dish activity or your reports. Answers use only the records shown on these
-          pages.
+          Choose a dish for analysis from a separate authorized server-read snapshot. Its evidence
+          period may differ from the report displayed here.
         </p>
         {dishes.length === 0 && (
           <>
@@ -374,12 +411,13 @@ function LiveAiPanel({
               </>
             )}
             <p className="owner-muted">
-              Report window:{' '}
+              Analysis evidence period:{' '}
               {reportPeriod({
                 start_time: shown.result.timeWindow.start,
                 end_time: shown.result.timeWindow.end,
               })}
             </p>
+            <p className="owner-muted">Synthetic analysis from a separate server-read snapshot.</p>
             <p className="owner-muted">{OWNER_ANALYSIS_LIMITATION}</p>
             <p className="owner-muted">No menu changes or customer messages are sent.</p>
           </div>

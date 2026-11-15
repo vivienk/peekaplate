@@ -12,6 +12,7 @@ test('dashboard traverses the real local API adapter and withholds CRM suggestio
   await expect(panel.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
   await expect(panel).toContainText('open rate: 50.0%');
   await expect(panel).toContainText('No menu changes or customer messages are sent.');
+  await page.screenshot({ path: 'test-results/owner-ai-desktop.png', fullPage: true });
   await panel.getByLabel('Review focus').selectOption('crm');
   await expect(panel.getByText('open rate: 50.0%')).toHaveCount(0);
   await panel.getByRole('button', { name: 'Review report' }).click();
@@ -29,6 +30,7 @@ test('mobile drawer shows connected suggestions and discards failed responses', 
   const dialog = page.getByRole('dialog', { name: 'Ask PeekaPlate AI' });
   await dialog.getByRole('button', { name: 'Review report' }).click();
   await expect(dialog.getByRole('heading', { name: 'Suggested review' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/owner-ai-mobile.png', fullPage: true });
   await page.route('**/ai/analysis', (route) =>
     route.fulfill({ status: 503, body: 'provider-private-error' }),
   );
@@ -36,4 +38,25 @@ test('mobile drawer shows connected suggestions and discards failed responses', 
   await expect(dialog.getByRole('alert')).toContainText('could not be reviewed');
   await expect(dialog.getByRole('heading', { name: 'Suggested review' })).toHaveCount(0);
   await expect(dialog.getByText('provider-private-error')).toHaveCount(0);
+});
+
+// The merged S09 design hides both AI surfaces while editing a dish.
+test('connected analysis stays hidden on Add/Edit and returns on the menu list', async ({
+  page,
+}) => {
+  await page.goto('http://127.0.0.1:5174/owner-dashboard.html');
+  const panel = page.getByRole('region', { name: 'Connected owner analysis' });
+  await expect(panel).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'Menu', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Add dish', exact: true }).click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toHaveCount(0);
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('button', { name: 'Menu', exact: true })
+    .click();
+  await expect(panel).toBeVisible();
 });

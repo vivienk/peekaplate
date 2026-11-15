@@ -30,6 +30,7 @@
 }
 .owner-workspace .stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--pp-space-16);
 }
 .owner-workspace .card,

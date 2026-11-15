@@ -1443,6 +1443,7 @@ export const MenuIngestionQueueMessageSchema = z.strictObject({
 });
 export type MenuIngestionQueueMessage = z.infer<typeof MenuIngestionQueueMessageSchema>;
 
+export * from './ingredient-artwork';
 export {
   type IngredientAssessment,
   IngredientAssessmentSchema,
@@ -1450,6 +1451,10 @@ export {
   ingredientAssessmentForReview,
 } from './ingredient-intelligence.js';
 export {
+  type AcceptPilotOrderAgreementRequest,
+  AcceptPilotOrderAgreementRequestSchema,
+  type AcceptPilotOrderAgreementResponse,
+  AcceptPilotOrderAgreementResponseSchema,
   ALL_ALLOWED_CSV_HEADERS,
   BASE_REQUIRED_CSV_HEADERS,
   CANONICAL_REVISION_HEADERS,
@@ -1459,12 +1464,20 @@ export {
   computeOrderLineChecksum,
   DEFAULT_HISTORICAL_IMPORT_WINDOW_DAYS,
   DEFAULT_RAW_CSV_RETENTION_DAYS,
+  type DeleteOrderDataRequest,
+  DeleteOrderDataRequestSchema,
+  type DeleteOrderDataResponse,
+  DeleteOrderDataResponseSchema,
   ISO_EXPLICIT_TIMEZONE_PATTERN,
   MAX_ORDER_OUTCOME_FILE_BYTES,
   MAX_ORDER_OUTCOME_ROWS,
   NINETY_DAYS_MICROS,
   OPTIONAL_CSV_HEADERS,
   OPTIONAL_PRICING_HEADERS,
+  type OrderDataDeletionReason,
+  OrderDataDeletionReasonSchema,
+  type OrderDataDeletionStatus,
+  OrderDataDeletionStatusSchema,
   type OrderOutcomeImportResponse,
   OrderOutcomeImportResponseSchema,
   type OrderOutcomeLine,
@@ -1475,10 +1488,17 @@ export {
   OrderOutcomeTypeSchema,
   OrderTokenIdentifierSchema,
   type ParsedCsvRow,
+  PILOT_ORDER_AGREEMENT_VERSION,
   PILOT_ORDER_OUTCOME_SCHEMA_VERSION,
   POS_ITEM_HEADERS,
   parseOrderOutcomeCsv,
   REQUIRED_CSV_HEADERS,
   type SanitizedRowDiagnostic,
   SanitizedRowDiagnosticSchema,
+  type SubmitOrderDeletionResponse,
+  SubmitOrderDeletionResponseSchema,
+  type VerifyOrderDeletionRequest,
+  VerifyOrderDeletionRequestSchema,
+  type VerifyOrderDeletionResponse,
+  VerifyOrderDeletionResponseSchema,
 } from './order-outcome';

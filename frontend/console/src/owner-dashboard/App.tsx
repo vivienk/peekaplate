@@ -195,7 +195,12 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
   const editDish = (id: string, from?: string) => {
     const m = menu.find((x) => x.id === id);
     if (!m) return;
-    setEd({ step: 'form', draft: { ...m, ing: [...m.ing] }, origId: id, from: from || null });
+    setEd({
+      step: 'form',
+      draft: { ...m, ing: [...m.ing], alg: [...m.alg] },
+      origId: id,
+      from: from || null,
+    });
     setPage('menu');
     setChatOpen(false);
     window.scrollTo(0, 0);
@@ -328,8 +333,11 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
     window.scrollTo(0, 0);
   };
 
+  // Figma S09 Add/Edit dish frames have no AI chat, so the panel and "Ask AI" are hidden there.
+  const showAi = !(page === 'menu' && ed.step === 'form');
+
   return (
-    <div className="app has-ai">
+    <div className={showAi ? 'app has-ai' : 'app'}>
       <aside className="side">
         <div className="brand">
           <img src={logo} alt="PeekaPlate logo" />
@@ -363,27 +371,31 @@ export function App({ ownerAnalysis }: { ownerAnalysis?: OwnerAnalysisConnection
           <div className="l">
             <TodayChip className="chip" />
           </div>
-          <Btn
-            kind="primary"
-            size="md"
-            icon="spark"
-            className="aibtn-top"
-            onClick={() => setChatOpen(true)}
-            aria-haspopup="dialog"
-          >
-            Ask AI
-          </Btn>
+          {showAi && (
+            <Btn
+              kind="primary"
+              size="md"
+              icon="spark"
+              className="aibtn-top"
+              onClick={() => setChatOpen(true)}
+              aria-haspopup="dialog"
+            >
+              Ask AI
+            </Btn>
+          )}
         </div>
         <main id="content">{body}</main>
       </div>
-      <aside className="aipanel" aria-label="PeekaPlate AI">
-        {ownerAnalysis ? (
-          <OwnerAnalysisPanel connection={ownerAnalysis} />
-        ) : (
-          <ChatBox chat={panelChat} panel ctxBar={aiPreview} />
-        )}
-      </aside>
-      {chatOpen && (
+      {showAi && (
+        <aside className="aipanel" aria-label="PeekaPlate AI">
+          {ownerAnalysis ? (
+            <OwnerAnalysisPanel connection={ownerAnalysis} />
+          ) : (
+            <ChatBox chat={panelChat} panel ctxBar={aiPreview} />
+          )}
+        </aside>
+      )}
+      {showAi && chatOpen && (
         <ModalDrawer label="Ask PeekaPlate AI" onClose={() => setChatOpen(false)}>
           {ownerAnalysis ? (
             <OwnerAnalysisPanel connection={ownerAnalysis} />
