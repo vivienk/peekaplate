@@ -122,6 +122,9 @@ test.describe('published states and image fallbacks', () => {
 
     const detailImg = page.locator('img.pp-detail__image');
     await expect(detailImg).toBeVisible();
+    // The card photo the detail falls back to (a Figma sample photo or a placeholder).
+    const cardSrc = await detailImg.getAttribute('src');
+    expect(cardSrc).toBeTruthy();
 
     // A distinct valid data URL avoids a second network error racing the explicit failure.
     await page.evaluate(() => {
@@ -135,9 +138,9 @@ test.describe('published states and image fallbacks', () => {
     // Should fall back to dish card photo URL rather than missing placeholder
     await expect(page.locator('.pp-detail__image--missing')).toHaveCount(0);
     await expect(detailImg).toBeVisible();
-    // Wait for the fallback src to be set (the card photo placeholder data URL) instead of
-    // reading it once, so the assertion is resilient to timing.
-    await expect(detailImg).toHaveAttribute('src', /^data:image\/svg\+xml/);
+    // Wait for the fallback src to be set (the dish's card photo) instead of reading it once,
+    // so the assertion is resilient to timing.
+    await expect(detailImg).toHaveAttribute('src', cardSrc ?? '');
 
     // Trigger second error on the fallback: now it should replace with missing placeholder.
     await detailImg.dispatchEvent('error');
