@@ -193,14 +193,22 @@ export function ReportData({
     VITE_OWNER_REPORT_VENUE_ID: import.meta.env.VITE_OWNER_REPORT_VENUE_ID,
   }),
   onAccessFailure,
+  onReport,
 }: {
   source?: ReportSource;
   onAccessFailure?: (kind: 'signed_out' | 'denied') => void;
+  /** The report on screen, or null while none is (loading, failed or denied). */
+  onReport?: (report: OwnerDishReport | null) => void;
 }) {
   const { state, retry } = useOwnerReport(source);
   useEffect(() => {
     if (state.kind === 'signed_out' || state.kind === 'denied') onAccessFailure?.(state.kind);
   }, [state.kind, onAccessFailure]);
+  const report = state.kind === 'ready' ? state.report : null;
+  useEffect(() => {
+    onReport?.(report);
+  }, [report, onReport]);
+  useEffect(() => () => onReport?.(null), [onReport]);
   return <ReportView state={state} saved={source.mode === 'saved'} onRetry={retry} />;
 }
 

@@ -208,15 +208,24 @@ export function LockedEmailField({
 
 // A recoverable error above the form (Error Message component). role="alert" announces it when it
 // appears; the text is always shown, so colour is never the only signal.
-export function ErrorBanner({ copy, action }: { copy: BannerCopy; action?: ReactNode }) {
+// icon: the error msg component's icon variant; the warning circle unless the screen picks another.
+export function ErrorBanner({
+  copy,
+  action,
+  icon = errorIcon,
+}: {
+  copy: BannerCopy;
+  action?: ReactNode;
+  icon?: string;
+}) {
   return (
     <div className="pp-auth-banner" role="alert">
       <span className="pp-auth-banner__icon" aria-hidden="true">
-        <img src={errorIcon} alt="" width="24" height="24" />
+        <img src={icon} alt="" width="24" height="24" />
       </span>
       <div className="pp-auth-banner__text">
         <p className="pp-auth-banner__title">{copy.title}</p>
-        <p className="pp-auth-banner__body">{copy.body}</p>
+        {copy.body && <p className="pp-auth-banner__body">{copy.body}</p>}
         {action}
       </div>
     </div>
@@ -245,40 +254,68 @@ export function SubmitButton({
       aria-busy={busy ? true : undefined}
       aria-disabled={blocked && !busy ? true : undefined}
     >
-      {busy && <span className="pp-auth__spinner" aria-hidden="true" />}
+      {busy && <Spinner />}
       {busy ? busyLabel : label}
     </Button>
   );
 }
 
-// Owner dashboard_Button, Large: Primary (filled) or Outlined, for actions that are not a form submit.
+// The Button component's Loading spinner (Figma PeekaPlate Icons, Icons=loading), drawn in the
+// label colour and turned in CSS (Rania, 14 Nov: 1–1.5 s per turn, still for reduced motion).
+export function Spinner() {
+  return (
+    <svg
+      className="pp-auth__spinner"
+      viewBox="0 0 23 23"
+      width="23"
+      height="23"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        opacity="0.5"
+        d="M11.3011 1.88354C9.43855 1.88354 7.6178 2.43586 6.06913 3.47065C4.52046 4.50544 3.31342 5.97622 2.60064 7.69701C1.88787 9.41781 1.70138 11.3113 2.06474 13.1381C2.42811 14.9649 3.32503 16.6429 4.64206 17.9599C5.9591 19.277 7.63711 20.1739 9.46389 20.5372C11.2907 20.9006 13.1842 20.7141 14.905 20.0013C16.6258 19.2886 18.0965 18.0815 19.1313 16.5329C20.1661 14.9842 20.7184 13.1634 20.7184 11.3009C20.7184 10.0642 20.4749 8.83958 20.0016 7.69701C19.5283 6.55445 18.8346 5.51629 17.9602 4.64182C17.0857 3.76734 16.0475 3.07366 14.905 2.6004C13.7624 2.12713 12.5378 1.88354 11.3011 1.88354ZM11.3011 18.8347C9.81106 18.8347 8.35447 18.3929 7.11553 17.565C5.87659 16.7372 4.91096 15.5606 4.34074 14.184C3.77052 12.8073 3.62132 11.2925 3.91202 9.83109C4.20271 8.36966 4.92024 7.02726 5.97387 5.97363C7.0275 4.92 8.36991 4.20247 9.83133 3.91177C11.2928 3.62108 12.8076 3.77027 14.1842 4.34049C15.5608 4.91071 16.7375 5.87634 17.5653 7.11528C18.3931 8.35422 18.835 9.81081 18.835 11.3009C18.835 13.299 18.0412 15.2152 16.6284 16.6281C15.2155 18.041 13.2992 18.8347 11.3011 18.8347Z"
+      />
+      <path d="M18.8346 11.3009H20.7181C20.7181 10.0642 20.4745 8.83958 20.0013 7.69701C19.528 6.55445 18.8343 5.51629 17.9598 4.64182C17.0854 3.76734 16.0472 3.07366 14.9046 2.6004C13.7621 2.12713 12.5375 1.88354 11.3008 1.88354V3.76701C13.2989 3.76701 15.2152 4.56075 16.628 5.97363C18.0409 7.3865 18.8346 9.30277 18.8346 11.3009Z" />
+    </svg>
+  );
+}
+
+// Owner dashboard_Button: Primary (filled) or Outlined, Large (48 high, default) or Medium (40 high),
+// for actions that are not a form submit.
 export function ActionButton({
   variant = 'primary',
+  size = 'large',
   busy = false,
   blocked = false,
   busyLabel,
   onClick,
   describedBy,
+  ariaLabel,
   children,
 }: {
   variant?: 'primary' | 'outlined';
+  size?: 'large' | 'medium';
   busy?: boolean;
   blocked?: boolean;
   busyLabel?: string;
   onClick: () => void;
-  describedBy?: string;
+  describedBy?: string | undefined;
+  ariaLabel?: string | undefined;
   children: string;
 }) {
   return (
     <Button
       variant={variant === 'primary' ? 'action' : 'outline'}
-      className={`pp-auth-btn pp-auth-btn--${variant}`}
+      className={`pp-auth-btn pp-auth-btn--${variant}${size === 'medium' ? ' pp-auth-btn--medium' : ''}`}
       aria-busy={busy ? true : undefined}
       aria-disabled={blocked && !busy ? true : undefined}
       aria-describedby={describedBy}
+      aria-label={ariaLabel}
       onClick={onClick}
     >
-      {busy && <span className="pp-auth__spinner" aria-hidden="true" />}
+      {busy && <Spinner />}
       {busy && busyLabel ? busyLabel : children}
     </Button>
   );

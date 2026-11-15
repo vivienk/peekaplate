@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./owner-ai": "./src/owner-ai.ts",
-    "./owner-report": "./src/owner-report.ts"
+    "./owner-report": "./src/owner-report.ts",
+    "./owner-analysis": "./src/owner-analysis.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
