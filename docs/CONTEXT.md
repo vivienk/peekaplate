@@ -762,7 +762,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     {
       "id": "processing",
       "status": "foundation",
-      "summary": "Menu extraction retains source-linked needs_review drafts. Vision-first processing preserves private bounded attempts locally, sanitizes provider failures, isolates cascade credentials, rejects wrapping-cloth products and retains plus-qualified prices as unknown fixed amounts. Hosted V1 carries actual extraction_mode separately from compatibility input_mode and excludes raw vision attempts. Existing T0/spatial/presentation modules remain. Hosted release acceptance is separate. AI-02 emits bounded local review-only sidecars with explicit unavailability and vision abstention. FE-06.4 has a read-only job/draft verifier with tenant and attempt identity checks, strict report version pairing and explicit unknown upstream provider usage; the separate required hosted gate enforces attempts; UI/accuracy acceptance remains separate. Reviewed ingredient PNGs retain exact-byte provenance and deliver through the staff API. QA-02 freezes references; human/AI acceptance stays pending.",
+      "summary": "Vision-first source-linked needs_review drafts retain private attempts, sanitized failures, isolated credentials, cloth-product rejection and plus-price abstention. Hosted V1 separates actual extraction_mode from compatibility input_mode; raw attempts stay private. AI-02 ingredient sidecars and existing capture/T0/spatial/presentation remain. FE-06.4 verifies job/draft tenant/attempt/version identity read-only; its upstream usage is unknown; the separate hosted provider gate enforces attempts. Reviewed ingredient PNGs retain exact-byte provenance through the staff API. QA-02 freezes reference bytes and declared review; strict offline scoring binds reports/exports and occurrence mappings, literal price/scalar/currency, duplicate/unresolved and mixed-page failure counts. Exposed sources stay development; new PDF holdouts are provisional. No authenticated reference truth, structured-option/ingredient/geometry accuracy, fresh model run or hosted/release acceptance follows.",
       "paths": [
         "processing/.gitignore",
         "processing/.python-version",
@@ -864,7 +864,13 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "processing/eval/qa02/EVIDENCE.md",
         "processing/eval/qa02/development.manifest.json",
         "processing/eval/qa02/development-inventory.json",
-        "processing/eval/qa02/synthetic-menu.reference.json"
+        "processing/eval/qa02/synthetic-menu.reference.json",
+        "processing/src/peekaplate_processing/qa02_strict_score.py",
+        "processing/tests/test_qa02_strict_score.py",
+        "processing/eval/qa02/STRICT_SCORER.md",
+        "processing/eval/qa02/source-plan-v1.json",
+        "docs/qa02-strict-scorer-spec.md",
+        "docs/qa02-real-menu-source-plan-v1.md"
       ],
       "adrs": [
         "docs/adr/0001-scope-and-repository.md",
@@ -873,7 +879,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "dependsOn": [
         "contracts"
       ],
-      "sourceFingerprint": "75cdfcc32230b8f8fb05a511d8335240b7b8da594af17de4995335d7af8af0e5"
+      "sourceFingerprint": "816c1498ece634a8a5455332eb116aeff4644fa52c85c8bd6e30efd76b0167e4"
     },
     {
       "id": "assets",
@@ -908,20 +914,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
     }
   ],
   "handoffs": [
-    {
-      "date": "2026-11-14",
-      "modules": [
-        "console"
-      ],
-      "summary": "PR172 adds S09 Add/Edit dish and category selection to the synthetic dashboard demo. Category command identity is separate from user category names, including add; the AI-review test now supplies the required photo so it isolates that guard. Reconciles owner onboarding and current develop without claiming real save/reload or publication.",
-      "files": [
-        "frontend/console/src/owner-dashboard/menu.tsx",
-        "frontend/console/src/owner-dashboard/category-field.tsx",
-        "frontend/console/src/owner-dashboard/menu.test.tsx",
-        "tests/e2e/owner-category-dropdown.spec.ts"
-      ],
-      "next": "Wire the screen through the owner-menu client separately; keep food evidence, verification and publishing authority on the server."
-    },
     {
       "date": "2026-11-14",
       "modules": [
@@ -1032,6 +1024,22 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "backend/src/owner-publication.workerd-harness.ts"
       ],
       "next": "Recheck the exact staging API release with the existing genuine owner and retained synthetic diner menu."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "processing"
+      ],
+      "summary": "PR181 adds the offline strict field scorer and proposed six-source/nine-page metadata plan. Existing inspected cases remain development; two new PDFs are only candidate holdouts. Hash-bound actual outputs retain null/zero, duplicate/unresolved and per-segment mixed-page failure evidence. Two pinned Spec findings were reproduced and fixed; 39 guarded local QA-02 controls passed before integrating merged169. No fresh real-menu prediction, frozen human reference or acceptance is inferred.",
+      "sources": [
+        "processing/src/peekaplate_processing/qa02_strict_score.py",
+        "processing/tests/test_qa02_strict_score.py",
+        "processing/eval/qa02/STRICT_SCORER.md",
+        "processing/eval/qa02/source-plan-v1.json",
+        "docs/qa02-real-menu-source-plan-v1.md",
+        "docs/qa02-strict-scorer-spec.md"
+      ],
+      "next": "Review source-only answers and scoring with Sai/Uneeza before new predictions; Vivien thresholds and call/retry authorization stay separate. PR169 merged at0946d21 with unchanged reference/helper bytes, removing its code-landing dependency. Reuse FE-06.4's job verifier and existing backend acceptance in the operator-coordinated156/171/172 run; do not claim routed-UI or release acceptance."
     },
     {
       "date": "2026-11-15",

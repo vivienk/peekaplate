@@ -3548,6 +3548,11 @@ The first browser run overlapped source formatting/HMR; a later provider run ove
 The first candidate renamed the standalone report token getter while an existing browser suite matched its exported name to inject a synthetic token. The older suite reproduced three setup failures (token seam did not apply); its other39 cases passed. Restore the existing getOwnerAccessToken export/default while retaining the live workspace's explicit actor-bound getter. All5 report browser regressions then passed in14.4s. The expanded workspace suite passed12 cases in12.3s, including real-SDK refresh and delayed identity after cross-tab sign-out. No default fixture or token is used by the real workspace.
 
 The initial context refresh exceeded the console summary's documented1000-character bound, and a check ran before the final fingerprints were ready. The summary was bounded and the stable repository check then passed. No runtime defect is inferred from that documentation sequencing failure.
+<!-- preserved QA-02 dependency check observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-13T18:43:51.688Z","exitCode":1}
+```
+
 
 ## 2026-11-14 — Pages clean auth callbacks
 
@@ -3691,6 +3696,34 @@ The 18 focused tests and 536-test offline Python suite pass. See
 processing/tests/test_qa02_reference.py and processing/eval/qa02/EVIDENCE.md.
 Integrity checks do not certify source truth, reviewer identity, model quality
 or hosted acceptance; the example's independent review remains pending.
+
+## Source/scorer integration preparation — November 14, 2026
+
+The isolated integration branch initially lacked a Git committer identity. The dependency merge was retried with the authenticated contributor's public noreply identity supplied only for that command, without changing global or shared repository identity settings. Current develop and PR169 had competing bounded context histories and append-only error entries; integration retained develop's recent handoffs and both historical error sequences. Runtime/provider behavior was not changed by this setup.
+
+## Source/scorer runtime and draft metadata — November 14, 2026
+
+The isolated worktree's first offline dependency sync could not discover Python3.12 on PATH. Supplying the existing pinned CPython3.12.12 interpreter explicitly created a separate environment and installed62 cached packages offline; the shared runtime and user checkout were not changed.
+
+PR181's initial CI43640010150 failed only its existing PR-documentation guard: the draft body used `Specification` instead of the required `Spec, issue, or ADR` label. Correcting the body triggered a newer automatic run43640383806, which passed onb1b62c17039a8b570be87b0108fa0b56feff35a1. No manual rerun or extraction-code fix was needed. That result covers the initial specification/dependency commit, not the new scorer implementation subsequently prepared locally; preserve the original failed record.
+
+## Strict scorer focused verification — November 14, 2026
+
+The first combined guarded QA-02 reference/scorer run passed38 tests in4.193s with no network attempts. The changed source-plan JSON initially failed the existing Biome formatter on compact-array layout only; the repository formatter corrected that new file without semantic or source/hash changes. These synthetic checks are not real-menu accuracy, frozen-reference approval or hosted acceptance. New verification uses only the isolated worktree; real source material remains private.
+
+The added actual-CLI argument regression initially failed two subcases: argparse exited2 before reaching the scorer's sanitized JSON handler. Argument parsing now uses a private controlled-error parser inside that handler; the consumer test requires a nonzero result, structured failure JSON, empty stderr and no private marker. The focused module-CLI test passed in5.334s after correction, without changing field-scoring semantics.
+
+The isolated Node workspace initially lacked an invokable pnpm launcher and the offline metadata cache lacked the newer Supabase package records. Exposed the existing pinned pnpm11.25.0 launcher with its required owner execute permission, then completed a normal frozen-lockfile installation. All222 supply-chain policy entries passed; no engine, lockfile or supply-chain guard was disabled. Registered context/docs checks then passed (13 modules,10 handoffs,71 Markdown files); the changed source-plan JSON also passed its narrow Biome check.
+
+## Strict scorer pinned review and CI corrections — November 14, 2026
+
+Two independent static axes reviewed d9d35e8→5bd9ee0. Standards found no supported documented breach or material smell. Spec found two P2 defects: omitted association rows were indistinguishable from explicit reviewed extras, and a ready segment could mask failed/skipped/error-bearing segments sharing the page. Two public-interface regressions produced four failures in0.029s before correction. Separate unresolved counters/dispositions and full individual segment diagnostics with partial/failure/skip flags correct both defects without dropping reference or prediction denominators. The combined guarded QA-02 reference/scorer run then passed39 tests in5.569s.
+
+CI43643187078 on5bd9ee0 ran556 Python tests and failed two subcases only because the new CLI test over-specified completely empty stderr. A PDF/ONNX dependency emitted a non-sensitive host-device discovery warning on the GitHub runner. The test now asserts the actual contract—nonzero structured failure JSON and no private source paths/content—without filtering, suppressing or special-casing dependency diagnostics. That amended contract test is included in the39-test passing run. Current corrected-head CI remains separate from these local observations.
+
+## Merged reference baseline integration — November 15, 2026
+
+Sai's PR169 mention confirms offline preparation merged at0946d21ec30b0e8e2b53016beb92bab59be92072; its revised branch head was5c16cf194185e73fed33777784eda7ad64fe935b. The reference helper, synthetic reference and manifest bytes did not change from the earlier6a89640 pin. Integration preserves all current develop runtime files, additive error history and the latest bounded handoffs plus the owned scorer handoff. Only context/history conflicts required resolution. Human real-menu reference/scoring confirmation remains pending; no new provider or hosted execution follows from the merge.
 
 ## Compare picker publication refresh - November 14, 2026
 
