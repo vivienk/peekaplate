@@ -156,6 +156,35 @@ test('a transient server error keeps the menu and never shows the withdrawn stat
   await expect(gone(page)).toHaveCount(0);
 });
 
+test('a failed re-read shows a Retry notice, keeps the menu and clears the notice on success', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state: State = { kind: 'valid' };
+  await open(page, state);
+  state.kind = 'error';
+  await reread(page);
+
+  const notice = page.getByText('We could not refresh the menu.', { exact: false });
+  const retry = page.getByRole('button', { name: 'Retry' });
+  await expect(notice).toBeVisible();
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+  await expect(gone(page)).toHaveCount(0);
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+
+  // Retry while the server is still failing keeps the notice and the focused button.
+  await retry.click();
+  await expect(notice).toBeVisible();
+  await expect(retry).toBeFocused();
+
+  // Retry after the server recovers clears the notice; the menu stays on the same publication.
+  state.kind = 'valid';
+  await retry.click();
+  await expect(notice).toHaveCount(0);
+  await expect(page.locator('.pp-card__open').first()).toBeVisible();
+});
+
 test('a replaced menu swaps in the new revision and is not shown as withdrawn', async ({
   page,
 }) => {
