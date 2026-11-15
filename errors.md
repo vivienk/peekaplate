@@ -2785,3 +2785,26 @@ runtime behavior, migration or hosted resource changed during this failure.
 ```json
 {"kind":"automatic-check-observation","check":"lint","timestamp":"2026-11-15T23:34:35.987Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:38:25.709Z","exitCode":1}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:46:24.662Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PRESERVATION-FINAL-GATE","status":"resolved","area":"browser-and-context-verification","cause":"The dedicated production portion spec was discovered by the default browser config without its base URL; simulated time raced asynchronous IndexedDB delivery; the restored performance frame skipped a heading level; and the audit document changed after its context refresh.","prevention":"Keep dedicated specs in their own config; poll observable delivery while advancing the fake clock; retain authored sizing on semantic headings; refresh context last and verify committed blobs.","sources":["playwright.config.ts","tests/e2e/menu-triggers-live.spec.ts","frontend/console/src/owner-dashboard/pages.tsx","frontend/console/src/owner-dashboard/performance.css","tests/e2e/owner-workspace.spec.ts","docs/screen-preservation-audit.md"],"regression":"Tracking file passed 27 repeated cases; workspace passed 43 cases including axe heading-order and 16px styling; dedicated production portion passed 2 cases. Final repository and Linux CI results are recorded on PR #205."}
+```
+
+```json
+{"id":"ERR-20261115-SDK-LOCAL-CONTENTION","status":"observed","area":"local-browser-verification","cause":"An eight-worker run timed out during the existing 360-step SDK retry/withdrawal test before its final assertion. No unexpected delivery assertion failed, but the discarded trace prevents a definitive timing diagnosis.","prevention":"Use bounded browser concurrency and preserve failed traces before another config clears the artifact directory. Do not weaken the withdrawal assertion.","sources":["tests/e2e/posthog-adapter.spec.ts"],"regression":"The unchanged SDK file passed 5/5 with two workers in 18.6s; the withdrawal case passed in 7.9s. This is focused recovery evidence, not an uninterrupted full-suite pass."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:e2e","timestamp":"2026-11-15T23:54:00.059Z","exitCode":1}
+```

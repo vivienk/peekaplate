@@ -174,15 +174,20 @@ test('a readable replacement records its menu once and cannot reuse the old expo
   await page.locator('.pp-category:not([hidden]) .pp-card__open').first().click();
   const opening = (await captured(page, 'dish_detail_opened')).at(-1);
   expect(opening?.payload).not.toHaveProperty('from_exposure_id');
-  await page.clock.runFor(6000);
-  const deliveries = await page.evaluate(
-    () => (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered,
-  );
-  expect(
-    deliveries.filter(
-      (event) => event.type === 'menu_viewed' && event.publication_revision_id === publicationB,
-    ),
-  ).toHaveLength(1);
+  // Advancing timers does not await the IndexedDB queue and asynchronous delivery.
+  await expect
+    .poll(async () => {
+      await page.clock.runFor(1000);
+      return page.evaluate(
+        (publication) =>
+          (window as unknown as { triggerCaptures: Captures }).triggerCaptures.delivered.filter(
+            (event) =>
+              event.type === 'menu_viewed' && event.publication_revision_id === publication,
+          ).length,
+        publicationB,
+      );
+    })
+    .toBe(1);
   await page.locator('.pp-detail__back').click();
   await page.waitForTimeout(100);
   await page.clock.runFor(1500);

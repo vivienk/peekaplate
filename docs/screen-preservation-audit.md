@@ -50,7 +50,10 @@ Use [the original ingredient pipeline guide](ingredient-icon-pipeline.md). Exact
 - PASS: local database upgrade and real Worker/database integration, 235 SQL assertions and 125 integration tests, including artwork approval/replay/revocation/isolation.
 - PASS: frozen Python processing/service suite, 573 tests in 46.998 seconds with Windows UTF-8 mode; no paid provider traffic.
 - PASS: production build and API dry-run; initial diner JavaScript 74,817 gzip bytes against 150,000 limit. The camera chunk stays lazy.
-- Pending: final combined repository checks and pinned independent reviews.
+- PASS: separate Astra screen-preservation/architecture and Sol backend/artwork reviews at `36ef701`; final verification-only changes receive a separate pinned delta review before merge.
+- PASS: final dedicated browser suites with two workers: PostHog 9 (12.8s), routing 7 (5.9s), auth 12 (18.1s), workspace 43 (45.8s; 3 pre-existing skips), published portion 2 (6.9s). Workspace includes heading-order accessibility and the unchanged 16px card-title styling.
+- The eight-worker default suite passed 259 cases with 3 skips, then timed out in the existing 360-step SDK withdrawal test before its final assertion. The entire SDK file passed 5/5 with two workers (18.6s; withdrawal case 7.9s). This is a focused recovery, not an uninterrupted full-suite PASS. Final Linux CI must pass before merge.
+- Corrected the dedicated-test discovery, fake-clock/IndexedDB delivery race and an invalid performance heading level. The latter changes semantics only; authored sizing remains unchanged. Refresh context after all source/audit edits, then check the committed graph.
 - NOT RUN: corrected hosted rollout, fresh provider generation, physical-phone camera/scale acceptance. The existing staged artwork table was absent at preflight. These statuses must be replaced only with observed evidence.
 
 ## Remaining product boundaries

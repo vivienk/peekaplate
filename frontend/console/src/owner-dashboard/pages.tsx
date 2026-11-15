@@ -973,7 +973,7 @@ function PerfFrame({
       <section className="card" aria-labelledby="ad-h">
         <div className="card-h">
           <div>
-            <h3 id="ad-h">All dishes</h3>
+            <h2 id="ad-h">All dishes</h2>
             <div className="sub" aria-live="polite">
               {summary}
             </div>
