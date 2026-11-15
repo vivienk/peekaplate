@@ -6,6 +6,17 @@ import logo from '../auth/assets/logo.png';
 import userIcon from './assets/user.svg';
 import './onboarding.css';
 
+export function OwnerAccountMenu({ children }: { children: ReactNode }) {
+  return (
+    <details className="pp-onboard__account-menu">
+      <summary className="pp-onboard__avatar" aria-label="Owner account">
+        <img src={userIcon} alt="" width="32" height="32" />
+      </summary>
+      <div className="pp-onboard__account-actions">{children}</div>
+    </details>
+  );
+}
+
 export function OnboardingLayout({
   restaurantName,
   bare = false,
@@ -33,12 +44,7 @@ export function OnboardingLayout({
               {restaurantName && <span className="pp-onboard__venue">{restaurantName}</span>}
             </p>
             {accountActions ? (
-              <details className="pp-onboard__account-menu">
-                <summary className="pp-onboard__avatar" aria-label="Owner account">
-                  <img src={userIcon} alt="" width="32" height="32" />
-                </summary>
-                <div className="pp-onboard__account-actions">{accountActions}</div>
-              </details>
+              <OwnerAccountMenu>{accountActions}</OwnerAccountMenu>
             ) : (
               <span className="pp-onboard__avatar" aria-hidden="true">
                 <img src={userIcon} alt="" width="32" height="32" />

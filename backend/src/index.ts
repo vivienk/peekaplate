@@ -22,6 +22,8 @@ import {
   ObservationQueueEnvelopeSchema,
   OwnerDishFieldsSchema,
   OwnerWorkspaceResponseSchema,
+  PreparedMenuPreviewSchema,
+  PreparedMenusSchema,
   type PublicMenuResponse,
   PublishMenuSchema,
   RestaurantSlugSchema,
@@ -76,6 +78,7 @@ import {
 import { ingestObservations } from './observation-ingest';
 import { registerOwnerAnalysisRoutes } from './owner-ai/routes';
 import { registerOwnerMenuRoutes } from './owner-menu-routes';
+import { fetchPreparedMenu, listPreparedMenus } from './owner-publication';
 import { readOwnerReport as queryOwnerReport } from './owner-report';
 import { listOwnerVenues } from './owner-workspace';
 import {
@@ -212,6 +215,12 @@ type Dependencies = {
     menuId: string,
     env: Bindings,
   ) => ReturnType<typeof readDinerLink>;
+  listPreparedMenus?: (
+    actorId: string,
+    venueId: string,
+    env: Bindings,
+  ) => ReturnType<typeof listPreparedMenus>;
+  fetchPreparedMenu?: typeof fetchPreparedMenu;
   issuePublicMenu?: (menu: PublicMenuRecord, env: Bindings) => Promise<PublicMenuResponse>;
   readMenuJwks?: (env: Bindings) => Promise<{ keys: unknown[] }>;
   submitIngestion?: (
@@ -525,6 +534,9 @@ const dependencies: Dependencies = {
     withDatabase(env, (client) => resolveRestaurantLink(client, slug)),
   readDinerLink: (actorId, venueId, menuId, env) =>
     withDatabase(env, (client) => readDinerLink(client, actorId, venueId, menuId)),
+  listPreparedMenus: (actorId, venueId, env) =>
+    withDatabase(env, (client) => listPreparedMenus(client, actorId, venueId)),
+  fetchPreparedMenu,
   async issuePublicMenu(menu, env) {
     if (!env.MENU_TOKEN_ISSUER || !env.MENU_TOKEN_SIGNING_JWK) throw new AuthUnavailableError();
     return createPublicMenuResponse(menu, {
@@ -920,7 +932,7 @@ export function createApp(services: Dependencies = dependencies) {
   });
   app.use('/venues/*', async (c, next) => {
     if (
-      !/^\/venues\/[^/]+\/(?:menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
+      !/^\/venues\/[^/]+\/(?:prepared-menus(?:\/|$)|menus\/(?:(?:uploads|upload-groups|url|jobs)(?:\/|$)|[^/]+\/(?:approvals|publications|withdrawals|diner-link)$)|drafts(?:\/|$)|extractions\/|dishes\/)/.test(
         c.req.path,
       )
     )
@@ -1197,6 +1209,34 @@ export function createApp(services: Dependencies = dependencies) {
     WithdrawMenuSchema,
     services.withdraw,
   );
+  for (const path of [
+    '/venues/:venueId/prepared-menus',
+    '/venues/:venueId/prepared-menus/:menuId/:revisionId',
+  ]) {
+    app.get(path, async (c) => {
+      if (!['local', 'staging'].includes(c.env?.APP_ENV ?? ''))
+        return c.json({ error: 'not_found' }, 404);
+      const authorization = c.req.header('Authorization');
+      if (!authorization || !/^Bearer \S+$/i.test(authorization))
+        return c.json({ error: 'unauthorized' }, 401);
+      const actorId = await services.verify(authorization, c.env ?? {});
+      const venue = VenueScopeSchema.safeParse({ venueId: c.req.param('venueId') });
+      if (!venue.success || new URL(c.req.url).search)
+        return c.json({ error: 'invalid_request' }, 400);
+      if (!services.listPreparedMenus || !services.fetchPreparedMenu)
+        throw new AuthUnavailableError();
+      const menus = await services.listPreparedMenus(actorId, venue.data.venueId, c.env ?? {});
+      const menuId = c.req.param('menuId');
+      if (!menuId) return c.json(PreparedMenusSchema.parse({ menus }));
+      const menu = menus.find(
+        (row) => row.menuId === menuId && row.menuRevisionId === c.req.param('revisionId'),
+      );
+      if (!menu) return c.json({ error: 'not_found' }, 404);
+      // The database connection/authorization transaction has ended before the bounded public fetch.
+      const content = await services.fetchPreparedMenu(menu);
+      return c.json(PreparedMenuPreviewSchema.parse({ menu, content }));
+    });
+  }
   app.get('/venues/:venueId/menus/:menuId/diner-link', async (c) => {
     const authorization = c.req.header('Authorization');
     if (!authorization || !/^Bearer \S+$/i.test(authorization))

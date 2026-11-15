@@ -363,6 +363,34 @@ export type PublicMenuCategory = z.infer<typeof PublicMenuCategorySchema>;
 export type PublicMenuContentBundle = z.infer<typeof PublicMenuContentBundleSchema>;
 export type PublicMenuDelivery = z.infer<typeof PublicMenuDeliverySchema>;
 
+export const PreparedMenuSchema = z.strictObject({
+  venueId: uuid,
+  menuId: uuid,
+  menuRevisionId: uuid,
+  contentApprovalId: uuid,
+  assetApprovalId: uuid,
+  contentHash: hash,
+  assetManifestHash: hash,
+  bundleUrl: z.url(),
+  reviewVersion: commandVersion,
+  publicationVersion: commandVersion,
+  publishedRevisionId: uuid.nullable(),
+});
+export const PreparedMenusSchema = z.strictObject({ menus: z.array(PreparedMenuSchema).max(100) });
+export const PreparedMenuPreviewSchema = z
+  .strictObject({
+    menu: PreparedMenuSchema,
+    content: PublicMenuContentBundleSchema,
+  })
+  .refine(
+    ({ menu, content }) =>
+      menu.venueId === content.venue_id &&
+      menu.menuId === content.menu_id &&
+      menu.menuRevisionId === content.menu_revision_id,
+  );
+export type PreparedMenu = z.infer<typeof PreparedMenuSchema>;
+export type PreparedMenuPreview = z.infer<typeof PreparedMenuPreviewSchema>;
+
 // S3-VIS-04: Menu Source Discovery and Bounded Evidence Retrieval Contract
 export const MAX_PASSAGE_CHARS = 2000;
 export const MAX_PASSAGES = 10;
