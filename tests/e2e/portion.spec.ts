@@ -1012,7 +1012,7 @@ test('2.5D opens the camera portal automatically and Back keeps the preview usab
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('camera demo retains the full diner menu and PR145 icons', async ({ page }) => {
+test('camera demo retains the full diner menu and current navigation icons', async ({ page }) => {
   await page.goto('http://127.0.0.1:5173/?scenario=portion-demo');
   await expect(page.getByRole('heading', { name: 'Ember & Stone', exact: true })).toBeVisible();
   await expect.poll(() => page.locator('.pp-card__open').count()).toBeGreaterThan(1);
@@ -1026,7 +1026,7 @@ test('camera demo retains the full diner menu and PR145 icons', async ({ page })
   await expect(page.locator('.pp-saved__item')).toContainText('Avocado Toast');
   await page.getByRole('button', { name: 'Back to menu', exact: true }).click();
   await page.getByRole('button', { name: 'Open Avocado Toast', exact: true }).click();
-  await expect(page.locator('.pp-detail__back-icon')).toBeVisible();
+  await expect(page.locator('.pp-detail__back svg')).toBeVisible();
   await expect(page.getByRole('button', { name: 'View Portion', exact: true })).toBeEnabled();
 });
 

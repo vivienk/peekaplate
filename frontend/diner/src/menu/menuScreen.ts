@@ -38,6 +38,7 @@ import { renderDishDetail } from './dishDetail';
 import { createMenuViewedTrigger, type DetailOpening, trackDishDetailOpened } from './events';
 import type { FixtureScenario } from './fixtures';
 import { createFixtureMenuSource, demoBundle } from './fixtures';
+import { UI_ICONS } from './icons';
 import { mountLiveArtwork } from './liveArtwork';
 import { formatPrice } from './price';
 import { createMenuRefresher, type MenuRefresher } from './refresh';
@@ -232,7 +233,7 @@ function renderMenu(
           <span class="pp-logo__name">${escapeHtml(menu.restaurant.name)}</span>
         </div>
         <button class="pp-search" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="pp-search-panel">
-          <span aria-hidden="true">⌕</span>
+          <img class="pp-search__icon" src="${UI_ICONS.search}" alt="" aria-hidden="true" width="18" height="18" />
         </button>
       </header>
       ${toastAreaMarkup()}
@@ -790,6 +791,7 @@ export function mountMenuScreen(container: HTMLElement): void {
       keptDish,
       exclude: replaceExclusions(comparison),
       confirmLabel: 'Replace Dish',
+      title: 'Replace Dish',
       onClose: () => showResult(comparison, undefined, back),
       onConfirm: (pickedDishId) => {
         const next = replaceSide(menu, comparison, side, pickedDishId);

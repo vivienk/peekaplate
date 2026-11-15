@@ -4372,3 +4372,51 @@ AR review follow-up: explicit ImageBitmap.close now releases GLTFLoader-owned de
 ## PR162 portion preview return destination — November 15, 2026
 
 Closing a preview opened from Saved reset the accessible back label to Menu while the callback still returned Saved. The real-browser regression failed before the fix. Capture the label when opening and restore it on close; the integrated Compare-origin case is covered too. Preview disposal now participates in the existing detail cleanup with artwork and Save, preserving current navigation and refresh behavior.
+
+## 2026-11-15 full Chromium run flakes on the Compare design follow-up
+
+- Check: `pnpm exec playwright test tests/e2e --project=chromium` on feat/s6-din-05-compare-design-followup.
+- Result: `search.spec.ts:154` (two `dish_viewed` fixture logs during search) and `tracking-outbox.spec.ts:218` failed only in the full parallel run; both pass alone, and `search.spec.ts --repeat-each 4 --workers 4` passed 28/28 both with and without this branch's diner changes.
+- Cause: not confirmed; timing-sensitive under full-suite load (1 s visibility timer and outbox fill), not the search styling.
+- Prevention: rerun a single full-suite failure in isolation and with `--repeat-each` before treating it as a regression.
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T17:43:19.710Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-TEST-SLUG","status":"resolved","area":"publication-tests","cause":"The new database test expected hyphens, but the existing automatic restaurant link allocator uses underscores. Runtime behavior was correct.","prevention":"Assert the existing allocator's contract, not the Figma sample spelling.","sources":["backend/src/owner-publication.integration.ts","backend/src/restaurant-link.ts"],"regression":"The publication/link integration assertion now expects synthetic_preview_cafe; rerun evidence is recorded on the PR."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T17:46:45.853Z","exitCode":1}
+```
+
+```json
+{"id":"ERR-20261115-PUBLISH-CONTEXT","status":"resolved","area":"context-handoff","cause":"The initial publication handoff exceeded the bounded summary; later UI/test edits invalidated its refreshed fingerprint.","prevention":"Keep the bounded summary and refresh after the final source and test edits.","sources":["docs/CONTEXT.md","scripts/context.mjs"],"regression":"Final pnpm check passes all functional, context and documentation checks; publication browser regressions pass separately."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"context:check","timestamp":"2026-11-15T18:06:14.398Z","exitCode":1}
+```
+
+```json
+{"id": "ERR-20261115-PREPARED-WORKER-REDIRECT", "status": "resolved", "area": "prepared-menu-fetch", "cause": "Node accepted redirect error, but workerd rejects that fetch option, making valid hosted previews return 503.", "prevention": "Exercise request options in the deployed runtime; use manual redirect handling and reject non-success responses without following.", "sources": ["backend/src/owner-publication.ts", "backend/src/owner-publication.test.ts", "backend/src/owner-publication.workerd-harness.ts"], "regression": "New network-free workerd test failed before the fix (502 instead of 200), then all 11 prepared publication tests passed; real public fixture also passed in local workerd after correction."}
+```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"typecheck","timestamp":"2026-11-15T18:30:31.359Z","exitCode":2}
+```
+
+```json
+{"id": "ERR-20261115-PREPARED-NODE-URL", "status": "resolved", "area": "test-types", "cause": "The new workerd test used the Worker global URL type with node fileURLToPath, whose iterator types differ.", "prevention": "Import URL with fileURLToPath from node:url, matching the existing workerd test.", "sources": ["backend/src/owner-publication.test.ts"], "regression": "Final pnpm check passes typecheck, 1851 unit tests and 106 script tests."}
+```
+
+## PR196 focused search placeholder contrast — November 15, 2026
+
+The empty focused search kept its dark-surface placeholder colour on a light surface. A browser-computed WCAG contrast check reproduced 2.3557:1 (required 4.5:1); the generic axe scan alone did not catch this pseudo-element. The focused placeholder now uses the existing neutral-600 token. `tests/e2e/search.spec.ts` covers the actual focused placeholder; 66 related Chromium checks pass in 1.1 minutes.
+
+- PR162 merge validation: the first context check exceeded the 1,000-character summary limit. Shortened the three affected summaries while retaining current module behavior; context/docs/build pass. Integrated camera checks passed 78/79 before updating the old back-icon selector to the authored #196 SVG and restoring the #162 search image.

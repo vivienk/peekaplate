@@ -267,7 +267,7 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "contracts",
         "tokens"
       ],
-      "sourceFingerprint": "11a7eaaaa94838d68d3097366d6b791a18068e761474abdddb322cedbf146643"
+      "sourceFingerprint": "3dcd13cf88aac93d852a36cb7047a619bb434a9cbd6f6e85d3b70b00f9884b18"
     },
     {
       "id": "console",
@@ -968,20 +968,6 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
       "modules": [
         "console"
       ],
-      "summary": "Owner menu client dependency reconciled with current authenticated workspace and screens; live composition remains in progress.",
-      "files": [
-        "frontend/console/src/owner-menu/api.ts",
-        "frontend/console/src/owner-menu/dishForm.ts",
-        "frontend/console/src/owner-menu/harness.tsx",
-        "docs/owner-menu-workspace.md"
-      ],
-      "next": "Connect actor-bound tokens and server-backed owner workspace; keep review approval separate from publication."
-    },
-    {
-      "date": "2026-11-15",
-      "modules": [
-        "console"
-      ],
       "summary": "Connect merged owner controls through PR156 client to existing authenticated menu/draft APIs; no new backend or pending-team-PR merge.",
       "files": [
         "frontend/console/src/owner/OwnerMenuWorkspace.tsx",
@@ -1102,6 +1088,17 @@ The append-only `errors.md` operational ledger is deliberately outside source fi
         "tests/e2e/portion.spec.ts"
       ],
       "next": "Run integrated browser and repository checks before merge; do not claim real-device accuracy or activate paid providers."
+    },
+    {
+      "date": "2026-11-15",
+      "modules": [
+        "diner"
+      ],
+      "summary": "PR196 preserves the authored Compare/navigation/search design changes and fixes focused placeholder contrast with a token colour. A browser regression reproduces 2.36:1 before correction and passes afterward; 66 related Chromium checks pass.",
+      "files": [
+        "tests/e2e/search.spec.ts"
+      ],
+      "next": "Review physical-device design separately; no hosted release follows from this merge."
     }
   ]
 }
