@@ -2102,6 +2102,10 @@ export async function deleteVenueOrderData(
     }
 
     const row = existingRequest.rows[0]!;
+    // Immutable intent/completion receipts bind this request to its first executor.
+    if (row.executed_by && row.executed_by !== operatorId) {
+      throw new OrderImportError('deletion_operator_mismatch', 409);
+    }
     if (row.status === 'awaiting_verification' || row.status === 'verified') {
       await client.query('COMMIT');
       const completedAtIso = (row.completed_at ?? now()).toISOString();

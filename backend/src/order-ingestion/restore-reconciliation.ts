@@ -329,7 +329,24 @@ export async function reconcileOrderDeletionsAfterRestore(
     }
 
     if (intentParsed && completedParsed) {
-      // Purge any resurrected R2 order-imports/<venueId>/ CSVs first
+      // A completed deletion does not cover imports accepted after its cutoff.
+      // DB timestamps/keys are authoritative; restored R2 upload dates are not.
+      await client.query('BEGIN READ ONLY');
+      let protectedKeys: Set<string>;
+      try {
+        await client.query("SET LOCAL statement_timeout = '5s'");
+        await client.query("SELECT set_config('app.tenant_id', $1, true)", [venueId]);
+        const later = await client.query<{ storage_key: string }>(
+          'SELECT storage_key FROM app_private.order_outcome_import_batches WHERE tenant_id=$1 AND created_at > $2',
+          [venueId, completedParsed.completedAt],
+        );
+        protectedKeys = new Set(later.rows.map((row) => row.storage_key));
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+      }
+      // Purge resurrected/orphan CSVs while preserving exact newer batch keys.
       let r2Purged = 0;
       if (typeof storage.list === 'function' && typeof storage.delete === 'function') {
         const prefix = `order-imports/${venueId}/`;
@@ -338,7 +355,7 @@ export async function reconcileOrderDeletionsAfterRestore(
         do {
           const listRes = await storage.list({ prefix, cursor: r2Cursor, limit: 100 });
           for (const obj of listRes.objects) {
-            if (obj.key.startsWith(prefix)) {
+            if (obj.key.startsWith(prefix) && !protectedKeys.has(obj.key)) {
               await storage.delete(obj.key);
               r2Purged++;
             }

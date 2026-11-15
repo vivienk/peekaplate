@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Operational entry point for post-restore order-data deletion reconciliation (S6-DATA-14).
+ * Run: node --experimental-transform-types --import ./scripts/node-ts-hooks.mjs ./scripts/reconcile-order-deletions-after-restore.mjs
  *
  * Prerequisites:
  * - OPERATOR_DATABASE_URL: PostgreSQL connection string for peekaplate_operator_login
@@ -16,6 +17,7 @@
 
 import { createHash, createHmac } from 'node:crypto';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -263,7 +265,7 @@ export async function runReconcileCli({
   }
 }
 
-if (import.meta.url === `file://${resolve(process.argv[1] ?? '')}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   runReconcileCli()
     .then(({ exitCode }) => {
       process.exit(exitCode);

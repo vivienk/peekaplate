@@ -1,12 +1,69 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   createR2S3Storage,
   runReconcileCli,
   validateR2S3Env,
   validateReconcileCliEnv,
 } from './reconcile-order-deletions-after-restore.mjs';
+
+test('the actual CLI entrypoint fails closed without operator configuration on every platform', () => {
+  const child = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./reconcile-order-deletions-after-restore.mjs', import.meta.url))],
+    {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { SystemRoot: process.env.SystemRoot ?? '' },
+    },
+  );
+  assert.equal(
+    child.status,
+    1,
+    'The CLI must execute validation instead of silently exiting successfully',
+  );
+  assert.match(child.stderr, /OPERATOR_DATABASE_URL is required/);
+});
+
+test('the documented Node launch loads the actual TypeScript reconciliation function', () => {
+  const moduleUrl = new URL('./reconcile-order-deletions-after-restore.mjs', import.meta.url).href;
+  const code = `
+    const { runReconcileCli } = await import(${JSON.stringify(moduleUrl)});
+    let closed = false;
+    try {
+      await runReconcileCli({
+        env: { OPERATOR_DATABASE_URL: 'postgres://synthetic', RECONCILIATION_OPERATOR_ID: '00000000-0000-4000-8000-000000000001', R2_ENDPOINT: 'https://example.invalid', R2_BUCKET: 'synthetic', R2_ACCESS_KEY_ID: 'synthetic', R2_SECRET_ACCESS_KEY: 'synthetic' },
+        createClient: async () => ({ connect: async () => {}, query: async () => ({ rows: [], rowCount: 0 }), end: async () => { closed = true; } }),
+        createStorage: () => ({}), log: () => {},
+      });
+      throw new Error('Expected the real reconciliation freeze check');
+    } catch (error) {
+      if (error.code !== 'restore_freeze_gate_missing' || !closed) throw error;
+      console.log('real restore function loaded and failed closed');
+    }
+  `;
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--experimental-transform-types',
+      '--import',
+      './scripts/node-ts-hooks.mjs',
+      '--input-type=module',
+      '-e',
+      code,
+    ],
+    {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      encoding: 'utf8',
+      timeout: 10000,
+    },
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.match(child.stdout, /real restore function loaded and failed closed/);
+});
 
 test('validateReconcileCliEnv fails closed when OPERATOR_DATABASE_URL is missing', () => {
   assert.throws(

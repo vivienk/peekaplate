@@ -8,6 +8,13 @@ import { fileURLToPath } from 'node:url';
 registerHooks({
   resolve(specifier, context, nextResolve) {
     const relative = specifier.startsWith('./') || specifier.startsWith('../');
+    if (relative && context.parentURL?.endsWith('.ts') && specifier.endsWith('.js')) {
+      // Source-only contracts also spell emitted .js imports; prefer any real JS.
+      const original = new URL(specifier, context.parentURL);
+      const source = new URL(`${specifier.slice(0, -3)}.ts`, context.parentURL);
+      if (!existsSync(fileURLToPath(original)) && existsSync(fileURLToPath(source)))
+        return nextResolve(source.href, context);
+    }
     if (relative && context.parentURL?.endsWith('.ts') && !/\.[cm]?[jt]s$/.test(specifier)) {
       for (const candidate of [`${specifier}.ts`, `${specifier}/index.ts`]) {
         const url = new URL(candidate, context.parentURL);

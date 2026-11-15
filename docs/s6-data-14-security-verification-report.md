@@ -1,5 +1,16 @@
 # S6-DATA-14 Adversarial Security Audit, Hardening & Database Verification Report
 
+## November 14 independent re-review
+
+The results below are the author's historical evidence. Independent review found
+and corrected SQL FOUND being overwritten by DELETEs, whole-venue restore purges
+destroying later imports, cross-operator retry breaking immutable ledger identity,
+and a Windows CLI entrypoint/TypeScript loader gap. Added PostgreSQL cutoff and
+repeat-reconciliation assertions, later-object preservation and operator-binding
+tests, plus actual Node entrypoint/default-loader checks. Current final commands,
+counts and durations are recorded on PR #166. Hosted deletion and restore drills
+remain NOT RUN; real pilot uploads and draft agreement approval stay gated.
+
 - **Date:** 2026-11-14
 - **Branch:** `feat/s6-data-14-pilot-agreement-and-deletion`
 - **Base HEAD:** `58cccf312dd1bf3db0a5af8e0fc5bf61f57001a7` (+ PR #166 review reconciliation & regression tests)

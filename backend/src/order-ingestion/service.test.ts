@@ -3423,6 +3423,33 @@ describe('importOrderOutcomes service', () => {
         expect(completedAfterRetry.operatorId).toBe(operatorId);
       });
 
+      it('does not let another operator replace the durable intent executor on retry or replay', async () => {
+        const { state, storage, operatorId, authorizedOperatorIds } = makeDeletionFixture();
+        const client = createMockClient(state) as any;
+        await submitOrderDataDeletionRequest({ client, actorId: ownerId, venueId, requestId });
+        const otherOperator = '00000000-0000-4000-8000-000000000777';
+        authorizedOperatorIds.add(otherOperator);
+        const row = state.deletionRequests!.get(`${venueId}:${requestId}`);
+        for (const status of ['executing', 'db_deleted', 'awaiting_verification', 'verified']) {
+          row.executed_by = operatorId;
+          row.status = status;
+          row.execution_lease_expires_at = new Date(0);
+          const writes = storage.put.mock.calls.length;
+          const deletes = storage.delete.mock.calls.length;
+          await expect(
+            deleteVenueOrderData({
+              client,
+              operatorId: otherOperator,
+              venueId,
+              requestId,
+              storage,
+              authorizedOperatorIds,
+            }),
+          ).rejects.toMatchObject({ code: 'deletion_operator_mismatch', status: 409 });
+          expect(storage.put.mock.calls.length).toBe(writes);
+          expect(storage.delete.mock.calls.length).toBe(deletes);
+        }
+      });
       it('is idempotent on retry with the same requestId', async () => {
         const { state, storage, operatorId, authorizedOperatorIds } = makeDeletionFixture();
         const client = createMockClient(state) as any;
@@ -3946,8 +3973,10 @@ describe('importOrderOutcomes service', () => {
         const controlVenue = otherVenueId;
         const reqCompleted = '00000000-0000-4000-8000-000000000444';
         const reqIntentOnly = '00000000-0000-4000-8000-000000000555';
+        const newerKey = `order-imports/${targetVenue}/newer/source.csv`;
 
         const r2Objects = new Map<string, string>([
+          [newerKey, 'csv-imported-after-the-deletion'],
           [`order-imports/${targetVenue}/b1/source.csv`, 'csv-resurrected'],
           [`order-imports/${controlVenue}/b2/source.csv`, 'csv-control'],
           [
@@ -3992,6 +4021,10 @@ describe('importOrderOutcomes service', () => {
         const mockClient = {
           query: vi.fn(async (sql: string, params?: any[]) => {
             const s = sql.replace(/\s+/g, ' ').trim();
+            if (s.includes('SELECT storage_key') && s.includes('created_at >')) {
+              expect(params).toEqual([targetVenue, '2026-11-12T00:01:00.000Z']);
+              return { rows: [{ storage_key: newerKey }], rowCount: 1 };
+            }
             if (s.includes('UPDATE app_private.system_gates') && s.includes('is_active = true')) {
               freezeActive = true;
               return { rows: [], rowCount: 1 };
@@ -4058,6 +4091,7 @@ describe('importOrderOutcomes service', () => {
         expect(res.reconciledCount).toBe(1);
         expect(res.blockedIntentOnlyCount).toBe(1);
         expect(r2Objects.has(`order-imports/${targetVenue}/b1/source.csv`)).toBe(false);
+        expect(r2Objects.has(newerKey)).toBe(true);
         expect(r2Objects.has(`order-imports/${controlVenue}/b2/source.csv`)).toBe(true);
         expect(
           r2Objects.has(`order-deletion-ledger/${targetVenue}/${reqCompleted}/reconciled.json`),

@@ -380,6 +380,9 @@ BEGIN
     IF OLD.status = 'verified' THEN
       RAISE EXCEPTION 'Verified deletion audit records are immutable';
     END IF;
+    IF OLD.executed_by IS NOT NULL AND NEW.executed_by IS DISTINCT FROM OLD.executed_by THEN
+      RAISE EXCEPTION 'Deletion request executor is immutable once assigned';
+    END IF;
 
     -- Allowed transitions
     IF NOT (
@@ -592,19 +595,25 @@ BEGIN
     FOR UPDATE;
 
     IF p_ledger_status = 'completed' THEN
-      DELETE FROM app_private.order_outcome_lines WHERE tenant_id = p_tenant_id;
+      IF p_completed_at IS NULL THEN
+        RAISE EXCEPTION 'Completed reconciliation requires its trusted deletion cutoff';
+      END IF;
+      DELETE FROM app_private.order_outcome_lines WHERE tenant_id = p_tenant_id
+        AND batch_id IN (SELECT id FROM app_private.order_outcome_import_batches WHERE tenant_id=p_tenant_id AND created_at <= p_completed_at);
       GET DIAGNOSTICS v_lines = ROW_COUNT;
 
-      DELETE FROM app_private.order_outcome_quarantine WHERE tenant_id = p_tenant_id;
+      DELETE FROM app_private.order_outcome_quarantine WHERE tenant_id = p_tenant_id
+        AND batch_id IN (SELECT id FROM app_private.order_outcome_import_batches WHERE tenant_id=p_tenant_id AND created_at <= p_completed_at);
       GET DIAGNOSTICS v_quarantine = ROW_COUNT;
 
-      DELETE FROM app_private.order_outcome_conflicts WHERE tenant_id = p_tenant_id;
+      DELETE FROM app_private.order_outcome_conflicts WHERE tenant_id = p_tenant_id
+        AND batch_id IN (SELECT id FROM app_private.order_outcome_import_batches WHERE tenant_id=p_tenant_id AND created_at <= p_completed_at);
       GET DIAGNOSTICS v_conflicts = ROW_COUNT;
 
-      DELETE FROM app_private.order_outcome_import_batches WHERE tenant_id = p_tenant_id;
+      DELETE FROM app_private.order_outcome_import_batches WHERE tenant_id = p_tenant_id AND created_at <= p_completed_at;
       GET DIAGNOSTICS v_batches = ROW_COUNT;
 
-      IF NOT FOUND THEN
+      IF existing_row.id IS NULL THEN
         INSERT INTO app_private.order_data_deletion_requests (
           tenant_id, id, requested_by, executed_by, reason, status,
           r2_objects_deleted, db_batches_deleted, db_lines_deleted,
@@ -639,7 +648,7 @@ BEGIN
       v_outcome := 'reconciled';
     ELSE
       -- intent_only / completed_without_intent / missing_in_r2 / conflict: keep venue blocked
-      IF NOT FOUND THEN
+      IF existing_row.id IS NULL THEN
         INSERT INTO app_private.order_data_deletion_requests (
           tenant_id, id, requested_by, executed_by, reason, status,
           error_code, requested_at, reconciled_from_r2

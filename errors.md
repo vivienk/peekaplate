@@ -3579,3 +3579,22 @@ the branch and draft PR #176 were created. No GitHub protection was bypassed.
 ```json
 {"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-14T17:30:50.061Z","exitCode":1}
 ```
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test:db","timestamp":"2026-11-15T00:04:37.426Z","exitCode":1}
+```
+## 2026-11-14 — Order restore reconciliation review
+
+The actual Windows CLI exited zero without validation because its manually built
+file URL did not match import.meta.url. pathToFileURL fixes that entrypoint; the
+documented transform-types flag plus the existing Node resolution hook now loads
+the real restore function, including source-only .js-to-.ts contract imports.
+The child-process loader regression verifies the real freeze check is reached.
+
+A PostgreSQL regression reproduced duplicate audit insertion on repeated restore:
+FOUND referred to the last DELETE rather than the request lookup. Explicit row
+identity fixes both existing/missing request cases. Cutoff and exact-key protection
+preserve later authorized imports during historical deletion replay. An execution
+is bound to its first operator to preserve immutable intent/completion identity.
+Tests use disposable PostgreSQL and synthetic storage; no hosted purge occurred.

@@ -1,6 +1,6 @@
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(111);
+SELECT plan(118);
 
 -- Setup test venues and staff memberships
 INSERT INTO app_private.venues (id, name) VALUES
@@ -708,8 +708,40 @@ SELECT lives_ok(
   'operator can reconcile venue order deletion from R2 ledger'
 );
 
+SELECT lives_ok(
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion(
+      '00000000-0000-4000-8000-000000000702',
+      '00000000-0000-0000-0000-000000000801',
+      '00000000-0000-4000-8000-000000000996',
+      '00000000-0000-0000-0000-000000000099',
+      now(), now(), 'completed', 0,
+      'order-deletion-ledger/test/completed.json'
+    )$$,
+  'repeated reconciliation with an existing request and no restored batches is harmless'
+);
+
 -- C1 & L2 deep security checks: arbitrary postgres-owned SECURITY DEFINER bypasses, direct SQL, and orphan key scope
 RESET ROLE;
+INSERT INTO app_private.venues(id,name) VALUES('00000000-0000-4000-8000-000000000803','Synthetic restore cutoff');
+INSERT INTO app_private.order_outcome_import_batches
+  (id,tenant_id,schema_version,source_filename,file_sha256,storage_key,created_by,created_at)
+VALUES
+  ('00000000-0000-4000-8000-000000000951','00000000-0000-4000-8000-000000000803','pilot_order_outcome.v1','synthetic-old.csv',repeat('d',64),'order-imports/00000000-0000-4000-8000-000000000803/old/source.csv','00000000-0000-0000-0000-000000000001','2026-11-13T00:00:00.000Z'),
+  ('00000000-0000-4000-8000-000000000952','00000000-0000-4000-8000-000000000803','pilot_order_outcome.v1','synthetic-new.csv',repeat('e',64),'order-imports/00000000-0000-4000-8000-000000000803/new/source.csv','00000000-0000-0000-0000-000000000001','2026-11-13T00:00:00.001Z');
+SET ROLE peekaplate_deletion_operator;
+SELECT set_config('app.tenant_id','00000000-0000-4000-8000-000000000803',true);
+SELECT lives_ok(
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000703','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff')$$,
+  'restore handles missing request with resurrected batches');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000951'),0,'batch exactly at deletion cutoff is removed');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000952'),1,'batch one millisecond after cutoff is preserved');
+SELECT is((SELECT count(*)::int FROM app_private.order_data_deletion_requests WHERE tenant_id='00000000-0000-4000-8000-000000000803' AND id='00000000-0000-4000-8000-000000000993'),1,'missing deletion audit is created even when batch deletion found rows');
+SELECT lives_ok(
+  $$SELECT * FROM app_private.reconcile_venue_order_deletion('00000000-0000-4000-8000-000000000704','00000000-0000-4000-8000-000000000803','00000000-0000-4000-8000-000000000993','00000000-0000-0000-0000-000000000099','2026-11-13T00:00:00.000Z',now(),'completed',0,'synthetic-cutoff')$$,
+  'cutoff reconciliation can repeat without destroying newer data');
+SELECT is((SELECT count(*)::int FROM app_private.order_outcome_import_batches WHERE tenant_id='00000000-0000-4000-8000-000000000803'),1,'newer batch survives repeated restore reconciliation');
+RESET ROLE;
+SELECT set_config('app.tenant_id','00000000-0000-0000-0000-000000000801',true);
 CREATE OR REPLACE FUNCTION app_private.test_arbitrary_postgres_definer_insert()
 RETURNS void
 SECURITY DEFINER

@@ -19,6 +19,34 @@
 
 ## Part 1: Pilot Order-Outcome Data Agreement
 
+### Current implementation and recovery limits
+
+The implemented lifecycle is requested → executing → r2_deleted → db_deleted →
+awaiting_verification → verified, with failed/retry paths. Only independent PASS
+verification permits imports again. The later operational proposal is historical
+where it says a completed row has no checker columns: the current migration adds
+checker fields and enforces them through record_deletion_verification.
+
+An execution is bound to its first operator. Another operator cannot reclaim or
+replay it, even after lease expiry; same-operator retries remain supported. An
+administrative handoff needs a separately reviewed protocol because the external
+intent and completion identities are immutable.
+
+Restore reconciliation applies each completed receipt only to batches created at
+or before its trusted completedAt, and child rows linked to those batches. Exact
+R2 keys of later accepted batches are preserved even if their object timestamps
+look old. Restored old objects do not become exempt merely because copying them
+changed uploaded timestamps. Global import freeze remains active through the
+entire reconciliation. Existing historical receipts must never erase legitimate
+uploads accepted after independent verification.
+
+Run the operator CLI from the repository root with the supported Node loader:
+
+`node --experimental-transform-types --import ./scripts/node-ts-hooks.mjs ./scripts/reconcile-order-deletions-after-restore.mjs`
+
+Credentials remain private operator environment variables. This implementation
+review does not approve the draft agreement or activate real pilot uploads.
+
 ### 1. Parties
 
 - **PeekaPlate ("Provider"):** `[PeekaPlate Legal Entity Name]`, `[Business Address Placeholder]`
