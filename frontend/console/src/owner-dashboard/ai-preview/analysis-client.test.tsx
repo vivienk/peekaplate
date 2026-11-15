@@ -41,6 +41,46 @@ it('does not send a request without a signed-in session', async () => {
   await expect(analyze({ dishId, goal: 'menu' }, new AbortController().signal)).rejects.toThrow();
   expect(fetchImpl).not.toHaveBeenCalled();
 });
+it('rejects unsupported API destinations before reading a staff credential', async () => {
+  const getAccessToken = vi.fn(async () => 'private-session');
+  const fetchImpl = vi.fn(async () => Response.json(result));
+  for (const baseUrl of [
+    'https://unapproved.example',
+    'https://peekaplate-api-staging.vxkong.workers.dev/other',
+    'http://127.0.0.1:5174/other',
+  ]) {
+    const analyze = createOwnerAnalysisClient({ baseUrl, venueId, getAccessToken, fetchImpl });
+    await expect(analyze({ dishId, goal: 'menu' }, new AbortController().signal)).rejects.toThrow();
+  }
+  expect(getAccessToken).not.toHaveBeenCalled();
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+it.each([401, 403])('preserves access denial %i for the workspace', async (status) => {
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
+    venueId,
+    getAccessToken: async () => 'session',
+    fetchImpl: async () => Response.json({ error: 'denied' }, { status }),
+  });
+  await expect(
+    analyze({ dishId, goal: 'menu' }, new AbortController().signal),
+  ).rejects.toMatchObject({ status });
+});
+it('does not dispatch after cancellation during session lookup', async () => {
+  const controller = new AbortController();
+  const fetchImpl = vi.fn(async () => Response.json(result));
+  const analyze = createOwnerAnalysisClient({
+    baseUrl: 'https://peekaplate-api-staging.vxkong.workers.dev',
+    venueId,
+    getAccessToken: async () => {
+      controller.abort();
+      return 'session';
+    },
+    fetchImpl,
+  });
+  await expect(analyze({ dishId, goal: 'menu' }, controller.signal)).rejects.toThrow();
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
 it.each([
   { venueId: dishId },
   { dishId: venueId },

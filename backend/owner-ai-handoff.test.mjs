@@ -8,7 +8,7 @@ import {
 } from './scripts/owner-ai-local-fixture';
 import { registerOwnerAnalysisRoutes } from './src/owner-ai/routes';
 
-const baseUrl = 'http://127.0.0.1:5174';
+const baseUrl = 'http://127.0.0.1:8787';
 const input = { dishId: LOCAL_AI_DISH, goal: 'menu' };
 
 // Exercise the browser client and Worker router without mounting OwnerShell or opening a socket.
@@ -47,7 +47,7 @@ function setup() {
     readReport,
     fetchImpl: provider,
     now: () => now,
-    allowedOrigins: [baseUrl],
+    allowedOrigins: ['http://127.0.0.1:5174'],
     syntheticVenues: [LOCAL_AI_VENUE],
   });
   const request = vi.fn(async (url, init) => app.fetch(new Request(url, init), env));

@@ -3826,3 +3826,8 @@ The locked dependency install first stopped because the noninteractive runner co
 The combined context summary initially exceeded its 1,000-character bound; it was condensed while retaining both integrations. The first full check passed unit tests but hit the known macOS /var versus /private/var temporary-path assertion in prepare-app-site.test.mjs. The repeat uses the canonical temporary-directory path rather than changing unrelated routing behavior.
 
 Final reconciliation verification: pnpm check with TMPDIR=/private/tmp passed 1,831 unit tests (five existing skips), 106 script checks, lint/types/context/docs. pnpm verify build passed. The mock-provider owner-AI browser suite passed three cases, including S09 visibility; desktop/mobile synthetic screenshots were retained for review. Database/full-browser CI remains separate evidence on the pushed commit.
+
+<!-- automatic observation; not root cause -->
+```json
+{"kind":"automatic-check-observation","check":"test","timestamp":"2026-11-15T08:52:42.006Z","exitCode":1}
+```
